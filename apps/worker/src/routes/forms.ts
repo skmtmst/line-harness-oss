@@ -3,6 +3,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import { formAvailability } from '../services/form-availability.js';
+import { applyAccountAllergyOptions } from '../services/allergy-options.js';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -421,13 +422,16 @@ function publicWebhookConfig(row: DbForm): {
   }
 }
 
-function serializePublicForm(row: DbForm) {
+function serializePublicForm(row: DbForm, layout = parseLayout(row.layout, row.fields)) {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    fields: JSON.parse(row.fields || '[]') as unknown[],
-    layout: parseLayout(row.layout, row.fields),
+    fields: (JSON.parse(row.fields || '[]') as Array<{name: string}>).map(field => {
+      const block = collectInputs(layout).find(block => block.name === field.name && block.fixedField === 'allergy' && block.type === 'checkbox');
+      return block ? { ...field, options: block.choices?.map(choice => choice.label), columns: 2 } : field;
+    }),
+    layout,
     isActive: Boolean(row.is_active),
     onSubmitMessageContent: row.on_submit_message_content,
     onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
@@ -940,18 +944,25 @@ forms.get('/api/forms/:id', async (c) => {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
     let friendId: string | null = null;
-    const layout = parseLayout(form.layout, form.fields);
-    if (!adminView && layout.options.oncePerFriend?.enabled && c.req.header('Authorization')) {
+    let layout = parseLayout(form.layout, form.fields);
+    let publicAccountId: string | null = null;
+    if (!adminView && !staff && c.req.header('Authorization')) {
       const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
       if (!identity) return c.json({ success: false, error: 'Unauthorized' }, 401);
       if (!identity.lineAccountId || !await formBelongsToLineAccount(c.env.DB, id, identity.lineAccountId)) {
         return c.json({ success: false, error: 'Form not found' }, 404);
       }
       friendId = (await getFriendByLineUserIdForAccount(c.env.DB, identity.lineUserId, identity.lineAccountId))?.id ?? null;
+      publicAccountId = identity.lineAccountId;
     }
+    if (!adminView && !publicAccountId) {
+      const accounts = await getFormAccountIds(c.env.DB, id);
+      if (accounts.length === 1) publicAccountId = accounts[0];
+    }
+    if (publicAccountId) layout = await applyAccountAllergyOptions(c.env.DB, publicAccountId, layout);
     const data = adminView
       ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
-      : { ...serializePublicForm(form), availability: await formAvailability({
+      : { ...serializePublicForm(form, layout), availability: await formAvailability({
         db: c.env.DB, formId: id, layout, active: !!form.is_active,
         submitCount: form.submit_count ?? 0, friendId,
       }) };
@@ -2606,7 +2617,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     //
     // layout が無い（昔のまま編集していない）フォームは、これまでどおり
     // fields の必須だけを見る。
-    const layout: FormLayout | null = form.layout ? parseLayout(form.layout) : null;
+    const layout: FormLayout | null = form.layout ? await applyAccountAllergyOptions(c.env.DB, identity.lineAccountId!, parseLayout(form.layout)) : null;
 
     const documentsError = await validateDocumentAnswers(c.env.DB, layout, submissionData, { accountId: identity.lineAccountId, formId, friendId, versionId: form.current_published_version_id ?? null, submissionId: resumeSubmissionId });
     if (documentsError) return c.json({ success: false, error: documentsError }, 400);

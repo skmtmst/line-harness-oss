@@ -16,6 +16,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ListState from '@/components/shared/list-state'
+import AllergyField from '@/components/shared/allergy-field'
 
 /*
  * 情報欄タブ（Q5F2QE の 4.）。その人について決めた項目を2列に並べ、最後に1回保存する。
@@ -36,6 +37,7 @@ function FieldInput({ field, value, onChange, disabled, id }: {
 }) {
   // 変えられないとき（権限が無い・ECが正本の項目）は、押せない部品を置かずに読み取りだけの欄で見せる（2026-10-06 オーナー決定）。
   const readOnly = disabled || !!field.ecIsMaster
+  if (field.fixedKey === 'allergy') return <AllergyField value={value} options={field.options ?? undefined} readOnly={readOnly} onChange={onChange} />
   if (field.type === 'textarea') {
     return <SaveErrorField names={["value"]}><TextArea id={id} rows={3} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
   }
@@ -167,7 +169,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                     disabled={!perms.canEditField(field) || !!fixed?.derived}
                   />
                   {fixed?.source ? <p className={styles.fieldNote}>{fixed.source}</p> : null}
-                  {field.type === 'multi_select' ? <p className={styles.fieldNote}>複数選択の項目はこの画面では変更できません。</p> : null}
+                  {field.type === 'multi_select' && field.fixedKey !== 'allergy' ? <p className={styles.fieldNote}>複数選択の項目はこの画面では変更できません。</p> : null}
                   {field.ecIsMaster ? <p className={styles.fieldNote}>EC側の値が正のため、ここからは変更できません。</p> : null}
                 </div>
               )

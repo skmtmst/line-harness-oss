@@ -109,6 +109,9 @@
 .addGroup { display: flex; flex-direction: column; gap: var(--tpl-fe-chip-gap); }
 .addGroupTitle { margin: 0; font-size: var(--tpl-fe-small-size); font-weight: 700; line-height: var(--tpl-fe-small-lh); color: var(--color-ink-secondary); }
 .addCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-fe-chip-gap); }
+.addCards[data-writing] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.addCards[data-writing] > :nth-child(6) { grid-column: 1; }
+.addCards[data-writing] > :nth-child(10) { grid-column: 1; }
 .addCard {
   height: var(--tpl-fe-add-card-h); display: flex; flex-direction: column; justify-content: center; gap: var(--tpl-fe-add-card-gap);
   padding: var(--tpl-fe-add-card-pad); border: 0; border-radius: var(--radius-control); background: var(--color-canvas);

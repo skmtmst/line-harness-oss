@@ -1,6 +1,6 @@
 import { friendFieldReminderTargetStatements } from './reminders.js';
 import { jstNow } from './utils.js';
-import { ageFromBirthday } from '@line-crm/shared';
+import { ageFromBirthday, validateAllergyValues, DEFAULT_ALLERGY_OPTIONS } from '@line-crm/shared';
 
 /** 移行前の情報欄を所属させる既定テナント。既存IDと値は変えない。 */
 const LEGACY_TENANT_ID = '00000000-0000-4000-8000-000000000001';
@@ -109,6 +109,8 @@ export interface FriendFieldUsageTarget {
 }
 
 function normalizeFriendField<T extends FriendField>(row: T): T {
+  // DBの固定定義は不変。複数値は既存TEXTにJSONで保存し、読み取り側の型だけ補う。
+  if (row.field_key === 'fixed_allergy') return { ...row, type: 'multi_select', options_json: row.options_json ?? JSON.stringify(DEFAULT_ALLERGY_OPTIONS) };
   return { ...row, type: row.type_v8 ?? row.type_v6 ?? row.type };
 }
 
@@ -802,6 +804,10 @@ export function validateFriendFieldValue(
   field: FriendFieldValueCheckTarget,
   raw: unknown,
 ): { ok: true; value: string | null } | { ok: false; error: string } {
+  if (field.field_key === 'fixed_allergy') {
+    const checked = validateAllergyValues(raw);
+    return checked.ok ? { ok: true, value: checked.values.length ? JSON.stringify(checked.values) : null } : checked;
+  }
   const type = typeof field.type === 'string' ? field.type : '';
   if (!VALUE_CHECKABLE_TYPES.has(type)) {
     return { ok: false, error: 'この項目の種類では値を保存できません' };

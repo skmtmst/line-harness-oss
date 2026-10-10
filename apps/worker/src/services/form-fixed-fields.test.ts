@@ -11,6 +11,18 @@ beforeEach(() => {
 })
 afterEach(() => fixture.raw.close())
 
+test('複数アレルギーを固定TEXTへJSONで保存し、旧文字を読める型で返す', async () => {
+  const layout = emptyLayout()
+  layout.sections[0].blocks = [{ id:'allergy', name:'allergy', kind:'input', type:'checkbox', label:'アレルギー', fixedField:'allergy', choices:[{id:'egg',label:'卵'},{id:'milk',label:'乳'},{id:'other',label:'そのほか',isOther:true}] }]
+  const result = await applyFormLayoutEffects({ db:fixture.db, layout, friendId:'f', answers:{allergy:['卵','乳','キウイ']}, formId:'form' })
+  expect(result.failedEffects).toEqual([])
+  expect((await getFriendFieldsWithValues(fixture.db,'f')).find(row=>row.fixed_key==='allergy')).toMatchObject({type:'multi_select',value:'["卵","乳","キウイ"]',source_id:'form'})
+  expect(fixture.raw.prepare("SELECT type FROM friend_fields WHERE id='fixed-allergy'").get()).toEqual({type:'text'})
+  fixture.raw.exec("UPDATE friend_field_values SET value='旧自由記入' WHERE field_id='fixed-allergy'")
+  expect((await getFriendFieldsWithValues(fixture.db,'f')).find(row=>row.fixed_key==='allergy')?.value).toBe('旧自由記入')
+  expect(fixture.raw.prepare("SELECT COUNT(*) n FROM friend_field_values WHERE friend_id='other'").get()).toEqual({n:0})
+})
+
 test('seven answers persist with source, real name sync, and unsubmitted friend remains untouched', async () => {
   const layout = emptyLayout()
   const specs = [

@@ -1,6 +1,6 @@
 import type { TapExtras } from './tap-extras.js';
 import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
-import { FIXED_FRIEND_FIELDS, ageFromBirthday, type FixedFriendFieldKey } from "./fixed-friend-fields";
+import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields";
 
 /**
  * 回答フォームの中身（レイアウト）。
@@ -1086,6 +1086,10 @@ export function validateAnswer(
   if (isEmpty) return null;
 
   if (block.fixedField) {
+    if (block.fixedField === "allergy") {
+      const checked = validateAllergyValues(value);
+      if (!checked.ok) return checked.error;
+    }
     if (block.fixedField === "birthday" && ageFromBirthday(String(value)) === null) return `${block.label} は過去の存在する日付で入力してください`;
     if (block.fixedField === "age" && (!/^\d{1,3}$/.test(String(value)) || Number(value) > 150)) return `${block.label} は0〜150の整数で入力してください`;
     const spec = FIXED_FRIEND_FIELDS.find(f => f.key === block.fixedField);
@@ -1260,7 +1264,7 @@ export function formBlockTypeError(input: unknown): string | null {
       if (b.kind === "input" && !FORM_INPUT_TYPES.includes(b.type as FormInputType)) return "この入力欄の種類は保存できません";
       if (b.fixedField !== undefined) {
         const spec = FIXED_FRIEND_FIELDS.find(f => f.key === b.fixedField);
-        if (b.kind !== "input" || !spec || b.type !== spec.type) return "決まった答えの種類を確認してください";
+        if (b.kind !== "input" || !spec || (b.type !== spec.type && !(b.fixedField === 'allergy' && b.type === 'text'))) return "決まった答えの種類を確認してください";
       }
     }
   }

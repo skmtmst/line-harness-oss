@@ -480,7 +480,7 @@ async function writeDestinations(
     await trackDestinationWrite(stats, 1, async () => {
       const target = await getFixedFriendField(db, fixedKey);
       if (!target) throw new Error('fixed friend field mapping missing');
-      const fixedValue = fixedKey === 'address' ? formatAddressValue(value) : text;
+      const fixedValue = fixedKey === 'address' ? formatAddressValue(value) : fixedKey === 'allergy' && Array.isArray(value) ? JSON.stringify(value) : text;
       await setFriendFieldValue(db, {
         friendId, fieldId: target.id, value: fixedValue, updatedBy: 'form',
         field: target, ...(formId ? { sourceType: 'form', sourceId: formId } : {}),

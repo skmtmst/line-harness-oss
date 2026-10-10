@@ -2,7 +2,9 @@
 import Toggle from '@/components/shared/toggle';
 
 import { Field } from '@/components/shared/form-controls'
-import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { api } from '@/lib/api'
+import { useStaffRole } from '@/lib/staff-role'
 import Link from '@/components/shared/list-navigation'
 import {
   AlignLeft,
@@ -285,7 +287,7 @@ function OpenBlock(props: RowProps) {
         ) : null}
         <RowActions className={styles.more} subjectName={`「${blockTitleLine(block)}」`} menuItems={menuItems} destructiveItem={menu.destructiveItem} />
       </div>
-      {input ? <InputFields block={input} refs={refs} patch={patch} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
+      {input ? <InputFields block={input} refs={refs} patch={patch} accountId={props.accountId} /> : <DecoFields block={block} patch={patch} accountId={props.accountId} />}
       {input ? (
         <InlineSettings open={detailOpen} title={`「${blockTitleLine(block)}」の詳しい設定`} onClose={() => setDetailOpen(false)}>
           <BlockEditor block={block} index={props.index} sections={props.layout.sections} refs={refs} selected onSelect={() => {}} onChange={patch} />
@@ -303,7 +305,7 @@ function Labeled({ label, htmlFor, children }: { label: string; htmlFor?: string
   return <Field label={label} htmlFor={htmlFor}>{children}</Field>
 }
 
-function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void }) {
+function InputFields({ block, refs, patch, accountId }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null }) {
   const set = (next: Partial<FormInputBlock>) => patch(next as Partial<FormBlock>)
   const labelId = `fe-q-${block.id}`
   /* 保存を押したあと、質問文が空なら欄を赤くして真下に理由を出す（B-139）。 */
@@ -321,9 +323,41 @@ function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: Form
       ) : null}
       {block.type === 'file' ? <FormFileSettings block={block} onChange={set} /> : null}
       {isChoiceType(block.type) ? <ChoiceFields block={block} set={set} /> : null}
+      {block.fixedField === 'allergy' && accountId ? <AllergyOptionsSave accountId={accountId} block={block} set={set} /> : null}
       {block.type === 'booking' ? <BookingFields block={block} refs={refs} set={set} /> : <SaveTo block={block} refs={refs} set={set} />}
     </>
   )
+}
+
+function AllergyOptionsSave({accountId, block, set}: {accountId: string; block: FormInputBlock; set: (next: Partial<FormInputBlock>) => void}) {
+  const role = useStaffRole()
+  const [version, setVersion] = useState<number | null>(null)
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  const setRef = useRef(set); setRef.current = set
+  useEffect(() => {
+    let active = true
+    setVersion(null); setMessage('')
+    api.accountSettings.getAllergyOptions(accountId).then(result => {
+      if (!active) return
+      if (!result.success) throw new Error(result.error)
+      setVersion(result.data.version)
+      setRef.current({choices: [...result.data.options.map((label, i) => ({id: `allergy-${i}`, label})), {id: 'allergy-other', label: 'そのほか（自由に書く）', isOther: true}]})
+    }).catch(() => { if (active) setMessage('店の選択肢を読み込めませんでした') })
+    return () => { active = false }
+  }, [accountId])
+  return <><p className={styles.cardNote}>この店の回答フォームと顧客情報で使う選択肢です。「そのほか」は自由に書けます。</p>
+    {role === 'owner' || role === 'admin' ? <Button disabled={version === null} busy={busy} onClick={async () => {
+      if (version === null) return
+      setBusy(true); setMessage('')
+      try {
+        const result = await api.accountSettings.saveAllergyOptions(accountId, (block.choices ?? []).filter(choice => !choice.isOther).map(choice => choice.label), version)
+        if (!result.success || !result.data) throw new Error(result.error ?? '保存できませんでした')
+        setVersion(result.data.version); setMessage('店の選択肢を保存しました')
+      } catch (error) { setMessage(error instanceof Error ? error.message : '保存できませんでした') }
+      finally { setBusy(false) }
+    }}>店の選択肢を保存する</Button> : null}
+    {message ? <p role="status" className={styles.cardNote}>{message}</p> : null}</>
 }
 
 function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Partial<FormInputBlock>) => void }) {
@@ -366,13 +400,14 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
             aria-label={`選択肢${index + 1}`}
             className={styles.choiceInput}
             value={choice.label}
+            readOnly={block.fixedField === 'allergy' && choice.isOther}
             onChange={(e) => set({ choices: choices.map((c, i) => (i === index ? { ...c, label: e.target.value } : c)) })}
           /></SaveErrorField>
           <button
             type="button"
             className={styles.choiceRemove}
             aria-label={`選択肢「${choice.label}」を消す`}
-            disabled={choices.length <= 1}
+            disabled={choices.length <= 1 || (block.fixedField === 'allergy' && choice.isOther)}
             onClick={() => set({ choices: choices.filter((_, i) => i !== index) })}
           >
             <X size={15} aria-hidden="true" />
@@ -394,7 +429,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
   const fixedKey = block.fixedField ?? (block.destinations?.realName ? undefined : fixedFieldForBlock(block))
   if (fixedKey) return <div className={styles.saveTo}>
     <span className={styles.fieldLabel}>答えを保存する先</span>
-    <span className={styles.cardNote}>友だちの決まった欄「{FIXED_FRIEND_FIELDS.find(f => f.key === fixedKey)?.label}」に入ります</span>
+    <span className={styles.cardNote}>{FIXED_FRIEND_FIELDS.find(f => f.key === fixedKey)?.label}（決まった欄）</span>
   </div>
   const current = block.destinations?.friendFieldIds?.[0] ?? ''
   const options = [
@@ -576,7 +611,7 @@ function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) 
       {ADD_GROUPS.map((group) => (
         <div key={group.title} className={styles.addGroup}>
           <p className={styles.addGroupTitle}>{group.title}</p>
-          <div className={styles.addCards}>
+          <div className={styles.addCards} data-writing={group.title === '書いてもらう' || undefined}>
             {group.cards.filter((card) => !hide?.has(card.key)).map((card) => (
               <button key={card.key} type="button" className={styles.addCard} data-fresh={card.fresh || undefined} onClick={() => onAdd(card.make)}>
                 <span className={styles.addCardTop}>

@@ -222,12 +222,13 @@ function renderField(field: FormField): string {
     }
 
     case 'checkbox': {
+      const block = state.formDef?.layout && collectInputs(state.formDef.layout).find(block => block.name === field.name);
       const boxes = (field.options ?? [])
         .map(
           (o) =>
             `<label class="checkbox-label">
               <input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${disabledChoice(field, o)} />
-              ${receptionOption(field, o)}
+              ${receptionOption(field, o)}${block?.fixedField === 'allergy' && block.choices?.some(choice => choice.label === o && choice.isOther) ? `<input type="text" data-allergy-other="${escapeHtml(field.name)}" aria-label="そのほかのアレルギー" maxlength="100" placeholder="自由に書く" />` : ''}
             </label>`,
         )
         .join('');
@@ -718,6 +719,12 @@ function collectFormData(): Record<string, unknown> {
           `input[name="${field.name}"]:checked`,
         ),
       ).map((el) => el.value);
+      const block = formDef.layout && collectInputs(formDef.layout).find(block => block.name === field.name && block.fixedField === 'allergy');
+      const other = block?.choices?.find(choice => choice.isOther);
+      if (other && checked.includes(other.label)) {
+        const value = document.querySelector<HTMLInputElement>(`[data-allergy-other="${CSS.escape(field.name)}"]`)?.value.trim() ?? '';
+        checked.splice(checked.indexOf(other.label), 1, value);
+      }
       result[field.name] = checked;
     } else if (field.type === 'radio') {
       const checked = document.querySelector<HTMLInputElement>(
@@ -738,6 +745,10 @@ function collectFormData(): Record<string, unknown> {
 function validateForm(): string | null {
   const { formDef } = state;
   if (!formDef) return null;
+  const values = collectFormData();
+  for (const block of formDef.layout ? collectInputs(formDef.layout) : []) {
+    if (block.fixedField === 'allergy' && Array.isArray(values[block.name]) && (values[block.name] as string[]).includes('')) return 'そのほかのアレルギーを書いてください';
+  }
 
   for (const field of formDef.fields) {
     if (!field.required) continue;

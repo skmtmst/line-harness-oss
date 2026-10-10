@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import Button from './button'
@@ -9,6 +9,10 @@ import Checkbox from './checkbox'
 import Dialog from './dialog'
 import { fixedFieldValue, FIXED_FRIEND_FIELDS } from './fixed-friend-field-values'
 import styles from './customer-info-panel.module.css'
+import AllergyField from './allergy-field'
+import { TextField } from './text-field'
+import { api } from '@/lib/api'
+import { notifyToast } from './toast'
 
 export type CustomerInfoSection = { key: string; label: string; action?: ReactNode; content: ReactNode }
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
@@ -30,6 +34,13 @@ export default function CustomerInfoPanel({
   const [hidden, setHidden] = useState<string[]>([])
   const [order, setOrder] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saved, setSaved] = useState<Record<string, string>>({})
+  const generation = useRef(0)
+  useEffect(() => { generation.current++; return () => { generation.current++ } }, [friendId, canEdit])
   // 既存受信箱の設定を引き継ぎ、概要と同じ好みを使う。顧客の値は保存しない。
   useEffect(() => {
     try {
@@ -46,7 +57,8 @@ export default function CustomerInfoPanel({
       localStorage.setItem('chat.friendInfoSections.v4', JSON.stringify({ ...previous, hidden, ...(order.length ? { order } : {}) }))
     } catch { /* 保存できなくてもその場の表示は使える */ }
   }, [hidden, order, loaded])
-  useEffect(() => { setExpanded(false); setSettings(false) }, [friendId])
+  useEffect(() => { setExpanded(false); setSettings(false); setEditing(false); setSaved({}); setSaveError(''); setSaving(false) }, [friendId, canEdit])
+  const shownFields = fields.map(field => saved[field.id] === undefined ? field : { ...field, value: saved[field.id], valueSource: null })
   const sorted = [...sections].sort((a,b) => {
     const ai = order.indexOf(a.key), bi = order.indexOf(b.key)
     return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
@@ -62,19 +74,31 @@ export default function CustomerInfoPanel({
     {!hidden.includes('names') ? <section className={styles.section} aria-label="基本">
       <div className={styles.head}>
         <h3>基本</h3>
-        {canEdit ? <Link className={styles.action} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>編集する</Link> : null}
+        {canEdit && state === 'ready' && !editing ? <Button variant="text" onClick={() => { setDraft(Object.fromEntries(shownFields.map(field => [field.id, field.value ?? '']))); setSaveError(''); setEditing(true) }}>編集</Button> : null}
       </div>
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
         : <dl className={styles.rows}>
           {FIXED_FRIEND_FIELDS.filter(spec => !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
-            const { value, source } = fixedFieldValue(fields, spec.key)
+            const { value, source, derived } = fixedFieldValue(shownFields, spec.key)
+            const field = shownFields.find(field => field.fixedKey === spec.key)!
             return <div className={styles.row} key={spec.key}>
               <dt>{spec.label}</dt>
-              <dd><span className={value ? styles.value : styles.note} title={value ?? undefined}>{value ?? '未設定'}</span>{source ? <small title={source}>{source}</small> : null}</dd>
+              <dd>{spec.key === 'allergy' ? <AllergyField value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
+                : editing && !derived ? <TextField aria-label={spec.label} readOnly={saving} value={draft[field.id] ?? ''} onChange={event => setDraft(current => ({ ...current, [field.id]: event.target.value }))} />
+                : <span className={value ? styles.value : styles.note} title={value ?? undefined}>{value ?? '未設定'}</span>}{source && !editing ? <small title={source}>{source}</small> : null}</dd>
             </div>
           })}
         </dl>}
+      {editing ? <><div className={styles.editActions}><Button disabled={saving} onClick={() => setEditing(false)}>キャンセル</Button><Button variant="primary" busy={saving} onClick={async () => {
+        if (!canEdit || saving) return
+        const started = generation.current
+        setSaving(true); setSaveError('');
+        const values = Object.fromEntries(shownFields.filter(field => FIXED_FRIEND_FIELDS.some(spec => spec.key === field.fixedKey) && draft[field.id] !== (field.value ?? '')).map(field => [field.id, draft[field.id]]))
+        try { const result = await api.friendFields.saveForFriend(friendId, values); if (generation.current !== started) return; if (!result.success) throw new Error(result.error ?? '保存できませんでした'); setSaved(current => ({ ...current, ...values })); setEditing(false); notifyToast('保存しました'); onRetry?.() }
+        catch (error) { if (generation.current === started) setSaveError(error instanceof Error ? error.message : '保存できませんでした') }
+        finally { if (generation.current === started) setSaving(false) }
+      }}>保存する</Button></div>{saveError ? <p className={styles.note} role="alert">{saveError}</p> : null}</> : null}
       {hiddenPersonalCount > 0 ? <p className={styles.note}>個人情報は閲覧権限が必要です。</p> : null}
     </section> : null}
     {sorted.filter(section => !hidden.includes(section.key)).map(section => <section className={styles.section} key={section.key} aria-label={section.label}>

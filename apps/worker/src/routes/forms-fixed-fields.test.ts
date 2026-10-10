@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID, emptyLayout, type FormLayout } from '@line-crm/shared';
-import { setFriendFieldValue } from '@line-crm/db';
+import { setFriendFieldValue, saveVersionedAccountSetting } from '@line-crm/db';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { forms } from './forms.js';
@@ -27,6 +27,25 @@ beforeEach(() => {
   app.route('/', friendFields);
 });
 afterEach(() => fixture.raw.close());
+
+test('公開版では配布先のアレルギー選択肢を返し、下書きと旧いfieldsを壊さない',async()=>{
+  const layout=emptyLayout(); layout.sections[0].blocks=[{id:'a',kind:'input',type:'checkbox',name:'allergy',label:'アレルギー',fixedField:'allergy',choices:[{id:'old',label:'古い選択肢'},{id:'other',label:'そのほか',isOther:true}]}];
+  await saveVersionedAccountSetting(fixture.db,{accountId:'a',key:'friend.allergy_options_v1',data:['キウイ'],expectedVersion:0});
+  expect((await request('/api/forms/form?account_id=a','PUT',{expectedContentRevision:1,layout})).status).toBe(200);
+  expect((await request('/api/forms/form/publish?account_id=a','POST',{expectedContentRevision:2})).status).toBe(200);
+  const publicRead=await request('/api/forms/form');
+  expect(await publicRead.json()).toMatchObject({data:{fields:[{options:['キウイ','そのほか（自由に書く）']}],layout:{sections:[{blocks:[{choices:[{label:'キウイ'},{isOther:true}]}]}]}}});
+  expect(await (await request('/api/forms/form?account_id=a')).json()).toMatchObject({data:{layout:{sections:[{blocks:[{choices:[{label:'古い選択肢'},{label:'そのほか'}]}]}]}}});
+});
+
+test('複数アレルギーを手で保存・読める。型違いは部分保存せず閲覧のみは403', async () => {
+  expect((await request('/api/friends/f/fields','PUT',{values:{'fixed-allergy':['卵','乳','キウイ']}})).status).toBe(200);
+  const read=await request('/api/friends/f/fields');
+  expect(await read.json()).toMatchObject({data:{items:expect.arrayContaining([expect.objectContaining({fixedKey:'allergy',type:'multi_select',value:'["卵","乳","キウイ"]'})])}});
+  expect((await request('/api/friends/f/fields','PUT',{values:{'fixed-allergy':['卵',42],'fixed-name':'変えない'}})).status).toBe(422);
+  expect(fixture.raw.prepare("SELECT real_name FROM friends WHERE id='f'").get()).toEqual({real_name:null});
+  expect((await request('/api/friends/f/fields','PUT',{values:{'fixed-allergy':[]}},'viewer-key')).status).toBe(403);
+});
 
 test.each([
   { id: 'x', kind: 'iframe' },

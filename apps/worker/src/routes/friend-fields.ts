@@ -40,6 +40,7 @@ import type { Env } from '../index.js';
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { requireVisibleFriend } from './friends.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { accountAllergyOptions } from '../services/allergy-options.js';
 
 const friendFields = new Hono<Env>();
 
@@ -803,6 +804,11 @@ friendFields.get(
           || hasStaffPermission(c, 'attribute.personal_info.edit'));
 
       const rows = await getFriendFieldsWithValues(c.env.DB, friendId);
+      const friend = await getFriendById(c.env.DB, friendId);
+      if (friend?.line_account_id) {
+        const { options } = await accountAllergyOptions(c.env.DB, friend.line_account_id);
+        for (const field of rows) if (field.field_key === 'fixed_allergy') field.options_json = JSON.stringify(options);
+      }
       const visible = rows.filter((r) => r.is_personal === 0 || canSeePersonal);
       const hiddenCount = rows.length - visible.length;
 
