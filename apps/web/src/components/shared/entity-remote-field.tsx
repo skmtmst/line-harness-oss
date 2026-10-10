@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
+
 import { useEffect, useRef, useState } from 'react'
 import { api, bookingApi, eventsApi, type CommonActionResources } from '@/lib/api'
 import { EntityPickerField, type EntityPickerItem } from './entity-picker'
@@ -27,8 +29,8 @@ export async function loadEntityCandidates(kind: RemoteEntityKind, accountId: st
     return response.data.map((row) => ({ id: row.id, name: row.name }))
   }
   if (kind === 'conversion') {
-    const to = new Date().toISOString().slice(0, 10)
-    const from = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10)
+    const to = jstDate()
+    const from = jstDateOffset(-365)
     const items: EntityPickerItem[] = []
     let cursor: string | undefined
     do {

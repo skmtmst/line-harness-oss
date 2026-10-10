@@ -52,3 +52,9 @@
 /* B-178：格子の表も一覧の型で同じ行高にする。 */
 [data-theme='v8'] [data-list-skeleton] .row { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); padding-block: 0; padding-inline: var(--tpl-list-cell-pad); }
 [data-theme='v8'] [data-list-skeleton] .row[data-head] { height: var(--tpl-list-head-h); min-height: var(--tpl-list-head-h); }
+
+/* B-217・B-209：枠と影なし、色と線を端まで。 */
+html[data-theme='v8'] .table { padding: 0; gap: 0; border-radius: var(--radius-flat); outline-color: transparent; box-shadow: none; }
+html[data-theme='v8'] .table .row { padding-inline: var(--tpl-list-inset); }
+html[data-theme='v8'] .table [data-list-name-cell] { color: var(--color-ink); font-weight: 700; white-space: nowrap; }
+html[data-theme='v8'] .row[data-broken]:hover { background: var(--color-status-danger-soft); }

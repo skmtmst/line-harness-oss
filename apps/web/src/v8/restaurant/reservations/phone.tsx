@@ -1,5 +1,7 @@
 'use client'
 
+import { jstCalendar } from '@/lib/jst-datetime'
+
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Lock, UserPlus } from 'lucide-react'
 import type { RestaurantCustomerHistory, RestaurantOpeningDay } from '@line-crm/shared'
@@ -267,7 +269,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         {history ? (
           <>
             <p className={styles.breakRow}><span>これまでの来店</span><strong>{`${history.visitCount} 回`}</strong></p>
-            <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${new Date(lastVisit.starts_at).getMonth() + 1}/${new Date(lastVisit.starts_at).getDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : emptyValue('unknown')}</strong></p>
+            <p className={styles.breakRow}><span>前回</span><strong>{lastVisit ? `${jstCalendar(new Date(lastVisit.starts_at)).getUTCMonth() + 1}/${jstCalendar(new Date(lastVisit.starts_at)).getUTCDate()}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : emptyValue('unknown')}</strong></p>
             <p className={styles.breakRow}><span>アレルギー（前回）</span><strong className={lastAllergy ? styles.alertText : undefined}>{lastAllergy || emptyValue('unknown')}</strong></p>
           </>
         ) : (

@@ -10,7 +10,7 @@
 export const ROUTES = {
   dashboard: '/',
   friends: '/friends',
-  'friend-detail': '/friends/detail?id=f-1',
+  'friend-detail': '/friends/detail?id=friend-1',
   'scenario-detail': '/scenarios/detail?id=scenario-0-paused',
   inbox: '/chats',
   'broadcast-new': '/broadcasts/new',

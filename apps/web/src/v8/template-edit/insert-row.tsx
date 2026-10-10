@@ -8,14 +8,14 @@
  */
 import { useRef, useState, type RefObject } from 'react'
 import Button from '@/components/shared/button'
-import { UserRound, ContactRound, Braces, CalendarDays, Ellipsis } from 'lucide-react'
 import ActionMenu from '@/components/shared/action-menu'
+import styles from './edit.module.css'
 import Dialog from '@/components/shared/dialog'
 import DateField from '@/components/shared/date-field'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { formatNumber } from '@/lib/format'
 import type { TemplateReferenceState, TemplateReferences } from './core'
-import styles from './edit.module.css'
+import MessageInsertRow, { MessageInsertButton } from '@/components/shared/message-insert-row'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export const DATE_OPTIONS = [
@@ -49,21 +49,8 @@ function Chip({ label, onClick, disabled, title, buttonRef, expanded, more = fal
   expanded?: boolean
   more?: boolean
 }) {
-  const Icon = more ? Ellipsis : label === '名前' ? UserRound : label === '友だち情報' ? ContactRound : label === '共通情報' ? Braces : CalendarDays
-  return (
-    <Button
-      ref={buttonRef}
-      variant="text"
-      size="field"
-      onClick={onClick}
-      disabled={disabled}
-      title={title ?? `${label}を差し込む`}
-      aria-haspopup={expanded === undefined ? undefined : 'menu'}
-      aria-expanded={expanded}
-    >
-      <Icon size={14} aria-hidden="true" />{label}
-    </Button>
-  )
+  return <MessageInsertButton kind={more ? 'other' : label === '名前' ? 'name' : label === '友だち情報' ? 'field' : label === '共通情報' ? 'var' : 'date'} ref={buttonRef} label={label} onClick={onClick} disabled={disabled} title={title ?? `${label}を差し込む`} expanded={expanded} />
+
 }
 
 export default function InsertRow({
@@ -126,20 +113,8 @@ export default function InsertRow({
   const over = length > 5000
 
   return (
-    <div className={styles.insertRow} aria-label="利用できる差し込み項目" role="group">
-      <div className={styles.insertLine}>
-        <span className={styles.insertLabel}>差し込む</span>
-        {nameChip}
-        {fieldChip}
-        {varChip}
-      </div>
-      <div className={styles.insertLine}>
-        {dateChip}
-        {otherChip}
-        <span className={styles.counter} data-over={over || undefined}>
-          {formatNumber(length)} / 5,000
-        </span>
-      </div>
+    <MessageInsertRow count={`${formatNumber(length)} / 5,000`} more={<>{varChip}{dateChip}{otherChip}</>}>
+      {nameChip}{fieldChip}
 
       <ActionMenu
         open={menu === 'field'}
@@ -189,6 +164,6 @@ export default function InsertRow({
           <SaveErrorField names={["targetDate","target_date"]}><DateField aria-label="日数を数える目標日" value={targetDate} onChange={setTargetDate} /></SaveErrorField>
         </div>
       </Dialog>
-    </div>
+    </MessageInsertRow>
   )
 }

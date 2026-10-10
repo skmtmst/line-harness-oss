@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { FolderDot, FolderDotName, folderDisplayColor } from './folder-dot'
 import TruncatedText from './truncated-text'
+import Checkbox from './checkbox'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 /*
@@ -62,6 +63,14 @@ describe('フォルダの色の丸', () => {
     const html = renderToStaticMarkup(<FolderDotName><a href="/inflow-links/detail?id=one"><TruncatedText value={name} /></a></FolderDotName>)
     expect(html).toContain(`data-list-name="" title="${name}"`)
     expect(html).toContain('href="/inflow-links/detail?id=one"')
+  })
+
+  it('行を選ぶチェックは省略する名前の外に出し、操作と全文を保つ', () => {
+    const html = renderToStaticMarkup(<FolderDotName><Checkbox aria-label="資料を選ぶ" checked={false} onCheckedChange={() => {}} /><button>資料をダウンロードした</button></FolderDotName>)
+    expect(html).toContain('aria-label="資料を選ぶ"')
+    expect(html.indexOf('aria-label="資料を選ぶ"')).toBeLessThan(html.indexOf('data-folder-dot'))
+    expect(html).toContain('title="資料をダウンロードした"')
+    expect(html).toContain('<button>資料をダウンロードした</button>')
   })
 
   it('大きさ 8・名前との間 8・説明の行の字下げ 16 は変数で持つ', () => {

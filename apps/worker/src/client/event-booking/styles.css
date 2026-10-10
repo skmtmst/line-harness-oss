@@ -1,3 +1,4 @@
+@import "../../../../liff/src/card-surface.css";
 /* event-booking 専用 CSS。salon-booking と同じパターン。
  * Tailwind v4: theme + utilities を取り込み、preflight (base reset) は除外。
  * preflight を含めると既存 form.ts / Calendar booking 用 inline CSS と衝突する

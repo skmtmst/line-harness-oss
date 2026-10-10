@@ -1,5 +1,8 @@
 'use client'
 
+import { jstMonthStart, jstDateOffset } from '@/lib/jst-datetime'
+
+
 import SegmentedControl from '@/components/shared/segmented'
 import { RowNameLink } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
@@ -124,18 +127,11 @@ const PERIOD_OPTIONS: Array<{ value: PeriodKey; label: string }> = [
   { value: 'custom', label: '日付で決める' },
 ]
 
-function ymd(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-/** 期間の選び方から、口へ渡す開始日（YYYY-MM-DD）を出す。決めた日・すべては null。 */
+/** 期間の境目は日本時間。端末のタイムゾーンに左右されない。 */
 export function periodFrom(period: PeriodKey, now: Date): string | null {
-  if (period === 'month') return ymd(new Date(now.getFullYear(), now.getMonth(), 1))
-  if (period === 'last7') return ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6))
-  if (period === 'last30') return ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29))
+  if (period === 'month') return jstMonthStart(now)
+  if (period === 'last7') return jstDateOffset(-6, now)
+  if (period === 'last30') return jstDateOffset(-29, now)
   return null
 }
 

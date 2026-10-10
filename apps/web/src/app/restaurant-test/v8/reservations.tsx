@@ -15,6 +15,7 @@
  * - 操作の可否：口自体が owner・admin・staff に開いている（v7 と同じ）。
  *   権限不足は口の 403 をそのまま帯に出す。黙って成功にしない。
  */
+import { jstCalendar } from '@/lib/jst-datetime'
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -357,7 +358,7 @@ function TodayView({ rows, tables, busy, day, isToday, sideExtra, onAddPreset, o
     return list
   }, [rows])
 
-  const nowMinutes = isToday ? new Date().getHours() * 60 + new Date().getMinutes() : -1
+  const nowMinutes = isToday ? jstCalendar().getUTCHours() * 60 + jstCalendar().getUTCMinutes() : -1
 
   const reservationAt = useCallback((tableId: string, slot: number) => {
     const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0).getTime()

@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDayStartIso } from '@/lib/jst-datetime'
+
+
 /*
  * 「今日のお店」（E-1）が読む物をまとめて取る。
  *  - snapshot（店舗・卓・今日の予約の範囲）… 店舗と卓。
@@ -105,9 +108,8 @@ export function useStoreToday(accountId: string | null): StoreToday {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
 
   const range = useMemo(() => {
-    const from = new Date(); from.setHours(0, 0, 0, 0)
-    const to = new Date(from); to.setDate(to.getDate() + 1)
-    return { from: from.toISOString(), to: to.toISOString() }
+    const now = new Date()
+    return { from: jstDayStartIso(now), to: jstDayStartIso(now, 1) }
   }, [])
 
   /* 店舗：選んでいる店舗（store-context）→ 無ければ先頭。 */

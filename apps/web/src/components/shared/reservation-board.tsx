@@ -1,5 +1,6 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
 import {useEffect,useMemo,useRef,useState,type ReactNode,type DragEvent} from 'react'
 import {Printer} from 'lucide-react'
 import {createPortal} from 'react-dom'
@@ -61,7 +62,7 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
  const to=Math.max(kind==='people'?18*60:23*60,...entries.map(e=>Math.ceil((minutes(e.startsAt)+(Date.parse(e.endsAt)-Date.parse(e.startsAt))/60000)/60)*60))
  const hours=useMemo(()=>Array.from({length:Math.max(1,(to-from)/60)},(_,i)=>from+i*60),[from,to])
  const days=dates?.length?dates:[...new Set(entries.map(e=>dayKey(e.startsAt)))].sort()
- const renderedDays=days.length?days:[new Date(Date.now()+9*3600000).toISOString().slice(0,10)]
+ const renderedDays=days.length?days:[jstDate()]
  const print=async()=>{
   setError('');setPrinting(true)
   try{setPrintRows(loadPrintEntries?await loadPrintEntries():entries);requestAnimationFrame(()=>requestAnimationFrame(()=>{try{window.print()}finally{setPrinting(false)}}))}

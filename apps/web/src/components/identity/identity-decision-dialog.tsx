@@ -107,7 +107,8 @@ export default function IdentityDecisionDialog({
   return (
     <Dialog
       open={open}
-      title="この2件を判定する"
+      designWidth={ec ? 480 : undefined}
+      title={ec ? '決める' : 'この2件を判定する'}
       description="判定すると履歴に残ります。元の友だち・注文は消えません。"
       busy={busy}
       error={error}
@@ -129,6 +130,7 @@ export default function IdentityDecisionDialog({
         <SaveErrorField names={["identity-decision","item","decision"]}><RadioCardGroup legend="判定" className={styles.choices}>
           {DECISIONS.map((item) => (
             <RadioCard
+              variant="row"
               key={item}
               name="identity-decision"
               value={item}

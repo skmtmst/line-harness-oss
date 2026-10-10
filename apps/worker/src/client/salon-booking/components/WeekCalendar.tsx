@@ -1,3 +1,4 @@
+import { jstDate } from '@line-crm/shared';
 // 週カレンダー: 横軸に7日、縦軸に時間軸（30分刻み）。
 // availability で受け取った {date → [HH:MM, ...]} を grid セルにマップして
 // タップ可能なものは緑、空いてないものは灰色で示す。
@@ -57,7 +58,7 @@ export default function WeekCalendar({
     );
   }
 
-  const todayJst = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const todayJst = jstDate();
 
   return (
     <div

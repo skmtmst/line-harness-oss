@@ -42,7 +42,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/data-table.module.css", "[data-theme='v8'] .frame[data-table-presentation='account-list'], [data-theme='v8'] .frame[data-table-presentation='account-handover']", "アカウント一覧と乗り換えの表の枠。影を重ねない。"],
   ["components/shared/file-drop.module.css", ".zone", "ファイルを落とす入力欄。内容のカードではない。"],
   ["components/shared/file-drop.module.css", ".row", "選んだファイルの入力行。外側の入力欄と影を重ねない。"],
-  ["components/shared/layout-picker.module.css", ".tile", "面の分け方の選択肢。選択枠で区別する。"],
   ["components/shared/line-preview.module.css", ".flat", "LINEに届く内容の見本。管理画面のカードの影は付けない。"],
   ["components/shared/media-slot.module.css", ".frame", "画像を入れる入力欄。内容のカードではない。"],
   ["components/shared/message-composer.module.css", ".bubble", "メッセージ本文の入力欄。内容のカードではない。"],

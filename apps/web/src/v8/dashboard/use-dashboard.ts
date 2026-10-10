@@ -1,6 +1,6 @@
 'use client'
 
-import { jstDate } from '@/lib/jst-datetime'
+import { jstDate, jstDayStartIso } from '@/lib/jst-datetime'
 
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -389,9 +389,7 @@ export function useDashboard() {
     const isCancelled = () => cancelled
     setSupplementLoading(true)
     const now = new Date()
-    const jstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
-    const jstMidnightUtc = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate()) - 9 * 60 * 60 * 1000
-    const todayStartIso = new Date(jstMidnightUtc).toISOString()
+    const todayStartIso = jstDayStartIso(now)
     const todayJst = jstDay(now)
     const bookingPromise = bookingApi.listRequests(selectedAccountId, 'all', { from: todayStartIso, limit: 100 })
     const bookingSummaryPromise = bookingApi.requestsSummary(selectedAccountId, {

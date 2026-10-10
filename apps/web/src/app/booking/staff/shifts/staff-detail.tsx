@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
+
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -60,7 +63,7 @@ function todayKey(timeZone: string): string {
     const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
     return `${get('year')}-${get('month')}-${get('day')}`
   } catch {
-    return new Date().toISOString().slice(0, 10)
+    return jstDate()
   }
 }
 

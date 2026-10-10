@@ -93,7 +93,7 @@ export function IdentitySubjectCard({
         {subject.attributes.map((attribute) => (
           <div key={attribute.label} className={styles.attribute}>
             <span className={styles.attributeLabel}>{attribute.label}</span>
-            <span className={styles.attributeValue}>{maskedText(attribute.valuePreview)}</span>
+            <span className={styles.attributeValue} title={maskedText(attribute.valuePreview)}>{maskedText(attribute.valuePreview)}</span>
             <span className={`${styles.tag} ${attribute.verified ? styles.tagStrong : styles.tagWeak}`}>
               {attribute.verified ? '確認済み' : '未確認'}
             </span>

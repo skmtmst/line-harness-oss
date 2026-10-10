@@ -1,3 +1,4 @@
+@import "../../../../liff/src/card-surface.css";
 /* webinar 専用 CSS。event-booking と同じパターン。
  * Tailwind v4: theme + utilities を取り込み、preflight (base reset) は除外。
  * webinar namespace (body.wb-active 配下) にだけ手動 reset を当てる。

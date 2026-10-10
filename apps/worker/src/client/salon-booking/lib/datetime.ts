@@ -3,10 +3,7 @@
 
 const JST_OFFSET_MS = 9 * 3600_000;
 
-export function jstToday(): string {
-  const now = new Date();
-  return new Date(now.getTime() + JST_OFFSET_MS).toISOString().slice(0, 10);
-}
+export { jstDate as jstToday } from '@line-crm/shared';
 
 export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);

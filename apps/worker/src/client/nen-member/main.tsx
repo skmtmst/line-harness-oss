@@ -1,3 +1,4 @@
+import { jstCalendar, jstDate } from '@line-crm/shared';
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import './styles.css';
@@ -91,11 +92,11 @@ function petBasics(pet: Pet): string {
   return [pet.animalType === 'cat' ? '猫' : '犬', pet.breed].filter(Boolean).join('・') + (age || gender ? `／${[age, gender].filter(Boolean).join('・')}` : '');
 }
 function petAgeDetail(birthday: string): string {
-  const born = new Date(`${birthday}T00:00:00`);
+  const born = new Date(`${birthday}T00:00:00Z`);
   if (!birthday || Number.isNaN(born.getTime())) return '';
-  const today = new Date();
-  let months = (today.getFullYear() - born.getFullYear()) * 12 + (today.getMonth() - born.getMonth());
-  if (today.getDate() < born.getDate()) months -= 1;
+  const today = jstCalendar();
+  let months = (today.getUTCFullYear() - born.getUTCFullYear()) * 12 + (today.getUTCMonth() - born.getUTCMonth());
+  if (today.getUTCDate() < born.getUTCDate()) months -= 1;
   if (months < 0) return '';
   if (months < 12) return `${months}か月`;
   return `${Math.floor(months / 12)}歳${months % 12 ? `${months % 12}か月` : ''}`;
@@ -107,9 +108,9 @@ function petAgeDetail(birthday: string): string {
 function previewFeeding(animalType: string, weightKg: number, birthday: string, neutered: Neutered, activity: Activity, product: FeedingProduct | null): { kcal: number; grams: number | null; label: string; formula: string } | null {
   if (!Number.isFinite(weightKg) || weightKg <= 0) return null;
   const cat = animalType === 'cat';
-  const born = new Date(`${birthday}T00:00:00`);
-  const today = new Date();
-  const months = Number.isNaN(born.getTime()) ? null : (today.getFullYear() - born.getFullYear()) * 12 + (today.getMonth() - born.getMonth()) - (today.getDate() < born.getDate() ? 1 : 0);
+  const born = new Date(`${birthday}T00:00:00Z`);
+  const today = jstCalendar();
+  const months = Number.isNaN(born.getTime()) ? null : (today.getUTCFullYear() - born.getUTCFullYear()) * 12 + (today.getUTCMonth() - born.getUTCMonth()) - (today.getUTCDate() < born.getUTCDate() ? 1 : 0);
   const stage = months == null ? 'adult' : months < 12 ? 'young' : months >= (cat ? 132 : 84) ? 'senior' : 'adult';
   let factor: number; let label: string;
   if (stage === 'young') { factor = cat ? 2.5 : months != null && months < 4 ? 3.0 : 2.0; label = cat ? '子猫' : months != null && months < 4 ? '子犬（4か月未満）' : '子犬'; }
@@ -371,15 +372,15 @@ function fmtValue(key: HealthKey, value: number): string {
 }
 /** 期間ごとに 8 枠（日＝直近8日、週＝直近8週の平均、月＝直近8か月の平均）。記録の無い枠は null。 */
 function healthBars(logs: HealthLog[], key: HealthKey, period: HealthPeriod): Array<{ label: string; value: number | null }> {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = new Date(`${jstDate()}T00:00:00Z`);
   const slots: Array<{ start: Date; end: Date; label: string }> = [];
   for (let i = 7; i >= 0; i -= 1) {
-    if (period === 'day') { const d = new Date(today); d.setDate(d.getDate() - i); const e = new Date(d); e.setDate(e.getDate() + 1); slots.push({ start: d, end: e, label: `${d.getMonth() + 1}/${d.getDate()}` }); }
-    else if (period === 'week') { const e = new Date(today); e.setDate(e.getDate() - i * 7 + 1); const d = new Date(e); d.setDate(d.getDate() - 7); slots.push({ start: d, end: e, label: `${d.getMonth() + 1}/${d.getDate()}` }); }
-    else { const d = new Date(today.getFullYear(), today.getMonth() - i, 1); const e = new Date(today.getFullYear(), today.getMonth() - i + 1, 1); slots.push({ start: d, end: e, label: `${d.getMonth() + 1}月` }); }
+    if (period === 'day') { const d = new Date(today); d.setUTCDate(d.getUTCDate() - i); const e = new Date(d); e.setUTCDate(e.getUTCDate() + 1); slots.push({ start: d, end: e, label: `${d.getUTCMonth() + 1}/${d.getUTCDate()}` }); }
+    else if (period === 'week') { const e = new Date(today); e.setUTCDate(e.getUTCDate() - i * 7 + 1); const d = new Date(e); d.setUTCDate(d.getUTCDate() - 7); slots.push({ start: d, end: e, label: `${d.getUTCMonth() + 1}/${d.getUTCDate()}` }); }
+    else { const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1)); const e = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i + 1, 1)); slots.push({ start: d, end: e, label: `${d.getUTCMonth() + 1}月` }); }
   }
   return slots.map(slot => {
-    const values = logs.map(log => ({ date: new Date(`${log.logged_on}T00:00:00`), value: healthValue(log, key) }))
+    const values = logs.map(log => ({ date: new Date(`${log.logged_on}T00:00:00Z`), value: healthValue(log, key) }))
       .filter(item => item.value != null && item.date >= slot.start && item.date < slot.end).map(item => item.value as number);
     return { label: slot.label, value: values.length ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10 : null };
   });
@@ -400,8 +401,8 @@ function HealthBars({ bars, keyName }: { bars: Array<{ label: string; value: num
 function weekAgoNote(logs: HealthLog[]): string {
   const latest = logs.find(log => log.weight_kg != null);
   if (!latest) return '—';
-  const latestDate = new Date(`${latest.logged_on}T00:00:00`);
-  const before = logs.find(log => log.weight_kg != null && (latestDate.getTime() - new Date(`${log.logged_on}T00:00:00`).getTime()) >= 6 * 86_400_000);
+  const latestDate = new Date(`${latest.logged_on}T00:00:00Z`);
+  const before = logs.find(log => log.weight_kg != null && (latestDate.getTime() - new Date(`${log.logged_on}T00:00:00Z`).getTime()) >= 6 * 86_400_000);
   if (!before) return '先週の記録なし';
   const diff = Math.round((Number(latest.weight_kg) - Number(before.weight_kg)) * 10) / 10;
   return diff === 0 ? '先週と同じ' : `先週 ${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
@@ -424,12 +425,12 @@ const tearOptions: Array<[string, string]> = [['normal', '問題なし'], ['mild
 function ChoiceGrid({ label, value, options, columns, onChange }: { label: string; value: string; options: Array<[string, string]>; columns: number; onChange: (v: string) => void }) {
   return <div className="nm-seg-field"><span>{label}</span><div className="nm-v6-choice" role="radiogroup" aria-label={label} style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>{options.map(([v, l]) => <button type="button" key={v} role="radio" aria-checked={value === v} className={value === v ? 'active' : ''} onClick={() => onChange(v)}>{l}</button>)}</div></div>;
 }
-function shiftDate(iso: string, days: number): string { const d = new Date(`${iso}T00:00:00`); d.setDate(d.getDate() + days); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
-function longDate(iso: string): string { const d = new Date(`${iso}T00:00:00`); if (Number.isNaN(d.getTime())) return iso; return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`; }
+function shiftDate(iso: string, days: number): string { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; }
+function longDate(iso: string): string { const d = new Date(`${iso}T00:00:00Z`); if (Number.isNaN(d.getTime())) return iso; return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${'日月火水木金土'[d.getUTCDay()]}）`; }
 
 /** ★V6 37-2-B-1 今日を記録：記録日（‹ 今日 ›）、からだの数値3列、便・食いつき・皮膚・涙やけはタップで選ぶ、メモ。 */
 function HealthForm({ ctx, pet, lastLog, onSaved }: { ctx: Ctx; pet: Pet; lastLog: HealthLog | null; onSaved: () => void }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = jstDate();
   const [form, setForm] = useState({ petId: pet.id, loggedOn: today, weightKg: '', heartRateBpm: '', respiratoryRateBpm: '', stoolStatus: 'normal', appetite: 'normal', skinStatus: 'normal', tearStainStatus: 'normal', note: '' });
   const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false);
   useEffect(() => { setForm(value => ({ ...value, petId: pet.id })); setMessage(''); }, [pet.id]);
@@ -679,11 +680,11 @@ function MembershipSheet({ membership, ownerName }: { membership: Membership; ow
 }
 
 function petAge(birthday: string): string {
-  const born = new Date(`${birthday}T00:00:00`);
+  const born = new Date(`${birthday}T00:00:00Z`);
   if (!Number.isFinite(born.getTime())) return '';
-  const today = new Date();
-  let years = today.getFullYear() - born.getFullYear();
-  const beforeBirthday = today.getMonth() < born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() < born.getDate());
+  const today = jstCalendar();
+  let years = today.getUTCFullYear() - born.getUTCFullYear();
+  const beforeBirthday = today.getUTCMonth() < born.getUTCMonth() || (today.getUTCMonth() === born.getUTCMonth() && today.getUTCDate() < born.getUTCDate());
   if (beforeBirthday) years -= 1;
   return years >= 0 ? `${years}歳` : '';
 }

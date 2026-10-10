@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
+
 import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
 
 /*
@@ -150,8 +153,7 @@ function WeightChart30d({ logs, generatedAt }: { logs: Logs; generatedAt: string
   const end = Number.isNaN(base.getTime()) ? new Date() : base
   const days: Array<{ key: string; value: number | null }> = []
   for (let i = 29; i >= 0; i--) {
-    const d = new Date(end.getFullYear(), end.getMonth(), end.getDate() - i)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const key = jstDateOffset(-i, end)
     days.push({ key, value: byDay.get(key) ?? null })
   }
   const known = days.map((d) => d.value).filter((v): v is number => v != null)

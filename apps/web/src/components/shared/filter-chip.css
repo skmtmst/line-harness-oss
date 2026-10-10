@@ -126,3 +126,6 @@
 [data-theme='v8'] .v6-filter-chip { border-radius: 999px; }
 
 [data-theme='v8'] .v6-filter-chip[data-size='compact'] { height: var(--tpl-msg-composer-sticker-chip-h); padding: var(--tpl-msg-composer-sticker-chip-pad); }
+
+/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+html[data-theme='v8'] .v6-filter-chip[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); outline-color: var(--color-selection-border); }

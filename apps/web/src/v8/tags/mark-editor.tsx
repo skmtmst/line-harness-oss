@@ -31,7 +31,7 @@ import { permissionDeniedMessage, withPermissionFailure } from '@/components/sha
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 
 /*
- * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。
+ * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、確認画面は `fy5dz`）。
  *
  * 型（CreatePage）の左に段「基本」（マーク名・色）と段「自動で変えるきまり」、右の列に「出す場所と数」と案内の帯。
  * 下の帯は「保管する」が左端、キャンセル・保存が真ん中。
@@ -442,7 +442,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       {editing ? (
         <p className={styles.infoNote}>
           <Pause className={styles.wayIcon} aria-hidden="true" />
-          保管すると、新しく付けられなくなります。いま付いている人は、保管の小窓で選ぶマークへ置き換わり、履歴に残ります。
+          保管すると、新しく付けられなくなります。いま付いている人は、確認画面で選ぶマークへ置き換わり、履歴に残ります。
         </p>
       ) : null}
       <div className={styles.field}>

@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate, jstCalendar } from '@/lib/jst-datetime'
+
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageTitle } from '@/components/templates/page-frame'
 
@@ -339,19 +341,13 @@ function formatWaitingDuration(iso: string | null, nowMs: number): string | null
 }
 
 function sameYmd(aIso: string, bIso: string): boolean {
-  const a = new Date(aIso)
-  const b = new Date(bIso)
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
+  return jstDate(new Date(aIso)) === jstDate(new Date(bIso))
 }
 
 /** ★V8 やりとりの日付の区切り（8月19日（火））。 */
 function formatDayJa(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getMonth() + 1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`
+  const d = jstCalendar(new Date(iso))
+  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${'日月火水木金土'[d.getUTCDay()]}）`
 }
 
 /** ★V8 担当者の名前が無いこちらの吹き出しの「自動：…」。口の source をそのまま言葉にする。 */
@@ -366,8 +362,8 @@ const AUTO_SOURCE_LABEL: Record<string, string> = {
 }
 
 function formatYmdSlash(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+  const d = jstCalendar(new Date(iso))
+  return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
 /**
@@ -4162,6 +4158,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               })()
             ) : (
             <FriendInfoSidebar
+              lastContactAt={chatDetail && chatDetail.id === selectedChatId ? chatDetail.lastMessageAt : null}
               friendId={activeFriendId}
               accountId={selectedAccountId ?? undefined}
               chatId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.id : null}

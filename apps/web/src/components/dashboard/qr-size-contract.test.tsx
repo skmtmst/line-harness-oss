@@ -56,8 +56,8 @@ describe('QRの大きさと形式（#689）', () => {
   })
 
   it('選べる形式が全て /api/qr の契約を通る', () => {
-    const labels = [...MARKUP.matchAll(/<button type="button" aria-pressed="(?:true|false)"[^>]*>([A-Z]+)<\/button>/g)]
-      .map((m) => m[1].toLowerCase())
+    const labels = [...MARKUP.matchAll(/<button[^>]*aria-pressed="(?:true|false)"[^>]*>([\s\S]*?)<\/button>/g)]
+      .map((m) => m[1].replace(/<[^>]*>/g, '').trim().toLowerCase())
     expect(labels, '形式の選択肢が読めていない').toEqual(['png', 'jpg', 'svg'])
     for (const label of labels) {
       // 知らない値は png へ丸められる。丸められた＝画面の表示と違うものが届く。

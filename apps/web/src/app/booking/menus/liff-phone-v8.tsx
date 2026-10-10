@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
+
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 
 /**
@@ -226,7 +229,7 @@ export function LiffPhoneDatetimeStep({
   }
   const openDates = [...byDate.keys()].sort()
   // 見本は「空きのある先頭の日が入った週」を出す。無ければ今日の週。
-  const anchor = openDates[0] ?? new Date().toISOString().slice(0, 10)
+  const anchor = openDates[0] ?? jstDate()
   const days = weekOf(anchor)
   const closed = new Set(closedDates)
   const closedDow = new Set(closedWeekdays)

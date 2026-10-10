@@ -28,7 +28,8 @@ it('6形の順を保ち、キーで形を変えると見本と同じA・Bの設�
   fireEvent.keyDown(one, { key: 'ArrowRight' })
   const two = within(group).getByRole('radio', { name: '上下2面（面 A・B）' }) as HTMLInputElement
   expect(two.checked).toBe(true)
-  expect(two.parentElement?.textContent).toBe('AB✓上下2面')
+  expect(two.closest('[data-choice-card]')?.textContent).toBe('上下2面AB')
+  expect(two.closest('[data-choice-card]')?.querySelectorAll('input:checked')).toHaveLength(1)
   expect(areaRows()).toEqual(['A上', 'B下'])
 })
 it('設定済みのBが消える形は確認してから変え、取り消すと元の形と設定を保つ', async () => {

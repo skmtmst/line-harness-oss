@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Send, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -187,7 +190,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `action-scores-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `action-scores-${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }

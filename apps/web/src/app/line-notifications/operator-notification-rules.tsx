@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
+
 import ActionMenu from '@/components/shared/action-menu'
 import IconButton from '@/components/shared/icon-button'
 import { MoreHorizontal } from 'lucide-react'
@@ -132,7 +135,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `operator-notifications-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = `operator-notifications-${jstDate()}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
       setNotice({ text: '実行記録をCSVで書き出しました。', error: false })

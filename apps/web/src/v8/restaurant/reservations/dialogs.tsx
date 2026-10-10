@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
+
+
 import { useEffect, useState } from 'react'
 import { Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -26,14 +29,14 @@ import EntitySelect from '@/components/shared/entity-select'
 function toLocalInput(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+  return jstDateTimeLocal(date)
 }
 
 /** 「10/2（金）」の形（取消の確認の1行目）。 */
 function monthDayWeek(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  return `${date.getMonth() + 1}/${date.getDate()}（${'日月火水木金土'[date.getDay()]}）`
+  return `${jstCalendar(date).getUTCMonth() + 1}/${jstCalendar(date).getUTCDate()}（${'日月火水木金土'[jstCalendar(date).getUTCDay()]}）`
 }
 
 export type ReservationPatch = Record<string, unknown>
