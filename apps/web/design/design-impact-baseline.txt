@@ -120,7 +120,6 @@ shared-button-importer app/friend-add-settings/publish/done-v8.tsx
 shared-button-importer app/friend-add-settings/runs/detail/detail-v8.tsx
 shared-button-importer app/friend-add-settings/runs/runs-v8.tsx
 shared-button-importer app/friends/friends-nav-v8.tsx
-shared-button-importer app/getting-started/page.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/account-browser-v8.tsx
 shared-button-importer app/hq/account-settings-dialogs.tsx
