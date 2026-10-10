@@ -580,7 +580,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
               const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
               return (
                 <Tr key={review.id}>
-                  <NameCell name={review.reviewerDisplayName ?? '匿名'} sub={<Stars rating={review.starRating} />} />
+                  <NameCell name={review.reviewerDisplayName ?? '匿名'} />
                   <Td><span className="line-clamp-2 text-sm" title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span></Td>
                   <Td><span className="text-ink-secondary whitespace-nowrap text-sm">{formatDateTime(reviewReceivedAt(review))}</span></Td>
                   <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>

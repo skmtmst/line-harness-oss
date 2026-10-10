@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * カルーセル保存の失敗まわりを、実際に mount して確かめる（N-149）。
  *
@@ -188,6 +190,7 @@ const okCreate = () => Promise.resolve({ success: true as const, data: { id: 'tp
 const okUpdate = () => Promise.resolve({ success: true as const, data: { id: 'tpl-new' } })
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []
   calls.templatesGet.mockReset()
   calls.templatesCreate.mockReset()

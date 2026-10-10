@@ -94,13 +94,21 @@ export default function BookingHistory() {
       });
   }, [reloadKey]);
 
-  const canCancel = (b: BookingHistoryItem) => tab === 'upcoming' && typeof b.lock_version === 'number';
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
+  const withinDeadline = (b: BookingHistoryItem, at: number) => !b.cancel_deadline_at || at <= Date.parse(b.cancel_deadline_at);
+  const canCancel = (b: BookingHistoryItem) => tab === 'upcoming' && typeof b.lock_version === 'number'
+    && withinDeadline(b, now);
   const canChange = (b: BookingHistoryItem) =>
     canCancel(b) && typeof b.menu_id === 'string' && typeof b.staff_id === 'string';
 
   async function runCancel() {
     const target = pendingCancel;
     if (!target || busy || typeof target.lock_version !== 'number') return;
+    if (!withinDeadline(target, Date.now())) {
+      setActionError('キャンセルの期限を過ぎています。トークでご連絡ください。');
+      return;
+    }
     setBusy(true);
     setActionError(null);
     try {
@@ -121,7 +129,7 @@ export default function BookingHistory() {
   }
 
   async function openChange(booking: BookingHistoryItem) {
-    if (busy || !booking.menu_id || !booking.staff_id) return;
+    if (busy || !canChange(booking) || !withinDeadline(booking, Date.now())) return;
     setActionError(null);
     setPendingChange({ booking, slots: null, slotsFailed: false, selected: null, error: null });
     const from = jstToday();
@@ -151,6 +159,10 @@ export default function BookingHistory() {
   async function runChange() {
     const target = pendingChange;
     if (!target || !target.selected || busy || typeof target.booking.lock_version !== 'number') return;
+    if (!withinDeadline(target.booking, Date.now())) {
+      setPendingChange(prev => prev ? { ...prev, error: '変更の期限を過ぎています。トークでご連絡ください。' } : prev);
+      return;
+    }
     setBusy(true);
     try {
       await api.rescheduleMyBooking(target.booking.id, {
@@ -265,6 +277,7 @@ export default function BookingHistory() {
             : ''
         }
         description="キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。"
+        error={actionError ?? undefined}
         confirmLabel="キャンセルする"
         cancelLabel="閉じる"
         destructive

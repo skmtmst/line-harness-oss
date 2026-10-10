@@ -126,7 +126,7 @@ describe('V8 ウェビナー一覧', () => {
     await render()
     const row = host.querySelector('[data-row-id="webinar-5"]')
     expect(row?.textContent).toContain('非公開')
-    expect(row?.textContent).toContain('/webinar/old')
+    expect(row?.querySelector('[data-list-name]')?.textContent).not.toContain('/webinar/old')
   })
 
   it('状態の札に、同じ条件で数えた件数が出る', async () => {

@@ -12,7 +12,7 @@
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -62,6 +62,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { notifyToast } from '@/components/shared/toast'
 import { RowMenu } from '@/components/shared/row-actions'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
@@ -91,6 +92,7 @@ const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeo
   { key: 'published', label: '有効', icon: CircleCheck },
   { key: 'draft', label: '下書き', icon: FilePen },
   { key: 'stopped', label: '停止中', icon: Pause },
+  { key: 'archived', label: '保管', icon: FilePen },
 ]
 
 function countText(value: number | null | undefined, unit: string) {
@@ -202,7 +204,7 @@ function FriendAddList() {
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [search, setSearch] = useListUrlValue('q', '')
   const [appliedSearch, setAppliedSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useListUrlValue<FriendAddRuleStatus | ''>('statusFilter', '')
+  const [statusFilter, setStatusFilter] = useListUrlValue<FriendAddRuleStatus | ''>('statusFilter', searchParams.get('status') === 'draft' ? 'draft' : '')
   const [folder, setFolder] = useListUrlValue<string | null>('folder', null)
   const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const { cursor, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
@@ -216,6 +218,10 @@ function FriendAddList() {
   const requestSequence = useRef(0)
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [highlightedId, setHighlightedId] = useState<string | null>(searchParams.get('highlight'))
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const duplicateKeys = useRef(new Map<string, string>())
+  const [restoringId, setRestoringId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [moveNotice, setMoveNotice] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
@@ -246,6 +252,7 @@ function FriendAddList() {
         q: appliedSearch.trim() || undefined,
         folder: folder ?? undefined,
         status: statusFilter || undefined,
+        highlightId: statusFilter === 'draft' ? highlightedId ?? undefined : undefined,
       })
       if (requestId !== requestSequence.current) return
       if (!response.success) {
@@ -265,7 +272,7 @@ function FriendAddList() {
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
-  }, [appliedSearch, cursor, folder, kind, perPage, selectedAccountId, statusFilter])
+  }, [appliedSearch, cursor, folder, kind, perPage, selectedAccountId, statusFilter, highlightedId])
 
   useEffect(() => { void load() }, [load])
 
@@ -287,15 +294,23 @@ function FriendAddList() {
     if (found) setDeleteTarget(found)
   }, [data, requestedDeleteId])
 
+  const clearHighlight = () => {
+    setHighlightedId(null)
+    writeListUrlParam('highlight', '')
+  }
   const selectFolder = (next: string | null) => {
+    clearHighlight()
     setFolder(next)
     resetCursor()
   }
   const selectStatus = (next: FriendAddRuleStatus | '') => {
+    // 複製直後だけ先頭に出す。利用者が絞り直したら通常の一覧へ戻す。
+    clearHighlight()
     setStatusFilter(next)
     resetCursor()
   }
   const changePerPage = (next: number) => {
+    clearHighlight()
     setPerPage(next)
     resetCursor()
   }
@@ -453,17 +468,41 @@ function FriendAddList() {
     try {
       const response = await api.friendAddRules.archive(selectedAccountId, deleteTarget.id)
       if (!response.success) {
-        setDeleteError('削除できませんでした。設定を確認してください。')
+        setDeleteError('保管できませんでした。設定を確認してください。')
         return
       }
       setDeleteTarget(null)
       if (requestedDeleteId) samePageUrl.replace(`/friend-add-settings?kind=${kind}`)
       await load()
     } catch (caught) {
-      setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message)
+      setDeleteError(describeFriendAddFailure(caught, '設定', 'delete').message.replaceAll('削除', '保管'))
     } finally {
       setDeleteBusy(false)
     }
+  }
+
+  const restore = async (rule: FriendAddRule) => {
+    if (!selectedAccountId || !canEdit || restoringId) return
+    setRestoringId(rule.id); setActionError('')
+    try {
+      const response = await api.friendAddRules.restore(selectedAccountId, rule.id, rule.version)
+      if (!response.success) throw new Error(response.error)
+      notifyToast('保管から下書きへ戻しました。配信は再開していません。'); await load()
+    } catch { setActionError('保管から戻せませんでした。一覧を読み直してお試しください。') }
+    finally { setRestoringId(null) }
+  }
+  const duplicate = async (rule: FriendAddRule) => {
+    if (!selectedAccountId || !canEdit || duplicatingId) return
+    setDuplicatingId(rule.id); setActionError('')
+    if (!duplicateKeys.current.has(rule.id)) duplicateKeys.current.set(rule.id, crypto.randomUUID())
+    try {
+      const response = await api.friendAddRules.duplicate(selectedAccountId, rule.id, rule.version, duplicateKeys.current.get(rule.id)!)
+      if (!response.success) throw new Error(response.error)
+      duplicateKeys.current.delete(rule.id); setHighlightedId(response.data.id)
+      setStatusFilter('draft'); setSearch(''); setAppliedSearch(''); setFolder(null); resetCursor()
+      notifyToast('複製した下書きを追加しました')
+    } catch { setActionError('複製できませんでした。一覧を読み直してお試しください。') }
+    finally { setDuplicatingId(null) }
   }
 
   /* ===== 行の「…」 ===== */
@@ -473,7 +512,11 @@ function FriendAddList() {
   /* 閲覧のみの人には変える操作を出さない（見るだけの「実行結果を見る」は残す）。 */
   const locked = (item: ActionMenuItem): ActionMenuItem[] => (canEdit ? [item] : [])
 
-  const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => [
+  const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => rule.status === 'archived' ? [
+    ...locked({ id: 'restore', label: '保管から戻す', disabled: restoringId !== null, onSelect: () => void restore(rule) }),
+    { id: 'runs', label: '実行結果を見る', onSelect: () => router.push(runsHref(rule.id)) },
+  ] : [
+    ...locked({ id: 'duplicate', label: '複製する', disabled: duplicatingId !== null, onSelect: () => void duplicate(rule) }),
     ...locked({ id: 'edit', label: '編集する', icon: <Pencil size={15} />, onSelect: () => router.push(editHref(rule.id)) }),
     { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} />, onSelect: () => router.push(runsHref(rule.id)) },
     ...locked({ id: 'test', label: 'テストを送る', icon: <Send size={15} />, onSelect: () => router.push(testHref(rule.id)) }),
@@ -500,7 +543,7 @@ function FriendAddList() {
               : []),
           ...locked({
             id: 'delete',
-            label: '削除する',
+            label: '保管する',
             tone: 'danger' as const,
             dividerBefore: true,
             onSelect: () => {
@@ -568,8 +611,8 @@ function FriendAddList() {
     <div className={styles.searchBox}>
       <SearchField
         value={search}
-        onChange={setSearch}
-        onClear={() => setSearch('')}
+        onChange={next => { clearHighlight(); setSearch(next) }}
+        onClear={() => { clearHighlight(); setSearch('') }}
         placeholder={narrow ? '設定名で探す' : '設定名・流入リンクで探す'}
         aria-label="設定名・流入リンクで探す"
       />
@@ -704,6 +747,7 @@ function FriendAddList() {
         canCreate={canEdit}
         filtered={filterActive}
         onClearFilters={() => {
+          clearHighlight()
           setSearch('')
           setAppliedSearch('')
           setStatusFilter('')
@@ -725,6 +769,7 @@ function FriendAddList() {
               {liveOrder.shown.map((rule, index) => (
                 <Tr
                   key={rule.id}
+                  selected={highlightedId === rule.id}
                   className={styles.row}
                   data-table-layout="columns"
                   data-row-id={rule.id}
@@ -753,12 +798,9 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(rule.folderName)}>
-                      <Link href={editHref(rule.id)}  className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
+                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} title={rule.routeNames.join('、') || '未選択'}>
-                      <Link2 size={12} aria-hidden="true" />
-                      <span className={styles.subText}>{rule.routeNames.join('、') || '未選択'}</span>
-                    </span>
+
                   </Td>
                   {sendCell(rule)}
                   <Td className={styles.colStatus}><StatusPill rule={rule} /></Td>
@@ -779,10 +821,7 @@ function FriendAddList() {
                     <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
                       <Link href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} title={SINK_NOTE}>
-                      <CircleHelp size={12} aria-hidden="true" />
-                      <span className={styles.subText}>{SINK_NOTE}</span>
-                    </span>
+
                   </Td>
                   {sendCell(sinkRule)}
                   <Td className={styles.colStatus}><StatusPill rule={sinkRule} /></Td>
@@ -918,9 +957,9 @@ function FriendAddList() {
         <ConfirmDialog
           open={deleteTarget !== null}
           designNode="Q3qP1r"
-          title={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ''}
-          description="削除すると、このリンクから追加された人には「経路が分からなかった人」の共通あいさつが動きます。過去の実行履歴は監査記録として残り、この操作は取り消せません。"
-          confirmLabel="削除する"
+          title={deleteTarget ? `「${deleteTarget.name}」を保管しますか？` : ''}
+          description="保管すると、このリンクから追加された人には「経路が分からなかった人」の共通あいさつが動きます。過去の実行履歴は監査記録として残り、保管から戻すと、下書きとして再び編集できます。"
+          confirmLabel="保管する"
           destructive
           busy={deleteBusy}
           error={deleteError}

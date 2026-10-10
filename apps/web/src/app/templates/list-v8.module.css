@@ -393,7 +393,6 @@
   font-weight: 600;
 }
 
-
 /* ページ送りの行。左に件数、右にページ送り。 */
 .pagerRow {
   display: flex;
@@ -493,7 +492,7 @@
 }
 
 .kindCard:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 

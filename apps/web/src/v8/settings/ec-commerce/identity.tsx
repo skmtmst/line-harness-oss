@@ -75,7 +75,7 @@ function confidenceTone(label: string): StatusBadgeTone {
 export default function EcIdentityCandidatesScreen() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)

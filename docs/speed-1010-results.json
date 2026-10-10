@@ -1,0 +1,226 @@
+{
+  "measuredAtJst": "2026-10-10 03:38 JST",
+  "baseSha": "53f4b6f7e3e58d5e38f8e06fb8d71a60c4dd88e3",
+  "measurement": "既存CLI・ローカル本番形式ビルド・偽API・Chromium・1440x900・各3回中央値",
+  "budgetUnchanged": true,
+  "exitCode": 0,
+  "measured": [
+    {
+      "name": "dashboard",
+      "route": "/",
+      "showMs": 744,
+      "pressMs": 33,
+      "lcpMs": 212,
+      "jsBytes": 3204781,
+      "longTaskMs": 0
+    },
+    {
+      "name": "inbox",
+      "route": "/chats",
+      "showMs": 686,
+      "pressMs": 66,
+      "lcpMs": 140,
+      "jsBytes": 1397055,
+      "longTaskMs": 0
+    },
+    {
+      "name": "friends",
+      "route": "/friends",
+      "showMs": 709,
+      "pressMs": 57,
+      "lcpMs": 152,
+      "jsBytes": 1630603,
+      "longTaskMs": 0
+    },
+    {
+      "name": "broadcasts",
+      "route": "/broadcasts",
+      "showMs": 730,
+      "pressMs": 66,
+      "lcpMs": 156,
+      "jsBytes": 1814119,
+      "longTaskMs": 0
+    },
+    {
+      "name": "broadcast-new",
+      "route": "/broadcasts/new",
+      "showMs": 702,
+      "pressMs": null,
+      "lcpMs": 192,
+      "jsBytes": 1713870,
+      "longTaskMs": 0
+    },
+    {
+      "name": "templates",
+      "route": "/templates",
+      "showMs": 742,
+      "pressMs": 33,
+      "lcpMs": 164,
+      "jsBytes": 1457767,
+      "longTaskMs": 0
+    },
+    {
+      "name": "booking",
+      "route": "/booking/bookings",
+      "showMs": 705,
+      "pressMs": 50,
+      "lcpMs": 188,
+      "jsBytes": 1234561,
+      "longTaskMs": 0
+    },
+    {
+      "name": "answers",
+      "route": "/form-submissions",
+      "showMs": 700,
+      "pressMs": 79,
+      "lcpMs": 148,
+      "jsBytes": 1297974,
+      "longTaskMs": 0
+    },
+    {
+      "name": "tags",
+      "route": "/tags",
+      "showMs": 738,
+      "pressMs": 73,
+      "lcpMs": 156,
+      "jsBytes": 1864230,
+      "longTaskMs": 0
+    },
+    {
+      "name": "settings",
+      "route": "/settings",
+      "showMs": 720,
+      "pressMs": 82,
+      "lcpMs": 120,
+      "jsBytes": 2728288,
+      "longTaskMs": 0
+    },
+    {
+      "name": "friends-2000",
+      "route": "/friends",
+      "showMs": 1774,
+      "pressMs": null,
+      "lcpMs": 172,
+      "jsBytes": 1630603,
+      "longTaskMs": 1064,
+      "rows": 2000,
+      "renderedRows": 2000
+    }
+  ],
+  "fixedCellPreservation": [
+    {
+      "width": 1440,
+      "sameGeometry": true,
+      "sameStates": true,
+      "rows": 2000,
+      "apiRows": 2000,
+      "first": [
+        426,
+        1188,
+        59
+      ],
+      "last": [
+        118367,
+        1188,
+        59
+      ],
+      "states": [
+        {
+          "rows": 2000,
+          "height": 118000,
+          "scroll": 0
+        },
+        {
+          "rows": 2000,
+          "height": 118000,
+          "scroll": 59209
+        },
+        {
+          "rows": 2000,
+          "height": 118000,
+          "scroll": 117590
+        }
+      ],
+      "interaction": true
+    },
+    {
+      "width": 1152,
+      "sameGeometry": true,
+      "sameStates": true,
+      "rows": 2000,
+      "apiRows": 2000,
+      "first": [
+        426,
+        936,
+        59
+      ],
+      "last": [
+        118367,
+        936,
+        59
+      ],
+      "states": [
+        {
+          "rows": 2000,
+          "height": 118000,
+          "scroll": 0
+        },
+        {
+          "rows": 2000,
+          "height": 118000,
+          "scroll": 59209
+        },
+        {
+          "rows": 2000,
+          "height": 118000,
+          "scroll": 117590
+        }
+      ],
+      "interaction": true
+    }
+  ],
+  "pixelComparison": [
+    {
+      "width": 1440,
+      "position": "top",
+      "changedPixels": 936,
+      "maxChannelDifference": 7,
+      "pixelsAbove8": 0
+    },
+    {
+      "width": 1440,
+      "position": "middle",
+      "changedPixels": 1935,
+      "maxChannelDifference": 18,
+      "pixelsAbove8": 324
+    },
+    {
+      "width": 1440,
+      "position": "bottom",
+      "changedPixels": 1520,
+      "maxChannelDifference": 4,
+      "pixelsAbove8": 0
+    },
+    {
+      "width": 1152,
+      "position": "top",
+      "changedPixels": 1030,
+      "maxChannelDifference": 18,
+      "pixelsAbove8": 249
+    },
+    {
+      "width": 1152,
+      "position": "middle",
+      "changedPixels": 2109,
+      "maxChannelDifference": 18,
+      "pixelsAbove8": 708
+    },
+    {
+      "width": 1152,
+      "position": "bottom",
+      "changedPixels": 1661,
+      "maxChannelDifference": 18,
+      "pixelsAbove8": 403
+    }
+  ]
+}

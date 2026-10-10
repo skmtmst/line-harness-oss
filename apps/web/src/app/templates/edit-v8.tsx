@@ -12,12 +12,12 @@
  * `?kind=` が資産の種類（リッチメッセージ・クーポン・リサーチ）のときは
  * asset-editor-v8.tsx へ渡す。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Link2 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
@@ -91,8 +91,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
   const narrowBoard = useNarrowBoard()
   const designNode = id ? 'u5YC6' : narrowBoard ? 'a1k3d' : 'u5YC6'
   const { accounts, selectedAccountId } = useAccount()
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [references, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)
@@ -475,7 +474,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
                     value={name}
                     onChange={(event) => updateDraft({ name: event.target.value })}
                     placeholder="例：予約前日のご案内"
-                    className="border-hairline rounded-control focus-visible:outline-action w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+                    className="border-hairline rounded-control focus-visible:outline-focus-ring w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
                   />
                 </Field>
                 <Field label="フォルダ" htmlFor="tp8-folder">
@@ -510,7 +509,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
                   rows={messageType === 'flex' ? 14 : 6}
                   value={messageContent}
                   onChange={(event) => updateDraft({ messageContent: event.target.value })}
-                  className={`border-hairline rounded-control focus-visible:outline-action w-full resize-y border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${messageType === 'flex' ? 'font-mono text-xs' : ''}`}
+                  className={`border-hairline rounded-control focus-visible:outline-focus-ring w-full resize-y border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${messageType === 'flex' ? 'font-mono text-xs' : ''}`}
                 />
                 {messageType === 'flex' && flexError ? (
                   <p role="alert" className="text-danger mt-1 text-xs">{flexError}このままでは保存できません。</p>

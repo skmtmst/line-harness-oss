@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -29,7 +30,6 @@ import {
   type BookingSettings,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
-import { canEditFeature } from '@/lib/staff-capability'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
@@ -116,10 +116,10 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
    */
   const [settingsLoadState, setSettingsLoadState] = useState<SupportingLoadState>('loading')
   const [page, setPage] = useState(1)
-  const [canManageResources, setCanManageResources] = useState(false)
+  const canManageResources = usePermissionAccess('booking.settings')
   // N-411: メニュー編集は '/booking/menus'、予約設定・資源は 'booking.settings' の
   // 実効permissionで出し分ける。役割だけで見せるとAPIが403で落ちる。
-  const [canEditMenus, setCanEditMenus] = useState(false)
+  const canEditMenus = usePermissionAccess('/booking/menus')
   const loadGenerationRef = useRef(0)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
@@ -188,8 +188,6 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   }, [load])
 
   useEffect(() => {
-    setCanManageResources(canEditFeature('booking.settings'))
-    setCanEditMenus(canEditFeature('/booking/menus'))
   }, [])
 
   useEffect(() => {
@@ -1539,9 +1537,8 @@ function MenusPageHost() {
   // R91: メニューがあるときも作れるよう、見出しに常設の入口を置く。
   // 編集権限の判定は一覧の中と同じ実効permissionで揃える。
   // 緑の塗りは1画面1つ。空のときは空状態が主役なので見出し側は脇役にする。
-  const [canEditMenus, setCanEditMenus] = useState(false)
+  const canEditMenus = usePermissionAccess('/booking/menus')
   useEffect(() => {
-    setCanEditMenus(canEditFeature('/booking/menus'))
   }, [])
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = selectedAccount?.liffId

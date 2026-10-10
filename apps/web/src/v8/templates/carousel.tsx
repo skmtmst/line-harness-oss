@@ -17,6 +17,7 @@
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { tapExtrasError, type TapExtras } from '@line-crm/shared'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -42,7 +43,6 @@ import { TAP_ACTION_KINDS, isTapActionKind, tapActionDef, type TapActionKind } f
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '../template-edit/frame'
@@ -194,7 +194,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number } | null>(null)
   const [publishError, setPublishError] = useState('')
-  const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
+  const canMutate = useFeatureAccess('templates')
   const actionOptions = useActionOptions()
 
   const folderAccountId = host?.composer?.accountId ?? (id ? templateAccountId : selectedAccountId)

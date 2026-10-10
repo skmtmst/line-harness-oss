@@ -38,6 +38,10 @@ function tokenMap(): Map<string, string> {
     const color = [0, 2, 4].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
     map.set(match[1], '#' + color)
   }
+  for (const match of css.matchAll(/--color-([\w-]+):\s*var\(--color-([\w-]+)\)/g)) {
+    const resolved = map.get(match[2])
+    if (resolved) map.set(match[1], resolved)
+  }
   return map
 }
 
@@ -57,7 +61,7 @@ describe('Issue #702: 札の文字色と背景の組み合わせは 4.5:1 以上
     ['success', 'success-bg', '公開中バッジ（濃緑 on 薄緑）'],
     ['warning', 'warning-bg', '停止中・アーカイブ札（濃黄土 on 薄黄）'],
     ['accent-deep', 'accent-soft', '成功バッジ（濃緑 on 薄緑）'],
-    ['status-info', 'status-info-soft', '情報バッジ（濃青 on 薄青）'],
+    ['status-info-deep', 'status-info-soft', '情報バッジ（濃青 on 薄青）'],
     ['status-warn-deep', 'status-warn-soft', '注意バッジ（濃飴 on 薄飴）'],
     ['ink-faint', 'canvas-sunken', '停止中・薄い札（グレー on 沈み面）'],
   ] as const
@@ -81,6 +85,12 @@ describe('Issue #702: 危険バッジは濃い赤のトークンを指す', () =
   it('.danger の文字色は --color-danger（個別の赤指定は残さない）', () => {
     expect(css).toContain('color: var(--color-danger)')
     expect(css).not.toContain('color: var(--color-status-danger);')
+  })
+
+  it('V8の情報札は案内の濃い青を使う（§6.5-4）', () => {
+    expect(css).toMatch(/\[data-tone='info'\][^}]*color:\s*var\(--polish-status-info-ink\)/)
+    expect(read('globals.css')).toContain('--polish-status-info-ink: #1d4ed8')
+    expect(read('globals.css')).toContain('--color-status-info-deep: #1d4ed8')
   })
 })
 

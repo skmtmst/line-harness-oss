@@ -99,7 +99,7 @@
 }
 
 .iconButton:focus-visible {
-  outline: 1px solid var(--color-action);
+  outline: 1px solid var(--color-focus-ring);
 }
 
 .iconButton > svg {
@@ -164,7 +164,7 @@
 /* ── 中身（左・右） ─────────────────────── */
 .body {
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
@@ -296,7 +296,6 @@
   flex-direction: column;
   gap: var(--tpl-sd-card-gap);
   box-sizing: border-box;
-  height: var(--tpl-sd-card-h);
   padding: var(--tpl-sd-card-pad);
   border-radius: var(--tpl-sd-card-radius);
   outline: 1px solid var(--card-edge);

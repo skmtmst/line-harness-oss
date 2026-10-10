@@ -10,7 +10,6 @@ import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import PrivacyNote from './ui/PrivacyNote.js';
 import type { SlotPick } from './DateTimePicker.js';
-import { LiffTextArea } from './forms/controls.js'
 
 /**
  * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
@@ -22,6 +21,7 @@ export default function Confirm({
   staff,
   slot,
   autoConfirm,
+  cancelDeadlineMinutesBefore = null,
   onBack,
   onSubmitted,
 }: {
@@ -30,6 +30,7 @@ export default function Confirm({
   slot: SlotPick;
   /** 予約のルールが承認なし確定のとき真。未承認の案内を出さない。 */
   autoConfirm: boolean;
+  cancelDeadlineMinutesBefore?: number | null;
   /** 「← 日時を選び直す」。日時の段へ戻る。 */
   onBack: () => void;
   /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
@@ -42,6 +43,7 @@ export default function Confirm({
 }) {
   // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
+  const deadline = menu.cancel_deadline_hours_before == null ? cancelDeadlineMinutesBefore : menu.cancel_deadline_hours_before * 60;
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,12 +98,12 @@ export default function Confirm({
         />
       </dl>
       <div className="space-y-1.5">
-        <FieldLabel htmlFor="booking-note">ご要望</FieldLabel>
+        <FieldLabel htmlFor="booking-note">{menu.intake_question?.trim() || 'ご要望'}</FieldLabel>
         <TextArea
           id="booking-note" value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
-          placeholder="例：前髪は短めにしたい"
+          placeholder={menu.intake_question?.trim() ? undefined : '例：前髪は短めにしたい'}
         />
       </div>
       {error && (
@@ -115,8 +117,7 @@ export default function Confirm({
           {autoConfirm
             ? '送るとその場で確定します。確定のお知らせをLINEで送ります。'
             : 'まだ確定ではありません。お店が確かめたら、LINEでお知らせします。'}
-          {menu.cancel_deadline_hours_before != null &&
-            `キャンセルは${menu.cancel_deadline_hours_before}時間前まで。`}
+          {deadline != null ? `キャンセルは開始の${deadline % 60 === 0 ? `${deadline / 60}時間` : `${deadline}分`}前まで。` : 'キャンセル期限は予約の履歴で確認してください。'}
         </p>
       </div>
       <PrivacyNote />

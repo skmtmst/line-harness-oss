@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * R621: 画像もタイトルもない本文の120文字上限と、一律60文字の注意文の矛盾。
  *
@@ -69,6 +71,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
       folders: { ...actual.api.folders, list: calls.foldersList },
       tags: { ...actual.api.tags, list: empty },
       friendFields: { ...actual.api.friendFields, list: empty },
@@ -124,6 +127,7 @@ function bodyCounter(): HTMLElement | null {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []
   calls.foldersList.mockReset()
   calls.foldersList.mockResolvedValue({ success: true, data: [] })

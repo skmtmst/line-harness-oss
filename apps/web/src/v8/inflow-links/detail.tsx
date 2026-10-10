@@ -100,7 +100,7 @@ function InflowDetailContent() {
   const requestedRefCode = searchParams.get('ref') ?? ''
   const role = useStaffRole()
   // WEB034：「流入」を任された staff も、経路の編集・止める／再開ができる（口と同じ条件）。完全削除は管理者だけ。
-  const readonly = role !== null && !canManageRole(role) && !canEditFeature('/inflow-links')
+  const readonly = !canManageRole(role) && !canEditFeature('/inflow-links', role)
 
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [route, setRoute] = useState<EntryRoute | null>(null)

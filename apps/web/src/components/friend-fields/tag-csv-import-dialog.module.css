@@ -151,7 +151,7 @@
   border-radius: var(--radius-card);
   background: var(--color-status-info-soft);
   padding: 12px 14px;
-  color: var(--color-status-info);
+  color: var(--color-action);
   font-size: 12px;
   line-height: 1.6;
 }

@@ -44,8 +44,8 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => accountState,
 }))
 
-vi.mock('@/lib/staff-capability', () => ({
-  isOwnerOrAdmin: () => true,
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => ({
+  ...await importOriginal(), useStaffRole: () => 'owner',
 }))
 
 /*

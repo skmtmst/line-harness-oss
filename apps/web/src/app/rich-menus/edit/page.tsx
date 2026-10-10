@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useStaffRole } from '@/lib/staff-role'
 import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 import Checkbox from '@/components/shared/checkbox'
@@ -453,20 +455,9 @@ function Editor({
    * 個人の情報を返す preview-targets は owner/admin 専用なので、staff は
    * audience-summary（集計だけ）へ切り替える。
    */
-  const [staffRole, setStaffRole] = useState<string | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    void api.staff.me()
-      .then((res) => {
-        if (!cancelled && res.success) setStaffRole(res.data.role)
-      })
-      .catch(() => {
-        // 取れなくても画面は出す。操作側はサーバが 403 で止める。
-      })
-    return () => { cancelled = true }
-  }, [])
+  const staffRole = useStaffRole()
   const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
-  const canOperate = staffRole === 'owner' || staffRole === 'admin'
+  const canOperate = useFeatureAccess('richMenus')
 
   /*
    * N-162: 保存済み署名との差分がある間だけ離脱確認を出す。

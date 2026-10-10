@@ -40,7 +40,7 @@
 
 .trigger:focus-visible,
 .option:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -241,7 +241,7 @@
 [data-theme='v8'] .trigger { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; padding: 0 10px 0 12px; gap: 6px; box-shadow: var(--control-shadow); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 [data-theme='v8'] .value { font-size: 13px; font-weight: 500; line-height: 20px; }
 [data-theme='v8'] .chevron { width: 14px; height: 14px; }
-[data-theme='v8'] .trigger:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .trigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 [data-theme='v8'] .invalid .trigger { outline-color: var(--color-danger); }
 [data-theme='v8'] .chevron { flex-basis: 14px; }
 }
@@ -324,7 +324,7 @@
 }
 
 /* WEB-006: 枠なしでも焦点の輪を残す。 */
-[data-theme='v8'] .textTrigger:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .textTrigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 /* B-152・仕上げ7 */
 [data-theme='v8'] .trigger:disabled { opacity: var(--polish-disabled-opacity); }

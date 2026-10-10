@@ -183,12 +183,18 @@ describe('友だち行の行き先', () => {
   })
 })
 
-it('省略したタグの件数から、隠れたすべてのタグ名を確認できる', () => {
+it('省略したタグの件数から、隠れたすべてのタグ名を確認できる', async () => {
+  const geometry = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 80, height: 24, top: 0, left: 0, right: 80, bottom: 24, x: 0, y: 0, toJSON() {} } as DOMRect)
   render({ ...BASE, tags: [
     { id: 'tag-1', name: '表示するタグ' },
     { id: 'tag-2', name: '省略したタグ1' },
     { id: 'tag-3', name: '省略したタグ2' },
   ] })
-  const count = [...host.querySelectorAll('span')].find((span) => span.textContent === '+2')!
-  expect(count.title).toBe('省略したタグ1・省略したタグ2')
+  const count = host.querySelector<HTMLButtonElement>('[data-tag-overflow] button[aria-haspopup="dialog"]')!
+  expect(count.textContent).toMatch(/^\+\d+$/)
+  await act(async () => count.click())
+  const all = document.querySelector('[role="dialog"]')!
+  for (const name of ['表示するタグ', '省略したタグ1', '省略したタグ2']) expect(all.textContent).toContain(name)
+  geometry.mockRestore()
+
 })

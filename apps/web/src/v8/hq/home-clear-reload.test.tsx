@@ -37,7 +37,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner' }))
 const fx = vi.hoisted(() => ({ refreshAccounts: vi.fn(async () => {}) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: () => {}, refreshAccounts: fx.refreshAccounts }) }))
 

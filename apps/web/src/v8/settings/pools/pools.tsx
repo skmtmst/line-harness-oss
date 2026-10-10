@@ -15,13 +15,17 @@ import { Copy, Info, Plus } from 'lucide-react'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import { Field } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
+import { notifyToast } from '@/components/shared/toast'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
@@ -48,8 +52,8 @@ export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
 export default function PoolsV8() {
   usePageTitle(TITLE)
   const role = useStaffRole()
-  // 役割が読めるまでは今までどおり出し、見るだけと分かったら操作を隠す（最後の守りはサーバの 403）。
-  const canManage = role === null || canManageRole(role)
+  // APIと同じくオーナーだけ。役割の確認中も変更操作を隠す。
+  const canManage = role === 'owner'
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
@@ -150,6 +154,12 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const isMain = pool.slug === 'main'
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const publicUrl = `${apiBase}/pool/${pool.slug}`
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState(pool.name)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [nameError, setNameError] = useState('')
+  const [discardOpen, setDiscardOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -157,6 +167,22 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  const closeEdit = () => {
+    if (editBusy) return
+    if (editName !== pool.name) setDiscardOpen(true)
+    else setEditing(false)
+  }
+  const saveEdit = async () => {
+    if (!canManage || editBusy) return
+    if (!editName.trim()) { setNameError('名前を入力してください'); return }
+    setEditBusy(true); setEditError('')
+    try {
+      const response = await api.pools.update(pool.id, { name: editName.trim() })
+      if (!response.success) throw new Error(response.error)
+      setEditing(false); notifyToast('プールを保存しました'); onChange()
+    } catch { setEditError('保存できませんでした。入力は残っています。もう一度お試しください。') }
+    finally { setEditBusy(false) }
+  }
 
 
   const onDelete = async () => {
@@ -183,14 +209,14 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
           <h2 className={styles.cardTitle} title={pool.name}>{pool.name}</h2>
           <p className={styles.slug} title={pool.slug}>slug：{pool.slug}{isMain ? '・既定' : ''}</p>
         </div>
-        {canManage && !isMain ? (
+        {canManage ? (
           <div className={styles.menuBox}>
             <RowMenu
               label={`${pool.name}の操作`}
               menuLabel="操作"
               open={menuOpen}
               onOpenChange={setMenuOpen}
-              items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } }]}
+              items={[{ id: 'edit', label: '編集する', onSelect: () => { setMenuOpen(false); setEditName(pool.name); setEditError(''); setNameError(''); setEditing(true) } }, ...(!isMain ? [{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } } as const] : [])]}
             />
           </div>
         ) : null}
@@ -202,6 +228,12 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
       {copyError ? <p role="alert" className={styles.inlineError}>{copyError}</p> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
 
+      <Dialog open={editing} title="プールを編集" designWidth={560} busy={editBusy} error={editError} onCancel={closeEdit} onConfirm={() => void saveEdit()} confirmLabel="保存する">
+        <Field label="プール名" htmlFor={`pool-name-${pool.id}`} required error={nameError}>
+          <TextField id={`pool-name-${pool.id}`} value={editName} maxLength={100} onChange={(event) => { setEditName(event.target.value); setNameError('') }} />
+        </Field>
+      </Dialog>
+      <ConfirmDialog open={discardOpen} title="入力を破棄しますか？" description="変更したプール名は保存されません。" confirmLabel="破棄する" onConfirm={() => { setDiscardOpen(false); setEditing(false) }} onCancel={() => setDiscardOpen(false)} />
       <ConfirmDialog
         open={confirmOpen}
         title={`プール「${pool.name}」を削除しますか？`}

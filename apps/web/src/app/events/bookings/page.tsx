@@ -221,7 +221,7 @@ function OccurrenceApplicantsPanel({
                   : 0
                 return (
                   <Tr key={`${applicant.source}:${applicant.id}`}>
-                    <NameCell name={applicant.displayName ?? '友だちは未取得'} sub={`${applicant.partySize}人`} />
+                    <NameCell name={applicant.displayName ?? '友だちは未取得'} />
                     <Td>
                       {applicant.source === 'waitlist'
                         ? applicant.status === 'waiting' ? `キャンセル待ち ${waitlistRank}番` : 'キャンセル待ち'
@@ -304,7 +304,7 @@ function OccurrenceApplicantsPanel({
                   <tbody>
                     {attendance.entries.map((entry) => (
                       <Tr key={entry.id}>
-                        <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
+                        <NameCell name={entry.displayName ?? '友だちは未取得'} />
                         <Td><StatusBadge tone={statusTone[entry.status] ?? 'neutral'} size="compact">{STATUS_LABELS.get(entry.status) ?? entry.status}</StatusBadge></Td>
                         <Td className="text-xs">{formatJp(entry.markedAt, '記録日時は未取得')}</Td>
                       </Tr>
@@ -338,7 +338,7 @@ function OccurrenceApplicantsPanel({
               <tbody>
                 {waitlistHistory.map((entry) => (
                   <Tr key={entry.id}>
-                    <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
+                    <NameCell name={entry.displayName ?? '友だちは未取得'} />
                     <Td><StatusBadge tone={statusTone[entry.status] ?? 'neutral'} size="compact">{WAITLIST_HISTORY_LABELS[entry.status] ?? STATUS_LABELS.get(entry.status) ?? entry.status}</StatusBadge></Td>
                     <Td className="text-xs">{formatJp(entry.createdAt, '—')}</Td>
                     <Td className="text-xs">
@@ -1223,7 +1223,6 @@ function BookingsInner() {
           </>
         ) : null}
       </section>
-
 
         {/*
           操作の失敗は**一覧を消さずに**上に出す。行が消えると、

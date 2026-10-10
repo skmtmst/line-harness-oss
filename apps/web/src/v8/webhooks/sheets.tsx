@@ -101,7 +101,7 @@ export default function WebhooksSheetsV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId, selectedAccount, accounts } = useAccount()
   const staffRole = useStaffRole()
-  const isOwner = staffRole === null || staffRole === 'owner'
+  const isOwner = staffRole === 'owner'
   const searchParams = useSearchParams()
   const callbackResult = searchParams.get('sheets')
   const overview = useWebhookOverview()

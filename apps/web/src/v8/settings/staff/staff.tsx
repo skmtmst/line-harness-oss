@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import LoginAudit from '@/components/staff/login-audit'
 import Button from '@/components/shared/button'
-import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
 import Checkbox from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
@@ -96,7 +96,6 @@ const LIST_SORT_OPTIONS = [
   { value: 'recent', label: '最後に入った日が新しい順' },
   { value: 'name', label: '名前順' },
 ]
-
 
 function messageOf(error: unknown): string { return error instanceof ApiError || error instanceof Error ? error.message : '通信に失敗しました。通信を確かめて、もう一度お試しください。' }
 
@@ -691,7 +690,7 @@ const V8_ROLE_LABEL: Record<RoleKey, string> = {
   owner: 'オーナー', administrator: '管理者', operations: '運用', reception: '受付', view_only: '見るだけ', custom: '個別設定',
 }
 function RoleChip({ role }: { role: RoleKey }) {
-  return <span className={styles.roleChip} data-role={role}>{V8_ROLE_LABEL[role]}</span>
+  return <span data-status-pill="" className={styles.roleChip} data-role={role}>{V8_ROLE_LABEL[role]}</span>
 }
 
 const STAFF_TAB_KEYS = [
@@ -1057,16 +1056,9 @@ function StaffPageHost() {
             const items = rowMenuItems(user)
             return (
               <GridRow key={user.id}>
-                <GridCell className={styles.colPerson} role="cell">
-                  <span className={styles.avatar} aria-hidden="true">{Array.from(user.name)[0] ?? '?'}</span>
-                  <span className={styles.personText}>
-                    <button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={user.name}>{user.name}</button>
-                    <span className={styles.personSub} title={user.email ?? ''}>{user.email ?? 'メール未登録'}</span>
-                    {tab === 'invited' && member && member.inviteStatus !== 'active' ? <span className={styles.personSub}>{`招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}`}</span> : null}
-                  </span>
-                </GridCell>
+                <GridNameCell className={styles.colPerson} name={<button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={user.name}>{user.name}</button>} />
                 <GridCell className={styles.colScope} role="cell" title={accessScopeLabel(user, accountNames)}>{scopeShort(user, accountNames)}</GridCell>
-                <GridCell className={styles.colRole} role="cell">{user.status === 'suspended' ? <span className={styles.roleChip} data-role="view_only">止めた</span> : <RoleChip role={roleOf(user)} />}</GridCell>
+                <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : undefined}>{user.status === 'suspended' ? <span className={styles.roleChip} data-role="view_only">止めた</span> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
                   <RowMenu size="row" label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />

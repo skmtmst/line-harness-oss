@@ -14,19 +14,20 @@ function isPlaceholderRow(row: HTMLTableRowElement): boolean {
 }
 
 /**
- * まだ出ている途中の行があるか。ブラウザでは行ごとの動きの状態を見る
+ * まだ出ている途中の行があるか。ブラウザでは表全体の動きを1回だけ取得する
  * （消える行・途中で数が変わっても取りこぼさない）。動きの API が無い環境
  * （試験の偽 DOM）では、最後の行の終わりを全部の終わりとみなす。
  */
 function rowsStillEntering(body: HTMLTableSectionElement, ended: HTMLTableRowElement): boolean {
-  const rows = Array.from(body.children)
-  if (rows.every((row) => typeof (row as Element & { getAnimations?: unknown }).getAnimations === 'function')) {
-    return rows.some((row) =>
-      row !== ended
-      && row.getAnimations().some((animation) =>
-        (animation as Animation & { animationName?: string }).animationName === ROW_ENTRANCE
-        && animation.playState !== 'finished'),
-    )
+  if (typeof body.getAnimations === 'function' && typeof ended.getAnimations === 'function') {
+    return body.getAnimations({ subtree: true }).some((animation) => {
+      const target = (animation.effect as KeyframeEffect | null)?.target
+      return target instanceof HTMLTableRowElement
+        && target.parentElement === body
+        && target !== ended
+        && (animation as Animation & { animationName?: string }).animationName === ROW_ENTRANCE
+        && animation.playState !== 'finished'
+    })
   }
   return body.lastElementChild !== ended
 }
@@ -38,27 +39,54 @@ function rowsStillEntering(body: HTMLTableSectionElement, ended: HTMLTableRowEle
  * 最後の行がいちばん遅く終わる（4 行目以降は同じ遅れ）ので、最後の行の終わりで付ける。
  * 途中の行で付けると、まだ出ている途中の行の動きが切れる。
  */
+function settleBody(body: HTMLTableSectionElement, row: HTMLTableRowElement): boolean {
+  if (body.hasAttribute('data-rows-settled')) return false
+  if (rowsStillEntering(body, row)) return false
+  body.setAttribute('data-rows-settled', '')
+  return true
+}
+
 export function settleRowEntrance(event: Pick<AnimationEvent, 'animationName' | 'target'>): boolean {
   if (event.animationName !== ROW_ENTRANCE) return false
   const row = event.target
   if (!(row instanceof HTMLTableRowElement)) return false
   const body = row.parentElement
   if (!(body instanceof HTMLTableSectionElement) || body.tagName !== 'TBODY') return false
-  if (body.hasAttribute('data-rows-settled')) return false
   if (isPlaceholderRow(row)) return false
-  if (rowsStillEntering(body, row)) return false
-  body.setAttribute('data-rows-settled', '')
-  return true
+  return settleBody(body, row)
 }
 
 /** 外枠（app-shell）に1つだけ置く。どの画面の表にも効く。 */
 export default function RowEntranceSettle() {
   useEffect(() => {
+    const pending = new Map<HTMLTableSectionElement, AnimationEvent>()
+    let frame: number | null = null
     const onEnd = (event: AnimationEvent) => {
-      settleRowEntrance(event)
+      if (event.animationName !== ROW_ENTRANCE || !(event.target instanceof HTMLTableRowElement)) return
+      const body = event.target.parentElement
+      if (!(body instanceof HTMLTableSectionElement) || body.tagName !== 'TBODY') return
+      if (body.hasAttribute('data-rows-settled') || isPlaceholderRow(event.target)) return
+      pending.set(body, event)
+      // 同じ描画で2,000行が終わっても、確認は表ごとに1回。動きの長さは変えない。
+      if (frame === null) frame = requestAnimationFrame(() => {
+        frame = null
+        for (const [body, event] of pending) {
+          if (!body.isConnected || body.children.length === 0) continue
+          const row = event.target as HTMLTableRowElement
+          if (isPlaceholderRow(row)) continue
+          // 確認までに終わった行が外れても、残った実データの行の動きを確認する。
+          if (row.parentElement !== body && Array.from(body.children).every((child) => isPlaceholderRow(child as HTMLTableRowElement))) continue
+          settleBody(body, row)
+        }
+        pending.clear()
+      })
     }
     document.addEventListener('animationend', onEnd, true)
-    return () => document.removeEventListener('animationend', onEnd, true)
+    return () => {
+      document.removeEventListener('animationend', onEnd, true)
+      if (frame !== null) cancelAnimationFrame(frame)
+      pending.clear()
+    }
   }, [])
   return null
 }

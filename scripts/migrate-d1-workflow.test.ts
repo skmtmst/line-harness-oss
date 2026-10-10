@@ -99,4 +99,16 @@ describe('D1 migration workflow safety', () => {
       expect(block).not.toContain('${{ runner.');
     }
   });
+  it('lists read-only and creates migration history only in apply after the bookmark', () => {
+    const pending = manualWorkflow.split('- name: List the pending migrations')[1].split('- name: Take a Time Travel bookmark')[0];
+    expect(pending).toContain('d1-pending-readonly.mjs');
+    expect(pending).not.toContain('CREATE TABLE');
+    expect(pending).toContain('total_count=$pending_count');
+    expect(pending).toContain('未適用の総数: ${pending_count} 件');
+    const apply = manualWorkflow.split('- name: Apply the pending migrations')[1].split('- name: Say what happened')[0];
+    expect(apply).toContain("if: inputs.mode == 'apply' && steps.pending.outputs.count != '0'");
+    expect(apply).toContain('CREATE TABLE IF NOT EXISTS _migrations');
+    expect(manualWorkflow.indexOf('Take a Time Travel bookmark')).toBeLessThan(manualWorkflow.indexOf('CREATE TABLE IF NOT EXISTS _migrations'));
+  });
+
 });

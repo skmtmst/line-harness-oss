@@ -79,7 +79,7 @@
 }
 
 .input:focus-visible {
-  outline: var(--tpl-tag-ring) solid var(--color-action);
+  outline: var(--tpl-tag-ring) solid var(--color-focus-ring);
 }
 
 .input:disabled {

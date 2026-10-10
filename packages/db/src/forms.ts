@@ -113,6 +113,8 @@ export interface FormWithStats extends Form {
 }
 
 export interface FormAccountScope {
+  /** 復元用一覧だけアーカイブを取得する。既定は通常一覧。 */
+  status?: 'active' | 'archived';
   lineAccountIds?: string[];
   includeUnassigned?: boolean;
   /** N-175 (#805): 指定フォルダだけに絞る。 */
@@ -126,14 +128,15 @@ export async function getFormsWithStats(
   scope: FormAccountScope = {},
 ): Promise<FormWithStats[]> {
   const accountIds = [...new Set(scope.lineAccountIds ?? [])].filter(Boolean);
-  let scopeClause = `WHERE f.status = 'active'`;
+  const statusClause = scope.status === 'archived' ? "f.status = 'archived'" : "f.status = 'active'";
+  let scopeClause = `WHERE ${statusClause}`;
   if (scope.lineAccountIds !== undefined && accountIds.length === 0) {
     scopeClause = scope.includeUnassigned
-      ? `WHERE f.status = 'active'
+      ? `WHERE ${statusClause}
            AND NOT EXISTS (SELECT 1 FROM form_accounts visible WHERE visible.form_id = f.id)`
       : 'WHERE 0';
   } else if (scope.lineAccountIds !== undefined) {
-    scopeClause = `WHERE f.status = 'active' AND (
+    scopeClause = `WHERE ${statusClause} AND (
            EXISTS (
              SELECT 1 FROM form_accounts visible
              WHERE visible.form_id = f.id

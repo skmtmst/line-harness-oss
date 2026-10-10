@@ -128,7 +128,7 @@
   white-space: nowrap;
 }
 .pill[data-tone='success'] { background: var(--color-success-bg); color: var(--color-success); }
-.pill[data-tone='info'] { background: var(--color-info-bg); color: var(--color-action); }
+.pill[data-tone='info'] { background: var(--color-info-bg); color: var(--color-info); }
 .pill[data-tone='warn'] { background: var(--color-warning-bg); color: var(--color-warning); }
 .pill[data-tone='danger'] { background: var(--color-danger-bg); color: var(--color-danger); }
 .pillDot {

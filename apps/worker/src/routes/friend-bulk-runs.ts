@@ -62,7 +62,7 @@ async function parseJsonBody<T>(c: Context<Env>): Promise<T> {
   }
 }
 
-friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const body = await parseJsonBody<{ selection?: unknown; operation?: unknown }>(c);
     const result = await previewFriendBulkRun(c.env.DB, c.get('staff')!, body.selection, body.operation);
@@ -72,7 +72,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/preview', requireRole('owner', 'admi
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const body = await parseJsonBody<{ selection?: unknown; operation?: unknown; scheduledAt?: unknown }>(c);
     const result = await startFriendBulkRun(c.env.DB, c.get('staff')!, {
@@ -113,7 +113,7 @@ friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin'), 
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const staff = c.get('staff')!;
     const count = await retryFriendBulkRun(
@@ -130,7 +130,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/:id/retry', requireRole('owner', 'ad
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const result = await createFriendBulkUndoRun(
       c.env.DB,
@@ -145,7 +145,7 @@ friendBulkRuns.post('/api/friends/bulk-runs/:id/undo', requireRole('owner', 'adm
   }
 });
 
-friendBulkRuns.post('/api/friends/bulk-runs/:id/approve', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+friendBulkRuns.post('/api/friends/bulk-runs/:id/approve', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: 1024 * 1024, tooLarge: { code: 'request_too_large', error: '一括操作の指定が大きすぎます' } }), async (c) => {
   try {
     const body = await parseJsonBody<{ confirmedRecipientCount?: unknown }>(c);
     const approval = await approveBulkMessage(c.env.DB, c.get('staff')!, c.req.param('id'), body.confirmedRecipientCount);

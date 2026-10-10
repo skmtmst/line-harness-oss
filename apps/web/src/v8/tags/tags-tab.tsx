@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 タグ「タグ」タブ（Pencil `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`、
  * フォルダ窓 `IjVpM`、状態の板 `U0aKD`）。
@@ -689,6 +691,7 @@ export default function TagsTab({
         <thead>
           <TableHeadRow>
             <Th className={styles.colName}>タグ</Th>
+            <Th>状態</Th>
             {/* 左にフォルダの列があるときは表にフォルダ列を置かず、名前の前に色の丸（2026-10-07 オーナー）。1152 は列を畳むので表に出す（絵 aPeD8）。 */}
             {narrow ? <Th className={styles.colFolder}>フォルダ</Th> : null}
             <Th className={styles.colCount}>人数</Th>
@@ -741,15 +744,17 @@ export default function TagsTab({
                           <span className={styles.gripSpace} aria-hidden="true" />
                         )}
                       </span>
-                      <TagPill name={tag.name} color={group ? folderDisplayColor(group) : null} size="sm" compactAtNarrow href={editHref} />
-                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>アーカイブ</StatusBadge> : null}
-                      {tag.cleanupReasons?.includes('duplicate_name') ? (
-                        <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
-                      ) : null}
-                    </div>
-                    <p className={styles.sub}>{`${formatDate(tag.createdAt)}登録`}</p>
+                      <FolderDotName folder={group}>
+                        {canEdit ? <Link href={editHref} title={tag.name} className={styles.name}>{tag.name}</Link> : <span title={tag.name}>{tag.name}</span>}
+                      </FolderDotName>
+                      </div>
+
                   </ContextMenu>
                 </Td>
+                <Td>{tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
+                      {tag.cleanupReasons?.includes('duplicate_name') ? (
+                        <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
+                      ) : null}</Td>
                 {narrow ? (
                   <Td className={styles.colFolder}>
                     <span className={styles.folderCell} title={group?.name ?? '未分類'}>

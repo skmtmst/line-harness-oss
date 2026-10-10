@@ -42,7 +42,7 @@ export function UpdateBanner() {
   }
 
   return (
-    <div className="bg-status-info-soft text-status-info px-4 py-2 border-b flex items-center gap-3 text-sm">
+    <div className="bg-status-info-soft text-status-info-deep px-4 py-2 border-b flex items-center gap-3 text-sm">
       <div>
         <strong>v{status.target.version}</strong> が利用可能（現 v
         {status.current}）

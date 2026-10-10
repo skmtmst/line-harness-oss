@@ -16,6 +16,7 @@
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
+import { useTenantWideAccess } from '@/lib/staff-role'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -36,7 +37,7 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { Th } from '@/components/shared/table'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
@@ -94,7 +95,6 @@ const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
 const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
 
-
 /** 種類ごとの中身の編集部品（タグ・リッチメニュー・回答フォーム・シナリオ）。入口が今の部品を渡す。 */
 export interface DefinitionEditorProps {
   type: TemplateType
@@ -131,7 +131,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   RichMenuCreate?: ComponentType<{ host: RichMenuCreateHost }>
 }) {
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = useTenantWideAccess()
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
   const [folderDistribution, setFolderDistribution] = useState<{ name: string; templates: HqTemplate[] } | null>(null)
@@ -1133,7 +1133,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                     <td>
                       <label className={styles.nameLabel} htmlFor={`hq-dist-${account.id}`}>
                         <FolderDotName folder={accountFolders.membership?.get(account.id)?.folder}><span className={styles.name} ><TruncatedText value={String(account.name ?? '')} /></span></FolderDotName>
-                        <span className={styles.sub}>{on ? (stage === 'result' ? progressLabel(account.id) || '配る' : '配る') : '配らない'}</span>
                       </label>
                     </td>
                     <td>

@@ -10,6 +10,7 @@
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -37,7 +38,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { describeCondition } from '@/components/scenarios/scenario-dialogs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useRowLeaving } from '@/lib/use-row-leaving'
 import { formatDay, formatNumber } from '@/lib/format'
@@ -209,7 +210,8 @@ export default function RichMenusListV8() {
    * 役割はサーバ（/api/staff/me）から読む。読めるまでは今までどおり操作を出す。
    */
   const role = useStaffRole()
-  const canEdit = role === null ? true : canManageRole(role)
+  const featureAccess = useFeatureAccess('richMenus')
+  const canEdit = featureAccess
 
   const [showExternal, setShowExternal] = useListUrlValue('showExternal', false)
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
@@ -433,7 +435,6 @@ export default function RichMenusListV8() {
       // 置き場が取れなくても一覧は出す。
     }
   }, [selectedAccount?.id])
-
 
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => { void loadTapStats() }, [loadTapStats])
@@ -1101,9 +1102,7 @@ export default function RichMenusListV8() {
                         <TruncatedText value={String(g.name ?? '')} />
                       </Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} >
-                      <TruncatedText value={String(`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`)} />
-                    </span>
+
                   </Td>
                   <Td className={styles.audienceCell}>
                     <span className={audienceSub ? styles.audienceMain : `${styles.audienceMain} ${styles.audienceAlone}`} title={audienceMain}>{audienceMain}</span>

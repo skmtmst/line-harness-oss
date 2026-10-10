@@ -7,15 +7,17 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const navigation = vi.hoisted(() => ({ query: '' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/friend-add-settings',
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(navigation.query),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -67,6 +69,9 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  navigation.query = ''
+  window.history.replaceState(null, '', '/friend-add-settings')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   roleState.role = 'owner'
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
@@ -89,6 +94,28 @@ beforeEach(() => {
     return json({ success: true, data: null })
   })
 })
+
+it('編集から複製した下書きは、元の位置が別ページでも先頭に読み込み強調する', async () => {
+  navigation.query = 'status=draft&highlight=copy'
+  window.history.replaceState(null, '', `/friend-add-settings?${navigation.query}`)
+  const fetch = vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(String(input))
+    if (url.pathname === '/api/friend-add-rules') return json({ success: true, data: {
+      items: url.searchParams.get('highlight') === 'copy' ? [rule({ id: 'copy', status: 'draft', name: '複製した案内' })] : [],
+      total: 21, nextCursor: null, folderCounts: [],
+      summary: { rules: 21, active: 0, recentAdds: 0, captured: 0, unknownRoute: 0, delivered: 0, failed: 0 },
+      options: { routes: [], scenarios: [], tags: [], folders: [] },
+    } })
+    return json({ success: true, data: null })
+  })
+  vi.stubGlobal('fetch', fetch)
+  await render()
+  await waitFor(() => expect(host.querySelector('[data-row-id="copy"]')?.getAttribute('aria-selected')).toBe('true'))
+  expect(fetch.mock.calls.some(([input]) => new URL(String(input)).searchParams.get('highlight') === 'copy')).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: /下書き/ }))
+  await waitFor(() => expect(new URL(String(fetch.mock.calls.at(-1)?.[0])).searchParams.has('highlight')).toBe(false))
+  await waitFor(() => expect(new URLSearchParams(window.location.search).has('highlight')).toBe(false))
+});
 
 afterEach(() => {
   act(() => root.unmount())
@@ -119,11 +146,11 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(buttons().some((text) => text.includes('初回案内を作る'))).toBe(true)
     expect(buttons().some((text) => text.includes('フォルダを追加'))).toBe(true)
     const regular = await openMenu('店頭QRの初回案内')
-    expect(regular).toEqual(expect.arrayContaining(['編集する', '実行結果を見る', '止める', '削除する']))
+    expect(regular).toEqual(expect.arrayContaining(['編集する', '実行結果を見る', '止める', '保管する']))
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
     const sink = await openMenu('経路が分からなかった人')
     expect(sink).toContain('止める')
-    expect(sink).not.toContain('削除する')
+    expect(sink).not.toContain('保管する')
   })
 
   it('行の名前の前に、左のフォルダの列と同じフォルダの丸が付く（未分類は輪）。閲覧のみでも出す', async () => {

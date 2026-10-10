@@ -120,7 +120,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const role = useStaffRole()
   /* 予約の口は owner・admin・staff に開いている（閲覧のみは 403）。受信データの試し（媒体の受信口）は owner・admin だけ。 */
   const canWrite = canWriteRole(role)
-  const canImport = role === null || canManageRole(role)
+  const canImport = canManageRole(role)
   const accountId = selectedAccountId || ''
   const storeId = store?.id || ''
   const tables = useMemo(() => data.tables.filter((t) => !store || t.store_id === store.id), [data.tables, store])

@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
  *
@@ -458,12 +460,12 @@ export default function ApprovalsTab() {
                     />
                   ) : null}
                 </Td>
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={personName(item.friendName)}  onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
-                    <span className={styles.rowPlan}>{`${formatMonthDayTime(item.createdAt)} に成果`}</span>
+                    <button type="button" className={styles.rowName} title={personName(item.friendName)} onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
+
                   </span>
-                </Td>
+                </FolderDotName></Td>
                 <Td className={styles.colApAffiliate}><span className={styles.cellNum} title={item.affiliateName ?? undefined}>{item.affiliateName ?? '名前を読み込めませんでした'}</span></Td>
                 <Td className={styles.colApAccount}><span className={styles.cellNum} title={item.lineAccountName ?? undefined}>{item.lineAccountName ?? 'アカウント未設定'}</span></Td>
                 <Td className={styles.colApOffer}>

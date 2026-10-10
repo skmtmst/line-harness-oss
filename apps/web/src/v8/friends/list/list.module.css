@@ -198,6 +198,18 @@
 :global([data-theme='v8']) .table td.tdCheck { padding-left: var(--tpl-fr-row-side); }
 :global([data-theme='v8']) .table td.tdMenu { padding-right: var(--tpl-fr-row-side); }
 
+/*
+ * 高さが32px以下の欄だけ、画面外の中身の描画を後回しにする。
+ * 文字・操作・行はDOMに残す。名前と対応の欄は常に測るため、行の高さは
+ * 最低52pxのまま実データで決まり、戻ってきた欄も同じ位置に描かれる。
+ */
+:global([data-theme='v8']) .table td:is(.tdCheck, .tdStar, .tdMenu, .fixedContent) {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto var(--tpl-fr-avatar);
+  /* 枠の外の影・フォーカス輪郭まで描き、セルの端で切らない。 */
+  overflow-clip-margin: var(--tpl-fr-cell-inset);
+}
+
 .row { cursor: default; }
 
 .menuBox { display: flex; justify-content: flex-end; }

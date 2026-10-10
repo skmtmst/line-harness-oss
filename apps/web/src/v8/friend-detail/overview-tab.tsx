@@ -21,6 +21,7 @@ import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import TagPill from '@/components/shared/tag-pill'
 import CustomerInfoPanel from '@/components/shared/customer-info-panel'
+import TagOverflow from '@/components/shared/tag-overflow'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { formatDay, formatDateTime, formatNumber, formatRelative } from '@/lib/format'
@@ -119,7 +120,7 @@ export default function OverviewTab({
           </dl></> },
             { key: 'tags', label: 'タグ', action: perms.editSupport ? <Link className={styles.groupLink} href={inbox}>編集する</Link> : null, content: <><div className={styles.tags}>
             {friend.tags?.length
-              ? friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)
+              ? <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow>
               : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
             {perms.editSupport ? <Link className={`${styles.tag} ${styles.tagAdd}`} href={inbox}>＋ 追加</Link> : null}
           </div></> },

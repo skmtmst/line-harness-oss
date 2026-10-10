@@ -30,7 +30,8 @@ import type { ConversionPoint } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
 import { formatNumber } from '@/lib/format'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -159,7 +160,7 @@ function ConversionCreate() {
   /* `?name=` で名前を入れて開ける（ほかの画面から「この名前で作る」）。 */
   const initialName = useSearchParams().get('name') ?? ''
   const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const canEdit = canEditFeature('/conversions', role) && canEditFeature('conversion.definition.edit', role)
   /*
    * 閲覧のみと分かったら、押せない入力の欄は置かず閲覧のみの帯だけを出す（2026-10-06 オーナー決定）。
    * 作る画面なので、閲覧のみの人に見せる中身は無い。役割を読むまでは今までどおり欄を出す（保存は役割が分かってから）。

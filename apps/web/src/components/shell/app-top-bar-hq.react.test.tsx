@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * ★V8 統括の上の帯（絵 V8-B/JKjsE・オーナー 2026-10-07「統括の方が全然良くない」）。
  *
@@ -63,6 +65,7 @@ import AppTopBar from './app-top-bar'
 
 describe('★V8 統括の上の帯', () => {
   beforeEach(() => {
+    forgetStaffIdentity()
     fixture.pathname = '/hq'
     fixture.theme = 'v8'
     fixture.push.mockReset()
@@ -72,6 +75,7 @@ describe('★V8 統括の上の帯', () => {
     document.documentElement.dataset.theme = fixture.theme
     window.localStorage.setItem('lh_staff_name', 'Kenta Kawano')
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
   })
 
   afterEach(() => {
@@ -136,6 +140,7 @@ describe('★V8 統括の上の帯', () => {
   it('店の画面：店だけの担当には［統括へ］も「統括に戻る」も出さない', async () => {
     fixture.pathname = '/friends'
     window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     const view = render(<AppTopBar />)
     await act(async () => { await Promise.resolve() })
     expect(view.queryAllByRole('button', { name: /統括へ/ })).toHaveLength(0)

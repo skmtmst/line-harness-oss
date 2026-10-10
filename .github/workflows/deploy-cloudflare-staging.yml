@@ -277,6 +277,16 @@ jobs:
           echo "admin_sha=$(git -C "$admin_root" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "worker_version=$(node -p "require('$worker_root/package.json').version")" >> "$GITHUB_OUTPUT"
           echo "released_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Stamp the staging Worker source version
+        id: worker_metadata
+        if: env.DELIVERY_TARGET != 'admin'
+        run: |
+          worker_root="${{ steps.worker_source.outputs.root }}"
+          pnpm exec tsx apps/worker/scripts/stamp-staging-version.ts "$worker_root" \
+            > "$RUNNER_TEMP/staging-worker-version.json"
+          cat "$RUNNER_TEMP/staging-worker-version.json"
+          echo "commit=$(jq -r .commit "$RUNNER_TEMP/staging-worker-version.json")" >> "$GITHUB_OUTPUT"
+          echo "version=$(jq -r .version "$RUNNER_TEMP/staging-worker-version.json")" >> "$GITHUB_OUTPUT"
 
       - name: Build Worker and LIFF assets
         if: env.DELIVERY_TARGET != 'admin'
@@ -335,6 +345,22 @@ jobs:
           active_version=$(printf '%s' "$active" | jq -r \
             '.result.deployments | max_by(.created_on) | .versions[] | select(.percentage == 100) | .version_id')
           test "$active_version" = "$version_id"
+
+          expected_commit="${{ steps.worker_metadata.outputs.commit }}"
+          expected_version="${{ steps.worker_metadata.outputs.version }}"
+          matched=false
+          for attempt in $(seq 1 15); do
+            public_version=$(curl --fail-with-body --silent --show-error "$STAGING_API_URL/admin/version" || true)
+            if printf '%s' "$public_version" | jq -e \
+              --arg commit "$expected_commit" --arg version "$expected_version" \
+              '.git_commit == $commit and .version == $version' > /dev/null; then
+              matched=true
+              break
+            fi
+            sleep 2
+          done
+          test "$matched" = true
+          echo "Worker public version: $expected_version ($expected_commit)" >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED" != "skip" ]; then
             actual=$(printf '%s' "$version" | jq -r \

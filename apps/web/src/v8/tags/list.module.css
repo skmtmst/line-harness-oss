@@ -101,7 +101,7 @@
 }
 
 .quickButton[data-active] {
-  outline: 1px solid var(--color-action);
+  outline: 1px solid var(--color-focus-ring);
   color: var(--color-action);
 }
 
@@ -202,8 +202,6 @@
   text-decoration: underline;
 }
 
-
-
 .sub {
   margin: var(--tpl-tag-sub-gap) 0 0;
   overflow: hidden;
@@ -260,7 +258,6 @@
 }
 
 /* 行の「…」（共通の RowMenu）。絵は 28 なので、共通の印ボタン（36）より強く当てる。 */
-
 
 .menuIcon {
   width: var(--tpl-tag-ro-icon);
@@ -391,7 +388,7 @@
 }
 
 .formInput:focus-visible {
-  outline: var(--tpl-tag-ring) solid var(--color-action);
+  outline: var(--tpl-tag-ring) solid var(--color-focus-ring);
 }
 
 .colorRow {

@@ -3,6 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const identity = vi.hoisted(() => ({ role: 'owner' }))
 const fixture = vi.hoisted(() => ({
   routerPush: vi.fn(),
   marksList: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/lib/api', () => ({
   api: {
+    staff: { me: async () => ({ success: true, data: { role: identity.role } }) },
     supportMarks: { list: fixture.marksList },
   },
 }))
@@ -24,6 +26,7 @@ vi.mock('@/lib/api', () => ({
 import SupportMarkEditor from './support-mark-editor'
 
 beforeEach(() => {
+  identity.role = 'owner'
   fixture.marksList.mockResolvedValue({ success: true, data: [] })
 })
 

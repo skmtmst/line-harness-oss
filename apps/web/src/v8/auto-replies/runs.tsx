@@ -158,7 +158,7 @@ export default function AutoReplyRunsV8() {
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
   const [period, setPeriod] = useListUrlValue<PeriodKey>('period', 'month')
   const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
   const [dateTo, setDateTo] = useListUrlValue('dateTo', '')

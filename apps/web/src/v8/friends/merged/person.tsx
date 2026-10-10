@@ -40,7 +40,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
   usePageTitle('統合ユーザーの詳細')
   const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canManageRole(staffRole)
+  const canManage = canManageRole(staffRole)
 
   const head = (title: string, description: string) => (
     <PageHeading title={title}

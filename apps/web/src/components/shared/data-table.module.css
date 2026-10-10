@@ -453,3 +453,9 @@
 [data-theme='v8'] .frame thead th { height: var(--polish-table-head); padding-block: 0; color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
 [data-theme='v8'] .frame[data-column-layout] .row { padding-block: 0; }
 [data-theme='v8'] .frame[data-column-layout] .row .bodyCell { padding-block: 0; }
+/* Native tables use the same optional-column contract as column layouts. */
+@container v8-page (max-width: 1099px) {
+  [data-theme='v8'] .frame:not([data-table-presentation='columns']) .table [data-cell-collapse='narrow'] {
+    display: none;
+  }
+}

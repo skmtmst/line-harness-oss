@@ -4,7 +4,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import { getFriendById, getLineAccountById, recordRichMenuAssignment } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const richMenus = new Hono<Env>();
@@ -16,7 +16,7 @@ async function resolveLineClient(c: Context<Env>): Promise<LineClient> {
   const accountId = c.req.query('accountId');
   if (accountId) {
     const account = await getLineAccountById(c.env.DB, accountId);
-    if (account) return new LineClient(account.channel_access_token);
+    if (account && await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return new LineClient(account.channel_access_token);
     throw new LineAccountRequiredError('LINE account not found');
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
@@ -47,7 +47,7 @@ richMenus.get('/api/rich-menus', async (c) => {
 });
 
 // POST /api/rich-menus — create a rich menu via LINE API
-richMenus.post('/api/rich-menus', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenus.post('/api/rich-menus', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   try {
     const body = await c.req.json();
     const lineClient = await resolveLineClient(c);
@@ -59,7 +59,7 @@ richMenus.post('/api/rich-menus', requireRole('owner', 'admin'), inputJsonBounda
 });
 
 // DELETE /api/rich-menus/:id — delete a rich menu
-richMenus.delete('/api/rich-menus/:id', requireRole('owner', 'admin'), async (c) => {
+richMenus.delete('/api/rich-menus/:id', requireDeliveryAccess('richMenus'), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const lineClient = await resolveLineClient(c);
@@ -71,7 +71,7 @@ richMenus.delete('/api/rich-menus/:id', requireRole('owner', 'admin'), async (c)
 });
 
 // POST /api/rich-menus/:id/default — set rich menu as default for all users
-richMenus.post('/api/rich-menus/:id/default', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+richMenus.post('/api/rich-menus/:id/default', requireDeliveryAccess('richMenus'), inputJsonBoundary(), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const lineClient = await resolveLineClient(c);
@@ -83,7 +83,7 @@ richMenus.post('/api/rich-menus/:id/default', requireRole('owner', 'admin'), inp
 });
 
 // POST /api/friends/:friendId/rich-menu — link rich menu to a specific friend
-richMenus.post('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin'), inputJsonBoundary({"richMenuId":["string"]}), async (c) => {
+richMenus.post('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMenus'), inputJsonBoundary({"richMenuId":["string"]}), async (c) => {
   try {
     const friendId = c.req.param('friendId');
     const body = await c.req.json<{ richMenuId: string }>();
@@ -130,7 +130,7 @@ richMenus.post('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin')
 });
 
 // DELETE /api/friends/:friendId/rich-menu — unlink rich menu from a specific friend
-richMenus.delete('/api/friends/:friendId/rich-menu', requireRole('owner', 'admin'), async (c) => {
+richMenus.delete('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMenus'), async (c) => {
   try {
     const friendId = c.req.param('friendId');
     const db = c.env.DB;
@@ -271,7 +271,7 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
 export { richMenus };
 
 // POST /api/rich-menus/:id/image — upload rich menu image (accepts base64 body or binary)
-richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), inputJsonBoundary({"image":["string"],"imageData":["string"],"contentType":["string"]}), async (c) => {
+richMenus.post('/api/rich-menus/:id/image', requireDeliveryAccess('richMenus'), inputJsonBoundary({"image":["string"],"imageData":["string"],"contentType":["string"]}), async (c) => {
   try {
     const richMenuId = c.req.param('id');
     const contentType = c.req.header('content-type') ?? '';

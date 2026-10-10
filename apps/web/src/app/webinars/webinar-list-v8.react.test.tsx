@@ -136,7 +136,9 @@ test('v8 では UyUMw の一覧（帯・表・視聴の2行）が出る', async 
   expect(board?.textContent).toContain('視聴開始 98人')
   expect(board?.textContent).toContain('視聴完了 —')
   expect(board?.textContent).toContain('公開中')
-  expect(board?.textContent).toContain('編集')
+  expect(Array.from(board!.querySelectorAll('button')).some((button) => button.textContent?.trim() === '編集')).toBe(false)
+  await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label^="ウェビナー「"][aria-label$="の操作"]')!.click() })
+  expect(document.querySelector('[role="menu"]')?.textContent).toContain('編集する')
 })
 
 /* 公開期間が終わった行の札は、一覧の絵（UyUMw・uBMuB・jiNg0）どおり「非公開」。 */

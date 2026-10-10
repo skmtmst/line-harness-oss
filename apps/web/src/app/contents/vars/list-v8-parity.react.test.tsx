@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 
 import React from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
@@ -39,9 +41,6 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-vi.mock('@/lib/staff-capability', () => ({
-  isOwnerOrAdmin: () => true,
-}))
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => undefined,
@@ -63,6 +62,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   document.documentElement.dataset.theme = 'v8'
 })
 

@@ -93,6 +93,9 @@ function ready() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // 一覧のページ・検索語はURLに残る。別の試験の操作を持ち越さない。
+  window.history.replaceState(null, '', '/settings/file-scan')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   mocks.accountId = 'acc-1'
   // ★V8 の画面は白い板の中に「設定の中のメニュー」を置き、手元の役割（localStorage）を読む。
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })

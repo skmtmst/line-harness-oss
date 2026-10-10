@@ -130,7 +130,7 @@
 
 /* 入力中（キーボードで移った）`SN4Ch`。緑は「正常」の意味なので輪郭に使わない。 */
 .input:focus-visible + .box {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
 }
 

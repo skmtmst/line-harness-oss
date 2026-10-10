@@ -21,7 +21,7 @@ export default function EcConnectorV8() {
   usePageTitle('EC連携')
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
 
   return (
     <div className={styles.board}>

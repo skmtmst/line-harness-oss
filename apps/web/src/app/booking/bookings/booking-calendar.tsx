@@ -1,6 +1,8 @@
 'use client'
 
 import KpiBand from '@/components/shared/kpi-band'
+import { BookingPageStats, BookingPageContent } from '@/components/templates/booking-page'
+import { CalendarDays, CalendarPlus, CircleAlert, CalendarX } from 'lucide-react'
 import KpiCard from '@/components/shared/kpi-card'
 import { useMemo } from 'react'
 import Link from 'next/link'
@@ -618,7 +620,6 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
   // ★V7：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
   const listMissing = dataState !== 'ready'
   const listMissingDetail = dataState === 'error' ? '読み込めませんでした' : '読み込んでいます'
-  const countOrDash = (text: string) => (listMissing ? '—' : text)
 
   /*
    * R316: 集計・注意の見出しは、選んでいる日・週そのものを名指しする。
@@ -637,21 +638,36 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
 
   return (
     <div data-design-node={mode === 'day' ? 'TV2DI' : 'SbuUI'}>
-      <KpiBand className="mb-4">
-        <KpiCard value={null} unit="" icon={null} presentation="band" title={`${periodWithToday}の予約`} valueText={countOrDash(`${activeItems.length}件`)} detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`} />
-        <KpiCard value={null} unit="" icon={null} presentation="band"
+      <BookingPageStats><KpiBand layout="booking">
+        <KpiCard
+          value={listMissing ? null : activeItems.length} unit="件" unitSpacing="tight"
+          icon={<CalendarDays size={14} />} presentation="band"
+          title={mode === 'day' && isToday ? '今日の予約' : `${periodWithToday}の予約`}
+          help={periodWithToday}
+          detail={listMissing ? listMissingDetail : `LINEから ${lineCount}・電話 ${phoneCount}`}
+        />
+        <KpiCard
+          value={listMissing || availability.status !== 'ready' ? null : capacity.freeSlots}
+          unit="枠" unitSpacing="tight" icon={<CalendarPlus size={14} />} presentation="band"
           title={mode === 'day' ? 'まだ空いている枠' : 'うまっている割合'}
-          valueText={listMissing ? '—' : mode === 'day' ? (availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—') : weekRateValue}
-          detail={listMissing ? listMissingDetail : mode === 'day' ? availabilityNote : weekRateDetail}
+          valueText={mode === 'week' ? (listMissing ? '—' : weekRateValue) : undefined}
+          help={mode === 'day' ? availabilityNote : weekRateDetail}
+          detail={listMissing ? listMissingDetail : availability.status === 'ready' ? (mode === 'day' ? (isToday ? '今日の残り' : '選んだ日の残り') : weekRateDetail) : availabilityNote}
         />
-        <KpiCard value={null} unit="" icon={null} presentation="band"
+        <KpiCard
+          value={listMissing ? null : mode === 'day' ? requested : availability.status === 'ready' ? capacity.freeSlots : null}
+          unit={mode === 'day' ? '件' : '枠'} unitSpacing="tight" icon={<CircleAlert size={14} />} presentation="band"
           title={mode === 'day' ? '未承認・要対応' : 'あいている枠'}
-          valueText={listMissing ? '—' : mode === 'day' ? `${requested}件` : availability.status === 'ready' ? `${capacity.freeSlots}枠` : '—'}
-          detail={listMissing ? listMissingDetail : mode === 'day' ? (requested > 0 ? '確認が必要です' : '現在、確認待ちはありません') : availabilityNote}
+          detail={listMissing ? listMissingDetail : mode === 'day' ? `確認待ち ${requested}件` : availabilityNote}
         />
-        <KpiCard value={null} unit="" icon={null} presentation="band" title="キャンセル" valueText={countOrDash(`${cancelled}件`)} detail={listMissing ? listMissingDetail : mode === 'day' ? '選んだ日' : 'この1週間'} />
-      </KpiBand>
+        <KpiCard
+          value={listMissing ? null : cancelled} unit="件" unitSpacing="tight"
+          icon={<CalendarX size={14} />} presentation="band" title="キャンセル"
+          detail={listMissing ? listMissingDetail : mode === 'day' ? (isToday ? '今日' : '選んだ日') : 'この1週間'}
+        />
+      </KpiBand></BookingPageStats>
 
+      <BookingPageContent>
       {/* ★V7：常に出ていた説明の帯は、色の見方だけを小さな凡例にした。 */}
       <p className="text-ink-secondary mb-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs">
         <span><span aria-hidden="true" className="text-accent-deep">●</span> LINEからの予約</span>
@@ -734,6 +750,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
           </SidePanel>
         </aside>
       </div>
+      </BookingPageContent>
     </div>
   )
 }

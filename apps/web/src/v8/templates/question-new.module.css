@@ -113,7 +113,7 @@
 }
 
 .input:focus-visible {
-  outline: var(--tpl-tag-ring) solid var(--color-action);
+  outline: var(--tpl-tag-ring) solid var(--color-focus-ring);
 }
 
 /* 保存で落ちた欄（B-139）。枠を危険の色にする。 */

@@ -29,10 +29,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-/* 役割はサーバへ聞かず、手元の値（lh_staff_role）で決める。新しい一覧は答えが来るまで手元の値を使う。 */
+/* 操作の試験は、本人確認が済んだ管理者として行う。 */
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => null }
+  return { ...actual, useStaffRole: () => 'owner' }
 })
 
 vi.mock('next/link', () => ({

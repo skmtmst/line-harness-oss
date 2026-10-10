@@ -63,6 +63,8 @@ const LEGACY_SCREENS = Object.entries(structure.screens) as Array<
 // この6画面はV8の作り直しで旧V6/V7の節・文言を置き換えた。
 // JSONの旧画面へ戻す要求にせず、現在のV8の節・検索・空状態を見張る。
 const V8_SECTIONS: Record<string, string[]> = {
+  // O2Z8u・GcyTr：旧V6のパンくず行を廃止し、頭は予約の型が持つ。
+  '/booking/bookings': ['Bar', 'Body', 'Folders', 'KPIs', 'Saved', 'Table', 'note', 'tf'],
   '/hq/members': ['Table'],
   '/broadcasts/new': [],
   // 「画面の見た目」の切り替えは V8 固定（2026-10-09）で外した。

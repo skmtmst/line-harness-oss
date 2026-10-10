@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 予約サイト・グルメ媒体（提案 E-4 `aSmph`。設定の中の1画面）。
  *
@@ -146,7 +148,7 @@ export default function BookingMediaPage() {
   useHideSettingsNav()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canManage = role === null || canManageRole(role)
+  const canManage = canManageRole(role)
 
   const [stores, setStores] = useState<RestaurantStore[]>([])
   const [storeId, setStoreId] = useState('')
@@ -393,12 +395,12 @@ export default function BookingMediaPage() {
             const changed = dirty.some((d) => d.code === row.code)
             return (
               <Tr key={row.code} data-dirty={changed || undefined}>
-                <Td className={styles.colName}>
+                <Td className={styles.colName}><FolderDotName>
                   <span className={styles.nameCell}>
                     <span className={styles.mark} aria-hidden="true">{row.name.slice(0, 1)}</span>
                     <span className={styles.name} ><TruncatedText value={String(row.name ?? '')} /></span>
                   </span>
-                </Td>
+                </FolderDotName></Td>
                 <Td className={styles.colPage}><UrlCell url={row.pageUrl} /></Td>
                 <Td className={styles.colLogin}><UrlCell url={row.loginUrl} /></Td>
                 <Td className={styles.colImport}>

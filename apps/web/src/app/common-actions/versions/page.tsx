@@ -369,7 +369,6 @@ function CommonActionVersionsInner() {
                     */}
                     <NameCell
                       name={<span className="block truncate" title={binding.consumerId}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>}
-                      sub={<span className="block truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
                     />
                     <Td>
                       <span className="text-ink-secondary">v{binding.versionNumber}</span>

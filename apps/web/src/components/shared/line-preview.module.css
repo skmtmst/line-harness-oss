@@ -61,7 +61,6 @@
   color: var(--color-ink);
 }
 
-
 /* v8 のスマホに内の題は置かない（cfVyj・j7PP04 どおり）。題は外が担う。 */
 
 /* 器 330×690・黒・縁 2px・内側 10・角丸 52・下への影。 */
@@ -258,7 +257,7 @@
 [data-theme='v8'] .tax { color: var(--v8-line-muted); font-size: 9.5px; font-weight: 400; line-height: 14px; }
 [data-theme='v8'] .productAction { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; height: 34px; padding: 0; border: 0; border-top: 1px solid var(--v8-line-hairline); background: transparent; color: var(--color-accent); font-family: inherit; font-size: 12px; font-weight: 700; line-height: 18px; cursor: pointer; }
 [data-theme='v8'] .secondaryAction { color: var(--color-action); }
-[data-theme='v8'] .productAction:focus-visible { outline: 2px solid var(--color-action); outline-offset: -3px; }
+[data-theme='v8'] .productAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -3px; }
 
 [data-theme='v8'] .island, [data-theme='v8'] .dateChip > span { border-radius: 999px; }
 [data-theme='v8'] .bubbleText { flex: 1; word-break: normal; }

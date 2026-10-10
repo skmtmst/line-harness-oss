@@ -74,7 +74,7 @@ const SIX_DOTS = (
 )
 
 const INLINE_SLOT_CLASS = 'inline-flex items-center justify-center p-0.5'
-const INLINE_CLASS = 'inline-flex cursor-grab items-center justify-center rounded-control p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action'
+const INLINE_CLASS = 'inline-flex cursor-grab items-center justify-center rounded-control p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
 
 export default function ReorderHandle({
   label,

@@ -6,11 +6,13 @@ import {
   PREFECTURES,
   collectInputs,
   isOtherFreeText,
+  formChoiceIsSelected,
   nextSectionIndex,
   normalizeBookingValue,
   normalizeFormTheme,
   normalizeRatingValue,
   validateAnswer,
+  type FormAvailability,
   type FormBlock,
   type FormBookingValue,
   type FormInputBlock,
@@ -63,14 +65,16 @@ import { LiffInput } from '../components/forms/controls.js'
 type Answers = Record<string, unknown>;
 
 /** 選択肢を選んだ状態から、はじめの値を作る。 */
-function initialAnswers(layout: FormLayout): Answers {
+function initialAnswers(layout: FormLayout, availability?: FormAvailability): Answers {
   const answers: Answers = {};
   for (const block of collectInputs(layout)) {
-    if (block.defaultValue) {
-      answers[block.name] = block.defaultValue;
+    const limited = availability?.choices[block.name] ?? {};
+    const defaultValue = block.defaultValue;
+    if (defaultValue && !(block.choices ?? []).some(c => limited[c.id]?.full && formChoiceIsSelected(block, c, [defaultValue]))) {
+      answers[block.name] = defaultValue;
       continue;
     }
-    const preselected = (block.choices ?? []).filter((c) => c.defaultSelected);
+    const preselected = (block.choices ?? []).filter((c) => c.defaultSelected && !limited[c.id]?.full);
     if (preselected.length === 0) continue;
     answers[block.name] =
       block.type === 'checkbox' ? preselected.map((c) => c.label) : preselected[0].label;
@@ -152,7 +156,7 @@ export default function Form() {
       try {
         const data = await api.getForm(id, testToken ?? undefined);
         if (cancelled) return;
-        const defaults = initialAnswers(data.layout);
+        const defaults = initialAnswers(data.layout, data.availability);
         setForm(data);
         setAnswers(defaults);
         // タブの題は上の帯（LiffHeader）が pageTitle・フォーム名から付ける。
@@ -163,10 +167,18 @@ export default function Form() {
           try {
             const latest = await api.getMyLatestFormAnswer(id);
             if (!cancelled && latest?.answers) {
-              const restored = { ...latest.answers };
-              // A document belongs to one answer. Restore other inputs; reselect attachments.
-              collectInputs(data.layout).filter(block => block.type === 'file').forEach(block => { delete restored[block.name]; });
-              setAnswers((prev) => ({ ...prev, ...restored }));
+              setAnswers((prev) => {
+                const next = { ...prev, ...latest.answers };
+                // 添付は回答ごとに選び直す。
+                collectInputs(data.layout).filter(block => block.type === 'file').forEach(block => { delete next[block.name]; });
+                for (const block of collectInputs(data.layout)) {
+                  const full = (block.choices ?? []).filter(c => data.availability?.choices[block.name]?.[c.id]?.full);
+                  const unavailable = (value: string) => full.some(c => formChoiceIsSelected(block, c, [value]));
+                  if (Array.isArray(next[block.name])) next[block.name] = (next[block.name] as string[]).filter(v => !unavailable(v));
+                  else if (unavailable(String(next[block.name] ?? ''))) next[block.name] = '';
+                }
+                return next;
+              });
             }
           } catch {
             // 前回の回答は無くても入力はできる
@@ -471,12 +483,13 @@ export default function Form() {
   const hasCustomTheme = options.theme !== undefined && options.theme !== null;
 
   // P（試し回答）：試し合言葉があるときは、受付停止の下書きでも試せる。
-  if (!form.isActive && !testToken) {
+  if ((!form.isActive && !testToken) || form.availability?.accepting === false) {
     return (
       <div className="min-h-screen bg-canvas">
         <LiffHeader title={options.pageTitle || form.name} />
         <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
-          <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
+          <StatusView icon="calendar" title={form.availability?.reason || 'このフォームは、いま回答を受け付けていません。'} />
+          <Button variant="secondary" onClick={() => setReloadKey(n => n + 1)}>もう一度読み込む</Button>
         </div>
       </div>
     );
@@ -580,6 +593,7 @@ export default function Form() {
       uploading={!!uploading[block.kind === 'input' ? block.name : '']}
       error={block.kind === 'input' ? (fieldErrors[block.name] ?? null) : null}
       errorColor={theme.error}
+      choiceAvailability={block.kind === 'input' ? form.availability?.choices[block.name] : undefined}
     />
   );
 
@@ -629,6 +643,11 @@ export default function Form() {
             </p>
           )}
 
+          {firstPage && form.availability && <div className="space-y-1 text-xs text-ink-secondary" aria-label="回答の受付条件">
+            {form.availability.deadlineAt && <p>締め切り：{new Date(form.availability.deadlineAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>}
+            {form.availability.oncePerFriend && <p>回答はお一人さま1回までです</p>}
+            {form.availability.totalRemaining != null && <p>受付上限まで残り{form.availability.totalRemaining}件（送信時に確定します）</p>}
+          </div>}
           {bodyBlocks.map((block) => blockView(block))}
 
           {error && (
@@ -1020,6 +1039,7 @@ function BlockView({
   uploading,
   error,
   errorColor,
+  choiceAvailability,
 }: {
   block: FormBlock;
   /** ページの先頭の画像 (題の上の表紙)。★V8 B8rCt は高さ 96・角丸 12 の帯。 */
@@ -1031,6 +1051,7 @@ function BlockView({
   uploading: boolean;
   error: string | null;
   errorColor: string;
+  choiceAvailability?: Record<string, { remaining: number; full: boolean }>;
 }) {
   if (block.kind === 'heading') {
     const size = block.level === 1 ? 'text-xl' : block.level === 3 ? 'text-sm' : 'text-lg';
@@ -1155,8 +1176,8 @@ function BlockView({
             >
               <option value="">選択してください</option>
               {(block.choices ?? []).map((choice) => (
-                <option key={choice.id} value={choice.label}>
-                  {choice.label}
+                <option key={choice.id} value={choice.label} disabled={choiceAvailability?.[choice.id]?.full}>
+                  {choice.label}{choiceAvailability?.[choice.id] ? `（${choiceAvailability[choice.id].full ? '受付終了' : `残り${choiceAvailability[choice.id].remaining}件`}）` : ''}
                 </option>
               ))}
             </FormSelectControl>
@@ -1184,9 +1205,10 @@ function BlockView({
                       type="radio"
                       name={block.name}
                       checked={checkedRadio}
+                      disabled={choiceAvailability?.[choice.id]?.full}
                       onChange={() => onChange(block.name, choice.label)}
                     />
-                    {choice.label}
+                    {choice.label}{choiceAvailability?.[choice.id] ? `（${choiceAvailability[choice.id].full ? '受付終了' : `残り${choiceAvailability[choice.id].remaining}件`}）` : ''}
                   </FormChoiceRow>
                   {choice.isOther && checkedRadio && (
                     <OtherTextInput
@@ -1213,6 +1235,7 @@ function BlockView({
                     <ChoiceInput
                       type="checkbox"
                       checked={isChecked}
+                      disabled={choiceAvailability?.[choice.id]?.full}
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);
@@ -1229,7 +1252,7 @@ function BlockView({
                         );
                       }}
                     />
-                    {choice.label}
+                    {choice.label}{choiceAvailability?.[choice.id] ? `（${choiceAvailability[choice.id].full ? '受付終了' : `残り${choiceAvailability[choice.id].remaining}件`}）` : ''}
                   </FormChoiceRow>
                   {choice.isOther && isChecked && (
                     <OtherTextInput

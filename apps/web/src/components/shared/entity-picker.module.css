@@ -14,7 +14,7 @@
 /* 窓の下の文字リンク（作る画面へ）。 */
 .createLink { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); min-width: 0; white-space: nowrap; font-size: var(--text-caption); color: var(--color-ink-secondary); text-decoration: none; }
 .createLink:hover { color: var(--color-action); text-decoration: underline; }
-.createLink:focus-visible, .textButton:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: var(--tpl-bcpick-focus); border-radius: var(--radius-control); }
+.createLink:focus-visible, .textButton:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-focus-ring); outline-offset: var(--tpl-bcpick-focus); border-radius: var(--radius-control); }
 .note { margin: 0; font-size: var(--text-caption); color: var(--color-warning); }
 
 /* まとめて選ぶ一覧。 */

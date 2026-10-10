@@ -20,7 +20,8 @@
 .bandTitle { display: block; color: var(--color-ink); font-weight: 700; line-height: var(--tpl-fr-back-lh); }
 .bandText { display: block; font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
 
-.pair > .card { min-height: var(--tpl-fr-mig-card-min); }
+/* 中身の高いカードに合わせる。固定の最小高さでボタンの上を空けない。 */
+.pair > .card { min-height: 0; }
 .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); align-items: stretch; }
 
 .card {

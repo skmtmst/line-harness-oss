@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * ★V8（夕41）：設定の画面の、白い板の中の左の「設定の中のメニュー」。
  *
@@ -46,6 +48,7 @@ import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 describe('★V8 設定の中のメニュー', () => {
   beforeEach(() => {
+    forgetStaffIdentity()
     clearFeatureVisibilityCache()
     fixture.visibility.mockReset()
     fixture.pathname = '/settings'
@@ -56,6 +59,7 @@ describe('★V8 設定の中のメニュー', () => {
     })
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
+    rememberStaffIdentity({ role: 'owner' } as StaffMember)
   })
 
   afterEach(() => cleanup())
@@ -134,6 +138,7 @@ describe('★V8 設定の中のメニュー', () => {
 
   it('見るだけの人には見られる画面だけ出す（スタッフにはログインユーザーを出さない）', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/emergency']))
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())

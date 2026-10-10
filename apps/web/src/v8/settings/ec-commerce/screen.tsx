@@ -551,7 +551,7 @@ export default function EcCommerceScreen({
 }) {
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   const actions = <Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={styles.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>
   return (
     <SbSettingsScreen

@@ -192,13 +192,13 @@ test.describe('Issue #710 保管済みタグの編集は名前と説明だけ（
 
     await page.goto(`${BASE}/tags`, { waitUntil: 'networkidle' })
 
-    await expect(page.getByRole('link', { name: `タグ「${ACTIVE_TAG.name}」を編集`, exact: true })).toBeVisible()
-    const activeRows = page.locator('tr').filter({ has: page.getByRole('link', { name: `タグ「${ACTIVE_TAG.name}」を編集`, exact: true }) })
+    await expect(page.getByRole('link', { name: ACTIVE_TAG.name, exact: true })).toBeVisible()
+    const activeRows = page.locator('tr').filter({ has: page.getByRole('link', { name: ACTIVE_TAG.name, exact: true }) })
     await expect(activeRows.getByText('アーカイブ', { exact: true })).toHaveCount(0)
-    await expect(page.getByRole('link', { name: `タグ「${ARCHIVED_TAG.name}」を編集`, exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: ARCHIVED_TAG.name, exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: '保管', exact: true }).click()
-    const rows = page.locator('tr').filter({ has: page.getByRole('link', { name: `タグ「${ARCHIVED_TAG.name}」を編集`, exact: true }) })
+    const rows = page.locator('tr').filter({ has: page.getByRole('link', { name: ARCHIVED_TAG.name, exact: true }) })
     await expect(rows.getByText('アーカイブ', { exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: `タグ「${ACTIVE_TAG.name}」を編集`, exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: ACTIVE_TAG.name, exact: true })).toHaveCount(0)
   })
 })
