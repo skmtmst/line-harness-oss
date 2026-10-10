@@ -17,7 +17,7 @@
 import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, Copy, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
+import { Copy, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
 import type { Folder, MediaItem, MessageTemplateMediaDefinition } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -26,7 +26,7 @@ import { readInlineActions, type InlineAction } from '@/components/auto-replies/
 import { ACTION_KINDS } from '@/components/scenarios/action-editor'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -183,7 +183,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [snapshotTaken, setSnapshotTaken] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [urlOpen, setUrlOpen] = useState(false)
-  const [actionsFor, setActionsFor] = useState<number | null>(null)
+
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number } | null>(null)
   const [publishError, setPublishError] = useState('')
@@ -578,10 +578,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         kinds={choiceKindOptions({ host: hqHost, current: action.kind }).filter(isTapActionKind)}
                         extraKinds={hqHost ? [] : ACTION_EXTRA_KIND}
                         renderBody={(kind) => kind !== 'action' ? undefined : (
-                          <button type="button" className={`${styles.pick} ${own.colBody}`} onClick={() => setActionsFor(ai)} title="押されたときの動きを決める">
-                            <span className={styles.pickText}>{inlineActionsText(action.actions, actionOptions.tags)}</span>
-                            <ChevronDown className={styles.pickIcon} aria-hidden="true" />
-                          </button>
+                          <InlineActionList actions={action.actions} {...actionOptions}
+                            onChange={next => update(selectedIndex, { actions: panel.actions.map((a, j) => j === ai ? { ...a, actions: next } : a) })} />
                         )}
                         scope={hqHost ? 'hq' : 'shop'}
                         hasLiff={Boolean(liffId)}
@@ -631,19 +629,6 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         )}
       </TemplateEditFrame>
 
-      <Dialog open={actionsFor !== null && Boolean(panel?.actions[actionsFor ?? 0])} size="large" title="押されたときの動き" onCancel={() => setActionsFor(null)}>
-        {actionsFor !== null && panel?.actions[actionsFor] ? (
-          <InlineActionList
-            actions={panel.actions[actionsFor].actions}
-            onChange={(next) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === actionsFor ? { ...a, actions: next } : a)) })}
-            tags={actionOptions.tags}
-            fields={actionOptions.fields}
-            marks={actionOptions.marks}
-            scenarios={actionOptions.scenarios}
-            vars={actionOptions.vars}
-          />
-        ) : null}
-      </Dialog>
       <ConfirmDialog
         open={publishCheck !== null}
         title="この内容を公開しますか？"

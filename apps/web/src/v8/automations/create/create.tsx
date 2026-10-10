@@ -1,5 +1,7 @@
 'use client'
 
+import ActionList from '@/components/shared/action-list'
+
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -11,17 +13,14 @@ import {
   api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail,
   type AutomationDraftDetail,
 } from '@/lib/api'
-import {
-  ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play,
-  RefreshCw, Tag as TagIcon, Trash2, TriangleAlert, UserPlus, UserRound, Zap,
-} from 'lucide-react'
+import { ArrowLeftRight, ChevronDown, FilePen, MessageCircle, Play, RefreshCw, Tag as TagIcon, TriangleAlert, UserPlus, UserRound, Zap } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
-import { RowMenu } from '@/components/shared/row-actions'
+
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -789,7 +788,7 @@ export function NewAutomationV8({
   const [previewRefreshing, setPreviewRefreshing] = useState(false)
   const [previewTotal, setPreviewTotal] = useState<{ accountId: string; draftId: string; total: number } | null>(null)
   /* 右の列の「…」と、することの中身を直す窓・条件の窓。 */
-  const [actionMenuKey, setActionMenuKey] = useState<number | null>(null)
+
   const [editingActionKey, setEditingActionKey] = useState<number | null>(null)
   const [conditionOpen, setConditionOpen] = useState(false)
   const [testFriendId, setTestFriendId] = useState('')
@@ -2234,20 +2233,7 @@ export function NewAutomationV8({
   const totalForDraft = previewTotal && savedDraft && previewTotal.accountId === selectedAccountId && previewTotal.draftId === savedDraft.id
     ? previewTotal.total
     : null
-  const editingRow = actions.find((row) => row.key === editingActionKey) ?? null
-  const addAction = (type: ActionType) => {
-    const row = { ...newActionDraft(), type }
-    setActions((current) => [...current, row])
-    setEditingActionKey(row.key)
-  }
-  const moveAction = (key: number, delta: -1 | 1) => setActions((current) => {
-    const index = current.findIndex((row) => row.key === key)
-    const next = index + delta
-    if (index < 0 || next < 0 || next >= current.length) return current
-    const copy = [...current]
-    ;[copy[index], copy[next]] = [copy[next], copy[index]]
-    return copy
-  })
+
   /* することの1行の下の小さな文（どれを・何を）。 */
   const actionRowDetail = (row: ActionDraft): string => {
     if (row.type === 'add_tag') {
@@ -2707,142 +2693,79 @@ export function NewAutomationV8({
           <h2 className={styles.cardTitle}>{isDraft ? '3. 何をするか' : '何をするか'}</h2>
           <p className={styles.cardDesc}>上から順に動きます</p>
         </div>
-        <ol className={styles.actionList}>
-          {actions.map((row, index) => {
-            const menuLabel = `${index + 1}つめのすること「${actionRowTitle(row.type)}」の操作`
-            return (
-              <li key={row.key} className={styles.actionRow}>
-                <span className={styles.actionNum}>{index + 1}</span>
-                <span className={styles.actionText}>
-                  <strong>{actionRowTitle(row.type)}</strong>
-                  <small title={actionRowDetail(row)}>{actionRowDetail(row)}</small>
-                </span>
-                {canEdit ? (
-                  <span className={styles.menuBox}>
-                    <RowMenu
-                      className={styles.menuButton}
-                      label={menuLabel}
-                      open={actionMenuKey === row.key}
-                      onOpenChange={(next) => setActionMenuKey(next ? row.key : null)}
-                      items={[
-                        { id: 'edit', label: '中身を直す', icon: <Pencil size={14} />, onSelect: () => { setActionMenuKey(null); setEditingActionKey(row.key) } },
-                        { id: 'up', label: '上へ', icon: <ArrowUp size={14} />, disabled: index === 0, onSelect: () => { setActionMenuKey(null); moveAction(row.key, -1) } },
-                        { id: 'down', label: '下へ', icon: <ArrowDown size={14} />, disabled: index === actions.length - 1, onSelect: () => { setActionMenuKey(null); moveAction(row.key, 1) } },
-                        {
-                          id: 'delete',
-                          label: '削除',
-                          icon: <Trash2 size={14} />,
-                          tone: 'danger',
-                          dividerBefore: true,
-                          disabled: actions.length === 1,
-                          disabledReason: '最後の1つは消せません',
-                          onSelect: () => { setActionMenuKey(null); setActions((current) => current.filter((item) => item.key !== row.key)) },
-                        },
-                      ]}
-                    />
-                  </span>
-                ) : null}
-              </li>
-            )
+        <ActionList<ActionDraft> value={actions} onChange={setActions} readOnly={!canEdit} idOf={row => String(row.key)} addId="v8-add-action" editingId={editingActionKey === null ? null : String(editingActionKey)}
+          titleOf={actionRowDetail} kindOf={row => actionRowTitle(row.type)}
+          choices={EDITABLE_ACTIONS.map(kind => {
+            const target = kind.value === 'add_tag' ? { items: tags, key: 'tagId', title: 'タグ' }
+              : kind.value === 'start_scenario' ? { items: scenarios, key: 'scenarioId', title: 'シナリオ' }
+              : kind.value === 'common_action' ? { items: commonActions, key: 'commonActionId', title: '共通アクション' } : null
+            return { id: kind.value, label: kind.label, make: () => ({ ...newActionDraft(), type: kind.value }), picker: target ? {
+              title: `${target.title}を選ぶ`, items: target.items, apply: (row, ids) => ({ ...row, [target.key]: ids[0] }),
+            } : undefined }
           })}
-        </ol>
-        {inputError?.target === 'v8-add-action' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
-        {canEdit ? (
-          <div className={styles.linkRow}>
-            <button id="v8-add-action" type="button" className={styles.linkButton} onClick={() => { setInputError(null); addAction('add_tag') }}>＋ すること を足す</button>
-            <button type="button" className={styles.linkButton} onClick={() => addAction('common_action')}>共通アクションから選ぶ</button>
-          </div>
-        ) : null}
-      </Card>
-
-      {/* することの中身を直す窓。種類と「どれを」をここで選ぶ。失敗したら、いまはその場で止まる。 */}
-      <Dialog
-        open={editingRow !== null}
-        title={editingRow ? `${actions.findIndex((row) => row.key === editingRow.key) + 1}つめのすること` : 'すること'}
-        description="上から順に動きます。失敗したときは、いまはここで止まります。"
-        designWidth={560}
-        confirmLabel="閉じる"
-        cancelLabel="閉じる"
-        onConfirm={() => setEditingActionKey(null)}
-        onCancel={() => setEditingActionKey(null)}
-      >
-        {editingRow ? (
-          <div className={styles.dialogBody}>
-            <label className={styles.field} htmlFor={`v8-action-${editingRow.key}`}>
-              <span className={styles.label}>すること</span>
-              <Select
-                id={`v8-action-${editingRow.key}`}
-                error={inputError?.target === `v8-action-${editingRow.key}` ? inputError.message : undefined}
-                aria-label="すること"
-                value={editingRow.type}
-                onChange={(value) => updateAction(editingRow.key, { type: value as ActionType })}
-                options={(editingRow.type === 'notify_staff' ? ACTIONS : EDITABLE_ACTIONS)
-                  .map((action) => ({ value: action.value, label: action.label }))}
-                size="full"
-              />
-            </label>
-            {editingRow.type === 'add_tag' ? (
+          renderEditor={(row) => <div className={styles.dialogBody}>
+            {row.type === 'add_tag' ? (
               <ResourcePick
                 kind="tag"
                 title="付けるタグ"
-                id={`v8-tag-${editingRow.key}`}
-                error={inputError?.target === `v8-tag-${editingRow.key}` ? inputError.message : undefined}
+                id={`v8-tag-${row.key}`}
+                error={inputError?.target === `v8-tag-${row.key}` ? inputError.message : undefined}
                 selectLabel="自動化で付けるタグ"
-                value={editingRow.tagId}
-                onPick={(value) => updateAction(editingRow.key, { tagId: value })}
+                value={row.tagId}
+                onPick={(value) => updateAction(row.key, { tagId: value })}
                 options={tags}
                 loading={tagsLoading}
                 failed={tagsFailed}
                 failedNote="タグを読み込めませんでした。画面を再読み込みしてください。"
               />
-            ) : editingRow.type === 'start_scenario' ? (
+            ) : row.type === 'start_scenario' ? (
               <ResourcePick
                 kind="scenario"
                 title="始めるシナリオ"
-                id={`v8-scenario-${editingRow.key}`}
-                error={inputError?.target === `v8-scenario-${editingRow.key}` ? inputError.message : undefined}
+                id={`v8-scenario-${row.key}`}
+                error={inputError?.target === `v8-scenario-${row.key}` ? inputError.message : undefined}
                 selectLabel="自動化で始めるシナリオ"
-                value={editingRow.scenarioId}
-                onPick={(value) => updateAction(editingRow.key, { scenarioId: value })}
+                value={row.scenarioId}
+                onPick={(value) => updateAction(row.key, { scenarioId: value })}
                 options={scenarios}
                 loading={tagsLoading}
                 failed={tagsFailed}
                 failedNote="シナリオを読み込めませんでした。画面を再読み込みしてください。"
               />
-            ) : editingRow.type === 'common_action' ? (
+            ) : row.type === 'common_action' ? (
               <ResourcePick
                 kind="common_action"
                 title="使う共通アクション"
-                id={`v8-common-action-${editingRow.key}`}
-                error={inputError?.target === `v8-common-action-${editingRow.key}` ? inputError.message : undefined}
+                id={`v8-common-action-${row.key}`}
+                error={inputError?.target === `v8-common-action-${row.key}` ? inputError.message : undefined}
                 selectLabel="自動化で使う共通アクション"
-                value={editingRow.commonActionId}
-                onPick={(value) => updateAction(editingRow.key, { commonActionId: value })}
+                value={row.commonActionId}
+                onPick={(value) => updateAction(row.key, { commonActionId: value })}
                 options={commonActions}
                 loading={tagsLoading}
                 failed={tagsFailed}
                 failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
               />
-            ) : editingRow.type === 'notify_staff' ? (
+            ) : row.type === 'notify_staff' ? (
               <p className={styles.cardDesc}>
                 知らせる相手と文面は、見本から作ったときのまま保ちます。変えるときは、することを選び直してください。
               </p>
             ) : (
-              <label className={styles.field} htmlFor={`v8-message-${editingRow.key}`}>
+              <label className={styles.field} htmlFor={`v8-message-${row.key}`}>
                 <span className={styles.label}>送る文面</span>
                 <TextArea
-                  invalid={inputError?.target === `v8-message-${editingRow.key}`}
-                  aria-describedby={inputError?.target === `v8-message-${editingRow.key}` ? 'v8-action-error' : undefined}
-                  id={`v8-message-${editingRow.key}`}
-                  value={editingRow.message}
-                  onChange={(event) => updateAction(editingRow.key, { message: event.target.value })}
+                  invalid={inputError?.target === `v8-message-${row.key}`}
+                  aria-describedby={inputError?.target === `v8-message-${row.key}` ? 'v8-action-error' : undefined}
+                  id={`v8-message-${row.key}`}
+                  value={row.message}
+                  onChange={(event) => updateAction(row.key, { message: event.target.value })}
                 />
-                {inputError?.target === `v8-message-${editingRow.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
+                {inputError?.target === `v8-message-${row.key}` ? <p id="v8-action-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
               </label>
             )}
-          </div>
-        ) : null}
-      </Dialog>
+          </div>} />
+        {inputError?.target === 'v8-add-action' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
+      </Card>
 
       {/* だれに：条件の窓。一斉配信・シナリオと同じ条件（標準互換・15軸）。 */}
       <Dialog

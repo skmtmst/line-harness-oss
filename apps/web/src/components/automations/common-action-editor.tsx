@@ -1,14 +1,13 @@
 'use client'
 
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
+import ActionList, { type ActionChoice } from '@/components/shared/action-list'
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
-import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
+
 import Select from '@/components/shared/select'
 import { EntityKindField, type EntityKind } from '@/components/shared/entity-picker-sources'
 import { TextArea, TextField } from '@/components/shared/text-field'
 
-const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> = [
+export const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> = [
   { value: 'add_tag', label: 'タグを付ける' },
   { value: 'remove_tag', label: 'タグを外す' },
   { value: 'set_metadata', label: '友だち情報を設定する' },
@@ -76,85 +75,45 @@ export default function CommonActionEditor({
   resourcesFailed?: boolean
 }) {
   const numberOf = (index: number, step: CommonActionStep) => stepNumbers?.[step.id] ?? index + 1
-  const update = (index: number, patch: Partial<CommonActionStep>) => {
-    onChange(value.map((step, stepIndex) => stepIndex === index ? { ...step, ...patch } : step))
-  }
-  const move = (index: number, offset: -1 | 1) => {
-    const target = index + offset
-    if (target < 0 || target >= value.length) return
-    const next = [...value]
-    ;[next[index], next[target]] = [next[target], next[index]]
-    onChange(next)
-  }
 
-  return (
-    <div className="space-y-3">
-      {value.map((step, index) => (
-        <section key={step.id} className="border-hairline rounded-card border bg-canvas p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className="text-ink font-semibold">{numberOf(index, step)}. {ACTION_OPTIONS.find((item) => item.value === step.type)?.label}</h3>
-            <div className="flex items-center gap-1">
-              <IconButton onClick={() => move(index, -1)} disabled={index === 0} aria-label={`${numberOf(index, step)}番目の処理を上へ`}>
-                <ArrowUp size={16} aria-hidden />
-              </IconButton>
-              <IconButton onClick={() => move(index, 1)} disabled={index === value.length - 1} aria-label={`${numberOf(index, step)}番目の処理を下へ`}>
-                <ArrowDown size={16} aria-hidden />
-              </IconButton>
-              <IconButton onClick={() => onChange(value.filter((_, stepIndex) => stepIndex !== index))} aria-label={`${numberOf(index, step)}番目の処理を削除`}>
-                <Trash2 size={16} aria-hidden />
-              </IconButton>
-            </div>
-          </div>
+  return <ActionList value={value} onChange={onChange} choices={commonActionChoices(resources)} idOf={step => step.id} numberOf={(step, index) => numberOf(index, step)}
+    titleOf={step => commonActionSummary(step, resources)} kindOf={step => ACTION_OPTIONS.find(item => item.value === step.type)?.label ?? step.type}
+    renderEditor={(step, patch) => <CommonActionConfig step={step} resources={resources} resourcesFailed={resourcesFailed} onChange={patch} />} />
+}
 
-          <div className="grid gap-3 lg:grid-cols-2">
-            <label className="text-ink-secondary text-sm">
-              処理
-              <Select
-                aria-label="処理"
-                size="full"
-                value={step.type}
-                onChange={(value) => update(index, {
-                  type: value as CommonActionStep['type'],
-                  params: defaultParams(value as CommonActionStep['type']),
-                })}
-                className="mt-1 w-full"
-                options={ACTION_OPTIONS}
-              />
-            </label>
-            <label className="text-ink-secondary text-sm">
-              失敗したとき
-              <Select
-                aria-label="失敗したとき"
-                size="full"
-                value={step.onFailure}
-                onChange={(value) => update(index, { onFailure: value as 'stop' | 'continue' })}
-                className="mt-1 w-full"
-                options={[
-                  { value: 'stop', label: 'ここで止める' },
-                  { value: 'continue', label: '次の処理へ進む' },
-                ]}
-              />
-            </label>
-          </div>
-
-          <div className="mt-3">
-            <ActionParams
-              step={step}
-              resources={resources}
-              resourcesFailed={resourcesFailed}
-              onChange={(params) => update(index, { params })}
-            />
-          </div>
-        </section>
-      ))}
-      <Button
-        onClick={() => onChange([...value, newCommonActionStep()])}
-      >
-        <Plus size={16} aria-hidden />
-        処理を追加する
-      </Button>
-    </div>
-  )
+export function commonActionChoices(resources: CommonActionResources): ActionChoice<CommonActionStep>[] {
+  const choices: ActionChoice<CommonActionStep>[] = ACTION_OPTIONS.map(option => {
+    const target = option.value === 'add_tag' || option.value === 'remove_tag' ? { items: resources.tags, key: 'tagId', label: 'タグ' }
+      : ['start_scenario', 'stop_scenario', 'resume_scenario'].includes(option.value) ? { items: resources.scenarios, key: 'scenarioId', label: 'シナリオ' }
+      : option.value === 'send_webhook' ? { items: resources.webhooks, key: 'webhookId', label: '送信先' }
+      : option.value === 'switch_rich_menu' ? { items: resources.richMenus, key: 'richMenuPageId', label: 'リッチメニュー' }
+      : option.value === 'common_action' ? { items: resources.commonActions, key: 'commonActionId', label: '共通アクション' } : null
+    return { id: option.value, label: option.label, make: () => newCommonActionStep(option.value), picker: target ? {
+      title: `${target.label}を選ぶ`, items: target.items, apply: (step, ids) => ({ ...step, params: { ...step.params, [target.key]: ids[0] } }),
+    } : undefined }
+  })
+  choices.splice(choices.findIndex(choice => choice.id === 'send_message') + 1, 0, {
+    id: 'send_template', label: 'テンプレートを送る', make: () => newCommonActionStep('send_message'),
+    picker: { title: 'テンプレートを選ぶ', items: resources.templates, apply: (step, ids) => ({ ...step, params: { templateId: ids[0] } }) },
+  })
+  return choices
+}
+export function commonActionSummary(step: CommonActionStep, resources: CommonActionResources): string {
+  const params = step.params
+  const id = String(params.tagId ?? params.scenarioId ?? params.templateId ?? params.webhookId ?? params.richMenuPageId ?? params.commonActionId ?? '')
+  if (id) return [...resources.tags, ...resources.scenarios, ...resources.templates, ...resources.webhooks, ...resources.richMenus, ...resources.commonActions].find(item => item.id === id)?.name ?? '未設定'
+  if (step.type === 'send_message') return String(params.content || '未設定')
+  if (step.type === 'wait') return `${params.durationMinutes ?? 0} 分`
+  return ACTION_OPTIONS.find(item => item.value === step.type)?.label ?? step.type
+}
+export function CommonActionConfig({ step, resources, resourcesFailed = false, onChange }: {
+  step: CommonActionStep; resources: CommonActionResources; resourcesFailed?: boolean; onChange: (next: CommonActionStep) => void
+}) {
+  return <>
+    <Select aria-label="失敗したとき" value={step.onFailure} onChange={value => onChange({ ...step, onFailure: value as 'stop' | 'continue' })}
+      options={[{ value: 'stop', label: 'ここで止める' }, { value: 'continue', label: '次の処理へ進む' }]} />
+    <ActionParams step={step} resources={resources} resourcesFailed={resourcesFailed} onChange={params => onChange({ ...step, params })} />
+  </>
 }
 
 /** 作ってあるものを選ぶ欄（共通の選ぶ窓・dJZ7Q）。保存する値は今と同じ ID。 */

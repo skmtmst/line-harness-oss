@@ -15,7 +15,7 @@ import KpiCard from '@/components/shared/kpi-card'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Copy, GitCompare, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api'
 import { formatDay } from '@/lib/format'
@@ -32,7 +32,8 @@ import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
 import Toggle from '@/components/shared/toggle'
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
-import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
+import LinkedActionList from '@/components/friend-fields/linked-action-list'
+import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model'
 import styles from './edit.module.css'
 
@@ -102,8 +103,7 @@ export function TagEditForm({
   const [applyToExisting, setApplyToExisting] = useState(retroactiveReference)
   const [reapplyMode, setReapplyMode] = useState<'once' | 'every'>(tag.reapplyPolicy === 'every_time' ? 'every' : 'once')
   const [actions, setActions] = useState<LinkedAction[]>(initialActions)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [selectedActionId, setSelectedActionId] = useState<string | null>(null)
+
   const [retroactiveOpen, setRetroactiveOpen] = useState(retroactiveReference)
   /* 畳んだ段。競合のときは、直した所が見えるように全部開く（xn95q）。 */
   const [actionsOpen, setActionsOpen] = useState(false)
@@ -161,23 +161,6 @@ export function TagEditForm({
     }
     void onSave(values, false)
   }
-
-  const moveAction = (index: number, direction: -1 | 1) => {
-    setActions((current) => {
-      const next = index + direction
-      if (next < 0 || next >= current.length) return current
-      const reordered = [...current]
-      const [moved] = reordered.splice(index, 1)
-      reordered.splice(next, 0, moved)
-      return reordered
-    })
-  }
-  const duplicateAction = (action: LinkedAction, index: number) => {
-    const id = crypto.randomUUID()
-    const copy = { ...action, id, definition: action.definition ? { ...action.definition, id } : undefined }
-    setActions((current) => [...current.slice(0, index + 1), copy, ...current.slice(index + 1)])
-  }
-  const removeAction = (id: string) => setActions((current) => current.filter((item) => item.id !== id))
 
   /* 使っている所：削除の影響確認と同じ数え方（dependencies）。取れないときはタグの一覧の数。 */
   const usageRows = buildUsageRows(dependencies, tag.usedIn)
@@ -313,22 +296,7 @@ export function TagEditForm({
               <>
                 {linked || host ? (
                   <>
-                    {actions.length === 0 ? <p className={styles.emptyBox}>連動の動きはまだありません</p> : actions.map((action, index) => (
-                      <div key={action.id} className={styles.actionRow} onFocus={() => setSelectedActionId(action.id)} onClick={() => setSelectedActionId(action.id)}>
-                        <span className={styles.actionIndex}>{index + 1}</span>
-                        <span className={styles.actionLabel} title={`${action.type}：${action.label}`}>{action.label}</span>
-                        {action.timing && action.timing !== 'すぐに' ? <span className={styles.actionTiming}>{action.timing}</span> : null}
-                        {readOnly ? null : <>
-                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を上へ`} disabled={index === 0} onClick={() => moveAction(index, -1)}><ArrowUp size={14} aria-hidden="true" /></button>
-                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を下へ`} disabled={index === actions.length - 1} onClick={() => moveAction(index, 1)}><ArrowDown size={14} aria-hidden="true" /></button>
-                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を複製`} onClick={() => duplicateAction(action, index)}><Copy size={14} aria-hidden="true" /></button>
-                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を削除`} onClick={() => removeAction(action.id)}><Trash2 size={14} aria-hidden="true" /></button>
-                        </>}
-                      </div>
-                    ))}
-                    {readOnly ? null : (
-                      <button type="button" className={styles.ghostButton} onClick={() => setDrawerOpen(true)}><Plus size={14} aria-hidden="true" />アクションを追加する</button>
-                    )}
+                    <LinkedActionList value={actions} onChange={next => { if (host && next.length > actions.length) setLinked(true); setActions(next) }} accountId={host ? null : accountId} allowedTypes={host?.allowedActionTypes} readOnly={readOnly} />
                   </>
                 ) : <p className={styles.emptyBox}>連動はオフです。右上のスイッチをオンにすると、付いたときの動きとマイルを決められます。</p>}
               </>
@@ -417,7 +385,7 @@ export function TagEditForm({
           ) : null}
         </fieldset>
       </CreatePage>
-      {drawerOpen ? <ActionDrawer hqV8={Boolean(host)} suppliedResources={host ? null : undefined} allowedActionTypes={host?.allowedActionTypes} accountId={host ? null : accountId} onClose={() => setDrawerOpen(false)} selectedAction={actions.find((action) => action.id === selectedActionId)} onAdd={(action, beforeId) => { if (host) setLinked(true); setActions((current) => { const index = beforeId ? current.findIndex((entry) => entry.id === beforeId) : -1; return index < 0 ? [...current, action] : [...current.slice(0, index), action, ...current.slice(index)] }); setDrawerOpen(false) }} /> : null}
+
       {retroactiveOpen ? (
         <RetroactiveDialog
           referenceState={retroactiveReference}

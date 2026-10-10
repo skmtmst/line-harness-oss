@@ -9,17 +9,19 @@
  * 見せ方を絵に合わせた：処理は番号つきの1行（何を・どれを）で並べ、行を押すとその処理の設定を開く。
  * 並べ替え・削除は閉じた行の右端から行う。「失敗したとき」は全部の処理の「失敗したとき」をまとめて決める（行ごとに変えることもできる）。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Save, Trash2 } from 'lucide-react'
+import { Save } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, describeSaveFailure, type CommonActionResources, type CommonActionStep } from '@/lib/api'
-import CommonActionEditor, { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
+import ActionList from '@/components/shared/action-list'
+import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import { CommonActionConfig, commonActionChoices, newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
+
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -27,7 +29,7 @@ import { Field, OptionalBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from './branch-editor'
-import { stepNumbers } from './action-order'
+
 import { ACTION_LABELS } from './version-diff'
 import styles from './common-action-new.module.css'
 
@@ -92,7 +94,7 @@ export function CommonActionNew() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [actions, setActions] = useState<CommonActionStep[]>([newCommonActionStep()])
-  const [openId, setOpenId] = useState<string | null>(null)
+
   const [resources, setResources] = useState<CommonActionResources>(EMPTY_RESOURCES)
   const [resourcesLoading, setResourcesLoading] = useState(true)
   const [resourcesFailed, setResourcesFailed] = useState(false)
@@ -101,7 +103,7 @@ export function CommonActionNew() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [inputError, setInputError] = useState<{ target: string; message: string } | null>(null)
-  const [exampleOpen, setExampleOpen] = useState(false)
+
   const [exampleId, setExampleId] = useState('')
   const [requestKey] = useState(() => newStepId())
 
@@ -174,7 +176,6 @@ export function CommonActionNew() {
     }
   }
 
-  const numbers = useMemo(() => stepNumbers(actions), [actions])
   /* 足した行は閉じたまま（2行目の「〇〇を選ぶ」で何を決めるかが分かる）。押すと設定を開く。 */
   const addStep = (step: CommonActionStep) => {
     setActions((current) => [...current, step])
@@ -184,23 +185,10 @@ export function CommonActionNew() {
     if (!id) return
     addStep({ ...newCommonActionStep('common_action'), params: { commonActionId: id } })
     setExampleId('')
-    setExampleOpen(false)
   }
-  const move = (id: string, offset: -1 | 1) => {
-    setActions((current) => {
-      const index = current.findIndex((step) => step.id === id)
-      const target = index + offset
-      if (index < 0 || target < 0 || target >= current.length) return current
-      const next = [...current]
-      ;[next[index], next[target]] = [next[target], next[index]]
-      return next
-    })
-  }
+
   /* 開いた設定（1つの処理）を直す・消す。 */
-  const replaceStep = (id: string, next: CommonActionStep[]) => {
-    setActions((current) => next.length ? current.map((step) => step.id === id ? next[0] : step) : current.filter((step) => step.id !== id))
-    if (next.length === 0) setOpenId(null)
-  }
+
   const updateBranch = (id: string, patch: BranchPatch) => {
     setActions((current) => current.map((step) => step.id === id ? updateBranchStep(step, patch) : step))
   }
@@ -294,60 +282,13 @@ export function CommonActionNew() {
             <Button onClick={() => setResourcesReloadKey((key) => key + 1)}>選択肢をもう一度読み込む</Button>
           </div>
         ) : null}
-        {actions.map((step, index) => {
-          const open = openId === step.id
-          const number = numbers[step.id] ?? index + 1
-          return (
-            <div key={step.id} className={styles.stepBox} data-open={open || undefined}>
-              <div className={styles.stepLine}>
-                <button type="button" className={styles.stepRow} aria-expanded={open} onClick={() => setOpenId(open ? null : step.id)}>
-                  <span className={styles.stepNo}>{number}</span>
-                  <span className={styles.stepText}>
-                    <span className={styles.stepTitle}>{ACTION_LABELS[step.type] ?? '処理'}</span>
-                    <span className={styles.stepSub}>{stepSummary(step, resources)}</span>
-                  </span>
-                </button>
-                <div className={styles.stepMoves}>
-                  <IconButton onClick={() => move(step.id, -1)} disabled={index === 0} aria-label={`${number}番目の処理を上へ`}><ArrowUp size={16} aria-hidden="true" /></IconButton>
-                  <IconButton onClick={() => move(step.id, 1)} disabled={index === actions.length - 1} aria-label={`${number}番目の処理を下へ`}><ArrowDown size={16} aria-hidden="true" /></IconButton>
-                  <IconButton onClick={() => replaceStep(step.id, [])} aria-label={`${number}番目の処理を削除`}><Trash2 size={16} aria-hidden="true" /></IconButton>
-                </div>
-              </div>
-              {open ? (
-                <div className={styles.stepEditor}>
-                  {step.type === 'branch' ? (
-                    <BranchEditors
-                      steps={[step]}
-                      resources={resources}
-                      onUpdate={updateBranch}
-                      onRemove={(id) => { setActions((current) => current.filter((item) => item.id !== id)); setOpenId(null) }}
-                    />
-                  ) : (
-                    <CommonActionEditor
-                      value={[step]}
-                      resources={resources}
-                      resourcesFailed={resourcesFailed}
-                      stepNumbers={{ [step.id]: number }}
-                      onChange={(next) => replaceStep(step.id, next)}
-                    />
-                  )}
-                </div>
-              ) : null}
-            </div>
-          )
-        })}
-        <div className={styles.addLinks}>
-          <button id="ca-add-step" type="button" className={styles.addLink} onClick={() => addStep(newCommonActionStep())}>＋ 処理を足す</button>
-          <button type="button" className={styles.addLink} onClick={() => addStep(newCommonActionStep('wait'))}>待ち時間を入れる</button>
-          <button type="button" className={styles.addLink} onClick={() => addStep(newBranchStep())}>条件で分ける</button>
-          {resources.commonActions.length > 0 ? (
-            exampleOpen ? (
-              <span className={styles.exampleBox}>
-                <Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '見本を選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
-              </span>
-            ) : <button type="button" className={styles.addLink} onClick={() => setExampleOpen(true)}>見本から受け渡す</button>
-          ) : null}
-        </div>
+        <ActionList value={actions} onChange={setActions} idOf={step => step.id} addId="ca-add-step"
+          choices={[...commonActionChoices(resources), { id: 'branch', label: '条件で分ける', make: newBranchStep }]}
+          titleOf={step => stepSummary(step, resources)} kindOf={step => ACTION_LABELS[step.type] ?? '処理'}
+          renderEditor={(step, update) => step.type === 'branch'
+            ? <BranchEditors steps={[step]} resources={resources} onUpdate={updateBranch} onRemove={id => setActions(current => current.filter(item => item.id !== id))} />
+            : <CommonActionConfig step={step} resources={resources} resourcesFailed={resourcesFailed} onChange={update} />} />
+        {resources.commonActions.length > 0 ? <EntityKindField kind="common_action" label="見本から受け渡す" options={resources.commonActions} value={exampleId} onChange={value => { setExampleId(value); addExample(value) }} /> : null}
         {inputError?.target === 'ca-add-step' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
       </section>
 

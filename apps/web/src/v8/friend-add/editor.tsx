@@ -1,5 +1,7 @@
 'use client'
 
+import ActionList from '@/components/shared/action-list'
+
 /*
  * ★V8 友だち追加時の配信を作る・直す（Pencil：作る①基本設定 `wDzkc` → ②流入リンク `h8uNW`
  * （1152 `xHpkS`）→ ③初回案内 `al47K` → ④あわせて行うこと `i1nThZ` → ⑤確認 `U8Xm3X`、
@@ -53,7 +55,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Select from '@/components/shared/select'
+
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
@@ -1423,70 +1425,21 @@ function ActionsStep({ definition, setDefinition, options, canEdit }: {
   options: FriendAddRuleOptions
   canEdit: boolean
 }) {
-  const [kind, setKind] = useState<FriendAddRuleAction['type']>('add_tag')
-  const [target, setTarget] = useState('')
-  const source = ACTION_KINDS.find((item) => item.type === kind)?.source ?? 'tag'
-  const targets = source === 'scenario' ? options.scenarios : options.tags
-  const addAction = () => {
-    const found = targets.find((item) => item.id === target)
-    if (!found) return
-    const label = kind === 'start_scenario'
-      ? `シナリオ「${found.name}」を始める`
-      : kind === 'remove_tag'
-        ? `タグ「${found.name}」を外す`
-        : `タグ「${found.name}」を付ける`
-    setDefinition((current) => ({ ...current, actions: [...current.actions, { type: kind, label, targetId: found.id }] }))
-    setTarget('')
+  const setActions = (actions: FriendAddRuleAction[]) => setDefinition(current => ({ ...current, actions }))
+  const title = (kind: FriendAddRuleAction['type'], id: string) => {
+    const list = kind === 'start_scenario' ? options.scenarios : options.tags
+    const name = list.find(item => item.id === id)?.name ?? '未設定'
+    return kind === 'start_scenario' ? `シナリオ「${name}」を始める` : `タグ「${name}」を${kind === 'remove_tag' ? '外す' : '付ける'}`
   }
-  return (
-    <Card padding="roomy" layout="vertical" className={styles.card} aria-label="あわせて行うこと">
-      <div className={styles.cardHead}>
-        <h2 className={styles.cardTitle}>あわせて行うこと</h2>
-        <p className={styles.cardDesc}>案内を送ったあと、上から順に行います</p>
-      </div>
-      {definition.actions.length === 0 ? (
-        <p className={styles.cardDesc}>まだ何もありません。下から足せます。</p>
-      ) : (
-        <ol className={styles.actionList}>
-          {definition.actions.map((action, index) => (
-            <li key={`${action.type}-${index}`} className={styles.actionRow}>
-              <span className={styles.actionIndex}>{index + 1}</span>
-              <span className={styles.actionLabel} title={action.label}>{action.label}</span>
-              {canEdit ? (
-                <Button
-                  type="button"
-                  variant="text"
-                  aria-label={`${action.label}を外す`}
-                  onClick={() => setDefinition((current) => ({ ...current, actions: current.actions.filter((_, itemIndex) => itemIndex !== index) }))}
-                >
-                  外す
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      )}
-      {canEdit ? (
-        <div className={styles.actionAdd}>
-          <div className={styles.actionSelect}>
-            <Select
-              aria-label="足す操作の種類"
-              size="full"
-              value={kind}
-              onChange={(value) => { setKind(value as FriendAddRuleAction['type']); setTarget('') }}
-              options={ACTION_KINDS.map((item) => ({ value: item.type, label: item.label }))}
-            />
-          </div>
-          <div className={styles.actionSelect}>
-            <EntityKindField kind={source} label="足す操作の対象" options={targets} value={target} onChange={setTarget} />
-          </div>
-          <Button type="button" disabled={!target} onClick={addAction}>
-            <Plus size={15} aria-hidden="true" />足す
-          </Button>
-        </div>
-      ) : null}
-    </Card>
-  )
+  return <Card padding="roomy" layout="vertical" className={styles.card} aria-label="あわせて行うこと">
+    <div className={styles.cardHead}><h2 className={styles.cardTitle}>あわせて行うこと</h2><p className={styles.cardDesc}>案内を送ったあと、上から順に行います</p></div>
+    <ActionList<FriendAddRuleAction> value={definition.actions} onChange={setActions} readOnly={!canEdit} idOf={(_, index) => String(index)} titleOf={action => action.label}
+      choices={ACTION_KINDS.map(kind => ({ id: kind.type, label: kind.label, make: () => ({ type: kind.type, label: '', targetId: '' }),
+        picker: { title: `${kind.source === 'tag' ? 'タグ' : 'シナリオ'}を選ぶ`, items: kind.source === 'tag' ? options.tags : options.scenarios,
+          apply: (action, ids) => ({ ...action, targetId: ids[0], label: title(action.type, ids[0]) }) } }))}
+      renderEditor={(action, update) => <EntityKindField kind={action.type === 'start_scenario' ? 'scenario' : 'tag'} label="操作の対象" options={action.type === 'start_scenario' ? options.scenarios : options.tags}
+        value={action.targetId} onChange={targetId => update({ ...action, targetId, label: title(action.type, targetId) })} />} />
+  </Card>
 }
 
 /* ===== 作る⑤ 確認（板 `U8Xm3X`） ===== */

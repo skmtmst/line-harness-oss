@@ -10,17 +10,17 @@
  * 「押されたら」は今の質問の部品（QuestionEditor）を窓で開いて決める（タグ・友だち情報・シナリオ・URL などの全部の設定が残る）。
  * 受け付ける URL：`/templates/questions/new`・`?id=<テンプレート>`（直す）。
  */
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, Plus, Send, Trash2 } from 'lucide-react'
+import { Plus, Send, Trash2 } from 'lucide-react'
 import type { Folder, Scenario, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { describeApiFailure, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import QuestionEditor, { emptyQuestion, newChoiceKey, type QuestionChoice, type ScenarioQuestion } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -95,8 +95,8 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [category, setCategory] = useState('未分類')
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [tags, setTags] = useState<Tag[]>([])
-  const [scenarios, setScenarios] = useState<Scenario[]>([])
+  const [, setTags] = useState<Tag[]>([])
+  const [, setScenarios] = useState<Scenario[]>([])
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [initialQuestion] = useState<ScenarioQuestion>(() => hostInitial?.question ?? emptyQuestion())
   const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
@@ -106,7 +106,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [publishConfirm, setPublishConfirm] = useState(false)
-  const [actionsOpen, setActionsOpen] = useState(false)
+
   const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
@@ -218,7 +218,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     setQuestion((current) => ({ ...current, choices: current.choices.filter((_, i) => i !== index) }))
   const addChoice = () =>
     setQuestion((current) => ({ ...current, choices: [...current.choices, { key: newChoiceKey(), label: '', behavior: 'none' }] }))
-  const summaryOf = useMemo(() => (choice: QuestionChoice) => choiceActionText(choice, tags, scenarios), [tags, scenarios])
 
   if (loading || (accountLoading && !host)) return <ListState kind="loading" title="質問テンプレートを読み込んでいます" />
 
@@ -342,13 +341,8 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   <input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} />
                 </label>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
-                {host ? null : <div className={styles.inline}>
-                  <span className={styles.smallLabel}>押されたら</span>
-                  <button type="button" className={styles.pick} title="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める" onClick={() => setActionsOpen(true)}>
-                    <span className={styles.pickText}>{summaryOf(choice)}</span>
-                    <ChevronDown className={styles.pickIcon} aria-hidden="true" />
-                  </button>
-                </div>}
+                {host ? null : <QuestionEditor value={question} onChange={setQuestion} choiceOnly={index} choiceColumns />}
+
                 <label className={styles.field}>
                   <span className={styles.label}>押したときの返信<span className={styles.optional}>任意</span></span>
                   <input className={styles.input} value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} />
@@ -365,9 +359,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       </TemplateEditFrame>
 
       {/* 押したときの動きは今の部品で決める（全部の選択肢をまとめて直せる）。 */}
-      <Dialog open={actionsOpen} size="large" title="押したときの動き" onCancel={() => setActionsOpen(false)}>
-        {actionsOpen ? <QuestionEditor value={question} onChange={setQuestion} choiceColumns /> : null}
-      </Dialog>
       <ConfirmDialog
         open={publishConfirm}
         title="この質問を公開しますか？"

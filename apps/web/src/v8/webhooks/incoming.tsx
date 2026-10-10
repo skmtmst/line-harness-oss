@@ -9,7 +9,7 @@
  * 試し・作成・動かす/止める・合言葉・名前・削除）。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
 import type { IncomingWebhook } from '@line-crm/shared'
@@ -55,6 +55,7 @@ import {
 } from './shell'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
+import IncomingActions from './incoming-actions'
 import styles from './incoming.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -135,6 +136,8 @@ export default function WebhooksIncomingV8() {
   const { incoming, incomingStatus, loadedAccountId, reload } = overview
 
   const [error, setError] = useState('')
+  const actionsGuard = useRef<((action: () => void) => void) | null>(null)
+  const onActionsGuardReady = useCallback((guard: ((action: () => void) => void) | null) => { actionsGuard.current = guard }, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<DetailType | null>(null)
   const [detailStatus, setDetailStatus] = useState<LoadStatus>('loading')
@@ -269,7 +272,7 @@ export default function WebhooksIncomingV8() {
     setUnmatchedStatus('ready')
   }, [selectedAccountId, selectedDetailId])
 
-  const selectInlet = (id: string) => withViewTransition(() => setSelectedId(id))
+  const selectInlet = (id: string) => { const select = () => withViewTransition(() => setSelectedId(id)); if (actionsGuard.current) actionsGuard.current(select); else select() }
   const moveSelection = (delta: -1 | 1) => {
     if (displayed.length === 0) return
     const current = selected ? displayed.findIndex((item) => item.id === selected.id) : -1
@@ -708,19 +711,9 @@ export default function WebhooksIncomingV8() {
             <p className={styles.cardNote}>保存されている処理を読み込んでいます。</p>
           ) : detailStatus === 'error' ? (
             <ListState kind="error" title="届いた後の処理を表示できませんでした" action={<Button onClick={() => setDetailReloadKey((key) => key + 1)}>詳細を読み直す</Button>} />
-          ) : detail && detail.actions.length > 0 ? (
-            detail.actions.map((action, index) => (
-              <div key={`${action.refKind}-${index}`} className={styles.actionRow}>
-                <span className={styles.actionName}>{`${index + 1} ${incomingActionLabel(action.refKind)}`}</span>
-                <span className={styles.spacer} aria-hidden="true" />
-                <span className={styles.actionTarget}>{`「${action.displayName}」`}</span>
-              </div>
-            ))
-          ) : (
-            <p className={styles.cardNote}>届いた後に動かす処理は、まだ決めていません。</p>
-          )}
-          {/* 絵の「＋ すること を足す」。設定の口（PATCH …/config）はあるが画面の配線がまだ無いので、押せる形にせず一言で伝える。 */}
-          {detailStatus === 'ready' ? <p className={styles.addNote}>すること の追加・入れ替えは、この画面ではまだできません</p> : null}
+          ) : detail && selectedAccountId ? (
+            <IncomingActions key={`${selectedAccountId}:${detail.id}:${detail.version}`} detail={detail} accountId={selectedAccountId} readOnly={staffRole !== 'owner'} onGuardReady={onActionsGuardReady} onSaved={() => setDetailReloadKey(key => key + 1)} />
+          ) : <p className={styles.cardNote}>届いた後に動かす処理は、まだ決めていません。</p>}
           {detail?.actionExecution.state === 'needs_attention' && detail.actionExecution.reason ? (
             <p className={styles.smallNote}>{detail.actionExecution.reason}</p>
           ) : null}

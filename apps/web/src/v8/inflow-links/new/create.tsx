@@ -1,5 +1,8 @@
 'use client'
 
+import ActionList from '@/components/shared/action-list'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+
 /*
  * ★V8 流入リンクを作る（Pencil：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`）。
  *
@@ -12,7 +15,7 @@
  * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
  */
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
@@ -30,12 +33,12 @@ import ListState from '@/components/shared/list-state'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
-import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
+
 import { Th } from '@/components/shared/table'
 import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
 import { focusField } from '../focus-field'
-import { groupTagsByFolder } from './tag-options'
+
 import styles from './create.module.css'
 
 /* ref は口（entry-routes.ts）と同じ `[A-Za-z0-9_-]{1,64}`。 */
@@ -91,14 +94,12 @@ function InflowCreate() {
   const [redirectUrl, setRedirectUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
-  const [tagGroups, setTagGroups] = useState<TagGroup[]>([])
-  const tagOptionGroups = useMemo(() => groupTagsByFolder(tags, tagGroups), [tags, tagGroups])
+  const [, setTagGroups] = useState<TagGroup[]>([])
+
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
-  const [showTagPick, setShowTagPick] = useState(false)
-  const [showIntroPick, setShowIntroPick] = useState(false)
-  const [showScenarioPick, setShowScenarioPick] = useState(false)
+
   const [pruneNotice, setPruneNotice] = useState<string | null>(null)
   /* 発行が 409（見分けるための文字が使用中）で返り、同じ文字の発行済みリンクが見つかったときだけ立つ。 */
   const [conflict, setConflict] = useState<EntryRoute | null>(null)
@@ -342,35 +343,9 @@ function InflowCreate() {
     </div>
   )
 
-  const actionRow = (opts: {
-    title: string
-    value: string | null
-    on: boolean
-    onOff: () => void
-    open: boolean
-    onToggleOpen: () => void
-    pickLabel: string
-    picker: ReactNode
-    /** 選ぶ窓（EntityKindDialog）を開くだけの行。下の段を出さない。 */
-    dialog?: boolean
-  }) => (
-    <div className={styles.actionItem}>
-      <div className={styles.actionRow}>
-        <Toggle checked={opts.on} label={opts.title} onChange={(next) => { if (!next) opts.onOff(); else if (!opts.on) opts.onToggleOpen() }} />
-        <div className={styles.actionText}>
-          <span className={styles.actionTitle}>{opts.title}</span>
-          <span className={styles.actionValue}>{opts.value ?? 'まだ決めていません'}</span>
-        </div>
-        <Button variant="text" onClick={opts.onToggleOpen} aria-expanded={opts.open} aria-label={`${opts.pickLabel}を${opts.value ? '変える' : '決める'}`}>
-          {opts.value ? '変える' : '決める'}
-        </Button>
-      </div>
-      {opts.open ? opts.dialog ? opts.picker : <div className={styles.actionPick}>{opts.picker}</div> : null}
-    </div>
-  )
-
   return (
     <CreatePage
+      hidePreviewWhenNarrow
       boardId="KMaMk"
       title="流入リンクを作る"
       description="発行すると URL と QR コードができます。友だちになった人を、この経路で数えます。"
@@ -506,68 +481,18 @@ function InflowCreate() {
           <h2 className={styles.cardTitle} id="ir-new-after">友だちになったときにすること</h2>
           <p className={styles.cardNote}>何も決めないと「動きが未設定」になり、数えるだけになります</p>
         </div>
-        {actionRow({
-          title: 'タグを付ける',
-          value: tagName,
-          on: tagId !== '',
-          onOff: () => setTagId(''),
-          open: showTagPick,
-          onToggleOpen: () => setShowTagPick((current) => !current),
-          pickLabel: '付けるタグ',
-          picker: (
-            <Select
-              id="ir-tag"
-              value={tagId}
-              onChange={(next) => { setTagId(next); setShowTagPick(false) }}
-              aria-label="付けるタグ"
-              size="full"
-              options={[
-                { value: '', label: '（付けない）' },
-                ...tagOptionGroups.flatMap((group) => group.tags.map((tag) => ({ value: tag.id, label: group.label ? `${group.label} / ${tag.name}` : tag.name }))),
-              ]}
-            />
-          ),
-        })}
-        {actionRow({
-          title: 'メッセージを送る',
-          value: introTemplate ? `テンプレート「${introTemplate.name}」` : null,
-          on: introTemplateId !== '',
-          onOff: () => setIntroTemplateId(''),
-          open: showIntroPick,
-          onToggleOpen: () => setShowIntroPick((current) => !current),
-          pickLabel: '送るメッセージ',
-          dialog: true,
-          picker: (
-            <EntityKindDialog
-              kind="template"
-              options={templates}
-              initialId={introTemplateId}
-              accountId={selectedAccountId}
-              onConfirm={(next) => { setIntroTemplateId(next); setShowIntroPick(false) }}
-              onCancel={() => setShowIntroPick(false)}
-            />
-          ),
-        })}
-        {actionRow({
-          title: 'シナリオ配信を始める',
-          value: scenarioName ? `シナリオ「${scenarioName}」` : null,
-          on: scenarioId !== '',
-          onOff: () => setScenarioId(''),
-          open: showScenarioPick,
-          onToggleOpen: () => setShowScenarioPick((current) => !current),
-          pickLabel: '始めるシナリオ',
-          dialog: true,
-          picker: (
-            <EntityKindDialog
-              kind="scenario"
-              options={scenarios}
-              initialId={scenarioId}
-              accountId={selectedAccountId}
-              onConfirm={(next) => { setScenarioId(next); setShowScenarioPick(false) }}
-              onCancel={() => setShowScenarioPick(false)}
-            />
-          ),
-        })}
+        <ActionList<{ kind: string; id: string }> value={[
+          ...(tagId ? [{ kind: 'tag', id: tagId }] : []), ...(introTemplateId ? [{ kind: 'template', id: introTemplateId }] : []), ...(scenarioId ? [{ kind: 'scenario', id: scenarioId }] : []),
+        ]} idOf={action => action.kind} kindOf={action => action.kind === 'tag' ? 'タグを付ける' : action.kind === 'template' ? 'メッセージを送る' : 'シナリオ配信を始める'} titleOf={action => (action.kind === 'tag' ? tags : action.kind === 'template' ? templates : scenarios).find(item => item.id === action.id)?.name ?? '未設定'}
+          onChange={next => { setTagId(next.find(action => action.kind === 'tag')?.id ?? ''); setIntroTemplateId(next.find(action => action.kind === 'template')?.id ?? ''); setScenarioId(next.find(action => action.kind === 'scenario')?.id ?? '') }}
+          choices={([
+            { id: 'tag', label: 'タグを付ける', items: tags, selected: tagId },
+            { id: 'template', label: 'メッセージを送る', items: templates, selected: introTemplateId },
+            { id: 'scenario', label: 'シナリオ配信を始める', items: scenarios, selected: scenarioId },
+          ]).filter(kind => !kind.selected).map(kind => ({ id: kind.id, label: kind.label, make: () => ({ kind: kind.id, id: '' }),
+            picker: { title: `${kind.label}対象を選ぶ`, items: kind.items, apply: (action, ids) => ({ ...action, id: ids[0] }) } }))}
+          reorderable={false}
+          renderEditor={(action, update) => <EntityPickerField label="操作の対象" noun="対象" value={action.id} items={action.kind === 'tag' ? tags : action.kind === 'template' ? templates : scenarios} onChange={id => update({ ...action, id })} />} />
       </section>
 
       <section className={styles.card} aria-labelledby="ir-new-url">

@@ -1,12 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
+import ActionList, { type ActionChoice } from '@/components/shared/action-list'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import { DragHandle, MoreAction, useReorder } from '@/components/shared/row-actions'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { actionIncompleteReason } from './action-completeness'
@@ -45,6 +45,10 @@ export function actionRowTitle(a: InlineAction, o: ActionOptions): string {
       return `友だち情報を変える${q(nameOf(o.fields, c.fieldId))}`
     case 'common_var':
       return `共通情報を変える${q(o.vars.find((v) => v.varKey === c.varKey)?.name)}`
+    case 'send_template': return `テンプレートを送る${q(nameOf(o.templates, c.templateId))}`
+    case 'reminder': return `リマインダを始める${q(nameOf(o.reminders, c.reminderId))}`
+    case 'event_booking': return `イベントに予約する${q(nameOf(o.events, c.eventId))}`
+    case 'send_message': return String(c.content || 'テキストを送る')
     default:
       return ACTION_KINDS.find((k) => k.type === a.actionType)?.label ?? a.actionType
   }
@@ -53,98 +57,47 @@ export function actionRowTitle(a: InlineAction, o: ActionOptions): string {
 export default function InlineActionRowsV8({ actions, onChange, ...options }: Props) {
   const { selectedAccountId } = useAccount()
   const visibility = useFeatureVisibility(selectedAccountId)
-  const [openMenu, setOpenMenu] = useState<string | null>(null)
-  const [editing, setEditing] = useState<string | null>(null)
-  const [adding, setAdding] = useState(false)
-  const addRef = useRef<HTMLButtonElement>(null)
-
-  const update = (key: string, patch: Partial<InlineAction>) => onChange(actions.map((a) => (a.key === key ? { ...a, ...patch } : a)))
-  const reorder = useReorder({ items: actions, idOf: action => action.key, onReorder: ({ ids }) => onChange(ids.map(id => actions.find(action => action.key === id)!)) })
-  const add = (actionType: InlineAction['actionType']) => {
-    const kind = ACTION_KINDS.find((k) => k.type === actionType)
-    const key = newActionKey()
-    onChange([...actions, { key, actionType, config: kind?.make() ?? {}, onFailure: 'continue' as const }])
-    setEditing(key)
-  }
-  const addItems: ActionMenuItem[] = [
-    { id: 'notify_staff', label: '担当者へ知らせる', onSelect: () => add('notify_staff') },
-    ...ACTION_KINDS.filter((k) => !k.feature || visibility.enabled(k.feature)).map((k) => ({ id: k.type, label: k.label, onSelect: () => add(k.type) })),
+  const choices: ActionChoice<InlineAction>[] = [
+    { id: 'notify_staff', label: '担当者へ知らせる', disabled: options.targetsLoading, disabledReason: '候補を読み込んでいます', make: () => ({ key: newActionKey(), actionType: 'notify_staff', config: {}, onFailure: 'continue' }),
+      picker: { title: '担当者通知を選ぶ', items: options.notificationRules ?? [], apply: (action, ids) => ({ ...action, config: { notificationRuleId: ids[0], notificationRuleVersion: options.notificationRules?.find(r => r.id === ids[0])?.version ?? 0 } }) } },
+    ...ACTION_KINDS.filter(kind => !kind.feature || visibility.enabled(kind.feature)).map(kind => {
+      const target = kind.type === 'tag' ? { items: options.tags, key: 'tagIds', label: 'タグ', multiple: true }
+        : kind.type === 'support_mark' ? { items: options.marks, key: 'markId', label: '対応マーク' }
+        : kind.type === 'common_var' ? { items: options.vars.map(row => ({ ...row, id: row.varKey })), key: 'varKey', label: '共通情報' }
+        : kind.type === 'friend_field' ? { items: options.fields, key: 'fieldId', label: '友だち情報欄' }
+        : kind.type === 'scenario' ? { items: options.scenarios, key: 'scenarioId', label: 'シナリオ' }
+        : kind.type === 'send_template' ? { items: options.templates ?? [], key: 'templateId', label: 'テンプレート' }
+        : kind.type === 'reminder' ? { items: options.reminders ?? [], key: 'reminderId', label: 'リマインダ' }
+        : kind.type === 'event_booking' ? { items: options.events ?? [], key: 'eventId', label: 'イベント' } : null
+      return { id: kind.type, label: kind.label, icon: kind.icon, disabled: Boolean(target && options.targetsLoading), disabledReason: '候補を読み込んでいます',
+        make: (): InlineAction => ({ key: newActionKey(), actionType: kind.type, config: kind.make(), onFailure: 'continue' }),
+        picker: target ? { title: `${target.label}を選ぶ`, items: target.items, multiple: target.multiple,
+          apply: (action: InlineAction, ids: string[]) => ({ ...action, config: { ...cfg(action), [target.key]: target.multiple ? ids : ids[0] } }) } : undefined,
+      }
+    }),
   ]
-
-  return (
-    <div className={styles.list}>
-      {actions.length === 0 && <p className={styles.empty}>まだ何もありません。「処理を足す」から選んでください。</p>}
-      {reorder.shown.map((action, index) => {
-        const incomplete = actionIncompleteReason(action.actionType, action.config)
-        const items: ActionMenuItem[] = [
-          { id: 'edit', label: editing === action.key ? '設定を閉じる' : '設定を変える', onSelect: () => setEditing(editing === action.key ? null : action.key) },
-          ...reorder.menuItems(action.key),
-          { id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => onChange(actions.filter((a) => a.key !== action.key)) },
-        ]
-        return (
-          <div key={action.key} className={styles.item} {...reorder.rowProps(action.key)}>
-            <div className={styles.row}>
-              <DragHandle label={`${actionRowTitle(action, options)}を並べ替える`} {...reorder.handleProps(action.key)} {...reorder.handle(action.key)} />
-              <span className={styles.num}>{index + 1}</span>
-              <span className={styles.title}>{actionRowTitle(action, options)}</span>
-              {incomplete ? <span className={styles.incomplete}>未完成</span> : null}
-              <span className={styles.spacer} />
-              <span className={styles.failLabel}>失敗したら</span>
-              <Select
-                className={styles.failSelect}
-                value={action.onFailure}
-                onChange={(v) => update(action.key, { onFailure: v === 'stop' ? 'stop' : 'continue' })}
-                aria-label={`${index + 1}つ目の失敗したときの動き`}
-                options={[{ value: 'continue', label: '次へ進む' }, { value: 'stop', label: 'ここで止める' }]}
-              />
-              <MoreAction label={`${index + 1}つ目の処理の操作`} onClick={() => setOpenMenu(openMenu === action.key ? null : action.key)} />
-              <ActionMenu open={openMenu === action.key} items={items} onClose={() => setOpenMenu(null)} ariaLabel={`${index + 1}つ目の処理の操作`} />
-            </div>
-            {incomplete && editing !== action.key ? <p className={styles.reason}>未完成 — {incomplete}</p> : null}
-            {editing === action.key ? (
-              <div className={styles.editor}>
-                {action.actionType === 'notify_staff' ? (
-                  <div className={styles.notify}>
-                    <Select
-                      aria-label="通知先"
-                      value={String(cfg(action).notificationRuleId ?? '')}
-                      options={[{ value: '', label: '通知先を選ぶ' }, ...(options.notificationRules ?? []).map((r) => ({ value: r.id, label: r.name }))]}
-                      onChange={(value) => {
-                        const rule = options.notificationRules?.find((r) => r.id === value)
-                        update(action.key, { config: { ...cfg(action), notificationRuleId: value, notificationRuleVersion: rule?.version ?? 0 } })
-                      }}
-                    />
-                    <textarea
-                      aria-label="通知の本文"
-                      maxLength={2000}
-                      className={styles.notifyText}
-                      value={String(cfg(action).message ?? '')}
-                      onChange={(e) => update(action.key, { config: { ...cfg(action), message: e.target.value } })}
-                    />
-                  </div>
-                ) : (
-                  <ActionConfigEditor
-                    action={{ id: action.key, scenarioId: '', hook: 'step_sent', stepId: null, choiceIndex: null, sortOrder: index, actionType: action.actionType, config: action.config, condition: null, repeatOnRefire: true }}
-                    tags={options.tags}
-                    fields={options.fields}
-                    marks={options.marks}
-                    scenarios={options.scenarios}
-                    vars={options.vars}
-                    onChange={(config) => update(action.key, { config })}
-                  />
-                )}
-              </div>
-            ) : null}
-          </div>
-        )
-      })}
-      <div className={styles.add}>
-        <Button ref={addRef} variant="text" type="button" onClick={() => setAdding(!adding)}>
-          <Plus size={14} aria-hidden="true" />
-          処理を足す
-        </Button>
-        <ActionMenu open={adding} items={addItems} onClose={() => setAdding(false)} ariaLabel="足す処理を選ぶ" anchorRef={addRef} />
-      </div>
-    </div>
-  )
+  return <>
+    {options.targetsError ? <Notice tone="danger" message={options.targetsError} action={options.retryTargets ? <Button onClick={options.retryTargets}>もう一度読み込む</Button> : undefined} /> : null}
+    <ActionList value={actions} onChange={onChange} choices={choices} idOf={action => action.key}
+      titleOf={action => actionRowTitle(action, options)} kindOf={action => action.actionType === 'notify_staff' ? '担当者へ知らせる' : ACTION_KINDS.find(kind => kind.type === action.actionType)?.label ?? '行うこと'} iconOf={action => action.actionType === 'notify_staff' ? Bell : ACTION_KINDS.find(kind => kind.type === action.actionType)?.icon}
+      renderHint={action => { const reason = actionIncompleteReason(action.actionType, action.config); return reason ? <p className={styles.reason}>未完成 — {reason}</p> : null }}
+      renderExtra={action => actionIncompleteReason(action.actionType, action.config) ? <span className={styles.incomplete}>未完成</span> : null}
+      renderEditor={(action, update, index) => <>
+        <div className={styles.notify}>
+          <span className={styles.failLabel}>失敗したら</span>
+          <Select className={styles.failSelect} value={action.onFailure} aria-label={`${index + 1}つ目の失敗したときの動き`}
+            onChange={value => update({ ...action, onFailure: value === 'stop' ? 'stop' : 'continue' })}
+            options={[{ value: 'continue', label: '次へ進む' }, { value: 'stop', label: 'ここで止める' }]} />
+        </div>
+        {action.actionType === 'notify_staff' ? <div className={styles.notify}>
+        <EntityPickerField label="通知先" noun="担当者通知" value={String(cfg(action).notificationRuleId ?? '')} items={options.notificationRules ?? []}
+          onChange={id => update({ ...action, config: { ...cfg(action), notificationRuleId: id, notificationRuleVersion: options.notificationRules?.find(r => r.id === id)?.version ?? 0 } })} />
+        <textarea aria-label="通知の本文" maxLength={2000} className={styles.notifyText} value={String(cfg(action).message ?? '')}
+          onChange={event => update({ ...action, config: { ...cfg(action), message: event.target.value } })} />
+      </div> : <ActionConfigEditor
+        action={{ id: action.key, scenarioId: '', hook: 'step_sent', stepId: null, choiceIndex: null, sortOrder: index, actionType: action.actionType, config: action.config, condition: null, repeatOnRefire: true }}
+        tags={options.tags} fields={options.fields} marks={options.marks} scenarios={options.scenarios} vars={options.vars}
+        templates={options.templates} reminders={options.reminders} events={options.events} targetsLoading={options.targetsLoading}
+        onChange={config => update({ ...action, config })} />}</>} />
+  </>
 }

@@ -36,6 +36,9 @@ import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import { ActionAddButton, ActionDragHandle, ActionRow, type ActionChoice } from '@/components/shared/action-list'
+import { useReorder } from '@/components/shared/row-actions'
+import { EntityPickerField } from '@/components/shared/entity-picker'
 import { EntityKindField, type EntityKind } from '@/components/shared/entity-picker-sources'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
@@ -585,7 +588,7 @@ export default function ActionEditor({
     return () => { cancelled = true }
   }, [scenarioId, selectedAccountId, reload])
 
-  const add = (kind: (typeof ACTION_KINDS)[number]) => {
+  const add = (kind: (typeof ACTION_KINDS)[number], config = kind.make()) => {
     setError('')
     void enqueue(async () => {
       const res = await api.scenarios.actions.create(scenarioId, {
@@ -593,13 +596,14 @@ export default function ActionEditor({
         stepId,
         choiceIndex,
         actionType: kind.type,
-        config: kind.make(),
+        config,
         repeatOnRefire: true,
       })
       if (!res.success) {
         throw new Error(res.error)
       }
       const fresh = await refresh()
+      setExpandedId(res.data.id)
       if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
       onChanged?.()
     })
@@ -646,31 +650,6 @@ export default function ActionEditor({
   }
 
   /** 上下の入れ替え。並び順は実行順なので、見た目と実行が一致している必要がある。 */
-  const move = (index: number, direction: -1 | 1) => {
-    const list = actionsRef.current
-    const target = list[index + direction]
-    if (!target) return
-    const current = list[index]
-    if (!current) return
-    setError('')
-    const next = [...list]
-    next[index] = target
-    next[index + direction] = current
-    setActionsSync(next)
-    void enqueue(async () => {
-      const first = await api.scenarios.actions.update(scenarioId, current.id, {
-        sortOrder: target.sortOrder,
-      })
-      const second = await api.scenarios.actions.update(scenarioId, target.id, {
-        sortOrder: current.sortOrder,
-      })
-      if (!first.success) throw new Error(first.error)
-      if (!second.success) throw new Error(second.error)
-      const fresh = await refresh()
-      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
-      onChanged?.()
-    })
-  }
 
   /* R243: 条件の窓を開くとき、下書きに写して持つ。入力のたびに保存しない。 */
   const openCondition = (action: ScenarioAction) => {
@@ -772,6 +751,34 @@ export default function ActionEditor({
     })
   }
 
+  const actionChoices: ActionChoice<{ kind: (typeof ACTION_KINDS)[number]; config: unknown }>[] = ACTION_KINDS
+    .filter(kind => kind.type !== 'common_var' && (!kind.feature || actionFeatureVisibility.enabled(kind.feature)))
+    .map(kind => {
+      const target = kind.type === 'tag' ? { items: tags, key: 'tagIds', title: 'タグ', multiple: true }
+        : kind.type === 'support_mark' ? { items: marks, key: 'markId', title: '対応マーク' }
+        : kind.type === 'friend_field' ? { items: fields, key: 'fieldId', title: '友だち情報欄' }
+        : kind.type === 'scenario' ? { items: scenarioOpts, key: 'scenarioId', title: 'シナリオ' }
+        : kind.type === 'send_template' ? { items: templates, key: 'templateId', title: 'テンプレート' }
+        : kind.type === 'reminder' ? { items: reminders, key: 'reminderId', title: 'リマインダ' }
+        : kind.type === 'event_booking' ? { items: events, key: 'eventId', title: 'イベント' } : null
+      return { id: kind.type, label: kind.label, icon: kind.icon, make: () => ({ kind, config: kind.make() }),
+        picker: target ? { title: `${target.title}を選ぶ`, items: target.items, multiple: target.multiple,
+          apply: (item, ids) => ({ ...item, config: { ...(item.config as object), [target.key]: target.multiple ? ids : ids[0] } }) } : undefined }
+    })
+  const reorder = useReorder({ items: actions, idOf: action => action.id, onReorder: ({ ids }) => {
+    const next = ids.map(id => actionsRef.current.find(action => action.id === id)!)
+    setActionsSync(next)
+    void enqueue(async () => {
+      for (const [index, action] of next.entries()) {
+        const res = await api.scenarios.actions.update(scenarioId, action.id, { sortOrder: index })
+        if (!res.success) throw new Error(res.error)
+      }
+      const fresh = await refresh()
+      if (!await saveDraftSnapshot(fresh)) throw new Error(errorRef.current || '下書きを保存できませんでした')
+      onChanged?.()
+    })
+  } })
+
   const editing = actions.find((a) => a.id === conditionFor) ?? null
 
   return (
@@ -869,22 +876,7 @@ export default function ActionEditor({
                     選ぶと、下の「実行する動作」の最後に足します。中身はあとから決められます。
                   </p>
                   {/* 設計は4×2。実装が持つ種別は5つなので、押せない札は並べない。 */}
-                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {ACTION_KINDS.filter((kind) => kind.type !== 'common_var' && (!kind.feature || actionFeatureVisibility.enabled(kind.feature))).map((kind) => {
-                      const Icon = kind.icon
-                      return (
-                        <button
-                          key={kind.type}
-                          type="button"
-                          onClick={() => void add(kind)}
-                          className={`${styles.kindButton} border-hairline text-ink hover:bg-canvas-sunken flex flex-col items-center justify-center gap-1 border text-caption font-medium transition-colors`}
-                        >
-                          <Icon aria-hidden size={18} strokeWidth={1.8} />
-                          {kind.label}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <ActionAddButton choices={actionChoices} disabled={pendingCount > 0 || targetsLoading} onAdd={item => add(item.kind, item.config)} />
                   <p className="sr-only">
                     {draftSaving
                       ? 'V6下書きへ保存しています…'
@@ -900,64 +892,19 @@ export default function ActionEditor({
                     タグは付け直しても、加算はもう一度足したくない、といった使い分けができます。
                   </p>
                   <div className="mt-1 space-y-2">
-                    {actions.map((action, index) => {
-                      const open = expandedId === action.id
-                      return (
-                      <div key={action.id} className="border-hairline rounded-card border">
-                        <div className={`${styles.actionRow} bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 px-4 py-2.5`}>
-                          <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
-                            {/* 実行順の丸番号（設計 26x26）。並べ替えるとここが変わる。 */}
-                            <span className={`${styles.orderMark} bg-accent-deep text-on-accent flex shrink-0 items-center justify-center rounded-pill text-caption font-medium`}>
-                              {index + 1}
-                            </span>
-                            {/*
-                              R240: 種別と要約は実際の設定から作る。並べ替えで
-                              変わるのは順序番号だけ。
-                            */}
-                            <span><span className="block">{KIND_LABEL[action.actionType]}</span><span className="text-ink-secondary mt-1 block text-xs font-normal">{describeAction(action, lookups)}</span></span>
-                            {/* 埋まっていないアクションは配信で実行されない。
-                                黙って何もしないと、効いていないことに気づけない。 */}
-                            {action.complete === false && (
-                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 font-medium" style={{ fontSize: 10 }}>
-                                未完成 — 配信では実行されません
-                              </span>
-                            )}
-                          </p>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            <Button variant="secondary" className={(`rounded-control h-9 border px-3 text-xs ${
-                                action.condition
-                                  ? 'border-accent text-accent-deep bg-accent-soft'
-                                  : 'border-hairline text-ink-secondary'
-                              }`) + ' whitespace-normal'} type="button" onClick={() => openCondition(action)}>
-                              {action.condition ? '条件ON' : '条件OFF'}
-                            </Button>
-                            {/*
-                              R244: 開閉は画面側で持つ。保存のたびに作り直して
-                              閉じないし、入力焦点も残る。
-                            */}
-                            <button
-                              type="button"
-                              onClick={() => setExpandedId(open ? null : action.id)}
-                              aria-expanded={open}
-                              className="text-action cursor-pointer list-none text-xs"
-                            >
-                              内容を編集
-                            </button>
-                          </div>
-                        </div>
-                        {open && (
-                          <div className="border-hairline border-t p-4">
-                            <ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={(config) => save(action, { config })} />
-                            <Checkbox className="mt-3" checked={action.repeatOnRefire} onCheckedChange={(checked) => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox>
-                            <div className="mt-3 flex gap-2"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => remove(action)} className="text-danger">削除する</button></div>
-                          </div>
-                        )}
-                      </div>
-                      )
-                    })}
+                    {reorder.shown.map((action, index) => <ActionRow key={action.id} number={index + 1} kind={KIND_LABEL[action.actionType]} title={describeAction(action, lookups)}
+                      icon={ACTION_KINDS.find(kind => kind.type === action.actionType)?.icon} open={expandedId === action.id} onToggle={() => setExpandedId(expandedId === action.id ? null : action.id)}
+                      rowProps={reorder.rowProps(action.id)} handle={<ActionDragHandle label={`${index + 1}つ目の行うこと`} ariaLabel={`${index + 1}つ目の行うことを並べ替える`} {...reorder.handle(action.id)} {...reorder.handleProps(action.id)} />}
+                      menuItems={reorder.menuItems(action.id)} onRemove={() => remove(action)} extra={<>
+                        {action.complete === false ? <span className="text-warning text-xs">未完成</span> : null}
+                        <Button onClick={() => openCondition(action)}>{action.condition ? '条件ON' : '条件OFF'}</Button>
+                      </>}>
+                      <ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={config => save(action, { config })} />
+                      <Checkbox checked={action.repeatOnRefire} onCheckedChange={checked => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox>
+                    </ActionRow>)}
                     {actions.length === 0 && (
                       <p className="text-ink-faint rounded-card border-hairline border border-dashed py-8 text-center text-sm">
-                        まだ動作がありません。上の「追加する動作を選ぶ」から足してください。
+                        まだ動作がありません。「行うことを足す」から足してください。
                       </p>
                     )}
                   </div>
@@ -1067,23 +1014,7 @@ export function ActionConfigEditor({
               />
             ))}
           </RadioCardGroup>
-          <div className="flex flex-wrap gap-1.5">
-            {tags.map((tag) => {
-              const on = selected.includes(tag.id)
-              return (
-                <Button variant="primary" className={(`rounded-pill v7:h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
-                  }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() =>
-                    onChange({
-                      ...c,
-                      tagIds: on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id],
-                    })
-                  }>
-                  {tag.name}
-                </Button>
-              )
-            })}
-          </div>
+          <EntityKindField kind="tag" label="タグ" multiple value={selected} options={tags} onChange={tagIds => onChange({ ...c, tagIds })} />
         </>
       )
     }
@@ -1091,15 +1022,7 @@ export function ActionConfigEditor({
     case 'friend_field':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            aria-label="友だち情報の項目"
-            value={String(c.fieldId ?? '')}
-            onChange={(value) => onChange({ ...c, fieldId: value })}
-            options={[
-              { value: '', label: '項目を選ぶ' },
-              ...fields.map((f) => ({ value: f.id, label: f.name })),
-            ]}
-          />
+          <EntityPickerField label="友だち情報の項目" noun="友だち情報欄" items={fields} value={String(c.fieldId ?? '')} onChange={fieldId => onChange({ ...c, fieldId })} />
           <span className="text-ink-secondary text-sm">に</span>
           {c.op !== 'clear' && (
             <input

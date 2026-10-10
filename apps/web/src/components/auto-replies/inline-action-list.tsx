@@ -2,15 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import type { ScenarioActionType } from '@/lib/api'
-import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
-import Select from '@/components/shared/select'
-import { actionIncompleteReason } from './action-completeness'
-import { newActionKey, type InlineAction } from './draft-fields'
 import { useAccount } from '@/contexts/account-context'
-import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import Button from '@/components/shared/button'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import type { InlineAction } from './draft-fields'
+import InlineActionRowsV8 from './inline-action-rows-v8'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import type { ActionTargetOption } from '@/components/scenarios/action-editor'
 
 /**
  * 応答したときに行うことの並び。
@@ -23,6 +19,12 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 type Option = { id: string; name: string }
 
 export interface ActionOptions {
+  templates?: ActionTargetOption[]
+  reminders?: ActionTargetOption[]
+  events?: ActionTargetOption[]
+  targetsLoading?: boolean
+  targetsError?: string
+  retryTargets?: () => void
   notificationRules?: Array<Option & {version:number}>
   tags: Option[]
   fields: Option[]
@@ -38,7 +40,6 @@ export interface ActionOptions {
  * 選べるものだけでも出すほうがよい。
  */
 export function useActionOptions(): ActionOptions {
-  const theme = useAdminTheme()
   const { selectedAccountId } = useAccount()
   const [options, setOptions] = useState<ActionOptions>({
     tags: [],
@@ -48,6 +49,8 @@ export function useActionOptions(): ActionOptions {
     vars: [],
   })
 
+  const [attempt, setAttempt] = useState(0)
+
   useEffect(() => {
     let cancelled = false
     if (!selectedAccountId) {
@@ -55,25 +58,34 @@ export function useActionOptions(): ActionOptions {
       return () => { cancelled = true }
     }
     void (async () => {
-      const [tags, fields, marks, scenarios, vars, notifications] = await Promise.allSettled([
+      setOptions({ tags: [], fields: [], marks: [], scenarios: [], vars: [], templates: [], reminders: [], events: [], notificationRules: [], targetsLoading: true })
+      const [tags, fields, marks, scenarios, vars, notifications, templates, reminders, events] = await Promise.allSettled([
         // R23横展開: タグ・シナリオの候補は今のアカウントだけ（別アカウント混入防止）。
         api.tags.list({ accountId: selectedAccountId }),
         api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
         api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }),
         api.scenarios.list({ accountId: selectedAccountId }),
         api.commonVars.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
-        theme === 'v8' ? Promise.resolve().then(() => api.notifications.operatorRules.list(selectedAccountId)) : Promise.resolve({success:true as const, data:{items:[]}}),
+        Promise.resolve().then(() => api.notifications.operatorRules.list(selectedAccountId)),
+        Promise.resolve().then(() => scenarioReferenceData.templates(selectedAccountId)),
+        Promise.resolve().then(() => scenarioReferenceData.reminders(selectedAccountId)),
+        Promise.resolve().then(() => scenarioReferenceData.events(selectedAccountId)),
       ])
       if (cancelled) return
       setOptions({
+        templates: templates.status === 'fulfilled' && templates.value.success ? templates.value.data.map(t => ({ ...t, id: t.id, name: t.name })) : [],
+        reminders: reminders.status === 'fulfilled' && reminders.value.success ? reminders.value.data.map(t => ({ ...t, id: t.id, name: t.name })) : [],
+        events: events.status === 'fulfilled' && events.value.success ? events.value.data.map(t => ({ ...t, id: t.id, name: t.name })) : [],
+        targetsLoading: false,
+        targetsError: [tags, fields, marks, scenarios, vars, notifications, templates, reminders, events].some(result => result.status === 'rejected' || !result.value.success) ? '選ぶ候補の一部を読み込めませんでした。' : undefined,
         notificationRules: notifications.status === 'fulfilled' && notifications.value.success ? notifications.value.data.items.filter(r=>r.isActive&&r.status==='published').map(r=>({id:r.id,name:r.name,version:r.version??1})) : [],
         tags:
           tags.status === 'fulfilled' && tags.value.success
-            ? tags.value.data.map((t) => ({ id: t.id, name: t.name }))
+            ? tags.value.data.map((t) => ({ ...t, id: t.id, name: t.name }))
             : [],
         fields:
           fields.status === 'fulfilled' && fields.value.success
-            ? fields.value.data.map((f) => ({ id: f.id, name: f.name }))
+            ? fields.value.data.map((f) => ({ ...f, id: f.id, name: f.name }))
             : [],
         marks:
           marks.status === 'fulfilled' && marks.value.success
@@ -81,7 +93,7 @@ export function useActionOptions(): ActionOptions {
             : [],
         scenarios:
           scenarios.status === 'fulfilled' && scenarios.value.success
-            ? scenarios.value.data.map((s) => ({ id: s.id, name: s.name }))
+            ? scenarios.value.data.map((s) => ({ ...s, id: s.id, name: s.name }))
             : [],
         vars:
           vars.status === 'fulfilled' && vars.value.success
@@ -92,9 +104,9 @@ export function useActionOptions(): ActionOptions {
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId, theme])
+  }, [selectedAccountId, attempt])
 
-  return options
+  return { ...options, retryTargets: () => setAttempt(value => value + 1) }
 }
 
 type Props = {
@@ -102,156 +114,7 @@ type Props = {
   onChange: (next: InlineAction[]) => void
 } & ActionOptions
 
-export default function InlineActionList({
-  actions,
-  onChange,
-  tags,
-  fields,
-  marks,
-  scenarios,
-  vars,
-  notificationRules = [],
-}: Props) {
-  const { selectedAccountId } = useAccount()
-  const theme = useAdminTheme()
-  // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
-  const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
-  function add(actionType: InlineAction['actionType']) {
-    const kind = ACTION_KINDS.find((k) => k.type === actionType)
-    // 失敗したときは続けるが既定（いまの動き）。止めたい人だけ変える。
-    onChange([...actions, { key: newActionKey(), actionType, config: kind?.make() ?? {}, onFailure: 'continue' as const }])
-  }
-
-  function update(key: string, config: unknown) {
-    onChange(actions.map((a) => (a.key === key ? { ...a, config } : a)))
-  }
-
-  function updateOnFailure(key: string, onFailure: 'stop' | 'continue') {
-    onChange(actions.map((a) => (a.key === key ? { ...a, onFailure } : a)))
-  }
-
-  function remove(key: string) {
-    onChange(actions.filter((a) => a.key !== key))
-  }
-
-  function move(index: number, delta: number) {
-    const target = index + delta
-    if (target < 0 || target >= actions.length) return
-    const next = [...actions]
-    const [moved] = next.splice(index, 1)
-    next.splice(target, 0, moved)
-    onChange(next)
-  }
-
-  return (
-    <div className="space-y-2">
-      {actions.length === 0 && (
-        <p className="text-ink-faint text-xs">
-          まだ何も設定されていません。下から選んで足してください。
-        </p>
-      )}
-
-      {actions.map((action, index) => {
-        /*
-         * R255: 必須の中身が空の処理は「未完成」の札を付け、保存の前に知らせる。
-         * 下書き保存自体は止めない（後から埋められる）が、不備が見えないまま
-         * 完成と思い込むのを防ぐ。札の形はシナリオの終了後の処理（#961）と同じ。
-         */
-        const incompleteReason = actionIncompleteReason(action.actionType, action.config)
-        return (
-        <div key={action.key} className="border-hairline rounded-control border p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-ink text-xs font-semibold">
-              {index + 1}. {action.actionType === 'notify_staff' ? '担当者へ通知' : ACTION_KINDS.find((k) => k.type === action.actionType)?.label ?? action.actionType}
-            </span>
-            <div className="flex items-center gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => move(index, -1)}
-                disabled={index === 0}
-                className="text-ink-faint hover:text-ink disabled:opacity-30"
-                aria-label="上へ"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                onClick={() => move(index, 1)}
-                disabled={index === actions.length - 1}
-                className="text-ink-faint hover:text-ink disabled:opacity-30"
-                aria-label="下へ"
-              >
-                ↓
-              </button>
-              <button
-                type="button"
-                onClick={() => remove(action.key)}
-                className="text-danger hover:underline"
-              >
-                削除する
-              </button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs">
-              <span className="text-ink-faint shrink-0">失敗したら</span>
-              <Select
-                value={action.onFailure}
-                onChange={(value) => updateOnFailure(action.key, value === 'stop' ? 'stop' : 'continue')}
-                aria-label={`${index + 1}つ目の失敗したときの動き`}
-                className="w-36"
-                options={[
-                  { value: 'continue', label: '次へ進む' },
-                  { value: 'stop', label: 'ここで止める' },
-                ]}
-              />
-            </label>
-            {action.actionType === 'notify_staff' ? <div className="space-y-2">
-              <label className="block text-xs">通知先<Select aria-label="通知先" value={String((action.config as Record<string,unknown>)?.notificationRuleId??'')} options={[{value:'',label:'選んでください'},...notificationRules.map(r=>({value:r.id,label:r.name}))]} onChange={value=>{const rule=notificationRules.find(r=>r.id===value);update(action.key,{...(action.config as object),notificationRuleId:value,notificationRuleVersion:rule?.version??0})}}/></label>
-              <label className="block text-xs">通知の本文<textarea aria-label="通知の本文" maxLength={2000} className="w-full border border-hairline rounded-control p-2" value={String((action.config as Record<string,unknown>)?.message??'')} onChange={e=>update(action.key,{...(action.config as object),message:e.target.value})}/></label>
-              {notificationRules.length===0&&<p className="text-xs text-ink-faint">公開済みの担当者通知を先に設定してください</p>}
-            </div> : <ActionConfigEditor
-              action={{
-                // ActionConfigEditor は中身と種別しか見ない。行として保存しないので、
-                // それ以外は形を合わせるためだけの値。
-                id: action.key,
-                scenarioId: '',
-                hook: 'step_sent',
-                stepId: null,
-                choiceIndex: null,
-                sortOrder: index,
-                actionType: action.actionType,
-                config: action.config,
-                condition: null,
-                repeatOnRefire: true,
-              }}
-              tags={tags}
-              fields={fields}
-              marks={marks}
-              scenarios={scenarios}
-              vars={vars}
-              onChange={(config) => update(action.key, config)}
-            />}
-            {incompleteReason ? (
-              <p className="mt-2">
-                <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 font-medium" style={{ fontSize: 10 }}>
-                  未完成 — {incompleteReason}
-                </span>
-              </p>
-            ) : null}
-          </div>
-        </div>
-        )
-      })}
-
-      <div className="flex flex-wrap gap-1.5">
-        {theme === 'v8' && <Button variant="secondary" onClick={()=>add('notify_staff')}>＋ 担当者へ通知</Button>}
-        {ACTION_KINDS.filter((kind) => !kind.feature || actionFeatureVisibility.enabled(kind.feature)).map((kind) => (
-          <Button variant="secondary" className="text-ink-secondary px-2.5 py-1 text-xs h-auto whitespace-normal" key={kind.type} type="button" onClick={() => add(kind.type)}>
-            ＋ {kind.label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  )
+/** 既存の呼び出し口も、B-169 の共通の行で描く。 */
+export default function InlineActionList(props: Props) {
+  return <InlineActionRowsV8 {...props} />
 }

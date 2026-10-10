@@ -1,208 +1,90 @@
-'use client'
+"use client"
 
-/**
- * 動作の編集。
- *
- * 「選択肢を選んだとき」と「回答を送ったあと」の2か所から同じものを使う。
- * どちらも中身は同じ（何を送る・何を付ける・どこへ登録する）で、置き場所
- * だけが違う。片方にしかない動作を作ると、運用側が「あっちでできたのに」
- * と探すことになるので、1つの部品にしてある。
- */
-
+import { Bell, FileText, MessageSquare, Tag, User, Workflow } from 'lucide-react'
 import type { FormAction } from '@line-crm/shared'
+import ActionList, { type ActionChoice } from '@/components/shared/action-list'
+import { EntityPickerField } from '@/components/shared/entity-picker'
 import Select from '@/components/shared/select'
-import { cellInput, miniButton, type FormRefs } from './form-refs'
-import Button from '@/components/shared/button'
+import { TextField } from '@/components/shared/text-field'
+import type { FormRefs } from './form-refs'
 
-const ACTION_LABELS: { kind: FormAction['kind']; label: string }[] = [
-  { kind: 'send_text', label: 'テキストを送る' },
-  { kind: 'send_template', label: 'テンプレートを送る' },
-  { kind: 'tag', label: 'タグを付ける・外す' },
-  { kind: 'friend_field', label: '友だち情報に書く' },
-  { kind: 'scenario', label: 'シナリオを開始・停止' },
-  { kind: 'reminder', label: 'リマインダを開始' },
-]
+const KINDS = [
+  { id: 'send_text', label: 'テキストを送る', icon: MessageSquare },
+  { id: 'send_template', label: 'テンプレートを送る', icon: FileText },
+  { id: 'tag', label: 'タグを付ける・外す', icon: Tag },
+  { id: 'friend_field', label: '友だち情報に書く', icon: User },
+  { id: 'scenario', label: 'シナリオを開始・停止', icon: Workflow },
+  { id: 'reminder', label: 'リマインダを開始', icon: Bell },
+] as const
 
-function emptyAction(kind: FormAction['kind']): FormAction {
+export function emptyFormAction(kind: FormAction['kind']): FormAction {
   switch (kind) {
-    case 'send_text':
-      return { kind: 'send_text', text: '' }
-    case 'send_template':
-      return { kind: 'send_template', templateId: '' }
-    case 'tag':
-      return { kind: 'tag', op: 'add', tagIds: [] }
-    case 'friend_field':
-      return { kind: 'friend_field', fieldId: '', value: '' }
-    case 'scenario':
-      return { kind: 'scenario', op: 'start', scenarioId: '' }
-    case 'reminder':
-      return { kind: 'reminder', reminderId: '' }
+    case 'send_text': return { kind, text: '' }
+    case 'send_template': return { kind, templateId: '' }
+    case 'tag': return { kind, op: 'add', tagIds: [] }
+    case 'friend_field': return { kind, fieldId: '', value: '' }
+    case 'scenario': return { kind, op: 'start', scenarioId: '' }
+    case 'reminder': return { kind, reminderId: '' }
   }
 }
 
-export default function ActionEditor({
-  value,
-  onChange,
-  refs,
-}: {
-  value: FormAction[]
-  onChange: (next: FormAction[]) => void
-  refs: FormRefs
-}) {
-  const patch = (index: number, next: FormAction) =>
-    onChange(value.map((a, i) => (i === index ? next : a)))
-
-  const remove = (index: number) => onChange(value.filter((_, i) => i !== index))
-
-  return (
-    <div className="space-y-2">
-      {value.length === 0 && (
-        <p className="text-ink-faint text-xs">まだ何も起きません。下から選んで足せます。</p>
-      )}
-
-      {value.map((action, index) => (
-        <div
-          key={index}
-          className="border-hairline rounded-control bg-canvas-sunken flex flex-wrap items-center gap-2 border p-2"
-        >
-          <Select
-            value={action.kind}
-            onChange={(value) => patch(index, emptyAction(value as FormAction['kind']))}
-            aria-label="動作の種類"
-            options={ACTION_LABELS.map((a) => ({ value: a.kind, label: a.label }))}
-          />
-
-          {/*
-            R26追補: スマホ幅では文章の入力欄を種類の選択の下に全幅で置く。
-            `flex-1` だけだと同行に残って約50pxに押し込まれる。
-            `basis-full` で折り返し、PC幅では元どおり横に並べる。
-          */}
-          {action.kind === 'send_text' && (
-            <input
-              type="text"
-              value={action.text}
-              onChange={(e) => patch(index, { ...action, text: e.target.value })}
-              placeholder="送る文面"
-              className={`${cellInput} min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[16rem]`}
-            />
-          )}
-
-          {action.kind === 'send_template' && (
-            <Select
-              value={action.templateId}
-              onChange={(value) => patch(index, { ...action, templateId: value })}
-              aria-label="送るテンプレート"
-              options={[
-                { value: '', label: '— 選んでください —' },
-                ...refs.templates
-                  .filter((t) => t.type === 'text')
-                  .map((t) => ({ value: t.id, label: t.name })),
-              ]}
-            />
-          )}
-
-          {action.kind === 'tag' && (
-            <>
-              <Select
-                value={action.op}
-                onChange={(value) =>
-                  patch(index, { ...action, op: value as 'add' | 'remove' })
-                }
-                aria-label="タグの付け外し"
-                options={[
-                  { value: 'add', label: '付ける' },
-                  { value: 'remove', label: '外す' },
-                ]}
-              />
-              <Select
-                value={action.tagIds[0] ?? ''}
-                onChange={(value) =>
-                  patch(index, { ...action, tagIds: value ? [value] : [] })
-                }
-                aria-label="タグ"
-                options={[
-                  { value: '', label: '— タグ —' },
-                  ...refs.tags.map((t) => ({ value: t.id, label: t.name })),
-                ]}
-              />
-            </>
-          )}
-
-          {action.kind === 'friend_field' && (
-            <>
-              <Select
-                value={action.fieldId}
-                onChange={(value) => patch(index, { ...action, fieldId: value })}
-                aria-label="書き込む友だち情報欄"
-                options={[
-                  { value: '', label: '— 情報欄 —' },
-                  ...refs.friendFields.map((f) => ({
-                    value: f.id,
-                    label: `${f.name}${f.ecIsMaster ? '（EC側が正）' : ''}`,
-                    disabled: f.ecIsMaster,
-                  })),
-                ]}
-              />
-              <input
-                type="text"
-                value={action.value}
-                onChange={(e) => patch(index, { ...action, value: e.target.value })}
-                placeholder="書き込む値"
-                className={`${cellInput} min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[10rem]`}
-              />
-            </>
-          )}
-
-          {action.kind === 'scenario' && (
-            <>
-              <Select
-                value={action.op}
-                onChange={(value) =>
-                  patch(index, { ...action, op: value as 'start' | 'stop' })
-                }
-                aria-label="シナリオの操作"
-                options={[
-                  { value: 'start', label: '開始する' },
-                  { value: 'stop', label: '停止する' },
-                ]}
-              />
-              <Select
-                value={action.scenarioId}
-                onChange={(value) => patch(index, { ...action, scenarioId: value })}
-                aria-label="シナリオ"
-                options={[
-                  { value: '', label: '— シナリオ —' },
-                  ...refs.scenarios.map((s) => ({ value: s.id, label: s.name })),
-                ]}
-              />
-            </>
-          )}
-
-          {action.kind === 'reminder' && (
-            <Select
-              value={action.reminderId}
-              onChange={(value) => patch(index, { ...action, reminderId: value })}
-              aria-label="リマインダ"
-              options={[
-                { value: '', label: '— リマインダ —' },
-                ...refs.reminders.map((r) => ({ value: r.id, label: r.name })),
-              ]}
-            />
-          )}
-
-          <button
-            onClick={() => remove(index)}
-            className="text-danger ml-auto px-1 text-xs hover:underline"
-            aria-label="この動作を削除"
-          >
-            削除する
-          </button>
-        </div>
-      ))}
-
-      <Button variant="secondary" className={(`${miniButton} border-hairline rounded-control border border-dashed px-3 py-1.5`) + ' h-auto whitespace-normal'} onClick={() => onChange([...value, emptyAction('tag')])}>
-        ＋ 動作を追加する
-      </Button>
-    </div>
-  )
+function targets(kind: FormAction['kind'], refs: FormRefs) {
+  switch (kind) {
+    case 'send_template': return refs.templates.filter(t => t.type === 'text')
+    case 'tag': return refs.tags
+    case 'friend_field': return refs.friendFields.map(f => ({ ...f, disabled: f.ecIsMaster, meta: f.ecIsMaster ? 'EC側から更新する欄です' : undefined }))
+    case 'scenario': return refs.scenarios
+    case 'reminder': return refs.reminders
+    default: return []
+  }
+}
+function applyTarget(action: FormAction, ids: string[]): FormAction {
+  switch (action.kind) {
+    case 'send_template': return { ...action, templateId: ids[0] }
+    case 'tag': return { ...action, tagIds: ids }
+    case 'friend_field': return { ...action, fieldId: ids[0] }
+    case 'scenario': return { ...action, scenarioId: ids[0] }
+    case 'reminder': return { ...action, reminderId: ids[0] }
+    default: return action
+  }
+}
+export function formActionChoices(refs: FormRefs): ActionChoice<FormAction>[] {
+  return KINDS.map(kind => ({ ...kind, make: () => emptyFormAction(kind.id), picker: kind.id === 'send_text' ? undefined : {
+    title: `${kind.id === 'send_template' ? 'テンプレート' : kind.id === 'tag' ? 'タグ' : kind.id === 'friend_field' ? '友だち情報欄' : kind.id === 'scenario' ? 'シナリオ' : 'リマインダ'}を選ぶ`,
+    items: targets(kind.id, refs), multiple: kind.id === 'tag', apply: applyTarget,
+  } }))
+}
+export function formActionTitle(action: FormAction, refs: FormRefs): string {
+  if (action.kind === 'send_text') return action.text ? `テキストを送る「${action.text}」` : 'テキストを送る'
+  const ids = action.kind === 'tag' ? action.tagIds : [action.kind === 'send_template' ? action.templateId : action.kind === 'friend_field' ? action.fieldId : action.kind === 'scenario' ? action.scenarioId : action.reminderId]
+  const names = ids.map(id => targets(action.kind, refs).find(item => item.id === id)?.name ?? '未設定').join('・') || '未設定'
+  switch (action.kind) {
+    case 'tag': return `タグ「${names}」を${action.op === 'remove' ? '外す' : '付ける'}`
+    case 'send_template': return `テンプレート「${names}」を送る`
+    case 'friend_field': return `友だち情報「${names}」に書く`
+    case 'scenario': return `シナリオ「${names}」を${action.op === 'stop' ? '停止' : '開始'}`
+    case 'reminder': return `リマインダ「${names}」を開始`
+  }
+}
+function formActionKind(action: FormAction): string {
+  if (action.kind === 'tag') return action.op === 'remove' ? 'タグを外す' : 'タグを付ける'
+  if (action.kind === 'friend_field') return '友だち情報を変える'
+  return KINDS.find(kind => kind.id === action.kind)?.label ?? action.kind
+}
+export function FormActionConfig({ action, refs, onChange }: { action: FormAction; refs: FormRefs; onChange: (next: FormAction) => void }) {
+  const label = KINDS.find(kind => kind.id === action.kind)!.label
+  return <>
+    {action.kind === 'send_text' ? <TextField aria-label="送る文面" value={action.text} onChange={event => onChange({ ...action, text: event.target.value })} />
+      : action.kind === 'tag' ? <EntityPickerField label="タグ" noun="タグ" items={targets(action.kind, refs)} multiple value={action.tagIds} onChange={ids => onChange(applyTarget(action, ids))} />
+      : <EntityPickerField label={label} noun={label} items={targets(action.kind, refs)} value={action.kind === 'send_template' ? action.templateId : action.kind === 'friend_field' ? action.fieldId : action.kind === 'scenario' ? action.scenarioId : action.reminderId} onChange={id => onChange(applyTarget(action, [id]))} />}
+    {action.kind === 'tag' ? <Select aria-label="タグの付け外し" value={action.op} onChange={op => onChange({ ...action, op: op as 'add' | 'remove' })} options={[{ value: 'add', label: '付ける' }, { value: 'remove', label: '外す' }]} /> : null}
+    {action.kind === 'scenario' ? <Select aria-label="シナリオの操作" value={action.op} onChange={op => onChange({ ...action, op: op as 'start' | 'stop' })} options={[{ value: 'start', label: '開始する' }, { value: 'stop', label: '停止する' }]} /> : null}
+    {action.kind === 'friend_field' ? <TextField aria-label="書き込む値" value={action.value} onChange={event => onChange({ ...action, value: event.target.value })} /> : null}
+  </>
+}
+export default function ActionEditor({ value, onChange, refs, readOnly = false }: { value: FormAction[]; onChange: (next: FormAction[]) => void; refs: FormRefs; readOnly?: boolean }) {
+  return <ActionList value={value} onChange={onChange} choices={formActionChoices(refs)} idOf={(_, index) => String(index)}
+    titleOf={action => formActionTitle(action, refs)} kindOf={formActionKind}
+    iconOf={action => KINDS.find(kind => kind.id === action.kind)?.icon} readOnly={readOnly}
+    renderEditor={(action, update) => <FormActionConfig action={action} refs={refs} onChange={update} />} />
 }
