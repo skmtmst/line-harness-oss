@@ -8,6 +8,8 @@
  * 違いは見せ方だけ——型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「共通アクションを作る」）・
  * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「中身を見る」と「…」。
  */
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveCommonActionToFolder } from '@/lib/move-to-folder'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -77,11 +79,11 @@ export function versionsHref(id: string): string {
   return `/common-actions/versions?id=${encodeURIComponent(id)}`
 }
 
-function TableHead() {
+function TableHead({ selection }: { selection?: ReactNode } = {}) {
   return (
     <thead>
       <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colName}>アクション名</Th>
+        <Th className={styles.colName}>{selection}アクション名</Th>
         <Th className={styles.colState}>状態</Th>
         <Th className={styles.colSteps}>中の処理</Th>
         <Th className={styles.colUsed} align="right">呼び出し元</Th>
@@ -115,6 +117,7 @@ export default function CommonActionsV8() {
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
+  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useState('')
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -137,6 +140,7 @@ export default function CommonActionsV8() {
       const response = await api.commonActions.list({
         accountId: selectedAccountId,
         status: filter,
+        folderId: folderFilter || undefined,
         query: deferredQuery,
         limit: pageSize,
         offset: (page - 1) * pageSize,
@@ -155,14 +159,15 @@ export default function CommonActionsV8() {
     } finally {
       if (requestSeq.current === my) setLoading(false)
     }
-  }, [deferredQuery, filter, page, pageSize, selectedAccountId])
+  }, [deferredQuery, filter, folderFilter, page, pageSize, selectedAccountId])
 
-  /* フォルダの箱（kind=common_action）。共通アクションを入れる口がまだ無いので、件数は出さない。 */
+  /* フォルダの箱と件数（kind=common_action）。 */
   const loadFolders = useCallback(async () => {
     if (!selectedAccountId) { setFolders([]); return }
     try {
       const res = await api.folders.list('common_action', selectedAccountId)
       setFolders(res.success ? res.data : [])
+      setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
     } catch {
       setFolders([])
     }
@@ -170,7 +175,13 @@ export default function CommonActionsV8() {
 
   useEffect(() => { if (!accountLoading) void load() }, [accountLoading, load])
   useEffect(() => { void loadFolders() }, [loadFolders])
-  useEffect(() => { setPage(1) }, [filter, deferredQuery, pageSize, selectedAccountId])
+  useEffect(() => { setPage(1) }, [filter, folderFilter, deferredQuery, pageSize, selectedAccountId])
+
+  const folderMove = useFolderMove({
+    accountId: selectedAccountId, canEdit: canEdit, items: items, folders,
+    move: (item, folderId) => moveCommonActionToFolder(item.id, selectedAccountId!, folderId),
+    onChanged: async () => { await load(); await loadFolders() },
+  })
 
   const duplicate = async (item: CommonActionSummary) => {
     if (!selectedAccountId || duplicatingId) return
@@ -214,6 +225,7 @@ export default function CommonActionsV8() {
     const usage: ActionMenuItem = { id: 'usage', label: '版と使われている場所を見る', onSelect: () => router.push(versionsHref(item.id)) }
     if (!canEdit) return [usage]
     return [
+      { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(item) },
       usage,
       ...(item.status !== 'archived'
         ? [{ id: 'edit', label: item.status === 'draft' ? '下書きを編集・公開する' : '下書きの中身を編集する', onSelect: () => router.push(`/common-actions/edit?id=${encodeURIComponent(item.id)}`) }]
@@ -237,8 +249,8 @@ export default function CommonActionsV8() {
   /* ===== フォルダ ===== */
   const folderRows: FolderPanelRow[] = [
     { kind: 'all' as const, id: '', label: 'すべて', count: ready ? summary.total : null },
-    ...folders.map((folder) => ({ kind: 'folder' as const, id: folder.id, label: folder.name, count: null, color: folder.color })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: ready ? summary.total : null },
+    ...folders.map((folder) => ({ kind: 'folder' as const, id: folder.id, label: folder.name, count: folder.itemCount ?? null, color: folder.color })),
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
   ]
   /* 閲覧のみには押せない「共通アクションを作る」を置かない（場所だけ空ける）。 */
   const createButton = canEdit
@@ -303,7 +315,7 @@ export default function CommonActionsV8() {
         action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
       />
     )
-  } else if (items.length === 0 || (folderFilter && folderFilter !== UNFILED)) {
+  } else if (items.length === 0) {
     listBody = query || filter !== 'all' || folderFilter
       ? <ListState kind="empty" title="条件に合う共通アクションはありません" description="検索や絞り込みの札を外すと、すべて出ます。" action={<Button variant="secondary" onClick={() => { setQuery(''); setFilter('all'); setFolderFilter('') }}>条件を外す</Button>} />
       : <ListState kind="empty" title="まだ、共通アクションはありません" description="よく使う処理をまとめると、設定の重複を減らせます。" action={canEdit ? <Button variant="primary" href="/common-actions/new"><Plus size={15} aria-hidden="true" />共通アクションを作る</Button> : undefined} />
@@ -312,7 +324,7 @@ export default function CommonActionsV8() {
       <>
         <div className={styles.tableWrap}>
           <DataTable className={styles.table}>
-            <TableHead />
+            <TableHead selection={folderMove.pageCheckbox} />
             <tbody>
               {items.map((item) => {
                 const menuLabel = `共通アクション「${item.name}」の操作`
@@ -322,8 +334,8 @@ export default function CommonActionsV8() {
                 return (
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
-                      {/* 名前の前にフォルダの丸（共通アクションはフォルダに入れないので未分類の輪）。説明は名前の頭にそろえる。 */}
-                      <FolderDotName folder={null}>
+                      {/* 名前の前に分類先の色の丸。説明は名前の頭にそろえる。 */}
+                      <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
                         <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}>{item.name}</a>
                       </FolderDotName>
                       <span className={`${styles.sub} ${styles.subIndent}`} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
@@ -416,8 +428,8 @@ export default function CommonActionsV8() {
           allId=""
           unfiledId={UNFILED}
           allCount={ready ? summary.total : null}
-          unfiledCount={ready ? summary.total : null}
-          countOf={() => null}
+          unfiledCount={unfiledCount}
+          countOf={(folder) => folder.itemCount ?? null}
           placeholder="例: 購入・予約"
         />
       </>}
@@ -425,6 +437,7 @@ export default function CommonActionsV8() {
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        {folderMove.overlays}
         <Dialog
           open={Boolean(archiving)}
           title={archiving?.mode === 'unarchive'

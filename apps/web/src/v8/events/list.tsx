@@ -8,9 +8,11 @@
  * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
  * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
  */
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveEventToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from '@/lib/api'
@@ -38,6 +40,7 @@ import DetailPanel from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { notifyToast } from '@/components/shared/toast'
 import { RowMenu } from '@/components/shared/row-actions'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
@@ -95,6 +98,12 @@ export default function EventsListV8() {
   const role = useStaffRole()
   /* 作る・名前の変更・削除・フォルダの追加は統括と管理者だけ（Worker も同じ権限）。 */
   const canEdit = role === null || role === 'owner' || role === 'admin'
+  const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
+  const activeAccountRef = useRef(selectedAccountId)
+  activeAccountRef.current = selectedAccountId
+  const duplicateLock = useRef(false)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [duplicateError, setDuplicateError] = useState('')
   const [items, setItems] = useState<EventListItem[]>([])
   const [listTotal, setListTotal] = useState(0)
   const [summary, setSummary] = useState<EventListSummary | null>(null)
@@ -159,6 +168,7 @@ export default function EventsListV8() {
       params.set('sort', sort)
       if (folderFilter) params.set('folderId', folderFilter)
       params.set('account_id', selectedAccountId)
+      if (highlightedId) params.set('highlight', highlightedId)
       const res = await withRequestTimeout(
         fetchApi<{ items: EventListItem[]; total?: number; summary?: EventListSummary | null }>(`/api/events/admin/events?${params}`),
       )
@@ -175,7 +185,7 @@ export default function EventsListV8() {
       // 403 は権限不足（管理者への依頼）、それ以外は通信失敗（もう一度）。
       setLoadStatus(cause instanceof ApiError && cause.status === 403 ? 'forbidden' : 'error')
     }
-  }, [selectedAccountId, page, perPage, query, filter, sort, folderFilter])
+  }, [selectedAccountId, page, perPage, query, filter, sort, folderFilter, highlightedId])
 
   useEffect(() => {
     void refresh()
@@ -251,12 +261,35 @@ export default function EventsListV8() {
     setDeleteTarget(target)
   }, [])
 
+  const duplicateEvent = async (event: EventListItem) => {
+    if (!selectedAccountId || !canEdit || duplicateLock.current) return
+    const accountId = selectedAccountId
+    duplicateLock.current = true
+    setDuplicatingId(event.id); setDuplicateError('')
+    try {
+      const copied = await eventsApi.duplicate(accountId, event.id, event.version)
+      if (activeAccountRef.current !== accountId) return
+      setHighlightedId(copied.id)
+      setFilter('all'); setQuery(''); setPage(1)
+      setItems((current) => [{ ...event, id: copied.id, name: `${event.name}（複製）`, is_published: 0, lifecycle_status: 'draft', version: 1, total_active: 0, pending_count: 0 }, ...current])
+      notifyToast('複製した下書きを追加しました')
+      await loadFolders()
+    } catch { if (activeAccountRef.current === accountId) setDuplicateError('複製できませんでした。一覧を読み直してお試しください。') }
+    finally { duplicateLock.current = false; setDuplicatingId(null) }
+  }
+
+  const folderMove = useFolderMove({
+    accountId: selectedAccountId, canEdit: canEdit, items: items, folders,
+    move: (item, folderId) => moveEventToFolder(item.id, selectedAccountId!, item.version, folderId),
+    onChanged: async () => { await refresh(); await loadFolders() },
+  })
+
   const rowMenuItems = (e: EventListItem): ActionMenuItem[] => [
     { id: 'detail', label: '中身を見る', onSelect: () => router.push(`/events/edit?id=${e.id}`) },
     { id: 'applicants', label: '申込者を見る', onSelect: () => router.push(`/events/bookings?id=${e.id}`) },
     { id: 'change', label: '日時・定員を変える', onSelect: () => router.push(`/events/change-review?id=${e.id}`) },
     { id: 'preview', label: 'プレビュー', onSelect: () => router.push(`/events/preview?id=${e.id}`) },
-    ...(canEdit ? [{ id: 'delete-event', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => requestDelete(e) }] : []),
+    ...(canEdit ? [{ id: 'duplicate', label: '複製する', disabled: duplicatingId !== null, onSelect: () => void duplicateEvent(e) }, { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(e) }, { id: 'delete-event', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => requestDelete(e) }] : []),
   ]
 
   const folderDotOf = (folderId: string | null | undefined) => {
@@ -407,7 +440,7 @@ export default function EventsListV8() {
       </colgroup>
       <thead>
         <TableHeadRow>
-          <Th className={`${styles.headName} ${styles.firstCell}`}>イベント名（場所）</Th>
+          <Th className={`${styles.headName} ${styles.firstCell}`}>{folderMove.pageCheckbox}イベント名（場所）</Th>
           <Th>開催日時</Th>
           <Th align="right">予約／定員</Th>
           <Th align="right">承認待ち</Th>
@@ -498,12 +531,12 @@ export default function EventsListV8() {
               const low = state === 'open' && isLowApplication(e)
               const when = whenText(e.next_slot_starts_at)
               return (
-                <Tr key={e.id} data-row-id={e.id}>
+                <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id}>
                   <NameCell
                     className={styles.firstCell}
                     name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
-                        <FolderDotName folder={folderDotOf(e.folderId)}>
+                        <FolderDotName folder={folderDotOf(e.folderId)}>{folderMove.checkbox(e)}
                           <button
                             type="button"
                             onClick={() => openDetail(e.id)}
@@ -578,6 +611,7 @@ export default function EventsListV8() {
 
   const overlays = (
     <>
+      {folderMove.overlays}
       <DetailPanel
         open={active !== null}
         title={active?.name ?? ''}
@@ -661,7 +695,7 @@ export default function EventsListV8() {
       )}
       folders={<>{createButton}{folderPanel}</>}
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
-      toolbar={toolbar}
+      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{toolbar}</>}
       pagination={pager}
       overlays={overlays}
     >

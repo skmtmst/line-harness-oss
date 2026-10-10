@@ -11,6 +11,8 @@
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveConversionToFolder } from '@/lib/move-to-folder'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -206,11 +208,11 @@ function StatePill({ point }: { point: ConversionDefinitionListItem }) {
   )
 }
 
-function TableHead() {
+function TableHead({ selection }: { selection?: ReactNode } = {}) {
   return (
     <thead>
       <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colName}>成果地点</Th>
+        <Th className={styles.colName}>{selection}成果地点</Th>
         <Th className={styles.colTrigger}>何が起きたら数えるか</Th>
         <Th className={styles.colCount} align="right">この30日</Th>
         <Th className={styles.colValue} align="right">金額</Th>
@@ -777,10 +779,17 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     `/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`
 
   /* 行の「…」。見るだけの操作は誰でも、変える操作は権限のある人だけに出す（押せない物は置かない）。 */
+  const folderMove = useFolderMove({
+    accountId: accountId, canEdit: canEdit, items: current, folders,
+    move: (item, folderId) => moveConversionToFolder(item, folderId),
+    onChanged: async () => { await load(); await folderState.reload() },
+  })
+
   const rowMenuItems = (point: ConversionDefinitionListItem): ActionMenuItem[] => [
     { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
     { id: 'usage', label: '使う場所を見る', onSelect: () => setPanelId(point.id) },
     ...(canEdit ? [
+      { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(point) },
       { id: 'add-usage', label: '使う場所を足す', external: true, onSelect: () => router.push(addUsageHref(point)) },
       ...(point.status !== 'stopped' ? [{ id: 'edit', label: '編集する', onSelect: () => openEdit(point) }] : []),
       ...(point.state === 'draft'
@@ -1060,7 +1069,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
         ) : null}
         <div className={`${styles.tableWrap} ${narrow ? styles.tableWrapNarrow : role !== null && !canEdit ? styles.tableWrapViewer : ''}`}>
           <DataTable className={styles.table}>
-            <TableHead />
+            <TableHead selection={folderMove.pageCheckbox} />
             <tbody>
               {current.map((point) => {
                 const usage = usageLines(point)
@@ -1078,7 +1087,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                   >
                     <Td className={styles.colName}>
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。札は名前の頭にそろえる。 */}
-                      <FolderDotName folder={folderDotFor(folders, point.folderId)} dot={!narrow}>
+                      <FolderDotName folder={folderDotFor(folders, point.folderId)} dot={!narrow}>{folderMove.checkbox(point)}
                       <button
                         type="button"
                         className={styles.nameButton}
@@ -1233,6 +1242,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        {folderMove.overlays}
         <ConversionDetailDialog
           detailTarget={detailTarget}
           setDetailTarget={setDetailTarget}

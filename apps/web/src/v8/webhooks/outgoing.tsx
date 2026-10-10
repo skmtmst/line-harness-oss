@@ -8,9 +8,11 @@
  * 案内の帯・道具の段・表をはめる。データの口は v7 と同じ（一覧・集計・
  * 動かす/止める・試し送信・合言葉の作り直し・削除）。
  *
- * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（フォルダへ入れる口が無い・
- * 「先月より」の集計が無い・複製の口が無い など）。
+ * 絵と今の作りが合わない所は BEHAVIOR.md に書いた
+ * （「先月より」の集計が無い・複製の口が無い など）。
  */
+import { useFolderMove } from '@/components/shared/use-folder-move'
+import { moveOutgoingWebhookToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -357,11 +359,18 @@ export default function WebhooksOutgoingV8() {
     }
   }
 
+  const folderMove = useFolderMove({
+    accountId: selectedAccountId, canEdit: canManage, items: visible, folders,
+    move: (item, folderId) => moveOutgoingWebhookToFolder(item.id, selectedAccountId!, folderId),
+    onChanged: async () => { await reload(); await loadFolders() },
+  })
+
   /* ===== 行の「設定」（操作の一覧） ===== */
   const menuItemsFor = (item: OutgoingWebhookOverview): ActionMenuItem[] => {
     const canActivate = item.hasSecret && isHttpsUrl(item.url)
     const items: ActionMenuItem[] = []
     if (canManage) {
+      items.push({ id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(item) })
       items.push({ id: 'edit', label: '直す', onSelect: () => { setMenuId(null); router.push(`/webhooks/edit?id=${item.id}`) } })
       items.push({
         id: 'toggle',
@@ -563,14 +572,14 @@ export default function WebhooksOutgoingV8() {
               {narrow ? (
                 /* 1152 の絵 AsfFB：送り先・今月送った・状態・操作の4列。 */
                 <TableHeadRow data-table-layout="columns">
-                  <Th grow inset="var(--tpl-folder-dot-indent)" className={styles.colName}>送り先（送るタイミング → URL）</Th>
+                  <Th grow inset="var(--tpl-folder-dot-indent)" className={styles.colName}>{folderMove.pageCheckbox}送り先（送るタイミング → URL）</Th>
                   <Th className={styles.colMonth}>今月送った</Th>
                   <Th className={styles.colStateNarrow}>状態</Th>
                   <Th className={styles.colOpsNarrow}>操作</Th>
                 </TableHeadRow>
               ) : (
               <TableHeadRow data-table-layout="columns">
-                <Th grow className={styles.colName}>つなぎ先</Th>
+                <Th grow className={styles.colName}>{folderMove.pageCheckbox}つなぎ先</Th>
                 <Th className={styles.colWhen}>いつ送るか</Th>
                 <Th className={styles.colPayload}>送るもの</Th>
                 <Th align="right" className={styles.colCount}>この30日</Th>
@@ -591,7 +600,7 @@ export default function WebhooksOutgoingV8() {
                 const tone = toggling ? 'neutral' : failing ? 'danger' : item.isActive ? 'active' : 'neutral'
                 const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '動いている' : '止めている'
                 const nameNode = (
-                  <FolderDotName folder={folderDotFor(folders, item.folderId)}>
+                  <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}
                     {canManage ? (
                       <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
                     ) : (
@@ -643,7 +652,7 @@ export default function WebhooksOutgoingV8() {
                   <Tr key={item.id} data-table-layout="columns" data-row-id={item.id}>
                     <Td grow className={styles.colName}>
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。 */}
-                      <FolderDotName folder={folderDotFor(folders, item.folderId)}>
+                      <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}
                         {canManage ? (
                           <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
                         ) : (
@@ -758,6 +767,7 @@ export default function WebhooksOutgoingV8() {
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
+        {folderMove.overlays}
         <ConfirmDialog
           open={testTarget !== null}
           title="試し送信をします"
