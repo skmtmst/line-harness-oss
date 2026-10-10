@@ -27,7 +27,7 @@ describe('ダッシュボード点検・中の契約(#491)', () => {
     // DASH-09: null は取得中。アカウント切替直後に前の経路を残さない。
     expect(PAGE).toContain('routes={routes ?? []}')
     expect(QR).toContain('const routes = routesProp ?? fetchedRoutes')
-    expect(QR).toContain('if (!open || routesProp) return')
+    expect(QR).toContain('if (!open || routesProp || resource) return')
     expect(QR.match(/api\.entryRoutes\.list\(\)/g)).toHaveLength(1)
   })
 

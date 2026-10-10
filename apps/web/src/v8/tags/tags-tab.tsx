@@ -717,8 +717,6 @@ export default function TagsTab({
           <TableHeadRow>
             <Th className={styles.colName}>タグ</Th>
             <Th>状態</Th>
-            {/* 左にフォルダの列があるときは表にフォルダ列を置かず、名前の前に色の丸（2026-10-07 オーナー）。1152 は列を畳むので表に出す（絵 aPeD8）。 */}
-            {narrow ? <Th className={styles.colFolder}>フォルダ</Th> : null}
             <Th className={styles.colCount}>人数</Th>
             <Th className={styles.colSource}>付け方</Th>
             <Th className={styles.colLink}>連動</Th>
@@ -744,7 +742,7 @@ export default function TagsTab({
                 detailKey="tag" onOpen={() => openTagDetail(tag.id)}
                 data-row-id={tag.id}
               >
-                <Td className={styles.colName}>
+                <Td className={styles.colName} data-list-name-cell>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
                     <div className={styles.nameRow}>
                       <span
@@ -774,18 +772,6 @@ export default function TagsTab({
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
                       ) : null}</Td>
-                {narrow ? (
-                  <Td className={styles.colFolder}>
-                    <span className={styles.folderCell} title={group?.name ?? '未分類'}>
-                      {group ? (
-                        <Folder className={styles.folderIcon} aria-hidden="true" color={folderDisplayColor(group)} fill={folderDisplayColor(group)} />
-                      ) : (
-                        <FolderOpen className={styles.folderIcon} aria-hidden="true" />
-                      )}
-                      <span className={styles.truncate}>{group?.name ?? '未分類'}</span>
-                    </span>
-                  </Td>
-                ) : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
                 <Td className={styles.colCount}>
                   <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>

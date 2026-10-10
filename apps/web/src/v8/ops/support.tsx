@@ -3,7 +3,7 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import StatusPill from '@/components/shared/status-pill'
-import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
+import { Building2, Check, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   api,
@@ -20,7 +20,7 @@ import { formatDateTime, planLabel, tenantDetailHref, opsCall } from '@/componen
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
+import { ListToolbarRow } from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -357,16 +357,7 @@ export default function OpsSupportV8() {
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
   const pick = (id: string) => { deepLink.current = null; if (aiAbort.current) aiAbort.current.cancelled = true; setSelectedId(id) }
-  const chip = (c: { key: OpsSupportStage | 'all'; label: string }) => (
-    <FilterChip
-      key={c.key}
-      icon={c.key === 'all' ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />}
-      selected={stage === c.key}
-      onChange={() => setStage(c.key)}
-    >
-      {summary ? `${c.label} ${summary.byStage[c.key]}` : c.label}
-    </FilterChip>
-  )
+
 
   return (
     <div data-design-node="P0jhqO">
@@ -384,16 +375,11 @@ export default function OpsSupportV8() {
       <div className={styles.columns}>
         <section aria-label="チケットの一覧" className={styles.list}>
           <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="チケットを探す" aria-label="チケットを探す" />
-          <div className={styles.chipRow}>{STAGE_CHIPS.slice(0, 3).map(chip)}</div>
-          <div className={styles.chipColumn}>
-            {STAGE_CHIPS.slice(3).map(chip)}
-            <div className={styles.priority}>
-              <SaveErrorField names={["priority"]}><Select aria-label="優先度で絞る" options={PRIORITY_FILTER} value={priority} onChange={(value) => setPriority(value as '' | OpsSupportPriority)} /></SaveErrorField>
-            </div>
-          </div>
-          <div className={styles.sort}>
-            <SaveErrorField names={["sort"]}><Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(value) => setSort(value as typeof sort)} size="full" /></SaveErrorField>
-          </div>
+          <ListToolbarRow>
+            <Select aria-label="状態で絞る" label="状態" options={STAGE_CHIPS.map(c => ({ value: c.key, label: c.label }))} value={stage} onChange={value => setStage(value as typeof stage)} size="page-size" />
+            <SaveErrorField names={["priority"]}><Select aria-label="優先度で絞る" options={PRIORITY_FILTER} value={priority} onChange={value => setPriority(value as '' | OpsSupportPriority)} size="page-size" /></SaveErrorField>
+            <SaveErrorField names={["sort"]}><Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={value => setSort(value as typeof sort)} size="page-size" /></SaveErrorField>
+          </ListToolbarRow>
           {loading && tickets.length === 0 ? (
             <ListState permissionScope="hq" kind="loading" title="チケットを読み込んでいます" />
           ) : listFailed && tickets.length === 0 ? (

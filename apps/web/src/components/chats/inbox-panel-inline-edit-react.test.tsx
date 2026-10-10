@@ -286,12 +286,14 @@ describe('購入のAPIの形と宛先（WEB242）', () => {
       { id:'other',friendId:'friend-b',orderNumber:'注文B',totalAmount:9000,orderedAt:'2026-10-02T00:00:00Z' }
     ] } })
     await renderPanel()
+    await act(async () => { button('顧客情報をすべて表示')!.click() })
     await eventually(() => { expect(host.textContent).toContain('1,200') })
     expect(mocks.orders).toHaveBeenCalledWith(expect.objectContaining({ lineAccountId:'account-a' }))
     expect(host.textContent).not.toContain('10,200')
   })
   it('取得失敗を購入0件と出さず、再試行を出す', async () => {
     mocks.orders.mockRejectedValue(new Error('down'));await renderPanel()
+    await act(async () => { button('顧客情報をすべて表示')!.click() })
     await eventually(() => { expect(host.textContent).toContain('購入を読み込めませんでした') })
     expect(document.querySelector('[aria-label="購入をもう一度読み込む"]')).toBeTruthy()
   })

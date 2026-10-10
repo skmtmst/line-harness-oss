@@ -190,7 +190,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     role.current = 'staff'
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(links('編集する')).toHaveLength(0)
+    expect(links('編集')).toHaveLength(0)
     expect(links('＋ 追加')).toHaveLength(0)
     expect(links('変更する')).toHaveLength(0)
     expect(host.textContent).not.toContain('シナリオに登録する')
@@ -202,7 +202,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/chats'] } as StaffMember)
     await render()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
-    expect(links('編集する').length).toBeGreaterThanOrEqual(3)
+    expect(links('編集').length).toBeGreaterThanOrEqual(3)
     // シナリオ登録はオーナー・管理者だけ。
     expect(host.textContent).not.toContain('シナリオに登録する')
   })

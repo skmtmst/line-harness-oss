@@ -320,3 +320,9 @@
 .nameLine { display: flex; min-width: 0; max-width: 100%; }
 .dotIndentPad { padding-inline-start: var(--tpl-folder-dot-indent); }
 .dotIndentMargin { margin-inline-start: var(--tpl-folder-dot-indent); }
+
+.colStatus { width: var(--tpl-il-col-url); flex: none; }
+:global(html[data-theme='v8']) .table :is(.headRow, .row)[data-table-layout='columns'] { padding-inline: var(--tpl-list-inset); }
+:global(html[data-theme='v8']) .table :is(.headRow, .row)[data-table-layout='columns'] > :is(th, td).colName { min-width: var(--tpl-list-name-min); }
+:global(html[data-theme='v8']) .table .colOps > .opsBox { width: 100%; justify-content: flex-end; }
+@container v8-page (max-width: 1100px) { .colLatest, .colPool { display: none !important; } }

@@ -1,4 +1,6 @@
 'use client'
+
+import CodeBlock from '@/components/shared/code-block'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -390,7 +392,7 @@ export default function SiteScriptV8() {
                   <p className={styles.small}>あなたのアカウントのコードを取得しています…</p>
                 ) : snippet ? (
                   <>
-                    <div className={styles.codeBox}><code className={styles.code}>{snippet}</code></div>
+                    <CodeBlock>{snippet}</CodeBlock>
                     {copyFailed ? <p className={styles.small} role="alert">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
                     <div className={styles.buttons}>
                       <CopyTextButton value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー"  />
