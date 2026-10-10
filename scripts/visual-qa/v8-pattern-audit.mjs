@@ -215,6 +215,8 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] })
       // 共通部品を包むだけの配置用divは、手書きの帯ではない。
       if (signal.id === 'own-band' && /^\}\s*>\s*<ReadOnlyNotice\b/.test(content.slice(m.index + m[0].length))) continue
       if (signal.id === 'own-size' && /=\s*(STANDARD_PAGE_SIZES|PAGE_SIZE_SELECT_OPTIONS)\b/.test(raw)) continue
+      // 共有の知らせの role は画面が欄の赤表示を手作りした証拠ではない。
+      if (signal.id === 'raw-alert' && /^<(Notice|ReadOnlyNotice)\b/.test(content.slice(content.lastIndexOf('<', m.index), m.index))) continue
       if (COMMENT_LINE.test(raw)) continue
       if (p.excludeLine.some((re) => re.test(text))) continue
       if (seen.has(line)) continue
