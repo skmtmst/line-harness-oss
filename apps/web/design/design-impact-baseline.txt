@@ -104,7 +104,6 @@ shared-button-importer app/events/events-list-v8.tsx
 shared-button-importer app/events/page.tsx
 shared-button-importer app/events/preview/page.tsx
 shared-button-importer app/form-submissions/edit/form-design-settings.tsx
-shared-button-importer app/form-submissions/edit/page.tsx
 shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
 shared-button-importer app/friend-add-settings/publish/done-v8.tsx
 shared-button-importer app/friend-add-settings/runs/detail/detail-v8.tsx

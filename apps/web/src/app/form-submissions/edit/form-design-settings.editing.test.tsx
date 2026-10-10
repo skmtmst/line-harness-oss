@@ -16,7 +16,8 @@ import FormDesignSettings from './form-design-settings'
  */
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => router }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => router }))
 
 let host: HTMLDivElement
 let root: Root

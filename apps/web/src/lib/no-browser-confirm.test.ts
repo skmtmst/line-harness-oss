@@ -102,9 +102,7 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
   // window.prompt 2箇所を隣の読取専用欄へ寄せたので、一覧から外した。
   // 2026-09-23 V6R-S3-f で予約管理・流入経路の詳細のコピー失敗を画面内の欄と一言へ寄せたので、
   // 一覧から外した。
-  const PROMPT_NOT_YET = [
-    'app/form-submissions/edit/page.tsx',
-  ]
+  const PROMPT_NOT_YET: string[] = []
 
   it('prompt を使うファイルを増やさない', () => {
     expect(offenders(BROWSER_PROMPT), 'ConfirmDialog の children に入力欄を置く').toEqual(

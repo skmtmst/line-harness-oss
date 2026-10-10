@@ -17,7 +17,7 @@ const EDIT = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
  */
 describe('回答フォームの残りの板ID', () => {
   it('狭い幅で編集が ITBAB になる', () => {
-    expect(EDIT).toContain("data-design-node={narrow ? 'ITBAB' : undefined}")
+    expect(EDIT).toContain("boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}")
     expect(EDIT).toContain('useNarrowViewport()')
   })
 })
