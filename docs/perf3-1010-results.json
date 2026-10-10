@@ -1,0 +1,1271 @@
+{
+  "base": "8845f86311412c1b8568802f4619dad80f58cf9c",
+  "conditions": {
+    "build": "production export",
+    "api": "repository mock fixtures (all /api/** and /admin/**)",
+    "browser": "Playwright Chromium headless shell",
+    "viewport": [
+      1440,
+      900
+    ],
+    "cpuThrottle": 1,
+    "repetitions": 3,
+    "stressRows": 2000,
+    "scrollSteps": 20,
+    "longTaskDetectionFloorMs": 50,
+    "restaurantTestUiEnabled": false,
+    "nodeVersion": "26.0.0 (CI: 22)"
+  },
+  "stages": {
+    "before": [
+      {
+        "name": "tags",
+        "diagnostic": false,
+        "median": {
+          "showMs": 1101,
+          "longTaskMs": 0,
+          "pressMs": 60,
+          "lcpMs": 136,
+          "jsBytes": 2085820
+        },
+        "samples": [
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 1101,
+            "pressMs": 57,
+            "lcpMs": 136,
+            "jsBytes": 2085820,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 1075,
+            "pressMs": 60,
+            "lcpMs": 128,
+            "jsBytes": 2085820,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 1109,
+            "pressMs": 66,
+            "lcpMs": 136,
+            "jsBytes": 2085820,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "friends-2000",
+        "diagnostic": false,
+        "median": {
+          "showMs": 237,
+          "longTaskMs": 0,
+          "pressMs": null,
+          "lcpMs": 144,
+          "jsBytes": 1826386
+        },
+        "samples": [
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 228,
+            "pressMs": null,
+            "lcpMs": 144,
+            "jsBytes": 1826386,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 237,
+            "pressMs": null,
+            "lcpMs": 144,
+            "jsBytes": 1826386,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 264,
+            "pressMs": null,
+            "lcpMs": 152,
+            "jsBytes": 1826386,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          }
+        ]
+      },
+      {
+        "name": "tags",
+        "diagnostic": true,
+        "median": {
+          "showMs": 1082,
+          "longTaskMs": 0,
+          "pressMs": 49,
+          "lcpMs": 136,
+          "jsBytes": 2085820
+        },
+        "diagnosisMedian": {
+          "scriptMs": 126.7,
+          "renderingMs": 108,
+          "eventMs": 20.6,
+          "layoutMs": 70.3,
+          "aggregationMs": 1.099999949336052
+        },
+        "layoutCounts": [
+          17,
+          16,
+          17
+        ]
+      },
+      {
+        "name": "friends-2000",
+        "diagnostic": true,
+        "median": {
+          "showMs": 287,
+          "longTaskMs": 0,
+          "pressMs": null,
+          "lcpMs": 168,
+          "jsBytes": 1826386
+        },
+        "diagnosisMedian": {
+          "scriptMs": 865.6,
+          "renderingMs": 667.2,
+          "eventMs": 29.5,
+          "layoutMs": 498.4,
+          "aggregationMs": 6.1000001430511475
+        },
+        "layoutCounts": [
+          1070,
+          1071,
+          1070
+        ]
+      }
+    ],
+    "after": [
+      {
+        "name": "tags",
+        "diagnostic": false,
+        "median": {
+          "showMs": 838,
+          "longTaskMs": 0,
+          "pressMs": 74,
+          "lcpMs": 172,
+          "jsBytes": 1570636
+        },
+        "samples": [
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 882,
+            "pressMs": 74,
+            "lcpMs": 200,
+            "jsBytes": 1570636,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 838,
+            "pressMs": 74,
+            "lcpMs": 172,
+            "jsBytes": 1570636,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 755,
+            "pressMs": 69,
+            "lcpMs": 136,
+            "jsBytes": 1570636,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "friends-2000",
+        "diagnostic": false,
+        "median": {
+          "showMs": 288,
+          "longTaskMs": 0,
+          "pressMs": null,
+          "lcpMs": 172,
+          "jsBytes": 1814764
+        },
+        "samples": [
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 426,
+            "pressMs": null,
+            "lcpMs": 180,
+            "jsBytes": 1814764,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 288,
+            "pressMs": null,
+            "lcpMs": 172,
+            "jsBytes": 1814764,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 282,
+            "pressMs": null,
+            "lcpMs": 172,
+            "jsBytes": 1814764,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          }
+        ]
+      },
+      {
+        "name": "tags",
+        "diagnostic": true,
+        "median": {
+          "showMs": 794,
+          "longTaskMs": 0,
+          "pressMs": 66,
+          "lcpMs": 220,
+          "jsBytes": 1570636
+        },
+        "diagnosisMedian": {
+          "scriptMs": 158.2,
+          "renderingMs": 129.5,
+          "eventMs": 36.4,
+          "layoutMs": 89.8,
+          "aggregationMs": 1.7000000029802322
+        },
+        "layoutCounts": [
+          9,
+          8,
+          16
+        ]
+      },
+      {
+        "name": "friends-2000",
+        "diagnostic": true,
+        "median": {
+          "showMs": 319,
+          "longTaskMs": 0,
+          "pressMs": null,
+          "lcpMs": 184,
+          "jsBytes": 1814764
+        },
+        "diagnosisMedian": {
+          "scriptMs": 916.3,
+          "renderingMs": 761.5,
+          "eventMs": 41.5,
+          "layoutMs": 325.6,
+          "aggregationMs": 4.200000017881393
+        },
+        "layoutCounts": [
+          839,
+          838,
+          836
+        ]
+      }
+    ],
+    "after-initial": [
+      {
+        "name": "tags",
+        "diagnostic": false,
+        "median": {
+          "showMs": 755,
+          "longTaskMs": 0,
+          "pressMs": 65,
+          "lcpMs": 164,
+          "jsBytes": 1570576
+        },
+        "samples": [
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 782,
+            "pressMs": 65,
+            "lcpMs": 184,
+            "jsBytes": 1570576,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 749,
+            "pressMs": 54,
+            "lcpMs": 156,
+            "jsBytes": 1570576,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 755,
+            "pressMs": 66,
+            "lcpMs": 164,
+            "jsBytes": 1570576,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "friends-2000",
+        "diagnostic": false,
+        "median": {
+          "showMs": 287,
+          "longTaskMs": 0,
+          "pressMs": null,
+          "lcpMs": 168,
+          "jsBytes": 1814704
+        },
+        "samples": [
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 287,
+            "pressMs": null,
+            "lcpMs": 172,
+            "jsBytes": 1814704,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 295,
+            "pressMs": null,
+            "lcpMs": 160,
+            "jsBytes": 1814704,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 274,
+            "pressMs": null,
+            "lcpMs": 168,
+            "jsBytes": 1814704,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          }
+        ]
+      },
+      {
+        "name": "tags",
+        "diagnostic": true,
+        "median": {
+          "showMs": 755,
+          "longTaskMs": 0,
+          "pressMs": 65,
+          "lcpMs": 156,
+          "jsBytes": 1570576
+        },
+        "diagnosisMedian": {
+          "scriptMs": 138.7,
+          "renderingMs": 123.1,
+          "eventMs": 25.2,
+          "layoutMs": 80.1,
+          "aggregationMs": 0.9999999701976776
+        },
+        "layoutCounts": [
+          14,
+          14,
+          14
+        ]
+      },
+      {
+        "name": "friends-2000",
+        "diagnostic": true,
+        "median": {
+          "showMs": 284,
+          "longTaskMs": 0,
+          "pressMs": null,
+          "lcpMs": 164,
+          "jsBytes": 1814704
+        },
+        "diagnosisMedian": {
+          "scriptMs": 840.2,
+          "renderingMs": 710.5,
+          "eventMs": 29.6,
+          "layoutMs": 509.9,
+          "aggregationMs": 5.499999970197678
+        },
+        "layoutCounts": [
+          840,
+          839,
+          839
+        ]
+      }
+    ]
+  },
+  "negativeControls": {
+    "unitSourceReverts": [
+      {
+        "source": "apps/web/src/components/shared/skeleton.tsx",
+        "test": "src/components/shared/skeleton-speed.test.tsx",
+        "exit": 1
+      },
+      {
+        "source": "apps/web/src/components/shared/table-body.tsx",
+        "test": "src/components/shared/table-body.test.tsx",
+        "exit": 1
+      },
+      {
+        "source": "apps/web/src/components/shared/tag-overflow.tsx",
+        "test": "src/components/shared/tag-overflow-speed.test.tsx",
+        "exit": 1
+      },
+      {
+        "source": "apps/web/src/components/shared/truncated-text.tsx",
+        "test": "src/components/shared/truncated-text.test.tsx",
+        "exit": 1
+      }
+    ],
+    "longTaskMs": [
+      100,
+      100,
+      100
+    ],
+    "showMs": [
+      3033,
+      2853,
+      3033
+    ],
+    "rowPrefetchRevertExit": 1
+  },
+  "visual": {
+    "widths": [
+      1440,
+      1152,
+      1920
+    ],
+    "geometryEqual": true,
+    "rowHeightPx": 60,
+    "pixelDifferences": [
+      {
+        "width": 1440,
+        "name": "tags",
+        "pixels": 0,
+        "geometryEqual": true
+      },
+      {
+        "width": 1440,
+        "name": "friends",
+        "pixels": 0,
+        "geometryEqual": true
+      },
+      {
+        "width": 1152,
+        "name": "tags",
+        "pixels": 0,
+        "geometryEqual": true
+      },
+      {
+        "width": 1152,
+        "name": "friends",
+        "pixels": 0,
+        "geometryEqual": true
+      },
+      {
+        "width": 1920,
+        "name": "tags",
+        "pixels": 0,
+        "geometryEqual": true
+      },
+      {
+        "width": 1920,
+        "name": "friends",
+        "pixels": 0,
+        "geometryEqual": true
+      }
+    ]
+  },
+  "dbAloneRechecks": [
+    {
+      "file": "test/350_webhook_secret_encryption.test.ts",
+      "exit": 0,
+      "passed": 12,
+      "log": "/tmp/perf3-db-alone-350_webhook_secret_encryption.test.ts.log"
+    },
+    {
+      "file": "test/376_friend_tag_side_effect_runs.test.ts",
+      "exit": 0,
+      "passed": 17,
+      "log": "/tmp/perf3-db-alone-376_friend_tag_side_effect_runs.test.ts.log"
+    },
+    {
+      "file": "test/friend-add-events.test.ts",
+      "exit": 0,
+      "passed": 6,
+      "log": "/tmp/perf3-db-alone-friend-add-events.test.ts.log"
+    },
+    {
+      "file": "test/friend-add-rules.test.ts",
+      "exit": 0,
+      "passed": 10,
+      "log": "/tmp/perf3-db-alone-friend-add-rules.test.ts.log"
+    },
+    {
+      "file": "test/046_affiliate_links.test.ts",
+      "exit": 0,
+      "passed": 6,
+      "log": "/tmp/perf3-db-alone-046_affiliate_links.test.ts.log"
+    },
+    {
+      "file": "test/047_affiliate_offers.test.ts",
+      "exit": 0,
+      "passed": 6,
+      "log": "/tmp/perf3-db-alone-047_affiliate_offers.test.ts.log"
+    },
+    {
+      "file": "test/358_friend_add_send_claims.test.ts",
+      "exit": 0,
+      "passed": 7,
+      "log": "/tmp/perf3-db-alone-358_friend_add_send_claims.test.ts.log"
+    },
+    {
+      "file": "test/556_f13_folder_kinds.test.ts",
+      "exit": 0,
+      "passed": 4,
+      "log": "/tmp/perf3-db-alone-556_f13_folder_kinds.test.ts.log"
+    },
+    {
+      "file": "test/affiliate-attribution.test.ts",
+      "exit": 0,
+      "passed": 14,
+      "log": "/tmp/perf3-db-alone-affiliate-attribution.test.ts.log"
+    },
+    {
+      "file": "test/affiliate-report.test.ts",
+      "exit": 0,
+      "passed": 27,
+      "log": "/tmp/perf3-db-alone-affiliate-report.test.ts.log"
+    },
+    {
+      "file": "test/conversion-point-options.test.ts",
+      "exit": 0,
+      "passed": 13,
+      "log": "/tmp/perf3-db-alone-conversion-point-options.test.ts.log"
+    },
+    {
+      "file": "test/mileage-earning-publish.test.ts",
+      "exit": 0,
+      "passed": 11,
+      "log": "/tmp/perf3-db-alone-mileage-earning-publish.test.ts.log"
+    }
+  ],
+  "v8Guards": [
+    {
+      "name": "layout",
+      "exit": 0
+    },
+    {
+      "name": "defects",
+      "exit": 0
+    },
+    {
+      "name": "list-rows",
+      "exit": 0
+    },
+    {
+      "name": "list-skeleton",
+      "exit": 0
+    }
+  ],
+  "v8GuardCounts": {
+    "layout": 72,
+    "defects": 192,
+    "list-rows": 129,
+    "list-skeleton": 93
+  },
+  "finalInteractionTests": [
+    {
+      "name": "friends",
+      "exit": 0
+    },
+    {
+      "name": "flow",
+      "exit": 0
+    }
+  ],
+  "webTests": {
+    "passed": 12324,
+    "files": 2109,
+    "skipped": 1,
+    "todo": 1
+  },
+  "workerTests": {
+    "passed": 10829,
+    "files": 917,
+    "skipped": 30
+  },
+  "scriptsTests": {
+    "passed": 871,
+    "files": 96
+  },
+  "ciConfigurationLocalSpeed": {
+    "complete": true,
+    "policy": {
+      "profile": "ci",
+      "sampleCount": 5,
+      "timeFactor": 1.3
+    },
+    "measured": [
+      {
+        "name": "dashboard",
+        "route": "/",
+        "showMs": 749,
+        "pressMs": 47,
+        "lcpMs": 140,
+        "jsBytes": 3358007,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "dashboard",
+            "route": "/",
+            "showMs": 745,
+            "pressMs": 58,
+            "lcpMs": 144,
+            "jsBytes": 3358007,
+            "longTaskMs": 0
+          },
+          {
+            "name": "dashboard",
+            "route": "/",
+            "showMs": 750,
+            "pressMs": 47,
+            "lcpMs": 144,
+            "jsBytes": 3358007,
+            "longTaskMs": 0
+          },
+          {
+            "name": "dashboard",
+            "route": "/",
+            "showMs": 749,
+            "pressMs": 52,
+            "lcpMs": 136,
+            "jsBytes": 3358007,
+            "longTaskMs": 0
+          },
+          {
+            "name": "dashboard",
+            "route": "/",
+            "showMs": 752,
+            "pressMs": 47,
+            "lcpMs": 140,
+            "jsBytes": 3358007,
+            "longTaskMs": 0
+          },
+          {
+            "name": "dashboard",
+            "route": "/",
+            "showMs": 742,
+            "pressMs": 46,
+            "lcpMs": 132,
+            "jsBytes": 3358007,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "inbox",
+        "route": "/chats",
+        "showMs": 683,
+        "pressMs": 58,
+        "lcpMs": 124,
+        "jsBytes": 1534649,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "inbox",
+            "route": "/chats",
+            "showMs": 683,
+            "pressMs": 65,
+            "lcpMs": 124,
+            "jsBytes": 1534649,
+            "longTaskMs": 0
+          },
+          {
+            "name": "inbox",
+            "route": "/chats",
+            "showMs": 687,
+            "pressMs": 57,
+            "lcpMs": 132,
+            "jsBytes": 1534649,
+            "longTaskMs": 0
+          },
+          {
+            "name": "inbox",
+            "route": "/chats",
+            "showMs": 682,
+            "pressMs": 58,
+            "lcpMs": 124,
+            "jsBytes": 1534649,
+            "longTaskMs": 0
+          },
+          {
+            "name": "inbox",
+            "route": "/chats",
+            "showMs": 688,
+            "pressMs": 57,
+            "lcpMs": 136,
+            "jsBytes": 1534649,
+            "longTaskMs": 0
+          },
+          {
+            "name": "inbox",
+            "route": "/chats",
+            "showMs": 682,
+            "pressMs": 58,
+            "lcpMs": 124,
+            "jsBytes": 1534649,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "friends",
+        "route": "/friends",
+        "showMs": 727,
+        "pressMs": 48,
+        "lcpMs": 136,
+        "jsBytes": 1814447,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "friends",
+            "route": "/friends",
+            "showMs": 728,
+            "pressMs": 49,
+            "lcpMs": 136,
+            "jsBytes": 1814447,
+            "longTaskMs": 0
+          },
+          {
+            "name": "friends",
+            "route": "/friends",
+            "showMs": 727,
+            "pressMs": 49,
+            "lcpMs": 136,
+            "jsBytes": 1814447,
+            "longTaskMs": 0
+          },
+          {
+            "name": "friends",
+            "route": "/friends",
+            "showMs": 716,
+            "pressMs": 48,
+            "lcpMs": 132,
+            "jsBytes": 1814447,
+            "longTaskMs": 0
+          },
+          {
+            "name": "friends",
+            "route": "/friends",
+            "showMs": 728,
+            "pressMs": 47,
+            "lcpMs": 136,
+            "jsBytes": 1814447,
+            "longTaskMs": 0
+          },
+          {
+            "name": "friends",
+            "route": "/friends",
+            "showMs": 727,
+            "pressMs": 46,
+            "lcpMs": 132,
+            "jsBytes": 1814447,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "broadcasts",
+        "route": "/broadcasts",
+        "showMs": 727,
+        "pressMs": 48,
+        "lcpMs": 132,
+        "jsBytes": 2016785,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "broadcasts",
+            "route": "/broadcasts",
+            "showMs": 732,
+            "pressMs": 49,
+            "lcpMs": 116,
+            "jsBytes": 2016785,
+            "longTaskMs": 0
+          },
+          {
+            "name": "broadcasts",
+            "route": "/broadcasts",
+            "showMs": 727,
+            "pressMs": 47,
+            "lcpMs": 132,
+            "jsBytes": 2016785,
+            "longTaskMs": 0
+          },
+          {
+            "name": "broadcasts",
+            "route": "/broadcasts",
+            "showMs": 724,
+            "pressMs": 47,
+            "lcpMs": 132,
+            "jsBytes": 2016785,
+            "longTaskMs": 0
+          },
+          {
+            "name": "broadcasts",
+            "route": "/broadcasts",
+            "showMs": 722,
+            "pressMs": 48,
+            "lcpMs": 132,
+            "jsBytes": 2016785,
+            "longTaskMs": 0
+          },
+          {
+            "name": "broadcasts",
+            "route": "/broadcasts",
+            "showMs": 727,
+            "pressMs": 50,
+            "lcpMs": 136,
+            "jsBytes": 2016785,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "broadcast-new",
+        "route": "/broadcasts/new",
+        "showMs": 712,
+        "pressMs": 58,
+        "lcpMs": 192,
+        "jsBytes": 1894391,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "broadcast-new",
+            "route": "/broadcasts/new",
+            "showMs": 706,
+            "pressMs": 46,
+            "lcpMs": 192,
+            "jsBytes": 1894391,
+            "longTaskMs": 0
+          },
+          {
+            "name": "broadcast-new",
+            "route": "/broadcasts/new",
+            "showMs": 713,
+            "pressMs": 66,
+            "lcpMs": 188,
+            "jsBytes": 1894391,
+            "longTaskMs": 0
+          },
+          {
+            "name": "broadcast-new",
+            "route": "/broadcasts/new",
+            "showMs": 711,
+            "pressMs": 67,
+            "lcpMs": 200,
+            "jsBytes": 1894391,
+            "longTaskMs": 0
+          },
+          {
+            "name": "broadcast-new",
+            "route": "/broadcasts/new",
+            "showMs": 735,
+            "pressMs": 58,
+            "lcpMs": 192,
+            "jsBytes": 1894391,
+            "longTaskMs": 0
+          },
+          {
+            "name": "broadcast-new",
+            "route": "/broadcasts/new",
+            "showMs": 712,
+            "pressMs": 47,
+            "lcpMs": 184,
+            "jsBytes": 1894391,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "templates",
+        "route": "/templates",
+        "showMs": 707,
+        "pressMs": 33,
+        "lcpMs": 132,
+        "jsBytes": 1598086,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "templates",
+            "route": "/templates",
+            "showMs": 704,
+            "pressMs": 33,
+            "lcpMs": 132,
+            "jsBytes": 1598086,
+            "longTaskMs": 0
+          },
+          {
+            "name": "templates",
+            "route": "/templates",
+            "showMs": 704,
+            "pressMs": 33,
+            "lcpMs": 124,
+            "jsBytes": 1598086,
+            "longTaskMs": 0
+          },
+          {
+            "name": "templates",
+            "route": "/templates",
+            "showMs": 711,
+            "pressMs": 41,
+            "lcpMs": 136,
+            "jsBytes": 1598086,
+            "longTaskMs": 0
+          },
+          {
+            "name": "templates",
+            "route": "/templates",
+            "showMs": 732,
+            "pressMs": 42,
+            "lcpMs": 140,
+            "jsBytes": 1598086,
+            "longTaskMs": 0
+          },
+          {
+            "name": "templates",
+            "route": "/templates",
+            "showMs": 707,
+            "pressMs": 33,
+            "lcpMs": 128,
+            "jsBytes": 1598086,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "booking",
+        "route": "/booking/bookings",
+        "showMs": 685,
+        "pressMs": 33,
+        "lcpMs": 172,
+        "jsBytes": 1359218,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "booking",
+            "route": "/booking/bookings",
+            "showMs": 685,
+            "pressMs": 33,
+            "lcpMs": 172,
+            "jsBytes": 1359218,
+            "longTaskMs": 0
+          },
+          {
+            "name": "booking",
+            "route": "/booking/bookings",
+            "showMs": 678,
+            "pressMs": 32,
+            "lcpMs": 168,
+            "jsBytes": 1359218,
+            "longTaskMs": 0
+          },
+          {
+            "name": "booking",
+            "route": "/booking/bookings",
+            "showMs": 685,
+            "pressMs": 34,
+            "lcpMs": 176,
+            "jsBytes": 1359218,
+            "longTaskMs": 0
+          },
+          {
+            "name": "booking",
+            "route": "/booking/bookings",
+            "showMs": 681,
+            "pressMs": 34,
+            "lcpMs": 164,
+            "jsBytes": 1359218,
+            "longTaskMs": 0
+          },
+          {
+            "name": "booking",
+            "route": "/booking/bookings",
+            "showMs": 693,
+            "pressMs": 32,
+            "lcpMs": 180,
+            "jsBytes": 1359218,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "answers",
+        "route": "/form-submissions",
+        "showMs": 693,
+        "pressMs": 47,
+        "lcpMs": 120,
+        "jsBytes": 1860270,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "answers",
+            "route": "/form-submissions",
+            "showMs": 686,
+            "pressMs": 46,
+            "lcpMs": 104,
+            "jsBytes": 1860270,
+            "longTaskMs": 0
+          },
+          {
+            "name": "answers",
+            "route": "/form-submissions",
+            "showMs": 685,
+            "pressMs": 46,
+            "lcpMs": 120,
+            "jsBytes": 1860270,
+            "longTaskMs": 0
+          },
+          {
+            "name": "answers",
+            "route": "/form-submissions",
+            "showMs": 693,
+            "pressMs": 47,
+            "lcpMs": 132,
+            "jsBytes": 1860270,
+            "longTaskMs": 0
+          },
+          {
+            "name": "answers",
+            "route": "/form-submissions",
+            "showMs": 696,
+            "pressMs": 51,
+            "lcpMs": 120,
+            "jsBytes": 1860270,
+            "longTaskMs": 0
+          },
+          {
+            "name": "answers",
+            "route": "/form-submissions",
+            "showMs": 699,
+            "pressMs": 50,
+            "lcpMs": 128,
+            "jsBytes": 1860270,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "tags",
+        "route": "/tags",
+        "showMs": 717,
+        "pressMs": 50,
+        "lcpMs": 132,
+        "jsBytes": 1570338,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 717,
+            "pressMs": 50,
+            "lcpMs": 132,
+            "jsBytes": 1570338,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 734,
+            "pressMs": 50,
+            "lcpMs": 144,
+            "jsBytes": 1570338,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 716,
+            "pressMs": 47,
+            "lcpMs": 132,
+            "jsBytes": 1570338,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 713,
+            "pressMs": 47,
+            "lcpMs": 124,
+            "jsBytes": 1570338,
+            "longTaskMs": 0
+          },
+          {
+            "name": "tags",
+            "route": "/tags",
+            "showMs": 729,
+            "pressMs": 66,
+            "lcpMs": 128,
+            "jsBytes": 1570338,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "settings",
+        "route": "/settings",
+        "showMs": 699,
+        "pressMs": 47,
+        "lcpMs": 100,
+        "jsBytes": 2909496,
+        "longTaskMs": 0,
+        "samples": [
+          {
+            "name": "settings",
+            "route": "/settings",
+            "showMs": 716,
+            "pressMs": 48,
+            "lcpMs": 112,
+            "jsBytes": 2909496,
+            "longTaskMs": 0
+          },
+          {
+            "name": "settings",
+            "route": "/settings",
+            "showMs": 706,
+            "pressMs": 47,
+            "lcpMs": 104,
+            "jsBytes": 2909496,
+            "longTaskMs": 0
+          },
+          {
+            "name": "settings",
+            "route": "/settings",
+            "showMs": 692,
+            "pressMs": 46,
+            "lcpMs": 100,
+            "jsBytes": 2909496,
+            "longTaskMs": 0
+          },
+          {
+            "name": "settings",
+            "route": "/settings",
+            "showMs": 695,
+            "pressMs": 46,
+            "lcpMs": 100,
+            "jsBytes": 2909496,
+            "longTaskMs": 0
+          },
+          {
+            "name": "settings",
+            "route": "/settings",
+            "showMs": 699,
+            "pressMs": 49,
+            "lcpMs": 100,
+            "jsBytes": 2909496,
+            "longTaskMs": 0
+          }
+        ]
+      },
+      {
+        "name": "friends-2000",
+        "route": "/friends",
+        "showMs": 255,
+        "pressMs": null,
+        "lcpMs": 152,
+        "jsBytes": 1814447,
+        "longTaskMs": 0,
+        "rows": 2000,
+        "renderedRows": 13,
+        "samples": [
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 252,
+            "pressMs": null,
+            "lcpMs": 152,
+            "jsBytes": 1814447,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 274,
+            "pressMs": null,
+            "lcpMs": 160,
+            "jsBytes": 1814447,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 255,
+            "pressMs": null,
+            "lcpMs": 148,
+            "jsBytes": 1814447,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 250,
+            "pressMs": null,
+            "lcpMs": 148,
+            "jsBytes": 1814447,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          },
+          {
+            "name": "friends-2000",
+            "route": "/friends",
+            "showMs": 293,
+            "pressMs": null,
+            "lcpMs": 160,
+            "jsBytes": 1814447,
+            "longTaskMs": 0,
+            "rows": 2000,
+            "renderedRows": 13
+          }
+        ]
+      }
+    ],
+    "budgetExit": 0,
+    "stressTargetExit": 0,
+    "perf3TargetExit": 0
+  },
+  "implementationCommit": "d333ebb360a859ea59f8c5747df89f21d1661b8e",
+  "measurementToolsCommit": "daa4cc9a9dd45c038bbb82e20eb886a3d5e1ea20"
+}

@@ -732,7 +732,7 @@ export default function TagsTab({
                         )}
                       </span>
                       <FolderDotName folder={group}>
-                        {canEdit ? <RowNameLink href={editHref} title={tag.name} className={styles.name}>{tag.name}</RowNameLink> : <span title={tag.name}>{tag.name}</span>}
+                        {canEdit ? <RowNameLink prefetch={false} href={editHref} title={tag.name} className={styles.name}>{tag.name}</RowNameLink> : <span title={tag.name}>{tag.name}</span>}
                       </FolderDotName>
                       </div>
 
@@ -756,7 +756,7 @@ export default function TagsTab({
                 ) : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
                 <Td className={styles.colCount}>
-                  <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
+                  <Link prefetch={false} href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
                     {tag.friendCount ?? 0} 人
                   </Link>
                 </Td>

@@ -1,7 +1,19 @@
 'use client'
 
-import { cloneElement, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { cloneElement, memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import styles from './table-body.module.css'
+
+// Window/height updates do not change an existing row's data or event handlers.
+// Keep its children mounted without recreating their measurement effects.
+const WindowedRow = memo(function WindowedRow<T>({ item, index, renderRow }: {
+  item: T
+  index: number
+  renderRow: (item: T, index: number) => ReactElement
+}) {
+  return cloneElement(renderRow(item, index) as ReactElement<Record<string, unknown>>, {
+    'data-table-index': index, 'aria-rowindex': index + 2,
+  })
+}) as <T>(props: { item: T; index: number; renderRow: (item: T, index: number) => ReactElement }) => ReactElement
 
 /** Native table rows with a bounded rendering window. Small lists keep their exact markup. */
 export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, threshold = 60, estimatedRowHeight = 58 }: {
@@ -164,9 +176,7 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
   }
   for (const index of indices) {
     spacer(previous, index)
-    rows.push(cloneElement(renderRow(items[index], index) as ReactElement<Record<string, unknown>>, {
-      key: keys[index], 'data-table-index': index, 'aria-rowindex': index + 2,
-    }))
+    rows.push(<WindowedRow key={keys[index]} item={items[index]} index={index} renderRow={renderRow} />)
     previous = index + 1
   }
   spacer(previous, items.length)

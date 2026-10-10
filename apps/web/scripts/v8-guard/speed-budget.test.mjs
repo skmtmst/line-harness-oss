@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { measureMedian, judge, median } from './speed-budget.mjs'
+import { measureMedian, judge, median, stubApi } from './speed-budget.mjs'
 import { speedPolicy } from './speed-policy.mjs'
 import { assertStressTargets } from './stress-targets.mjs'
 import { speedReport } from './speed-report.mjs'
@@ -115,7 +115,25 @@ test('速度だけ参考にし、必須レイアウトと生outcomeの警告を�
   assert.match(report.if, /!cancelled\(\)/)
   assert.match(report.env.SPEED_BUDGET_OUTCOME, /speed_budget.outcome/)
   assert.match(report.env.STRESS_SPEED_OUTCOME, /stress_speed.outcome/)
+  const perf3 = guard.steps.find(s => s.id === 'perf3_targets')
+  assert.equal(perf3['continue-on-error'], true)
+  assert.match(perf3.run, /perf3-targets.mjs/)
+  assert.match(report.env.PERF3_TARGETS_OUTCOME, /perf3_targets.outcome/)
   const upload = guard.steps.find(s => s.name === 'Upload V8 screen guard results')
   assert.match(upload.if, /always\(\)/)
   assert.match(upload.with.path, /\/tmp\/v8-guard\//)
+})
+
+
+test('local-stubはAPI外のバージョン確認もCIと同じ固定応答にし、外部通信を残さない', async () => {
+  const routes = new Map()
+  const page = { route: async (pattern, answer) => routes.set(pattern, answer) }
+  const paths = []
+  await stubApi(page, async (method, path) => { paths.push([method, path]); return { status: 200, body: '{"version":"2.6.4"}' } })
+  let fulfilled
+  await routes.get('**/admin/**')({ request: () => ({ url: () => 'https://example.test/admin/version', method: () => 'GET', headers: () => ({ origin: 'http://127.0.0.1:4393' }) }), fulfill: async value => { fulfilled = value } })
+  assert.deepEqual(paths, [['GET', '/admin/version']])
+  assert.equal(fulfilled.status, 200)
+  assert.equal(JSON.parse(fulfilled.body).version, '2.6.4')
+  assert.equal(fulfilled.headers['Access-Control-Allow-Origin'], 'http://127.0.0.1:4393')
 })
