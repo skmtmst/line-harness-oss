@@ -16,7 +16,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { CONVERSION_APPROVAL_EDIT_KEY, normalizeStaffPermissionKeys, toggleStaffPermissionKey } from '../permission-labels'
+import { CONVERSION_APPROVAL_EDIT_KEY, normalizeStaffPermissionKeys, toggleStaffPermissionKey } from '@/v8/settings/staff/permission-labels'
 
 type Role = 'admin' | 'staff' | 'viewer'
 type Channel = { email: boolean; line: boolean }

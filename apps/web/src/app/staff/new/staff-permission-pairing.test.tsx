@@ -37,7 +37,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 const { default: NewStaffPage } = await import('./page')
-const labels = await import('../permission-labels')
+const labels = await import('@/v8/settings/staff/permission-labels')
 
 async function fillBasics() {
   render(<NewStaffPage />)

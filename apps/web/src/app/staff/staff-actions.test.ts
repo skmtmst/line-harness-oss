@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
-import { matchStaffMember, scopeBundleToStaffRole, staffActionPolicy } from './staff-actions'
+import { matchStaffMember, scopeBundleToStaffRole, staffActionPolicy } from '@/v8/settings/staff/staff-actions'
 
 function member(overrides: Partial<StaffMember> = {}): StaffMember {
   return {

@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { PERMISSION_LABELS } from './permission-labels'
+import { PERMISSION_LABELS } from '@/v8/settings/staff/permission-labels'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const NEW_PAGE = fs.readFileSync(path.join(__dirname, 'new', 'page.tsx'), 'utf8')
