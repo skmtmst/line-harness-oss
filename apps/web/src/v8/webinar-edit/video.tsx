@@ -265,7 +265,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       boardId={scheduled ? 'LPOe7' : 'VWNaA'}
       title={chrome.title}
       actions={chrome.actions}

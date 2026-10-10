@@ -161,7 +161,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       boardId="j7PP04"
       title={chrome.title}
       actions={chrome.actions}

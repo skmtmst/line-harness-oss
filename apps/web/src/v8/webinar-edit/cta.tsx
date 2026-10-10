@@ -217,9 +217,11 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
 
   const cardsDirty = savedCards !== null && JSON.stringify([ctas, times]) !== savedCards
   const formDirty = registrationFormId !== savedForm
+  const formsReadyForSave = forms.state === 'ready' || (forms.state === 'error' && !formDirty && ctas !== null && ctas.every(card => card.kind !== 'form'))
+  const canSave = !readOnly && ctas !== null && formsReadyForSave && !conflict
   const saveCurrent = useRef<() => Promise<boolean>>(async () => false)
   saveCurrent.current = async () => {
-    if (readOnly || ctas === null || lock.current || conflict) return false
+    if (!canSave || lock.current) return false
     lock.current = true
     setSaving(true)
     try {
@@ -234,10 +236,10 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   useEffect(() => { onDirtyChange(cardsDirty || formDirty) }, [cardsDirty, formDirty, onDirtyChange])
   useEffect(() => () => onDirtyChange(false), [onDirtyChange])
   useEffect(() => {
-    if (readOnly) { registerSave(null); return }
+    if (!canSave) { registerSave(null); return }
     registerSave(() => saveCurrent.current())
     return () => registerSave(null)
-  }, [registerSave, readOnly])
+  }, [registerSave, canSave])
 
   /* 同時編集：最新を読んで見比べる → 最新を読み込んで続ける（自分のカードの入力は残さない／申込フォームは最新へ）。 */
   const readLatest = async () => {
@@ -276,7 +278,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const busy = saving || reading
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       boardId={conflict ? 'pvimJ' : 'Q0Jrk'}
       title={chrome.title}
       actions={chrome.actions}

@@ -377,10 +377,15 @@ function EditInner() {
     } catch (cause) { if (!saveErrors.capture(cause)) setDuplicateError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
     finally { setDuplicating(false) }
   }
-  const menuActions = !readOnly ? <><RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false || duplicating }} items={[
-    { id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) },
-    ...(webinar.status === 'active' ? [{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }] : []),
-  ]} />{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}</> : null
+  const menuActions = <><RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false || duplicating }} items={[
+    { id: 'participants', label: '参加者を見る', onSelect: () => goStep('participants') },
+    { id: 'analytics', label: '分析を見る', onSelect: () => goStep('analytics') },
+    { id: 'comments', label: 'コメント演出を開く', onSelect: () => goStep('comments') },
+    ...(!readOnly ? [
+      { id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) },
+      ...(webinar.status === 'active' ? [{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }] : []),
+    ] : []),
+  ]} />{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}</>
 
   const wizardChrome = (key: StepKey, primary?: ReactNode): WizardChrome => {
     const nextLabel = NEXT_LABEL[key]

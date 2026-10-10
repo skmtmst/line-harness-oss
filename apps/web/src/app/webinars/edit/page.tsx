@@ -27,7 +27,6 @@ import {
   type StepKey,
 } from './edit-steps'
 import BasicV8 from './basic-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import WebinarEditV8 from '@/v8/webinar-edit/edit'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -1046,10 +1045,10 @@ const EditWebinarPageWithTestSupport = Object.assign(EditWebinarPage, {
   },
 })
 
-/* V8 のときだけ新しい編集（src/v8/webinar-edit）。それ以外は今の編集のまま。 */
+/* 現役の編集へ固定。旧の試験用の部品は次の区切りで移す。 */
 function EditWebinarEntry() {
-  const theme = useAdminTheme()
-  return theme === 'v8' ? <WebinarEditV8 /> : <EditWebinarPageWithTestSupport />
+
+  return <WebinarEditV8 />
 }
 
 export default Object.assign(EditWebinarEntry, { __testing: EditWebinarPageWithTestSupport.__testing })

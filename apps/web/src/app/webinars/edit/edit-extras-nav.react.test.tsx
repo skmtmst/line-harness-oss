@@ -14,6 +14,8 @@ vi.hoisted(() => {
 const get = vi.hoisted(() => vi.fn())
 const editor = vi.hoisted(() => vi.fn())
 const analytics = vi.hoisted(() => vi.fn())
+const navFixture = vi.hoisted(() => ({ query: 'id=w1&pane=participants', role: 'owner' }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => navFixture.role }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -24,14 +26,16 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       get,
       editor,
       analytics,
+      folders: vi.fn(async () => ({ success: true, data: [] })),
+      participants: vi.fn(async () => ({ data: { items: [], nextCursor: null } })),
       publishValidation: vi.fn(() => new Promise(() => {})),
     },
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
-  useSearchParams: () => new URLSearchParams('id=w1'),
+  useSearchParams: () => new URLSearchParams(navFixture.query),
   usePathname: () => '/webinars/edit',
 }))
 
@@ -39,7 +43,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -98,6 +102,9 @@ const editorPayload = {
 }
 
 beforeEach(() => {
+  navFixture.query = 'id=w1&pane=participants'
+  navFixture.role = 'owner'
+  window.history.replaceState(null, '', '/webinars/edit?id=w1')
   get.mockImplementation(async () => ({ success: true, data: webinar }))
   editor.mockImplementation(async () => ({ success: true, data: editorPayload }))
   analytics.mockImplementation(() => new Promise(() => {}))
@@ -122,7 +129,7 @@ describe('R94 編集画面の常設導線', () => {
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    const nav = host.querySelector('nav[aria-label="参加者・分析・演出へ移動"]')
+    const nav = host.querySelector('nav[aria-label="設定・参加者・分析・コメント演出"]')
     expect(nav, '常設導線の nav が見つかりません').toBeTruthy()
     expect(nav!.textContent).toContain('参加者')
     expect(nav!.textContent).toContain('分析')
@@ -133,11 +140,33 @@ describe('R94 編集画面の常設導線', () => {
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
-    const nav = host.querySelector('nav[aria-label="参加者・分析・演出へ移動"]')!
+    const nav = host.querySelector('nav[aria-label="設定・参加者・分析・コメント演出"]')!
     const button = [...nav.querySelectorAll('button')].find((el) => el.textContent === '分析')
     expect(button, '分析の行き先が見つかりません').toBeTruthy()
     await act(async () => { button!.click() })
     await flush()
-    expect(button!.getAttribute('aria-current')).toBe('page')
+    expect(host.querySelector('nav[aria-label="設定・参加者・分析・コメント演出"] [aria-current="page"]')?.textContent).toBe('分析')
+  })
+})
+
+describe('現役の設定から参加者へ移る口', () => {
+  it.each(['owner', 'staff'])('%s は設定のメニューから参加者へ移れる', async (role) => {
+    navFixture.role = role
+    navFixture.query = 'id=w1&pane=basic'
+    await act(async () => root.render(<EditWebinarPage />))
+    await flush()
+    const more = host.querySelector('button[aria-label="ウェビナーの操作"]') as HTMLButtonElement
+    expect(more).not.toBeNull()
+    await act(async () => more.click())
+    const menu = document.querySelector('[role="menu"]')!
+    expect(menu.textContent).toContain('参加者を見る')
+    expect(menu.textContent).toContain('分析を見る')
+    expect(menu.textContent).toContain('コメント演出を開く')
+    if (role === 'staff') expect(menu.textContent).not.toContain('複製する')
+    const participants = [...menu.querySelectorAll('[role="menuitem"]')].find(item => item.textContent === '参加者を見る') as HTMLButtonElement
+    await act(async () => participants.click())
+    await flush()
+    expect(host.querySelector('[data-wc-tabs] [aria-current="page"]')?.textContent).toContain('参加者')
+    expect(window.location.search).toContain('pane=participants')
   })
 })

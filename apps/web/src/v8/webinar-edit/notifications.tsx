@@ -333,7 +333,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       hidePreviewWhenNarrow
       boardId="E7iAYs"
       title={chrome.title}

@@ -210,7 +210,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
                   <RowNameLink href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</RowNameLink>
 
                 </FolderDotName></Td>
-                <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
+                <Td className={styles.colWhen}><span className={styles.main} title={[joinNote(participant), joinKindLabel(participant)].filter(Boolean).join("・")}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
                 <Td className={styles.colWatch}>
                   <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}</span>
                   <span className={styles.sub}>{participantStateLabel(participant, webinar.durationSeconds)}</span>
