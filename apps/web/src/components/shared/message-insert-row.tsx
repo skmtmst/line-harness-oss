@@ -1,12 +1,12 @@
 'use client'
 
 import { forwardRef, useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
-import { User, IdCard, Braces, Calendar, Ellipsis } from 'lucide-react'
+import { User, IdCard, Braces, Calendar, Ellipsis, Store, Phone, Link } from 'lucide-react'
 import styles from './message-insert-row.module.css'
 import MenuPortal from './menu-portal'
 
-export type MessageInsertKind = 'name' | 'field' | 'var' | 'date' | 'other'
-const ICONS = { name: User, field: IdCard, var: Braces, date: Calendar, other: Ellipsis }
+export type MessageInsertKind = 'name' | 'field' | 'var' | 'date' | 'other' | 'store' | 'phone' | 'link'
+const ICONS = { name: User, field: IdCard, var: Braces, date: Calendar, other: Ellipsis, store: Store, phone: Phone, link: Link }
 /** 店・統括の種類と処理だけを渡す。見た目は本文の枠内で共通。 */
 export const MessageInsertButton = forwardRef<HTMLButtonElement, {
   kind: MessageInsertKind; label: ReactNode; onClick: () => void; disabled?: boolean

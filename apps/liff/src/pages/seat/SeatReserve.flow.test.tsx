@@ -16,7 +16,7 @@ vi.mock('@line/liff', () => ({
   default: { getProfile: vi.fn().mockResolvedValue({ displayName: '山田 花子' }), closeWindow: vi.fn() },
 }));
 vi.mock('../../lib/api.js', () => ({
-  api: {
+  api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     liffConfig: vi.fn().mockResolvedValue({ success: true, data: { accountName: '然 - NEN -' } }),
     bookingSettings: vi.fn().mockResolvedValue({}),
   },

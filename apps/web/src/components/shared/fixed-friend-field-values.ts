@@ -1,4 +1,4 @@
-import { ageFromBirthday, FIXED_FRIEND_FIELDS, type FriendField, type FixedFriendFieldKey } from '@line-crm/shared'
+import { ageFromBirthday, allergyValues, BASIC_FRIEND_FIELDS as FIXED_FRIEND_FIELDS, type FriendField, type FixedFriendFieldKey } from '@line-crm/shared'
 import { formatYmd, formatTime } from '@/lib/format'
 
 export function fixedFieldValue(fields: FriendField[], key: FixedFriendFieldKey, now?: Date): {
@@ -11,6 +11,6 @@ export function fixedFieldValue(fields: FriendField[], key: FixedFriendFieldKey,
   const source = sourceField?.valueSource?.type === 'form'
     ? `回答フォーム『${sourceField.valueSource.name ?? '削除されたフォーム'}』から${sourceField.valueUpdatedAt ? ' ' + formatYmd(sourceField.valueUpdatedAt).slice(5).replace('-', '/') + ' ' + formatTime(sourceField.valueUpdatedAt).padStart(5, '0') : ''}`
     : age !== null ? '生年月日から計算' : null
-  return { value: age !== null ? String(age) : field?.value ?? null, source, derived: age !== null }
+  return { value: age !== null ? String(age) : key === 'allergy' ? allergyValues(field?.value).join('・') || null : field?.value ?? null, source: source ?? (field?.value ? '手で入れた' : null), derived: age !== null }
 }
 export { FIXED_FRIEND_FIELDS }

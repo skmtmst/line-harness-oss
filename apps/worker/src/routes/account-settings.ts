@@ -10,9 +10,46 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { saveVersionedAccountSetting } from '@line-crm/db';
+import {accountCustomerLook, CUSTOMER_LOOK_KEY} from '../services/customer-look.js';
+import {customerLookError, resolveCustomerLook} from '@line-crm/shared';
+import { validateAllergyValues } from '@line-crm/shared';
+import { ALLERGY_OPTIONS_KEY, accountAllergyOptions } from '../services/allergy-options.js';
 
 const accountSettings = new Hono<Env>();
+accountSettings.put('/api/account-settings/customer-look',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+ const body=await c.req.json<{accountId?:unknown;expectedVersion?:unknown;look?:unknown}>();
+ if (typeof body.accountId !== 'string' || !body.accountId || typeof body.expectedVersion !== 'number' || !Number.isInteger(body.expectedVersion) || body.expectedVersion < 0) return c.json({success:false,error:'店と確認した版を指定してください'},422);
+ if (!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[body.accountId])) return c.json({success:false,error:'権限がありません'},403);
+ const error=customerLookError(body.look);if(error)return c.json({success:false,error},422);
+ const result=await saveVersionedAccountSetting(c.env.DB,{accountId:body.accountId,key:CUSTOMER_LOOK_KEY,expectedVersion:body.expectedVersion,data:resolveCustomerLook(body.look)});
+ if(result.status==='conflict')return c.json({success:false,code:'SAVE_CONFLICT',error:'ほかの人が保存しました。最新の設定を読み直してください。'},409);
+ return c.json({success:true,data:{version:result.setting.version,look:result.setting.data}});
+});
+accountSettings.get('/api/account-settings/customer-look',requireRole('owner','admin','staff'),async c=>{
+ const accountId=c.req.query('accountId');
+ if (!accountId) return c.json({success:false,error:'店を選んでください'},400);
+ if (!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId])) return c.json({success:false,error:'権限がありません'},403);
+ return c.json({success:true,data:await accountCustomerLook(c.env.DB,accountId)});
+});
 const MAX_TEST_RECIPIENTS = 90;
+
+accountSettings.get('/api/account-settings/allergy-options', requireRole('owner','admin','staff'), async c => {
+  const accountId=c.req.query('accountId');
+  if (!accountId) return inputError(c,{success:false,error:'お店を選んでください'},400,['accountId']);
+  if (!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId])) return c.json({success:false,error:'このお店の設定は読めません'},403);
+  return c.json({success:true,data:await accountAllergyOptions(c.env.DB,accountId)});
+});
+accountSettings.put('/api/account-settings/allergy-options', requireRole('owner','admin'), inputJsonBoundary(), async c => {
+  const body=await c.req.json<{accountId?:string;expectedVersion?:number;options?:unknown}>();
+  if (!body.accountId || !Number.isInteger(body.expectedVersion) || Number(body.expectedVersion)<0) return inputError(c,{success:false,error:'お店と保存した版を確認してください'},400,['accountId','expectedVersion']);
+  if (!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[body.accountId])) return c.json({success:false,error:'このお店の設定は変えられません'},403);
+  if (!Array.isArray(body.options)) return inputError(c,{success:false,error:'選択肢を確認してください'},422,['options']);
+  const checked=validateAllergyValues(body.options);
+  if (!checked.ok) return inputError(c,{success:false,error:checked.error},422,['options']);
+  const result=await saveVersionedAccountSetting(c.env.DB,{accountId:body.accountId,key:ALLERGY_OPTIONS_KEY,expectedVersion:body.expectedVersion!,data:checked.values});
+  return result.status==='conflict' ? c.json({success:false,code:'SAVE_CONFLICT',error:'ほかの人が先に保存しました',data:result.current},409) : c.json({success:true,data:{version:result.setting.version,options:result.setting.data}});
+});
 
 // GET /api/account-settings/test-recipients?accountId=xxx
 accountSettings.get('/api/account-settings/test-recipients', async (c) => {

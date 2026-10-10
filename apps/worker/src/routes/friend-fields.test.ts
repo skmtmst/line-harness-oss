@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 
 const mocks = {
   getFriendFields: vi.fn(),
+  getVersionedAccountSetting: vi.fn(async()=>null),
   getFriendFieldsForScope: vi.fn(),
   getFriendFieldById: vi.fn(),
   getFriendFieldByIdForScope: vi.fn(),
@@ -147,7 +148,7 @@ beforeEach(() => {
   accountMocks.canAccessAllLineAccounts.mockResolvedValue(true);
   mocks.getFriendById.mockResolvedValue({ id: 'f-1', line_account_id: 'account-1' });
   mocks.getFriendFields.mockResolvedValue([FIELD]);
-  mocks.getFriendFieldsForScope.mockResolvedValue([{ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 }]);
+  mocks.getFriendFieldsForScope.mockImplementation(async()=>[...await mocks.getFriendFields(),...await mocks.getFriendFieldsWithValues()]);
   mocks.getFriendFieldById.mockResolvedValue(FIELD);
   mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
   mocks.createFriendField.mockResolvedValue(FIELD);

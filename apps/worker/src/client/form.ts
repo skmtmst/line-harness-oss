@@ -1,5 +1,6 @@
 import '../../../liff/src/card-surface.css';
 import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
+import {applyCustomerFormTheme} from './customer-look.js';
 /**
  * LIFF Form Page — Dynamic form renderer for LINE surveys / questionnaires
  *
@@ -223,12 +224,13 @@ function renderField(field: FormField): string {
     }
 
     case 'checkbox': {
+      const block = state.formDef?.layout && collectInputs(state.formDef.layout).find(block => block.name === field.name);
       const boxes = (field.options ?? [])
         .map(
           (o) =>
             `<label class="checkbox-label">
               <input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${disabledChoice(field, o)} />
-              ${receptionOption(field, o)}
+              ${receptionOption(field, o)}${block?.fixedField === 'allergy' && block.choices?.some(choice => choice.label === o && choice.isOther) ? `<input type="text" data-allergy-other="${escapeHtml(field.name)}" aria-label="そのほかのアレルギー" maxlength="100" placeholder="自由に書く" />` : ''}
             </label>`,
         )
         .join('');
@@ -508,7 +510,7 @@ function render(): void {
       const surveyData: Record<string, unknown> = {};
       for (const field of surveyFields) {
         if (field.type === 'checkbox') {
-          surveyData[field.name] = Array.from(document.querySelectorAll<HTMLInputElement>(`input[name="${field.name}"]:checked`)).map((el) => el.value);
+          surveyData[field.name] = collectFormData()[field.name];
         } else if (field.type === 'radio') {
           surveyData[field.name] = document.querySelector<HTMLInputElement>(`input[name="${field.name}"]:checked`)?.value ?? '';
         } else {
@@ -719,6 +721,12 @@ function collectFormData(): Record<string, unknown> {
           `input[name="${field.name}"]:checked`,
         ),
       ).map((el) => el.value);
+      const block = formDef.layout && collectInputs(formDef.layout).find(block => block.name === field.name && block.fixedField === 'allergy');
+      const other = block?.choices?.find(choice => choice.isOther);
+      if (other && checked.includes(other.label)) {
+        const value = document.querySelector<HTMLInputElement>(`[data-allergy-other="${CSS.escape(field.name)}"]`)?.value.trim() ?? '';
+        checked.splice(checked.indexOf(other.label), 1, value);
+      }
       result[field.name] = checked;
     } else if (field.type === 'radio') {
       const checked = document.querySelector<HTMLInputElement>(
@@ -739,6 +747,10 @@ function collectFormData(): Record<string, unknown> {
 function validateForm(): string | null {
   const { formDef } = state;
   if (!formDef) return null;
+  const values = collectFormData();
+  for (const block of formDef.layout ? collectInputs(formDef.layout) : []) {
+    if (block.fixedField === 'allergy' && Array.isArray(values[block.name]) && (values[block.name] as string[]).includes('')) return 'そのほかのアレルギーを書いてください';
+  }
 
   for (const field of formDef.fields) {
     if (!field.required) continue;
@@ -1345,6 +1357,7 @@ export async function initForm(formId: string | null): Promise<void> {
     }
 
     state.formDef = json.data;
+    applyCustomerFormTheme(json.data.layout?.options.theme);
     state.receptionHtml = json.data.availability ? (await import('./form-reception.js')).renderFormReception(json.data.availability) : '';
     // ブラウザ・LINE の上の帯に出る題。フォームの名前（1行目）にする。
     document.title = json.data.name.split(/\\n|\n/)[0] || document.title;

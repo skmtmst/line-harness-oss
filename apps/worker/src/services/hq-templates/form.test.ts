@@ -266,3 +266,18 @@ test('HQ fixed fields and public image survive distribution and answers save int
   expect(result.failedEffects).toEqual([]);
   expect(fixture.raw.prepare("SELECT value,source_id FROM friend_field_values WHERE friend_id='fixed-friend' AND field_id='fixed-name'").get()).toEqual({value:'配布先の名前',source_id:id});
 });
+
+test('複数アレルギー・本人確認書類は配布先へ入り、デザインは店を引き継ぐ',async()=>{
+ const layout=emptyLayout();layout.options.customerDesign={mode:'account',preset:'line'};
+ layout.sections[0].blocks=[{id:'a',kind:'input',type:'checkbox',name:'allergy',label:'アレルギー',fixedField:'allergy',choices:[{id:'egg',label:'卵'},{id:'other',label:'そのほか',isOther:true}]},{id:'id',kind:'input',type:'file',name:'identity',label:'本人確認書類',fileKind:'identity',fileBothSides:true}];
+ const source={...input,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',layout,fields:[],save_to_metadata:true}})};
+ const id=await commit(await plan((await preflight('a1','create',source)).context,source));
+ const stored=JSON.parse(String((fixture.raw.prepare('SELECT layout FROM forms WHERE id=?').get(id) as any).layout));
+ expect(stored.options.customerDesign.mode).toBe('account');expect(stored.sections[0].blocks).toMatchObject([{fixedField:'allergy',type:'checkbox'},{fileKind:'identity',fileBothSides:true}]);
+ const {applyAccountAllergyOptions}=await import('../allergy-options.js');const {saveVersionedAccountSetting}=await import('@line-crm/db');
+ await saveVersionedAccountSetting(fixture.db,{accountId:'a1',key:'friend.allergy_options_v1',expectedVersion:0,data:['キウイ']});
+ expect((await applyAccountAllergyOptions(fixture.db,'a1',stored)).sections[0].blocks[0]).toMatchObject({choices:[{label:'キウイ'},{isOther:true}]});
+ const {formTemplateWarnings}=await import('./form.js');layout.sections[0].blocks.push({id:'seat',kind:'input',type:'text',name:'seat',label:'席の好み',fixedField:'seat_preference'});
+ expect(await formTemplateWarnings(fixture.db,'a1',{...source,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',layout,fields:[]}})})).toHaveLength(1);
+ layout.options.customerDesign={mode:'fixed',preset:'night'};expect(parseFormTemplateDefinition({...source,definitionJson:JSON.stringify({schemaVersion:1,form:{name:'基本登録',layout,fields:[]}})}).form.layout?.options.customerDesign).toEqual({mode:'fixed',preset:'night'});
+});

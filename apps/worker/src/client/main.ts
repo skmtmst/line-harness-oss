@@ -19,6 +19,7 @@
  */
 
 import { initBooking } from './booking.js';
+import {applyCustomerLook} from './customer-look.js';
 import { initForm } from './form.js';
 import { safeRedirectTarget } from '../lib/safe-redirect.js';
 import { restoreLiffStateInCurrentUrl } from './liff-query.js';
@@ -733,9 +734,11 @@ async function main() {
     if (forceReloginForStaleToken()) return;
 
     // Resolve bot basic ID from API (multi-account support)
+    applyCustomerLook(undefined);
     try {
       const configRes = await fetch(`/api/liff/config?liffId=${encodeURIComponent(LIFF_ID)}`);
-      const configJson = await configRes.json() as { success: boolean; data?: { botBasicId?: string } };
+      const configJson = await configRes.json() as { success: boolean; data?: { botBasicId?: string; customerLook?: unknown } };
+      if (configJson.success && configJson.data?.customerLook) applyCustomerLook(configJson.data.customerLook);
       if (configJson.success && configJson.data?.botBasicId) {
         BOT_BASIC_ID = configJson.data.botBasicId;
       }

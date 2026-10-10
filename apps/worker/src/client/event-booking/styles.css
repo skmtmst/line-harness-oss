@@ -96,8 +96,8 @@ body.eb-active #app {
 }
 
 /* LINE 緑テーマ (salon-booking と統一) */
-.eb-line-green { background-color: #06C755; }
-.eb-line-green-text { color: #06C755; }
+.eb-line-green { background-color: var(--customer-primary, #06C755); }
+.eb-line-green-text { color: var(--customer-primary, #06C755); }
 
 /* fade-in / slide-up アニメーション */
 @keyframes eb-fade-in {
@@ -117,14 +117,14 @@ body.eb-active #app {
 .eb-spinner {
   width: 32px; height: 32px;
   border: 3px solid #e5e7eb;
-  border-top-color: #06C755;
+  border-top-color: var(--customer-primary, #06C755);
   border-radius: 9999px;
   animation: eb-spin 0.8s linear infinite;
 }
 
 /* セクションカード */
 .eb-card {
-  background: #fff;
+  background: var(--customer-ground, #fff);
   border-radius: 14px;
   padding: 18px 16px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
@@ -147,7 +147,7 @@ body.eb-active #app {
   padding: 8px 14px 8px 10px;
   font-size: 13px;
   color: #4b5563;
-  background: #fff;
+  background: var(--customer-ground, #fff);
   border-radius: 9999px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
   transition: background-color 0.15s;
@@ -163,8 +163,8 @@ body.eb-active #app {
   font-weight: 600;
   font-size: 14px;
   background: #ecfdf5;
-  color: #06C755;
-  border: 1.5px solid #06C755;
+  color: var(--customer-primary, #06C755);
+  border: 1.5px solid var(--customer-primary, #06C755);
   cursor: pointer;
   transition: transform 0.15s, background-color 0.15s, color 0.15s;
   display: flex;
@@ -173,7 +173,7 @@ body.eb-active #app {
 }
 .eb-slot-btn:active {
   transform: scale(0.98);
-  background-color: #06C755;
+  background-color: var(--customer-primary, #06C755);
   color: #fff;
 }
 .eb-slot-btn:disabled {
@@ -188,7 +188,7 @@ body.eb-active #app {
   width: 100%;
   padding: 14px 16px;
   border-radius: 12px;
-  background: #06C755;
+  background: var(--customer-primary, #06C755);
   color: #fff;
   font-weight: 700;
   font-size: 15px;

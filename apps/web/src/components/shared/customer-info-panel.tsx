@@ -1,17 +1,21 @@
 'use client'
+import {japaneseDetailOf} from '@/components/shared/api-error-message'
 
-import { useEffect, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { FileText, Settings2 } from 'lucide-react'
 import HelpTip from './help-tip'
 import Avatar from './avatar'
 import type { FriendField } from '@line-crm/shared'
 import Button from './button'
-import { ReorderHandle, RowMenu, useReorder } from './row-actions'
-import Checkbox from './checkbox'
 import Dialog from './dialog'
+import DisplayItemsDialog from './display-items-dialog'
 import { fixedFieldValue, FIXED_FRIEND_FIELDS } from './fixed-friend-field-values'
 import styles from './customer-info-panel.module.css'
+import AllergyField from './allergy-field'
+import { TextField } from './text-field'
+import { api } from '@/lib/api'
+import { notifyToast } from './toast'
 
 export type CustomerInfoSection = { key: string; label: string; action?: ReactNode; content: ReactNode }
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
@@ -34,6 +38,13 @@ export default function CustomerInfoPanel({
   const [hidden, setHidden] = useState<string[]>([])
   const [order, setOrder] = useState<string[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saved, setSaved] = useState<Record<string, string>>({})
+  const generation = useRef(0)
+  useEffect(() => { generation.current++; return () => { generation.current++ } }, [friendId, canEdit])
   // 既存受信箱の設定を引き継ぎ、概要と同じ好みを使う。顧客の値は保存しない。
   useEffect(() => {
     try {
@@ -50,18 +61,14 @@ export default function CustomerInfoPanel({
       localStorage.setItem('chat.friendInfoSections.v4', JSON.stringify({ ...previous, hidden, ...(order.length ? { order } : {}) }))
     } catch { /* 保存できなくてもその場の表示は使える */ }
   }, [hidden, order, loaded])
-  useEffect(() => { setExpanded(false); setSettings(false) }, [friendId])
+  useEffect(() => { setExpanded(false); setSettings(false); setEditing(false); setSaved({}); setSaveError(''); setSaving(false) }, [friendId, canEdit])
+  useEffect(() => { setSaved({}) }, [fields])
+  const shownFields = fields.map(field => saved[field.id] === undefined ? field : { ...field, value: saved[field.id], valueSource: null })
   const sorted = [...sections].sort((a,b) => {
     const ai = order.indexOf(a.key), bi = order.indexOf(b.key)
     return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
   })
   const choices = [{ key: 'names', label: '基本' }, ...[...sorted, ...extraSections].map(({ key, label }) => ({ key, label }))]
-  const reorder = useReorder({
-    items: sorted,
-    idOf: section => section.key,
-    onReorder: change => setOrder(current => [...change.ids, ...current.filter(key => !change.ids.includes(key))]),
-  })
-  const toggle = (key: string, visible: boolean) => setHidden(current => visible ? current.filter(k => k !== key) : [...current, key])
   return <div className={styles.panel} data-customer-info-panel>
     {profile ? <div className={styles.profile}>
       <Avatar name={profile.name} src={profile.pictureUrl} size={32} />
@@ -71,21 +78,33 @@ export default function CustomerInfoPanel({
     {!hidden.includes('names') ? <section className={styles.section} aria-label="基本">
       <div className={styles.head}>
         <h3>基本</h3>
-        {canEdit ? <Link className={styles.action} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>編集</Link> : null}
+        {canEdit && state === 'ready' && !editing ? <Button variant="text" onClick={() => { setDraft(Object.fromEntries(shownFields.map(field => [field.id, field.value ?? '']))); setSaveError(''); setEditing(true) }}>編集</Button> : null}
       </div>
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
         : <dl className={styles.rows}>
-          {FIXED_FRIEND_FIELDS.filter(spec => spec.key !== 'age' && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
-            const { value, source } = fixedFieldValue(fields, spec.key)
-            const age = spec.key === 'birthday' ? fixedFieldValue(fields, 'age').value : null
+          {[...FIXED_FRIEND_FIELDS].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => spec.key !== 'age' && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
+            const { value, source, derived } = fixedFieldValue(shownFields, spec.key)
+            const age = spec.key === 'birthday' ? fixedFieldValue(shownFields, 'age').value : null
             const display = value && age ? `${value}（${age}歳）` : value
+            const field = shownFields.find(field => field.fixedKey === spec.key)!
             return <div className={styles.row} key={spec.key}>
               <dt>{spec.label}</dt>
-              <dd><span className={value ? styles.value : styles.note} title={display ?? undefined}>{display ?? '未設定'}</span>{source ? <HelpTip hover label={`${spec.label}の出どころ`} icon={<FileText aria-hidden="true" />}>{source}</HelpTip> : null}</dd>
+              <dd>{spec.key === 'allergy' ? <AllergyField value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
+                : editing && !derived ? <TextField aria-label={spec.label} readOnly={saving} value={draft[field.id] ?? ''} onChange={event => setDraft(current => ({ ...current, [field.id]: event.target.value }))} />
+                : <span className={value ? styles.value : styles.note} title={display ?? undefined}>{display ?? '未設定'}</span>}{source && !editing ? <HelpTip hover label={`${spec.label}の出どころ`} icon={<FileText aria-hidden="true" />}>{source}</HelpTip> : null}</dd>
             </div>
           })}
         </dl>}
+      {editing ? <><div className={styles.editActions}><Button disabled={saving} onClick={() => setEditing(false)}>キャンセル</Button><Button variant="primary" busy={saving} onClick={async () => {
+        if (!canEdit || saving) return
+        const started = generation.current
+        setSaving(true); setSaveError('');
+        const values = Object.fromEntries(shownFields.filter(field => FIXED_FRIEND_FIELDS.some(spec => spec.key === field.fixedKey) && draft[field.id] !== (field.value ?? '')).map(field => [field.id, draft[field.id]]))
+        try { const result = await api.friendFields.saveForFriend(friendId, values); if (generation.current !== started) return; if (!result.success) throw new Error(result.error ?? '保存できませんでした'); setSaved(current => ({ ...current, ...values })); setEditing(false); notifyToast('保存しました'); onRetry?.() }
+        catch (error) { if (generation.current === started) setSaveError(japaneseDetailOf(error) || '保存できませんでした') }
+        finally { if (generation.current === started) setSaving(false) }
+      }}>保存する</Button></div>{saveError ? <p className={styles.note} role="alert">{saveError}</p> : null}</> : null}
       {hiddenPersonalCount > 0 ? <p className={styles.note}>個人情報は閲覧権限が必要です。</p> : null}
     </section> : null}
     {sorted.filter(section => !hidden.includes(section.key)).map(section => <section className={styles.section} key={section.key} aria-label={section.label}>
@@ -103,19 +122,15 @@ export default function CustomerInfoPanel({
       </section>)}
       {more}
     </div> : null}
-    <Button variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</Button>
-    <Dialog open={settings} title="表示項目" onCancel={() => setSettings(false)} cancelLabel="閉じる">
-      <div className={styles.options}>
-        {choices.map(choice => <div key={choice.key} className={styles.option} {...reorder.rowProps(choice.key)}>
-          {sections.some(section => section.key === choice.key) ? <ReorderHandle label={choice.label} {...reorder.handleProps(choice.key)} onMove={direction => reorder.moveBy(choice.key, direction)} /> : null}
-          <Checkbox checked={!hidden.includes(choice.key)} onCheckedChange={visible => toggle(choice.key, visible)}>{choice.label}</Checkbox>
-          {sections.some(section => section.key === choice.key) ? <RowMenu label={`${choice.label}の順序`} items={reorder.menuItems(choice.key)} /> : null}
-        </div>)}
-        <div className={styles.basicOptions} role="group" aria-label="基本の表示項目">
-          {FIXED_FRIEND_FIELDS.filter(spec => spec.key !== 'age').map(spec => <Checkbox key={spec.key} checked={!hidden.includes(`fixed:${spec.key}`)} onCheckedChange={visible => toggle(`fixed:${spec.key}`, visible)}>{spec.label}</Checkbox>)}
-        </div>
-      </div>
-    </Dialog>
+    {canEdit ? <Button variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</Button> : null}
+    {settings && canEdit ? <DisplayItemsDialog title="表示項目" items={[
+      ...choices.map(choice => ({...choice, group:'顧客情報の段'})),
+      ...FIXED_FRIEND_FIELDS.filter(spec => spec.key !== 'age').map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本'})),
+    ]} selected={[...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.filter(spec => spec.key !== 'age').map(spec => `fixed:${spec.key}`)].filter(key => !hidden.includes(key)).sort((a,b) => (order.indexOf(a)<0?999:order.indexOf(a))-(order.indexOf(b)<0?999:order.indexOf(b)))}
+      manageHref="/friend-fields" onCancel={() => setSettings(false)} onConfirm={keys => {
+        const all = [...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.filter(spec => spec.key !== 'age').map(spec => `fixed:${spec.key}`)]
+        setHidden(all.filter(key => !keys.includes(key))); setOrder(keys); setSettings(false)
+      }} /> : null}
   </div>
 }
 

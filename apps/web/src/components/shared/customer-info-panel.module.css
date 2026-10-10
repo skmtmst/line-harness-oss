@@ -20,6 +20,9 @@
 .option { display: flex; align-items: center; gap: var(--tpl-fdt-group-gap); }
 
 .basicOptions { display: flex; flex-direction: column; gap: var(--tpl-fdt-group-gap); padding-top: var(--tpl-fdt-summary-gap); border-top: 1px solid var(--color-hairline); }
+.allergies { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-fdt-group-gap); min-width: 0; }
+.other { display: flex; gap: var(--tpl-fdt-group-gap); align-items: center; min-width: 0; }
+.editActions { display: flex; gap: var(--tpl-fdt-group-gap); justify-content: flex-end; }
 }
 
 /* B-212：欄の内側は16以上。基本の値と出どころの印を横に並べる。 */

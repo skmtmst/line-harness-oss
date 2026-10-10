@@ -20,6 +20,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/settings/customer-look/screen.tsx',
   'v8/hq-deliveries/console.tsx',
   'v8/webhooks/incoming-actions.tsx',
   'components/shared/restaurant-floor-editor.tsx',
@@ -177,6 +178,7 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  'v8/form-edit/content-tab.tsx': 'v8/form-edit/edit.tsx',
   // 動き1：画面のdirtyは型／共通の番兵が守る。
   'app/emergency/page.tsx': 'components/shared/form-leave-guard.tsx',
   'components/templates/create-page.tsx': 'components/shared/form-leave-guard.tsx',

@@ -14,7 +14,7 @@ import type { EventBookingMine, EventSlot } from '../lib/api.js';
  */
 
 vi.mock('../lib/api.js', () => ({
-  api: {
+  api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     myEventBookings: vi.fn(),
     cancelMyEventBooking: vi.fn(),
     getEventSlots: vi.fn(),

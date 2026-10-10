@@ -380,6 +380,7 @@ export interface FormSubmitResponse {
 }
 
 export const api = {
+  customerLook: () => get<{success: boolean;data:{settings:LiffLookApiSettings;look:import('@line-crm/shared').CustomerLook;version:number}}>('/api/liff/customer-look'),
   researchForm: (id: string) => getData<{ formId: string }>(`/api/liff/research/${encodeURIComponent(id)}/form`),
   entryRouteCoupon: {
     receive: async (ref: string) => unwrapSuccessData<EntryRouteCouponReceived>(await post<unknown>('/api/liff/entry-route-coupon', { ref }), '/api/liff/entry-route-coupon'),

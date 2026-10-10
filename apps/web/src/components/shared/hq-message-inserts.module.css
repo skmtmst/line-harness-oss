@@ -1,0 +1,8 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.body { display:flex; flex-direction:column; min-width:0; gap:var(--tpl-msg-composer-gap); }
+.row { display:flex; align-items:center; flex-wrap:wrap; gap:var(--tpl-msg-composer-gap-s); font-size:var(--text-caption); color:var(--color-ink-secondary); }
+.row button { white-space:nowrap; }
+.count { margin-left:auto; white-space:nowrap; }
+
+}

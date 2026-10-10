@@ -27,6 +27,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
+import {HqInsertRow,HQ_INSERT_CHIPS,insertHqToken} from '@/components/shared/hq-message-inserts'
 import { InsertButton, type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
@@ -998,8 +999,8 @@ export default function HqBroadcastCreate() {
                   bubbles={bubbles.map((item) => item.kind === 'text' ? { id: item.id, type: 'text', content: { text: item.body } } : toApiBubble(item, item.id) ?? { id: item.id, type: 'research', content: item.content })}
                   accountId={null}
                   busy={composerBusy} onBusyChange={setComposerBusy}
-                  extraTokens={STORE_INSERT_CHIPS}
-                  inserts={(ref, value, change) => <><span>差し込む：</span>{STORE_INSERTS.map((item) => <InsertButton size="compact" key={item.label} label={item.label.slice(1, -1)} title={item.help} onClick={() => { const field = ref.current; const start = field?.selectionStart ?? value.length; const end = field?.selectionEnd ?? start; change((value.slice(0, start) + item.label + value.slice(end)).slice(0, BODY_MAX)); requestAnimationFrame(() => { field?.focus(); field?.setSelectionRange(start + item.label.length, start + item.label.length) }) }} />)}</>}
+                  extraTokens={[...STORE_INSERT_CHIPS,...HQ_INSERT_CHIPS]}
+                  inserts={(ref, value, change) => <HqInsertRow count={value.length} max={BODY_MAX} onInsert={token=>insertHqToken(ref,value,change,token,BODY_MAX)}/>}
                   unavailable={{ intro: notYetText('intro'), rich_video: '統括からリッチビデオはまだ送れません。' }}
                   onChange={(index, next) => { const item = fromApiBubble(next); if (item) setBubbles((items) => items.map((current, i) => i === index ? { ...current, ...item, id: current.id, ...(current.kind === item.kind ? { media: current.media, previewCard: current.previewCard } : {}) } : current)) }}
                   onMove={(index, direction) => { setBubbles((items) => { const next = [...items]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next }); setOpenBubble(index + direction) }}

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Sparkles, Link2 } from 'lucide-react'
 import {
-  FORM_THEME_DEFAULT,
+  FORM_THEME_DEFAULT, CUSTOMER_DESIGNS, DEFAULT_CUSTOMER_LOOK, resolveCustomerFormTheme, type CustomerLook,
   formThemeContrastError,
   normalizeFormTheme,
   type FormCornerRadius,
@@ -12,6 +12,9 @@ import {
   type FormTheme,
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Link from 'next/link'
+import RadioCard, {RadioCardGroup} from '@/components/shared/radio-card'
+import CustomerDesignPicker from '@/components/shared/customer-design-picker'
 import Checkbox from '@/components/shared/checkbox'
 import ColorWell from '@/components/shared/color-well'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -52,6 +55,8 @@ type Props = {
   readOnly?: boolean
   options: FormOptions
   accountId: string | null
+  accountLook?: CustomerLook | null
+  accountLookError?: string
   /** 統括のひな形（host.ts）：背景の画像・リンクの見え方は置き場が無い（配った先で決める）。 */
   portable?: boolean
   name: string
@@ -70,11 +75,15 @@ type Props = {
 
 export function AppearanceTab(props: Props) {
   const { options, onChangeOptions } = props
-  const theme = options.theme ?? FORM_THEME_DEFAULT
+  const mode = options.customerDesign?.mode ?? (options.theme ? 'fixed' : 'account')
+  const preset = options.customerDesign?.preset ?? (options.theme ? 'custom' : 'line')
+  const theme = resolveCustomerFormTheme(options,props.accountLook ?? DEFAULT_CUSTOMER_LOOK)
+  const accountLabel = CUSTOMER_DESIGNS.find(design=>design.id===props.accountLook?.preset)?.label ?? (props.accountLook?.preset === 'custom'?'カスタム':'読み込み中')
   const contrastError = formThemeContrastError(normalizeFormTheme(theme))
   const [pickerFor, setPickerFor] = useState<'background' | 'ogImage' | null>(null)
   const [linkOpen, setLinkOpen] = useState(false)
-  const patchTheme = (next: Partial<FormTheme>) => onChangeOptions({ theme: { ...theme, ...next } })
+  const patchTheme = (next: Partial<FormTheme>) => onChangeOptions({customerDesign:{mode:'fixed',preset:'custom'}, theme: { ...theme, ...next } })
+  const patchBackground = (backgroundImageUrl: string | null) => onChangeOptions({customerDesign:{mode,preset},theme:{...theme,backgroundImageUrl}})
   const deadlineOn = options.deadline?.enabled ?? false
   const ogImageError = ogImageUrlError(props.ogImageUrl)
   const linkSummary = [props.ogTitle.trim() ? '見出し' : null, props.ogDescription.trim() ? '説明' : null, props.ogImageUrl.trim() ? '画像' : null].filter(Boolean).join('・') || '自動で作る'
@@ -163,6 +172,14 @@ export function AppearanceTab(props: Props) {
 
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
+          <RadioCardGroup legend="見た目の使い方" className={styles.designModes}>
+            <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} title={props.portable?'配った先の店のデザインに合わせる':'店の設定に合わせる'} note={props.portable?'配った先で、その店の設定を使います':`今：${accountLabel}`} />
+            <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} title={props.portable?'色を決めて配る':'このフォームだけ変える'} note="型かカスタムを選ぶ" />
+          </RadioCardGroup>
+          {!props.portable ? <Link href="/settings/customer-look">店のデザインを変える ↗</Link> : mode === 'fixed' ? <p className={styles.cardNote}>このフォームは色を固定して配ります。配った先の店の設定より優先します。</p> : null}
+          {props.accountLookError && !props.portable ? <p role="alert" className={styles.fieldError}>{props.accountLookError}</p> : null}
+          {mode === 'fixed' ? <><p className={styles.fieldLabelPlain}>デザインの型</p><CustomerDesignPicker value={preset} onChange={next => onChangeOptions({customerDesign:{mode:'fixed',preset:next}})} /></> : null}
+          {mode === 'fixed' && preset === 'custom' ? <>
           <p className={styles.fieldLabelPlain}>色（5つの役割）</p>
           <div id="fe-colors" className={styles.wells}>
             {COLOR_ROLES.map((role) => (
@@ -197,7 +214,7 @@ export function AppearanceTab(props: Props) {
               onChange={(value) => patchTheme({ cornerRadius: value as FormCornerRadius })}
               options={(Object.keys(RADIUS_LABEL) as FormCornerRadius[]).map((key) => ({ value: key, label: `角の丸み：${RADIUS_LABEL[key]}` }))}
             /></SaveErrorField>
-          </div>
+          </div></> : null}
         </div>
 
         {props.portable ? null : <div className={styles.subBox}>
@@ -209,7 +226,7 @@ export function AppearanceTab(props: Props) {
               value={theme.backgroundImageUrl || null}
               accept="image/jpeg,image/png,image/gif,image/webp"
               upload={props.accountId ? async (file, progress) => (await uploadToMediaLibrary(file, props.accountId as string, 'image', progress)).url : undefined}
-              onChange={(url) => patchTheme({ backgroundImageUrl: url })}
+              onChange={patchBackground}
               onMediaPick={() => setPickerFor('background')}
             /></SaveErrorField>
             <button type="button" className={styles.selectLike} onClick={() => setLinkOpen(true)} aria-haspopup="dialog">
@@ -273,7 +290,7 @@ export function AppearanceTab(props: Props) {
         onClose={() => setPickerFor(null)}
         onSelect={(item) => {
           // 配信用の公開URLを保存値へ入れる（管理画面の表示用URLではない）。
-          if (pickerFor === 'background') patchTheme({ backgroundImageUrl: item.url })
+          if (pickerFor === 'background') patchBackground(item.url)
           else if (pickerFor === 'ogImage') props.onChangeOgImageUrl(item.url)
           setPickerFor(null)
         }}

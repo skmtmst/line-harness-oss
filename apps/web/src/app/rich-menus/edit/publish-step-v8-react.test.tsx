@@ -32,7 +32,8 @@ vi.mock('next/navigation', async importOriginal => ({
   useRouter: () => ({ push: () => {} }),
   useSearchParams: () => ({ get: () => null }),
 }))
-vi.mock('@line-crm/shared', () => ({ RICH_MENU_DIMENSIONS: { large: { width: 2500, height: 1686 }, compact: { width: 2500, height: 843 } } }))
+vi.mock('@line-crm/shared', async(importOriginal) => ({
+  ...await importOriginal<typeof import('@line-crm/shared')>(), RICH_MENU_DIMENSIONS: { large: { width: 2500, height: 1686 }, compact: { width: 2500, height: 843 } } }))
 
 const { default: RichMenuEditPage } = await import('./page')
 const testing = (RichMenuEditPage as unknown as { __testing: { PublishStep: React.ComponentType<Record<string, unknown>> } }).__testing

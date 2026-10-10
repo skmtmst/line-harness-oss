@@ -8,7 +8,7 @@ import { cleanup, render, screen } from '@testing-library/react';
  */
 
 vi.mock('../lib/api.js', () => ({
-  api: { bookingSettings: vi.fn() },
+  api: { customerLook: vi.fn() },
 }));
 vi.mock('../lib/user-message.js', () => ({ logFailure: vi.fn() }));
 
@@ -20,13 +20,13 @@ async function renderScope(
   vi.resetModules();
   const { default: LiffLookScope } = await import('./LiffLookScope.js');
   const { api } = await import('../lib/api.js');
-  const bookingSettings = vi.mocked(api.bookingSettings);
+  const customerLook = vi.mocked(api.customerLook);
   if (settings instanceof Promise) {
-    bookingSettings.mockImplementation(() => settings as never);
+    customerLook.mockImplementation(() => settings as never);
   } else if (settings instanceof Error) {
-    bookingSettings.mockRejectedValue(settings);
+    customerLook.mockRejectedValue(settings);
   } else {
-    bookingSettings.mockResolvedValue(settings as never);
+    customerLook.mockResolvedValue({success:true,data:{settings}} as never);
   }
   render(
     <LiffLookScope className={props.className} designNode={props.designNode}>
@@ -34,7 +34,7 @@ async function renderScope(
     </LiffLookScope>,
   );
   const scope = () => screen.getByText('中身').parentElement!;
-  return { bookingSettings, scope };
+  return { customerLook, scope };
 }
 
 beforeEach(() => {
@@ -78,12 +78,12 @@ describe('LiffLookScope', () => {
   });
 
   it('設定が読めなくても止めず、今の見た目のまま出す', async () => {
-    const { bookingSettings, scope } = await renderScope(
+    const { customerLook, scope } = await renderScope(
       { className: 'min-h-screen bg-canvas' },
       new Error('offline'),
     );
     await vi.waitFor(() => {
-      expect(bookingSettings).toHaveBeenCalled();
+      expect(customerLook).toHaveBeenCalled();
     });
     await vi.waitFor(() => {
       expect(scope().getAttribute('data-liff-theme')).toBe('line');

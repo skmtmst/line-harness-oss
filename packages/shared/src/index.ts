@@ -9,6 +9,7 @@ export * from "./reminder-name";
 export * from "./anniversary";
 export * from "./shipping-schedule";
 export * from "./form-layout";
+export * from "./customer-look";
 export * from "./flex-content";
 export * from "./tenant";
 export * from "./data-retention";

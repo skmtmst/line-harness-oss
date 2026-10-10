@@ -12,9 +12,9 @@ describe('fixed form fields', () => {
   })
   test.each(FIXED_FRIEND_FIELDS)('fixed $key round trips without store IDs', spec => {
     const layout = emptyLayout()
-    layout.sections[0].blocks = [{ id: 'q', kind: 'input', name: 'answer', label: spec.label, type: spec.type, fixedField: spec.key }]
+    layout.sections[0].blocks = [{ id: 'q', kind: 'input', name: 'answer', label: spec.label, type: spec.type, fixedField: spec.key, ...(spec.key === 'allergy' ? { choices: [{ id: 'egg', label: '卵' }] } : {}) }]
     expect(validateFormDefinition(layout)).toBeNull()
-    expect(normalizeLayout(JSON.parse(JSON.stringify(layout)))?.sections[0].blocks[0]).toMatchObject({ fixedField: spec.key })
+    expect(normalizeLayout(JSON.parse(JSON.stringify(layout)))?.sections[0].blocks[0]).toMatchObject({ fixedField: spec.key, ...(spec.key === 'allergy' ? { choices: [{ id: 'egg', label: '卵' }] } : {}) })
   })
   test('changing the limit does not disable validation of an age or email', () => {
     const block: FormInputBlock = { id: 'q', kind: 'input', name: 'age', label: '年齢', type: 'text', fixedField: 'age' }

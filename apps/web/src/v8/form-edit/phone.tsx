@@ -10,7 +10,7 @@ import { jstDateOffset } from '@/lib/jst-datetime'
  */
 import { useState, type ReactNode } from 'react'
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
-import { PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
+import { resolveCustomerFormTheme, DEFAULT_CUSTOMER_LOOK, type CustomerLook, PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
 import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../../../../liff/src/components/forms/controls'
 import styles from './edit.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -20,12 +20,13 @@ const SAMPLE_TIMES = ['10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
 
 type Props = {
   layout: FormLayout
+  accountLook?: CustomerLook | null
   pageIndex: number
   accountName: string
   bookingMenus: { id: string; name: string; durationMinutes: number }[]
 }
 
-export function FormPhone({ layout, pageIndex, accountName, bookingMenus }: Props) {
+export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus }: Props) {
   const sections = layout.sections
   const section = sections[pageIndex] ?? sections[0]
   const options = { ...FORM_OPTIONS_DEFAULT, ...layout.options }
@@ -40,14 +41,15 @@ export function FormPhone({ layout, pageIndex, accountName, bookingMenus }: Prop
   const firstInput = blocks.findIndex((b) => b.kind === 'input')
   const progressAt = pageIndex === 0 && firstInput > 0 ? firstInput : 0
   // 色を決めたフォームは、その主の色で見せる（決めていなければ LINE の緑）。
-  const main = layout.options.theme?.main ?? null
+  const theme = resolveCustomerFormTheme(layout.options,accountLook ?? DEFAULT_CUSTOMER_LOOK)
+  const main = theme.main
   const nextLabel = last
     ? (options.submitLabel || '送信する')
     : `${options.nextLabel || '次へ'}（${pageIndex + 1} / ${sections.length}）`
 
   return (
     <LiffPhoneFrame title="回答フォーム" accountName={accountName} caption="お客さまに見える形" label="お客さまに見える形" accent={main}>
-          <div className={styles.phoneForm}>
+          <div className={styles.phoneForm} style={{backgroundColor:theme.sub,color:theme.text,fontFamily:theme.fontFamily==='serif'?'serif':'sans-serif'}}>
             {blocks.length === 0 ? <p className={styles.phoneEmpty}>このページにはまだブロックがありません</p> : null}
             {blocks.map((block, index) => (
               <PhoneBlockWithProgress key={block.id} block={block} showProgress={index === progressAt} progress={progress} bookingMenus={bookingMenus} />

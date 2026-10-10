@@ -1,3 +1,4 @@
+import { allergyValues } from './fixed-friend-fields.js';
 /** 共通盤。保存先・状態・版は種類ごとの既存契約を保つ。 */
 export type ReservationAxis = 'resource' | 'floor' | 'list' | 'month';
 export type DiningSnapshot = { allergy: string | null; anniversary: string | null; seatPreference: string | null; courseId: string | null; courseAllergens?: string[]; capturedAt: string };
@@ -30,7 +31,7 @@ export function reservationInstant(value:unknown):string {
 }
 export function diningSnapshot(value:unknown):DiningSnapshot|null {
  if(typeof value!=='string')return null;
- try {return JSON.parse(value) as DiningSnapshot;}catch{return null;}
+ try {const snapshot = JSON.parse(value) as DiningSnapshot; return { ...snapshot, allergy: allergyValues(snapshot.allergy).join('・') || null };}catch{return null;}
 }
 export function seatBoardEntry(r:Record<string,unknown>):ReservationBoardEntry {
  let links:string[]=[];try{links=JSON.parse(String(r.table_ids_json??'[]'));}catch{/* old rows */}

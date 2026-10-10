@@ -1,4 +1,5 @@
 'use client'
+import HqMessageBody from '@/components/shared/hq-message-inserts'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PlayCircle, Plus } from 'lucide-react'
 import { tapExtrasError } from '@line-crm/shared'
@@ -159,7 +160,7 @@ export default function MessageForm({
             </div>
           )}
           <Field label="タイトル"><SaveErrorField names={["title","card.title"]}><input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></SaveErrorField></Field>
-          <Field label="本文"><SaveErrorField names={["body","card.body"]}><textarea className={styles.textarea} aria-label="配信する本文" {...bindField('body', 'hq-msg-body')} maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={(event) => updateCard({ ...card, body: event.target.value })} /></SaveErrorField>
+          <Field label="本文"><SaveErrorField names={["body","card.body"]}><HqMessageBody value={card.body} label="配信する本文" max={card.format === 'flex'?2000:5000} readOnly={disabled} onChange={body=>updateCard({...card,body})}/></SaveErrorField>
 <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError></Field>
           {card.format === 'flex' && (
             <div className={styles.buttonsBox}>
@@ -213,7 +214,7 @@ export default function MessageForm({
           )}
         </> : (
           <div {...(fields ? fields.bind('body') : {})}>
-          <MessageTemplateEditor
+          <MessageTemplateEditor hqInserts
             value={{ messageType: current.messageType, messageContent: current.messageContent }}
             onChange={(next) => onChange({ ...value, template: { ...current, messageType: next.messageType as MessageTemplateDefinition['template']['messageType'], messageContent: next.messageContent } })}
             targetDate={targetDate}
