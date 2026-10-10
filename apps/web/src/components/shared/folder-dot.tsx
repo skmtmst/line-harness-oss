@@ -44,7 +44,10 @@ export function FolderDot({ folder }: { folder?: FolderDotFolder | null }) {
 function nameText(node: ReactNode): string {
   return Children.toArray(node).map((child): string => {
     if (typeof child === 'string' || typeof child === 'number') return String(child)
-    if (isValidElement<{ children?: ReactNode; title?: string }>(child)) return child.props.title ?? nameText(child.props.children)
+    if (isValidElement<{ children?: ReactNode; title?: string; value?: string }>(child)) {
+      if (child.type === TruncatedText) return child.props.value ?? ''
+      return child.props.title ?? nameText(child.props.children)
+    }
     return ''
   }).join('').trim()
 }

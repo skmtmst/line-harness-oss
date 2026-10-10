@@ -5,6 +5,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { FolderDot, FolderDotName, folderDisplayColor } from './folder-dot'
+import TruncatedText from './truncated-text'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 /*
@@ -53,6 +54,13 @@ describe('フォルダの色の丸', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }} dot={false}>NEN会員</FolderDotName>)
     expect(html).toContain('data-folder-dot')
     expect(html).toContain('title="NEN会員"')
+  })
+
+  it('リンク内の省略部品にも、名前の全文を残す', () => {
+    const name = 'Google広告から来た夏キャンペーンのお客さま'
+    const html = renderToStaticMarkup(<FolderDotName><a href="/inflow-links/detail?id=one"><TruncatedText value={name} /></a></FolderDotName>)
+    expect(html).toContain(`data-list-name="" title="${name}"`)
+    expect(html).toContain('href="/inflow-links/detail?id=one"')
   })
 
   it('大きさ 8・名前との間 8・説明の行の字下げ 16 は変数で持つ', () => {
