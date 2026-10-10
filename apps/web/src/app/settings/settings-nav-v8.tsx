@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { api } from '@/lib/api'
 import { canEditTable } from './manual-links/manual-link-view'
 import styles from './settings-v8.module.css'
-import { Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, Store, type LucideIcon } from 'lucide-react'
+import { Palette, Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, Store, type LucideIcon } from 'lucide-react'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 
@@ -37,6 +37,7 @@ function useManualLinkAccess(): boolean {
 type NavLink = { href: string; label: string; icon?: LucideIcon }
 
 const TOP_LINKS: NavLink[] = [
+  { href:'/settings/customer-look',label:'お客さまのデザイン',icon:Palette },
   { href: '/getting-started', label: 'はじめの設定', icon: Rocket },
   { href: '/accounts', label: 'LINEアカウント', icon: MessageCircle },
   { href: '/pools', label: 'プール管理', icon: Layers },

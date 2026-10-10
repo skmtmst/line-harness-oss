@@ -1,4 +1,5 @@
 import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
+import {applyCustomerFormTheme} from './customer-look.js';
 /**
  * LIFF Form Page — Dynamic form renderer for LINE surveys / questionnaires
  *
@@ -1355,6 +1356,7 @@ export async function initForm(formId: string | null): Promise<void> {
     }
 
     state.formDef = json.data;
+    applyCustomerFormTheme(json.data.layout?.options.theme);
     state.receptionHtml = json.data.availability ? (await import('./form-reception.js')).renderFormReception(json.data.availability) : '';
     // ブラウザ・LINE の上の帯に出る題。フォームの名前（1行目）にする。
     document.title = json.data.name.split(/\\n|\n/)[0] || document.title;

@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.js';
+import LiffLookScope from './components/LiffLookScope.js';
 import { initLiff } from './lib/liff-auth.js';
 import './index.css';
 
@@ -11,7 +12,7 @@ import './index.css';
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <BrowserRouter>
-          <App />
+          <LiffLookScope><App /></LiffLookScope>
         </BrowserRouter>
       </StrictMode>,
     );

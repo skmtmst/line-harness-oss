@@ -1,4 +1,6 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import {accountCustomerLook} from '../services/customer-look.js';
+import {customerLookPublicSettings,DEFAULT_CUSTOMER_LOOK} from '@line-crm/shared';
 import { receiveEntryRouteCoupon } from '../services/entry-route-coupon.js';
 import { redeemCoupon } from '../services/coupon-redemption.js';
 import { Hono, type Context } from 'hono';
@@ -1246,6 +1248,16 @@ liffRoutes.get('/auth/callback', async (c) => {
 
 // ─── LIFF config endpoint ──────────────────────────────────────
 
+// 見た目だけの公開口。予約機能の有無に依存せず、LIFF IDで店を固定する。
+liffRoutes.get('/api/liff/customer-look',async c=>{
+ const liffId=c.req.query('liffId');if(!liffId)return c.json({success:false,error:'liffId is required'},400);
+ const account=await c.env.DB.prepare('SELECT id FROM line_accounts WHERE liff_id = ? AND is_active = 1').bind(liffId).first<{id:string}>();
+ if(!account)return c.json({success:false,error:'unknown_liff'},404);
+ const stopped=await stoppedLineAccountResponse(c,account.id);if(stopped)return stopped;
+ const value=await accountCustomerLook(c.env.DB,account.id);
+ c.header('Cache-Control','no-store');
+ return c.json({success:true,data:{...value,settings:customerLookPublicSettings(value.look)}});
+});
 // GET /api/liff/config - resolve account info from LIFF ID (public, no auth)
 liffRoutes.get('/api/liff/config', async (c) => {
   try {
@@ -1289,7 +1301,7 @@ liffRoutes.get('/api/liff/config', async (c) => {
 
     return c.json({
       success: true,
-      data: { botBasicId, accountName, accountId },
+      data: { botBasicId, accountName, accountId, customerLook: account ? (await accountCustomerLook(c.env.DB,account.id)).look : DEFAULT_CUSTOMER_LOOK },
     });
   } catch (err) {
     console.error('GET /api/liff/config error:', err);
