@@ -22,11 +22,18 @@ export function useCardHeights() {
           if (cards.length < 2 || document.documentElement.dataset.theme !== 'v8') return
           const layout = getComputedStyle(parent)
           const horizontal = layout.display.includes('grid') || layout.display.includes('flex') && layout.flexDirection === 'row'
+          if (!horizontal) {
+            // 縦の箱は本来の幅・高さを保つ。flex-start は縦並びの幅を内容幅へ縮める。
+            for (const card of cards) {
+              const original = originals.get(card)
+              if (original !== undefined) { card.style.cssText = original; originals.delete(card) }
+            }
+            return
+          }
           for (const card of cards) {
             if (!originals.has(card)) originals.set(card, card.style.cssText)
             card.style.minHeight = '0'; card.style.height = 'auto'; card.style.alignSelf = 'flex-start'
           }
-          if (!horizontal) return
           const rows = new Map<number, HTMLElement[]>()
           for (const card of cards) {
             const y = Math.round(card.getBoundingClientRect().top / 4)

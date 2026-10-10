@@ -505,7 +505,7 @@
 }
 
 /* B-217：一覧は平ら。見出しと線は全幅、中身だけ左右24。 */
-html[data-theme='v8'] .frame {
+html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) {
   border: 0; border-radius: var(--radius-flat); outline-color: transparent; box-shadow: none;
 }
 html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) { overflow-x: clip; }
@@ -515,7 +515,7 @@ html[data-theme='v8'] .frame [data-list-name-cell] { min-width: var(--tpl-list-n
 html[data-theme='v8'] .actionCell > :is(button, a) { min-width: var(--row-action-width, max-content); }
 
 /* 表に実際に残る幅で、補助列を畳む。名前と操作を潰して収めない。 */
-html[data-theme='v8'] .frame { container-type: inline-size; container-name: v8-list-table; }
+html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) { container-type: inline-size; container-name: v8-list-table; }
 @container v8-list-table (max-width: 1100px) { html[data-theme='v8'] .frame[data-shared-part='list-table'] .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
 html[data-theme='v8'] .actionCell { flex: none; min-width: max-content; }
 html[data-theme='v8'] .actionCell :is(button, a):not([data-row-menu]) { min-width: var(--row-action-width, max-content); }

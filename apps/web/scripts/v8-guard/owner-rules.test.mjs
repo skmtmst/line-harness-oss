@@ -98,3 +98,16 @@ test('一覧の判定を足しても、既存GridTableの幅による畳み方�
     assert.equal(await page.locator('[data-grid-probe]').evaluate(el => getComputedStyle(el).color), 'rgb(9, 9, 9)')
   } finally { await browser.close() }
 })
+
+
+test('共通の余白が実際に16pxになり、カレンダーを一覧の器に変えない', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
+    await page.setContent(shell(`<style>${read('app/globals.css')}${read('components/shared/card.module.css')}${read('components/shared/data-table.module.css')}</style><section class="card vertical" data-card-padding="none" data-card-variant="default"><p>見出し</p><p>本文</p></section><div class="frame" data-table-presentation="calendar"><span>時刻と卓の格子</span></div>`))
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'v8' })
+    assert.deepEqual(await page.locator('section').evaluate(el => ({ padding: getComputedStyle(el).paddingTop, gap: getComputedStyle(el).rowGap })), { padding: '16px', gap: '16px' })
+    assert.equal(await page.locator('[data-table-presentation="calendar"]').evaluate(el => getComputedStyle(el).containerType), 'normal')
+  } finally { await browser.close() }
+})

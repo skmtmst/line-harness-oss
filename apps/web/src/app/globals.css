@@ -3075,6 +3075,8 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   --choice-ring: 1.5px;
   --choice-dot: 8px;
   --choice-card-ring: 2px;
+  --space-8: 8px;
+  --space-16: 16px;
   --tpl-list-inset: 24px;
   --tpl-list-name-min: 12em;
   --tpl-customer-label: 72px;
