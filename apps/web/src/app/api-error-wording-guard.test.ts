@@ -206,7 +206,6 @@ const BASELINE: Record<string, number> = {
   'v8/tags/searches-tab.tsx': 2,
   'v8/tags/tags-tab.tsx': 4,
   'v8/templates/carousel-core.ts': 1,
-  'v8/webhooks/create.tsx': 1,
   'v8/webinar-edit/comments.tsx': 1,
 }
 

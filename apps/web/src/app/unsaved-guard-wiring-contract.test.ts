@@ -96,7 +96,6 @@ const GUARDED = [
   'app/templates/carousel/page.tsx',
   'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
-  'app/webhooks/new/page.tsx',
   'v8/webhooks/create.tsx',
   'v8/conversions/create.tsx',
   'v8/form-edit/edit.tsx',
