@@ -207,7 +207,6 @@ shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/users/users-v8.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webinars/edit/analytics-v8.tsx
-shared-button-importer app/webinars/edit/basic-v8.tsx
 shared-button-importer app/webinars/edit/comments-v8.tsx
 shared-button-importer app/webinars/edit/cta-v8.tsx
 shared-button-importer app/webinars/edit/notifications-v8.tsx
