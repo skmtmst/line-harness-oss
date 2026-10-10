@@ -591,6 +591,16 @@ function DeliveryInner() {
     />
   ) : (
     <div className={styles.headActions}>
+      {/* 絵の板の頭は「題 → 間 → 更新（印＋名 nDOMR）→ 品切れ設定 → 一括停止」の並び。 */}
+      <div className={styles.refreshRow}>
+        <RefreshCw
+          className={`${styles.icon13}${loading ? ` ${styles.spin}` : ''}`}
+          aria-hidden="true"
+        />
+        <p className={styles.muted}>
+          30秒ごとに自動更新・最終 {loadedAt === null ? DASH : formatClock(new Date(loadedAt).toISOString())}
+        </p>
+      </div>
       {storePicker}
       {canManage ? (
         <>
@@ -713,22 +723,16 @@ function DeliveryInner() {
         </Notice>
       ) : null}
 
-      {view === 'orders' ? (
-        <div className={styles.refreshRow}>
-          <RefreshCw
-            className={`${styles.icon13}${loading ? ` ${styles.spin}` : ''}`}
-            aria-hidden="true"
-          />
-          <p className={styles.muted}>
-            30秒ごとに自動更新・最終 {loadedAt === null ? DASH : formatClock(new Date(loadedAt).toISOString())}
-          </p>
-        </div>
-      ) : null}
-
       {body}
 
+      {/*
+       * キャンセルの確認（絵 dgeTy）は、注文の詳細の上に重ねない。
+       * 絵は確認の窓だけを板の上に描いている。詳細を開いたままにすると
+       * 後ろの窓の文字が確認の窓に隠れて切れる（重なり）。
+       * orderId は残すので、確認の「戻る」で詳細へそのまま戻れる。
+       */}
       <OrderDetailDialog
-        open={Boolean(orderId)}
+        open={Boolean(orderId) && !cancelOpen}
         loading={detailLoading}
         error={detailError}
         detail={detail}

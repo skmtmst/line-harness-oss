@@ -1545,6 +1545,9 @@
   --tpl-rt-kicker-ink: #9a8a5a; --tpl-rt-kicker-size: 9px; --tpl-rt-kicker-tracking: 2px; --tpl-rt-label-lh: 20px; --tpl-rt-input-lh: 21px; --tpl-rt-body-box-h: 56px; --tpl-rt-body-box-pad: 0 12px;
   --tpl-rt-preview-w: 210px; --tpl-rt-preview-bg: #8fa8cf; --tpl-rt-preview-icon: 22px; --tpl-rt-rich-radius: 14px; --tpl-rt-photo-h: 96px; --tpl-rt-photo-icon: 22px; --tpl-rt-rich-pad: 12px 14px; --tpl-rt-rich-ink: #111111; --tpl-rt-rich-sub: #666666; --tpl-rt-rich-body-lh: 17px; --tpl-rt-rich-action-pad: 10px 0; --tpl-rt-rich-link: #42659a;
   --tpl-rt-photo-a: #c8a27a; --tpl-rt-photo-b: #9fb3c8; --tpl-rt-photo-c: #d9b8a6; --tpl-rt-photo-d: #b9c7a5; --tpl-rt-mini-pad: 18px; --tpl-rt-mini-title-size: 16px;
+  /* ★V8 デリバリー受注 v02（2026-10-09 承認：kDQHr・hjdqV・dgeTy・OzHLO・h7OeT・XCVGd）。行の間 8、札の中 12/14、列の幅は絵の実寸。 */
+  --tpl-rt-dlv-gap: 8px; --tpl-rt-dlv-card-gap: 12px; --tpl-rt-dlv-card-pad: 12px 14px; --tpl-rt-dlv-foot-pad-top: 4px; --tpl-rt-dlv-total-pad-top: 8px;
+  --tpl-rt-dlv-col-select: 46px; --tpl-rt-dlv-col-service: 118px; --tpl-rt-dlv-col-actions: 204px; --tpl-rt-dlv-check-h: 320px;
   --tpl-inbox-tag-bottom: 14px; --tpl-inbox-basic-bottom: 6px; --tpl-inbox-profile-pad: 6px; --tpl-inbox-profile-gap: 8px; --tpl-inbox-profile-lh: 24px; --tpl-inbox-title-inset: 8px; --tpl-inbox-summary-pad: 20px; --tpl-inbox-summary-gap: 16px; --tpl-inbox-summary-top: 21px;
   /* 受信箱の会話の中を探す（M0393 段13・枠 v7GV2）。 */
   --tpl-inbox-search-pad: 8px 20px; --tpl-inbox-search-gap: 8px; --tpl-inbox-search-field-h: 32px; --tpl-inbox-search-field-pad: 0 10px; --tpl-inbox-search-field-gap: 6px; --tpl-inbox-search-field-line: 1.5px solid var(--color-accent-deep); --tpl-inbox-search-field-line-offset: -1.5px;

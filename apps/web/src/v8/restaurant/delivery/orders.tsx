@@ -81,6 +81,8 @@ const TAB_ORDER: DeliveryOrderTab[] = ['new', 'cooking', 'handed_over', 'all']
 
 /** 表の列数（選ぶ・注文番号・サービス・注文内容・金額・経過・急ぎ度・状態・操作）。 */
 const COLUMN_COUNT = 9
+/** 閲覧のみの人には「選ぶ」の列を出さないので1つ少ない（★V8 2026-10-06）。 */
+const COLUMN_COUNT_VIEW_ONLY = COLUMN_COUNT - 1
 
 /** 数を推測しない。取れないときは「—」にする（D021/D024）。0 は 0 のまま出す。 */
 function countText(value: number | null | undefined, unit = '件'): string {
@@ -187,14 +189,17 @@ function OrderRow({
 }) {
   return (
     <Tr density="comfortable">
-      <Td className={styles.td}>
-        <Checkbox
-          aria-label={`注文${order.orderNumber}を選ぶ`}
-          checked={checked}
-          disabled={!selectable || busy}
-          onCheckedChange={(next) => onToggleSelect(order.id, next)}
-        />
-      </Td>
+      {/* 閲覧のみの人には「選ぶ」を押せない形で置かずに列ごと出さない（★V8 2026-10-06）。 */}
+      {canManage ? (
+        <Td className={styles.td}>
+          <Checkbox
+            aria-label={`注文${order.orderNumber}を選ぶ`}
+            checked={checked}
+            disabled={!selectable || busy}
+            onCheckedChange={(next) => onToggleSelect(order.id, next)}
+          />
+        </Td>
+      ) : null}
       <Td className={styles.td}>
         <Button
           variant="text"
@@ -442,7 +447,8 @@ export default function OrdersBoard({
       {/* 絵（kDQHr）の並びは サービス3枚 → 数の帯 → タブ → 表。 */}
       <Tabs items={tabs} label="注文の状態" />
 
-      {checkedCount > 0 ? (
+      {/* 閲覧のみの人は選べないので、選んだ数の帯もまとめての札も出さない。 */}
+      {canManage && checkedCount > 0 ? (
         <div className={styles.selectBar}>
           <span className={styles.selectCount}>選択中 {checkedCount}件</span>
           <span className={styles.spacer} />
@@ -451,7 +457,7 @@ export default function OrdersBoard({
             size="compact"
             busy={bulkBusy}
             busyLabel="受付中…"
-            disabled={!canManage || bulkBusy}
+            disabled={bulkBusy}
             onClick={onBulkAccept}
           >
             まとめて受け付ける
@@ -461,15 +467,17 @@ export default function OrdersBoard({
 
       <DataTable className={styles.table} data-design="kDQHr" label="デリバリーの注文一覧"><thead>
         <TableHeadRow>
-          <Th className={styles.th}>
-            <Checkbox
-              aria-label="新着の注文をすべて選ぶ"
-              checked={allChecked}
-              indeterminate={someChecked}
-              disabled={!canManage || selectableIds.length === 0 || bulkBusy}
-              onCheckedChange={onToggleSelectAll}
-            />
-          </Th>
+          {canManage ? (
+            <Th className={styles.th}>
+              <Checkbox
+                aria-label="新着の注文をすべて選ぶ"
+                checked={allChecked}
+                indeterminate={someChecked}
+                disabled={selectableIds.length === 0 || bulkBusy}
+                onCheckedChange={onToggleSelectAll}
+              />
+            </Th>
+          ) : null}
           <Th className={styles.th}>注文番号</Th>
           <Th className={styles.th}>サービス</Th>
           <Th className={styles.th}>注文内容</Th>
@@ -487,7 +495,7 @@ export default function OrdersBoard({
         </TableHeadRow></thead><tbody>
         {visible.length === 0 ? (
           <TableStateRow
-            colSpan={COLUMN_COUNT}
+            colSpan={canManage ? COLUMN_COUNT : COLUMN_COUNT_VIEW_ONLY}
             kind="empty"
             title="この状態の注文はありません"
             description="新しい注文が届くと、ここに表示されます。"

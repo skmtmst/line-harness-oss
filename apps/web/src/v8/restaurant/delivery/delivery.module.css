@@ -8,14 +8,14 @@
 .headActions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tpl-rt-dlv-gap);
 }
 
 /* 自動更新の印。読み直した時刻を必ず添える（古い数字を今の数字と見間違えないため）。 */
 .refreshRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tpl-rt-dlv-gap);
   min-width: 0;
 }
 
@@ -83,7 +83,7 @@
 .serviceRow {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--tpl-rt-dlv-card-gap);
 }
 
 @media (max-width: 900px) {
@@ -95,8 +95,8 @@
 .serviceCard {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: var(--tpl-rt-dlv-gap);
+  padding: var(--tpl-rt-dlv-card-pad);
   border-radius: var(--tpl-rt-card-radius);
   outline: 1px solid var(--card-edge);
   outline-offset: -1px;
@@ -107,7 +107,7 @@
 .serviceHead {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tpl-rt-dlv-gap);
   min-width: 0;
 }
 
@@ -123,7 +123,7 @@
 .serviceBody {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--tpl-rt-card-gap);
   min-width: 0;
 }
 
@@ -152,23 +152,23 @@
  * `.table` は共通部品の外枠に付く名前で、`data-design` は中の `table` に付くので
  * 子孫で書く（同じ要素に重ねると当たらない）。
  */
-.table table[data-design='kDQHr'] thead .th:nth-child(1) { width: 46px; }
+.table table[data-design='kDQHr'] thead .th:nth-child(1) { width: var(--tpl-rt-dlv-col-select); }
 .table table[data-design='kDQHr'] thead .th:nth-child(2) { width: 9.5%; }
 /* 3列目（サービス）は札の文字数で決まるので実寸。割合だと狭い幅で札が列いっぱいになり、となりの文字とくっつく。 */
-.table table[data-design='kDQHr'] thead .th:nth-child(3) { width: 118px; }
+.table table[data-design='kDQHr'] thead .th:nth-child(3) { width: var(--tpl-rt-dlv-col-service); }
 /* 4列目（注文内容）は幅を書かない。残りを受け取って、あふれる分は「…」で省く。 */
 .table table[data-design='kDQHr'] thead .th:nth-child(5) { width: 7%; }
 .table table[data-design='kDQHr'] thead .th:nth-child(6) { width: 6%; }
 .table table[data-design='kDQHr'] thead .th:nth-child(7) { width: 7.5%; }
 .table table[data-design='kDQHr'] thead .th:nth-child(8) { width: 7.5%; }
-.table table[data-design='kDQHr'] thead .th:nth-child(9) { width: 204px; }
+.table table[data-design='kDQHr'] thead .th:nth-child(9) { width: var(--tpl-rt-dlv-col-actions); }
 
 /*
  * 品切れ一括設定（h7OeT）の列の幅。
  * ここも等分されるため、長い商品名が「分類」の文字に重なる。
  * 商品名の列だけ幅を書かずに残りを受け取り、あふれる分は「…」で省く。
  */
-.table table[data-design='h7OeT'] thead .th:nth-child(1) { width: 46px; }
+.table table[data-design='h7OeT'] thead .th:nth-child(1) { width: var(--tpl-rt-dlv-col-select); }
 .table table[data-design='h7OeT'] thead .th:nth-child(3) { width: 16%; }
 .table table[data-design='h7OeT'] thead .th:nth-child(4) { width: 12%; }
 .table table[data-design='h7OeT'] thead .th:nth-child(5) { width: 14%; }
@@ -227,7 +227,7 @@
 .rowActions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--tpl-rt-payload-gap);
   justify-content: flex-start;
 }
 
@@ -247,22 +247,22 @@
 .tableFoot {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-top: 4px;
+  gap: var(--tpl-rt-dlv-card-gap);
+  padding-top: var(--tpl-rt-dlv-foot-pad-top);
 }
 
 /* 注文詳細の窓（hjdqV）。 */
 .detailHead {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tpl-rt-dlv-gap);
   flex-wrap: wrap;
 }
 
 .detailFacts {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 6px 12px;
+  grid-template-columns: var(--tpl-rt-col-96) minmax(0, 1fr);
+  gap: var(--tpl-rt-payload-gap) var(--tpl-rt-dlv-card-gap);
   margin: 0;
 }
 
@@ -282,7 +282,7 @@
 .itemList {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--tpl-rt-payload-gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -291,7 +291,7 @@
 .itemRow {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--tpl-rt-dlv-gap);
   min-width: 0;
 }
 
@@ -317,8 +317,8 @@
 .total {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding-top: 8px;
+  gap: var(--tpl-rt-dlv-gap);
+  padding-top: var(--tpl-rt-dlv-total-pad-top);
   border-top: 1px solid var(--card-edge);
   font-weight: 600;
 }
@@ -327,15 +327,15 @@
 .checkList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 320px;
+  gap: var(--tpl-rt-dlv-gap);
+  max-height: var(--tpl-rt-dlv-check-h);
   overflow-y: auto;
 }
 
 .checkRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tpl-rt-dlv-gap);
   min-width: 0;
 }
 
@@ -365,7 +365,7 @@
 .selectBar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tpl-rt-dlv-gap);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -381,7 +381,7 @@
 .filterRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--tpl-rt-dlv-gap);
   flex-wrap: wrap;
   min-width: 0;
 }

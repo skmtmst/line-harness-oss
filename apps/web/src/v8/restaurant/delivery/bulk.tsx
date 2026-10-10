@@ -38,6 +38,8 @@ const STOP_WIDTH = 480
 const STOP_TOP = 260
 
 const SOLD_OUT_COLUMN_COUNT = 6
+/** 閲覧のみの人には「選択」と「切替」を出さないので2つ少ない（★V8 2026-10-06）。 */
+const SOLD_OUT_COLUMN_COUNT_VIEW_ONLY = SOLD_OUT_COLUMN_COUNT - 2
 
 /* ── D-5 `h7OeT` 品切れ一括設定 ───────────────────────────────── */
 
@@ -131,7 +133,8 @@ export default function SoldOutBoard({
   const checkedCount = visible.filter((item) => selectedSet.has(item.id)).length
   const allChecked = visible.length > 0 && checkedCount === visible.length
   const someChecked = checkedCount > 0 && !allChecked
-  const canSubmit = canManage && checkedCount > 0 && !busy
+  // 権限の有無は帯ごと出す・出さないで分ける。ここは「選んでいないので押せない」だけ。
+  const canSubmit = checkedCount > 0 && !busy
 
   return (
     <>
@@ -151,6 +154,8 @@ export default function SoldOutBoard({
 
       {items.length > 0 ? (
         <>
+          {/* 閲覧のみの人は選べないので、選んだ数の帯もまとめての札も出さない（★V8 2026-10-06）。 */}
+          {canManage ? (
           <div className={styles.selectBar}>
             <span className={styles.selectCount}>選択中 {checkedCount}品</span>
             <span className={styles.spacer} />
@@ -173,39 +178,45 @@ export default function SoldOutBoard({
               <RotateCcw size={15} aria-hidden="true" />販売を再開する
             </Button>
           </div>
+          ) : null}
 
           {error ? <p className={styles.muted}>{error}</p> : null}
 
           <DataTable className={styles.table} data-design="h7OeT" label="メニューの品切れ設定"><thead>
             <TableHeadRow>
-              <Th className={styles.th}>
-                <Checkbox
-                  aria-label="表示中をすべて選ぶ"
-                  checked={allChecked}
-                  indeterminate={someChecked}
-                  disabled={!canManage}
-                  onCheckedChange={onToggleAll}
-                />
-              </Th>
+              {canManage ? (
+                <Th className={styles.th}>
+                  <Checkbox
+                    aria-label="表示中をすべて選ぶ"
+                    checked={allChecked}
+                    indeterminate={someChecked}
+                    onCheckedChange={onToggleAll}
+                  />
+                </Th>
+              ) : null}
               <Th className={styles.th}>商品名</Th>
               <Th className={styles.th}>分類</Th>
               <Th className={styles.th} align="right">価格</Th>
               <Th className={styles.th}>状態</Th>
-              <Th className={styles.th}>切替</Th>
+              {canManage ? <Th className={styles.th}>切替</Th> : null}
             </TableHeadRow></thead><tbody>
             {visible.length === 0 ? (
-              <TableStateRow colSpan={SOLD_OUT_COLUMN_COUNT} kind="empty" />
+              <TableStateRow
+                colSpan={canManage ? SOLD_OUT_COLUMN_COUNT : SOLD_OUT_COLUMN_COUNT_VIEW_ONLY}
+                kind="empty"
+              />
             ) : (
               visible.map((item) => (
                 <Tr key={item.id}>
-                  <Td className={styles.td}>
-                    <Checkbox
-                      aria-label={`${item.name || '商品'}を選ぶ`}
-                      checked={selectedSet.has(item.id)}
-                      disabled={!canManage}
-                      onCheckedChange={(checked) => onToggle(item.id, checked)}
-                    />
-                  </Td>
+                  {canManage ? (
+                    <Td className={styles.td}>
+                      <Checkbox
+                        aria-label={`${item.name || '商品'}を選ぶ`}
+                        checked={selectedSet.has(item.id)}
+                        onCheckedChange={(checked) => onToggle(item.id, checked)}
+                      />
+                    </Td>
+                  ) : null}
                   <Td className={styles.td}>
                     <span className={styles.menuName} title={item.name || undefined}>
                       {item.name || DASH}
@@ -220,14 +231,16 @@ export default function SoldOutBoard({
                       {item.soldOut ? '品切れ' : '販売中'}
                     </StatusBadge>
                   </Td>
-                  <Td className={styles.td}>
-                    <Toggle
-                      label={`${item.name || '商品'}の販売`}
-                      checked={!item.soldOut}
-                      disabled={!canManage || busy || busyItemId === item.id}
-                      onChange={(next) => onToggleOne(item.id, !next)}
-                    />
-                  </Td>
+                  {canManage ? (
+                    <Td className={styles.td}>
+                      <Toggle
+                        label={`${item.name || '商品'}の販売`}
+                        checked={!item.soldOut}
+                        disabled={busy || busyItemId === item.id}
+                        onChange={(next) => onToggleOne(item.id, !next)}
+                      />
+                    </Td>
+                  ) : null}
                 </Tr>
               ))
             )}
