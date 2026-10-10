@@ -17,6 +17,7 @@ import SharedStatusPill from '@/components/shared/status-pill'
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import BulkBar from '@/components/shared/bulk-bar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
@@ -49,7 +50,7 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { completeReorder } from '@/lib/complete-reorder'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { ROLE_LABELS } from '@/lib/hq-members'
 import { isForbidden } from '@/components/shared/api-error-message'
 import NoPermissionBoard from '@/v8/no-permission/no-permission'
@@ -150,7 +151,8 @@ export default function ScenariosListV8() {
    * 押せる見た目にしておく（最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('scenarios')
+  const canEdit = featureAccess
 
   /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
   const [nameQuery, setNameQuery] = useListUrlParam('q')

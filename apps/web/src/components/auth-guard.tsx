@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
@@ -46,6 +47,7 @@ function sessionFingerprint(handoffToken: string): string {
 
 /** テストと、外から「次の遷移で必ず確認して」が必要なときの口。 */
 export function invalidateAuthSessionCheck(): void {
+  forgetStaffIdentity()
   lastSessionCheck = null
   forgetSessionSnapshot()
   forgetAuthCheck()

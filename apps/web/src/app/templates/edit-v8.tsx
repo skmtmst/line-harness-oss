@@ -12,12 +12,12 @@
  * `?kind=` が資産の種類（リッチメッセージ・クーポン・リサーチ）のときは
  * asset-editor-v8.tsx へ渡す。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Link2 } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
@@ -91,8 +91,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
   const narrowBoard = useNarrowBoard()
   const designNode = id ? 'u5YC6' : narrowBoard ? 'a1k3d' : 'u5YC6'
   const { accounts, selectedAccountId } = useAccount()
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [references, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)

@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
 import { PageHeading } from '@/components/templates/page-frame'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -147,7 +148,7 @@ export default function HealthPage() {
    */
   const [accountsError, setAccountsError] = useState<unknown>(null)
   // M019：移行口は owner 専用（サーバの権限表）。画面側でも役割で出し分ける目安。
-  const [role, setRole] = useState<string | null>(null)
+  const role = useStaffRole()
 
   const loadAccounts = useCallback(async () => {
     setLoading(true)
@@ -212,7 +213,6 @@ export default function HealthPage() {
     loadAccounts()
     loadMigrations()
     try {
-      setRole(window.localStorage.getItem('lh_staff_role') || null)
     } catch {
       // ストレージが使えなくても画面は出せる
     }
@@ -242,7 +242,7 @@ export default function HealthPage() {
   }
 
   // M019：役割が分かっていて owner でないときは移行の入口を出さない。最終の門はサーバ。
-  const canMigrate = role === null || role === 'owner'
+  const canMigrate = role === 'owner'
 
   const getAccountName = (id: string): string => {
     const account = accounts.find((a) => a.id === id)

@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 全ルート監査 A2（2026-09-25）:
  * `/line-notifications/operator/new` の「受け取る人」が
@@ -24,7 +26,6 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, useSettingsNavInline: () => undefined }))
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {
@@ -38,6 +39,7 @@ import Page from './page'
 const flush = () => act(async () => { await Promise.resolve() })
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   apiMocks.previewRecipients.mockReset()
 })
 afterEach(cleanup)

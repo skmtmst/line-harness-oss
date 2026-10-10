@@ -124,7 +124,7 @@ function MembersInner() {
   /* 絵 `r4ARpV` の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
   const rows = sortMembersByRole(members)
   const kpis = useMemo(() => memberKpis(members), [members])
-  const canManage = me?.role === 'owner' || me?.role === 'admin'
+  const canManage = !me?.readOnly && me?.accountScope !== 'accounts' && (me?.role === 'owner' || me?.role === 'admin')
   const restricted = me?.accountScope === 'accounts'
 
   const submitDialog = async (value: MemberDialogValue, stepUpToken?: string) => {

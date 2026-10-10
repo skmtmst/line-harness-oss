@@ -11,12 +11,13 @@
  */
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleSlash, Send } from 'lucide-react'
 import { type TapExtras, type Folder, type MediaItem, type TemplateImagemapUpload } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
@@ -185,7 +186,8 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const router = useRouter()
   const role = useStaffRole()
   const hqHost = Boolean(host && !host.composer?.accountId)
-  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutate = host ? !host.readOnly : featureAccess
   const { selectedAccountId, accounts } = useAccount()
   usePageTitle(host?.composer ? null : host ? 'テンプレート' : 'リッチメッセージを作る', !host?.composer)
   /*

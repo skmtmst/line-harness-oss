@@ -11,6 +11,7 @@
  * 未保存の離脱確認、権限が無いときの案内、読み込み失敗の言い分け）は
  * 今までの app/booking/staff/new（v7・staff-new-v8）から写した。BEHAVIOR.md を参照。
  */
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -27,7 +28,6 @@ import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
-import { canEditFeature } from '@/lib/staff-capability'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
@@ -167,8 +167,7 @@ export default function StaffNewV8() {
   }
 
   // N-411: 予約スタッフ登録は 'booking.settings' の実効 permission 必須。
-  const [canManageStaff] = useState(() =>
-    typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
+  const canManageStaff = usePermissionAccess('booking.settings')
 
   /* 登録途中の離脱確認。どれかに手を付けていたら、キャンセルや左メニューで確認窓を出す。 */
   const dirty = Boolean(

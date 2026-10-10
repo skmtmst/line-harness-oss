@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -15,6 +17,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 
 let host: RichMenuCreateHost
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   document.documentElement.setAttribute('data-theme', 'v8')
   window.history.replaceState(null, '', '/hq/rich-menus')
   host = {

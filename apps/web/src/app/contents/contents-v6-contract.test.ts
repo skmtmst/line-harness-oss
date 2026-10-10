@@ -204,7 +204,7 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(WORKER).toContain('getMediaVersionByNo')
   })
 
-  it('退避・復帰は管理者口だけから理由付きで呼ぶ（N-201）', () => {
+  it('退避・復帰は編集権限の口から理由付きで呼ぶ（N-201）', () => {
     // 既定の一覧は退避済みを外し、明示の棚だけが archived=only を渡す。
     expect(PAGE).toContain("archived: showArchivedOnly ? 'only' : undefined")
     expect(API).toContain("q.set('archived', params.archived)")
@@ -215,8 +215,8 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('（あとから履歴で確認できます）')
     expect(PAGE).toContain('{canManageMedia ? (')
     // worker は owner/admin だけを通し、理由なしは 400、二重実行は 409。
-    expect(WORKER).toContain("contents.post('/api/media/:id/archive', requireRole('owner', 'admin')")
-    expect(WORKER).toContain("contents.post('/api/media/:id/restore', requireRole('owner', 'admin')")
+    expect(WORKER).toContain("contents.post('/api/media/:id/archive', requireDeliveryAccess('contents')")
+    expect(WORKER).toContain("contents.post('/api/media/:id/restore', requireDeliveryAccess('contents')")
     expect(WORKER).toContain("code: 'media_reason_required'")
     // 状態遷移と監査は db 側の条件付き UPDATE で行う。
     expect(DB).toContain('archived_at IS NULL')

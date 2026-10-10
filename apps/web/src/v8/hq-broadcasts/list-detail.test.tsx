@@ -16,7 +16,7 @@ const hq = vi.hoisted(() => ({
 }))
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => params.value }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children) }))

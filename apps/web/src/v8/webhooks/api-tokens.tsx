@@ -84,7 +84,7 @@ export default function WebhooksApiTokensV8() {
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || staffRole === 'owner'
+  const canManage = staffRole === 'owner'
   const overview = useWebhookOverview()
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)

@@ -383,7 +383,7 @@ export default function ScenarioDetailV8({
    * 今までどおり押せる見た目（最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   const readonlyReason = '閲覧のみのため、この操作はできません'
 
   /* --- ★V8 だけの状態 --- */

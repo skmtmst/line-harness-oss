@@ -694,7 +694,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
   const { selectedAccountId, selectedAccount } = useAccount()
   /* 変える操作（出す・止める・文面を直す）はオーナー・管理者だけ。閲覧のみには押せないボタンを置かない。役割が分かるまでは今までどおり出す。 */
   const staffRole = useStaffRole()
-  const canManage = staffRole ? canManageRole(staffRole) : true
+  const canManage = canManageRole(staffRole)
   /* 運用者へのお知らせ（u8xibp）：板の頭の「CSVで書き出す」で開く理由の窓。 */
   const [operatorExportOpen, setOperatorExportOpen] = useState(false)
   /*

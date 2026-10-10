@@ -4,7 +4,7 @@ export type Registration = {
   method: string; path: string; router: string; position: number; guarded: boolean;
   mountedRouter?: string;
 };
-const GUARDS = new Set(['requireRole', 'requirePermission', 'requirePlatformAdminWrite', 'authMiddleware']);
+const GUARDS = new Set(['requireRole', 'requirePermission', 'requireDeliveryAccess', 'requirePlatformAdminWrite', 'authMiddleware']);
 
 /** Import names alone never protect a route: only middleware arguments count. */
 export function registrations(source: string): Registration[] {

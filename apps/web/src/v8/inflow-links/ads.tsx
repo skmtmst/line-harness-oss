@@ -106,7 +106,7 @@ export default function AdsV8() {
   usePageTitle('広告連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '流入と計測', href: '/inflow-links' }])
   const role = useStaffRole()
-  const readonly = role !== null && !canManageRole(role)
+  const readonly = !canManageRole(role)
   const { selectedAccountId } = useAccount()
   const loadGenerationRef = useRef(0)
   const latestAccountRef = useRef(selectedAccountId)

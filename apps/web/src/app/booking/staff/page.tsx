@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { PageHeading } from '@/components/templates/page-frame'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -17,7 +18,6 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { canEditFeature } from '@/lib/staff-capability'
 // 編集窓は V8 予約設定の担当スタッフタブ（menus/settings-v8.tsx）と共用。
 import { EMPTY_STAFF as EMPTY, StaffEditModal } from './staff-edit-dialog'
 
@@ -74,7 +74,7 @@ export default function BookingStaffPage() {
   const [deleting, setDeleting] = useState(false)
   const [removeError, setRemoveError] = useState('')
   // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
-  const [canManageStaff, setCanManageStaff] = useState(false)
+  const canManageStaff = usePermissionAccess('booking.settings')
   // 行の「その他」メニューの開き先（#641）
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const router = useRouter()
@@ -105,7 +105,6 @@ export default function BookingStaffPage() {
   }, [selectedAccountId])
 
   useEffect(() => {
-    setCanManageStaff(canEditFeature('booking.settings'))
   }, [])
 
   useEffect(() => {

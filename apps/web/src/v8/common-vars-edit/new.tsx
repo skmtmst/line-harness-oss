@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+
 /*
  * ★V8 共通情報を作る（板 `p82v9`）。
  *
@@ -33,7 +35,6 @@ import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED, isSecretLikeVarValue } from '@/lib/common-vars'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -165,8 +166,7 @@ export default function NewCommonVarV8() {
    * 登録の口は `requireRole('owner', 'admin')` で閉じている。staff には
    * 閲覧のみの帯を出して保存の押し口を押せない形にする（閉さない）。
    */
-  const [canWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canWrite = useFeatureAccess('commonVars')
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [name, setName] = useState('')

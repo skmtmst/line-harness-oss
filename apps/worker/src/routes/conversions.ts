@@ -1,3 +1,4 @@
+import { hasStaffAccess } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { conversionApprovalCounts } from '../services/tab-counts.js';
@@ -137,18 +138,11 @@ type ConversionPermission = 'view' | 'edit' | 'export';
 function conversionPermission(permission: ConversionPermission): MiddlewareHandler<Env> {
   return async (c, next) => {
     const staff = c.get('staff');
-    const keys = staff?.permissionKeys ?? [];
-    const hasFeature = keys.includes('/conversions');
-    const allowed = staff && (
-      staff.role === 'owner'
-      || staff.role === 'admin'
-      || (permission === 'view' && hasFeature)
-      || (permission === 'edit' && hasFeature && keys.includes('conversion.definition.edit'))
-      || (permission === 'export' && hasFeature && keys.includes('conversion.report.export'))
-    );
-    if (!allowed) {
-      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
-    }
+    const read = permission === 'view';
+    const allowed = hasStaffAccess(staff, '/conversions', read)
+      && (permission === 'view' || hasStaffAccess(staff,
+        permission === 'edit' ? 'conversion.definition.edit' : 'conversion.report.export', read));
+    if (!allowed) return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     await next();
   };
 }

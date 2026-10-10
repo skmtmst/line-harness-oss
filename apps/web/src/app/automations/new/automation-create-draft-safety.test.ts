@@ -144,6 +144,10 @@ function json(route: Route, body: unknown, status = 200) {
 
 /** この画面の合否に関係しない、共通の下ごしらえ（在席・店の一覧・機能表）。 */
 async function serveSharedStubs(route: Route, pathname: string): Promise<boolean> {
+  if (pathname === '/api/staff/me') {
+    await json(route, { success: true, data: { name: '試験担当', role: 'owner', permissionKeys: [], accountScope: 'all' } })
+    return true
+  }
   if (pathname === '/api/auth/session') {
     await json(route, { success: true, data: { name: '試験担当', role: 'owner', permissionKeys: [] }, csrfToken: 'csrf-test' })
     return true

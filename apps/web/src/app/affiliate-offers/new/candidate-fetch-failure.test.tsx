@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * R524: 案件作成でタグ・シナリオの候補取得に失敗したら「（なし）」に
  * 化けさせず、失敗と再試行を出す。取り直すまで保存させない。
@@ -76,6 +78,7 @@ async function openOptions(buttonId: string) {
 
 describe('R524 候補の取得失敗は空と区別して再試行を出す', () => {
   beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
     failTags = false
     failScenarios = false
     stubFetch()

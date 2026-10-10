@@ -33,6 +33,7 @@ const TEMPLATES = [
 vi.mock('@/lib/api', () => ({
   ApiError: class ApiError extends Error {},
   api: {
+    staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: templateGet,

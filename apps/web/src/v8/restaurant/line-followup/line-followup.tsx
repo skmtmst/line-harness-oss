@@ -105,7 +105,7 @@ function FlowCard({ flow, store, ctx, readOnly }: { flow: RestaurantLineFlow; st
 function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
   const { data, store } = ctx
   const role = useStaffRole()
-  const readOnly = role !== null && !canManageRole(role)
+  const readOnly = !canManageRole(role)
   const flows = data.lineFlows.filter((flow) => !store || !flow.store_id || flow.store_id === store.id)
   const has = (type: string) => flows.some((flow) => flow.flow_type === type)
   return (

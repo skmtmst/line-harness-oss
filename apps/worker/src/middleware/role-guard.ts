@@ -1,3 +1,4 @@
+import { hasDeliveryAccess, type DeliveryFeature, type StaffFeatureOperation } from '@line-crm/shared';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../index.js';
 import type { StaffRole } from './auth.js';
@@ -112,4 +113,14 @@ function roleLabel(role: StaffRole | undefined): string {
     default:
       return '相応の';
   }
+}
+
+/** 操作の鍵を束と共通の表から選ぶ。アカウント境界は各routeで確認する。 */
+export function requireDeliveryAccess(feature: DeliveryFeature, operation: StaffFeatureOperation = 'edit'): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    if (!hasDeliveryAccess(c.get('staff'), feature, operation)) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    return next();
+  };
 }

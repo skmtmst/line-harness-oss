@@ -69,3 +69,4 @@ test('409の比較だけでは入力と読んだ版を変えず、明示した�
   fireEvent.click(screen.getByRole('button', { name: '保存する' }))
   await waitFor(() => expect(net.update).toHaveBeenLastCalledWith('mk1', 'acc', expect.objectContaining({ expectedVersion: 2 })))
 })
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))

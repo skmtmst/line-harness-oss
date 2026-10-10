@@ -11,6 +11,7 @@
  * 受け付ける URL：`/templates/questions/new`・`?id=<テンプレート>`（直す）。
  */
 import TapExtrasField from '@/components/shared/tap-extras-field'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -32,7 +33,6 @@ import { useAccount } from '@/contexts/account-context'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TemplateEditFrame } from '../template-edit/frame'
@@ -110,7 +110,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [error, setError] = useState('')
   const [publishConfirm, setPublishConfirm] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
-  const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
+  const canMutate = useFeatureAccess('templates')
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
   const folderAccountId = id ? templateAccountId : selectedAccountId

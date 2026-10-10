@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const accountStore = vi.hoisted(() => ({ id: 'account-A' }))
 
+const identity = vi.hoisted(() => ({ role: 'owner' }))
 const fixture = vi.hoisted(() => ({
   routerPush: vi.fn(),
   marksList: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/lib/api', () => ({
   api: {
+    staff: { me: async () => ({ success: true, data: { role: identity.role } }) },
     supportMarks: {
       list: fixture.marksList,
       create: fixture.marksCreate,
@@ -64,6 +66,7 @@ function createButton(): HTMLButtonElement {
 }
 
 beforeEach(() => {
+  identity.role = 'owner'
   accountStore.id = 'account-A'
   const store = new Map<string, string>()
   Object.defineProperty(window, 'localStorage', {

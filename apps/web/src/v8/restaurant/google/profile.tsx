@@ -81,7 +81,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   }
 
   const { profile, today } = data
-  const canChange = !data.closed && !busy && (role === null || canManageRole(role))
+  const canChange = !data.closed && !busy && (canManageRole(role))
   const todayText = today.closed ? '本日は休業' : formatPeriods(today.periods)
   const closeOptions = TIME_OPTIONS.filter((t) => today.periods.length > 0 && t > today.periods[today.periods.length - 1].open).map((t) => ({ value: t, label: t }))
   const updates = data.googleUpdates
@@ -103,7 +103,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
 
   return (
     <>
-      {role !== null && !canManageRole(role) ? <Notice tone="info">閲覧のみです。営業時間と店舗情報を確認できます。</Notice> : null}
+      {!canManageRole(role) ? <Notice tone="info">閲覧のみです。営業時間と店舗情報を確認できます。</Notice> : null}
       {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)}>{syncing ? '取得中…' : 'もう一度取得'}</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
       {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount} 件）。`}</Notice> : null}

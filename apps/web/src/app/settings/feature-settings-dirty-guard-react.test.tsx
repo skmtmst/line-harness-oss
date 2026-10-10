@@ -55,6 +55,7 @@ beforeEach(() => {
   })
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(response({ success: true, data: { role: 'owner' } }))
     const accountId = new URL(path, 'http://localhost').searchParams.get('account_id') ?? 'account-a'
     if (path.includes('/api/settings/features/impact')) {
       return response({ success: true, data: { version: 3, impacts: [], requiresConfirmation: false, impactToken: null } })

@@ -71,7 +71,7 @@ export default function TagsListV8({
    * （最後の守りはサーバの 403）。
    */
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = canManageRole(staffRole)
   /*
    * 狭い幅（1152）の板は `aPeD8`。畳み込み自体は入れ物の問い合わせが
    * 担い、ここでは板 ID だけを替える（auto-replies・reminders と同じ）。

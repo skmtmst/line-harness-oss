@@ -136,7 +136,7 @@ export default function FriendsListV8() {
    */
   const [keys, setKeys] = useState({ friends: false, chats: false })
   useEffect(() => { setKeys({ friends: hasEditKey('/friends'), chats: hasEditKey('/chats') }) }, [])
-  const manager = staffRole === null || canManageRole(staffRole)
+  const manager = canManageRole(staffRole)
   const canEditFriends = manager || keys.friends
   const canEditChats = manager || keys.chats
   const readOnly = !canEditFriends && !canEditChats

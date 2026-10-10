@@ -16,6 +16,7 @@ import SharedStatusPill from '@/components/shared/status-pill'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -47,8 +48,7 @@ import {
   type CommonVarReplacementImpact,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { clampSearchQuery } from '@/lib/search-query'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -203,13 +203,13 @@ function CommonVarsListInner() {
    * 書き込みの口（作成・更新・削除・状態切替・フォルダ操作）は
    * `requireRole('owner', 'admin')` で閉じている。staff へ操作を見せると
    * 押しても 403 になるだけなので、閲覧のみの帯を出して押せない形にする
-   * （板 `OxSw8`）。一覧・CSVで書き出す・差し込み名のコピーは使える。
-   * 役割はサーバ（/api/staff/me）で確かめ、答えが来るまでは手元の値で決める。
+   * （板 `OxSw8`）。一覧・差し込み名のコピーは使える。CSVは管理者だけ。
+   * 役割と鍵は本人APIで確かめ、答えが来るまでは変更操作を隠す。
    */
-  const [localCanWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const staffRole = useStaffRole()
-  const canWrite = staffRole === null ? localCanWrite : canManageRole(staffRole)
+  const featureAccess = useFeatureAccess('commonVars')
+  const canWrite = featureAccess
+  const canExport = useFeatureAccess('commonVars', 'export')
 
   const [items, setItems] = useState<CommonVar[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
@@ -1825,11 +1825,11 @@ function CommonVarsListInner() {
       title="共通情報"
       help="会社名・営業時間・電話番号など、何度も使う文字をここで持ち、テンプレートや配信に差し込みます。ここを変えると、差し込んだ所がまとめて変わります。"
       actions={
-        <VarsExportPanel
+        canExport ? <VarsExportPanel
           accountId={selectedAccountId}
           folderId={folderFilter && folderFilter !== UNGROUPED ? folderFilter : null}
           ungrouped={folderFilter === UNGROUPED}
-        />
+        /> : null
       }
       tabs={canWrite ? undefined : (
         /* 閲覧のみの帯（`OxSw8`）。数の帯の上。 */

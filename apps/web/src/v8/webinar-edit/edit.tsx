@@ -11,6 +11,7 @@
  * 読み込み・失敗の分け方・段の行き来（URL の pane）・離れる前の確かめ・
  * 1本の保存の帯は app/webinars/edit/page.tsx と同じ（BEHAVIOR.md）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -23,7 +24,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import {
   ApiError,
   webinarApi,
@@ -90,7 +91,8 @@ function EditInner() {
   const { accounts, loading: accountsLoading } = useAccount()
   const role = useStaffRole()
   /* 役割の確認が済むまでは今までどおり出し、staff と分かったら変える操作を隠す（最後の守りはサーバの 403）。 */
-  const readOnly = role !== null && !canManageRole(role)
+  const featureAccess = useFeatureAccess('webinars')
+  const readOnly = !featureAccess
 
   const [loaded, setLoaded] = useState<{ id: string; webinar: Webinar; editor: WebinarEditor } | null>(null)
   const [loadFailure, setLoadFailure] = useState<{ id: string; failure: WebinarLoadFailure } | null>(null)

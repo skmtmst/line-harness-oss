@@ -389,7 +389,7 @@ describe('HQひな形の配布フロー', () => {
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], selectedAccountId: null, selectedAccount: null, setSelectedAccountId: vi.fn(), loading: false }) }))
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => true, useStaffRole: () => 'owner', canManageRole: () => true }))
 
 vi.mock('@/components/shell/page-chrome', () => ({usePageTitle: () => {}, usePageCrumbs: () => {}}))
 

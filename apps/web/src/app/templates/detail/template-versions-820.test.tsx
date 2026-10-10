@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * #820: 詳細の「使われている場所」と「版の履歴」。
  * 空・読み込み中・失敗・正常を描画で確かめる。
@@ -82,6 +84,7 @@ function stubAll(usedBy = USED_BY, versions = VERSIONS) {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   searchParams.value = new URLSearchParams('id=tpl-1')
   templateGet.mockReset()
   templateVersions.mockReset()

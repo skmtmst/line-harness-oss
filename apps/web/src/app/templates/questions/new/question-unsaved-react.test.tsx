@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,11 +27,11 @@ vi.mock('@/lib/api', () => ({
     scenarios: { list: async () => ({ success: true, data: [] }) },
   },
 }))
-vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
 
 import QuestionTemplatePage from './page'
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   fixture.foldersList.mockResolvedValue({ success: true, data: [] })
 })
 

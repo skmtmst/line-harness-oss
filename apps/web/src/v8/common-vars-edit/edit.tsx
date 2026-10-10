@@ -1,6 +1,7 @@
 'use client'
 
 import { jstDate } from '@/lib/jst-datetime'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 
 /*
  * ★V8 共通情報の編集（板 `AYc6O`、編集（1152）`C67dE`、競合 `piWhz`）。
@@ -49,7 +50,6 @@ import FolderSelect, { folderById, folderCreator } from '@/components/shared/fol
 import { api, ApiError, type CommonVarDetail } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -159,8 +159,7 @@ function EditCommonVarV8Inner() {
    * 保存・削除・状態切替の口は `requireRole('owner', 'admin')` で閉じている。
    * staff には閲覧のみの帯を出し、保存などの押し口は置かない（2026-10-06 オーナー決定）。
    */
-  const [canWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canWrite = useFeatureAccess('commonVars')
 
   const [item, setItem] = useState<CommonVarDetail | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])

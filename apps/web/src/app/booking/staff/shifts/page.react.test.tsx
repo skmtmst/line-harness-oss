@@ -74,6 +74,7 @@ vi.mock('@/lib/api', () => {
   }
   return {
     ApiError,
+    api: { staff: { me: async () => ({ success: true, data: { role: window.localStorage.getItem('lh_staff_role') ?? 'owner', permissionKeys: [], permissionViewKeys: JSON.parse(window.localStorage.getItem('lh_staff_view_permissions') ?? '[]') } }) }, },
     bookingApi: {
       getSettings: (...args: unknown[]) => fixture.getSettings(...args),
       saveSettings: (...args: unknown[]) => fixture.saveSettings(...args),

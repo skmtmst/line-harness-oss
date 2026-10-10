@@ -186,7 +186,7 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
   const { data, selectedStoreId, busy, mutate, reload } = ctx
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const readOnly = role !== null && !canManageRole(role)
+  const readOnly = !canManageRole(role)
   const [returnTarget, setReturnTarget] = useState<RestaurantApproval | null>(null)
   const rows = data.approvals.filter((item) => !selectedStoreId || item.store_id === selectedStoreId || item.store_id === null)
   const pending = rows.filter((item) => item.status === 'pending')

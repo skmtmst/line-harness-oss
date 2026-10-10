@@ -160,6 +160,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     },
     api: {
       ...actual.api,
+      staff: {
+        ...actual.api.staff,
+        me: async () => ({ success: true, data: { role: 'admin', permissionKeys: [] } }),
+      },
       friends: {
         ...actual.api.friends,
         upcoming: (...args: unknown[]) => {

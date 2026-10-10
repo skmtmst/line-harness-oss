@@ -1,3 +1,4 @@
+import { SESSION_LOST_EVENT } from './session-events'
 import type { ApiFieldErrors } from '@line-crm/shared'
 import { csvFileName } from './csv-file-name'
 import { getFeatureDisabledContext } from './feature-disabled-context'
@@ -2488,7 +2489,7 @@ export const CSRF_STORAGE_KEY = 'lh_csrf'
  * 残っているかどうかを見て、案内を出すか、ただの未ログインとして
  * 見送るかを決める。
  */
-export const SESSION_LOST_EVENT = 'lh-session-lost'
+export { SESSION_LOST_EVENT } from './session-events'
 
 /** 機能設定でオフになっている API を開いたとき、共通 shell へ知らせる合図。 */
 export const FEATURE_DISABLED_EVENT = 'lh-feature-disabled'

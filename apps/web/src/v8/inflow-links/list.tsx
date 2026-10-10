@@ -128,8 +128,8 @@ export default function InflowListV8({
    * owner/admin に加えて「流入」を任された staff にも許している。画面も同じ条件で出す。
    * フォルダの作成・名前の変更は口が owner/admin だけなので、別に分ける。
    */
-  const readonly = role !== null && !canManageRole(role) && !canEditFeature(INFLOW_LINKS_EDIT_KEY)
-  const canManageFolders = role === null || canManageRole(role)
+  const readonly = !canManageRole(role) && !canEditFeature(INFLOW_LINKS_EDIT_KEY, role)
+  const canManageFolders = canManageRole(role)
 
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId

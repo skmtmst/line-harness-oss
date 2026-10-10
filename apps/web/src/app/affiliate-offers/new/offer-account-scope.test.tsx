@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * N-211: 案件作成で選ぶタグ・シナリオが選択accountで絞られることを、
  * 本物のReactで動かして見る。一覧取得のURLに選択accountが付くこと。
@@ -47,6 +49,7 @@ async function settle(milliseconds: number) {
 
 describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
   beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
     stubFetch()
     host = document.createElement('div')
     document.body.appendChild(host)

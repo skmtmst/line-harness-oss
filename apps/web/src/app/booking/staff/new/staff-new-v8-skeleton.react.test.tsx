@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約スタッフの登録（V8）の「サクサク感」（V8 のときだけ）。
  * A: メニュー・ログインユーザーの読み込み中は目に見える「読み込み中」の
@@ -55,7 +57,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return {
     ...actual,
     ApiError,
-    api: { staff: { list: (...args: unknown[]) => fixture.staffList!(...(args as [])) } },
+    api: { staff: { me: async () => ({ success: true, data: { role: 'owner' } }), list: (...args: unknown[]) => fixture.staffList!(...(args as [])) } },
     bookingApi: {
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       listStaff: (...args: unknown[]) => fixture.listStaff!(...(args as [])),
@@ -91,6 +93,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   memStorage.setItem('lh_staff_role', 'owner')
   document.documentElement.dataset.theme = 'v8'
   fixture.listMenus = async () => ({ menus: MENUS })

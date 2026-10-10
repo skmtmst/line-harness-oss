@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * R578: 担当メニューの取得失敗と「まだ無い」を言い分ける。
  *
@@ -90,6 +92,7 @@ const MENUS = [
 ]
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   memStorage.setItem('lh_staff_role', 'owner')
   fixture.listMenus = async () => ({ menus: MENUS })
   fixture.createStaff = vi.fn(async () => ({ id: 'staff-new-1' }))

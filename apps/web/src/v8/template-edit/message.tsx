@@ -10,6 +10,7 @@
  */
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -17,7 +18,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -84,7 +85,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const router = useRouter()
   const role = useStaffRole()
   // 役割の確認が済むまでは操作を出す（最後の守りはサーバの 403）。staff と分かったら隠す。
-  const canMutate = host ? !host.readOnly : role === null || canManageRole(role)
+  const featureAccess = useFeatureAccess('templates')
+  const canMutate = host ? !host.readOnly : featureAccess
   const narrow = useNarrowViewport(1351)
   const { accounts, selectedAccountId } = useAccount()
 

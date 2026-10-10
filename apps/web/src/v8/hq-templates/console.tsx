@@ -16,6 +16,7 @@
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
+import { useTenantWideAccess } from '@/lib/staff-role'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -36,7 +37,7 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { Th } from '@/components/shared/table'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
@@ -131,7 +132,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   RichMenuCreate?: ComponentType<{ host: RichMenuCreateHost }>
 }) {
   const staffRole = useStaffRole()
-  const canEdit = staffRole === null || canManageRole(staffRole)
+  const canEdit = useTenantWideAccess()
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
   const [folderDistribution, setFolderDistribution] = useState<{ name: string; templates: HqTemplate[] } | null>(null)

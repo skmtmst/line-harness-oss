@@ -11,6 +11,7 @@
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useListScrollMemory } from '@/components/shared/list-url-state'
@@ -32,7 +33,6 @@ import {
 import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared'
 import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
@@ -114,18 +114,12 @@ export default function FormsListV8() {
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   /*
    * 箱の作成・名前変更・削除・並び替えは `/api/folders` が owner/admin で閉じている。
-   * 役割はサーバ（/api/staff/me）で確かめ、答えが来るまでは手元の値で決める。
+   * 役割と鍵は本人APIで確かめ、答えが来るまでは変更操作を隠す。
    * 変えられない人には操作を出さず、閲覧のみの帯（`JV2oR`）を出す。
    */
-  const [localCanManage] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const staffRole = useStaffRole()
-  // 役割が読めない（null・空の返事）あいだは手元の値。読めた役割だけで決め直す。
-  const canManageFolders = staffRole ? canManageRole(staffRole) : localCanManage
-  // フォームは項目別の編集権限も受ける。サーバの役割と手元の役割が食い違う間は変更口を隠す。
-  const canEditForms = staffRole
-    ? canManageRole(staffRole) || (staffRole === 'staff' && !isOwnerOrAdmin() && canEditFeature('/form-submissions'))
-    : canEditFeature('/form-submissions')
+  const canManageFolders = canManageRole(staffRole)
+  const canEditForms = useFeatureAccess('forms')
   /* 1152 の板（`GrnO4`）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 

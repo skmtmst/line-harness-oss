@@ -318,7 +318,7 @@ function OutgoingV8Inner() {
    * 試し送信と失敗のやり直しは管理者も使える。見るだけの担当者は
    * 中身の確認と検索だけ（`l5SRfT`）。
    */
-  const canManage = staffRole === null || staffRole === 'owner'
+  const canManage = staffRole === 'owner'
   const canTest = canManage || staffRole === 'admin'
   const manageReason = '統括だけが変更できます。必要なときは統括に頼んでください。'
 

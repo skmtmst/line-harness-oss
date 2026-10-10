@@ -28,7 +28,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [{ id: 'account-1', name: '本店' }], selectedAccountId: 'account-1', loading: false }),
 }))
-vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
 vi.mock('@/lib/staff-role', () => ({
   useStaffRole: () => role.value,
   canManageRole: (r: string | null | undefined) => r === 'owner' || r === 'admin',

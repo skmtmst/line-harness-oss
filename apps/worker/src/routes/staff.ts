@@ -1,3 +1,4 @@
+import { effectiveStaffEditKeys, SCOPE_OPERATION_KEYS } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -23,7 +24,6 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import {
   ACCESS_ROLE_BUNDLE_IDS, SCOPE_ITEMS, BUNDLE_PRESETS, scopeLevelsToKeys, keysToScopeLevels,
-  BROADCAST_EDIT_OPERATION_KEYS,
   type AccessRoleBundleId, type FeatureAccessLevel, type EmailMaskLevel, type ScopeLevels,
 } from '@line-crm/shared';
 import {
@@ -107,7 +107,7 @@ function parseScope(value: unknown): ScopeLevels | null | undefined {
  */
 const SCOPE_COVERED_KEYS: ReadonlySet<string> = new Set([
   ...SCOPE_ITEMS.flatMap((item) => item.keys),
-  ...BROADCAST_EDIT_OPERATION_KEYS,
+  ...SCOPE_OPERATION_KEYS,
 ]);
 
 /*
@@ -193,7 +193,7 @@ async function serializeStaff(
     lineLinked: Boolean(row.line_user_id),
     twoFactorEnabled: Boolean(row.totp_enabled_at && row.totp_secret_enc),
     isActive: Boolean(row.is_active),
-    permissionKeys: editKeys,
+    permissionKeys: effectiveStaffEditKeys(editKeys),
     permissionViewKeys: viewKeys,
     permissionScope: { ...keysToScopeLevels(editKeys, viewKeys), pii: piiLevel },
     notificationPreferences: safeJson<Record<string, { email: boolean; line: boolean }>>(row.notification_preferences, {}),
@@ -357,7 +357,7 @@ staff.get('/api/staff/me', async (c) => {
     }
     const member = await getStaffById(c.env.DB, current.id);
     if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
-    return c.json({ success: true, data: await serializeStaff(c.env.DB, member) });
+    return c.json({ success: true, data: { ...await serializeStaff(c.env.DB, member), readOnly: current.readOnly } });
   } catch (error) {
     console.error('GET /api/staff/me error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);

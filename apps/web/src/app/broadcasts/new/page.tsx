@@ -1,12 +1,12 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ListState from '@/components/shared/list-state'
 import { useStaffRole } from '@/lib/staff-role'
-import { canEditFeature } from '@/lib/staff-capability'
 import type { Tag } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -107,7 +107,7 @@ function NewBroadcastPageContent() {
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
   const staffRole = useStaffRole()
-  const canManage = staffRole === null || canEditFeature('broadcast.definition.edit')
+  const canManage = useFeatureAccess('broadcasts')
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [tags, setTags] = useState<Tag[]>([])

@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 /*
  * カルーセル編集の未保存ガード（D009）を、実際に mount して確かめる。
  *
@@ -134,6 +136,7 @@ function click(element: HTMLElement) {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []
   calls.foldersList.mockReset()
   calls.foldersList.mockResolvedValue({ success: true, data: [] })

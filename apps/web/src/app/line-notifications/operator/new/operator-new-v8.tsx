@@ -4,6 +4,8 @@
  * 運用者へのお知らせを作る（板 `gjUz3`、公開前の確認 `sDXNy`）。
  * V8だけで作る（v7の作成画面は捨てた）。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -15,7 +17,6 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
 import {
   describeApiFailure,
@@ -107,8 +108,7 @@ function NewOperatorNotificationV8Inner() {
    * お知らせの口はすべて `requireRole('owner', 'admin')` で閉じている。
    * staff には閲覧のみの帯を出して保存の押し口を押せない形にする（閉さない）。
    */
-  const [canWrite] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canWrite = useFeatureAccess('lineNotifications')
 
   const [eventType, setEventType] = useState(DEFAULT_OPERATOR_EVENT_TYPE)
   const [threshold, setThreshold] = useState('one')

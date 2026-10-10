@@ -11,6 +11,7 @@
  * 読み込み・保存（questionStatus）・離脱番兵の判断は v7（questions/new/page.tsx）
  * と同じ口を使う。ここにあるのは置き場と見え方だけ。
  */
+import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -27,7 +28,6 @@ import Select from '@/components/shared/select'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import type { Folder } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import EditorV8, { EditorCard } from '../editor-v8'
 import styles from '../editor-v8.module.css'
 
@@ -85,8 +85,7 @@ function QuestionTemplateV8Inner() {
   const [error, setError] = useState('')
   /** 「保存して公開」の使用先確認窓。 */
   const [publishConfirm, setPublishConfirm] = useState(false)
-  const [canMutateTemplates] = useState(() =>
-    typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  const canMutateTemplates = useFeatureAccess('templates')
 
   const folderAccountId = id ? templateAccountId : selectedAccountId
   useEffect(() => {
