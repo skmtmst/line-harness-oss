@@ -12605,6 +12605,14 @@ export const api = {
   },
   webhooks: {
     incoming: {
+      saveConfig: (id: string, lineAccountId: string, data: {
+        expectedVersion: number;
+        identityMatching: IncomingWebhookDetail['identityMatching'];
+        actions: Array<Pick<IncomingWebhookDetail['actions'][number], 'refKind' | 'refId' | 'refVersionId'>>;
+      }) => fetchApi<ApiResponse<{ id: string; version: number }>>(
+        `/api/webhooks/incoming/${encodeURIComponent(id)}/config?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        { method: 'PATCH', body: JSON.stringify(data) },
+      ),
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<IncomingWebhook[]>>(
           `/api/webhooks/incoming?lineAccountId=${encodeURIComponent(lineAccountId)}`,

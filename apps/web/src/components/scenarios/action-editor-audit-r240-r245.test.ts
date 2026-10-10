@@ -115,7 +115,7 @@ describe('R243 編集中の未完成行は保持し、保存時に入力不足�
 describe('R244 編集欄と入力を保存のたびに作り直さない', () => {
   it('開閉は画面側で持ち、読み込み中の作り直しをしない', () => {
     expect(EDITOR).toContain('expandedId')
-    expect(EDITOR).toContain('aria-expanded')
+    expect(EDITOR).toContain('open={expandedId === action.id}')
     expect(EDITOR).not.toContain('<details>')
     /* 初回だけ「読み込んでいます」。保存後の読み直しは黙って入れ替える。 */
     expect(EDITOR).toContain('const refresh = useCallback')

@@ -133,7 +133,7 @@ function setup() {
 it('WEB267: 一部のアクションを保存しても別の通の下書きを消さない', async () => {
   setup()
   await renderEditor()
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '内容を編集' })))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'タグを追加（タグ未選択）' })))
   await act(async () => fireEvent.click(screen.getByRole('checkbox', { name: '発動2回目以降も実行する' })))
   expect(net.saveDraft).toHaveBeenCalled()
   expect(net.saveDraft.mock.calls.at(-1)![1].afterActions).toContainEqual(sibling)
@@ -145,7 +145,7 @@ it('WEB264: 反映は保存待ちを閉じず、通信失敗を表示する', as
   net.update.mockImplementation(() => new Promise((_, fail) => { reject = fail }))
   const close = vi.fn()
   await act(async () => render(<ActionEditor scenarioId="sc-1" hook="scenario_completed" title="あと" onClose={close} />))
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '内容を編集' })))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'タグを追加（タグ未選択）' })))
   await act(async () => fireEvent.click(screen.getByRole('checkbox', { name: '発動2回目以降も実行する' })))
   fireEvent.click(screen.getByRole('button', { name: 'このアクションを反映' }))
   expect(close).not.toHaveBeenCalled()
@@ -165,9 +165,9 @@ it('WEB262: A→B→Aの切替でも最初のAの遅いアクション一覧を�
   await act(async () => {})
   view.rerender(<ActionEditor {...props} scenarioId="sc-1" />)
   await act(async () => {})
-  expect(screen.getByRole('button', {name:'内容を編集'})).toBeTruthy()
+  expect(screen.getByRole('button', {name:'タグを追加（タグ未選択）'})).toBeTruthy()
   await act(async () => finish({success:true,data:[]}))
-  expect(screen.getByRole('button', {name:'内容を編集'})).toBeTruthy()
+  expect(screen.getByRole('button', {name:'タグを追加（タグ未選択）'})).toBeTruthy()
 })
 
 it('保存の内部エラーを日本語で知らせ、失敗後も編集の窓を保つ', async () => {
@@ -176,7 +176,7 @@ it('保存の内部エラーを日本語で知らせ、失敗後も編集の窓�
   net.update.mockRejectedValue(new ApiError(500, 'API error: 500'))
   const close = vi.fn()
   await act(async () => render(<ActionEditor scenarioId="sc-1" hook="scenario_completed" title="あと" onClose={close} />))
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '内容を編集' })))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'タグを追加（タグ未選択）' })))
   await act(async () => fireEvent.click(screen.getByRole('checkbox', { name: '発動2回目以降も実行する' })))
   expect(screen.getByText(/サーバー側で保存できませんでした/)).toBeTruthy()
   expect(document.body.textContent).not.toContain('API error: 500')

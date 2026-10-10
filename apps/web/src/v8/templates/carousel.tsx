@@ -1,4 +1,6 @@
 'use client'
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { tapExtrasError, type TapExtras } from '@line-crm/shared'
@@ -45,7 +47,6 @@ import styles from './question-new.module.css'
 import own from './carousel.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 テンプレート「カルーセルを作る・編集」（Pencil `J60utH`）。
@@ -194,7 +195,6 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [snapshotTaken, setSnapshotTaken] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [urlOpen, setUrlOpen] = useState(false)
-  const [actionsFor, setActionsFor] = useState<number | null>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number } | null>(null)
   const [publishError, setPublishError] = useState('')
@@ -238,6 +238,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
           const fieldFailure = saveErrors.capture(saveFailure)
 
           { if (!fieldFailure)
+
 
           setError('いまの中身を読み取れませんでした。保存すると上書きされます。') }
         }
@@ -587,10 +588,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         kinds={choiceKindOptions({ host: hqHost, current: action.kind }).filter(isTapActionKind)}
                         extraKinds={hqHost ? [] : ACTION_EXTRA_KIND}
                         renderBody={(kind) => kind !== 'action' ? undefined : (
-                          <button type="button" className={`${styles.pick} ${own.colBody}`} onClick={() => setActionsFor(ai)} title="押されたときの動きを決める" >
-                            <span className={styles.pickText}>{inlineActionsText(action.actions, actionOptions.tags)}</span>
-                            <ChevronDown className={styles.pickIcon} aria-hidden="true" />
-                          </button>
+                          <InlineActionList actions={action.actions} {...actionOptions}
+                            onChange={next=> update(selectedIndex, { actions: panel.actions.map((a, j) => j === ai ? { ...a, actions: next } : a) })}/>
                         )}
                         scope={hqHost ? 'hq' : 'shop'}
                         hasLiff={Boolean(liffId)}
@@ -637,22 +636,6 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         )}
       </TemplateEditFrame>
 
-      <Dialog open={actionsFor !== null && Boolean(panel?.actions[actionsFor ?? 0])} size="large" title="押されたときの動き" onCancel={() => setActionsFor(null)}>
-        {actionsFor !== null && panel?.actions[actionsFor] ? (
-          <InlineActionList
-            actions={panel.actions[actionsFor].actions}
-            onChange={(next) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === actionsFor ? { ...a, actions: next } : a)) })}
-            tags={actionOptions.tags}
-            fields={actionOptions.fields}
-            marks={actionOptions.marks}
-            scenarios={actionOptions.scenarios}
-            vars={actionOptions.vars}
-            templates={actionOptions.templates}
-            reminders={actionOptions.reminders}
-            events={actionOptions.events}
-          />
-        ) : null}
-      </Dialog>
       <ConfirmDialog
         open={publishCheck !== null}
         title="この内容を公開しますか？"

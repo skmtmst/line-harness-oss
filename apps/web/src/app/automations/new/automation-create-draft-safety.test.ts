@@ -556,19 +556,20 @@ async function switchAccount(page: Page, accountId: string) {
   await expect.poll(() => page.evaluate(() => localStorage.getItem('lh_selected_account'))).toBe(accountId)
 }
 
-/** V8は行の「…」から中身を直す窓を開く。入力を隠したまま保存しない。 */
+/** B-169: 行の設定をその場で開き、閉じても入力を保つ。 */
 async function editFirstAction(page: Page) {
-  await page.getByRole('button', { name: /^1つめのすること「.+」の操作$/ }).click()
-  await page.getByRole('menuitem', { name: '中身を直す' }).click()
-  const dialog = page.getByRole('dialog', { name: '1つめのすること', exact: true })
-  await dialog.waitFor()
-  return dialog
+  const row = page.locator('[data-action-row]').first()
+  if (await row.locator('button[aria-expanded="true"]').count() === 0) {
+    await row.getByRole('button', { name: '1つ目の行うことのその他操作' }).click()
+    await page.getByRole('menuitem', { name: '設定を変える' }).click()
+  }
+  return row
 }
 
 async function closeActionEditor(page: Page) {
-  // V8の窓はEscでも入力を保ったまま閉じる。
-  await page.keyboard.press('Escape')
-  await page.getByRole('dialog', { name: '1つめのすること', exact: true }).waitFor({ state: 'hidden' })
+  const row = page.locator('[data-action-row]').first()
+  await row.getByRole('button', { name: '1つ目の行うことのその他操作' }).click()
+  await page.getByRole('menuitem', { name: '設定を閉じる' }).click()
 }
 
 async function pickTag(page: Page, label: string) {
@@ -591,14 +592,16 @@ async function fillTagRule(page: Page, name: string) {
 
 async function fillMessageRule(page: Page, name: string, message: string) {
   await page.locator('#v8-rule-name').fill(name)
-  const dialog = await editFirstAction(page)
-  const current = await dialog.getByLabel('すること', { exact: true }).innerText()
-  if (!current.includes('メッセージを送る')) {
-    await dialog.getByLabel('すること', { exact: true }).click()
-    // 選択候補は窓の外の共通ポータルへ出る。
-    await page.getByRole('listbox').getByRole('button', { name: 'メッセージを送る', exact: true }).click()
+  let row = page.locator('[data-action-row]').first()
+  if (!(await row.innerText()).includes('メッセージを送る')) {
+    await row.getByRole('button', { name: '1つ目の行うことのその他操作' }).click()
+    await page.getByRole('menuitem', { name: '削除する' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '削除する', exact: true }).click()
+    await page.getByRole('button', { name: '行うことを足す' }).click()
+    await page.getByRole('menuitem', { name: 'メッセージを送る', exact: true }).click()
   }
-  await dialog.getByLabel('送る文面').fill(message)
+  row = await editFirstAction(page)
+  await row.getByLabel('送る文面').fill(message)
   await closeActionEditor(page)
 }
 

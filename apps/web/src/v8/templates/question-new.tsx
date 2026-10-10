@@ -1,4 +1,6 @@
 'use client'
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useEffect, useMemo, useState } from 'react'
@@ -30,7 +32,6 @@ import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
@@ -102,7 +103,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [tags, setTags] = useState<Tag[]>([])
-  const [scenarios, setScenarios] = useState<Scenario[]>([])
+  const [, setScenarios] = useState<Scenario[]>([])
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [initialQuestion] = useState<ScenarioQuestion>(() => hostInitial?.question ?? emptyQuestion())
   const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
@@ -112,7 +113,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [publishConfirm, setPublishConfirm] = useState(false)
-  const [actionsOpen, setActionsOpen] = useState(false)
   const canMutate = useFeatureAccess('templates')
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
@@ -206,7 +206,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     } catch (caught) {
       const extraError = tapExtraSaveError(caught)
       if (extraError) { fields.setServerErrors(Object.fromEntries(question.choices.map((_, ci) => [`extras-${ci}`, extraError]))); return false }
-      if (!saveErrors.capture(caught, fields)) setError(describeApiFailure(caught, '保存', { scope: 'store' }))
+      if (!saveErrors.capture(caught, fields))
+ setError(describeApiFailure(caught, '保存', { scope: 'store' }));
+
       return false
     } finally {
       setSaving(false)
@@ -227,7 +229,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     setQuestion((current) => ({ ...current, choices: current.choices.filter((_, i) => i !== index) }))
   const addChoice = () =>
     setQuestion((current) => ({ ...current, choices: [...current.choices, { key: newChoiceKey(), label: '', behavior: 'none' }] }))
-  const summaryOf = useMemo(() => (choice: QuestionChoice) => choiceActionText(choice, tags, scenarios), [tags, scenarios])
 
   if (loading || (accountLoading && !host)) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="質問テンプレートを読み込んでいます" /></SaveErrorScope>
 
@@ -339,13 +340,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 </div>
                 <Field label="ボタンの文字（20文字まで）"><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
-                {host ? null : <div className={styles.inline}>
-                  <span className={styles.smallLabel}>押されたら</span>
-                  <button type="button" className={styles.pick} title="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める"  onClick={() => setActionsOpen(true)}>
-                    <span className={styles.pickText}>{summaryOf(choice)}</span>
-                    <ChevronDown className={styles.pickIcon} aria-hidden="true" />
-                  </button>
-                </div>}
+                {host ? null : <QuestionEditor value={question} onChange={setQuestion} choiceOnly={index} choiceColumns/>}
                 <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
                 <Field label="押したときの返信"><SaveErrorField names={[`choices.${index}.reply`,"reply","choice.reply"]}><input className={styles.input} value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} /></SaveErrorField></Field>
               </div>
@@ -360,9 +355,6 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       </TemplateEditFrame>
 
       {/* 押したときの動きは今の部品で決める（全部の選択肢をまとめて直せる）。 */}
-      <Dialog open={actionsOpen} size="large" title="押したときの動き" onCancel={() => setActionsOpen(false)}>
-        {actionsOpen ? <QuestionEditor value={question} onChange={setQuestion} choiceColumns /> : null}
-      </Dialog>
       <ConfirmDialog
         open={publishConfirm}
         title="この質問を公開しますか？"

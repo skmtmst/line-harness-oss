@@ -75,7 +75,7 @@ const MULTIPLIERS = [
   { value: '30000', label: '3.0倍' },
 ]
 
-const ACTION_TYPES = [
+export const ACTION_TYPES = [
   ['テキスト送信', 'テキスト送信'],
   ['テンプレート送信', 'テンプレート'],
   ['タグ追加', 'タグ'],
@@ -92,7 +92,7 @@ const ACTION_TYPES = [
 ] as const
 export type TagEditorActionLabel = (typeof ACTION_TYPES)[number][0]
 
-const ACTION_DEFINITIONS: Record<(typeof ACTION_TYPES)[number][0], { actionType: string; resource?: keyof CommonActionResources; paramKey?: string }> = {
+export const ACTION_DEFINITIONS: Record<(typeof ACTION_TYPES)[number][0], { actionType: string; resource?: keyof CommonActionResources; paramKey?: string }> = {
   'テキスト送信': { actionType: 'send_message' },
   'テンプレート送信': { actionType: 'send_message', resource: 'templates', paramKey: 'templateId' },
   'タグ追加': { actionType: 'add_tag', resource: 'tags', paramKey: 'tagId' },

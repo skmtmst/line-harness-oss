@@ -1,4 +1,5 @@
 'use client'
+
 import { LinePreviewFlex } from '@/components/shared/line-preview'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
@@ -105,6 +106,8 @@ import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ActionList from '@/components/shared/action-list'
+import { EntityPickerField } from '@/components/shared/entity-picker'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -1416,6 +1419,7 @@ export default function BroadcastForm({
       setPreflightStatus('error');
 
       if (!silent) { if (!fieldFailure)
+
  setError('確認できませんでした') }
     }
   }
@@ -1511,6 +1515,7 @@ export default function BroadcastForm({
         /* 先行の失敗はこの保存の判断に混ぜない。下で最新を送る。 */
       }
       if ((selectedAccountIdRef.current || null) !== accountId)
+
  return null
     }
     const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
@@ -1670,6 +1675,7 @@ export default function BroadcastForm({
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
       const fieldFailure = saveErrors.capture(error)
       { if (!fieldFailure)
+
 
       setError(describeSaveFailure(error)) }
       return false
@@ -2101,6 +2107,7 @@ export default function BroadcastForm({
       const fieldFailure = saveErrors.capture(caught)
       { if (!fieldFailure)
 
+
       setError(describeSaveFailure(caught)) }
     } finally { submittingRef.current = false; setSaving(false) }
   }
@@ -2471,13 +2478,15 @@ export default function BroadcastForm({
         {!showTemplatePicker && <section className="rounded-card border content-card bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
-            <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
-          </div>
-          <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
-            <SaveErrorField names={["afterActionVersionId","after_action_version_id"]}><Combobox aria-label="配信後のアクション" placeholder="実行しない" value={afterActionVersionId} onChange={setAfterActionVersionId} options={[{ value: '', label: '実行しない' }, ...publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))]} className="mt-2 w-full font-normal" /></SaveErrorField>
-          </div>
-          {!afterActionVersionId && <p className="mt-2 text-xs text-ink-faint">実行しない</p>}
-          {afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
+            </div>
+          <ActionList
+            <string> value={afterActionVersionId ? [afterActionVersionId] : []} onChange={next =>setAfterActionVersionId(next[next.length - 1] ?? '')}
+            idOf={id => id} titleOf={id => publishedActions.find(action => action.versionId === id)?.name ?? '設定済みの共通アクション'}
+            choices={afterActionVersionId ? [] :[{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
+              title: '公開済みの共通アクションを選ぶ', items:publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_, ids) => ids[0],
+            } }]}
+            renderEditor={(id, update) =>
+          <EntityPickerField label="配信後のアクション" noun="共通アクション" items={publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` }))} value={id} onChange={update}/>}/>
         </section>}
         {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}

@@ -1,4 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
+
 import { notifySaved } from '@/components/shared/toast'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -77,7 +79,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ActionList from '@/components/shared/action-list'
 
 /*
  * ★V8 友だち追加時の配信を作る・直す（Pencil：作る①基本設定 `wDzkc` → ②流入リンク `h8uNW`
@@ -327,6 +329,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       const fieldFailure = saveErrors.capture(caught);
 
       if (isCurrentRequest()) { if (!fieldFailure)
+
  setError(describeFriendAddFailure(caught, '設定', 'load').message) }
     } finally {
       if (isCurrentRequest()) setLoading(false)
@@ -446,6 +449,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       } else {
         { if (!fieldFailure)
 
+
         setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store')) }
       }
       return null
@@ -490,6 +494,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (loadRequestRef.current !== request) return
       const fieldFailure = saveErrors.capture(caught)
       { if (!fieldFailure)
+
 
       setError(describeFriendAddFailure(caught, '設定', 'load').message) }
     } finally {
@@ -539,6 +544,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (loadRequestRef.current !== request) return
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
+
 
       setError('テストを実行できませんでした。') }
     } finally {
@@ -608,6 +614,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (loadRequestRef.current !== request) return
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
+
 
       setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
@@ -709,7 +716,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (!response.success) throw new Error(response.error)
       notifyToast('複製した下書きを追加しました')
       router.push(`/friend-add-settings?kind=${rule.friendKind}&highlight=${encodeURIComponent(response.data.id)}&status=draft`)
-    } catch (cause) { if (!saveErrors.capture(cause)) setError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
+    } catch (cause) { if (!saveErrors.capture(cause))
+ setError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
     finally { setDuplicating(false) }
   }
 
@@ -1454,70 +1462,27 @@ function ActionsStep({ definition, setDefinition, options, canEdit }: {
   options: FriendAddRuleOptions
   canEdit: boolean
 }) {
-  const [kind, setKind] = useState<FriendAddRuleAction['type']>('add_tag')
-  const [target, setTarget] = useState('')
-  const source = ACTION_KINDS.find((item) => item.type === kind)?.source ?? 'tag'
-  const targets = source === 'scenario' ? options.scenarios : options.tags
-  const addAction = () => {
-    const found = targets.find((item) => item.id === target)
-    if (!found) return
-    const label = kind === 'start_scenario'
-      ? `シナリオ「${found.name}」を始める`
-      : kind === 'remove_tag'
-        ? `タグ「${found.name}」を外す`
-        : `タグ「${found.name}」を付ける`
-    setDefinition((current) => ({ ...current, actions: [...current.actions, { type: kind, label, targetId: found.id }] }))
-    setTarget('')
+  const setActions = (actions:FriendAddRuleAction[]) =>
+    setDefinition(current => ({ ...current, actions }))
+  const title =(kind: FriendAddRuleAction['type'], id: string) => {
+    const list = kind === 'start_scenario' ? options.scenarios : options.tags
+    const name = list.find(item => item.id === id)?.name ?? '未設定'
+    return kind === 'start_scenario' ? `シナリオ「${name}」を始める` : `タグ「${name}」を${kind === 'remove_tag' ? '外す' : '付ける'}`
   }
-  return (
-    <Card padding="roomy" layout="vertical" className={styles.card} aria-label="あわせて行うこと">
+  return <Card padding="roomy" layout="vertical" className={styles.card} aria-label="あわせて行うこと">
       <div className={styles.cardHead}>
         <h2 className={styles.cardTitle}>あわせて行うこと</h2>
         <p className={styles.cardDesc}>案内を送ったあと、上から順に行います</p>
       </div>
-      {definition.actions.length === 0 ? (
-        <p className={styles.cardDesc}>まだ何もありません。下から足せます。</p>
-      ) : (
-        <ol className={styles.actionList}>
-          {definition.actions.map((action, index) => (
-            <li key={`${action.type}-${index}`} className={styles.actionRow}>
-              <span className={styles.actionIndex}>{index + 1}</span>
-              <span className={styles.actionLabel} title={action.label}>{action.label}</span>
-              {canEdit ? (
-                <Button
-                  type="button"
-                  variant="text"
-                  aria-label={`${action.label}を外す`}
-                  onClick={() => setDefinition((current) => ({ ...current, actions: current.actions.filter((_, itemIndex) => itemIndex !== index) }))}
-                >
-                  外す
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      )}
-      {canEdit ? (
-        <div className={styles.actionAdd}>
-          <div className={styles.actionSelect}>
-            <SaveErrorField names={["kind","type"]}><Select
-              aria-label="足す操作の種類"
-              size="full"
-              value={kind}
-              onChange={(value) => { setKind(value as FriendAddRuleAction['type']); setTarget('') }}
-              options={ACTION_KINDS.map((item) => ({ value: item.type, label: item.label }))}
-            /></SaveErrorField>
-          </div>
-          <div className={styles.actionSelect}>
-            <SaveErrorField names={["target"]}><EntityKindField kind={source} label="足す操作の対象" options={targets} value={target} onChange={setTarget} /></SaveErrorField>
-          </div>
-          <Button type="button" disabled={!target} onClick={addAction}>
-            <Plus size={15} aria-hidden="true" />足す
-          </Button>
-        </div>
-      ) : null}
-    </Card>
-  )
+    <ActionList<FriendAddRuleAction> value=
+      {definition.actions} onChange={setActions} readOnly={!canEdit} idOf=
+          {(_, index) => String (index)} titleOf={action=>action.label}
+      choices={ACTION_KINDS.map(kind=> ({ id: kind.type, label: kind.label, make:() =>({ type: kind.type, label: '', targetId: '' }),
+        picker: { title: `${kind.source === 'tag' ? 'タグ' : 'シナリオ'}を選ぶ`, items: kind.source === 'tag' ? options.tags : options.scenarios,
+          apply:(action, ids) => ({ ...action, targetId: ids[0], label: title(action.type, ids[0]) }) } }))}
+      renderEditor={(action, update) =>
+            <SaveErrorField names={["target"]}><EntityKindField kind={action.type === 'start_scenario' ? 'scenario' : 'tag'} label="操作の対象" options={action.type === 'start_scenario' ? options.scenarios : options.tags} value={action.targetId} onChange={targetId => update({ ...action, targetId, label: title(action.type, targetId) })} /></SaveErrorField>} />
+          </Card>
 }
 
 /* ===== 作る⑤ 確認（板 `U8Xm3X`） ===== */

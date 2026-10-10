@@ -1,4 +1,7 @@
 'use client'
+import { api, type CommonActionResources } from '@/lib/api';
+import Toggle from '@/components/shared/toggle';
+
 import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -35,7 +38,8 @@ import styles from './notifications.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ActionList from '@/components/shared/action-list'
+import { EntityPickerField } from '@/components/shared/entity-picker'
 
 /*
  * ★V8 ウェビナーの ④通知（Pencil E7iAYs）。
@@ -83,13 +87,6 @@ function referenceKey(type: WebinarAction['actionType']): string | null {
   if (type === 'switch_rich_menu') return 'richMenuPageId'
   return null
 }
-function actionSummary(action: WebinarAction): string {
-  const key = referenceKey(action.actionType)
-  const ref = key ? String(action.config[key] ?? '').trim() : ''
-  if (action.actionType === 'add_tag' && ref) return `タグ「${ref}」を付ける`
-  if (action.actionType === 'start_scenario' && ref) return `シナリオ「${ref}」を始める`
-  return ACTION_LABEL[action.actionType]
-}
 
 export default function NotificationsPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const saveErrors = useSaveFormErrors()
@@ -129,14 +126,28 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   const notificationDirty = settings !== null && baseline !== null && (baseline.version === 0 || SETTINGS_KEYS.some((key) => settings[key] !== baseline[key]))
 
   /* ===== 視聴後にすること ===== */
+  const [actionAttempt, setActionAttempt] = useState(0)
+  const [actionsBase, setActionsBase] = useState<WebinarAction[] | null>(null)
+  const [resourceAttempt, setResourceAttempt] = useState(0)
+  const [actionResources, setActionResources] = useState<CommonActionResources | null>(null)
+  const [resourcesError, setResourcesError] = useState(false)
+  const actionAccountId = webinar.accountId
+  useEffect(() => {
+    setActionResources(null); setResourcesError(false)
+    if (!actionAccountId || readOnly) return
+    let active = true
+    Promise.resolve().then(() => api.commonActions.resources(actionAccountId))
+      .then(res => { if (!res.success) throw new Error('resources'); if (active) setActionResources(res.data) })
+      .catch(() => { if (active) setResourcesError(true) })
+    return () => { active = false }
+  }, [actionAccountId, readOnly, resourceAttempt])
   const [actions, setActions] = useState<WebinarAction[] | null>(null)
   const [actionError, setActionError] = useState(false)
-  const [actionAttempt, setActionAttempt] = useState(0)
   useEffect(() => {
     let active = true
     setActions(null)
     setActionError(false)
-    webinarApi.actions(webinarId).then((res) => { if (active) setActions(res.data) }).catch(() => { if (active) setActionError(true) })
+    webinarApi.actions(webinarId).then((res) => { if (active) { setActions(res.data); setActionsBase(res.data) } }).catch(() => { if (active) setActionError(true) })
     return () => { active = false }
   }, [webinarId, actionAttempt])
   const [templateBody, setTemplateBody] = useState(editor.actionPolicy?.templateBody ?? '')
@@ -152,7 +163,8 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor.actionPolicy?.templateBody, editor.actionPolicy?.missingResultPolicy])
 
-  const dirty = notificationDirty || policyDirty
+  const actionsDirty = actions !== null && actionsBase !== null && JSON.stringify(actions) !== JSON.stringify(actionsBase)
+  const dirty = notificationDirty || policyDirty || actionsDirty
   useEffect(() => { onDirtyChange(dirty) }, [dirty, onDirtyChange])
   useEffect(() => () => onDirtyChange(false), [onDirtyChange])
 
@@ -189,6 +201,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
           { if (!fieldFailure)
 
+
           setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。') }
           return false
         }
@@ -203,11 +216,16 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         setPolicyBase({ templateBody, policy })
         ctx.onEditorChange(res.data)
       }
+      if (actionsDirty && actions) {
+        const res = await webinarApi.saveActions(webinarId, actions)
+        setActions(res.data); setActionsBase(res.data)
+      }
       return true
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
+
 
       setError(webinarErrorText(cause, '保存できませんでした。入力を残しました。もう一度お試しください。')) }
       return false
@@ -254,8 +272,6 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   const testDone = !dirty && editor.notificationTest?.status === 'passed'
 
   /* ===== 視聴後の動きを変える窓 ===== */
-  const [actionsOpen, setActionsOpen] = useState<WebinarAction['trigger'] | null>(null)
-  const [menuOpen, setMenuOpen] = useState<WebinarAction['trigger'] | null>(null)
 
   /* ===== 見え方 ===== */
   const [previewKey, setPreviewKey] = useState<RowKey>('dayBefore')
@@ -319,6 +335,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
+      hidePreviewWhenNarrow
       boardId="E7iAYs"
       title={chrome.title}
       actions={chrome.actions}
@@ -355,105 +372,56 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         {actionError ? (
           <Notice tone="info" action={<Button onClick={() => setActionAttempt((value) => value + 1)}>もう一度読み込む</Button>}>視聴後の設定を読み込めませんでした。</Notice>
         ) : (
-          <ul className={styles.rows}>
-            {TRIGGERS.map((trigger) => {
-              const list = actions?.filter((action) => action.trigger === trigger.key) ?? []
-              const text = actions === null ? '読み込んでいます' : list.map(actionSummary).join('・') || 'まだ何もしない'
-              const menuLabel = `${trigger.label}のときの動きの操作`
-              return (
-                <li key={trigger.key} className={styles.row} data-tall>
-                  <span className={styles.afterLabel}>{trigger.label}</span>
-                  <span className={`${styles.rowText} ${styles.afterText}`} title={text}>{text}</span>
-                  {readOnly ? null : (
-                    <div className={form.menuBox}>
-                      <RowMenu
-                        label={menuLabel}
-                        open={menuOpen === trigger.key}
-                        onOpenChange={(next) => setMenuOpen(next ? trigger.key : null)}
-                        items={[{ id: 'edit', label: '動きを変える', onSelect: () => { setMenuOpen(null); setActionsOpen(trigger.key) } }]}
-                      />
+          <div>
+            {resourcesError ? <Notice tone="danger" action={<Button onClick={() => setResourceAttempt(n => n + 1)}>もう一度読み込む</Button>}>動きの対象を読み込めませんでした。</Notice> : null}
+            {TRIGGERS.map(trigger => <div key ={trigger.key}>
+              <h3 className={form.cardTitle}>{trigger.label}</h3>
+              { actions === null? <ListState kind="loading" /> : <ActionList<WebinarAction> value={actions.filter(action => action.trigger === trigger.key)} readOnly={readOnly || saving}
+                onChange={next => setActions(current => [...(current ?? []).filter(action => action.trigger !== trigger.key), ...next])}
+                idOf={(action, index) => action.id ?? String(index)} titleOf={action =>{
+                  const items = webinarActionItems(action.actionType, actionResources)
+                  const key = referenceKey(action.actionType)
+                  return key ? items.find(item => item. id === action.config[key])?.name ?? '未設定': ACTION_LABEL[action.actionType]
+                }} kindOf={action => ACTION_LABEL[action.actionType]}
+                choices={Object.entries(ACTION_LABEL).map(([id, label]) => {
+                  const type = id as WebinarAction['actionType']
+                  const key = referenceKey(type)
+                  return { id, label, disabled: Boolean(key && !actionResources), disabledReason: resourcesError ? '候補を読み直してください' : '候補を読み込んでいます', make: () =>({ trigger:trigger.key, actionType: type, config: { } }), picker: key ? {
+                    title: `${label}対象を選ぶ`, items: webinarActionItems(type, actionResources), apply: (action, ids) => ({ ...action, config: { [key]: ids[0] } }),
+                  } : undefined }
+                })}
+                renderEditor={(action, update) => {
+                  const key = referenceKey(action.actionType)
+                  return key ? <EntityPickerField label="操作の対象" noun="対象" items={webinarActionItems(action.actionType, actionResources)} value={String(action.config[key] ?? '')} onChange={id => update({ ...action, config: { ...action.config, [key]: id } })}
+                      /> : <p>ほかに決めることはありません</p>
+                }} />}
                     </div>
                   )}
-                </li>
-              )
-            })}
-          </ul>
+                </div>
         )}
-        <div className={form.field}><Field label="視聴完了のメッセージ" htmlFor="webinar-action-message"><SaveErrorField names={["templateBody","actionTemplateBody","template_body"]}><TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} /></SaveErrorField></Field></div>
-        <div className={form.field}><Field label="結果が取れないとき" htmlFor="webinar-missing-policy"><div className={styles.policy}>
+        <div className={form.field}>< label className={form.label} htmlFor="webinar-action-message">視聴完了のメッセージ</label><SaveErrorField names={["templateBody","actionTemplateBody","template_body"]}><TextField id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} readOnly={readOnly} disabled={saving} onChange={(event) => setTemplateBody(event.target.value)} /></SaveErrorField></div>
+        <div className={form.field}>< label className={form.labelSmall} htmlFor="webinar-missing-policy">結果が取れないとき</label><div className={styles.policy}>
             {readOnly
               ? <ReadValue label="視聴結果を取得できない場合">{policy === 'escalate' ? '要対応へ追加' : '翌日に取り直す'}</ReadValue>
               : <SaveErrorField names={["policy","missingResultPolicy"]}><Select id="webinar-missing-policy" aria-label="視聴結果を取得できない場合" size="full" value={policy} disabled={saving} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に取り直す' }]} /></SaveErrorField>}
-          </div></Field></div>
-        {readOnly ? null : <div><Button onClick={() => setActionsOpen('completed')}><Plus size={15} aria-hidden="true" />条件を足す</Button></div>}
+          </div></div>
       </section>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 
-      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} onConfirm={() => runTest()}>
+      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} onConfirm={() => void runTest()}>
         <p className={form.cardNote}>{dirty ? '保存していない設定を保存してから送ります。' : ''}{`対象：「${webinar.title}」の入っている通知。本文は設定済みのものを送ります。`}</p>
       </ConfirmDialog>
-      {actionsOpen && actions ? (
-        <ActionsDialog
-          webinarId={webinarId}
-          initialTrigger={actionsOpen}
-          actions={actions}
-          onClose={() => setActionsOpen(null)}
-          onSaved={(next) => { setActions(next); setActionsOpen(null) }}
-        />
-      ) : null}
     </CreatePage></SaveErrorScope>
   )
 }
-
-/** 視聴後の動きを変える窓。場合ごとに動きを足す・外す・保存（口は webinarApi.saveActions）。 */
-function ActionsDialog({ webinarId, initialTrigger, actions, onClose, onSaved }: {
-  webinarId: string
-  initialTrigger: WebinarAction['trigger']
-  actions: WebinarAction[]
-  onClose: () => void
-  onSaved: (next: WebinarAction[]) => void
-}) {
-  const saveErrors = useSaveFormErrors()
-
-  const [draft, setDraft] = useState<WebinarAction[]>(actions)
-  const [trigger, setTrigger] = useState(initialTrigger)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const visible = draft.filter((action) => action.trigger === trigger)
-  const update = (target: WebinarAction, patchValue: Partial<WebinarAction>) => setDraft((current) => current.map((action) => (action === target ? { ...action, ...patchValue } : action)))
-  const save = async () => {
-    setSaving(true)
-    setError('')
-    try {
-      const response = await webinarApi.saveActions(webinarId, draft)
-      onSaved(response.data)
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-
-      setError('保存できませんでした。状態を読み直して、もう一度お試しください。') }
-    } finally {
-      setSaving(false)
-    }
-  }
-  return (
-    <SaveErrorScope errors={saveErrors}><Dialog open title="視聴後の動きを変える" description="見終わった・CTA を押した・見ていない、の場合ごとに動きを決めます。" confirmLabel="保存する" busy={saving} error={error || undefined} onConfirm={() => save()} onCancel={() => { if (!saving) onClose() }}>
-      <div className={styles.dialogBody}>
-        <SaveErrorField names={["trigger"]}><Select aria-label="どの場合か" size="full" value={trigger} onChange={(value) => setTrigger(value as WebinarAction['trigger'])} options={TRIGGERS.map((item) => ({ value: item.key, label: item.label }))} /></SaveErrorField>
-        {visible.length === 0 ? <p className={form.cardNote}>この場合の動きはまだありません。</p> : visible.map((action, index) => {
-          const key = referenceKey(action.actionType)
-          return (
-            <div key={action.id ?? `${trigger}-${index}`} className={styles.dialogRow}>
-              <SaveErrorField names={[`visible.${index}.actionType`,`visible.${index}.action_type`,"actionType","action.actionType","action_type","action.action_type"]}><Select aria-label="する動き" size="full" value={action.actionType} onChange={(value) => update(action, { actionType: value as WebinarAction['actionType'], config: {} })} options={Object.entries(ACTION_LABEL).map(([value, label]) => ({ value, label }))} /></SaveErrorField>
-              {key ? <TextField aria-label="対象（タグ・シナリオなどの名前やID）" value={String(action.config[key] ?? '')} onChange={(event) => update(action, { config: { [key]: event.target.value } })} placeholder="対象の名前・ID" /> : <span className={form.cardNote}>ほかに決めることはありません</span>}
-              <Button onClick={() => setDraft((current) => current.filter((item) => item !== action))}>外す</Button>
-            </div>
-          )
-        })}
-        <div><Button onClick={() => setDraft((current) => [...current, { trigger, actionType: 'add_tag', config: { tagId: '' } }])}><Plus size={15} aria-hidden="true" />動きを足す</Button></div>
-      </div>
-    </Dialog></SaveErrorScope>
-  )
+function webinarActionItems(type: WebinarAction['actionType'], resources: CommonActionResources | null): Array <{ id: string; name: string}>{
+  if( !resources) return []
+  if (type=== 'add_tag' || type=== 'remove_tag'
+  ) return resources.tags
+  if (type === 'start_scenario' || type === 'stop_scenario' || type === 'resume_scenario') return resources.scenarios
+  if (type === 'send_message') return resources.templates
+  if (type === 'send_webhook') return resources.webhooks
+  if (type === 'switch_rich_menu') return resources.richMenus
+  return []
 }

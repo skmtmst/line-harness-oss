@@ -30,13 +30,13 @@ describe('V6 質問テンプレート', () => {
 
   it('タグは全件を展開せず、閉じた選択欄と選択済みの札だけを表示する', () => {
     // タグは選ぶ窓（まとめて選ぶ欄）。欄は選んだ件数と名前の1行で、全件は窓の中にだけ並ぶ。素の <select> は置かない。
-    expect(editor).toContain('kind="tag"')
+    expect(editor).toContain('<ActionList<Effect>')
     expect(editor).toContain('multiple')
     expect(editor).not.toContain('<select')
-    expect(editor).toContain('label={label}')
-    expect(editor).toContain('selectedTags.filter')
+    expect(editor).toContain('<EntityPickerField label="タグ"')
+    expect(editor).toContain('item.ids')
     expect(editor).not.toContain('tags.map((tag) => {')
-    expect(editor).toContain('(choiceColumns || openChoice === index)')
+    expect(editor).toContain('(choiceOnly !== undefined || choiceColumns || openChoice === index)')
     expect(editor).toContain('タグ・記録などの詳しい設定')
   })
 

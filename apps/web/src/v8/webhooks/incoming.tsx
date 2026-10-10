@@ -1,4 +1,6 @@
 'use client'
+import { useCallback } from 'react';
+
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -50,7 +52,7 @@ import styles from './incoming.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import IncomingActions from './incoming-actions'
 
 /*
  * ★V8 外部連携「こちらで受け取る」タブ（Pencil `gW0F2`、作る窓 `H031gC`）。
@@ -141,6 +143,8 @@ export default function WebhooksIncomingV8() {
   const { incoming, incomingStatus, loadedAccountId, reload } = overview
 
   const [error, setError] = useState('')
+  const actionsGuard = useRef<((action: () => void) => void) | null>(null)
+  const onActionsGuardReady = useCallback((guard: ((action: () => void) => void) | null) => { actionsGuard.current = guard }, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<DetailType | null>(null)
   const [detailStatus, setDetailStatus] = useState<LoadStatus>('loading')
@@ -275,7 +279,7 @@ export default function WebhooksIncomingV8() {
     setUnmatchedStatus('ready')
   }, [selectedAccountId, selectedDetailId])
 
-  const selectInlet = (id: string) => withViewTransition(() => setSelectedId(id))
+  const selectInlet = (id: string) => { const select = () => withViewTransition(() => setSelectedId(id)); if (actionsGuard.current) actionsGuard.current(select); else select() }
   const moveSelection = (delta: -1 | 1) => {
     if (displayed.length === 0) return
     const current = selected ? displayed.findIndex((item) => item.id === selected.id) : -1
@@ -737,19 +741,10 @@ export default function WebhooksIncomingV8() {
             <p className={styles.cardNote}>保存されている処理を読み込んでいます。</p>
           ) : detailStatus === 'error' ? (
             <ListState kind="error" title="届いた後の処理を表示できませんでした" onRetry={() => setDetailReloadKey((key) => key + 1)} />
-          ) : detail && detail.actions.length > 0 ? (
-            detail.actions.map((action, index) => (
-              <div key={`${action.refKind}-${index}`} className={styles.actionRow}>
-                <span className={styles.actionName}>{`${index + 1} ${incomingActionLabel(action.refKind)}`}</span>
-                <span className={styles.spacer} aria-hidden="true" />
-                <span className={styles.actionTarget}>{`「${action.displayName}」`}</span>
-              </div>
-            ))
-          ) : (
-            <p className={styles.cardNote}>届いた後に動かす処理は、まだ決めていません。</p>
-          )}
-          {/* 絵の「＋ すること を足す」。設定の口（PATCH …/config）はあるが画面の配線がまだ無いので、押せる形にせず一言で伝える。 */}
-          {detailStatus === 'ready' ? <p className={styles.addNote}>すること の追加・入れ替えは、この画面ではまだできません</p> : null}
+          ) : detail && selectedAccountId ? (
+              <IncomingActions key={`${selectedAccountId}:${detail.id}:${detail.version}`} detail={detail} accountId={selectedAccountId} readOnly={staffRole !== 'owner'} onGuardReady={onActionsGuardReady} onSaved={() => setDetailReloadKey(key => key + 1)}/>
+            ) :
+            <p className={styles.cardNote}>届いた後に動かす処理は、まだ決めていません。</p>}
           {detail?.actionExecution.state === 'needs_attention' && detail.actionExecution.reason ? (
             <p className={styles.smallNote}>{detail.actionExecution.reason}</p>
           ) : null}

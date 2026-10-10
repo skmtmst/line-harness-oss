@@ -1,15 +1,5 @@
 'use client'
 
-/*
- * 質問メッセージ（分岐）の編集。
- *
- * 選択肢ごとに「押されたら何が起きるか」を全部この場に置く。別画面に
- * 分けると、2つの選択肢の差（片方だけタグを付ける等）が見比べられない。
- *
- * 文字数の上限は LINE 側の都合。超えたぶんは途中で切れて相手に届くので、
- * 保存を止めるのではなく**その場で残り文字数を出す**。
- */
-
 import { useEffect, useId, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import Checkbox from '@/components/shared/checkbox'
@@ -19,6 +9,20 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { scenarioReferenceData } from './scenario-reference-data'
 import Button from '@/components/shared/button'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField } from '@/components/shared/text-field'
+import ActionList from '@/components/shared/action-list'
+import { EntityPickerField } from '@/components/shared/entity-picker'
+
+
+/*
+ * 質問メッセージ（分岐）の編集。
+ *
+ * 選択肢ごとに「押されたら何が起きるか」を全部この場に置く。別画面に
+ * 分けると、2つの選択肢の差（片方だけタグを付ける等）が見比べられない。
+ *
+ * 文字数の上限は LINE 側の都合。超えたぶんは途中で切れて相手に届くので、
+ * 保存を止めるのではなく**その場で残り文字数を出す**。
+ */
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
 
@@ -258,6 +262,7 @@ export interface QuestionEditorProps {
   onOpenChoiceActions?: (choiceIndex: number) => void
   /** 質問テンプレートのように、選択肢を横に見比べる画面。 */
   accountId?: string | null
+  choiceOnly?: number
   choiceColumns?: boolean
 }
 
@@ -266,6 +271,7 @@ export default function QuestionEditor({
   onChange,
   onOpenChoiceActions,
   choiceColumns = false,
+  choiceOnly,
   accountId,
 }: QuestionEditorProps) {
   const { selectedAccountId: contextAccountId } = useAccount()
@@ -312,6 +318,7 @@ export default function QuestionEditor({
   return (
     <div className="space-y-5">
       {referenceError && <p role="alert">候補を読み込めませんでした。<Button onClick={() => setReferenceRetry(value => value + 1)}>もう一度読み込む</Button></p>}
+      {choiceOnly === undefined ? <>
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <label htmlFor={`${fieldBase}-intro`} className="text-ink-secondary text-xs font-medium">前文</label>
@@ -359,8 +366,10 @@ export default function QuestionEditor({
         /></SaveErrorField>
       </div>
 
+      </> : null}
       <div className={choiceColumns ? 'grid gap-3 xl:grid-cols-2' : 'space-y-3'}>
         {value.choices.map((choice, index) => {
+          if (choiceOnly !== undefined && index !== choiceOnly) return null
           /*
            * SCENARIO-22: URI を開くだけの挙動では押された通知が届かない。
            * 届かないのに返信・タグ・アクションを設定できると、実行されると
@@ -371,6 +380,7 @@ export default function QuestionEditor({
           const dead = uriOnly ? deadAnswerSettings(choice) : []
           return (
           <div key={index} className="border-hairline rounded-card border">
+            {choiceOnly === undefined ?
             <div className="border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
               <button
                 type="button"
@@ -407,10 +417,11 @@ export default function QuestionEditor({
                   削除する
                 </button>
               </div>
-            </div>
+            </div> : null}
 
-            {(choiceColumns || openChoice === index) && (
+            {(choiceOnly !== undefined ||choiceColumns || openChoice === index) && (
               <div className="space-y-4 px-4 py-4">
+                {choiceOnly === undefined ? <>
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <label htmlFor={`${fieldBase}-choice-${index}-label`} className="text-ink-secondary text-xs font-medium">
@@ -429,9 +440,11 @@ export default function QuestionEditor({
                   </p>
                 </div>
 
+                </> : null}
                 <div className="flex flex-wrap items-center gap-2">
                   <label htmlFor={`${fieldBase}-choice-${index}-behavior`} className="text-ink-secondary text-xs font-medium">選択後の挙動</label>
                   <SaveErrorField names={[`choices.${index}.behavior`,"behavior","choice.behavior"]}><Select
+                    size="full"
                     aria-label="選択後の挙動"
                     id={`${fieldBase}-choice-${index}-behavior`}
                     value={choice.behavior}
@@ -571,6 +584,7 @@ export default function QuestionEditor({
                   </div>
                 ) : (
                   <>
+                {choiceOnly === undefined ? <>
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <label htmlFor={`${fieldBase}-choice-${index}-reply`} className="text-ink-secondary text-xs font-medium">選択時の返信</label>
@@ -586,7 +600,8 @@ export default function QuestionEditor({
                   /></SaveErrorField>
                 </div>
 
-                <details className="border-hairline rounded-control border">
+                </> : null}
+                <details open={choiceOnly !== undefined || undefined} className="border-hairline rounded-control border">
                   <summary className="text-ink-secondary cursor-pointer px-3 py-2 text-xs font-medium">
                     タグ・記録などの詳しい設定
                   </summary>
@@ -632,59 +647,10 @@ export default function QuestionEditor({
                       </p>
                     </div>
 
-                    <TagPicker
-                      status={referenceError ? 'error' : referenceLoading ? 'loading' : 'ready'}
-                      label="選択時に追加するタグ"
-                      tags={tags}
-                      selected={choice.addTagIds ?? []}
-                      onChange={(ids) => setChoice(index, { addTagIds: ids })}
+                    <QuestionChoiceEffects choice={choice}
+                      tags={tags} fields={fields} loading={referenceLoading}
+                      onChange={patch => setChoice(index, patch)}
                     />
-                    <TagPicker
-                      status={referenceError ? 'error' : referenceLoading ? 'loading' : 'ready'}
-                      label="選択時にはずすタグ"
-                      tags={tags}
-                      selected={choice.removeTagIds ?? []}
-                      onChange={(ids) => setChoice(index, { removeTagIds: ids })}
-                    />
-
-                    {/*
-                      #973 U022: 友だち情報欄は全幅の縦配置にする。選択と
-                      書き込む値を同じ行に押し込むと、狭い幅で右側が切れる。
-                    */}
-                    <div>
-                      <label htmlFor={`${fieldBase}-choice-${index}-field`} className="text-ink-secondary text-xs font-medium">友だち情報欄</label>
-                      <SaveErrorField names={["fieldId","choice.field?.fieldId","field?.fieldId","field_id","choice.field?.field_id","field?.field_id"]}><Select
-                        aria-label="友だち情報欄"
-                        id={`${fieldBase}-choice-${index}-field`}
-                        value={choice.field?.fieldId ?? ''}
-                        onChange={(next) =>
-                          setChoice(index, {
-                            field: next
-                              ? { fieldId: next, value: choice.field?.value ?? '' }
-                              : undefined,
-                          })
-                        }
-                        options={[
-                          { value: '', label: '設定しない' },
-                          ...fields.map((f) => ({ value: f.id, label: f.name })),
-                        ]}
-                        size="full"
-                        className="mt-1.5"
-                      /></SaveErrorField>
-                      {choice.field?.fieldId && (
-                        <SaveErrorField names={["value","choice.field.value","field.value"]}><input
-                          aria-label={`選択肢${index + 1}の友だち情報欄にセットする値`}
-                          value={choice.field.value}
-                          onChange={(e) =>
-                            setChoice(index, {
-                              field: { fieldId: choice.field?.fieldId ?? '', value: e.target.value },
-                            })
-                          }
-                          placeholder="セットする値（既存の値は上書き）"
-                          className="border-hairline rounded-control text-ink mt-2 h-9 w-full border px-3 text-sm"
-                        /></SaveErrorField>
-                      )}
-                    </div>
                   </div>
                 </details>
                   </>
@@ -695,6 +661,8 @@ export default function QuestionEditor({
           )
         })}
 
+        {choiceOnly === undefined ? <>
+
         <Button variant="secondary" className="text-ink-secondary rounded-card v7:h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
             onChange({
               ...value,
@@ -703,7 +671,11 @@ export default function QuestionEditor({
           } disabled={value.choices.length >= 13}>
           ＋ 選択肢を追加
         </Button>
+      </> : null}
+
       </div>
+
+      {choiceOnly === undefined ? <>
 
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -718,47 +690,36 @@ export default function QuestionEditor({
           className={`${inputClass} mt-1.5`}
         /></SaveErrorField>
       </div>
+    </> : null}
+
     </div>
   )
 }
 
-function TagPicker({
-  status = 'ready',
-  label,
-  tags,
-  selected,
-  onChange,
-}: {
-  status?: 'loading' | 'ready' | 'error'
-  label: string
-  tags: { id: string; name: string }[]
-  selected: string[]
-  onChange: (ids: string[]) => void
-}) {
-  const selectedTags = selected.map((id) => ({
-    id,
-    name: tags.find((tag) => tag.id === id)?.name ?? '選択済みのタグ',
-  }))
+/** 質問の保存値（付与／解除タグ・情報欄）は固定の順。保存できない並べ替えは出さない。 */
 
-  return (
-    <div>
-      <span className="text-ink-secondary text-xs font-medium">{label}</span>
-      <div className="mt-1.5">
-        {tags.length > 0 || selected.length > 0 ? (
-          /* #973 U022: タグの選択は全幅の独立行にする。選ぶ窓でまとめて選び、外すのも窓で行う。
-             候補から消えたタグも窓で外せるよう、選択済みの行を残す。 */
-          <SaveErrorField names={["selected"]}><EntityKindField
-            kind="tag"
-            multiple
-            label={label}
-            value={selected}
-            onChange={onChange}
-            options={[...tags, ...selectedTags.filter((tag) => !tags.some((item) => item.id === tag.id))]}
-          /></SaveErrorField>
-        ) : (
-          <span className="text-ink-faint text-xs">{status === 'loading' ? '読み込んでいます' : status === 'error' ? '候補を読み込めませんでした' : 'タグがまだありません'}</span>
-        )}
-      </div>
-    </div>
-  )
+function QuestionChoiceEffects({ choice,
+  tags, fields, loading,
+  onChange
+}: { choice: QuestionChoice;
+  tags: { id: string; name: string }[]; fields: { id: string; name: string }[]; loading: boolean;
+  onChange: (patch: Partial<QuestionChoice>) => void
+}) {
+  type Effect = { kind: string; ids: string[]; value?: string }
+  const value: Effect[] = [
+    ...(choice.addTagIds?.length ? [{ kind: 'add', ids: choice.addTagIds }] : []),
+    ...(choice.removeTagIds?.length ? [{ kind: 'remove', ids: choice.removeTagIds }] : []),
+    ...(choice.field?.fieldId ? [{ kind: 'field', ids: [choice.field.fieldId], value: choice.field.value }] : []),
+  ]
+  return <ActionList<Effect> value={value} idOf={item => item.kind} reorderable={false}
+    kindOf={item => item.kind === 'field' ? '友だち情報に書く' : item.kind === 'add' ? 'タグを付ける' : 'タグを外す'}
+    titleOf={item => item.ids.map(id => (item.kind === 'field' ? fields: tags).find(row => row.id === id)?.name ?? '設定済みの項目').join ('・')}
+            onChange={next => onChange({ addTagIds: next.find(item => item.kind === 'add')?.ids ?? [], removeTagIds: next.find(item => item.kind === 'remove')?.ids ?? [], field: next.find(item => item.kind === 'field') ? { fieldId: next.find(item => item.kind === 'field')!.ids[0], value: next.find(item => item.kind === 'field')!.value ?? '' } : undefined })}
+    choices={[{ id: 'add', label: 'タグを付ける' }, { id: 'remove', label: 'タグを外す' }, { id: 'field', label: '友だち情報に書く' }].filter(kind => !value.some(item => item.kind === kind.id)).map(kind => ({ ...kind, disabled: loading, disabledReason: '候補を読み込んでいます', make: () => ({ kind: kind.id, ids: [], value: '' }), picker: {
+      title: kind.id === 'field' ? '友だち情報欄を選ぶ' : 'タグを選ぶ', items: kind.id === 'field' ? fields : tags, multiple: kind.id !== 'field', apply: (item, ids) => ({ ...item, ids }),
+    } }))}
+    renderEditor={(item, update) => <>
+      {item.kind === 'field' ? <EntityPickerField label="友だち情報欄" noun="友だち情報欄" items={fields} value={item.ids[0]} onChange={id => update({ ...item, ids : [id] })} />
+        : <EntityPickerField label="タグ" noun="タグ" items={tags} multiple value={item.ids} onChange={ids => update({ ...item, ids })} />}
+      {item.kind === 'field' ? <TextField aria-label="友だち情報欄に書き込む値" value={item.value ?? ''} onChange={event => update({ ...item, value: event.target.value })} /> : null}</>}/>
 }

@@ -1,10 +1,5 @@
 // @vitest-environment happy-dom
-/*
- * R19/R20: ボタンのタグ選びは共通の複数選択（★V7 WUVcz §2）。
- * - 打つと絞り込める（104件を小さな枠から探さない）
- * - まとまりの読み上げ名の入れ子がない（各項目は個別の名前だけ）
- * - 選んだタグは札で並び、札の×で外せる
- */
+// B-169: メニュー→選ぶ窓→確定。取消では保存値を変えない。
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -52,44 +47,48 @@ function Harness({ initial = [] as string[] }: { initial?: string[] }) {
   )
 }
 
-describe('ボタンのタグ選び（R19/R20）', () => {
+function openTags() {
+  fireEvent.click(screen.getByRole('button', { name: '行うことを足す' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /タグを付ける/ }))
+  return screen.getByRole('dialog', { name: 'タグを選ぶ' })
+}
+
+describe('ボタンのタグ選び（B-169・R19/R20）', () => {
   it('打つと候補が絞り込める', () => {
     render(<Harness />)
-    const field = screen.getByRole('combobox', { name: 'タグを付ける' })
-    fireEvent.focus(field)
-    fireEvent.change(field, { target: { value: '定期' } })
-    const listbox = screen.getByRole('listbox')
-    expect(within(listbox).getAllByRole('option')).toHaveLength(2)
+    const dialog = openTags()
+    fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: '定期' } })
+    expect(within(dialog).queryByRole('checkbox', { name: 'NEN会員' })).toBeNull()
+    expect(within(dialog).getByRole('checkbox', { name: '定期便' })).toBeTruthy()
+    expect(within(dialog).getByRole('checkbox', { name: '定期便提案対象' })).toBeTruthy()
   })
-
   it('まとまりの読み上げ名の入れ子がなく、各項目は個別の名前だけ', () => {
-    const { container } = render(<Harness />)
-    // label の入れ子（外側 label が全タグ名を連結して読む原因）はない
-    expect(container.querySelectorAll('label label')).toHaveLength(0)
-    const field = screen.getByRole('combobox', { name: 'タグを付ける' })
-    fireEvent.focus(field)
-    const listbox = screen.getByRole('listbox')
-    const options = within(listbox).getAllByRole('option')
-    expect(options).toHaveLength(4)
-    // 先頭の項目名に他のタグ名が混ざらない
-    expect(options[0].textContent).not.toContain('定期便')
-    expect(within(listbox).getByRole('option', { name: /NEN会員/ })).toBeTruthy()
+    render(<Harness />)
+    const dialog = openTags()
+    expect(dialog.querySelectorAll('label label')).toHaveLength(0)
+    expect(within(dialog).getByRole('checkbox', { name: 'NEN会員' })).toBeTruthy()
+    expect(within(dialog).getByRole('checkbox', { name: 'ギフト' })).toBeTruthy()
   })
-
-  it('選んだタグは札で並び、札の×で外せる', () => {
+  it('設定済みの行からタグを外せる', () => {
     render(<Harness initial={['tag-1']} />)
-    expect(screen.getByRole('button', { name: '「NEN会員」を外す' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '「NEN会員」を外す' }))
+    fireEvent.click(screen.getByRole('button', { name: 'NEN会員' }))
+    fireEvent.click(screen.getByRole('button', { name: 'タグを付ける：変える' }))
+    const dialog = screen.getByRole('dialog', { name: 'タグを選ぶ' })
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'NEN会員' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'この 0件にする' }))
     expect(screen.getByTestId('tag-ids').textContent).toBe('')
   })
-
-  it('候補を選ぶと足され、開いたままになる', () => {
+  it('確定まで保存値を変えず、取消しても空の行を作らない', () => {
     render(<Harness />)
-    const field = screen.getByRole('combobox', { name: 'タグを付ける' })
-    fireEvent.focus(field)
-    fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: /ギフト/ }))
+    let dialog = openTags()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'ギフト' }))
+    expect(screen.getByTestId('tag-ids').textContent).toBe('')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    expect(screen.queryByRole('button', { name: 'ギフト' })).toBeNull()
+    dialog = openTags()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'ギフト' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'この 1件にする' }))
     expect(screen.getByTestId('tag-ids').textContent).toBe('tag-4')
-    expect(screen.getByRole('listbox')).toBeTruthy()
   })
 })
 

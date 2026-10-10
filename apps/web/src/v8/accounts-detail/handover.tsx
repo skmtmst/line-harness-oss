@@ -508,7 +508,7 @@ export default function AccountHandoverV8() {
           const editable = canManage && (decision.bucket === 'review' || decision.bucket === 'lookalike')
           const name = decision.sourceName ?? decision.from_friend_id
           return (
-            <Tr data-row-id={decision.id} key={decision.id} data-row-id={decision.id}>
+            <Tr data-row-id={decision.id} key={decision.id}>
               <Td className={styles.colName}><FolderDotName><div className={styles.nameStack}>
                 <span className={styles.name} title={name}>{name}</span>
 

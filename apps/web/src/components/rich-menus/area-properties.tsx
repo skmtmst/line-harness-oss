@@ -18,6 +18,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import type { Area } from './canvas-editor'
 import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import TapSideEffects from '@/components/shared/tap-side-effects'
 
 type Option = { id: string; name: string }
 
@@ -586,41 +587,10 @@ export function AreaProperties({
           </p>
         ) : (
           <>
-            {/*
-              R19/R20: 検索なしの小さな選択枠を、共通の複数選択（★V7 WUVcz §2）へ。
-              外側の label で包むと各項目の label と入れ子になり、先頭項目の
-              読み上げに全タグ名が混ざる。見出しは span、欄の名前は
-              MultiSelect の aria-label、各項目は個別の名前だけにする。
-            */}
-            <div>
-              <span className="text-ink-secondary text-xs font-medium">タグを付ける</span>
-              {theme === 'v8' ? <TagPickerField label="タグを付ける" options={tags} accountId={isHq ? null : account?.selectedAccountId} value={selectedTagIds} onChange={tagIds => onUpdate({ tagIds })} readOnly={readOnly} /> : tags.length === 0 ? (
-                <p className="text-ink-faint mt-1 text-micro">タグがまだありません。</p>
-              ) : (
-                <MultiSelect
-                  aria-label="タグを付ける"
-                  options={tags.map((t) => ({ value: t.id, label: t.name }))}
-                  values={selectedTagIds}
-                  onChange={(next) => onUpdate({ tagIds: next })}
-                  placeholder="タグを選ぶ"
-                  className="mt-1 w-full"
-                />
-              )}
-            </div>
-
-            <Field label="スコアを足す" hint="マイナスを入れると減ります。空欄なら何もしません。">
-              <SaveErrorField names={["scoreChange","area.scoreChange","score_change","area.score_change"]}><input
-                type="number"
-                value={area.scoreChange ?? ''}
-                onChange={(e) =>
-                  onUpdate({
-                    scoreChange: e.target.value === '' ? null : parseInt(e.target.value, 10) || 0,
-                  })
-                }
-                placeholder="例：10"
-                className={inputClass}
-              /></SaveErrorField>
-            </Field>
+            <TapSideEffects tags={tags} tagIds={selectedTagIds} score={area.scoreChange}
+                onChange={
+                  onUpdate}
+              />
 
             {intent === 'text' && (area.tagIds?.length || area.scoreChange) ? (
               <p className="text-ink-faint text-micro">
