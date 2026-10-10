@@ -183,3 +183,11 @@
 [data-theme='v8'] .paddingDefault,
 [data-theme='v8'] .paddingRoomy,
 [data-theme='v8'] .paddingSpacious { padding: var(--tpl-card-pad); }
+
+/* B-180：中身の段の題は型や配置によらず15/700。 */
+[data-theme='v8'] .header .title,
+[data-theme='v8'] .headerStacked .title,
+[data-theme='v8'] .headerPanel .title {
+  font-size: var(--tpl-section-title-size);
+  font-weight: var(--tpl-section-title-weight);
+}

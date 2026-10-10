@@ -95,3 +95,9 @@
 [data-theme='v8'] .create { width: fit-content; max-width: 100%; align-self: flex-start; margin-bottom: 16px; }
 [data-theme='v8'] .create > * { width: fit-content; max-width: 100%; height: var(--tpl-folder-create-h); min-height: 0; padding: var(--tpl-folder-create-pad); }
 [data-theme='v8'] .createPlaceholder { height: var(--tpl-folder-create-h); }
+
+/* B-159 / B-180：フォルダの追加も通常のボタンの寸法を読む。 */
+[data-theme='v8'] .panel .add {
+  height: var(--tpl-button-h);
+  padding: 0 var(--tpl-button-pad-side);
+}

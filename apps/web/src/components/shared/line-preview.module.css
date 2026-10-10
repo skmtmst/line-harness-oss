@@ -298,3 +298,8 @@
 
 [data-theme='v8'] .messageRow[data-density='compact'] .bubble { max-width: var(--v8-line-bubble-preview-w); }
 [data-theme='v8'] .messageRow[data-density='compact'] .bubbleBody { font-size: 11.5px; line-height: 18px; }
+
+[data-theme='v8'] .phoneTitle {
+  font-size: var(--tpl-section-title-size);
+  font-weight: var(--tpl-section-title-weight);
+}

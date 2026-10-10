@@ -338,3 +338,9 @@
 
 /* B-161：浮く面の影と薄い縁を共通化。 */
 [data-theme='v8'] .panel { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
+
+/* B-180：幅の指定がある引き出しでも窓の題の段をそろえる。 */
+[data-theme='v8'] .panel.panel .title {
+  font-size: var(--tpl-dialog-title-size);
+  font-weight: var(--tpl-dialog-title-weight);
+}
