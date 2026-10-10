@@ -616,9 +616,6 @@
   "components/ui/sort-select.tsx": {
     "unresolved-classname": 1
   },
-  "components/users/users-table.tsx": {
-    "arbitrary-value": 5
-  },
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 1

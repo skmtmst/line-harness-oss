@@ -5,9 +5,9 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 
-const fixture = vi.hoisted(() => ({ list: vi.fn() }))
+const fixture = vi.hoisted(() => ({ list: vi.fn(), stats: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
@@ -26,13 +26,15 @@ vi.mock('@/lib/api', async (importOriginal) => {
       ...actual.api,
       usersGrouped: { ...actual.api.usersGrouped, list: fixture.list },
       lineAccounts: { ...actual.api.lineAccounts, list: () => Promise.resolve({ success: true, data: [] }) },
-      duplicates: { ...actual.api.duplicates, stats: () => Promise.resolve({ success: false, error: 'x' }) },
+      duplicates: { ...actual.api.duplicates, stats: fixture.stats },
     },
   }
 })
 
 const { useMergedUsers } = await import('./use-merged-users')
 const { default: UsersV8 } = await import('./users-v8')
+const { useUsersSummary } = await import('@/components/users/use-users-summary')
+const { default: MergedUsersV8 } = await import('@/v8/friends/merged/merged')
 
 const person = (id: string) => ({
   id, displayName: `人${id}`, emails: [], phones: [], accounts: [{ accountName: 'A' }],
@@ -41,6 +43,7 @@ const person = (id: string) => ({
 
 beforeEach(() => {
   fixture.list.mockReset()
+  fixture.stats.mockReset().mockResolvedValue({ success: false, error: 'x' })
 })
 afterEach(() => {
   cleanup()
@@ -54,6 +57,65 @@ describe('統合ユーザーの失敗と0件（WEB322）', () => {
     await waitFor(() => expect(screen.getByText('—人')).toBeTruthy())
     const kpis = document.body.textContent ?? ''
     expect(kpis).not.toContain('0人')
+  })
+
+  it('集計の失敗を表示し、画面の再試行で実値0と紐付く友だちを取得する', async () => {
+    fixture.list.mockResolvedValue({ success: true, data: { rows: [], total: 0 } })
+    fixture.stats.mockRejectedValueOnce(new Error('down')).mockResolvedValue({
+      success: true, data: { uniquePeople: 0, totalFollowing: 7, friendDups: 0 },
+    })
+    render(<UsersV8 />)
+    await waitFor(() => expect(screen.getByText('読み込めませんでした')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    await waitFor(() => expect(screen.getByTitle('紐付く友だち：7件（各アカウントの友だち登録）')).toBeTruthy())
+    expect(screen.getByTitle('紐付く友だち：7件（各アカウントの友だち登録）').previousElementSibling?.textContent).toBe('0人')
+    expect(fixture.stats).toHaveBeenCalledTimes(2)
+  })
+
+  it('友だちの統合タブも、失敗から再試行して実値0と友だち数を確かめられる', async () => {
+    fixture.list.mockResolvedValue({ success: true, data: { rows: [], total: 0 } })
+    fixture.stats.mockResolvedValueOnce({ success: false, error: 'down' }).mockResolvedValue({
+      success: true, data: { uniquePeople: 0, totalFollowing: 7, friendDups: 0 },
+    })
+    render(<MergedUsersV8 />)
+    await waitFor(() => expect(screen.getByText('読み込めませんでした')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    await waitFor(() => expect(screen.queryByText('読み込めませんでした')).toBeNull())
+    expect(screen.getAllByText('0 人').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: '統合ユーザーの説明' }))
+    expect(screen.getByText(/紐付く友だち：7件/)).toBeTruthy()
+    expect(fixture.stats).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['success', 'failure'] as const)('新しい集計を、古い%sの返答で上書きしない', async (response) => {
+    let resolveOld!: (value: unknown) => void
+    let rejectOld!: (reason: unknown) => void
+    fixture.stats.mockImplementationOnce(() => new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject }))
+      .mockResolvedValue({ success: true, data: { uniquePeople: 20, totalFollowing: 30, friendDups: 10 } })
+    const { result } = renderHook(() => useUsersSummary())
+    await waitFor(() => expect(fixture.stats).toHaveBeenCalledTimes(1))
+    await act(async () => { await result.current.load() })
+    expect(result.current.stats?.uniquePeople).toBe(20)
+    await act(async () => {
+      if (response === 'success') resolveOld({ success: true, data: { uniquePeople: 1, totalFollowing: 1, friendDups: 0 } })
+      else rejectOld(new Error('old down'))
+    })
+    expect(result.current.status).toBe('ready')
+    expect(result.current.stats?.uniquePeople).toBe(20)
+  })
+
+  it('再取得に失敗したら以前の人数を残さず、再試行で取り直す', async () => {
+    fixture.stats.mockResolvedValueOnce({ success: true, data: { uniquePeople: 20, totalFollowing: 30, friendDups: 10 } })
+      .mockResolvedValueOnce({ success: false, error: 'down' })
+      .mockResolvedValue({ success: true, data: { uniquePeople: 0, totalFollowing: 0, friendDups: 0 } })
+    const { result } = renderHook(() => useUsersSummary())
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await act(async () => { await result.current.load() })
+    expect(result.current.status).toBe('error')
+    expect(result.current.stats).toBeNull()
+    await act(async () => { await result.current.load() })
+    expect(result.current.status).toBe('ready')
+    expect(result.current.stats?.uniquePeople).toBe(0)
   })
 })
 

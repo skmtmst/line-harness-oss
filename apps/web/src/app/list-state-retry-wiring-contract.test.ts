@@ -26,7 +26,7 @@ const TARGETS = [
   '../components/friend-fields/tags-page-v4.tsx',
   '../components/friends/bulk-run-dialog.tsx',
   '../components/merged-person/merged-person-detail.tsx',
-  '../components/users/users-table.tsx',
+  '../v8/friends/merged/merged.tsx',
 ] as const
 
 function failureDisplays(source: string) {

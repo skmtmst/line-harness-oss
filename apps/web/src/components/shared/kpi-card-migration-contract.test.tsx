@@ -39,7 +39,7 @@ describe('KpiCardへの一本化契約', () => {
     const files = [
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
-      'components/users/summary-bar.tsx',
+      'v8/friends/merged/merged.tsx',
     ]
 
     for (const file of files) {
@@ -55,7 +55,7 @@ describe('KpiCardへの一本化契約', () => {
     const files = [
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
-      'components/users/summary-bar.tsx',
+      'v8/friends/merged/merged.tsx',
     ]
 
     for (const file of files) {

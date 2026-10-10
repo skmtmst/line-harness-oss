@@ -15,8 +15,9 @@ const FRIENDS = read('app/friends/page.tsx')
 const FRIENDS_BODY = withoutComments(FRIENDS)
 const ROW = read('components/friends/friend-list-row.tsx')
 const ROW_BODY = withoutComments(ROW)
-const SUMMARY = read('components/users/summary-bar.tsx')
+const SUMMARY = read('v8/friends/merged/merged.tsx')
 const SUMMARY_BODY = withoutComments(SUMMARY)
+const SUMMARY_HOOK = read('components/users/use-users-summary.ts')
 const DUPLICATES_BODY = withoutComments(read('app/duplicates/page.tsx'))
 const TOKENS = read('app/globals.css')
 
@@ -61,8 +62,8 @@ describe('統合ユーザー(r7eSi)の指標カードを共通部品へ載せ替
     expect(SUMMARY_BODY).toContain('読み込んでいます')
     expect(SUMMARY_BODY).toContain('読み込めませんでした')
     expect(SUMMARY_BODY).toContain('再読み込み')
-    expect(SUMMARY_BODY, '失敗しても前の数字を残している').toContain('setStats(null)')
-    expect(SUMMARY_BODY, '遅れて返った古い集計を照合していない').toContain(
+    expect(SUMMARY_HOOK, '失敗しても前の数字を残している').toContain('setStats(null)')
+    expect(SUMMARY_HOOK, '遅れて返った古い集計を照合していない').toContain(
       'requestGuard.isCurrent(requestGeneration)',
     )
   })

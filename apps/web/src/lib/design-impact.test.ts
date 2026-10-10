@@ -149,7 +149,6 @@ describe('共通部品の影響範囲', () => {
       'components/shared/media-picker-dialog.tsx',
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
-      'components/users/users-table.tsx',
       /*
        * 2026-10-07: 入口が src/v8 の新しい画面を出すようになり、描かれなくなった古い画面ファイル
        * （成果とアフィリエイト・オートメーション・共通アクション・予約設定のタブ・登録メディア・共通情報・
