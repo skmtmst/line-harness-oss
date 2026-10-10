@@ -2021,7 +2021,7 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/Mu8qW.png",
-      "url": "/events"
+      "url": "/events/bookings?id=ev-1"
     },
     "MuhWR": {
       "doc": "V8-B",
@@ -5403,7 +5403,120 @@
       ],
       "width": 1440,
       "shot": "lint/V8-B/shots/meBRB.png",
-      "url": "/hq/templates"
+      "url": "/hq/templates",
+      "state": {
+        "click": [
+          "秋の新商品のお知らせを配る",
+          "check:然 -NEN- 本店",
+          "check:然 -NEN- 渋谷店",
+          "check:2025年イベント",
+          "選んだ3アカウントを確かめる",
+          "一括の配布方法：選ぶ",
+          "press:ArrowDown",
+          "press:Enter",
+          "この内容で3アカウントへ配る"
+        ],
+        "api": [
+          {
+            "match": "POST /api/hq/templates/visual-hq-tpl-autumn/distribute",
+            "status": 200,
+            "body": {
+              "success": true,
+              "data": {
+                "runId": "visual-hq-run-1",
+                "status": "running",
+                "stores": [
+                  {
+                    "accountId": "visual-qa-account-prod",
+                    "accountName": "然 -NEN- 本店",
+                    "status": "succeeded",
+                    "reason": null,
+                    "counts": {
+                      "created": 0,
+                      "overwritten": 1,
+                      "aliased": 0
+                    },
+                    "createdName": null
+                  },
+                  {
+                    "accountId": "visual-qa-account-store",
+                    "accountName": "然 -NEN- 渋谷店",
+                    "status": "succeeded",
+                    "reason": null,
+                    "counts": {
+                      "created": 0,
+                      "overwritten": 1,
+                      "aliased": 0
+                    },
+                    "createdName": null
+                  },
+                  {
+                    "accountId": "visual-qa-account-event-2025",
+                    "accountName": "2025年イベント",
+                    "status": "pending",
+                    "reason": null,
+                    "counts": {
+                      "created": 0,
+                      "overwritten": 0,
+                      "aliased": 0
+                    },
+                    "createdName": null
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "match": "GET /api/hq/templates/visual-hq-tpl-autumn/distributions/",
+            "status": 200,
+            "body": {
+              "success": true,
+              "data": {
+                "runId": "visual-hq-run-1",
+                "status": "running",
+                "stores": [
+                  {
+                    "accountId": "visual-qa-account-prod",
+                    "accountName": "然 -NEN- 本店",
+                    "status": "succeeded",
+                    "reason": null,
+                    "counts": {
+                      "created": 0,
+                      "overwritten": 1,
+                      "aliased": 0
+                    },
+                    "createdName": null
+                  },
+                  {
+                    "accountId": "visual-qa-account-store",
+                    "accountName": "然 -NEN- 渋谷店",
+                    "status": "succeeded",
+                    "reason": null,
+                    "counts": {
+                      "created": 0,
+                      "overwritten": 1,
+                      "aliased": 0
+                    },
+                    "createdName": null
+                  },
+                  {
+                    "accountId": "visual-qa-account-event-2025",
+                    "accountName": "2025年イベント",
+                    "status": "pending",
+                    "reason": null,
+                    "counts": {
+                      "created": 0,
+                      "overwritten": 0,
+                      "aliased": 0
+                    },
+                    "createdName": null
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
     },
     "n4DT7": {
       "doc": "V8-B",
