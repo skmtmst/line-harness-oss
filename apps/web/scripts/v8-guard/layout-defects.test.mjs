@@ -119,7 +119,8 @@ test('空白検査はCIで一度だけ実行し、既存V8 guardと同じ必須�
   const job = yaml.split('  v8-screen-guard:')[1].split('  required-pr-gate:')[0]
   assert.equal((job.match(/run: node apps\/web\/scripts\/v8-guard\/layout-defects\.mjs /g)||[]).length,1)
   assert.doesNotMatch(job,/run:.*blank-gap\.mjs/,'blankfixの空白検査を別ステップで重ねない')
-  const step=job.split('      - name: No new overlap')[1].split('      - name:')[0]
+  const step=job.split('      - name:').find(step => step.includes('run: node apps/web/scripts/v8-guard/layout-defects.mjs'))
+  assert.ok(step, '実画面の崩れ検査のステップが必要')
   assert.doesNotMatch(step,/continue-on-error/)
   assert.match(step,/steps.scope.outputs.run == 'true'/)
 })

@@ -163,7 +163,6 @@ export function RowMenu({
     onOpenChange?.(next)
   }
   const triggerRef = useRef<HTMLButtonElement>(null)
-  if (items.length === 0) return null
   const toggle = (event: MouseEvent<HTMLButtonElement>) => {
     /* R13: 「…」自体の押下も行の詳細遷移へ伝えない。 */
     event.stopPropagation()
@@ -178,7 +177,7 @@ export function RowMenu({
   return (
     <>
       {appearance === 'plain' ? (
-        <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} />
+        <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} data-row-menu="" />
       ) : (
         <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} data-row-menu="">
           <MoreHorizontal size={size === 'row' ? 14 : 16} aria-hidden="true" />
@@ -189,7 +188,7 @@ export function RowMenu({
         ariaLabel={menuLabel ?? label}
         onClose={() => setOpen(false)}
         items={orderRowMenuItems(items)}
-        note={note}
+        note={note ?? (items.length ? undefined : 'この行に使える操作はありません')}
         anchorRef={triggerRef}
       />
     </>
@@ -325,26 +324,13 @@ export function RowActions({
     ? [...normalItems, { ...destructiveItem, tone: 'danger' }]
     : normalItems
   return (
-    <span className={[styles.rowActions, className].filter(Boolean).join(' ')}>
+    <span data-row-actions="" className={[styles.rowActions, className].filter(Boolean).join(' ')}>
       {detail ? <RowActionButton action={detail} defaultLabel="詳細" /> : null}
-      {items.length > 0 ? (
-        <RowMenu
-          appearance={menuAppearance}
-          size={menuSize}
-          items={items}
-          label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
-          menuLabel={subjectName ? `${subjectName}の操作` : '操作'}
-          note={menuNote}
-          triggerProps={menuButtonProps}
-        />
-      ) : (
-        /*
-         * 「⋯」が無い行（送信済みなど）でも同じ幅の場所を取る。
-         * 無いと主ボタン（詳細）が右へずれて行ごとにそろわない。
-         * 見せない・読ませないが、幅は「⋯」と同じだけ取る。
-         */
-        <span className={styles.morePlaceholder} data-more-placeholder aria-hidden="true" />
-      )}
+      <RowMenu appearance={menuAppearance} size={menuSize} items={items}
+        label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
+        menuLabel={subjectName ? `${subjectName}の操作` : '操作'}
+        note={menuNote ?? (items.length ? undefined : 'この行に使える操作はありません')}
+        triggerProps={menuButtonProps} />
     </span>
   )
 }

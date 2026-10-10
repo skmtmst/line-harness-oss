@@ -24,17 +24,19 @@ test('birthday takes priority, fallback age and source match the displayed value
   expect(fixedFieldValue(fields,'age').source).toContain('回答フォーム『登録』から 10/08 10:12')
   expect(fixedFieldValue(fields.filter(f=>f.fixedKey!=='birthday'),'age')).toEqual({value:'18',derived:false,source:null})
 })
-test('seven visible basics, view-only edits hidden, shared display preferences persist',()=>{
+test('birthday with age and six visible basics, view-only edits hidden, shared display preferences persist',()=>{
   const props={friendId:'f',fields,state:'ready' as const,canEdit:false,sections:[{key:'tags',label:'タグ',content:<p>VIP</p>}]}
   const first=render(<CustomerInfoPanel {...props}/>)
-  for(const spec of FIXED_FRIEND_FIELDS) expect(screen.getByText(spec.label)).toBeTruthy()
-  expect(screen.queryByText('編集する')).toBeNull()
+  for(const spec of FIXED_FRIEND_FIELDS.filter(f=>f.key!=='age')) expect(screen.getByText(spec.label)).toBeTruthy()
+  expect(screen.queryByText('年齢')).toBeNull()
+  expect(screen.getByText(/2000-01-01（\d+歳）/)).toBeTruthy()
+  expect(screen.queryByText('編集')).toBeNull()
   fireEvent.click(screen.getByRole('button',{name:'表示項目'}))
   fireEvent.click(screen.getByRole('checkbox',{name:'タグ'}))
   expect(JSON.parse(localStorage.getItem('chat.friendInfoSections.v4')!).hidden).toContain('tags')
   first.unmount()
   render(<CustomerInfoPanel {...props} canEdit/>)
-  expect(screen.getByText('編集する')).toBeTruthy()
+  expect(screen.getByText('編集')).toBeTruthy()
   expect(screen.queryByText('VIP')).toBeNull()
 })
 test('failed fetch is shown with retry instead of unregistered values',()=>{

@@ -1,7 +1,7 @@
 'use client'
 
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
 import { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
@@ -29,7 +29,7 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/shared/table';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
@@ -192,11 +192,11 @@ function TableHead({ selection }: { selection?: ReactNode } = {}) {
     <thead>
       <TableHeadRow className={styles.headRow} data-table-layout="columns">
         <Th className={styles.colName}>{selection}成果地点</Th>
-        <Th>状態</Th>
-            <Th className={styles.colTrigger}>何が起きたら数えるか</Th>
+        <Th className={styles.colState}>状態</Th>
+            <Th className={styles.colTrigger} collapseAt="narrow">何が起きたら数えるか</Th>
         <Th className={styles.colCount} align="right">この30日</Th>
         <Th className={styles.colValue} align="right">金額</Th>
-        <Th className={styles.colUsage}>使われている場所</Th>
+        <Th className={styles.colUsage} collapseAt="narrow">使われている場所</Th>
         <Th className={styles.colOps}>操作</Th>
       </TableHeadRow>
     </thead>
@@ -216,12 +216,12 @@ function ListSkeleton() {
               {[0, 1, 2, 3, 4].map((index) => (
                 <Tr key={index} className={styles.row} data-table-layout="columns">
                   <Td className={styles.colName}><Skeleton className={styles.skeletonName} /></Td>
-                  <Td><Skeleton className={styles.skeletonName} /></Td>
-                    <Td className={styles.colTrigger}><Skeleton className={styles.skeletonName} /></Td>
+                  <Td className={styles.colState}><Skeleton className={styles.skeletonName} /></Td>
+                    <Td className={styles.colTrigger} collapseAt="narrow"><Skeleton className={styles.skeletonName} /></Td>
                   <Td className={styles.colCount}><Skeleton className={styles.skeletonNum} /></Td>
                   <Td className={styles.colValue}><Skeleton className={styles.skeletonNum} /></Td>
-                  <Td className={styles.colUsage}><Skeleton className={styles.skeletonName} /></Td>
-                  <Td className={styles.colOps}><Skeleton className={styles.skeletonNum} /></Td>
+                  <Td className={styles.colUsage} collapseAt="narrow"><Skeleton className={styles.skeletonName} /></Td>
+                  <ActionCell className={styles.colOps}><Skeleton className={styles.skeletonNum} /></ActionCell>
                 </Tr>
               ))}
             </tbody>
@@ -896,7 +896,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       <ListToolbarRow>
         <div className={styles.narrowChips}>{filterChips}</div>
         <span className={styles.spacer} aria-hidden="true" />
-        {savedBox}
+        <ListToolbarOptional compact label="保存した絞り込み">{savedBox}</ListToolbarOptional>
         {perPageBox}
       </ListToolbarRow>
     </ListToolbarFrame>
@@ -1117,8 +1117,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                       </FolderDotName>
 
                     </Td>
-                    <Td><StatePill point={point} /></Td>
-                    <Td className={styles.colTrigger}>
+                    <Td className={styles.colState}><StatePill point={point} /></Td>
+                    <Td className={styles.colTrigger} collapseAt="narrow">
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
                       <span className={styles.cellSub} title={rowSub(point)}>{rowSub(point)}</span>
                     </Td>
@@ -1126,11 +1126,11 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                     <Td className={styles.colValue}>
                       <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
-                    <Td className={styles.colUsage}>
+                    <Td className={styles.colUsage} collapseAt="narrow">
                       <span className={styles.usageMain} title={usageLabel(point)}>{usage.main}</span>
                       {usage.sub ? <span className={styles.cellSub} title={usage.sub}>{usage.sub}</span> : null}
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
                         {canEdit
                           ? <Button href={addUsageHref(point)}>使う場所を足す</Button>
@@ -1142,7 +1142,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                           items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}

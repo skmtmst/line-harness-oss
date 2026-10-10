@@ -112,7 +112,7 @@
  */
 [data-theme='v8'] .frame {
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-flat);
   --color-divider: var(--color-hairline);
 }
 
@@ -504,3 +504,22 @@
   height: var(--tpl-ev-ls-row-h);
   padding-block: 0;
 }
+
+/* B-217：一覧は平ら。見出しと線は全幅、中身だけ左右24。 */
+html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) {
+  border: 0; border-radius: var(--radius-flat); outline-color: transparent; box-shadow: none;
+}
+html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) { overflow-x: clip; }
+html[data-theme='v8'] .frame .row[data-table-layout='columns'] { padding-inline: var(--tpl-list-inset); }
+html[data-theme='v8'] .name { color: var(--color-ink); font-weight: 700; white-space: nowrap; }
+html[data-theme='v8'] .frame [data-list-name-cell] { min-width: var(--tpl-list-name-min); }
+html[data-theme='v8'] .actionCell > :is(button, a) { min-width: var(--row-action-width, max-content); }
+
+/* 表に実際に残る幅で、補助列を畳む。名前と操作を潰して収めない。 */
+html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) { container-type: inline-size; container-name: v8-list-table; }
+@container v8-list-table (max-width: 1100px) { html[data-theme='v8'] .frame[data-shared-part='list-table'] .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
+html[data-theme='v8'] .actionCell { flex: none; min-width: max-content; }
+html[data-theme='v8'] .actionCell :is(button, a):not([data-row-menu]) { min-width: var(--row-action-width, max-content); }
+
+/* 既存の細いGridTableの判定も同じ器を使う。名前を置き換えない。 */
+html[data-theme='v8'] .frame[data-grid-table] { container-name: v8-list-table shared-grid-table; }

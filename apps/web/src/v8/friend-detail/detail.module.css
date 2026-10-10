@@ -169,3 +169,6 @@ a.recentTitle:hover { text-decoration: underline; }
 .danger, .dangerNoticePlacement { margin: 0; }
 
 .warnText, .warnTextNoticePlacement { margin: 0; }
+/* B-212：狭い幅の要点は共通の欄で開く。本文の上に長い列を積まない。 */
+.overview:has(:global([data-customer-rail][data-collapsed])) { flex-direction: column; }
+.summary { padding: var(--tpl-customer-rail-pad); }

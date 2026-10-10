@@ -3105,3 +3105,54 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
 [data-theme="v8"] { --tpl-rs-rsv-period-w:152px; --tpl-rs-rsv-status-w:164px; }
 
 [data-theme="v8"] { --tpl-rs-detail-fact-gap:10px; --tpl-rs-detail-fact-min-h:32px; --tpl-rs-detail-fact-pad:6px 0; --tpl-rs-detail-actions-gap:8px; }
+
+/* 2026-10-10 B-200〜B-218。新しく固定した ★V8 の値。 */
+[data-theme='v8'] {
+  --radius-flat: 0;
+  --choice-selected-shadow: inset 0 0 0 1px var(--color-selection-border);
+  --tpl-customer-rail-pad: 0;
+  --color-choice-selected: #f1f8f3;
+  --color-selection-bg: #e8f5ec;
+  --color-selection-border: #087a3e;
+  --color-code-bg: #f5f6f8;
+  --color-code-border: #e5e7eb;
+  --color-choice-border: #c9ced6;
+  --choice-size: 16px;
+  --choice-ring: 1.5px;
+  --choice-dot: 8px;
+  --choice-card-ring: 2px;
+  --space-8: 8px;
+  --space-16: 16px;
+  --tpl-list-inset: 24px;
+  --tpl-list-name-min: 12em;
+  --tpl-customer-label: 72px;
+  --tpl-customer-face: 32px;
+  --tpl-row-pad-side: var(--tpl-list-inset);
+  --tpl-thead-pad-side: var(--tpl-list-inset);
+  --tpl-list-cell-pad: var(--tpl-list-inset);
+  --tpl-slot-h-compact: 140px;
+  --tpl-slot-pad-compact: 16px;
+}
+/* コードの面を部品と同じ値で描く。動画・写真には適用しない。 */
+html[data-theme='v8'] pre {
+  background: var(--color-code-bg);
+  color: var(--color-ink);
+  border: 1px solid var(--color-code-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-16);
+  font-family: var(--font-mono);
+}
+
+/* B-203：共通部品を通さない既存の入力にも同じ選択の形を適用。 */
+html[data-theme='v8'] input:is([type='radio'], [type='checkbox']) { appearance: none; width: var(--choice-size); height: var(--choice-size); flex-shrink: 0; vertical-align: middle; }
+html[data-theme='v8'] input[type='radio'] { border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
+html[data-theme='v8'] input[type='radio']:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+
+html[data-theme='v8'] input[type='checkbox'] { border: var(--choice-ring) solid var(--color-choice-border); border-radius: var(--radius-checkbox, 3px); background: var(--color-canvas); }
+html[data-theme='v8'] input[type='checkbox']:checked { border-color: var(--color-selection-border); background: var(--color-selection-border) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='m3 8 3 3 7-7'/%3E%3C/svg%3E") center/contain no-repeat; }
+html[data-theme='v8'] input:is([type='radio'], [type='checkbox']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+/* B-211：古い画面の素の切り替えも同じ選択の色。 */
+html[data-theme='v8'] button:is([aria-pressed='true'], [data-current]:not([data-current='false']), [aria-current='page'], [aria-current='step']) { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
+
+[data-theme='v8'] { --tpl-list-state-w: 104px; }

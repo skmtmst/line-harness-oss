@@ -166,3 +166,10 @@
 .cardRadio { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .tpCard:has(.cardRadio:focus-visible) { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: var(--tpl-bcpick-focus); }
 }
+
+/* B-203：候補のカードも同じ選択の枠・輪・点。 */
+html[data-theme='v8'] .tpCard { position: relative; padding-right: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
+html[data-theme='v8'] .tpCard[data-selected] { background: var(--color-choice-selected); outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; }
+html[data-theme='v8'] .cardRadio { appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); right: var(--space-16); top: var(--space-16); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
+html[data-theme='v8'] .cardRadio:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+html[data-theme='v8'] .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }

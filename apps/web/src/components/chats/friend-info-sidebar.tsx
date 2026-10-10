@@ -29,7 +29,7 @@ import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import { canEditFeature } from '@/lib/staff-capability'
 import { X } from 'lucide-react'
-import { formatNumber } from '@/lib/format'
+import { formatRelative, formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -73,6 +73,7 @@ interface Props {
   /** 担当者名 (ChatDetail で operatorId → name 変換済を渡す想定) */
   operatorName?: string | null
   /** A-2 その場で直すための会話 ID。無いときは表示のみ（従来どおり）。 */
+  lastContactAt?: string | null
   chatId?: string | null
   /** 同時編集の見分け札（chats.revision）。無いときは送らない。 */
   revision?: number
@@ -230,7 +231,7 @@ function upcomingDeliveryHref(delivery: NonNullable<FriendUpcoming['nextAutoDeli
     : `/reminders/detail?id=${delivery.id}`
 }
 
-export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, chatId, revision, operators, operatorId, accountId, onChatChanged }: Props) {
+export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, chatId, revision, operators, operatorId, accountId, onChatChanged, lastContactAt }: Props) {
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1131,7 +1132,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 </a>}
               </div>
               <div className="flex flex-wrap gap-1">
-                <TagOverflow>{(effectiveTags ?? []).map((tag) => isV8 ? (
+                <TagOverflow maxVisible={isV8 ? 2 : undefined}>{(effectiveTags ?? []).map((tag) => isV8 ? (
                   <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs"
                     onRemove={canEditFriend && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
                 ) : (
@@ -1456,7 +1457,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             </div>
 
             {/* ⑥購入（EC の直近3件と合計）。数は実データ。無いときは「—」。★V8 は顧客情報の枠の最後に置き、見出しをほかの節とそろえる。 */}
-            <div className="p-4" style={isV8 ? { order: DETAIL_SECTIONS.length } : undefined}>
+            <div data-customer-section="purchase" className="p-4" style={isV8 ? { order: DETAIL_SECTIONS.length } : undefined}>
               <div className="mb-2 flex items-center justify-between">
                 <h4 className={isV8 ? 'text-ink text-xs font-bold' : 'text-micro font-semibold text-ink-faint'}>購入</h4>
                 <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
@@ -1486,6 +1487,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   <p className="text-micro text-danger">購入を読み込めませんでした</p>
                   <button
                     type="button"
+                    aria-label="購入をもう一度読み込む"
                     onClick={() => setPurchaseRetry((key) => key + 1)}
                     className="text-action text-micro font-semibold underline underline-offset-2"
                   >
@@ -1711,51 +1713,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   タグ・シナリオ・購入・マイル → 顧客情報の節。顔と要点はいつも上（並べ替えの外）。
                   対応・担当の札は会話の頭にあるので、ここには重ねて出さない。
                 */}
-                <div style={{ order: -3 }} className={`${sectionVisibility('profile')} ${v8.person}`}>
-                  <Avatar name={friend.displayName} src={friend.pictureUrl} size={52} />
-                  <ExpandableText value={friend.displayName} empty="名前なし" className={v8.personName} />
-                  <p className={v8.personSub}>{formatAddedDate(friend.createdAt)}</p>
-                  {!friend.isFollowing ? <span className={v8.blocked}>ブロック済</span> : null}
-                  <div className={v8.personActions}>
-                    <Button variant="secondary" href={`/friends/detail?id=${friend.id}`}>
-                      友だち詳細
-                    </Button>
-                    {isV8 ? null : settingsButton}
-                  </div>
-                </div>
-                <dl style={{ order: -2 }} className={v8.summary} data-inbox-v8="customer-summary">
-                  <div className={v8.summaryRow}>
-                    <dt>タグ</dt>
-                    <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
-                      {(effectiveTags ?? []).length > 0 ? <TagOverflow>{(effectiveTags ?? []).map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow> : <span className={v8.empty}>なし</span>}
-                    </dd>
-                  </div>
-                  <div className={v8.summaryRow}>
-                    <dt>シナリオ</dt>
-                    <dd>
-                      {upcoming.kind === 'data' && upcoming.data.nextAutoDelivery?.kind === 'scenario'
-                        ? upcoming.data.nextAutoDelivery.name
-                        : upcoming.kind === 'loading' ? <span className={v8.empty}>…</span> : <span className={v8.empty}>なし</span>}
-                    </dd>
-                  </div>
-                  <div className={v8.summaryRow}>
-                    <dt>購入</dt>
-                    <dd>
-                      {purchase.kind === 'data'
-                        ? `直近${purchase.count}件・${formatNumber(purchase.total)}円`
-                        : purchase.kind === 'loading' ? <span className={v8.empty}>…</span>
-                        : purchase.reason === 'none' ? <span className={v8.empty}>0件</span> : <span className={v8.empty}>—{purchase.reason === 'unavailable' ? <><span role="alert">購入を読み込めませんでした</span><Button aria-label="購入をもう一度読み込む" onClick={() => setPurchaseRetry((current) => current + 1)}>もう一度</Button></> : null}</span>}
-                    </dd>
-                  </div>
-                  <div className={v8.summaryRow}>
-                    <dt>マイル</dt>
-                    <dd>
-                      {mileage.kind === 'data'
-                        ? `${formatNumber(mileage.summary.available)} mile`
-                        : mileage.kind === 'loading' ? <span className={v8.empty}>…</span> : <span className={v8.empty}>—</span>}
-                    </dd>
-                  </div>
-                </dl>
                 {/*
                   ★V8（M0393 XqSvX「顧客情報」）：節は角丸の枠の中に、見出し＋中身を線で区切って並べる。
                   上の要点（顔・名前・タグ・シナリオ・購入・マイル）とは線で切らず、枠で分ける。
@@ -1763,22 +1720,23 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 {accountId && friendId ? <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} /> : null}
                 <CustomerInfoPanel
                   friendId={friend.id}
+                  profile={{ name: friend.realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: formatAddedDate(friend.createdAt) }}
                   fields={friendFields.kind === 'data' ? friendFields.items : []}
                   state={friendFields.kind === 'data' ? 'ready' : friendFields.kind}
                   onRetry={() => setFieldsRetry(key => key + 1)}
                   canEdit={canEditFeature('attribute.personal_info.edit', staffRole)}
                   hiddenPersonalCount={friendFields.kind === 'data' ? friendFields.hiddenPersonalCount : 0}
                   sections={[
-                    { key: 'support', label: '対応', content: sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) },
+                    { key: 'support', label: '対応', content: <>{sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']))}<dl><div><dt>最後の連絡</dt><dd>{lastContactAt ? formatRelative(lastContactAt) : '—'}</dd></div></dl></> },
                     { key: 'tags', label: 'タグ', content: sectionBody(renderTags(friend)) },
                     { key: 'mileage', label: 'マイル', content: sectionBody(renderMileage(friend)) },
-                    { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Link href="/rich-menus">編集する</Link> : null, content: sectionBody(renderRichMenu(friend)) },
+                    { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Link href="/rich-menus">編集</Link> : null, content: sectionBody(renderRichMenu(friend)) },
                     { key: 'memo', label: 'メモ', content: sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) },
                   ]}
                   extraSections={Children.toArray(renderDetailSections(friend).props.children).flatMap(child => {
                     if (!isValidElement<{ 'data-customer-section'?: string; children?: React.ReactNode }>(child)) return []
                     const key = child.props['data-customer-section'] ?? ''
-                    const label = ({ starred: '★つき友だち情報', metadata: '友だち情報', forms: 'フォーム回答' } as Record<string, string>)[key]
+                    const label = ({ starred: '★つき友だち情報', metadata: '友だち情報', forms: 'フォーム回答', purchase: '購入' } as Record<string, string>)[key]
                     return label ? [{ key, label, content: stripSectionHeadings(child.props.children) }] : []
                   })}
                 />

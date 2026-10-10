@@ -2,7 +2,7 @@
 /*
  * 板 `P0jhqO` 運営お問い合わせの絵合わせ（V8）。
  * - 頭：説明＋代わりに起票する
- * - 左：チケットを探す、6つの札（保留は口が無いので出さない）、
+ * - 左：チケットを探す、状態・優先度・並びの選ぶ欄（B-205）、
  *   優先度：すべて、並び替え：優先度、行に契約先・優先度
  * - 右：契約先を開く・代理ログイン、1行の契約先情報、
  *   足元に解決済みにする・クローズする・下書きを保存する・返信する
@@ -89,11 +89,17 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     // 頭
     expect(body).toContain('統括の管理画面「お問い合わせ」から送られたものが新規として並びます')
     expect(body).toContain('代わりに起票する')
-    // 左の札（保留は出さない）
-    for (const chip of ['すべて', '新規', '対応中', '確認待ち', '解決', 'クローズ']) {
-      expect(body).toContain(chip)
-    }
-    expect(body).not.toContain('保留')
+    // B-205：細い列に札を並べず、状態の選択で同じ取得口へ届く。
+    expect(host.querySelector('.v6-filter-chip')).toBeNull()
+    const state = host.querySelector<HTMLButtonElement>('button[aria-label="状態で絞る"]')!
+    expect(state.textContent).toContain('状態：すべて')
+    await act(async () => { state.click() })
+    await settle()
+    const waiting = [...document.querySelectorAll<HTMLButtonElement>('[role="option"] button')].find(button => button.textContent?.includes('確認待ち'))!
+    expect(waiting).toBeTruthy()
+    await act(async () => { waiting.click() })
+    await settle()
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('stage=waiting'))).toBe(true)
     expect(body).toContain('優先度：すべて')
     expect(body).toContain('並び替え：優先度')
     // 行

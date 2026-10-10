@@ -4162,6 +4162,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               })()
             ) : (
             <FriendInfoSidebar
+              lastContactAt={chatDetail && chatDetail.id === selectedChatId ? chatDetail.lastMessageAt : null}
               friendId={activeFriendId}
               accountId={selectedAccountId ?? undefined}
               chatId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.id : null}

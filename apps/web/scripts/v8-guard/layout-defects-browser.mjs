@@ -6,6 +6,8 @@ export default function scanLayoutDefects() {
   const css = el => { if (!style.has(el)) style.set(el, getComputedStyle(el)); return style.get(el) }
   const visible = el => {
     for (let p = el; p; p = p.parentElement) {
+      // 閉じたdetailsの本文は寸法が残っても描画されない。見出しは引き続き測る。
+      if (p !== el && p.matches('details:not([open])') && !p.querySelector(':scope > summary')?.contains(el)) return false
       const c = css(p)
       if (c.display === 'none' || c.visibility === 'hidden' || c.visibility === 'collapse' || +c.opacity === 0) return false
     }
@@ -13,11 +15,12 @@ export default function scanLayoutDefects() {
     return r.width > 1 && r.height > 1
   }
   const excluded = el => {
+    // 編集欄もbubbleという名前を持つ。LINEの見本の除外を入力欄へ広げない。
     for (let p = el; p; p = p.parentElement) {
       const name = p.getAttribute('data-pencil-name') || ''
       const classes = typeof p.className === 'string' ? p.className : ''
       if (p.matches('nav,script,style,noscript,svg,[data-template-region="folders"],[data-template-region="collapsed-folders"],[data-line-preview-part="talk"]') ||
-          /フォルダの列|左メニュー/.test(name) || /(?:^|[ _-])(?:bubbleBody|bubbleText|bubbleIn|bubbleOut|messageBubble|bubble)(?:[_ -]|$)/i.test(classes)) return true
+          /フォルダの列|左メニュー/.test(name) || /(?:^|[ _-])(?:bubbleBody|bubbleText|bubbleIn|bubbleOut|messageBubble|bubble)(?:[_ -]|$)/i.test(classes) && !p.closest('[data-message-composer]')) return true
     }
     return false
   }

@@ -282,3 +282,5 @@
 @layer components {
 [data-theme='v8'] .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
 }
+/* B-211：共通ボタンを選ぶ札として使う画面も同じ形。 */
+html[data-theme='v8'] .button[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }

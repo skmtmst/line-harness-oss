@@ -361,3 +361,13 @@
 :global([data-theme='v8']) [data-page-template='restaurant'] .heading[data-heading-inset='none'] .subtitle { line-height: var(--tpl-rs-lh-13); }
 
 :global([data-theme='v8']) [data-page-template='dashboard'][data-template-layout='restaurant'] .heading { padding-bottom: var(--polish-space-field); }
+
+/* B-217：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
+:global([data-theme='v8']) .listBody .content[data-content-inset] { padding-inline: 0; }
+:global([data-theme='v8']) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
+:global([data-theme='v8']) .listBody .pagination { padding-inline: var(--tpl-list-inset); }
+:global([data-theme='v8']) [data-list-skeleton] .paginationRow,
+:global([data-theme='v8']) [data-list-skeleton] .pagination { justify-content: space-between; }
+
+/* 旧画面が表の外に足していた枠も、共通の型で平らにする。 */
+:global([data-theme='v8']) [data-list-skeleton] .content :global(div:has(> [data-shared-part='list-table'])) { margin: 0; padding-inline: 0; border: 0; border-radius: var(--radius-flat); box-shadow: none; }
