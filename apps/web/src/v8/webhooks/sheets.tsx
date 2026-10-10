@@ -552,7 +552,7 @@ export default function WebhooksSheetsV8() {
           {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
           {disconnectNotice ? <Notice tone="warn">{disconnectNotice}</Notice> : null}
           {saveNotice ? (
-            <Notice tone="warn" action={<Button onClick={() => void load()}>もう一度読み込む</Button>}>{saveNotice}</Notice>
+            <Notice tone="warn" action={<Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>}>{saveNotice}</Notice>
           ) : null}
           {body}
         </div>

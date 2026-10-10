@@ -76,6 +76,8 @@ export type DialogProps = {
   confirmDisabled?: boolean
   error?: string
   confirmLabel?: string
+  /** 実行中の文字。Buttonのbusyへ渡す。 */
+  busyLabel?: string
   cancelLabel?: string
   onConfirm?: () => void
   onCancel: () => void
@@ -137,6 +139,7 @@ export default function Dialog({
   initialFocusId,
   error,
   confirmLabel = '保存する',
+  busyLabel = '処理中…',
   cancelLabel = 'キャンセル',
   confirmDisabled = false,
   onConfirm,
@@ -322,7 +325,7 @@ export default function Dialog({
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
             onClick={runConfirm}
-            disabled={busy || confirmDisabled} busy={busy} busyLabel="処理中…">
+            disabled={busy || confirmDisabled} busy={busy} busyLabel={busyLabel}>
             {!busy && confirmIcon ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
             {tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
           </Button>

@@ -277,7 +277,7 @@ export default function AccountDetailV8() {
                 {parentValue ?? (
                   <span className={styles.inline}>
                     読み込めませんでした
-                    <Button type="button" variant="text" presentation="account-inline" onClick={() => void loadAll()}>もう一度読み込む</Button>
+                    <Button type="button" variant="text" presentation="account-inline" onClick={() => loadAll()} busyLabel="処理中…">もう一度読み込む</Button>
                   </span>
                 )}
               </Row>

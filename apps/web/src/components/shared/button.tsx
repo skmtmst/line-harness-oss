@@ -142,7 +142,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const [automaticBusy, setAutomaticBusy] = useState(false)
   const [automaticError, setAutomaticError] = useState('')
   const automaticLock = useRef(false)
-  const stateful = busy !== undefined || done !== undefined || automaticBusy
+  const stateful = busy !== undefined || done !== undefined || props.busyLabel !== undefined || automaticBusy
   const busyNow = busy === true || (busy === undefined && automaticBusy)
 
   /* done が true になったら 1.2 秒だけ ✓ を出して元の文字へ戻す。 */
@@ -163,7 +163,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   useLayoutEffect(() => {
     const el = elementRef.current
     if (!el || !stateful) return
-    if (busy === true || done === true) {
+    if (busyNow || done === true) {
       if (idleWidthRef.current > 0) el.style.minWidth = `${idleWidthRef.current}px`
       return
     }

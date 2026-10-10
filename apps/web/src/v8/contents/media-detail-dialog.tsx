@@ -618,7 +618,7 @@ export default function MediaDetailDialog({
             ) : phase === 'error' ? (
               <div className="mt-3 space-y-2" role="alert">
                 <p className="text-danger text-xs">使われている場所を確認できませんでした。</p>
-                <Button type="button" onClick={() => void loadImpact()}>もう一度読み込む</Button>
+                <Button type="button" onClick={() => loadImpact()} busyLabel="処理中…">もう一度読み込む</Button>
               </div>
             ) : impact ? (
               <>
@@ -634,7 +634,7 @@ export default function MediaDetailDialog({
                         ? 'ほかに確認できていない場所があります。'
                         : '使われている場所を確かめられませんでした。'}
                     </p>
-                    <Button type="button" onClick={() => void loadImpact()}>もう一度読み込む</Button>
+                    <Button type="button" onClick={() => loadImpact()} busyLabel="処理中…">もう一度読み込む</Button>
                   </div>
                 ) : null}
                 {impact.references.length > 0 ? (

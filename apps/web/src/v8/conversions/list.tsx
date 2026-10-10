@@ -991,8 +991,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       </div>
       {canEdit && panelPoint.status !== 'stopped' ? (
         <div className={styles.panelButtons}>
-          {panelPoint.state !== 'draft' ? <Button onClick={() => void openStop(panelPoint, 'stop')}><Pause size={15} aria-hidden="true" />止める</Button> : null}
-          <Button variant="danger" onClick={() => void openStop(panelPoint, 'delete')}>削除する</Button>
+          {panelPoint.state !== 'draft' ? <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={15} aria-hidden="true" />止める</Button> : null}
+          <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button>
         </div>
       ) : null}
     </Card>
@@ -1257,7 +1257,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         {highlightedPoint ? <div className={styles.statsNotice}><Notice tone="success">{`「${highlightedPoint.name}」を保存しました。色の付いた行です。`}</Notice></div> : null}
         {reportFailed && !loadFailed ? (
           <div className={styles.statsNotice}>
-            <Notice tone="info" action={<Button onClick={() => void reloadReport()}>集計を読み直す</Button>}>集計を表示できませんでした。一覧はそのまま使えます。</Notice>
+            <Notice tone="info" action={<Button onClick={() => reloadReport()} busyLabel="処理中…">集計を読み直す</Button>}>集計を表示できませんでした。一覧はそのまま使えます。</Notice>
           </div>
         ) : null}
         <KpiBand>

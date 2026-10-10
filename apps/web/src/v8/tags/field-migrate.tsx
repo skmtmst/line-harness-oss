@@ -514,7 +514,7 @@ function FieldMigrate() {
           <Button type="button" onClick={() => void refetchRun()} disabled={executing}>結果を確認する</Button>
         ) : null}
         {needsPollAction ? (
-          <Button variant="primary" type="button" onClick={() => void resume()} disabled={executing}>{executing ? '再開中…' : '続きから再開する'}</Button>
+          <Button variant="primary" type="button" onClick={() => void resume()} disabled={executing} busy={executing} busyLabel="再開中…">続きから再開する</Button>
         ) : null}
         {!confirmed ? (
           <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">

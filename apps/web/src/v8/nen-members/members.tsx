@@ -196,9 +196,9 @@ function CsvExportButton({ accountId }: { accountId: string }) {
   const { exportCsv, busy, error } = useMembersCsv(accountId)
   return (
     <span className={styles.csvWrap}>
-      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
+      <Button variant="secondary" onClick={() => void exportCsv()} disabled={busy} busy={Boolean(busy)} busyLabel="書き出しています…">
         <Download size={15} aria-hidden="true" />
-        {busy ? '書き出しています…' : 'CSVで書き出す'}
+        CSVで書き出す
       </Button>
       {error ? <span className={styles.csvError} role="alert">{error}</span> : null}
     </span>

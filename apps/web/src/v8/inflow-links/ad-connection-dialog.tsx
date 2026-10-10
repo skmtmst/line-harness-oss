@@ -47,7 +47,7 @@ export default function AdConnectionDialog({provider,platform,accountId,onClose,
 if(current.current){ if (!fieldFailure)setError('接続できませんでした。入力と広告側の権限を確認して、もう一度お試しください') }}
   finally {if(current.current)setBusy(false)}
  }
- return <SaveErrorScope errors={saveErrors}> <Dialog open busy={busy} title={`${provider.label}をつなぐ`} onCancel={()=>{if(!busy)onClose()}} footer={<><Button disabled={busy} onClick={onClose}>閉じる</Button><Button variant="primary" disabled={busy} onClick={()=>void connect()} busy={Boolean(busy)} busyLabel="処理中…">{busy?'確認しています…':'接続を確認してつなぐ'}</Button></>}>
+ return <SaveErrorScope errors={saveErrors}> <Dialog open busy={busy} title={`${provider.label}をつなぐ`} onCancel={()=>{if(!busy)onClose()}} footer={<><Button disabled={busy} onClick={onClose}>閉じる</Button><Button variant="primary" disabled={busy} onClick={()=>void connect()} busy={Boolean(busy)} busyLabel="確認しています…">接続を確認してつなぐ</Button></>}>
   <p className="mb-4 text-sm">広告側の費用を読み取って接続を確認します。鍵の値は再表示しません。</p>
   <div className="space-y-3">{AD_CONNECTION_FIELDS[provider.key].map(field=><Field key={field.key} label={field.label} htmlFor={`ad-connect-${field.key}`} error={fieldErrors[field.key]}><SaveErrorField names={["values"]}><TextField aria-label={field.label} type={field.secret?'password':'text'} value={values[field.key]??''} autoComplete={field.secret?'new-password':undefined} placeholder={field.secret&&platform?.secretKeys?.includes(field.key)?'保存済み（空欄なら保持）':''} onChange={e=>{setValues(v=>({...v,[field.key]:e.target.value}));setFieldErrors(v=>({...v,[field.key]:''}))}}/></SaveErrorField></Field>)}</div>
   {error&&<p role="alert" className="mt-3 text-sm text-status-danger">{error}</p>}

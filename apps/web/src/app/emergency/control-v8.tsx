@@ -527,8 +527,8 @@ const EmergencyControlV8 = (
         <div className={`${styles.feedbackBand} ${styles.feedbackWarn}`} role="status">
           <span>{stopBlockers.map((blocker) => blockerText[blocker]).join('')}</span>
           {stopBlockers.includes('unavailable') ? (
-            <Button type="button" onClick={() => void reloadControl()} disabled={reloading}>
-              {reloading ? '読み直しています…' : '最新の状態を読み直す'}
+            <Button type="button" onClick={() => void reloadControl()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
+              最新の状態を読み直す
             </Button>
           ) : null}
         </div>
@@ -541,8 +541,8 @@ const EmergencyControlV8 = (
         >
           <span>{feedback.text}</span>
           {feedback.tone !== 'success' && needsReload ? (
-            <Button type="button" onClick={() => void reloadControl()} disabled={reloading}>
-              {reloading ? '読み直しています…' : '最新の状態を読み直す'}
+            <Button type="button" onClick={() => void reloadControl()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
+              最新の状態を読み直す
             </Button>
           ) : null}
         </div>

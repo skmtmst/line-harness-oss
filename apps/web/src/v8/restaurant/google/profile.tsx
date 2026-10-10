@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, CalendarX, Clock, GitCompare, History, Pencil, RefreshCw, Timer } from 'lucide-react'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
@@ -39,6 +39,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const syncLock = useRef(false)
   const [showHolidays, setShowHolidays] = useState(false)
   const [showDiff, setShowDiff] = useState(false)
   const [showMore, setShowMore] = useState(false)
@@ -47,8 +48,11 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   const [earlyClose, setEarlyClose] = useState<string | null>(null)
 
   const load = useCallback(async (sync = false) => {
-    if (sync) setSyncing(true)
-    else setLoading(true)
+    if (sync) {
+      if (syncLock.current) return
+      syncLock.current = true
+      setSyncing(true)
+    } else setLoading(true)
     setError('')
     try {
       setData(sync ? await restaurantGoogleApi.syncProfile(accountId) : await restaurantGoogleApi.profile(accountId))
@@ -57,7 +61,10 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
       setError(errorMessage(err, 'プロフィールを読み込めませんでした。'))
     } finally {
       setLoading(false)
-      setSyncing(false)
+      if (sync) {
+        syncLock.current = false
+        setSyncing(false)
+      }
     }
   }, [accountId])
 
@@ -106,9 +113,10 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   return (
     <>
       {!canManageRole(role) ? <Notice tone="info">閲覧のみです。営業時間と店舗情報を確認できます。</Notice> : null}
-      {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)}>{syncing ? '取得中…' : 'もう一度取得'}</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
+      {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
       {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount} 件）。`}</Notice> : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-today-title">
         <SectionHeader size="small" title={<span id="gb-today-title">本日の営業時間</span>} />

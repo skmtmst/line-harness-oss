@@ -383,7 +383,7 @@ export default function AssignMatrixV8() {
               <p className={shell.stateDesc}>{loadFailure?.description ?? error}</p>
               {loadFailure?.retryable ? (
                 <div className={shell.stateActions}>
-                  <Button onClick={() => void load()}>もう一度読み込む</Button>
+                  <Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
                 </div>
               ) : null}
             </div>

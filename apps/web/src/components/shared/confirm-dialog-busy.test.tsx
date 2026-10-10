@@ -38,3 +38,11 @@ test('入力のある窓もbusy省略時に非同期保存を待ち、失敗は�
   expect(button.disabled).toBe(false)
   expect(screen.getByRole('alert').textContent).toContain('実行できませんでした')
 })
+
+test('確定ボタンの処理中の文字も共通Buttonへ渡し、入力を残す', () => {
+  render(<ConfirmDialog open busy busyLabel="移動中…" title="移動" description="フォルダを移動" confirmLabel="移動する" onConfirm={() => {}} onCancel={() => {}}><input aria-label="移動先" defaultValue="入力を残す" /></ConfirmDialog>)
+  const button = screen.getByRole('button', { name: '移動中…' }) as HTMLButtonElement
+  expect(button.disabled).toBe(true)
+  expect(button.getAttribute('aria-busy')).toBe('true')
+  expect((screen.getByRole('textbox', { name: '移動先' }) as HTMLInputElement).value).toBe('入力を残す')
+})

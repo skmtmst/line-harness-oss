@@ -885,9 +885,9 @@ function EditCommonVarV8Inner() {
               <Button
                 type="button"
                 onClick={() => {
-                  if (item && selectedAccountId) void loadFolders(selectedAccountId)
+                  if (item && selectedAccountId) return loadFolders(selectedAccountId)
                 }}
-              >
+               busyLabel="処理中…">
                 再読み込み
               </Button>
             </div>
@@ -976,9 +976,9 @@ function EditCommonVarV8Inner() {
           <Button
             type="button"
             onClick={() => {
-              if (item && selectedAccountId) void loadSchedules(item.id, selectedAccountId)
+              if (item && selectedAccountId) return loadSchedules(item.id, selectedAccountId)
             }}
-          >
+           busyLabel="処理中…">
             再読み込み
           </Button>
         </div>
@@ -1122,7 +1122,7 @@ function EditCommonVarV8Inner() {
       identity={<></>}
       preview={preview}
       destructive={canWrite && item ? (
-        <Button variant="danger" type="button" onClick={() => void openDelete()}>
+        <Button variant="danger" type="button" onClick={() => openDelete()} busyLabel="処理中…">
           削除
         </Button>
       ) : undefined}
@@ -1246,9 +1246,9 @@ function EditCommonVarV8Inner() {
                   <Button
                     type="button"
                     onClick={() => {
-                      if (item && selectedAccountId) void loadImpact(item.id, selectedAccountId)
+                      if (item && selectedAccountId) return loadImpact(item.id, selectedAccountId)
                     }}
-                  >
+                   busyLabel="処理中…">
                     {STATE_TEXT.retry}
                   </Button>
                 ) : null}

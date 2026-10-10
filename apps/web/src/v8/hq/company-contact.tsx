@@ -156,7 +156,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     <SettingsFormRow>{field('contactEmail')}{field('invoiceAddressee')}</SettingsFormRow>
     {loading ? <p role="status" className={styles.hint}>読み込んでいます…</p> : null}
     {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-    {!loading && revision === null && canEdit ? <Button type="button" onClick={() => void load()}>もう一度読み込む</Button> : null}
+    {!loading && revision === null && canEdit ? <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button> : null}
     {null}
   </SettingsFormCard></SaveErrorScope>
 }

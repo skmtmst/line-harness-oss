@@ -579,7 +579,7 @@ function InflowDetailContent() {
             {route.isActive ? (
               <Button onClick={() => openDelete('stop')}><Pause size={15} aria-hidden="true" />止める</Button>
             ) : (
-              <Button onClick={() => void reopenRoute()}>受付を再開する</Button>
+              <Button onClick={() => reopenRoute()} busyLabel="処理中…">受付を再開する</Button>
             )}
             <Button variant="primary" onClick={() => setEditingRoute(true)}>
               <Pencil size={15} aria-hidden="true" />{happenParts.length > 0 ? 'することを変える' : 'することを決める'}

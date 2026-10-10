@@ -1115,7 +1115,7 @@ export default function AutoRepliesListV8() {
             : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
       {visibleLoadState === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
+        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
       )}
     </div>
   ) : sortedItems.length === 0 ? (
@@ -1329,7 +1329,7 @@ export default function AutoRepliesListV8() {
                         router.push(`/auto-replies/runs?id=${panelRow.id}`)
                       })
                     }
-                  >
+                   busyLabel="移動中…">
                     実行結果を見る
                   </Button>
                   {canEdit && <Button

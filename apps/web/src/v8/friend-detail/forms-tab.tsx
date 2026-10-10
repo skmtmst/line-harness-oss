@@ -25,7 +25,7 @@ export default function FormsTab({ data }: { data: FriendDetailState }) {
     return (
       <div className={`${styles.pane} ${styles.centered}`} role="alert">
         <p className={styles.paneNote}>回答を読み込めませんでした。</p>
-        <Button onClick={() => void data.loadSubmissions()}>もう一度読み込む</Button>
+        <Button onClick={() => data.loadSubmissions()} busyLabel="処理中…">もう一度読み込む</Button>
       </div>
     )
   }

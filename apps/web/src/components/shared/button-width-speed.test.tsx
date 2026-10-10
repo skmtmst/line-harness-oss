@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Button from './button'
 
@@ -43,4 +43,35 @@ describe('保存中・完了のボタン幅', () => {
     expect(button.textContent).toBe('保存中…')
     expect(button.style.minWidth).toBe('100px')
   })
+})
+
+it('Promiseを返す入口はbusyLabelで初回から幅を予約し、待機・成功後も幅を変えない', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(100)
+  let resolve!: () => void
+  const save = vi.fn(() => new Promise<void>((done) => { resolve = done }))
+  const { rerender } = render(<Button onClick={save} busyLabel="読み込み中…">読み直す</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  const initial = button.style.width
+  expect(initial).toBe('121px')
+  const reads = width.mock.calls.length
+  fireEvent.click(button)
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(button.style.width).toBe(initial)
+  expect(width.mock.calls.length).toBe(reads)
+  expect(button.getAttribute('aria-busy')).toBe('true')
+  await act(async () => { resolve() })
+  expect(button.disabled).toBe(false)
+  expect(button.style.width).toBe(initial)
+  rerender(<Button onClick={save} busyLabel="読み込み中…">読み直す</Button>)
+  expect(width.mock.calls.length).toBe(reads)
+})
+
+it('普通の同期ボタンは状態用の幅を確保しない', () => {
+  document.documentElement.dataset.theme = 'v8'
+  const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get')
+  render(<Button onClick={() => {}}>閉じる</Button>)
+  expect(screen.getByRole('button').style.width).toBe('')
+  expect(width).not.toHaveBeenCalled()
 })

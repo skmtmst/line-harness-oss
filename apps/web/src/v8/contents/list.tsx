@@ -1380,12 +1380,12 @@ export default function MediaLibraryListV8() {
               count={selected.size}
               total={selectionTotal}
               onSelectAll={selectAllMedia}
-              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => void readSelectableMedia()}>もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
+              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => readSelectableMedia()} busyLabel="処理中…">もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
             >
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
               </Button>
-              <Button type="button" variant="danger" onClick={() => void removeSelected()}>
+              <Button type="button" variant="danger" onClick={() => removeSelected()} busyLabel="処理中…">
                 選択したメディアを削除
                 {selected.size > 0 && <span>（{selected.size}）</span>}
               </Button>
@@ -1452,7 +1452,7 @@ export default function MediaLibraryListV8() {
               使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
             </p>
             {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
-            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
+            <Button type="button" onClick={() => { if (deleting) return openDelete(deleting) }} busyLabel="処理中…">もう一度読み込む</Button>
           </div>
         ) : impact ? (
           <div>
@@ -1462,7 +1462,7 @@ export default function MediaLibraryListV8() {
             </p>
             {impact.verified === false ? (
               <div>
-                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
+                <Button type="button" onClick={() => { if (deleting) return openDelete(deleting) }} busyLabel="処理中…">もう一度読み込む</Button>
               </div>
             ) : null}
 
@@ -1855,8 +1855,8 @@ function MediaCardV8({
               <Button variant="secondary" onClick={onRenameCancel} disabled={renamingBusy}>
                 キャンセル
               </Button>
-              <Button variant="primary" onClick={onRenameConfirm} disabled={renamingBusy}>
-                {renamingBusy ? '保存中…' : '保存する'}
+              <Button variant="primary" onClick={onRenameConfirm} disabled={renamingBusy} busy={renamingBusy} busyLabel="保存中…">
+                保存する
               </Button>
             </div>
           </div>
@@ -1926,7 +1926,7 @@ function MediaCardV8({
                   : []),
                 {
                   id: 'download',
-                  label: downloading ? '取得中…' : 'ダウンロード',
+                  label: 'ダウンロード',
                   disabled: downloading,
                   disabledReason: downloading ? 'ファイルを取り出しています' : undefined,
                   onSelect: onDownload,

@@ -549,7 +549,7 @@ function ReminderDetailV8() {
                   <Pause size={15} aria-hidden="true" />一時停止する
                 </Button>
               ) : (
-                <Button className={styles.sideAction} onClick={() => void setReminderActive(true)}>
+                <Button className={styles.sideAction} onClick={() => setReminderActive(true)} busyLabel="処理中…">
                   <Play size={15} aria-hidden="true" />再開する
                 </Button>
               )

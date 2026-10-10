@@ -8,6 +8,8 @@ import { Copy, Eye, MailPlus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
+import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { useStepUpGate, isStepUpRequired } from '@/components/step-up-prompt'
@@ -213,8 +215,8 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
       )}
       {store && !error && !readOnly ? (
         <div className={styles.intakeFoot}>
-          <Button disabled={issuing || loading} onClick={() => { if (addresses.length > 0) setReissueOpen(true); else void issue() }}>
-            <MailPlus aria-hidden className={styles.buttonIcon} />{issuing ? '発行中…' : 'アドレスを発行'}
+          <Button disabled={issuing || loading} onClick={() => { if (addresses.length > 0) setReissueOpen(true); else void issue() }} busy={issuing} busyLabel="発行中…">
+            <MailPlus aria-hidden className={styles.buttonIcon} />アドレスを発行
           </Button>
         </div>
       ) : null}
@@ -366,6 +368,22 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
     }
   }
 
+  const organizationTree = (
+    <div className={styles.treeBody}>
+      <p className={styles.treeTenant}>{`統括：${data.organization?.tenant_name || emptyValue('unconfigured')}`}</p>
+      <p className={styles.treeRoot}>{data.organization?.name}</p>
+      <div className={styles.treeChildren}>
+        {data.stores.map((s) => (
+          <div key={s.id} className={styles.treeStore}>
+            <span className={styles.treeStoreName}>{s.name}</span>
+            <span className={styles.spacer} aria-hidden="true" />
+            <Status value={s.status} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   return (
     <SaveErrorScope errors={saveErrors}><>
       {readOnly ? (
@@ -373,21 +391,14 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
       ) : null}
       <div className={styles.layout}>
         {prompt}
-        <Panel title="組織階層" narrow flush>
-          <div className={styles.treeBody}>
-          <p className={styles.treeTenant}>{`統括：${data.organization?.tenant_name || emptyValue('unconfigured')}`}</p>
-          <p className={styles.treeRoot}>{data.organization?.name}</p>
-          <div className={styles.treeChildren}>
-            {data.stores.map((s) => (
-              <div key={s.id} className={styles.treeStore}>
-                <span className={styles.treeStoreName}>{s.name}</span>
-                <span className={styles.spacer} aria-hidden="true" />
-                <Status value={s.status} />
-              </div>
-            ))}
+        <div className={styles.tree}>
+          <div className={styles.treeExpanded}>
+            <Panel title="組織階層" flush>{organizationTree}</Panel>
           </div>
-          </div>
-        </Panel>
+          <Disclosure className={styles.treeCollapsed} title="組織階層" hint={`${data.stores.length} 店舗`}>
+            {organizationTree}
+          </Disclosure>
+        </div>
         <div className={styles.main}>
           <Panel
             title="店舗管理"
@@ -458,14 +469,20 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
                   <span role="cell" className={`${styles.cell} ${styles.colState}`}><Status value={m.status} /></span>
                   <span role="cell" className={`${styles.cell} ${styles.colOps}`}>
                     {readOnly ? null : (
-                      <span className={styles.ops}>
-                        <Button disabled={busy} onClick={() => { setEditingMemberId(m.id); setShowMemberForm(false) }}>変更</Button>
-                        {m.status === 'suspended' ? (
-                          <Button disabled={busy} onClick={() => void mutate(() => updateMember(m.id, { status: 'active' }), '再開しました。')}>再開</Button>
-                        ) : (
-                          <Button disabled={busy} onClick={() => setStopId(m.id)}>停止</Button>
-                        )}
-                      </span>
+                      <RowActions
+                        subjectName={m.staff_name}
+                        detail={{ label: '変更', disabled: busy, onClick: () => { setEditingMemberId(m.id); setShowMemberForm(false) } }}
+                        menuButtonProps={{ disabled: busy }}
+                        menuItems={[m.status === 'suspended' ? {
+                          id: 'resume', label: '再開', disabled: busy,
+                          disabledReason: busy ? 'ほかの操作を反映しています' : undefined,
+                          onSelect: () => void mutate(() => updateMember(m.id, { status: 'active' }), '再開しました。'),
+                        } : {
+                          id: 'stop', label: '停止', tone: 'danger', disabled: busy,
+                          disabledReason: busy ? 'ほかの操作を反映しています' : undefined,
+                          onSelect: () => setStopId(m.id),
+                        }]}
+                      />
                     )}
                   </span>
                 </div>

@@ -371,7 +371,7 @@ export default function WebhooksInteractionsV8() {
                   </Td>
                   <Td align="right" className={styles.colTime}><span className={styles.main}>{seconds(item.durationMs)}</span></Td>
                   <Td className={styles.colOps}>
-                    <Button onClick={() => openDetail(item)} aria-label={`「${item.webhookName}」の中身を見る`}>中身を見る</Button>
+                    <Button onClick={() => openDetail(item)} aria-label={`「${item.webhookName}」の中身を見る`} busyLabel="読み込み中…">中身を見る</Button>
                   </Td>
                 </Tr>
               )

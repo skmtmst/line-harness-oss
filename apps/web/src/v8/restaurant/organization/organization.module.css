@@ -56,6 +56,11 @@
 /* 組織階層：幅280・中身は余白16・段の間8。 */
 .tree {
   flex: 0 0 var(--tpl-rt-tree-w);
+  min-width: 0;
+}
+
+.treeCollapsed {
+  display: none;
 }
 
 .treeBody {
@@ -310,12 +315,6 @@
   font-weight: 600;
 }
 
-.ops {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--tpl-rt-payload-gap);
-}
-
 .matrixYes {
   color: var(--color-accent-deep);
   font-weight: 700;
@@ -418,4 +417,13 @@
   gap: var(--tpl-rt-chip-row-gap);
   padding-top: var(--tpl-rt-dialog-gap);
   box-shadow: var(--tpl-sb-line-top);
+}
+
+/* 狭い白い板では階層を開閉する段へ移し、表の名前と操作の幅を保つ。 */
+@container v8-page (width < 1100px) {
+  .layout { flex-direction: column; }
+  .tree { flex: none; width: 100%; }
+  .treeExpanded { display: none; }
+  .treeCollapsed { display: block; }
+  .main { width: 100%; }
 }

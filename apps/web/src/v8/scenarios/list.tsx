@@ -1241,7 +1241,7 @@ export default function ScenariosListV8() {
                       router.push(`/scenarios/results?id=${encodeURIComponent(panelRow.id)}`)
                     })
                   }
-                >
+                 busyLabel="移動中…">
                   配信結果を見る
                 </Button>
                 {canEdit && <Button variant="secondary" onClick={() => openDuplicate(panelRow)}>

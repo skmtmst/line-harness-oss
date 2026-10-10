@@ -513,7 +513,7 @@ export default function NewCommonVarV8() {
 {foldersError ? (
               <div className={styles.folderError} data-folders-state="error">
                 <p className={styles.fieldHint}>フォルダの一覧を読み込めませんでした。未分類のまま登録できます。</p>
-                <Button type="button" onClick={() => void loadFolders()}>
+                <Button type="button" onClick={() => loadFolders()} busyLabel="処理中…">
                   再読み込み
                 </Button>
               </div>

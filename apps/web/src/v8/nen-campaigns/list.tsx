@@ -815,7 +815,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
           {canEdit ? (
             <span className={styles.buttonRow}>
               <Button type="button" disabled={introDraft === selected.introText || props.savingColumnId === selected.id || !introDraft.trim()} busy={props.savingColumnId === selected.id} busyLabel="保存中…" onClick={() => props.onSaveIntro(selected)}>紹介文を保存する</Button>
-              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)}><Copy size={15} aria-hidden="true" />{props.duplicatingColumnId === selected.id ? '複製しています' : '同じ形で書く'}</Button>
+              <Button type="button" disabled={props.duplicatingColumnId === selected.id} onClick={() => props.onDuplicateColumn(selected)} busy={props.duplicatingColumnId === selected.id} busyLabel="複製しています"><Copy size={15} aria-hidden="true" />同じ形で書く</Button>
               <span className={styles.muted}>{`${introDraft.length}／1500文字`}</span>
             </span>
           ) : null}

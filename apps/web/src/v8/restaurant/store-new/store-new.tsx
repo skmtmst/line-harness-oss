@@ -222,7 +222,7 @@ export default function StoreNewV8() {
     if (step === STEP.TERMS) {
       return <>
         <Button href="/hq">キャンセル</Button>
-        <Button variant="primary" disabled={!canSubmitTerms(readToEnd, termsChecked) || agreeing} onClick={() => void agree()}><ArrowRight aria-hidden className={styles.icon15} />{agreeing ? '同意を記録中…' : '同意して次へ進む'}</Button>
+        <Button variant="primary" disabled={!canSubmitTerms(readToEnd, termsChecked) || agreeing} onClick={() => void agree()} busy={agreeing} busyLabel="同意を記録中…"><ArrowRight aria-hidden className={styles.icon15} />同意して次へ進む</Button>
       </>
     }
     if (step === STEP.BASICS) return <><Button href="/hq">キャンセル</Button><Button variant="primary" onClick={nextFromBasics}><ArrowRight aria-hidden className={styles.icon15} />次へ</Button></>
@@ -233,7 +233,7 @@ export default function StoreNewV8() {
         ? <Button variant="primary" disabled={saving} onClick={() => void enterStore()} busy={Boolean(saving)} busyLabel="処理中…">この店舗の管理画面へ</Button>
         : <Button href="/hq">統括の店舗一覧へ</Button>
     }
-    return <><Button disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)}>戻る</Button><Button variant="primary" disabled={saving} onClick={() => void connect()} busy={Boolean(saving)} busyLabel="処理中…">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</Button></>
+    return <><Button disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)}>戻る</Button><Button variant="primary" disabled={saving} onClick={() => void connect()} busy={Boolean(saving)} busyLabel="接続を確認中…">アカウントセットアップ実行</Button></>
   })()
 
   return (

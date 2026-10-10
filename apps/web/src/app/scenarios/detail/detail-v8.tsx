@@ -2239,7 +2239,7 @@ export default function ScenarioDetailV8({
               items={[
                 {
                   id: 'duplicate',
-                  label: duplicating ? '複製中…' : '複製する',
+                  label: '複製する',
                   disabled: duplicating,
                   onSelect: openDuplicateDialog,
                 },
@@ -2296,13 +2296,13 @@ export default function ScenarioDetailV8({
                 続きからやり直すか、作りかけのコピーを削除してください。
               </p>
               <div className={styles.remainderActions}>
-                <button
+                <Button
                   type="button"
                   disabled={duplicating}
                   onClick={() => void handleDuplicate()}
-                >
-                  {duplicating ? '複製中…' : '続きからやり直す'}
-                </button>
+                 variant="text" size="inline" busy={duplicating} busyLabel="複製中…">
+                  続きからやり直す
+                </Button>
                 <Link href={`/scenarios/detail?id=${duplicateRemainder.copyId}`}>コピーを確認する</Link>
                 <button
                   type="button"
@@ -2629,7 +2629,7 @@ export default function ScenarioDetailV8({
                               },
                               {
                                 id: 'duplicate',
-                                label: duplicatingStepId === step.id ? '複製中…' : '複製する',
+                                label: '複製する',
                                 disabled: duplicatingStepId === step.id,
                                 disabledReason: 'この通を複製しています',
                                 onSelect: () => {
@@ -2912,7 +2912,7 @@ export default function ScenarioDetailV8({
         cancelLabel="閉じる"
         onCancel={() => setCompareOpen(false)}
         footer={
-          <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
+          <Button type="button" variant="primary" onClick={() => acceptLatestAndContinue()} busyLabel="処理中…">
             最新を読み込んで続ける
           </Button>
         }
