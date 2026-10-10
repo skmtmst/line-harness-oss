@@ -40,6 +40,8 @@ import {
 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { RowMenu } from '@/components/shared/row-actions'
+import { notifyToast } from '@/components/shared/toast'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
@@ -226,6 +228,8 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const [saving, setSaving] = useState(false)
   const [enabling, setEnabling] = useState(false)
   const [error, setError] = useState('')
+  const [duplicating, setDuplicating] = useState(false)
+  const duplicateKey = useRef(crypto.randomUUID())
   const [notice, setNotice] = useState('')
   /* 先にほかの人が保存したとき（版の競合）。保存はせず、違いを比べるか最新を読むかを選ぶ。 */
   const [conflict, setConflict] = useState(false)
@@ -340,7 +344,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     && savedSnapshot.current !== editorSnapshot(rule, definition)
 
   /* 未保存の変更がある間、画面外への離脱を確認対話へ寄せる。 */
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: hasUnsavedChanges, busy: saving || enabling })
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty: hasUnsavedChanges, busy: saving || enabling || duplicating })
 
   const validateStep = (target: Step) => {
     const skipsScenario = rule.friendKind === 'returning' && definition.returningMode === 'none'
@@ -668,6 +672,18 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     </>
   )
 
+  const duplicateSaved = async () => {
+    if (!ruleId || !selectedAccountId || !canEdit || duplicating) return
+    setDuplicating(true); setError('')
+    try {
+      const response = await api.friendAddRules.duplicate(selectedAccountId, ruleId, rule.version, duplicateKey.current)
+      if (!response.success) throw new Error(response.error)
+      notifyToast('複製した下書きを追加しました')
+      router.push(`/friend-add-settings?kind=${rule.friendKind}&highlight=${encodeURIComponent(response.data.id)}&status=draft`)
+    } catch { setError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
+    finally { setDuplicating(false) }
+  }
+
   const nextStep = STEPS[Math.min(currentIndex + 1, STEPS.length - 1)]
   const stepperSteps: StepperStep[] = STEPS.map((item, index) => ({
     key: item.key,
@@ -680,6 +696,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
     <CreatePage
       boardId={step === 'routes' && narrow ? 'xHpkS' : conflict ? 'h5rm8t' : STEPS[currentIndex].node}
       title="初回案内を作る"
+      actions={canEdit && ruleId ? <RowMenu label="初回案内の操作" triggerProps={{ disabled: saving || enabling || duplicating }} items={[{ id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) }]} /> : undefined}
       steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
       description={<>
         {step === 'basic'
