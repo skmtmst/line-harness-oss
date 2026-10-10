@@ -1,0 +1,105 @@
+{
+  "measured": [
+    {
+      "name": "dashboard",
+      "route": "/",
+      "showMs": 748,
+      "pressMs": 33,
+      "lcpMs": 212,
+      "jsBytes": 3204647,
+      "longTaskMs": 0
+    },
+    {
+      "name": "inbox",
+      "route": "/chats",
+      "showMs": 701,
+      "pressMs": 75,
+      "lcpMs": 140,
+      "jsBytes": 1397066,
+      "longTaskMs": 0
+    },
+    {
+      "name": "friends",
+      "route": "/friends",
+      "showMs": 729,
+      "pressMs": 52,
+      "lcpMs": 148,
+      "jsBytes": 1635355,
+      "longTaskMs": 0
+    },
+    {
+      "name": "broadcasts",
+      "route": "/broadcasts",
+      "showMs": 730,
+      "pressMs": 66,
+      "lcpMs": 144,
+      "jsBytes": 1814035,
+      "longTaskMs": 0
+    },
+    {
+      "name": "broadcast-new",
+      "route": "/broadcasts/new",
+      "showMs": 740,
+      "pressMs": null,
+      "lcpMs": 204,
+      "jsBytes": 1713792,
+      "longTaskMs": 0
+    },
+    {
+      "name": "templates",
+      "route": "/templates",
+      "showMs": 758,
+      "pressMs": 42,
+      "lcpMs": 160,
+      "jsBytes": 1457697,
+      "longTaskMs": 0
+    },
+    {
+      "name": "booking",
+      "route": "/booking/bookings",
+      "showMs": 709,
+      "pressMs": 52,
+      "lcpMs": 172,
+      "jsBytes": 1234493,
+      "longTaskMs": 0
+    },
+    {
+      "name": "answers",
+      "route": "/form-submissions",
+      "showMs": 733,
+      "pressMs": 83,
+      "lcpMs": 164,
+      "jsBytes": 1297898,
+      "longTaskMs": 0
+    },
+    {
+      "name": "tags",
+      "route": "/tags",
+      "showMs": 753,
+      "pressMs": 67,
+      "lcpMs": 156,
+      "jsBytes": 1883738,
+      "longTaskMs": 0
+    },
+    {
+      "name": "settings",
+      "route": "/settings",
+      "showMs": 775,
+      "pressMs": 91,
+      "lcpMs": 136,
+      "jsBytes": 2808516,
+      "longTaskMs": 0
+    },
+    {
+      "name": "friends-2000",
+      "route": "/friends",
+      "showMs": 267,
+      "pressMs": null,
+      "lcpMs": 172,
+      "jsBytes": 1635355,
+      "longTaskMs": 0,
+      "rows": 2000,
+      "renderedRows": 13
+    }
+  ]
+}

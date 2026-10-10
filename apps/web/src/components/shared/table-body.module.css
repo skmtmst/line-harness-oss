@@ -1,0 +1,7 @@
+/* Spacers preserve native column widths and the total scroll extent, without cells or lines. */
+.spacer > td {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: 0;
+}
