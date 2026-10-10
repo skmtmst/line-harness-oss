@@ -1,5 +1,19 @@
 # 列車14の組み立て記録（2026-10-10）
 
+## PR #1686 のCI修正
+
+- 試験前の本線SHA：`9da94f6fe717f84464b7ca055a0d9eedceb34ae9`（取得・取り込み確認済み）。開始前診断は合格、開始時の作業ツリーはクリーン。
+- Admin tests は保存結果不明の固定入力へ切り替わった直後、説明欄のラベル接続を待たず取得していた。対象ファイルの全試験を点検し、取得は `findBy`、入力はラベル接続と操作可能状態を `waitFor` で待つ。同期の `getByLabelText` は `waitFor` の中だけに残した。
+- V8 screen guard のログ全体で新規違反は予約台帳の押さえ時刻の折り返しのみ（1152・1440・1920）。時刻を1行に保ち、許可リストは変更していない。
+- `NEXT_PUBLIC_API_URL=https://nen-line-stg.skmtmst.workers.dev` で対象32試験を5回連続合格。5回ともweb全体試験を同時に回して負荷を掛けた。ログ：`/tmp/train14-final-repeat-{1..5}.log`。
+- 同じAPI指定のweb全体試験：2,090ファイル・12,182試験成功、1 skipped・1 todo、失敗0。ログ：`/tmp/train14-web-all-clean.log`。
+- lint・web型検査・webビルド・`verify:design`・`git diff --check` は合格。web全体試験は自身で開発サーバーを起動するため、ビルドと順番を分け、停止を確認した。
+- 画面用ビルドはCIと同じ `NEXT_PUBLIC_RESTAURANT_TEST_ENABLED=true`。他の作業のモックに干渉しないようAPIは手元の専用ポート8794、静的サーバーは4394を使った。
+- `layout-defects.mjs`：全64画面×1152・1440・1920＝192件で新規0・測定失敗0。予約台帳は各幅で新規0・従来の許可1。結果：`/tmp/train14-defects.json`。
+- `layout-overflow.mjs`：全対象・全幅で崩れの合計0。結果：`/tmp/train14-layout.json`。検知器の対照試験4件も成功。
+- 予約台帳の撮影を全3幅で確認し、押さえ時刻の切れ・重なりなし。撮影：`/tmp/train14-reservations-{1152,1440,1920}.png`。
+- 作業で起動した開発サーバー・見本API・静的サーバーは停止。push・D1更新・配備は行わず、コミットを司令塔へ渡す。
+
 - 作業場所：`~/lh-work/lh-train-14`
 - 専用ブランチ：`codex/kenta-train-14-1010`
 - 開始・試験前の本線：`9da94f6fe717f84464b7ca055a0d9eedceb34ae9`（列車13 #1685を含む）。

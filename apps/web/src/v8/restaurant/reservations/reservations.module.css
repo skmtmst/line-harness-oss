@@ -145,6 +145,7 @@
 }
 
 .holdTime {
+  white-space: nowrap;
   color: var(--color-ink-faint);
   font-size: var(--text-nano);
   line-height: var(--tpl-rs-lh-10);
