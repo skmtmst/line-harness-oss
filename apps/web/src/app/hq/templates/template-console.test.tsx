@@ -356,6 +356,7 @@ describe('HQひな形の配布フロー', () => {
       // 消去後は固定入力から TagEditor に掛け直される。表示文だけを待つと、
       // mock の初期化 effect が次の入力を古い名前に戻すことがある。
       // 非同期の再確認と描画・effect を act で終えてから入力する。
+      const frozenName = screen.getByLabelText('ひな形の名前')
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: '前回の保存を再確認' })) })
       if (outcome === 'success') await screen.findByRole('checkbox', { name: '銀座本店' })
       else await screen.findByText('前回の保存は受け付けられていません。内容を確認して保存し直してください。')
@@ -364,6 +365,13 @@ describe('HQひな形の配布フロー', () => {
       expect(screen.queryByRole('button', { name: '前回の保存を再確認' })).toBeNull()
       if (outcome === 'definite-rejection') {
         // 「入力を固定」は解かれ、やり直せるようになる。
+        await waitFor(() => {
+          const input = screen.getByLabelText('ひな形の名前') as HTMLInputElement
+          expect(input).not.toBe(frozenName)
+          expect(input.disabled).toBe(false)
+          expect(input.value).toBe('消去待ちの内容')
+          expect((screen.getByRole('button', { name: '下書きを保存' }) as HTMLButtonElement).disabled).toBe(false)
+        })
         const editable = await nameInput()
         expect(editable.disabled).toBe(false)
         fireEvent.change(editable, { target: { value: '修正した新しい内容' } })

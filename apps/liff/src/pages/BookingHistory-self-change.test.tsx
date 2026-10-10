@@ -133,9 +133,9 @@ it('確認窓を開いた後に期限を過ぎたら送信を止め、理由を�
   const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2099-10-01T00:00:00Z'));
   try {
     setup([item({ cancel_deadline_at: '2099-10-01T00:00:01Z' })]);
-    fireEvent.click(await screen.findByRole('button', { name: 'キャンセル' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'キャンセルする' }));
     clock.mockReturnValue(Date.parse('2099-10-01T00:00:02Z'));
-    fireEvent.click(screen.getByRole('button', { name: 'キャンセルする' }));
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'キャンセルする' }));
     expect(cancelMyBooking).not.toHaveBeenCalled();
     const dialog = screen.getByRole('alertdialog');
     expect(dialog.textContent).toContain('キャンセルの期限を過ぎています');

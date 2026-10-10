@@ -188,7 +188,7 @@ export async function stubApi(page, mockFetch) {
   })
 }
 
-export async function gotoTarget(page, target, waitUntil = 'networkidle') {
+export async function gotoTarget(page, target, waitUntil = 'commit') {
   // 標準画面は従来の通信待ちを保つ。負荷画面は下の実データの印で判定する。
   // 通信待ちがtimeoutしても、描画中の画面を再読込しない。
   try {
@@ -206,7 +206,7 @@ export async function measureScreen(browser, target, name, route) {
   if (target.stub) await stubApi(page, target.mockFetch)
   const start = Date.now()
   debug(`${name}: document`)
-  await gotoTarget(page, target.url(route))
+  await gotoTarget(page, target.url(route), 'networkidle')
   debug(`${name}: data-ready`)
   await waitForScreenReady(page, route)
   if (SLOW_MS) await page.waitForTimeout(SLOW_MS)

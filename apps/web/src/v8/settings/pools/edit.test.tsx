@@ -44,7 +44,7 @@ it('編集中に閉じると破棄を確認し、キャンセルでは入力を�
   fireEvent.change(screen.getByRole('textbox', { name: /プール名/ }), { target: { value: '入力途中' } })
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'キャンセル', exact: true }))
   const confirm = screen.getByRole('dialog', { name: '入力を破棄しますか？' })
-  fireEvent.click(within(confirm).getByRole('button', { name: 'キャンセル', exact: true }))
+  fireEvent.click(within(confirm).getByRole('button', { name: '編集を続ける', exact: true }))
   expect((screen.getByRole('textbox', { name: /プール名/ }) as HTMLInputElement).value).toBe('入力途中')
   expect(net.update).not.toHaveBeenCalled()
 })

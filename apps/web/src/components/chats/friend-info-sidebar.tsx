@@ -1766,13 +1766,13 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   fields={friendFields.kind === 'data' ? friendFields.items : []}
                   state={friendFields.kind === 'data' ? 'ready' : friendFields.kind}
                   onRetry={() => setFieldsRetry(key => key + 1)}
-                  canEdit={isOwnerOrAdmin() || canEditFeature('attribute.personal_info.edit')}
+                  canEdit={canEditFeature('attribute.personal_info.edit', staffRole)}
                   hiddenPersonalCount={friendFields.kind === 'data' ? friendFields.hiddenPersonalCount : 0}
                   sections={[
                     { key: 'support', label: '対応', content: sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) },
                     { key: 'tags', label: 'タグ', content: sectionBody(renderTags(friend)) },
                     { key: 'mileage', label: 'マイル', content: sectionBody(renderMileage(friend)) },
-                    { key: 'richMenu', label: 'リッチメニュー', action: isOwnerOrAdmin() ? <Link href="/rich-menus">編集する</Link> : null, content: sectionBody(renderRichMenu(friend)) },
+                    { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Link href="/rich-menus">編集する</Link> : null, content: sectionBody(renderRichMenu(friend)) },
                     { key: 'memo', label: 'メモ', content: sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) },
                   ]}
                   extraSections={Children.toArray(renderDetailSections(friend).props.children).flatMap(child => {

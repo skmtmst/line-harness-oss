@@ -52,7 +52,7 @@ export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
 export default function PoolsV8() {
   usePageTitle(TITLE)
   const role = useStaffRole()
-  // 役割が読めるまでは今までどおり出し、見るだけと分かったら操作を隠す（最後の守りはサーバの 403）。
+  // APIと同じくオーナーだけ。役割の確認中も変更操作を隠す。
   const canManage = role === 'owner'
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])

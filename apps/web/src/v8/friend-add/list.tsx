@@ -12,7 +12,7 @@
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -294,15 +294,23 @@ function FriendAddList() {
     if (found) setDeleteTarget(found)
   }, [data, requestedDeleteId])
 
+  const clearHighlight = () => {
+    setHighlightedId(null)
+    writeListUrlParam('highlight', '')
+  }
   const selectFolder = (next: string | null) => {
+    clearHighlight()
     setFolder(next)
     resetCursor()
   }
   const selectStatus = (next: FriendAddRuleStatus | '') => {
+    // 複製直後だけ先頭に出す。利用者が絞り直したら通常の一覧へ戻す。
+    clearHighlight()
     setStatusFilter(next)
     resetCursor()
   }
   const changePerPage = (next: number) => {
+    clearHighlight()
     setPerPage(next)
     resetCursor()
   }
@@ -603,8 +611,8 @@ function FriendAddList() {
     <div className={styles.searchBox}>
       <SearchField
         value={search}
-        onChange={setSearch}
-        onClear={() => setSearch('')}
+        onChange={next => { clearHighlight(); setSearch(next) }}
+        onClear={() => { clearHighlight(); setSearch('') }}
         placeholder={narrow ? '設定名で探す' : '設定名・流入リンクで探す'}
         aria-label="設定名・流入リンクで探す"
       />
@@ -739,6 +747,7 @@ function FriendAddList() {
         canCreate={canEdit}
         filtered={filterActive}
         onClearFilters={() => {
+          clearHighlight()
           setSearch('')
           setAppliedSearch('')
           setStatusFilter('')
@@ -789,7 +798,7 @@ function FriendAddList() {
                   </Td>
                   <Td className={styles.colName}>
                     <FolderDotName folder={folderDotOf(rule.folderName)}>
-                      <Link href={editHref(rule.id)}  className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
+                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
                     </FolderDotName>
 
                   </Td>

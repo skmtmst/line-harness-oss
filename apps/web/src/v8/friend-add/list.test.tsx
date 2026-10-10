@@ -70,6 +70,8 @@ let host: HTMLDivElement
 
 beforeEach(() => {
   navigation.query = ''
+  window.history.replaceState(null, '', '/friend-add-settings')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   roleState.role = 'owner'
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
@@ -95,6 +97,7 @@ beforeEach(() => {
 
 it('編集から複製した下書きは、元の位置が別ページでも先頭に読み込み強調する', async () => {
   navigation.query = 'status=draft&highlight=copy'
+  window.history.replaceState(null, '', `/friend-add-settings?${navigation.query}`)
   const fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = new URL(String(input))
     if (url.pathname === '/api/friend-add-rules') return json({ success: true, data: {
@@ -111,6 +114,7 @@ it('編集から複製した下書きは、元の位置が別ページでも先�
   expect(fetch.mock.calls.some(([input]) => new URL(String(input)).searchParams.get('highlight') === 'copy')).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: /下書き/ }))
   await waitFor(() => expect(new URL(String(fetch.mock.calls.at(-1)?.[0])).searchParams.has('highlight')).toBe(false))
+  await waitFor(() => expect(new URLSearchParams(window.location.search).has('highlight')).toBe(false))
 });
 
 afterEach(() => {

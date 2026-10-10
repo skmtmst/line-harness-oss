@@ -1161,7 +1161,7 @@ export default function TemplatesListV8() {
                     <NameCell name={
                         <div className={styles.dotLine}>
                           <>
-                            <Link href={detailHref(t)} title=<TruncatedText value={String(t.name ?? '')} /> className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                            <Link href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
                               <TruncatedText value={String(t.name ?? '')} />
                             </Link>
                           </>
