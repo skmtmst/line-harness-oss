@@ -3209,24 +3209,29 @@
       ]
     },
     "NUOgw": {
-      "name": "手順（共通・題と説明の下・左寄せ）",
-      "export": "html/components-ZBjxY.html",
+      "name": "手順",
+      "export": "html/components-NbomF.html",
       "nodes": [
         {
           "d": 0,
-          "n": "手順（共通・題と説明の下・左寄せ）",
+          "n": "手順",
           "t": "frame",
-          "gap": 8
+          "pad": [
+            12,
+            24
+          ],
+          "gap": 12,
+          "fill": "#fafafc",
+          "sw": {
+            "top": 1,
+            "right": 0,
+            "bottom": 1,
+            "left": 0
+          }
         },
         {
           "d": 1,
-          "n": "段 基本設定",
-          "t": "frame",
-          "gap": 8
-        },
-        {
-          "d": 2,
-          "n": "丸",
+          "n": "丸1",
           "t": "frame",
           "gap": 0,
           "r": 999,
@@ -3236,42 +3241,18 @@
         },
         {
           "d": 2,
-          "n": "名",
-          "t": "text",
-          "fs": 13,
-          "fw": "400",
-          "color": "#1d1d1f"
+          "n": "✓",
+          "t": "icon",
+          "h": 16,
+          "w": 16
         },
         {
           "d": 1,
-          "n": "線",
-          "t": "frame",
-          "h": 1.5,
-          "w": 24,
-          "fill": "#087a3e"
-        },
-        {
-          "d": 1,
-          "n": "段 配信対象",
-          "t": "frame",
-          "gap": 8
-        },
-        {
-          "d": 2,
-          "n": "丸",
-          "t": "frame",
-          "gap": 0,
-          "r": 999,
-          "h": 22,
-          "w": 22,
-          "fill": "#087a3e"
-        },
-        {
-          "d": 2,
-          "n": "名",
+          "n": "名1",
           "t": "text",
           "fs": 13,
           "fw": "600",
+          "lh": 1.5384615384615385,
           "color": "#1d1d1f"
         },
         {
@@ -3279,102 +3260,36 @@
           "n": "線",
           "t": "frame",
           "h": 1.5,
-          "w": 24,
-          "fill": "#1d1d1f12"
+          "w": 28,
+          "fill": "#087a3e"
         },
         {
           "d": 1,
-          "n": "段 メッセージを作成",
-          "t": "frame",
-          "gap": 8
-        },
-        {
-          "d": 2,
-          "n": "丸",
+          "n": "丸2",
           "t": "frame",
           "gap": 0,
           "r": 999,
           "h": 22,
           "w": 22,
-          "fill": "#ffffff",
-          "stroke": "#c9ced6",
-          "sw": 1
+          "fill": "#087a3e"
         },
         {
           "d": 2,
-          "n": "名",
+          "n": "数",
+          "t": "text",
+          "fs": 11,
+          "fw": "600",
+          "lh": 1.5454545454545454,
+          "color": "#ffffff"
+        },
+        {
+          "d": 1,
+          "n": "名2",
           "t": "text",
           "fs": 13,
-          "fw": "400",
-          "color": "#4a5565"
-        },
-        {
-          "d": 1,
-          "n": "線",
-          "t": "frame",
-          "h": 1.5,
-          "w": 24,
-          "fill": "#1d1d1f12"
-        },
-        {
-          "d": 1,
-          "n": "段 送信設定",
-          "t": "frame",
-          "gap": 8
-        },
-        {
-          "d": 2,
-          "n": "丸",
-          "t": "frame",
-          "gap": 0,
-          "r": 999,
-          "h": 22,
-          "w": 22,
-          "fill": "#ffffff",
-          "stroke": "#c9ced6",
-          "sw": 1
-        },
-        {
-          "d": 2,
-          "n": "名",
-          "t": "text",
-          "fs": 13,
-          "fw": "400",
-          "color": "#4a5565"
-        },
-        {
-          "d": 1,
-          "n": "線",
-          "t": "frame",
-          "h": 1.5,
-          "w": 24,
-          "fill": "#1d1d1f12"
-        },
-        {
-          "d": 1,
-          "n": "段 最終確認",
-          "t": "frame",
-          "gap": 8
-        },
-        {
-          "d": 2,
-          "n": "丸",
-          "t": "frame",
-          "gap": 0,
-          "r": 999,
-          "h": 22,
-          "w": 22,
-          "fill": "#ffffff",
-          "stroke": "#c9ced6",
-          "sw": 1
-        },
-        {
-          "d": 2,
-          "n": "名",
-          "t": "text",
-          "fs": 13,
-          "fw": "400",
-          "color": "#4a5565"
+          "fw": "600",
+          "lh": 1.5384615384615385,
+          "color": "#1d1d1f"
         }
       ]
     },
@@ -4571,6 +4486,176 @@
           "sw": 1
         }
       ]
+    },
+    "Fa8ED": {
+      "name": "手順（共通・題と説明の下・左寄せ）",
+      "export": "html/components-ZBjxY.html",
+      "nodes": [
+        {
+          "d": 0,
+          "n": "手順（共通・題と説明の下・左寄せ）",
+          "t": "frame",
+          "gap": 8
+        },
+        {
+          "d": 1,
+          "n": "段 基本設定",
+          "t": "frame",
+          "gap": 8
+        },
+        {
+          "d": 2,
+          "n": "丸",
+          "t": "frame",
+          "gap": 0,
+          "r": 999,
+          "h": 22,
+          "w": 22,
+          "fill": "#087a3e"
+        },
+        {
+          "d": 2,
+          "n": "名",
+          "t": "text",
+          "fs": 13,
+          "fw": "400",
+          "color": "#1d1d1f"
+        },
+        {
+          "d": 1,
+          "n": "線",
+          "t": "frame",
+          "h": 1.5,
+          "w": 24,
+          "fill": "#087a3e"
+        },
+        {
+          "d": 1,
+          "n": "段 配信対象",
+          "t": "frame",
+          "gap": 8
+        },
+        {
+          "d": 2,
+          "n": "丸",
+          "t": "frame",
+          "gap": 0,
+          "r": 999,
+          "h": 22,
+          "w": 22,
+          "fill": "#087a3e"
+        },
+        {
+          "d": 2,
+          "n": "名",
+          "t": "text",
+          "fs": 13,
+          "fw": "600",
+          "color": "#1d1d1f"
+        },
+        {
+          "d": 1,
+          "n": "線",
+          "t": "frame",
+          "h": 1.5,
+          "w": 24,
+          "fill": "#1d1d1f12"
+        },
+        {
+          "d": 1,
+          "n": "段 メッセージを作成",
+          "t": "frame",
+          "gap": 8
+        },
+        {
+          "d": 2,
+          "n": "丸",
+          "t": "frame",
+          "gap": 0,
+          "r": 999,
+          "h": 22,
+          "w": 22,
+          "fill": "#ffffff",
+          "stroke": "#c9ced6",
+          "sw": 1
+        },
+        {
+          "d": 2,
+          "n": "名",
+          "t": "text",
+          "fs": 13,
+          "fw": "400",
+          "color": "#4a5565"
+        },
+        {
+          "d": 1,
+          "n": "線",
+          "t": "frame",
+          "h": 1.5,
+          "w": 24,
+          "fill": "#1d1d1f12"
+        },
+        {
+          "d": 1,
+          "n": "段 送信設定",
+          "t": "frame",
+          "gap": 8
+        },
+        {
+          "d": 2,
+          "n": "丸",
+          "t": "frame",
+          "gap": 0,
+          "r": 999,
+          "h": 22,
+          "w": 22,
+          "fill": "#ffffff",
+          "stroke": "#c9ced6",
+          "sw": 1
+        },
+        {
+          "d": 2,
+          "n": "名",
+          "t": "text",
+          "fs": 13,
+          "fw": "400",
+          "color": "#4a5565"
+        },
+        {
+          "d": 1,
+          "n": "線",
+          "t": "frame",
+          "h": 1.5,
+          "w": 24,
+          "fill": "#1d1d1f12"
+        },
+        {
+          "d": 1,
+          "n": "段 最終確認",
+          "t": "frame",
+          "gap": 8
+        },
+        {
+          "d": 2,
+          "n": "丸",
+          "t": "frame",
+          "gap": 0,
+          "r": 999,
+          "h": 22,
+          "w": 22,
+          "fill": "#ffffff",
+          "stroke": "#c9ced6",
+          "sw": 1
+        },
+        {
+          "d": 2,
+          "n": "名",
+          "t": "text",
+          "fs": 13,
+          "fw": "400",
+          "color": "#4a5565"
+        }
+      ]
     }
   },
   "checks": [
@@ -4662,7 +4747,7 @@
       "name": "手順（共通・題と説明の下・左寄せ） width",
       "file": "src/components/templates/steps.module.css",
       "selector": ".dot",
-      "source": "html/components-ZBjxY.html NUOgw 丸",
+      "source": "html/components-ZBjxY.html Fa8ED 丸",
       "declarations": [
         {
           "prop": "width",
@@ -4674,7 +4759,7 @@
       "name": "手順（共通・題と説明の下・左寄せ） height",
       "file": "src/components/templates/steps.module.css",
       "selector": ".dot",
-      "source": "html/components-ZBjxY.html NUOgw 丸",
+      "source": "html/components-ZBjxY.html Fa8ED 丸",
       "declarations": [
         {
           "prop": "height",

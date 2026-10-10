@@ -10,7 +10,7 @@ const DESIGN = process.env.V8_DESIGN_DIR ?? '/Users/kentakenta/lh-work/design/v8
 const DATE = '2026-10-10'
 const aliases = {
   ASVsl: '表の見出し（B-178）', JpOg0: '表の行（B-178）',
-  NUOgw: '手順（共通・題と説明の下・左寄せ）',
+  NUOgw: '手順', Fa8ED: '手順（共通・題と説明の下・左寄せ）',
 }
 
 const px = value => /^-?\d+(?:\.\d+)?px$/.test(value) ? parseFloat(value) : undefined
@@ -66,7 +66,8 @@ export function regenerate() {
   const old = JSON.parse(readFileSync(valuePath, 'utf8'))
   const docs = ['components-ZBjxY', 'components-NbomF'].map(load)
   const parts = {}
-  for (const [id, part] of Object.entries(old.parts)) {
+  // 部品所有表の「手順」にはNUOgw（旧）とFa8ED（正）がある。IDを混同しない。
+  for (const [id, part] of Object.entries({ ...old.parts, Fa8ED: { name: aliases.Fa8ED } })) {
     const name = aliases[id] ?? part.name
     const doc = docs.find(doc => find(doc, name))
     if (!doc) throw new Error(`固定HTMLに部品がない: ${id} ${name}`)
@@ -125,9 +126,9 @@ export function regenerate() {
   add('v8-text-link', 'text-link', 'g5Db8', [['root', 'color', link]])
   const table = find(docs[1], '表の見出し（B-178）')
   add('v8-table-spacing', 'table', 'ASVsl', [['headRow', 'padding', table, 'padding', "[data-theme='v8'] .headRow[data-table-layout='columns']"]])
-  const steps = find(docs[0], aliases.NUOgw)
+  const steps = find(docs[0], aliases.Fa8ED)
   const dot = steps.querySelector('[data-pencil-name="丸"]')
-  add('v8-step-circle', 'steps', 'NUOgw', [['dot', 'width', dot], ['dot', 'height', dot]])
+  add('v8-step-circle', 'steps', 'Fa8ED', [['dot', 'width', dot], ['dot', 'height', dot]])
   const on = find(docs[0], 'ラジオ/オン').querySelector('[data-pencil-name="丸"]')
   add('v8-radio', 'radio', 'y4YQSB', [
     ['input', 'width', on], ['input', 'height', on],
