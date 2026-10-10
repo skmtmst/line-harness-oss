@@ -1,3 +1,5 @@
+import { jstCalendar } from './jst-datetime.js';
+
 /** フォーム・情報欄・要点の欄が共通で使う10項目。IDは配布先に持ち込まない。 */
 export const FIXED_FRIEND_FIELDS = [
   { key: 'name', label: '名前', type: 'text', format: 'none' },
@@ -49,7 +51,7 @@ export function ageFromBirthday(birthday: string | null | undefined, now = new D
   const [year, month, day] = birthday.split('-').map(Number);
   const born = new Date(birthday + 'T00:00:00Z');
   if (born.getUTCFullYear() !== year || born.getUTCMonth() + 1 !== month || born.getUTCDate() !== day) return null;
-  const today = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const today = jstCalendar(now);
   const age = today.getUTCFullYear() - year -
     (today.getUTCMonth() + 1 < month || (today.getUTCMonth() + 1 === month && today.getUTCDate() < day) ? 1 : 0);
   return age < 0 ? null : age;
