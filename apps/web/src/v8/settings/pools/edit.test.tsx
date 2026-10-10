@@ -16,7 +16,7 @@ import PoolsV8 from './pools'
 
 beforeEach(() => {
   net.role = 'owner'
-  net.list.mockReset().mockResolvedValue({ success: true, data: [{ id: 'pool', name: '店への入り口', slug: 'main' }] })
+  net.list.mockReset().mockResolvedValue({ success: true, data: [{ id: 'pool', name: '店への入り口', slug: 'main', updatedAt: '2026-10-10T00:00:00.000+09:00' }] })
   net.update.mockReset().mockRejectedValue(new Error('offline'))
 })
 afterEach(cleanup)
@@ -32,7 +32,7 @@ it('既定プールも名前を編集でき、空欄は送らず、失敗して�
   expect(screen.getByText('名前を入力してください')).toBeTruthy()
   fireEvent.change(input, { target: { value: '  新しい名前  ' } })
   fireEvent.click(screen.getByRole('button', { name: '保存する', exact: true }))
-  await waitFor(() => expect(net.update).toHaveBeenCalledWith('pool', { name: '新しい名前' }))
+  await waitFor(() => expect(net.update).toHaveBeenCalledWith('pool', { name: '新しい名前', expectedUpdatedAt: '2026-10-10T00:00:00.000+09:00' }))
   await waitFor(() => expect(screen.getByRole('dialog').textContent).toContain('入力は残っています'))
   expect(input.value).toBe('  新しい名前  ')
 })
