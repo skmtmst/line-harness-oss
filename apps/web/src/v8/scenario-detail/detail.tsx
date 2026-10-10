@@ -2409,7 +2409,7 @@ export default function ScenarioDetailV8({
         </div>
       )}
 
-      <div className={styles.body} data-design="Body">
+      <div className={styles.body} data-design="Body" data-template-region="body">
         <div className={styles.left}>
           {!canEdit ? (
             <div className={styles.viewerBand} role="status">
@@ -2779,7 +2779,7 @@ export default function ScenarioDetailV8({
         </div>
 
         {/* 右の欄：選んだ通のスマホ。 */}
-        <aside className={styles.right}>
+        <aside className={styles.right} data-template-region="preview" data-preview-narrow="hidden">
           <h2 className={styles.rightTitle}>
             {`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : emptyValue('unknown')}）の見え方`}
           </h2>

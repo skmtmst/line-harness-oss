@@ -477,10 +477,10 @@ export default function MediaSlot({
         ) : error ? (
           <>
             <span className={styles.reason} role="alert">{error}</span>
-            {limit ? <span className={styles.desc}>{limit}</span> : null}
+            {limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{limit}</span> : null}
           </>
         ) : !canFile ? (
-          limit ? <span className={styles.desc}>{compact ? limit : `（${limit}）`}</span> : null
+          limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{compact ? limit : `（${limit}）`}</span> : null
         ) : (
           <>
             <span className={styles.desc}>
@@ -488,7 +488,7 @@ export default function MediaSlot({
               <br />
               {compact ? 'またはクリック' : 'またはクリックしてファイルをアップロード'}
             </span>
-            {limit ? <span className={styles.desc}>{compact ? limit : `（${limit}）`}</span> : null}
+            {limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{compact ? limit : `（${limit}）`}</span> : null}
           </>
         )}
       </>
