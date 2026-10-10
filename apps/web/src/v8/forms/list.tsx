@@ -180,6 +180,7 @@ export default function FormsListV8() {
   const [stopImpactLoading, setStopImpactLoading] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
+  const [restoringId, setRestoringId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   /** 数の帯。取れないときは全部「—」（0 とは言わない）。 */
@@ -893,10 +894,28 @@ export default function FormsListV8() {
   ]
 
   /* ===== 行の「…」（編集・名前を変更・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
+  const restoreForm = async (form: Form) => {
+    if (!selectedAccountId || !canEditForms || restoringId) return
+    const accountId = selectedAccountId
+    setRestoringId(form.id)
+    try {
+      const response = await api.forms.unarchive(form.id, accountId, form.revision)
+      if (!response.success) throw new Error('restore_failed')
+      if (activeAccountRef.current !== accountId) return
+      notifyToast('アーカイブから戻しました。受付は停止中です。')
+      await loadForms()
+    } catch {
+      if (activeAccountRef.current === accountId) notifyToast('戻せませんでした。一覧を読み直してお試しください。', { tone: 'error' })
+    } finally { setRestoringId(null) }
+  }
+
   const rowMenuItems = (form: Form): ActionMenuItem[] => !canEditForms ? [{
     id: 'responses', label: '集まった回答', external: true,
     onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
-  }] : [
+  }] : form.status === 'archived' ? [
+    { id: 'restore', label: 'アーカイブから戻す', disabled: restoringId !== null, onSelect: () => void restoreForm(form) },
+    { id: 'responses', label: '集まった回答', onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`) },
+  ] : [
     {
       id: 'edit',
       label: '編集',
@@ -1006,6 +1025,9 @@ export default function FormsListV8() {
         icon={<IdCard size={13} aria-hidden="true" />}
       >
         情報欄に保存
+      </FilterChip>
+      <FilterChip selected={formFilter === 'archived'} onChange={(next) => updateListState({ filter: next ? 'archived' : 'all', page: 1 })}>
+        アーカイブ済み
       </FilterChip>
       {/* 「後処理未完」は数の帯の「未完を見る」から入る絞り込み。選んでいる間だけ札を出す。 */}
       {formFilter === 'pending' ? (

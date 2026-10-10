@@ -60,7 +60,7 @@ export type FormListResponse = Form[] | {
 }
 
 /** 絞り込み札。「後処理未完」は数の帯の「未完を見る」から入る。 */
-export type FormFilter = 'all' | 'published' | 'draft' | 'stored' | 'pending'
+export type FormFilter = 'all' | 'published' | 'draft' | 'stored' | 'pending' | 'archived'
 export type FormSort = 'latest-answer' | 'answers' | 'updated' | 'name'
 
 /** 表示件数（決まり：ページ送りのある一覧は 10・20・50 件）。 */
@@ -82,7 +82,7 @@ export function validSort(value: string | null): FormSort {
 }
 
 export function validFilter(value: string | null): FormFilter {
-  return value === 'published' || value === 'draft' || value === 'stored' || value === 'pending'
+  return value === 'published' || value === 'draft' || value === 'stored' || value === 'pending' || value === 'archived'
     ? value
     : 'all'
 }

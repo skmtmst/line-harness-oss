@@ -14,6 +14,7 @@ vi.hoisted(() => {
 
 const fetchApi = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
+const unarchive = vi.hoisted(() => vi.fn())
 const listStats = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const narrow = vi.hoisted(() => ({ value: false }))
@@ -24,7 +25,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return {
     ...actual,
     fetchApi,
-    api: { ...api, folders: { ...api.folders, list: listFolders }, listStats: { get: listStats } },
+    api: { ...api, forms: { ...api.forms, unarchive }, folders: { ...api.folders, list: listFolders }, listStats: { get: listStats } },
   }
 })
 
@@ -106,6 +107,8 @@ beforeEach(() => {
   Object.defineProperty(window, 'localStorage', { value: storage, configurable: true })
   window.localStorage.setItem('lh_staff_role', 'owner')
   narrow.value = false
+  unarchive.mockReset()
+  unarchive.mockResolvedValue({ success: true, data: { status: 'active', revision: 2, isActive: false } })
   fetchApi.mockReset()
   fetchApi.mockImplementation(async (path: string) => {
     if (path.startsWith('/api/forms?')) {
@@ -305,3 +308,17 @@ describe('V8 回答フォーム一覧の右クリック', () => {
     expect(menu!.textContent).toContain('受付を止める')
   })
 })
+
+it('アーカイブの絞り込みと復元は版番号を送り、受付を勝手に再開しない', async () => {
+  fetchApi.mockImplementation(async (path: string) => ({ success: true, data: path.includes('filter=archived')
+    ? { items: [{ ...baseForm, id: 'f-old', name: '過去のフォーム', status: 'archived', isActive: false, revision: 7 }], total: 1 }
+    : { items: [], total: 0 } }));
+  await mount();
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'アーカイブ済み' })));
+  await flush();
+  expect(fetchApi.mock.calls.some(([path]) => path.includes('filter=archived'))).toBe(true);
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '「過去のフォーム」のその他の操作' })));
+  await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: 'アーカイブから戻す' })));
+  await flush();
+  expect(unarchive).toHaveBeenCalledWith('f-old', 'account-a', 7);
+});
