@@ -26,6 +26,7 @@ import styles from './settings.module.css'
 import ch from './channels.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -446,7 +447,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
             <span className={ch.cardDesc}>{data.autoAssign ? 'オン' : 'オフ'}</span>
           </p>
         )}
-        {assignError ? <p role="alert" className={ch.cardDesc}>{assignError}</p> : null}
+        {assignError ? <Notice tone="danger" className={ch.cardDescNoticePlacement} >{assignError}</Notice> : null}
       </section>
 
       {detailTarget ? (

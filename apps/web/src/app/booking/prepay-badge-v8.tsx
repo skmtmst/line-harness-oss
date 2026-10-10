@@ -9,6 +9,7 @@ import {
 } from '@/lib/api'
 import styles from './prepay-badge-v8.module.css'
 import { Field } from '@/components/shared/form-controls'
+import Notice from '@/components/shared/notice'
 
 function jstMonthDay(iso: string): string {
   const date = new Date(iso)
@@ -91,7 +92,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
   }
 
   if (!loaded) return <p role="status">前払い情報を読み込み中…</p>
-  if (loadError) return <div role="alert"><p>前払い情報を読み込めませんでした</p><Button onClick={reload}>もう一度読み込む</Button></div>
+  if (loadError) return <Notice tone="danger" action={<> <Button onClick={reload}>もう一度読み込む</Button> </>} >前払い情報を読み込めませんでした</Notice>
   if (!decision?.prepayOnly) return null
   const dates = decision.recentDates.map(jstMonthDay).filter((text) => text !== '')
 

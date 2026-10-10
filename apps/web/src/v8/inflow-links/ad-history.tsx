@@ -9,7 +9,7 @@
  * BEHAVIOR.md の「広告への送信履歴」。
  */
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useMemo, useState } from 'react'
 import { Download, RotateCw } from 'lucide-react'
 import { api, type AdConversionLog } from '@/lib/api'
@@ -29,6 +29,7 @@ import styles from './ad-pages.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'すべての状態' },
@@ -192,7 +193,7 @@ export default function AdHistoryV8() {
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <span className={styles.toolsCount}>{`${formatNumber(model.total)} 件中 ${formatNumber(visible.length)} 件`}</span>
         </div>
-        {retryError ? <p className={adsStyles.error} role="alert">{retryError}</p> : null}
+        {retryError ? <Notice tone="danger" className={adsStyles.errorNoticePlacement} >{retryError}</Notice> : null}
         {body}
         {pageCount > 1 ? (
           <div className={styles.pager}>

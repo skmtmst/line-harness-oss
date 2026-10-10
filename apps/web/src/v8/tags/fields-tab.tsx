@@ -513,10 +513,8 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
           >
             <FolderPanelNote>フォルダを消しても、中の項目は未分類に残ります</FolderPanelNote>
             {folderError ? (
-              <p role="alert" className={styles.folderNote}>
-                {folderError}
-                <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button>
-              </p>
+              <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
+                <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button></Notice>
             ) : null}
           </FolderPanel>
         </>}

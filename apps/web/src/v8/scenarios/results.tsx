@@ -37,6 +37,7 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './results.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]
@@ -658,10 +659,8 @@ export default function ScenarioResultsV8() {
                 </div>
                 {/* 続きを読めるかぎり読む。読み込み中の失敗は一覧を消さず、再試行口だけ出す。 */}
                 {runsMoreError ? (
-                  <p className={styles.moreError} role="alert">
-                    {runsMoreError}
-                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button>
-                  </p>
+                  <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{runsMoreError}
+                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button></Notice>
                 ) : null}
                 {runs.pagination.nextCursor ? (
                   <div className={styles.more}>
@@ -710,12 +709,10 @@ export default function ScenarioResultsV8() {
       >
         {/* 候補の取得失敗は「移せるシナリオがありません」と分ける（SCENARIO-10 と同じ分け方）。 */}
         {moveOptionsError ? (
-          <p className={styles.moreError} role="alert">
-            移し先の候補を読み込めませんでした。
+          <Notice tone="danger" className={styles.moreErrorNoticePlacement} >移し先の候補を読み込めませんでした。
             <button type="button" className={styles.sectionLink} onClick={() => void loadMoveOptions()} disabled={opBusy !== null}>
               もう一度読み込む
-            </button>
-          </p>
+            </button></Notice>
         ) : (
           <EntityKindField
             kind="scenario"

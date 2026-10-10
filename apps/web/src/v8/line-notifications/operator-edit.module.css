@@ -21,7 +21,6 @@
 }
 
 .cardNote {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: normal;
@@ -201,7 +200,6 @@
 }
 
 .formError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-label);
 }
@@ -307,3 +305,7 @@
 
 /* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
 .roBand { }
+
+.cardNote, .cardNoteNoticePlacement { margin: 0; }
+
+.formError, .formErrorNoticePlacement { margin: 0; }

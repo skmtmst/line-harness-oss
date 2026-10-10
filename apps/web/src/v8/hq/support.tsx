@@ -306,7 +306,7 @@ export default function HqSupportV8() {
           </div>
 
           {error ? <Notice tone="danger" >{error}</Notice> : null}
-          {blocked && (input.subject || input.body || input.kind) ? <p className={styles.warn} role="alert">{blocked}</p> : null}
+          {blocked && (input.subject || input.body || input.kind) ? <Notice tone="danger" className={styles.warnNoticePlacement} >{blocked}</Notice> : null}
 
           <div className={styles.actions}>
             <Button onClick={clear} disabled={sending}>内容をクリア</Button>

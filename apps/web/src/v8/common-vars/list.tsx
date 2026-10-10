@@ -20,7 +20,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert, X } from 'lucide-react'
+import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react'
 import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
 import {
   api,
@@ -875,18 +875,13 @@ function CommonVarsListInner() {
   /* ===== フォルダの列 ===== */
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
   const folderFailureNote = folderFailure ? (
-    <div role="alert" className={styles.folderAlert}>
-      <p className={styles.folderNote}>
-        {folderForbidden
-          ? permissionDeniedMessage('store')
-          : 'フォルダを読み込めませんでした。登録した共通情報は消えていません。'}
-      </p>
-      {folderForbidden ? null : (
+    <Notice tone="danger" action={<> {folderForbidden ? null : (
         <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
           {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
         </Button>
-      )}
-    </div>
+      )} </>} >{folderForbidden
+          ? permissionDeniedMessage('store')
+          : 'フォルダを読み込めませんでした。登録した共通情報は消えていません。'}</Notice>
   ) : null
 
   /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
@@ -1082,14 +1077,7 @@ function CommonVarsListInner() {
         </div>
       ) : null}
       {error && !listFailed ? (
-        <div className={styles.alertBand} data-tone="danger" role="alert">
-          <TriangleAlert size={16} aria-hidden="true" />
-          <span className={styles.alertText}>{error}</span>
-          <span className={styles.alertSpacer} aria-hidden="true" />
-          <IconButton title="閉じる" aria-label="お知らせを閉じる" onClick={() => setError('')}>
-            <X size={14} aria-hidden="true" />
-          </IconButton>
-        </div>
+        <Notice tone="danger" onClose={() => setError('')}>{error}</Notice>
       ) : null}
     </>
   )

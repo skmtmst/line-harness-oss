@@ -13,7 +13,7 @@ import { Field as SharedField } from '@/components/shared/form-controls'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Copy, Eye, MailPlus, Plus } from 'lucide-react'
+import { Eye, MailPlus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -35,6 +35,7 @@ import { formatStamp, Panel, StatRow, Status } from '../common-a/parts'
 import styles from './organization.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 const roleLabel: Record<RestaurantMembership['role'], string> = {
   super_admin: 'SuperAdmin',
@@ -185,7 +186,7 @@ function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string;
       <div className={styles.intakeBody}>
       <p className={styles.intakeWarning}>このアドレスは予約メールの専用受信口です。第三者へ共有せず、予約媒体の通知設定だけに使用してください。</p>
       {notice ? <p className={styles.intakeNotice} role="status">{notice}</p> : null}
-      {actionError ? <p className={styles.intakeError} role="alert">{actionError}</p> : null}
+      {actionError ? <Notice tone="danger" className={styles.intakeErrorNoticePlacement} >{actionError}</Notice> : null}
       {!store ? (
         <p className={styles.muted}>上部の店舗選択から、設定する店舗を選んでください。</p>
       ) : loading ? (

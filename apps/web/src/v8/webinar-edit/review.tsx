@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Check, ExternalLink, Globe, Play, Send } from 'lucide-react'
+import { Check, Globe, Play, Send } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -169,7 +169,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           </div>
         ))}
         {state === 'ready' && failed.length > 0 ? (
-          <p className={styles.blocker} role="alert">{`このままでは公開できません：${(validation?.blockers.length ? validation.blockers : failed.map((check) => `${check.label}がまだです。`)).join('・')}`}</p>
+          <Notice tone="danger" className={styles.blockerNoticePlacement} >{`このままでは公開できません：${(validation?.blockers.length ? validation.blockers : failed.map((check) => `${check.label}がまだです。`)).join('・')}`}</Notice>
         ) : state === 'ready' ? <p className={styles.ok}>必要なものはそろっています。</p> : null}
         {readOnly ? null : (
           <div className={form.buttons}>
@@ -178,7 +178,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           </div>
         )}
         {notice ? <p className={form.cardNote} role="status">{notice}</p> : null}
-        {publishError ? <p className={form.fieldError} role="alert">{publishError}</p> : null}
+        {publishError ? <Notice tone="danger" className={form.fieldErrorNoticePlacement} >{publishError}</Notice> : null}
       </section>
 
       <section className={form.card} aria-labelledby="webinar-summary-title">

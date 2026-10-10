@@ -2653,16 +2653,10 @@ export function NewAutomationV8({
           <h2 className={styles.cardTitle}>だれに動かしますか</h2>
         </div>
         {conditionUnreadable ? (
-          <div className={styles.subBox} role="alert">
-            <p className={styles.subTitle}>保存されていた条件は読めませんでした</p>
-            <p className={styles.cardDesc}>
-              以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
-              以前の条件を外してもよければ、下のボタンから付け直せます。
-            </p>
-            <div>
+          <Notice tone="danger" heading={<> 保存されていた条件は読めませんでした </>} action={<> <div>
               <Button id="v8-repair-condition" onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>
-            </div>
-          </div>
+            </div> </>} >以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
+              以前の条件を外してもよければ、下のボタンから付け直せます。</Notice>
         ) : (
           <>
             <div className={styles.field}>

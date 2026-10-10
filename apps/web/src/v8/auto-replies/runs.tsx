@@ -15,15 +15,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowLeft,
-  Download,
-  MessageCircle,
-  Pause,
-  Pencil,
-  RotateCcw,
-  TriangleAlert,
-} from 'lucide-react'
+import { ArrowLeft, Download, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react'
 import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
 import { DetailPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -51,6 +43,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import Notice from '@/components/shared/notice'
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
@@ -450,14 +443,7 @@ export default function AutoReplyRunsV8() {
       </div>
 
       {failedCount > 0 ? (
-        <div className={styles.failBand} role="alert">
-          <TriangleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)} 件あります`}</p>
-            <p className={styles.failNote}>止まった行の理由を見て、もう一度実行できます。返信が届いているかは「行ったこと」に出ます。</p>
-          </div>
-          <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>
-          {canManage ? (
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>{canManage ? (
             <Button
               variant="primary"
               onClick={() => void retryAllFailed()}
@@ -467,8 +453,7 @@ export default function AutoReplyRunsV8() {
             >
               <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null}
-        </div>
+          ) : null} </>} >止まった行の理由を見て、もう一度実行できます。返信が届いているかは「行ったこと」に出ます。</Notice>
       ) : null}
 
       <section className={styles.card} aria-label="実行の記録">

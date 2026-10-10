@@ -139,7 +139,7 @@ export default function ColumnNewV8() {
       </div>
 
       {failure ? (
-        <p className={styles.errorText} role="alert" data-failure-kind={failure.kind}>{failure.message}</p>
+        <Notice tone="danger" className={styles.errorTextNoticePlacement} data-failure-kind={failure.kind}>{failure.message}</Notice>
       ) : null}
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}
 

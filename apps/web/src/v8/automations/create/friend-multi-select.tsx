@@ -7,6 +7,7 @@ import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
 import { FRIEND_SELECT_LIMIT, normalizeFriendIds } from './trigger-helpers'
 import TruncatedText from '@/components/shared/truncated-text'
+import Notice from '@/components/shared/notice'
 
 /**
  * 対象の友だちの複数選択（R22・設計G-2）。
@@ -124,7 +125,7 @@ export function FriendMultiSelect({
             {searching ? (
               <p className="px-3 py-2 text-xs text-ink-faint" role="status">探しています…</p>
             ) : searchFailed ? (
-              <p className="px-3 py-2 text-xs text-ink-secondary" role="alert">探せませんでした。通信を確かめてください。</p>
+              <Notice tone="danger" >探せませんでした。通信を確かめてください。</Notice>
             ) : options.length === 0 ? (
               <p className="px-3 py-2 text-xs text-ink-faint">「{query.trim()}」に合う友だちはいません。</p>
             ) : (

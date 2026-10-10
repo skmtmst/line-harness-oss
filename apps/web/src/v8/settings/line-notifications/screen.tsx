@@ -1211,12 +1211,10 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       * #634・M031：運用者タブの件数だけが取れなかったとき、その場所に小さく1行だけ。403 は権限変更後に読み直せるようにする。
       */}
     {expandedSetting === null && (operatorState === 'error' || operatorState === 'forbidden') ? (
-      <p role="alert" className={styles.minor}>
-        {isForbiddenOrRateLimited(operatorCountError)
+      <Notice tone="danger" className={styles.minorNoticePlacement} >{isForbiddenOrRateLimited(operatorCountError)
           ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
           : '運用者へのお知らせの件数を読み込めませんでした。'}
-        <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button>
-      </p>
+        <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button></Notice>
     ) : null}
     {!canManage && expandedSetting === null ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
     {tab === 'failures' ? <RunsTab lineAccountId={selectedAccountId} mode="failures" /> : null}

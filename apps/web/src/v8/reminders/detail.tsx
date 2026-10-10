@@ -14,7 +14,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Check, CircleAlert, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react'
+import { ArrowRight, Check, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react'
 import { describeReminderTiming, type Reminder, type ReminderStep } from '@line-crm/shared'
 import {
   api,
@@ -626,16 +626,9 @@ function OverviewTab({
   return (
     <>
       {hasErrors ? (
-        <div className={styles.failBand} role="alert">
-          <CircleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>送れなかった通知が {formatNumber(data.summary.errors)} 通あります</p>
-            <p className={styles.failNote}>友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</p>
-          </div>
-          <Button onClick={onShowErrors}>
+        <Notice tone="danger" heading={<> 送れなかった通知が {formatNumber(data.summary.errors)}通あります </>} action={<> <Button onClick={onShowErrors}>
             <ArrowRight size={15} aria-hidden="true" />実行結果を見る
-          </Button>
-        </div>
+          </Button> </>} >友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</Notice>
       ) : null}
 
       <section className={styles.card} aria-labelledby="rm-detail-steps">

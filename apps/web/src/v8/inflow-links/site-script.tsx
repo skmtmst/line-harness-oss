@@ -39,6 +39,7 @@ import { Field } from '@/components/shared/form-controls'
 
 import { emptyValue } from '@/components/shared/empty-value'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -283,7 +284,7 @@ export default function SiteScriptV8() {
     <p className={styles.note}>まだサイトがありません。追加するとサイトごとの計測コードが出ます。</p>
   ) : (
     <>
-      {siteActionError ? <p className={styles.note} role="alert">{siteActionError}</p> : null}
+      {siteActionError ? <Notice tone="danger" className={styles.noteNoticePlacement} >{siteActionError}</Notice> : null}
       <div className={styles.siteTable} role="table" aria-label="成果を数えるサイト">
       <div className={styles.siteHead} role="row">
         <span className={styles.colSite} role="columnheader">サイト</span>
@@ -384,7 +385,7 @@ export default function SiteScriptV8() {
                 ) : snippet ? (
                   <>
                     <div className={styles.codeBox}><code className={styles.code}>{snippet}</code></div>
-                    {copyFailed ? <p className={styles.small} role="alert">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
+                    {copyFailed ? <Notice tone="danger" className={styles.smallNoticePlacement} >コピーできませんでした。上のコードを選んでコピーしてください。</Notice> : null}
                     <div className={styles.buttons}>
                       <CopyTextButton value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー"  />
                       <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー"  />

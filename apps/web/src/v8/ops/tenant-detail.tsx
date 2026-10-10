@@ -27,6 +27,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
@@ -154,7 +155,7 @@ function DetailContent() {
         )}
       />
       <div className={parts.stack}>
-        {error ? <p role="alert" className={parts.alert}>{error}</p> : null}
+        {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
         <div className={parts.tabs}>
           <Tabs
             label="契約先の中身"

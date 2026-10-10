@@ -1035,7 +1035,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   richMenuReferences={{ tags: referenceOptions('tag'), templates: referenceOptions('template'), forms: referenceOptions('form') }}
                   formReferences={{ tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] }}
                 />
-              ) : <p role="alert">この種類のひな形は、ここでは編集できません。</p>}
+              ) : <Notice tone="danger" >この種類のひな形は、ここでは編集できません。</Notice>}
               {!canonicalEditorOwnsSave ? uncertainNotice : null}
               {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)} 件を含めて配布します。`}</p> : null}
             </section>

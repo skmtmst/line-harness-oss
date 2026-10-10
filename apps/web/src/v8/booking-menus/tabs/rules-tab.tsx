@@ -11,7 +11,7 @@ import { TimeField } from '@/components/shared/date-time-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
 import HelpTip from '@/components/shared/help-tip'
-import { notifyToast } from '@/components/shared/toast'
+
 import { bookingApi, type BookingSettings, type BookingStaff } from '@/lib/api'
 import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
 import { bookingWindowEnd } from '../lib/format-time'
@@ -29,6 +29,7 @@ import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import Notice from '@/components/shared/notice'
 
 /* 候補は v7（/booking/menus の BookingRulesEditor）と同じ。 */
 const TIME_ZONE_CHOICES = [
@@ -407,12 +408,10 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         </Disclosure>
 
         {saveError ? (
-          <p className="text-danger text-sm" role="alert">
-            {saveError}
+          <Notice tone="danger" >{saveError}
             {saveError.includes('先に保存') ? (
               <button type="button" className="text-action ml-2 font-semibold underline" onClick={onReload}>最新の内容を読み直す</button>
-            ) : null}
-          </p>
+            ) : null}</Notice>
         ) : null}
       </div>
     </div>

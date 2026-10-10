@@ -980,7 +980,7 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           /></Field></div>
       </div>
       {legacy ? (
-        <p className={styles.fieldError} role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</p>
+        <Notice tone="warn" role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</Notice>
       ) : null}
       <div className={styles.conditionRow}>
         {canEdit ? (

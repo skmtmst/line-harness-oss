@@ -36,6 +36,7 @@ import styles from './staff-new.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import Notice from '@/components/shared/notice'
 
 /** 一度に見せるメニューの数。残りは「ほかのメニュー」で開く（1行に収める）。 */
 const MENU_FOLD = 4
@@ -462,7 +463,7 @@ export default function StaffNewV8() {
           </section>
 
           {createdStaffId ? <p className={layout.warnBand} role="status">スタッフは登録済みです。担当メニューの設定が残っています。</p> : null}
-          {saveError ? <p className={layout.fieldError} role="alert">{saveError}</p> : null}
+          {saveError ? <Notice tone="danger" className={layout.fieldErrorNoticePlacement} >{saveError}</Notice> : null}
           <div className={layout.actions} data-design="Actions">
             <Button href="/booking/menus?tab=staff">キャンセル</Button>
             <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="登録しています…">

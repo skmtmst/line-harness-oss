@@ -783,7 +783,7 @@ export default function WebhooksIncomingV8() {
                         )
                       ) : null}
                     {unmatchedActionError && unmatchedActionError.id === item.id ? (
-                      <p role="alert" className={styles.fieldError}>{unmatchedActionError.message}</p>
+                      <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{unmatchedActionError.message}</Notice>
                     ) : null}
                     </Td>
                   </Tr>
@@ -921,7 +921,7 @@ export default function WebhooksIncomingV8() {
           confirmLabel="試す"
         >
           <Field label="届いたつもりのJSON"><TextArea value={testJson} onChange={(event) => setTestJson(event.target.value)} placeholder='{"friendId": "…"}' /></Field>
-          {testError ? <p className={styles.fieldError} role="alert">{testError}</p> : null}
+          {testError ? <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{testError}</Notice> : null}
           {testResult ? (
             <div className={styles.form}>
               <span className={styles.fieldLabel}>だれに届くか</span>

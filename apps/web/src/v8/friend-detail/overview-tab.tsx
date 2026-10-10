@@ -33,6 +33,7 @@ import styles from './detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import Notice from '@/components/shared/notice'
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
@@ -230,10 +231,8 @@ export default function OverviewTab({
           {upcomingStatus === 'loading' || upcomingStatus === 'idle' ? (
             <DetailLoading />
           ) : deliveryFailed ? (
-            <p className={styles.secNote} role="alert">
-              配信予定を読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadUpcoming()}>もう一度読み込む</button>
-            </p>
+            <Notice tone="danger" className={styles.secNoteNoticePlacement} >配信予定を読み込めませんでした
+              <button type="button" className={styles.retry} onClick={() => void data.loadUpcoming()}>もう一度読み込む</button></Notice>
           ) : nextDelivery ? (
             <Link
               className={styles.row}

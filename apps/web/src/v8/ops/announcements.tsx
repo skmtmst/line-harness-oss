@@ -40,6 +40,7 @@ import styles from './announcements.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。
@@ -348,7 +349,7 @@ export default function OpsAnnouncementsV8() {
                 { text: `本文：入力 ${form.body} ／ 最新 ${collision.latest.body}` },
                 { text: `公開時刻：入力 ${form.publishAt || 'すぐに'} ／ 最新 ${toLocalInput(collision.latest.publishAt) || 'すぐに'}` },
               ] : null} />
-            {formError && !confirmSend ? <p role="alert" className={parts.alert}>{formError}</p> : null}
+            {formError && !confirmSend ? <Notice tone="danger" className={parts.alertNoticePlacement} >{formError}</Notice> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <div className={styles.field}><Field label="件名" htmlFor="ann-subject"><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} />
 <FieldError id="ann-subject-error">{fields.error('subject')}</FieldError></Field></div>

@@ -74,7 +74,6 @@
 }
 
 .folderNote {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: 11px;
   line-height: 1.6;
@@ -120,7 +119,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin: 0;
   padding: 10px 14px;
   border: 1px solid var(--color-danger);
   border-radius: var(--radius-control, 8px);
@@ -560,3 +558,7 @@
 .viewerCreateSpace { display: block; height: var(--tpl-rm-viewer-create-h); }
 /* 閲覧のみ：つまみと同じ大きさの見えない印で、名前の位置を保つ。 */
 .gripSpace { display: inline-flex; visibility: hidden; }
+
+.folderNote, .folderNoteNoticePlacement { margin: 0; }
+
+.errorBand, .errorBandNoticePlacement { margin: 0; }

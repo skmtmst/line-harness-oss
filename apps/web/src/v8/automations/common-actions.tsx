@@ -444,9 +444,7 @@ export default function CommonActionsV8() {
           onConfirm={() => confirmArchive()}
         >
           {archiving?.mode === 'archive' && archiving.item.bindingCount > 0 ? (
-            <p className={styles.dialogWarn} role="alert">
-              利用中のため保管できません（{archiving.item.bindingCount}か所）。先に利用先を外してください。
-            </p>
+            <Notice tone="danger" className={styles.dialogWarnNoticePlacement} >利用中のため保管できません（{archiving.item.bindingCount}か所）。先に利用先を外してください。</Notice>
           ) : null}
           {archiveError ? <Notice tone="danger" >{archiveError}</Notice> : null}
         </Dialog>

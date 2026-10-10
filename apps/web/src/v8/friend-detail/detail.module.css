@@ -58,7 +58,7 @@
 .secTitle { flex: 1 1 0; margin: 0; font-size: var(--tpl-fdt-sec-size); line-height: var(--tpl-fdt-sec-lh); font-weight: 600; color: var(--color-ink); white-space: nowrap; }
 .secLink { display: inline-flex; align-items: center; gap: var(--tpl-fdt-link-gap); font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); font-weight: 500; color: var(--color-action); white-space: nowrap; text-decoration: none; }
 .secLink:hover { text-decoration: underline; }
-.secNote { margin: 0; font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-ink-faint); }
+.secNote { font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-ink-faint); }
 
 .row { display: flex; align-items: center; gap: var(--tpl-fdt-row-gap); min-height: var(--tpl-fdt-row-min-h); padding: var(--tpl-fdt-row-pad); border-radius: var(--tpl-fdt-row-radius); outline: 1px solid var(--card-edge); outline-offset: -0.5px; color: inherit; text-decoration: none; box-shadow: var(--card-shadow); }
 a.row:hover { background: var(--color-surface-pearl); }
@@ -90,7 +90,7 @@ a.recentTitle:hover { text-decoration: underline; }
 .opsTitle { flex: 1 1 0; margin: 0; font-size: var(--tpl-fdt-text-size); line-height: var(--tpl-fdt-text-lh); font-weight: 600; color: var(--color-ink); white-space: nowrap; }
 .opsNote { font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-ink-faint); white-space: nowrap; }
 .success { margin: 0; font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-success); }
-.danger { margin: 0; font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-danger); }
+.danger { font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-danger); }
 
 /* ---- 履歴タブ ---- */
 .pane { display: flex; flex-direction: column; gap: var(--tpl-fdt-hist-gap); padding: var(--tpl-fdt-hist-pad); min-width: 0; }
@@ -143,7 +143,7 @@ a.recentTitle:hover { text-decoration: underline; }
 .answer > dt { flex: 0 0 var(--tpl-fdt-form-label-w); color: var(--color-ink-secondary); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .answer > dd { margin: 0; flex: 1 1 0; min-width: 0; color: var(--color-ink); overflow-wrap: anywhere; }
 .orphan { margin-left: var(--tpl-fdt-row-text-gap); font-size: var(--tpl-fdt-orphan-size); color: var(--color-ink-faint); }
-.warnText { margin: 0; font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-warning); }
+.warnText { font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); color: var(--color-warning); }
 
 /* ---- まだ中身が無いタブ ---- */
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-fdt-empty-gap); padding: var(--tpl-fdt-empty-pad); border-radius: var(--tpl-fdt-row-radius); background: var(--color-surface-pearl); text-align: center; }
@@ -163,3 +163,9 @@ a.recentTitle:hover { text-decoration: underline; }
   .summary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
   .fieldGrid { grid-template-columns: minmax(0, 1fr); }
 }
+
+.secNote, .secNoteNoticePlacement { margin: 0; }
+
+.danger, .dangerNoticePlacement { margin: 0; }
+
+.warnText, .warnTextNoticePlacement { margin: 0; }

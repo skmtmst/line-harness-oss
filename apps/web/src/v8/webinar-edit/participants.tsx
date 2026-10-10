@@ -285,7 +285,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
         {body}
         {state === 'ready' && (nextCursor || moreError) ? (
           <div className={styles.more}>
-            {moreError ? <p className={styles.moreError} role="alert">{moreError}</p> : null}
+            {moreError ? <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{moreError}</Notice> : null}
             {nextCursor ? <Button onClick={() => void loadMore()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込み中…">続きを読み込む</Button> : null}
           </div>
         ) : null}

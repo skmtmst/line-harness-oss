@@ -7,7 +7,7 @@ import SegmentedControl from '@/components/shared/segmented'
  * 受信・送信・システム通知の切り替えは、読んだ行の中で絞る（口は今と同じ1本）。
  */
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { Fragment, useState } from 'react'
+import { Fragment } from 'react'
 import Link from 'next/link'
 import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -28,6 +28,8 @@ import {
 import styles from './detail.module.css'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 
 const FILTERS: Array<{ value: TimelineFilter; label: string }> = [
   { value: 'all', label: '全件' },
@@ -72,10 +74,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
             {[0, 1, 2, 3].map((i) => <div key={i} className={styles.skeletonRow} />)}
           </div>
         ) : historyStatus === 'error' ? (
-          <div className={`${styles.centered} ${styles.pane}`} role="alert">
-            <p className={styles.paneNote}>履歴を読み込めませんでした。</p>
-            <Button onClick={() => void data.loadHistory()}>もう一度読み込む</Button>
-          </div>
+          <ListState kind="error" title="履歴を読み込めませんでした。" description="" action={<><Button onClick={() => void data.loadHistory()}>もう一度読み込む</Button></>} />
         ) : (
           <>
             {rows.map((item, index) => {
@@ -132,7 +131,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
       {historyStatus === 'ready' && historyNextCursor ? (
         <div className={styles.centered}>
           {/* FRIEND-26: 続きの取り損ねはここだけ。読めていた行とカーソルは残る。 */}
-          {historyMoreError ? <p className={styles.danger} role="alert">続きを読み込めませんでした。同じところから試せます。</p> : null}
+          {historyMoreError ? <Notice tone="danger" className={styles.dangerNoticePlacement} >続きを読み込めませんでした。同じところから試せます。</Notice> : null}
           <Button onClick={() => void data.loadHistory(historyNextCursor)} disabled={historyLoadingMore} busy={historyLoadingMore} busyLabel="読み込み中…">
             {historyMoreError ? 'もう一度試す' : 'さらに読み込む'}
           </Button>

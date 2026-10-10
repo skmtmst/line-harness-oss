@@ -16,7 +16,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Circle, CircleCheck, CircleAlert, CircleX, GitBranch, Pencil, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw } from 'lucide-react'
 import { api, ApiError, type RichMenuPublishRun, type RichMenuTargetPreview } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -280,14 +280,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         <div className={styles.split}>
           <div className={styles.content}>
             {failed ? (
-              <div className={styles.failBand} role="alert">
-                <CircleAlert size={18} aria-hidden="true" className={styles.failIcon} />
-                <div className={styles.bandText}>
-                  <p className={styles.bandTitle}>公開が途中で止まりました</p>
-                  <p className={styles.bandNote}>{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</p>
-                </div>
-                {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={14} aria-hidden="true" />もう一度公開する</Button> : null}
-              </div>
+              <Notice tone="danger" heading={<> 公開が途中で止まりました </>} action={<> {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={14} aria-hidden="true" />もう一度公開する</Button> : null} </>} >{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</Notice>
             ) : progress ? (
               <div className={styles.doneBand} role="status">
                 <CircleCheck size={18} aria-hidden="true" className={styles.doneIcon} />

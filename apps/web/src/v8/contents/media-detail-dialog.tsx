@@ -26,7 +26,7 @@ import {
   putMediaFile,
   validateMediaFile,
 } from './media-direct-upload'
-import { formatDateTime } from '@/lib/format'
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
@@ -435,7 +435,7 @@ export default function MediaDetailDialog({
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" onClick={() => void downloadItem()} disabled={downloading} busy={downloading} busyLabel="取得中…">ダウンロード
           </Button>
-          {downloadError ? <p className="text-danger text-xs" role="alert">{downloadError}</p> : null}
+          {downloadError ? <Notice tone="danger" >{downloadError}</Notice> : null}
           {impact && impact.usageCount > 0 ? (
             <Button type="button" variant="primary" onClick={() => onOpenReplacement(item)}>使用先を差し替える</Button>
           ) : null}
@@ -595,10 +595,7 @@ export default function MediaDetailDialog({
             {phase === 'loading' ? (
               <p className="text-ink-faint mt-3 text-xs">使われている場所を確認しています…</p>
             ) : phase === 'error' ? (
-              <div className="mt-3 space-y-2" role="alert">
-                <p className="text-danger text-xs">使われている場所を確認できませんでした。</p>
-                <Button type="button" onClick={() => void loadImpact()}>もう一度読み込む</Button>
-              </div>
+              <Notice tone="danger" className="mt-3" action={<Button type="button" onClick={() => void loadImpact()}>もう一度読み込む</Button>}>使われている場所を確認できませんでした。</Notice>
             ) : impact ? (
               <>
                 {/*
@@ -663,7 +660,7 @@ export default function MediaDetailDialog({
                 )}
               </>
             ) : null}
-            {usageError ? <p className="text-danger mt-3 text-xs" role="alert">{usageError}</p> : null}
+            {usageError ? <Notice tone="danger" className="mt-3" >{usageError}</Notice> : null}
             {impact ? <p className="text-ink-faint mt-3 text-xs">{checkedAtText(impact.checkedAt)} 時点で確認</p> : null}
             {impact && impact.verified === false ? (
               <p className="text-ink-secondary mt-3 text-xs leading-5">確かめられないため削除できません。読み直してから、もう一度お試しください。</p>
@@ -702,7 +699,7 @@ export default function MediaDetailDialog({
                   </li>
                 ))}
               </ul>
-              {versionDownloadError ? <p className="text-danger mt-2 text-xs" role="alert">{versionDownloadError}</p> : null}
+              {versionDownloadError ? <Notice tone="danger" className="mt-2" >{versionDownloadError}</Notice> : null}
             </section>
           ) : null}
         </aside>

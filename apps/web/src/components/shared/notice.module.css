@@ -43,6 +43,10 @@
 /* 帯の右に置く操作（1つまで）。 */
 .action {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  flex-wrap: wrap;
   flex: none;
 }
 

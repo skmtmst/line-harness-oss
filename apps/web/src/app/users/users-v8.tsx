@@ -29,6 +29,7 @@ import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 const UID_STATUS = {
   url_token: '要確認',
@@ -207,7 +208,7 @@ export default function UsersV8() {
       </div>
 
       {u.exportError ? (
-        <p className={styles.errorBand} role="alert">{u.exportError}</p>
+        <Notice tone="danger" className={styles.errorBandNoticePlacement} >{u.exportError}</Notice>
       ) : null}
 
       {/* 一覧。状態は SXCb3：骨格・0件・失敗をこの場所で出す。 */}

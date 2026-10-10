@@ -10,7 +10,6 @@
 }
 
 .folderNote {
-  margin: 0;
   word-break: normal;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
@@ -376,7 +375,6 @@ a.answerCount:hover {
 }
 
 .alertText {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
@@ -597,3 +595,7 @@ a.answerCount:hover {
   display: flex;
   flex: 1 1 0;
 }
+
+.folderNote, .folderNoteNoticePlacement { margin: 0; }
+
+.alertText, .alertTextNoticePlacement { margin: 0; }

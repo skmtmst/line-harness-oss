@@ -1268,9 +1268,7 @@ function EditCommonVarV8Inner() {
           {deletePhase === 'loading' ? (
             <p className={styles.fieldHint}>使われている場所を読み込んでいます</p>
           ) : deletePhase === 'error' ? (
-            <p className={styles.fieldError} role="alert">
-              使用先を読み込めませんでした。読み直してから、もう一度お試しください。
-            </p>
+            <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >使用先を読み込めませんでした。読み直してから、もう一度お試しください。</Notice>
           ) : deleteImpact ? (
             <>
               <p className={deleteImpact.blockingTotal > 0 ? styles.fieldError : styles.fieldHint}>

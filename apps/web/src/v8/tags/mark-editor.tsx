@@ -485,7 +485,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                   {rulesState === 'forbidden' ? <p className={styles.fieldNote}>{permissionDeniedMessage('store')}</p> : null}
                   {rulesState === 'error' ? (
                     <div className={styles.inlineRetry}>
-                      <p className={styles.fieldError} role="alert">きまりを読み込めませんでした。</p>
+                      <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >きまりを読み込めませんでした。</Notice>
                       <Button type="button" variant="text" onClick={() => void loadRules()}>もう一度読み込む</Button>
                     </div>
                   ) : null}

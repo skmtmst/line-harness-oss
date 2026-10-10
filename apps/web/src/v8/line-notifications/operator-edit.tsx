@@ -63,6 +63,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 function OperatorEditInner() {
   const editId = useSearchParams().get('id')
@@ -549,7 +550,7 @@ function OperatorEditInner() {
                 {/* 絵 gjUz3：チームを選んでいるときはスタッフの箱を出さない（顔ぶれはチームのとおり）。 */}
                 {teamId ? (teamError ? (
                   <div className={styles.teamError}>
-                    <p role="alert">{teamError}</p>
+                    <Notice tone="danger" >{teamError}</Notice>
                     <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
                   </div>
                 ) : null) : (
@@ -602,11 +603,9 @@ function OperatorEditInner() {
                     : recipientsError !== null
                       ? (
                         <div>
-                          <p className={styles.cardNote} role="alert">
-                            {isForbiddenOrRateLimited(recipientsError)
+                          <Notice tone="danger" className={styles.cardNoteNoticePlacement} >{isForbiddenOrRateLimited(recipientsError)
                               ? loadFailureNotice(recipientsError, '受け取る人')
-                              : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}
-                          </p>
+                              : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}</Notice>
                           {isForbidden(recipientsError) ? null : (
                             <Button variant="secondary" onClick={() => loadRecipients()}>もう一度読み込む</Button>
                           )}
@@ -629,7 +628,7 @@ function OperatorEditInner() {
                   ) : null}
                   {teamError ? (
                     <div className={styles.teamError}>
-                      <p role="alert">{teamError}</p>
+                      <Notice tone="danger" >{teamError}</Notice>
                       <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
                     </div>
                   ) : null}
@@ -654,7 +653,7 @@ function OperatorEditInner() {
                 <p className={styles.cardNote}>営業時間外のものは翌朝 10:00 にまとめて送ります。</p>
               </FormSection>
 
-              {error ? <p className={styles.formError} role="alert">{error}</p> : null}
+              {error ? <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice> : null}
               {notice ? <p className={styles.formNotice} role="status">{notice}</p> : null}
           </DetailColumns>
 

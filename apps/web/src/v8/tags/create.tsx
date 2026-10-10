@@ -250,7 +250,7 @@ function TagCreate() {
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>
-                <p className={styles.fieldError} role="alert">フォルダを読み込めませんでした。未分類のまま作れます。</p>
+                <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >フォルダを読み込めませんでした。未分類のまま作れます。</Notice>
                 <Button type="button" variant="text" onClick={() => setFoldersReloadKey((key) => key + 1)}>フォルダを読み直す</Button>
               </div>
             ) : null}

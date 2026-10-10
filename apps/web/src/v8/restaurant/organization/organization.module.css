@@ -186,7 +186,6 @@
 }
 
 .intakeError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
   font-weight: 600;
@@ -419,3 +418,5 @@
   padding-top: var(--tpl-rt-dialog-gap);
   box-shadow: var(--tpl-sb-line-top);
 }
+
+.intakeError, .intakeErrorNoticePlacement { margin: 0; }

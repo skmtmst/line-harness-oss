@@ -104,7 +104,7 @@ export default function ManualLinksScreen() {
         </Button>
       </div>
 
-      {actionError && <p role="alert" className={styles.danger}>{actionError}</p>}
+      {actionError && <Notice tone="danger" className={styles.dangerNoticePlacement} >{actionError}</Notice>}
 
       {shown.length === 0 ? (
         <ListState

@@ -443,8 +443,8 @@ function InflowDetailContent() {
         <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       ) : null}
       {copyFailed && url ? (
-        <div role="alert" className={styles.copyFallback}>
-          <p className={styles.note}>コピーできませんでした。下の欄を選んでコピーしてください。</p>
+        <div className={styles.copyFallback}>
+          <Notice tone="danger">コピーできませんでした。下の欄を選んでコピーしてください。</Notice>
           <input
             readOnly
             autoFocus

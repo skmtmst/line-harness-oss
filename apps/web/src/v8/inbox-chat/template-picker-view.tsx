@@ -20,6 +20,7 @@ import { SettingCheckbox } from '@/components/shared/checkbox'
 import SearchField from '@/components/shared/search-field'
 import styles from './inbox-chat.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import Notice from '@/components/shared/notice'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -74,9 +75,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
       search={<SearchField ref={props.searchInputRef} value={props.search} onChange={props.onSearch} onClear={() => props.onSearch('')} placeholder="テンプレート名・本文で探す" aria-label="テンプレート名・本文で探す" className={styles.tpSearchField} />}
       beforeFooter={<>
           {props.unresolved && props.unresolved.length > 0 ? (
-            <p className={styles.tpError} role="alert">
-              解決できない差し込みがあります: {props.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。
-            </p>
+            <Notice tone="danger" className={styles.tpErrorNoticePlacement} >解決できない差し込みがあります: {props.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。</Notice>
           ) : null}
           {packMode && packItems.length > 0 ? (
             <div className={styles.tpBand}>

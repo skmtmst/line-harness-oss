@@ -20,6 +20,7 @@ import { fixedFieldValue } from '@/components/shared/fixed-friend-field-values'
 import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ListState from '@/components/shared/list-state'
 
 /** 種類の名前は絵では出さない。ラベルの title で読めるようにする。 */
 export const BASIC_GROUP = 'basic'
@@ -88,10 +89,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
   }
   if (fieldsStatus === 'error') {
     return (
-      <div className={`${styles.pane} ${styles.centered}`} role="alert">
-        <p className={styles.paneNote}>情報欄を読み込めませんでした。</p>
-        <Button onClick={() => void data.loadFields()}>もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="情報欄を読み込めませんでした。" description="" action={<><Button onClick={() => void data.loadFields()}>もう一度読み込む</Button></>} />
     )
   }
 

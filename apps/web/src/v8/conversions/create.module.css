@@ -73,7 +73,6 @@
   min-width: 0;
 }
 .fieldNote {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
   line-height: var(--tpl-cn-main-lh);
@@ -238,3 +237,5 @@
 
 /* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
 .viewerBand { }
+
+.fieldNote, .fieldNoteNoticePlacement { margin: 0; }

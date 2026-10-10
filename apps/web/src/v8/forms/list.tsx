@@ -911,12 +911,10 @@ export default function FormsListV8() {
     >
       <FolderPanelNote>フォルダを消しても、中のフォームは未分類に残ります。</FolderPanelNote>
       {folderError ? (
-        <p role="alert" className={styles.folderNote}>
-          {folderError}
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
           <button type="button" onClick={() => void loadForms()} className={styles.textButton}>
             もう一度
-          </button>
-        </p>
+          </button></Notice>
       ) : null}
     </FolderPanel>
   )
@@ -1329,7 +1327,7 @@ export default function FormsListV8() {
             </div>
           )}
         >
-          {moveError ? <p className={styles.alertText} role="alert">{moveError}</p> : null}
+          {moveError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{moveError}</Notice> : null}
           <RadioCardGroup legend="移動先のフォルダ" className={styles.radioList}>
             {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
               <RadioCard
@@ -1393,7 +1391,7 @@ export default function FormsListV8() {
               }}
               className={styles.panelInput}
             /></Field>
-          {duplicateError ? <p className={styles.alertText} role="alert">{duplicateError}</p> : null}
+          {duplicateError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{duplicateError}</Notice> : null}
         </DetailPanel>
       ) : null}
 
@@ -1565,7 +1563,7 @@ export default function FormsListV8() {
             ) : null}
           </>
         ) : null}
-        {deleteError ? <p className={styles.alertText} role="alert">{deleteError}</p> : null}
+        {deleteError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{deleteError}</Notice> : null}
         </div>
       </Dialog>
 

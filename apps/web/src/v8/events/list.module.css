@@ -191,7 +191,6 @@
 
 /* フォルダの列。 */
 .folderNote {
-  margin: 0;
   word-break: normal;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
@@ -235,3 +234,5 @@
   gap: var(--tpl-toolbar-gap);
   margin-top: var(--tpl-toolbar-gap);
 }
+
+.folderNote, .folderNoteNoticePlacement { margin: 0; }

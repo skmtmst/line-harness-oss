@@ -883,7 +883,7 @@ export default function TemplatesListV8() {
       rows={folderRows}
     >
       {/* 補助のデータ（フォルダ）だけ取れないときは、その場所に小さく1行だけ。 */}
-      {folderError ? <p role="alert" className={styles.folderNote}>{folderError}</p> : null}
+      {folderError ? <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}</Notice> : null}
       <p className={styles.folderNote}>
         フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります
       </p>
@@ -1351,7 +1351,7 @@ export default function TemplatesListV8() {
         onCancel={() => { if (!deleting) { setPendingDelete(null); setDeleteError('') } }}
       >
         <Notice tone="danger" message="削除は元に戻せません。" />
-        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? <p className={styles.alertText} role="alert">アカウントが切り替わりました。削除するテンプレートを選び直してください。</p> : null}
+        {pendingDelete !== null && pendingDelete.accountId !== selectedAccountId ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >アカウントが切り替わりました。削除するテンプレートを選び直してください。</Notice> : null}
       </ConfirmDialog>
 
       {/* まとめて削除の確認窓。対象は「使っていない」ものだけ。 */}
@@ -1418,9 +1418,7 @@ export default function TemplatesListV8() {
           <p className={styles.faintText}>使用先を読み込んでいます…</p>
         ) : blockedLoadError ? (
           // 消してよいか分からないのに消させない。閉じて読み直すだけ。
-          <p className={styles.alertText} role="alert">
-            使っている所を確認できませんでした。閉じてから、もう一度お試しください。
-          </p>
+          <Notice tone="danger" className={styles.alertTextNoticePlacement} >使っている所を確認できませんでした。閉じてから、もう一度お試しください。</Notice>
         ) : blockedUsage ? (
           <div className={styles.usageList}>
             <ul>
@@ -1629,7 +1627,7 @@ export default function TemplatesListV8() {
                     {moving ? '移動中…' : '移動する'}
                   </Button>
                 </div>
-                {moveError ? <p className={styles.alertText} role="alert">{moveError}</p> : null}
+                {moveError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{moveError}</Notice> : null}
               </>
             ) : null}
           </div>

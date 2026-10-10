@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { GitCompare, Play, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Play, Plus } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -381,7 +381,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
             </div>
           ) : forms.state === 'loading' ? <p className={form.cardNote}>回答フォームを読み込んでいます。</p>
             : forms.state === 'forbidden' ? <p className={form.cardNote}>{permissionDeniedMessage('store')}</p>
-              : forms.state === 'error' ? <p className={form.cardNote} role="alert">回答フォームを読み込めませんでした。<Button size="compact" onClick={loadForms}>もう一度読み込む</Button></p>
+              : forms.state === 'error' ? <Notice tone="danger" className={form.cardNoteNoticePlacement} >回答フォームを読み込めませんでした。<Button size="compact" onClick={loadForms}>もう一度読み込む</Button></Notice>
                 : <p className={form.cardNote}>LINE 公式アカウントを確かめられないため、候補を出せません。</p>}
         </div>
         {forms.state === 'ready' && published.length === 0 ? <p className={form.cardNote}>公開中の回答フォームがありません。</p> : null}

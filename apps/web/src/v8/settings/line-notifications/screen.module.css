@@ -4,7 +4,6 @@
  */
 
 .minor {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--tpl-sb-row-sub);
 }
@@ -288,3 +287,5 @@
   .opSchedule { display: none; }
   .name, .opNameLink { display: block; white-space: nowrap; text-overflow: ellipsis; }
 }
+
+.minor, .minorNoticePlacement { margin: 0; }

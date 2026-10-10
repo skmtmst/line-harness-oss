@@ -1185,18 +1185,13 @@ export default function MediaLibraryListV8() {
             placeholder="例：01_商品写真"
           >
             {folderFailure ? (
-              <div role="alert">
-                <p>
-                  {folderForbidden
-                    ? permissionDeniedMessage('store')
-                    : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}
-                </p>
-                {folderForbidden ? null : (
+              <Notice tone="danger" action={<> {folderForbidden ? null : (
                   <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
                     {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
                   </Button>
-                )}
-              </div>
+                )} </>} >{folderForbidden
+                    ? permissionDeniedMessage('store')
+                    : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}</Notice>
             ) : null}
           </ManagedFolderPanel>
         </>
@@ -1414,9 +1409,7 @@ export default function MediaLibraryListV8() {
           <p>使われている場所を確認しています…</p>
         ) : impactPhase === 'error' ? (
           <div>
-            <p role="alert">
-              使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
-            </p>
+            <Notice tone="danger" >使われている場所を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
             {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
             <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
           </div>

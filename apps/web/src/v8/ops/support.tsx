@@ -16,7 +16,7 @@ import {
   type OpsTenantRow,
 } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
-import { formatDateTime, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
+import { planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -36,6 +36,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
@@ -377,7 +378,7 @@ export default function OpsSupportV8() {
         )}
       />
       {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
-      {error && !listFailed && !detailFailed ? <p role="alert" className={`${parts.alert} ${styles.notice}`}>{error}</p> : null}
+      {error && !listFailed && !detailFailed ? <Notice tone="danger" >{error}</Notice> : null}
 
       <div className={styles.columns}>
         <section aria-label="チケットの一覧" className={styles.list}>

@@ -1613,9 +1613,7 @@ export default function AutoRepliesListV8() {
           </div>
         )}
         {toggleTargetStale && (
-          <p className="text-danger text-sm leading-relaxed" role="alert">
-            アカウントが切り替わりました。操作する自動応答を選び直してください。
-          </p>
+          <Notice tone="danger" >アカウントが切り替わりました。操作する自動応答を選び直してください。</Notice>
         )}
       </Dialog>
 
@@ -1682,9 +1680,7 @@ export default function AutoRepliesListV8() {
       >
         <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
         {deleteTargetStale && (
-          <p className="text-danger text-sm leading-relaxed" role="alert">
-            アカウントが切り替わりました。削除する自動応答を選び直してください。
-          </p>
+          <Notice tone="danger" >アカウントが切り替わりました。削除する自動応答を選び直してください。</Notice>
         )}
       </Dialog>
 

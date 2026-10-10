@@ -27,6 +27,7 @@ import { PageHeading } from '@/components/templates/page-frame'
 
 import { emptyValue } from '@/components/shared/empty-value'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 const STEPS = [
   { title: 'クリックの目印を持ち帰る', text: '広告から中継リンクを通った人の目印を残します。中継リンクを通らないと広告と結びつきません。' },
@@ -214,7 +215,7 @@ export default function AdConnectionsV8() {
           </KpiBand>
         )}
         <h2 className={adsStyles.sectionTitle}>成果地点と、広告に返す名前の対応</h2>
-        {saveError ? <p className={adsStyles.error} role="alert">{saveError}</p> : null}
+        {saveError ? <Notice tone="danger" className={adsStyles.errorNoticePlacement} >{saveError}</Notice> : null}
         {table}
         <p className={adsStyles.notice}>
           気をつけること：広告側で成果の名前を先に作ってから対応を決めてください。失敗した送信のやり直しは、送信履歴から行えます。

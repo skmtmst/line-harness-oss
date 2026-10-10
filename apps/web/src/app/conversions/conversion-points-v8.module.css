@@ -406,7 +406,6 @@
 }
 
 .panelError {
-  margin: 8px 0 0;
   color: var(--color-danger);
   font-size: 12px;
   line-height: 1.6;
@@ -533,3 +532,5 @@
     flex-basis: 100%;
   }
 }
+
+.panelError, .panelErrorNoticePlacement { margin: 8px 0 0; }

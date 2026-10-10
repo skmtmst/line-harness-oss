@@ -362,13 +362,8 @@ export default function TemplateDetailV8() {
         </dl>
       </section>
       {flexError ? (
-        <div role="alert" className={styles.flexError}>
-          <p className={styles.flexErrorTitle}>{flexError}</p>
-          <p className={styles.flexErrorNote}>
-            このままでは公開できません。
-            {canMutate ? <Link href={editHref} className={styles.inlineLink}>再編集で直してください。</Link> : 'オーナー・管理者に再編集を依頼してください。'}
-          </p>
-        </div>
+        <Notice tone="danger" heading={<> {flexError} </>} >このままでは公開できません。
+            {canMutate ? <Link href={editHref} className={styles.inlineLink}>再編集で直してください。</Link> : 'オーナー・管理者に再編集を依頼してください。'}</Notice>
       ) : (
         <LinePreview title="届き方" accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
           {template.messageType === 'flex' ? <FlexPreviewComponent content={draftContent} /> : (

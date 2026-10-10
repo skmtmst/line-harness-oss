@@ -611,9 +611,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               {host ? <p className={styles.hint}>統括のテンプレートで差し込めるのは、名前・配信日・その他です（友だち情報・共通情報はアカウントごとに違うため）。</p>
                 : !editorAccountId && !loading ? <p className={styles.hint}>LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p> : null}
               {accountMismatch ? (
-                <div role="alert" className={styles.readonly}>
+                <Notice tone="warn" role="alert">
                   {ACCOUNT_MISMATCH_MESSAGE}（このテンプレートは「{accountName(editor.templateAccountId) ?? editor.templateAccountId}」のものです。差し込み候補もそのアカウントのまま出しています）
-                </div>
+                </Notice>
               ) : null}
             </Card>
 

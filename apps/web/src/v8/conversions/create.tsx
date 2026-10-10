@@ -579,7 +579,7 @@ function ConversionCreate() {
         </Field>
         {pointsFailed ? (
           <div className={styles.inlineRetry}>
-            <p className={styles.fieldNote} role="alert">同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。</p>
+            <Notice tone="danger" className={styles.fieldNoteNoticePlacement} >同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。</Notice>
             <Button variant="text" onClick={() => requestPoints()}>同名の確認を再読み込み</Button>
           </div>
         ) : null}

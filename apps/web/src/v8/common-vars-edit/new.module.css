@@ -171,7 +171,7 @@
 }
 .talkTime { color: var(--v8-line-time); font-size: var(--tpl-ar-cv-talk-time-size); white-space: nowrap; }
 
-.formError { margin: 0; color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
+.formError { color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
 .secretConfirm {
   padding: var(--tpl-side-card-pad);
   border-radius: var(--radius-card);
@@ -185,3 +185,5 @@
 
 /* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
 .roBand { }
+
+.formError, .formErrorNoticePlacement { margin: 0; }

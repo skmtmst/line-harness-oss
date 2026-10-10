@@ -639,10 +639,8 @@ export default function TagsTab({
       {canEdit ? null : <span className={styles.viewerFolderAddSpace} aria-hidden="true" />}
       <FolderPanelNote>フォルダを消しても、中のタグは未分類に残ります</FolderPanelNote>
       {folderError ? (
-        <p role="alert" className={styles.folderNote}>
-          {folderError}
-          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
+          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button></Notice>
       ) : null}
     </>
   )

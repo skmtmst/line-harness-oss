@@ -113,7 +113,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
           </>
         )}
       />
-      {error && !approving ? <p role="alert" className={`${parts.alert} ${styles.articleError}`}>{error}</p> : null}
+      {error && !approving ? <Notice tone="danger" >{error}</Notice> : null}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
       <div className={styles.article}>
         <section className={styles.fields} aria-label="記事の中身">

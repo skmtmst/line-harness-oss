@@ -334,10 +334,8 @@ export default function EventsListV8() {
       placeholder="例：教室"
     >
       {foldersError ? (
-        <p role="alert" className={styles.folderNote}>
-          フォルダを読み込めませんでした。
-          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
+          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button></Notice>
       ) : null}
     </ManagedFolderPanel>
   )

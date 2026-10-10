@@ -52,6 +52,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -257,7 +258,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           CSVで書き出す
         </Button>
       </div>
-      {model.exportError ? <p className={styles.panelError} role="alert">{model.exportError}</p> : null}
+      {model.exportError ? <Notice tone="danger" className={styles.panelErrorNoticePlacement} >{model.exportError}</Notice> : null}
 
       {!canEdit ? (
         <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
@@ -267,7 +268,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
       {highlightedPoint ? (
         <Notice tone="info" message={`「${highlightedPoint.name}」を保存しました。色の付いた行です。`} />
       ) : null}
-      {actionError ? <p className={styles.panelError} role="alert">{actionError}</p> : null}
+      {actionError ? <Notice tone="danger" className={styles.panelErrorNoticePlacement} >{actionError}</Notice> : null}
 
       <ul className={styles.kpis} aria-label="数の帯">
         <li className={styles.kpi}>
@@ -400,15 +401,11 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
               ))}
             </div>
           ) : model.loadFailed ? (
-            <div className={styles.stateBox} role="alert">
-              <p className={styles.stateBoxTitle}>成果地点を読み込めませんでした</p>
-              <p className={styles.stateBoxNote}>数の帯は「—」です。道具はそのまま使えます。</p>
-              <div className={styles.stateBoxAction}>
+            <ListState kind="error" title="成果地点を読み込めませんでした" description="数の帯は「—」です。道具はそのまま使えます。" action={<><div className={styles.stateBoxAction}>
                 <Button variant="secondary" onClick={() => model.onReload()}>
                   もう一度読む
                 </Button>
-              </div>
-            </div>
+              </div></>} />
           ) : model.points.length === 0 ? (
             <div className={styles.stateBox}>
               <p className={styles.stateBoxTitle}>まだ成果地点がありません</p>
@@ -587,7 +584,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                   発行した鍵（この表示でだけ見られます。連携先へ渡してください）：{model.issuedSecret}
                 </p>
               ) : null}
-              {model.ingestError ? <p className={styles.panelError} role="alert">{model.ingestError}</p> : null}
+              {model.ingestError ? <Notice tone="danger" className={styles.panelErrorNoticePlacement} >{model.ingestError}</Notice> : null}
               <div className={styles.panelButtons}>
                 {panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
                   <Button
@@ -739,7 +736,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
                   placeholder="計測の仕方を変えるため"
                   onChange={(event) => model.onStopReasonChange(event.target.value)}
                 /></Field>
-              {model.stopError ? <p className={styles.panelError} role="alert">{model.stopError}</p> : null}
+              {model.stopError ? <Notice tone="danger" className={styles.panelErrorNoticePlacement} >{model.stopError}</Notice> : null}
               <div className={styles.panelButtons}>
                 <Button variant="secondary" onClick={() => model.onCancelStop()} disabled={model.stopping}>
                   キャンセル

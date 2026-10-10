@@ -482,7 +482,7 @@ export async function requestWebinarListV8(args: {
 }
 
 export function WebinarListErrorNotice({ failure, onRetry }: { failure: WebinarLoadFailure; onRetry: () => void }) {
-  return <div role="alert" className="border-hairline border-b px-4 py-3"><p className="text-ink text-sm font-semibold">{failure.title}</p><p className="text-ink-secondary mt-1 text-xs">{failure.description}</p>{failure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : null}</div>
+  return <Notice tone="danger" heading={failure.title} action={failure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : null}>{failure.description}</Notice>
 }
 
 export function WebinarListContent({ accountLoading, loading, selectedAccountId, accountsCount, loadFailure, visibleItems, panelGrand, refreshing, onRetry, onArchive, canEdit = true, readonlyReason = '', onClearFilters = () => undefined, onOpenDetail = () => undefined }: {

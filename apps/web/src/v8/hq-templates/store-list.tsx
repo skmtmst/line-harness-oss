@@ -51,6 +51,7 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /** 店のテンプレートと同じ6種類（上のタブ）。 */
 export const KIND_TABS: { kind: TemplateKind; label: string; icon: typeof MessageSquare }[] = [
@@ -264,7 +265,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   ]
   const selectFolder = (id: string) => { onFolderFilter(id); setPage(1) }
   const folderPanel = folderLoadFailed ? (
-    <p role="alert" className={storeStyles.folderNote}>フォルダを読み込めませんでした。ページを再読み込みしてください。</p>
+    <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice>
   ) : (
     <FolderPanel
       activeId={folderFilter}

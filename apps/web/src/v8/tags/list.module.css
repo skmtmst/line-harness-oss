@@ -105,7 +105,6 @@
 
 /* フォルダの列の下の注（字11/17・2行）。 */
 .folderNote {
-  margin: 0;
   padding: 0;
   color: var(--color-ink-secondary);
   font-size: var(--tpl-tag-note-size);
@@ -558,3 +557,5 @@
 
 /* 統括だけ、共通の配る操作の場所を表の列として確保する。 */
 .colDistribute { width: var(--tpl-hq-attribute-distribute-col); text-align: left; }
+
+.folderNote, .folderNoteNoticePlacement { margin: 0; }

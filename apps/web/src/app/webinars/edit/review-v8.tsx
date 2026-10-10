@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import HelpTip from '@/components/shared/help-tip'
@@ -129,7 +129,7 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
         {validationState === 'ready' ? blockers.length > 0 ? <Notice tone="warn">このままでは公開できません：{blockers.map((check) => check.detail || check.label).join('・')}</Notice> : <p className="text-success mt-2 text-xs">必要なものは揃っています。</p> : null}
         <div className="mt-3 flex flex-wrap gap-2"><Button disabled={publishing || testing} onClick={onTestNotifications}>通知のテストを送る</Button><Button disabled={publishing || testing} busy={testing} busyLabel="確認中…" onClick={() => void testPublicPage()}>ページをテスト</Button></div>
         {testNotice ? <p className="text-ink-secondary mt-2 text-xs" role="status">{testNotice}</p> : null}
-        {publishError ? <p className="text-danger mt-2 text-xs" role="alert">{publishError}</p> : null}
+        {publishError ? <Notice tone="danger" className="mt-2" >{publishError}</Notice> : null}
       </section>
       <section className="content-card bg-canvas rounded-card border p-4" aria-label="設定のまとめ"><h2 className="text-ink text-base font-semibold">設定のまとめ</h2><dl className="divide-hairline mt-3 divide-y">{rows.map(([label, value]) => <div key={label} className="flex items-baseline justify-between gap-4 py-3 text-xs"><dt className="text-ink-faint shrink-0">{label}</dt><dd className="text-ink min-w-0 text-right">{value}</dd></div>)}</dl></section>
     </div>

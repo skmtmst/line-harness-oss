@@ -409,7 +409,6 @@
   min-width: 0;
 }
 .caption {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: var(--tpl-an-sub-lh);
@@ -1216,3 +1215,5 @@
 .table[data-kind='page'] .thead[data-size='compact'],
 .table[data-kind='page'] .trow[data-size='compact'] { gap: var(--tpl-an-report-col-gap); }
 .table[data-kind='page'] .num[data-w^='sc'] { padding-right: var(--tpl-an-num-pad-end); }
+
+.caption, .captionNoticePlacement { margin: 0; }

@@ -22,7 +22,7 @@ import type {
   FriendAddEventKind,
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
-import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw, TriangleAlert } from 'lucide-react'
+import { Download, FileText, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react'
 import { DetailPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -49,6 +49,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
+import Notice from '@/components/shared/notice'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -478,20 +479,12 @@ function FriendAddRunsInner() {
       </div>
 
       {!loading && !error && failedCount > 0 ? (
-        <div className={styles.failBand} role="alert">
-          <TriangleAlert size={18} className={styles.failIcon} aria-hidden="true" />
-          <div className={styles.failText}>
-            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)} 件あります`}</p>
-            <p className={styles.failNote}>案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</p>
-          </div>
-          <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>
-          {canManage ? (
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>{canManage ? (
             <Button variant="primary" onClick={() => void retryAllFailed()} disabled={failedItems.length === 0 || retrying !== null}
               busy={retrying === 'all'} busyLabel="実行しています">
               <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null}
-        </div>
+          ) : null} </>} >案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</Notice>
       ) : null}
 
       <section className={styles.card} aria-label="実行の記録">

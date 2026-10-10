@@ -68,6 +68,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -1277,16 +1278,14 @@ export default function RemindersListV8() {
             placeholder="例：予約"
           >
             {foldersError && (reminders.length > 0 || !reminderList.error) ? (
-              <p role="alert" className={styles.folderNote}>
-                フォルダを読み込めませんでした。
+              <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
                 <button
                   type="button"
                   onClick={() => void loadFolders()}
                   className="text-action ml-2 font-semibold hover:underline"
                 >
                   もう一度
-                </button>
-              </p>
+                </button></Notice>
             ) : null}
           </ManagedFolderPanel>
         </>}
@@ -1347,11 +1346,9 @@ export default function RemindersListV8() {
           )}
 
           {actionError && (
-            <p className={styles.errorBand} role="alert">
-              <AlertCircle size={14} aria-hidden="true" />
+            <Notice tone="danger" className={styles.errorBandNoticePlacement} >
               {actionError}
-              <button type="button" onClick={() => setActionError('')}>閉じる</button>
-            </p>
+              <button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
           )}
 
           {table}

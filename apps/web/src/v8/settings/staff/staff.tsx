@@ -60,6 +60,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -1051,7 +1052,7 @@ function StaffPageHost() {
           <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
         </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
-          : error ? <div className={styles.stateRow} role="alert"><p>ログインユーザーを読み込めませんでした。登録した内容は消えていません。</p><Button onClick={() => void load()}>もう一度読み込む</Button></div>
+          : error ? <ListState kind="error" title="ログインユーザーを読み込めませんでした。登録した内容は消えていません。" description="" action={<><Button onClick={() => void load()}>もう一度読み込む</Button></>} />
           : shown.length === 0 ? <p className={styles.stateRow}>条件に合うログインユーザーはいません。条件を変えてお試しください。</p>
           : shown.map((user) => {
             const member = memberById.get(user.id)
@@ -1135,7 +1136,7 @@ function StaffPageHost() {
                   {usersTotal > accessUsers.length ? (
                     <Button variant="secondary" size="compact" onClick={() => void loadMoreUsers()} disabled={moreUsersBusy} busy={moreUsersBusy}>続きを読み込む</Button>
                   ) : null}
-                  {moreUsersError ? <p role="alert">{moreUsersError}</p> : null}
+                  {moreUsersError ? <Notice tone="danger" >{moreUsersError}</Notice> : null}
                   <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} />
                 </div>
               ) : null}

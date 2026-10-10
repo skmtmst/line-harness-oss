@@ -268,7 +268,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
           <section className={styles.historyCard} aria-labelledby="saved-history-title">
             <h2 id="saved-history-title" className={styles.hoursTitle} title={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${schedules.filter((schedule) => schedule.savedAnalysisIds.includes(selected.id)).length}件`}` : undefined}>{selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'}</h2>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
-            {snapshotError ? <p className={styles.caption} role="alert">結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></p> : null}
+            {snapshotError ? <Notice tone="danger" className={styles.captionNoticePlacement} >結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></Notice> : null}
             {snapshotLoading ? <p className={styles.caption}>結果を読み込んでいます</p>
               : !selected ? <p className={styles.caption}>一覧から分析を選んでください</p>
               : snapshots.length === 0 ? <p className={styles.caption}>保存された結果はありません</p>

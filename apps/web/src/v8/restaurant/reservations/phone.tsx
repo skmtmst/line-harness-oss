@@ -36,7 +36,7 @@ import StoreTabs from '../store-tabs/store-tabs'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
+
 import { formatYen as polishFormatYen } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -328,7 +328,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                   </Field>
                   {!person && search.trim().length >= 2 ? (
                     <div className={styles.foundList}>
-                      {searchError ? <p role="alert" className={styles.formError}>{searchError}</p> : null}
+                      {searchError ? <Notice tone="danger" className={styles.formErrorNoticePlacement} >{searchError}</Notice> : null}
                       {found.length === 0 && !searchError ? <p className={styles.sideText}>台帳に見つかりません。電話番号のタブから入れられます。</p> : null}
                       {found.map((c) => (
                         <Button key={`${c.lineUid || c.phone || c.name}`} type="button" onClick={() => { setPerson(c); setSearch('') }}>

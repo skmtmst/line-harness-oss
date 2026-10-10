@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
-import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeDate, knowledgeState } from '@/components/ops/knowledge-format'
+import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState } from '@/components/ops/knowledge-format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
@@ -22,6 +22,7 @@ import parts from './parts.module.css'
 import styles from './ops-knowledge-v8.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のナレッジ V8（絵 `h114s`・記事 `R5ckwJ`）。
@@ -132,7 +133,7 @@ export default function OpsKnowledgeV8() {
           <span className={styles.count}>{ready && total > 0 ? <ListRange total={total} first={offset + 1} last={Math.min(offset + rows.length, total)} /> : ready ? '0件' : emptyValue('unknown')}</span>
         </div>
 
-        {actionError ? <p role="alert" className={parts.alert}>{actionError}</p> : null}
+        {actionError ? <Notice tone="danger" className={parts.alertNoticePlacement} >{actionError}</Notice> : null}
 
         {!loaded && rows.length === 0 ? (
           <ListState permissionScope="hq" kind="loading" />

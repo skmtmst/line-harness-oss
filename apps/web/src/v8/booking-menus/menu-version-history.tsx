@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenuVersion } from '@/lib/api'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import Notice from '@/components/shared/notice'
 
 /**
  * T: 予約メニューの版の履歴（右から出る欄）。
@@ -133,7 +134,7 @@ export default function MenuVersionHistory({
       ) : (
         <div className="flex flex-col gap-4">
           {revertError ? (
-            <p role="alert" className="text-danger text-xs">{revertError}</p>
+            <Notice tone="danger" >{revertError}</Notice>
           ) : null}
           <VersionHistory
             versions={history}

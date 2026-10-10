@@ -823,7 +823,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
                 </Button>
               </div>
             ) : null}
-            {testError ? <p role="alert" className={styles.urlError}>{testError}</p> : null}
+            {testError ? <Notice tone="danger" className={styles.urlErrorNoticePlacement} >{testError}</Notice> : null}
             {testUrl ? (
               <TextLink external href={testUrl}   className={styles.urlLink}>試しのURLを開く</TextLink>
             ) : null}

@@ -137,7 +137,7 @@
 }
 .tpSearchField { flex: none; }
 .tpNote { color: var(--color-ink-faint); font-size: var(--text-caption); }
-.tpError { width: 100%; padding: var(--tpl-inbox-tp-band-pad); color: var(--color-danger); font-size: var(--text-caption); }
+.tpError { padding: var(--tpl-inbox-tp-band-pad); color: var(--color-danger); font-size: var(--text-caption); }
 .tpList .tpError { padding: 0; }
 .tpCards { display: flex; flex-direction: column; gap: var(--tpl-inbox-composer-gap); }
 .tpCard {
@@ -502,3 +502,5 @@ a.sentFile:hover .sentFileName { text-decoration: underline; }
 .sentFileText { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 .sentFileName { overflow: hidden; color: var(--color-ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .sentFileSub { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+
+.tpError, .tpErrorNoticePlacement { width: 100%; }

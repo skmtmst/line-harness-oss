@@ -15,7 +15,7 @@ import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { RowMenu } from '@/components/shared/row-actions'
-import { notifyToast } from '@/components/shared/toast'
+
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
 import { slotReasonLabel } from '../lib/slot-reason'
 import {
@@ -33,6 +33,7 @@ import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
+import Notice from '@/components/shared/notice'
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -256,7 +257,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             )
           })}
         </div>
-        {saveError ? <p className="text-danger mt-3 text-sm" role="alert">{saveError}</p> : null}
+        {saveError ? <Notice tone="danger" className="mt-3" >{saveError}</Notice> : null}
 
         {/* 絵 yRPxl：設備と空きの確かめは、開ける時間の白い板の中の入れ子の箱（枠・角12・内側16）。 */}
         <div className={styles.innerStack}>
@@ -403,7 +404,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
           items={menuItems}
         />
       </span>
-      {error ? <p className="text-danger w-full text-xs" role="alert">{error}</p> : null}
+      {error ? <Notice tone="danger" className="w-full" >{error}</Notice> : null}
       <ResourceDialog
         open={editing}
         onClose={() => setEditing(false)}
@@ -494,7 +495,7 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
         <Field label="設備名"><input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
         <Field label="種類"><input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
         <Field label="受付上限"><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></Field>
-        {error ? <p className="text-danger text-xs" role="alert">{error}</p> : null}
+        {error ? <Notice tone="danger" >{error}</Notice> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={() => { if (!saving) onClose() }} disabled={saving}>キャンセル</Button>
           <Button variant="primary" onClick={() => void submit()} disabled={saving} busy={saving}>保存する</Button>
@@ -615,7 +616,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
           </div>
         ) : null}
       </div>
-      {checkError ? <p className="text-danger mt-2 text-xs" role="alert">{checkError}</p> : null}
+      {checkError ? <Notice tone="danger" className="mt-2" >{checkError}</Notice> : null}
     </section>
   )
 }

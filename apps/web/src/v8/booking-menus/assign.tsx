@@ -48,6 +48,7 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
+import Notice from '@/components/shared/notice'
 
 /* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
 const V8_TABS = [
@@ -380,7 +381,7 @@ export default function AssignMatrixV8() {
           ) : (
             <>
               {error && !loadFailed ? (
-                <p className={shell.warnBand} role="alert">{error}</p>
+                <Notice tone="danger" className={shell.warnBandNoticePlacement} >{error}</Notice>
               ) : null}
 
               <section className={shell.section} data-design="Table">
@@ -522,21 +523,14 @@ export default function AssignMatrixV8() {
                 ) : null}
 
                 {orphans.length > 0 ? (
-                  <div className={shell.warnBand} data-design="Warn" role="alert">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  <span>
+                  <Notice tone="warn" role="alert" data-design="Warn"><span>
                     {unassigned.length > 0
                       ? `「${unassigned.map((m) => m.name).join('」「')}」は担当が0人です。出しても予約は入りません。`
                       : null}
                     {inactiveOnly.length > 0
                       ? `${unassigned.length > 0 ? ' ' : ''}「${inactiveOnly.map((m) => m.name).join('」「')}」は受付を止めている担当しかいません。`
                       : null}
-                  </span>
-                  </div>
+                  </span></Notice>
                 ) : null}
               </section>
             </>

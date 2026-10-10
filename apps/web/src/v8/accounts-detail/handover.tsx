@@ -517,7 +517,7 @@ export default function AccountHandoverV8() {
       {canManage && (editCount > 0 || decisionError) ? (
         <div className={styles.pendingBand}>
           {decisionError
-            ? <p role="alert" className={styles.pendingText}>{decisionError}</p>
+            ? <Notice tone="danger" className={styles.pendingTextNoticePlacement} >{decisionError}</Notice>
             : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
           <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>
             <RotateCcw size={14} aria-hidden="true" />事前確認をやり直す

@@ -50,6 +50,7 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import Notice from '@/components/shared/notice'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1255,7 +1256,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                   </Button>
                 ) : null}
               </div>
-              {genError ? <p className={layout.fieldError} role="alert">{genError}</p> : null}
+              {genError ? <Notice tone="danger" className={layout.fieldErrorNoticePlacement} >{genError}</Notice> : null}
               {generatedCount !== null && !genError ? <p className={styles.savedNote} role="status">{generatedCount}日分作りました。</p> : null}
             </section> : null}
 

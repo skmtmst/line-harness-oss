@@ -317,7 +317,7 @@ export default function StoreNewV8() {
                     <p className={styles.doneTitle}>接続できました</p>
                     <p className={styles.cardText}>{`「${created.storeName}」とLINE公式アカウント「${created.lineAccountName}」を登録しました。`}</p>
                   </div>
-                  {connectionError ? <p role="alert" className={styles.errorBox}>{connectionError}</p> : null}
+                  {connectionError ? <Notice tone="danger" className={styles.errorBoxNoticePlacement} >{connectionError}</Notice> : null}
                 </>
               ) : (
                 <>
@@ -329,7 +329,7 @@ export default function StoreNewV8() {
                       <div><dt className={styles.help}>店舗の略称</dt><dd className={styles.summaryValue}>{alias || name}</dd></div>
                     </dl>
                   </div>
-                  {connectionError ? <p role="alert" className={styles.errorBox}>{connectionError}</p> : null}
+                  {connectionError ? <Notice tone="danger" className={styles.errorBoxNoticePlacement} >{connectionError}</Notice> : null}
                 </>
               )
             ) : null}

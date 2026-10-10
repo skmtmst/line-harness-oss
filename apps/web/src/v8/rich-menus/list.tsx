@@ -1242,7 +1242,7 @@ export default function RichMenusListV8() {
           {impactPhase === 'loading' ? (
             <p className={styles.impactFaint}>消したときの影響を確認しています…</p>
           ) : impactPhase === 'error' ? (
-            <p className={styles.impactDanger} role="alert">消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。</p>
+            <Notice tone="danger" >消したときの影響を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
           ) : impact ? (
             <div className={styles.impactDetail}>
               <p>

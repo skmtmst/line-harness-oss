@@ -58,6 +58,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -925,10 +926,8 @@ export default function BroadcastListV8() {
         </div>
       ) : null}
       {savedViewError ? (
-        <p role="alert" className={styles.note}>
-          {savedViewError}
-          <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.noteNoticePlacement} >{savedViewError}
+          <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button></Notice>
       ) : null}
     </div>
   )
@@ -1156,10 +1155,8 @@ export default function BroadcastListV8() {
           {canEdit ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
           <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
           {folderError ? (
-            <p role="alert" className={styles.note}>
-              {folderError}
-              <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button>
-            </p>
+            <Notice tone="danger" className={styles.noteNoticePlacement} >{folderError}
+              <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button></Notice>
           ) : null}
         </FolderPanel>
       )}

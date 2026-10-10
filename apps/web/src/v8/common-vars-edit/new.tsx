@@ -680,7 +680,7 @@ export default function NewCommonVarV8() {
         </div>
       )}
 
-      {error && <p className={styles.formError} role="alert">{error}</p>}
+      {error && <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice>}
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した共通情報" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>

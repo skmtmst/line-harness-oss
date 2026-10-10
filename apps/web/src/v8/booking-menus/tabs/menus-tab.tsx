@@ -14,7 +14,7 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+
 import Pagination from '@/components/shared/pagination'
 import { RowMenu } from '@/components/shared/row-actions'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
@@ -34,6 +34,7 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import Notice from '@/components/shared/notice'
 
 export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: {
   accountId: string
@@ -241,8 +242,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         )}
       </div>
 
-      {reorderError ? <p className="text-danger mt-2 text-xs" role="alert">{reorderError}</p> : null}
-      {visibilityError ? <p className="text-danger mt-2 text-xs" role="alert">{visibilityError}</p> : null}
+      {reorderError ? <Notice tone="danger" className="mt-2" >{reorderError}</Notice> : null}
+      {visibilityError ? <Notice tone="danger" className="mt-2" >{visibilityError}</Notice> : null}
 
       {shown.length === 0 ? (
         /* 修正案 D-2：空の一覧。 */

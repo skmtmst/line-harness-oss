@@ -30,7 +30,7 @@
 
 .body { display: flex; flex-direction: column; gap: var(--tpl-cn-card-gap); padding-top: var(--tpl-detail-head-pad-bottom); }
 .viewerBand { margin: 0; }
-.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
+.error { color: var(--color-danger); font-size: var(--text-caption); }
 .faint { color: var(--color-ink-faint); }
 
 /* 媒体の4枚：間12・余白14・枠1・角12。 */
@@ -105,3 +105,5 @@
 .fieldRow { display: flex; gap: var(--tpl-cn-field-row-gap); }
 .label { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-cn-label-lh); }
 .pickLabel { color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-cn-main-lh); }
+
+.error, .errorNoticePlacement { margin: 0; }
