@@ -3144,6 +3144,15 @@
       "column": "tenant_id"
     }
   },
+  "rt_reservation_external_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
   "rt_reservations": {
     "category": "purge",
     "scope": {

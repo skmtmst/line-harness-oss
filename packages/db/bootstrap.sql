@@ -6825,6 +6825,23 @@ CREATE TABLE rt_reservation_events (
  UNIQUE(reservation_id,reservation_version,event_type)
 );
 
+CREATE TABLE rt_reservation_external_links (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id),
+  provider TEXT NOT NULL CHECK (provider IN ('restaurant_board','reszaiko','hotpepper','tabelog','gurunavi','ikyu','retty','google_reservation','tablecheck')),
+  external_id TEXT NOT NULL CHECK (length(trim(external_id)) BETWEEN 1 AND 200 AND external_id = trim(external_id)),
+  reservation_id TEXT NOT NULL REFERENCES rt_reservations(id),
+  origin_provider TEXT CHECK (origin_provider IS NULL OR origin_provider IN ('restaurant_board','reszaiko','hotpepper','tabelog','gurunavi','ikyu','retty','google_reservation','tablecheck')),
+  provider_updated_at TEXT,
+  last_event_id TEXT,
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  unlinked_at TEXT,
+  updated_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (store_id, provider, external_id)
+);
+
 CREATE TABLE rt_reservation_links (
  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id), token TEXT NOT NULL UNIQUE,
  created_at TEXT NOT NULL DEFAULT(datetime('now'))
@@ -10391,6 +10408,8 @@ CREATE UNIQUE INDEX rt_departure_one_active ON rt_reservation_departures(reserva
 
 CREATE INDEX rt_event_pending ON rt_reservation_event_receipts(status,next_attempt_at);
 
+CREATE INDEX rt_external_links_reservation ON rt_reservation_external_links(reservation_id, unlinked_at);
+
 CREATE INDEX rt_inventory_outbox_pending ON rt_inventory_notification_outbox(sent_at,lease_until);
 
 CREATE INDEX rt_reserved_table ON rt_reservation_table_links(table_id,reservation_id);
@@ -10861,6 +10880,28 @@ CREATE TRIGGER rt_departure_version AFTER UPDATE OF departed_at ON rt_reservatio
 CREATE TRIGGER rt_dining_snapshot_insert AFTER INSERT ON rt_reservations WHEN NEW.dining_snapshot_json IS NULL BEGIN UPDATE rt_reservations SET dining_snapshot_json=json_object( 'allergy',COALESCE(NEW.allergy_note,(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-allergy' LIMIT 1)), 'anniversary',(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-anniversary' LIMIT 1), 'seatPreference',(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-seat_preference' LIMIT 1), 'courseId',NEW.course_id,'courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=NEW.course_id AND store_id=NEW.store_id),'[]')),'capturedAt',NEW.created_at) WHERE id=NEW.id; END;
 
 CREATE TRIGGER rt_event_receipts AFTER INSERT ON rt_reservation_events BEGIN INSERT INTO rt_reservation_event_receipts(event_id,consumer_key) VALUES(NEW.id,'event_bus'),(NEW.id,'mileage'); INSERT INTO rt_reservation_event_receipts(event_id,consumer_key) SELECT NEW.id,'visit_stamp_queue' WHERE NEW.event_type IN('restaurant.arrived','restaurant.arrival_undone'); END;
+
+CREATE TRIGGER rt_external_links_legacy_insert BEFORE INSERT ON rt_reservation_external_links
+WHEN NEW.unlinked_at IS NULL AND EXISTS (
+  SELECT 1 FROM rt_reservations WHERE store_id = NEW.store_id AND source = NEW.provider
+    AND trim(external_id) = NEW.external_id AND id <> NEW.reservation_id
+)
+BEGIN SELECT RAISE(ABORT, 'external_link_legacy_conflict'); END;
+
+CREATE TRIGGER rt_external_links_legacy_update BEFORE UPDATE ON rt_reservation_external_links
+WHEN NEW.unlinked_at IS NULL AND EXISTS (
+  SELECT 1 FROM rt_reservations WHERE store_id = NEW.store_id AND source = NEW.provider
+    AND trim(external_id) = NEW.external_id AND id <> NEW.reservation_id
+)
+BEGIN SELECT RAISE(ABORT, 'external_link_legacy_conflict'); END;
+
+CREATE TRIGGER rt_external_links_store_insert BEFORE INSERT ON rt_reservation_external_links
+WHEN NOT EXISTS (SELECT 1 FROM rt_reservations WHERE id = NEW.reservation_id AND store_id = NEW.store_id)
+BEGIN SELECT RAISE(ABORT, 'external_link_store_mismatch'); END;
+
+CREATE TRIGGER rt_external_links_store_update BEFORE UPDATE OF reservation_id, store_id ON rt_reservation_external_links
+WHEN NOT EXISTS (SELECT 1 FROM rt_reservations WHERE id = NEW.reservation_id AND store_id = NEW.store_id)
+BEGIN SELECT RAISE(ABORT, 'external_link_store_mismatch'); END;
 
 CREATE TRIGGER rt_floor_new_store AFTER INSERT ON rt_stores BEGIN INSERT INTO rt_floors(id,store_id,name) VALUES('floor-'||NEW.id,NEW.id,'1階'); END;
 

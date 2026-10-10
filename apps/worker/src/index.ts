@@ -178,6 +178,7 @@ import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { dbFor } from './services/db-router.js';
 import { restaurantTest } from './routes/restaurant-test.js';
+import { restaurantExternalLinks } from './routes/restaurant-external-links.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
 import { tiktokPnl } from './routes/tiktok-pnl.js';
@@ -639,6 +640,7 @@ app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', visitStamps);
+app.route('/', restaurantExternalLinks);
 app.route('/', restaurantTest);
 app.route('/', restaurantCustomerBooking);
 app.route('/', restaurantGoogle);

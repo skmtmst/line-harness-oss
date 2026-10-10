@@ -571,7 +571,8 @@
     "626_restaurant_floor_layout.sql",
     "627_restaurant_dining_fields.sql",
     "628_restaurant_departures.sql",
-    "629_restaurant_reservation_events.sql"
+    "629_restaurant_reservation_events.sql",
+    "633_restaurant_external_links.sql"
   ],
-  "migrationCount": 572
+  "migrationCount": 573
 }
