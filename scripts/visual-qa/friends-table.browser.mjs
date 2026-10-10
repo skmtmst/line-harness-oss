@@ -22,7 +22,16 @@ try {
     await page.goto(`${base}/friends`, { waitUntil: 'networkidle' })
     await waitForScreenReady(page, '/friends', 2000)
     assert.equal(assertStressResponse(response), 2000)
-    await page.waitForTimeout(500)
+    await page.evaluate(() => document.fonts.ready)
+    // The uniform fixture must finish ResizeObserver measurement before its height is the reference.
+    // A fixed delay can capture a transient 1/16px spacer correction under parallel CI load.
+    await page.waitForFunction(() => {
+      const body = document.querySelector('tbody[data-virtual-table]')
+      const rows = [...body.querySelectorAll('[data-friend-row]')]
+      const height = rows[0]?.getBoundingClientRect().height
+      return height > 0 && rows.every(row => row.getBoundingClientRect().height === height)
+        && body.getBoundingClientRect().height === Number(body.dataset.rowCount) * height
+    })
     const initial = await page.evaluate(() => {
       const body = document.querySelector('tbody[data-virtual-table]')
       return { rows: Number(body.dataset.rowCount), height: body.getBoundingClientRect().height, rendered: body.querySelectorAll('[data-friend-row]').length }
