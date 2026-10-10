@@ -604,6 +604,7 @@ export const api = {
 
 /** 来店スタンプ。PINを使う口には本人のIDトークンを常に送る。 */
 export const visitStampsApi = {
+  redeemQr:(accountId:string,token:string,requestId:string,visitId?:string)=>post<{success:true;data:import('@line-crm/shared').VisitStampQrResult}>(`/api/liff/visit-stamps/qr/redeem?${new URLSearchParams({accountId})}`,{token,requestId,visitId}),
   cards: (accountId:string) => get<{success:true;data:Array<{card:import('@line-crm/shared').VisitStampCard;wallet:import('@line-crm/shared').VisitStampWallet}>}>(`/api/liff/visit-stamps/cards?${new URLSearchParams({accountId})}`),
   card: (accountId:string,id:string) => get<{success:true;data:{card:import('@line-crm/shared').VisitStampCard;wallet:import('@line-crm/shared').VisitStampWallet;entries:import('@line-crm/shared').VisitStampEntry[]}}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`),
   showReward: (accountId:string,id:string,rewardId:string,requestId:string) => post<{success:true;data:import('@line-crm/shared').VisitStampRedemption}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/rewards?${new URLSearchParams({accountId})}`,{rewardId,requestId}),

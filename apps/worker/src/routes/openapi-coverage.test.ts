@@ -133,6 +133,12 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'DELETE /api/visit-stamps/staff-qr/{id}',
+  'GET /api/visit-stamps/cards/{id}/storefront-qr',
+  'GET /api/visit-stamps/staff-qr/{id}',
+  'POST /api/liff/visit-stamps/qr/redeem',
+  'POST /api/visit-stamps/cards/{id}/staff-qr',
+  'POST /api/visit-stamps/cards/{id}/storefront-qr',
   'GET /api/booking/admin/board',
   'PATCH /api/booking/admin/board/{id}',
   'POST /api/tags/{id}/restore',

@@ -17,6 +17,7 @@ import { restaurantGoogleApi, type GoogleConnectionData, type GoogleReview } fro
 import {
   restaurantTestApi,
   type RestaurantReservation,
+  type RestaurantRotation,
   type RestaurantSnapshot,
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
@@ -37,6 +38,7 @@ export type StoreToday = {
   snapshot: RestaurantSnapshot | null
   store: RestaurantStore | null
   today: RestaurantReservation[] | null
+  rotation: RestaurantRotation | null
   media: StoreMedium[] | null
   closeTasks: RestaurantChannelCloseTask[] | null
   hours: RestaurantOpeningDay[] | null
@@ -91,6 +93,7 @@ export function useStoreToday(accountId: string | null): StoreToday {
   const [snapshot, setSnapshot] = useState<RestaurantSnapshot | null>(null)
   const [storeId, setStoreId] = useState('')
   const [today, setToday] = useState<RestaurantReservation[] | null>(null)
+  const [rotation,setRotation]=useState<RestaurantRotation|null>(null)
   const [media, setMedia] = useState<StoreMedium[] | null>(null)
   const [closeTasks, setCloseTasks] = useState<RestaurantChannelCloseTask[] | null>(null)
   const [hours, setHours] = useState<RestaurantOpeningDay[] | null>(null)
@@ -131,6 +134,7 @@ export function useStoreToday(accountId: string | null): StoreToday {
     if (!accountId || !storeId) return
     const day = toYmd(new Date())
     await Promise.all([
+      Promise.resolve().then(()=>restaurantTestApi.rotation(accountId,storeId,day)).then(r=>setRotation(r.data)).catch(()=>setRotation(null)),
       restaurantTestApi.reservationsDay(accountId, storeId, day)
         .then((res) => setToday(Array.isArray(res.data?.reservations) ? res.data.reservations : []))
         .catch(() => setToday((current) => current ?? [])),
@@ -179,5 +183,5 @@ export function useStoreToday(accountId: string | null): StoreToday {
 
   const reload = useCallback(async () => { await loadStore() }, [loadStore])
 
-  return { accountId: accountId ?? '', snapshot, store, today, media, closeTasks, hours, google, latestReview, oldestReview, loading, error, updatedAt, reload }
+  return { accountId: accountId ?? '', snapshot, store, today, rotation, media, closeTasks, hours, google, latestReview, oldestReview, loading, error, updatedAt, reload }
 }

@@ -1634,12 +1634,13 @@ describe('提案E 来店記録', () => {
   it('来店の印と取消が履歴に反映され、過去の案内済みも数える', async () => {
     seedRestaurantFixture();
     testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09000000000' WHERE id='reservation-ginza'");
+    const version=(testDb.raw.prepare("SELECT customer_version FROM rt_reservations WHERE id='reservation-ginza'").get() as {customer_version:number}).customer_version;
     const path='/api/restaurant-test/reservations/reservation-ginza/visit?account_id=account-1';
-    expect((await request(path,{kind:'visited'})).status).toBe(200);
-    expect((await request(path,{kind:'visited'})).status).toBe(409);
+    expect((await request(path,{kind:'visited',expectedVersion:version,requestId:'visit'})).status).toBe(200);
+    expect((await request(path,{kind:'visited',expectedVersion:version,requestId:'new-visit'})).status).toBe(409);
     const history=()=>request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
     expect((await (await history()).json() as any).data.visitCount).toBe(1);
-    expect((await requestWithMethod(path,'DELETE')).status).toBe(200);
+    expect((await requestWithMethod(path+`&expectedVersion=${version+1}&requestId=undo`,'DELETE')).status).toBe(200);
     expect((await (await history()).json() as any).data.visitCount).toBe(0);
     expect(testDb.raw.prepare('SELECT undone_at FROM rt_seat_visit_marks').get()).toMatchObject({undone_at:expect.any(String)});
     testDb.raw.exec("UPDATE rt_reservations SET status='seated' WHERE id='reservation-ginza'");

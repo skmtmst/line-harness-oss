@@ -39,13 +39,14 @@ export function routeLabel(r: Pick<RestaurantReservation, 'source' | 'note'>): s
   return isWalkIn(r) ? 'ウォークイン' : sourceName(r.source)
 }
 
-export function TodayTable({ rows,storeName, tables=[],canWrite, busyId, onVisited, onUndo }: {
+export function TodayTable({ rows,storeName, tables=[],canWrite, busyId, onVisited, onUndo, onDeparture }: {
   storeName?:string
   tables?:RestaurantTable[]
   rows: RestaurantReservation[] | null
   canWrite: boolean
   busyId: string
   onVisited: (id: string) => void
+  onDeparture?: (id:string,undo:boolean)=>void
   onUndo: (id: string) => void
 }) {
   const {selectedAccountId}=useAccount()
@@ -69,8 +70,8 @@ export function TodayTable({ rows,storeName, tables=[],canWrite, busyId, onVisit
         help="取消を除く今日の予約です。来店したお客さまは［来店］を押すと来店済みになります。30秒ごとに読み直します。"
         helpLabel="今日の予約の説明"
         note={`${list.length}件を表示`}
-      />} trailingToolbar={<Button presentation="restaurant" href="/restaurant-test/reservations"><ArrowRight size={16}/>予約台帳で見る</Button>} columns="today" menus={e=><RowActions subjectName={e.customerName} menuItems={[{id:'detail',label:'詳細を見る',onSelect:()=>router.push(`/restaurant-test/reservations?id=${encodeURIComponent(e.id)}`)}]}/>} renderBody={body=>body} axis={axis} onAxis={setAxis} floor={floor} dates={[toYmd(new Date())]} entries={list.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={id=>router.push(`/restaurant-test/reservations?id=${encodeURIComponent(id)}`)} canWrite={canWrite}
-          actions={e=>canWrite?(canMarkVisited(list.find(r=>r.id===e.id)!)?<Button presentation="restaurant" aria-label={`${e.customerName}さんを来店にする`} disabled={busyId===e.id} onClick={()=>onVisited(e.id)}><Check size={16} aria-hidden/>来店</Button>:['visited','seated'].includes(e.status)?<Button presentation="restaurant" size="inline" aria-label={`${e.customerName}さんの来店の印を取り消す`} onClick={()=>onUndo(e.id)} disabled={busyId===e.id}>取り消す</Button>:null):null}/>
+      />} trailingToolbar={<Button presentation="restaurant" href="/restaurant-test/reservations"><ArrowRight size={16}/>予約台帳で見る</Button>} columns="today" menus={e=><RowActions subjectName={e.customerName} menuItems={[...(canWrite&&onDeparture&&['visited','seated'].includes(e.status)?[{id:'depart',label:e.departedAt?'退店を訂正する':'退店にする',disabled:busyId===e.id,onSelect:()=>onDeparture(e.id,!!e.departedAt)}]:[]),{id:'detail',label:'詳細を見る',onSelect:()=>router.push(`/restaurant-test/reservations?id=${encodeURIComponent(e.id)}`)}]}/>} renderBody={body=>body} axis={axis} onAxis={setAxis} floor={floor} dates={[toYmd(new Date())]} entries={list.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={id=>router.push(`/restaurant-test/reservations?id=${encodeURIComponent(id)}`)} canWrite={canWrite}
+          actions={e=>canWrite?(canMarkVisited(list.find(r=>r.id===e.id)!)?<Button presentation="restaurant" aria-label={`${e.customerName}さんを来店にする`} disabled={busyId===e.id} onClick={()=>onVisited(e.id)}><Check size={16} aria-hidden/>来店</Button>:!e.departedAt&&['visited','seated'].includes(e.status)?<Button presentation="restaurant" size="inline" aria-label={`${e.customerName}さんの来店の印を取り消す`} onClick={()=>onUndo(e.id)} disabled={busyId===e.id}>取り消す</Button>:null):null}/>
 
       )}
     </Card>

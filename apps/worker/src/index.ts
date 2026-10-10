@@ -10,6 +10,7 @@ import { scenarioDrafts, purgeExpiredScenarioDrafts } from './routes/scenario-dr
 import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
 import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
+import { processRestaurantEvents } from './services/restaurant-events.js';
 import { processVisitStampQueue } from './services/visit-stamps.js';
 import { processVisitStampReminders } from './services/visit-stamp-reminders.js';
 import { Hono, type Context } from 'hono';
@@ -1724,6 +1725,7 @@ async function runFrequentHeavyJobs(
       },
     },
     { name: 'visit stamps', run: () => processVisitStampQueue(env) },
+    { name: 'restaurant events', run: () => processRestaurantEvents(env) },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',

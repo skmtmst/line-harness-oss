@@ -4,6 +4,12 @@ type Response<T>={success:true;data:T};
 const path=(s:string)=>`/api/visit-stamps${s}`;
 const send=<T>(s:string,method:string,body:unknown)=>fetchApi<Response<T>>(path(s),{method,body:JSON.stringify(body)});
 export const visitStampsApi={
+ storefrontQr:(id:string,accountId:string)=>fetchApi<Response<import('@line-crm/shared').VisitStampQr|null>>(path(`/cards/${encodeURIComponent(id)}/storefront-qr?${new URLSearchParams({accountId})}`)),
+ issueStorefrontQr:(id:string,accountId:string,input:import('@line-crm/shared').VisitStampQrInput)=>send<import('@line-crm/shared').VisitStampQr>(`/cards/${encodeURIComponent(id)}/storefront-qr`,'POST',{...input,accountId}),
+ issueStaffQr:(id:string,accountId:string,input:import('@line-crm/shared').VisitStampQrInput)=>send<import('@line-crm/shared').VisitStampQr>(`/cards/${encodeURIComponent(id)}/staff-qr`,'POST',{...input,accountId}),
+ staffQrStatus:(id:string,accountId:string)=>fetchApi<Response<import('@line-crm/shared').VisitStampQrStatus>>(path(`/staff-qr/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`)),
+ revokeStaffQr:(id:string,accountId:string)=>fetchApi<Response<{id:string}>>(path(`/staff-qr/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`),{method:'DELETE'}),
+
  entries:(query:import('@line-crm/shared').VisitStampEntryQuery)=>fetchApi<Response<import('@line-crm/shared').VisitStampEntryPage>>(path(`/entries?${new URLSearchParams(Object.entries(query).filter(([,v])=>v!==undefined).map(([k,v])=>[k,String(v)]))}`)),
  paperPhoto:(accountId:string,id:string)=>fetchApiBlob(path(`/paper-photos/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`)),
  cards:()=>fetchApi<Response<VisitStampCard[]>>(path('/cards')),

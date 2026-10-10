@@ -14,6 +14,7 @@ import SectionHeader from '@/components/shared/section-header'
 import StatusBadge from '@/components/shared/status-badge'
 import TextLink from '@/components/shared/text-link'
 import type { GoogleConnectionData, GoogleReview } from '@/lib/restaurant-google-api'
+import type {RestaurantRotation} from '@/lib/restaurant-test-api'
 import type { StoreMedium } from './use-store-today'
 import styles from './dashboard.module.css'
 
@@ -29,7 +30,8 @@ function ago(iso: string, now: number): string {
   return `${Math.floor(minutes / (60 * 24))}日前`
 }
 
-export function SidePanel({ media, google, latestReview, canWrite, now }: {
+export function SidePanel({ media, google, latestReview, canWrite, now, rotation }: {
+  rotation?:RestaurantRotation|null
   media: StoreMedium[] | null
   google: GoogleConnectionData | null
   latestReview: GoogleReview | null
@@ -39,7 +41,7 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
   const connected = google?.connection.status === 'connected'
   return (
     <div className={styles.side}>
-      <Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action" title="今日の回転"/><div className={styles.rotation}>{['稼働率','回転','滞在','無断取消'].map(label=><div key={label}><span>{label}</span><strong title="この指標はまだ計測されていません">—</strong></div>)}</div></Card>
+      <Card padding="roomy" layout="vertical" gap="10px"><SectionHeader linkTone="action" title="今日の回転"/><div className={styles.rotation}>{[['稼働率',rotation?.utilization==null?'—':`${Math.round(rotation.utilization*100)}%`],['回転',rotation?.turnover==null?'—':`${rotation.turnover.toFixed(1)}回`],['滞在',rotation?.averageStayMinutes==null?'—':`${Math.round(rotation.averageStayMinutes)}分`],['無断取消',rotation?.noShowRate==null?'—':`${Math.round(rotation.noShowRate*100)}%`]].map(([label,value])=><div key={label}><span>{label}</span><strong title={value==='—'?'実測記録または営業時間がありません':undefined}>{value}</strong></div>)}</div></Card>
       <Card padding="roomy" layout="vertical" gap="12px">
       <SectionHeader linkTone="action"
         title="予約サイト・グルメ媒体" note={media?.some(m=>m.storePageUrl||m.adminUrl)?<RowActions subjectName="媒体のリンク" menuItems={media.flatMap(m=>[...(m.storePageUrl?[{id:m.code+'-page',label:`${m.name}の店舗ページ`,href:m.storePageUrl,external:true,onSelect:()=>{}}]:[]),...(m.adminUrl?[{id:m.code+'-admin',label:`${m.name}の管理画面`,href:m.adminUrl,external:true,onSelect:()=>{}}]:[])])}/>:undefined}

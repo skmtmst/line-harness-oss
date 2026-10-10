@@ -4288,5 +4288,39 @@
       "by": "lineAccount",
       "column": "line_account_id"
     }
+  },
+  "rt_reservation_departures": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_event_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "event_id",
+      "parent": "rt_reservation_events",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_events": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "visit_stamp_qr_codes": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
   }
 }

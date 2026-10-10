@@ -26,6 +26,7 @@ export type ReservationQuery = {
   from?: string; to?: string; status?: string; limit?: number; offset?: number
 }
 export type RestaurantReservation = {
+  arrived_at?:string|null; departed_at?:string|null;
   id: string; store_id: string; store_name: string; source: string; external_id: string | null;
   customer_name: string; customer_phone: string | null; line_uid: string | null; guest_count: number;
   starts_at: string; ends_at: string; table_id: string | null; table_label: string | null;
@@ -37,13 +38,15 @@ export type RestaurantTable = {
   id: string; store_id: string; code: string; label: string; seat_type: string; min_capacity: number;
   max_capacity: number; floor_id?:string; floor_version?:number; floor_x: number; floor_y: number; join_group: string | null; is_active: number
 }
+export type RestaurantRotation = {date:string;activeTables:number;departedGroups:number;turnover:number|null;utilization:number|null;averageStayMinutes:number|null;noShowRate:number|null;unmeasuredVisits:number};
+
 export type SeatVisitMark = {
   id?: string; kind: 'visited' | 'late' | 'no_show'; late_minutes: number | null;
   marked_by_name: string | null; marked_at: string
 }
 export type SeatWaitlistEntry = {
   id: string; store_id: string; starts_at: string; guest_count: number; customer_name: string;
-  status: 'waiting' | 'invited' | 'converted' | 'cancelled'; hold_minutes: number;
+  status: 'waiting' | 'invited' | 'converted' | 'cancelled' | 'finished'; hold_minutes: number;
   table_id: string | null; table_label?: string | null;
   invited_at: string | null; hold_expires_at: string | null; notified_at: string | null; created_at: string
 }
@@ -152,16 +155,18 @@ export const restaurantTestApi = {
   decideApproval: (accountId: string, id: string, action: 'approve' | 'return', comment?: string) => fetchApi<{ success: true; data: RestaurantApprovalDecision }>(withAccount(`/api/restaurant-test/approvals/${id}`, accountId), { method: 'PATCH', body: JSON.stringify({ action, comment }) }),
   createReservation: (accountId: string, body: Record<string, unknown>) => fetchApi<{ success: true; data: { id: string; tableId: string | null; lineNotice: { sent: boolean; reason: string | null } } }>(withAccount('/api/restaurant-test/reservations/manual', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateReservation: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/reservations/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
+  attendance:(accountId:string,id:string,body:{action:'visited'|'depart'|'undo_departure'|'undo_visit';expectedVersion:number;requestId:string})=>fetchApi<{success:true;data:{stamp:{status:string;count:number}}}>(withAccount(`/api/restaurant-test/reservations/${encodeURIComponent(id)}/attendance`,accountId),{method:'POST',body:JSON.stringify(body)}),
+  rotation:(accountId:string,storeId:string,date:string)=>fetchApi<{success:true;data:RestaurantRotation}>(withAccount(`/api/restaurant-test/rotation?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`,accountId)),
   /** 席の来店の印（booking-plus 6 の席対応）。 */
-  postSeatVisitMark: (accountId: string, id: string, body: { kind: 'visited' | 'late' | 'no_show'; lateMinutes?: number }) =>
-    fetchApi<{ success: true; data: { status: string; visit_mark: SeatVisitMark } }>(
+  postSeatVisitMark: (accountId: string, id: string, body: { kind: 'visited' | 'late' | 'no_show'; lateMinutes?: number;expectedVersion:number;requestId:string }) =>
+    fetchApi<{ success: true; data: { stamp?:{status:string;count:number};status: string; visit_mark: SeatVisitMark } }>(
       withAccount(`/api/restaurant-test/reservations/${id}/visit`, accountId),
       { method: 'POST', body: JSON.stringify(body) },
     ),
   /** 席の来店の印を取り消す（元に戻す）。 */
-  deleteSeatVisitMark: (accountId: string, id: string) =>
+  deleteSeatVisitMark: (accountId: string, id: string,expectedVersion:number,requestId:string) =>
     fetchApi<{ success: true; data: { status: string } }>(
-      withAccount(`/api/restaurant-test/reservations/${id}/visit`, accountId),
+      withAccount(`/api/restaurant-test/reservations/${id}/visit?expectedVersion=${expectedVersion}&requestId=${encodeURIComponent(requestId)}`, accountId),
       { method: 'DELETE' },
     ),
   /** 席の空き待ちの一覧。 */

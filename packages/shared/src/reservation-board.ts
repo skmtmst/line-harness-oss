@@ -6,7 +6,7 @@ export interface ReservationBoardEntry {
  startsAt: string; endsAt: string; status: string; customerName: string;
  guestCount: number; resourceIds: string[]; resourceLabel: string | null;
  contactLabel?:string|null; currentAllergy?:string|null; source: string; courseName: string | null; note: string | null; dining: DiningSnapshot | null;
- holdExpiresAt: string | null;
+ holdExpiresAt: string | null; arrivedAt?: string | null; departedAt?: string | null;
 }
 export interface ReservationBoardResource { id: string; label: string; active: boolean; capacity: number; }
 export interface ReservationBoardPage { entries: ReservationBoardEntry[]; total: number; limit: number; offset: number; }
@@ -20,9 +20,9 @@ export interface RestaurantFloor {
  tables: Array<{joinGroup?:string|null;id:string;x:number;y:number;width:number;height:number;rotation:number;shape:'rectangle'|'circle'|'long'|'counter'|'sofa'}>;
 }
 export type RestaurantFloorWrite = Omit<RestaurantFloor,'version'> & {expectedVersion:number};
-/** visited は来店。退店（次の束）までは予定終了まで占有する。 */
-export function reservationOccupies(status:string,holdExpiresAt:string|null,now=Date.now()):boolean {
- return !['cancelled','no_show'].includes(status) && !(status==='pending'&&holdExpiresAt!==null&&Date.parse(reservationInstant(holdExpiresAt))<=now);
+/** visited は来店。退店済みは卓を解放し、予定終了は記録として維持する。 */
+export function reservationOccupies(status:string,holdExpiresAt:string|null,now=Date.now(),departedAt:string|null=null):boolean {
+ return departedAt===null && !['cancelled','no_show'].includes(status) && !(status==='pending'&&holdExpiresAt!==null&&Date.parse(reservationInstant(holdExpiresAt))<=now);
 }
 export function reservationInstant(value:unknown):string {
  const raw=String(value);
@@ -38,7 +38,7 @@ export function seatBoardEntry(r:Record<string,unknown>):ReservationBoardEntry {
  startsAt:reservationInstant(r.starts_at),endsAt:reservationInstant(r.ends_at),status:String(r.status),customerName:String(r.customer_name),
  guestCount:Number(r.guest_count),resourceIds:links.length?links:r.table_id?[String(r.table_id)]:[],resourceLabel:r.table_label?String(r.table_label):null,
  contactLabel:r.line_uid?'LINE UID':r.customer_phone?String(r.customer_phone).replace(/^(\d{3})[- ]?\d+[- ]?(\d{4})$/,'$1-****-$2'):'電話未登録',currentAllergy:r.allergy_note?String(r.allergy_note):null,source:String(r.source),courseName:r.course_name?String(r.course_name):null,note:r.note?String(r.note):null,
- dining:diningSnapshot(r.dining_snapshot_json),holdExpiresAt:r.hold_expires_at?reservationInstant(r.hold_expires_at):null};
+ arrivedAt:r.arrived_at?reservationInstant(r.arrived_at):null,departedAt:r.departed_at?reservationInstant(r.departed_at):null,dining:diningSnapshot(r.dining_snapshot_json),holdExpiresAt:r.hold_expires_at?reservationInstant(r.hold_expires_at):null};
 }
 export function peopleBoardEntry(r:Record<string,unknown>):ReservationBoardEntry {
  return {id:String(r.id),kind:'people',version:Number(r.lock_version??0),scopeId:String(r.line_account_id),
