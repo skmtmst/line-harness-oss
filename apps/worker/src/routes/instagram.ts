@@ -157,8 +157,11 @@ instagram.post(
       state,
       response_type: 'code',
       // instagram_content_publish が無いと同時投稿ができないので、接続のときに一緒に貰う。
+      // pages_manage_metadata は求めない。ページのWebhook購読にしか使わない権限で、
+      // その口（instagramWebhook）は審査待ちのため止めてある。Meta のアプリ側でも
+      // Instagram API のユースケースに並ばないため、求めると認可画面で弾かれる。
       scope:
-        'pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,pages_manage_metadata,instagram_content_publish',
+        'pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,instagram_content_publish',
     }).toString();
     return c.json({
       success: true,
