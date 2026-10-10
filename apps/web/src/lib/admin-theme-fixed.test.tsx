@@ -9,7 +9,6 @@ import { ADMIN_THEME_CHANGED_EVENT } from './events'
 
 // テーマの関数と実際のページ入口は差し替えない。V7が選ばれたらその場で失敗する。
 vi.mock('@/v8/webinars/list', () => ({ default: () => <p data-screen="v8">ウェビナー</p> }))
-vi.mock('@/app/webinars/list-v8', () => ({ default: () => { throw new Error('旧画面が選ばれた') } }))
 vi.mock('next/font/google', () => ({ Inter: () => ({ variable: 'inter' }), Noto_Sans_JP: () => ({ variable: 'noto' }) }))
 vi.mock('@/components/app-shell', () => ({ default: ({ children }: { children: ReactNode }) => children }))
 vi.mock('@/components/client-error-reporter', () => ({ default: () => null }))

@@ -308,9 +308,6 @@
   "app/webinars/edit/participants-shared.tsx": {
     "unresolved-classname": 2
   },
-  "app/webinars/list-v8.tsx": {
-    "unresolved-classname": 2
-  },
   "app/webinars/published/page.tsx": {
     "arbitrary-value": 4
   },

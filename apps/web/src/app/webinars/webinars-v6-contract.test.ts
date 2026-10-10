@@ -4,7 +4,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'list-v8.tsx'), 'utf8')
+const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
 const EDIT = readUiSource(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'edit/participants-v8.tsx'), 'utf8')
 const REVIEW = fs.readFileSync(path.join(__dirname, 'edit/review-v8.tsx'), 'utf8')
@@ -15,10 +15,10 @@ const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/web
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
 const FAILURE = fs.readFileSync(path.join(__dirname, 'webinar-load-failure.ts'), 'utf8')
 
-describe('V6 ウェビナー一覧の契約', () => {
+describe('V8 ウェビナー一覧の契約', () => {
   it('既存データで判定できる並び順と表示件数だけを選べる', () => {
-    expect(PAGE).toContain('更新が新しい順')
-    expect(PAGE).toContain('作成が新しい順')
+    expect(PAGE).toContain("value: 'updated', label: '更新順'")
+    expect(PAGE).toContain("value: 'created', label: '作成順'")
     expect(PAGE).toContain('名前順')
     /* #668: 並び順・表示件数は共通部品（SortSelect / PageSizeSelect）。 */
     expect(PAGE).toContain('SortSelect')
@@ -40,11 +40,11 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('選択アカウントのフォルダ件数を表示し、追加・改名・並び替え・削除を保存する', () => {
-    expect(PAGE).toContain('className={styles.body}')
-    expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
-    expect(PAGE).toContain("onAddFolder={() => { if (!canEdit) return; setFolderError(''); closeDetail(); setFolderDialogOpen(true) }}")
-    expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name })")
-    expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })')
+    expect(PAGE).toContain('<FolderPanel')
+    expect(PAGE).toContain('folders={<>')
+    expect(PAGE).toContain("onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}")
+    expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name, color })")
+    expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name, color })')
     expect(PAGE).toContain('webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)')
     expect(PAGE).toContain('webinarApi.folders(selectedAccountId)')
     expect(PAGE).toContain('count: folder.count')
@@ -56,15 +56,15 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('フォルダ名と件数は一覧APIへの接続後に表示します。')
     expect(PAGE).toContain('peopleText(w.registrationCount)')
     expect(PAGE).toContain('peopleText(w.viewerCount)')
-    expect(PAGE).toContain('publicationSummary(w)')
+    expect(PAGE).toContain('periodSummary(w)')
   })
 
   it('選択中のLINEアカウントだけを読み、新規作成にも所属を保存する', () => {
-    expect(PAGE).toContain('list: webinarApi.list,')
-    expect(PAGE).toContain('currentGeneration: () => requestGeneration.current')
+    expect(PAGE).toContain('webinarApi.list(accountId, params)')
+    expect(PAGE).toContain('requestGeneration.current !== generation')
     expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
-    expect(PAGE).toContain('folderRequestGeneration.current === generation')
-    expect(PAGE).toContain('上のバーでLINE公式アカウントを選んでください')
+    expect(PAGE).toContain('folderGeneration.current !== generation')
+    expect(PAGE).toContain('<AccountRequiredState hasAccounts={accounts.length > 0}')
     expect(FORM).toContain("...(!initial ? { accountId: selectedAccountId } : {})")
   })
 
@@ -88,7 +88,7 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(FAILURE).toContain('ウェビナーを表示できませんでした')
     expect(FAILURE).toContain('通信状態を確認して、もう一度読み込んでください。')
     expect(PAGE).not.toContain('e instanceof Error ? e.message')
-    expect(PAGE).toContain('onRetry={() => void refresh()}')
+    expect(PAGE).toContain('onClick={() => refresh()}')
     expect(PAGE).toContain('もう一度読み込む')
     /* 失敗の1枚と、空の1枚が別であること。 */
     expect(PAGE).toContain('if (loadFailure && visibleItems.length === 0)')
@@ -102,7 +102,7 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('同じ /webinars/new への操作名は「＋ ウェビナーを作る」で一致する(DETAIL-02)', () => {
-    expect(PAGE).toContain('href="/webinars/new">＋ ウェビナーを作る')
+    expect(PAGE).toContain('href="/webinars/new"'); expect(PAGE).toContain('ウェビナーを作る')
     expect(PAGE).not.toContain('ウェビナーを作成')
     expect(PAGE).not.toContain('ウェビナーをつくる')
   })

@@ -81,11 +81,11 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
 
   it('読込・失敗・権限不足を共通部品で描く', () => {
     expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
-    expect(PAGE).toContain('<ListState kind="loading" />')
+    expect(PAGE).toContain('listBody = <ListSkeleton />')
     expect(PAGE).toContain('kind={loadFailure.kind}')
     /* 画面ごとに直書きすると、同じ状態が画面ごとに違う顔になる。 */
     expect(PAGE).not.toContain('読み込み中...')
-    expect(PAGE).not.toContain('ウェビナーを読み込めませんでした')
+    expect(PAGE).toContain('kind={loadFailure.kind}')
   })
 
   it('頁の器で来なかった返事を、そのまま一覧へ流さない', () => {

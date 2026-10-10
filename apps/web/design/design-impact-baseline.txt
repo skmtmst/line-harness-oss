@@ -218,7 +218,6 @@ shared-button-importer app/webinars/edit/video-v8.tsx
 shared-button-importer app/webinars/edit/viewer-comments.tsx
 shared-button-importer app/webinars/edit/webinar-edit-compare-dialog.tsx
 shared-button-importer app/webinars/edit/webinar-edit-conflict-band.tsx
-shared-button-importer app/webinars/list-v8.tsx
 shared-button-importer app/webinars/published/page.tsx
 shared-button-importer components/accounts/account-edit-modal.tsx
 shared-button-importer components/accounts/account-ordering.tsx

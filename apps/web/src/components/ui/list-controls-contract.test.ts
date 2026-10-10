@@ -1,4 +1,3 @@
-import { readFileSync as readOriginal } from 'node:fs'
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
@@ -61,7 +60,7 @@ const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
    * `@/v8/` もたどるようになった（2026-10-06）ので、v7 の並びは v7 の本体（list-v8.tsx。名前は v8 だが
    * 今は v7 のときに描かれる）で見て、V8 は部品を変数にまとめて並べる道具の段（wideToolbar）で見る。
    */
-  ['ウェビナー', '../../app/webinars/list-v8.tsx', ['<SearchField', '<FilterChip', '<SortSelect', '<PageSizeSelect']],
+  ['ウェビナー', '../../app/webinars/page.tsx', ['const wideToolbar', '<ListToolbar', 'search={{', 'filters={filterChips}', 'trailing={<>{sortBox}{savedBox}{perPageBox}</>}']],
   ['ウェビナー（V8）', '../../v8/webinars/list.tsx', ["search={{ placeholder: 'ウェビナー名で探す'", 'filters={filterChips}', 'trailing={<>{sortBox}', '{perPageBox}</>}']],
   ['共通情報', '../../app/contents/vars/page.tsx', ['const wideToolbar', '<ListToolbar', 'search={{', 'filters={filterChips}', 'trailing={<>{orderBox}{perPageBox}</>}']],
 ]
@@ -126,10 +125,10 @@ describe('フィルターバー統一（監査6 #668）', () => {
   it.each(TOOLBAR_ORDER.map(([name, path, markers]) => ({ name, path, markers })))(
     '$name は「検索 → 絞り込み → 並び順 → 表示件数」の順',
     ({ path, markers }) => {
-      const source = path === '../../app/webinars/list-v8.tsx' ? readOriginal(new URL(path, import.meta.url), 'utf8') : read(path)
+      const source = read(path)
       let previous = -1
       for (const marker of markers) {
-        const index = source.indexOf(marker, path === '../../app/contents/vars/page.tsx' ? previous + 1 : 0)
+        const index = source.indexOf(marker, ['../../app/contents/vars/page.tsx', '../../app/webinars/page.tsx'].includes(path) ? previous + 1 : 0)
         expect(index, `${path} に ${marker} がない`).toBeGreaterThan(-1)
         expect(index, `${path} で ${marker} が前の項目より先にある`).toBeGreaterThan(previous)
         previous = index

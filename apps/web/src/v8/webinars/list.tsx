@@ -75,8 +75,6 @@ type SavedFilter = '' | 'active' | 'draft' | 'archived'
 
 const UNFILED = '__unfiled__'
 const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
-/** 検索入力を口へ渡すまでの待ち時間。1文字ごとの取り直しを束ねる。 */
-const SEARCH_DEBOUNCE_MS = 300
 
 function scheduleSummary(w: Webinar): string {
   if (w.schedule.length === 0) return '未設定'
@@ -541,8 +539,8 @@ function WebinarList() {
   useEffect(() => { setQuery((current) => (current.trim() === view.q ? current : view.q)) }, [view.q])
   useEffect(() => {
     if (query.trim() === view.q) return
-    const timer = setTimeout(() => setView({ q: query.trim(), page: '1' }), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    // 共通SearchFieldが300ms束ねた値を受ける。ここで二重に待たせない。
+    setView({ q: query.trim(), page: '1' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
   useEffect(() => { void refreshOverview() }, [refreshOverview])
