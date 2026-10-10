@@ -1,4 +1,7 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+import Toggle from '@/components/shared/toggle';
+
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
@@ -110,6 +113,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 自動応答の作成・編集・有効化。
@@ -1109,6 +1113,7 @@ function AutoReplyWizardV8Inner() {
 
       { if (!fieldFailure)
 
+
       setError('試し送りできませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setSaving(false)
@@ -1151,6 +1156,7 @@ function AutoReplyWizardV8Inner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
+
 
       setError(
         caught instanceof ApiError && caught.status === 409
@@ -2354,7 +2360,7 @@ function AutoReplyWizardV8Inner() {
                 </div>
                 {/* 絵 Guoye：送信者の行 → 届いたメッセージと「試す」の行。友だちを名前で探す欄は機能なので送信者の行の右に残す。 */}
                 <div className={styles.testRow}>
-                  <SaveErrorField names={["selectedFriendId","friendId","selected_friend_id"]}><Select
+                  <SaveErrorField names={["selectedFriendId","friendId","selected_friend_id"]}><EntitySelect
                     id="wiz-test-friend"
                     className={styles.testGrow}
                     aria-label="送信者"
@@ -2365,7 +2371,7 @@ function AutoReplyWizardV8Inner() {
                         ? [{ value: '', label: '友だちを読み込めませんでした' }]
                         : friends.length === 0
                           ? [{ value: '', label: '友だちがいません' }]
-                          : friends.map((f) => ({
+                          : friends.map((f) => ({ ...entityOptionMetadata(f),
                               value: f.id,
                               label: f.id === selectedFriendId
                                 ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${friends.length}人）`

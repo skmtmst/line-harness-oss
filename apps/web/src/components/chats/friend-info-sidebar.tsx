@@ -1,6 +1,6 @@
 'use client'
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
 
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { formAnswerText } from '@/lib/form-answer'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionAccess } from '@/lib/use-feature-access'
@@ -32,6 +32,7 @@ import { X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 interface FriendDetail {
   id: string
@@ -1007,13 +1008,13 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 {canEditChat && operators && isV8 ? (
                   /* ★V8 B-26：共通の選ぶ欄（選んだ行は ✓ だけ）。 */
                   <div className={v8.editField}>
-                    <Select
+                    <EntitySelect
                       id="inbox-panel-assignee"
                       size="full"
                       aria-label="担当者を変える"
                       value={effectiveOperatorId ?? ''}
                       onChange={(value) => saveAssignee(value || null)}
-                      options={[{ value: '', label: '未割り当て' }, ...operators.map((op) => ({ value: op.id, label: op.name }))]}
+                      options={[{ value: '', label: '未割り当て' }, ...operators.map((op) => ({ ...entityOptionMetadata(op), value: op.id, label: op.name }))]}
                     />
                   </div>
                 ) : canEditChat && operators ? (
@@ -1162,14 +1163,14 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               {canEditFriend && isV8 ? (
                 /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
                 <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
-                  <Combobox
+                  <EntitySelect clearable size="full" kind="tag"
                     id="inbox-panel-tag"
                     aria-label="タグを探して付ける"
                     placeholder="タグを探して付ける"
                     value=""
                     options={tagOptions
                       .filter((t) => !(effectiveTags ?? []).some((own) => own.id === t.id))
-                      .map((t) => ({ value: t.id, label: t.name }))}
+                      .map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
                     onChange={(tagId) => { if (tagId) addTagById(tagId) }}
                     createLabel={(query) => `＋「${query}」を作って付ける`}
                     onCreate={(query) => { void createAndAddTag(query) }}

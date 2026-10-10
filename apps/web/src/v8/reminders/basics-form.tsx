@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, IdCard } from 'lucide-react'
 import type { FriendField, ReminderDraftSettings, ReminderDraftStep, ReminderTriggerType } from '@line-crm/shared'
@@ -16,6 +17,7 @@ import { ChoiceCardV8 } from './ui'
 import styles from './edit.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 リマインダ手順1「基本設定」の入力部分（板 VE1u5・競合 k32cn）。
@@ -347,7 +349,7 @@ export function ReminderBasicsFormV8({
           <div className={styles.field}>
             <span className={styles.label}>基準日に使う情報欄</span>
             <div className={styles.testRow}>
-              <SaveErrorField names={["triggerFieldId","value.triggerFieldId","trigger_field_id","value.trigger_field_id"]}><Select
+              <SaveErrorField names={["triggerFieldId","value.triggerFieldId","trigger_field_id","value.trigger_field_id"]}><EntitySelect
                 error={fieldError?.key === 'triggerFieldId' ? fieldError.message : undefined}
                 value={value.triggerFieldId}
                 onChange={(next) => patch({ triggerFieldId: next })}
@@ -356,7 +358,7 @@ export function ReminderBasicsFormV8({
                 size="full"
                 options={[
                   { value: '', label: fieldsLoadState === 'loading' || fieldsLoadState === 'idle' ? '情報欄を読み込み中' : fieldsLoadState === 'error' ? '情報欄を読み込めませんでした' : '選んでください' },
-                  ...dateFields.map((field) => ({ value: field.id, label: field.name })),
+                  ...dateFields.map((field) => ({ ...entityOptionMetadata(field), value: field.id, label: field.name })),
                 ]}
               /></SaveErrorField>
               {fieldsLoadState === 'error' ? <Button onClick={() => setFieldsLoadState('idle')}>もう一度読み込む</Button> : null}

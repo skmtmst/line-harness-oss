@@ -1,4 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
+
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer } from '@/lib/api'
@@ -18,7 +20,7 @@ import {
 } from './offer-terms'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * 案件を作る・編集する窓（OfferFormModal）。app/affiliates/tabs.tsx から写した
@@ -274,11 +276,11 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
         ) : null}
         <OfferTermsFields errors={fieldErrors} values={terms} onChange={setTerms} disabled={isEdit && !termsLoaded} />
 
-        <div><Field label="誘導 LINE アカウント"><SaveErrorField names={["lineAccountId","line_account_id"]}><Select
+        <div><Field label="誘導 LINE アカウント"><SaveErrorField names={["lineAccountId","line_account_id"]}><EntitySelect
             aria-label="誘導 LINE アカウント"
             value={lineAccountId}
             onChange={(value) => setLineAccountId(value)}
-            options={[{ value: '', label: '— 選択しない —' }, ...accounts.map((acc) => ({ value: acc.id, label: acc.name }))]}
+            options={[{ value: '', label: '— 選択しない —' }, ...accounts.map((acc) => ({ ...entityOptionMetadata(acc), value: acc.id, label: acc.name }))]}
             className="w-full"
             size="full"
           /></SaveErrorField></Field></div>

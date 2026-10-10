@@ -12,7 +12,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextField } from '@/components/shared/text-field'
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * 質問メッセージ（分岐）の編集。

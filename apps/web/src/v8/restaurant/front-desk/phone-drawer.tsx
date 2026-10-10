@@ -1,4 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Check, CircleCheck, Minus, Plus } from 'lucide-react'
@@ -19,7 +21,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import styles from './front-desk.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 電話予約の引き出し（提案 E-2 `wEzuG`）。
@@ -169,6 +171,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
 
       { if (!fieldFailure)
 
+
       setError(caught instanceof Error && caught.message ? caught.message : '予約を入れられませんでした。もう一度お試しください。') }
     } finally {
       setBusy(false)
@@ -267,12 +270,12 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
           {candidates.length > 1 && !changingTable ? <Button variant="text" onClick={() => setChangingTable(true)}>変える</Button> : null}
         </div>
         {changingTable && candidates.length > 1 ? (
-          <SaveErrorField names={["id","chosenTable?.id","tableId","chosen_table?.id","table_id"]}><Select
+          <SaveErrorField names={["id","chosenTable?.id","tableId","chosen_table?.id","table_id"]}><EntitySelect
             aria-label="卓を選ぶ"
             size="full"
             value={chosenTable?.id ?? ''}
             onChange={setTableId}
-            options={candidates.map((t) => ({ value: t.id, label: `${t.code}（${tableNote(t)}）` }))}
+            options={candidates.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.code}（${tableNote(t)}）` }))}
           /></SaveErrorField>
         ) : null}
         <Field label="メモ"><SaveErrorField names={["memo","note"]}><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" /></SaveErrorField></Field>

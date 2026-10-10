@@ -1,3 +1,4 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * 分析レポート作成の V8（板 H5UoIu）と作成時の競合小窓（G83vi）。
@@ -213,11 +214,7 @@ describe('V8 レポート作成（H5UoIu）', () => {
     if (!nameField) throw new Error('名前の入力が見つかりません')
     await act(async () => { fireEvent.change(nameField, { target: { value: '' } }) })
     // 宛先を選んで保存できる形にする
-    const person = [...container.querySelectorAll('input[type="checkbox"]')].find(
-      (item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('担当1'),
-    ) as HTMLInputElement | undefined
-    if (!person) throw new Error('宛先が見つかりません')
-    await act(async () => { fireEvent.click(person) })
+    await pickEntities('レポートを受け取る人', ['担当1'])
     await click(buttonByText('つくって動かす'))
     await settle()
     expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)

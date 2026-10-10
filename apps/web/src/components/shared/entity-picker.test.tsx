@@ -1,8 +1,9 @@
-// @vitest-environment happy-dom
+
 import React, { act, useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
+// @vitest-environment happy-dom
 
 afterEach(cleanup)
 
@@ -25,7 +26,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
   it('欄は空なら［選ぶ］、選ぶと名前とフォルダ＋［変える］。窓の中で押しただけでは変わらない', async () => {
     const onChange = vi.fn()
     render(<Single onChange={onChange} />)
-    expect(screen.getByText('（回答フォームを選んでください）')).toBeTruthy()
+    expect(screen.getByText('回答フォームを選ぶ')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '回答フォーム：選ぶ' }))
     const dialog = await screen.findByRole('dialog', { name: '回答フォームを選ぶ' })
     // フォルダの列で絞る
@@ -65,6 +66,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     fireEvent.click(screen.getByRole('button', { name: '回答フォーム：見る' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).queryByRole('button', { name: '選ぶ' })).toBeNull()
+    expect(within(dialog).queryByRole('link', { name: /作る画面へ/ })).toBeNull()
     expect(within(dialog).getAllByRole('button', { name: '閉じる' })).toHaveLength(2)
   })
 
@@ -104,14 +106,14 @@ describe('まとめて選ぶ窓', () => {
     let dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '分類なし' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
-    expect(screen.getByText('（タグを選んでください）')).toBeTruthy()
+    expect(screen.getByText('タグを選ぶ')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'タグ：選ぶ' }))
     dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '分類なし' }))
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '来店アンケート' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'この 2件にする' }))
-    expect(screen.getByText('2件')).toBeTruthy()
-    expect(screen.getByText('来店アンケート・分類なし')).toBeTruthy()
+    expect(screen.getByText('来店アンケート')).toBeTruthy()
+    expect(screen.getByText('分類なし')).toBeTruthy()
   })
 })
 

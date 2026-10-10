@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
@@ -21,7 +22,7 @@ import type {
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 の一覧（src/v8/inflow-links/list.tsx）用の写し。元は
@@ -172,6 +173,7 @@ export default function EditRouteModal({
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
       { if (!fieldFailure)
 
+
       setError(withPermissionFailure(err, describeSaveFailure(err), 'store')) }
     } finally {
       // 失敗時に「保存中…」のまま固まらないよう、必ず戻す。
@@ -266,19 +268,19 @@ export default function EditRouteModal({
         <Field note={<>
             友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
           </>} label="自動付与タグ（任意）">
-          <SaveErrorField names={["tagId","form.tagId","tag_id","form.tag_id"]}><Combobox
+          <SaveErrorField names={["tagId","form.tagId","tag_id","form.tag_id"]}><EntitySelect clearable size="full" kind="tag"
             aria-label="自動付与タグ（任意）"
             placeholder="— 設定なし —"
             value={form.tagId ?? ''}
             onChange={(next) => setForm({ ...form, tagId: next || null })}
-            options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+            options={tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
             className="w-full"
           /></SaveErrorField>
 
         </Field>
 
         <Field label="送り先 Pool">
-          <SaveErrorField names={["poolId","form.poolId","pool_id","form.pool_id"]}><Select
+          <SaveErrorField names={["poolId","form.poolId","pool_id","form.pool_id"]}><EntitySelect
             aria-label="送り先 Pool"
             value={form.poolId ?? ''}
             onChange={(value) => setForm({ ...form, poolId: value || null })}
@@ -289,7 +291,7 @@ export default function EditRouteModal({
                 members.length === 0
                   ? '（アカウント未所属）'
                   : `— ${members.join(', ')}`
-              return {
+              return { ...entityOptionMetadata(p),
                 value: p.id,
                 label: `${p.name}${p.slug === 'main' ? '（既定）' : ''} ${memberText}`,
               }
@@ -298,23 +300,23 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="起動シナリオ（任意）">
-          <SaveErrorField names={["scenarioId","form.scenarioId","scenario_id","form.scenario_id"]}><Combobox
+          <SaveErrorField names={["scenarioId","form.scenarioId","scenario_id","form.scenario_id"]}><EntitySelect clearable size="full" kind="scenario"
             aria-label="起動シナリオ（任意）"
             placeholder="— 設定なし —"
             value={form.scenarioId ?? ''}
             onChange={(next) => setForm({ ...form, scenarioId: next || null })}
-            options={scenarios.map((s) => ({ value: s.id, label: s.name }))}
+            options={scenarios.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))}
             className="w-full"
           /></SaveErrorField>
         </Field>
 
         <Field label="即時 push テンプレ（任意）">
-          <SaveErrorField names={["introTemplateId","form.introTemplateId","intro_template_id","form.intro_template_id"]}><Combobox
+          <SaveErrorField names={["introTemplateId","form.introTemplateId","intro_template_id","form.intro_template_id"]}><EntitySelect clearable size="full" kind="template"
             aria-label="即時 push テンプレ（任意）"
             placeholder="— 設定なし —"
             value={form.introTemplateId ?? ''}
             onChange={(next) => setForm({ ...form, introTemplateId: next || null })}
-            options={templates.map((t) => ({ value: t.id, label: t.name }))}
+            options={templates.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
             className="w-full"
           /></SaveErrorField>
         </Field>

@@ -1,5 +1,6 @@
 'use client'
 
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageHeading } from '@/components/templates/page-frame'
 
 import { useEffect, useState } from 'react'
@@ -9,7 +10,7 @@ import CreatePage, { AsideCard, FormSection, Field } from '@/components/shared/c
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { TextInput } from '@/components/shared/form-controls'
-import Select from '@/components/shared/select'
+
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -130,7 +131,7 @@ export default function NewStaffPage() {
 
     <FormSection step={3} label="最初に表示するLINEアカウント" note="ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。">
       <Field label="最初に表示するアカウント" htmlFor="staff-account" required>
-        <Select
+        <EntitySelect
           id="staff-account"
           aria-label="最初に表示するアカウント"
           size="full"
@@ -139,7 +140,7 @@ export default function NewStaffPage() {
           onChange={(value) => { fields.touch('account'); setAssignedLineAccountId(value) }}
           options={[
             { value: '', label: '選択してください' },
-            ...accounts.map((account) => ({ value: account.id, label: account.name })),
+            ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name })),
           ]}
         />
       </Field>

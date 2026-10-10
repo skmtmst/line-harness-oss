@@ -1,4 +1,5 @@
 'use client'
+
 import { jstDate } from '@/lib/jst-datetime'
 import { Download, FileSearch, Info } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
@@ -21,7 +22,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`）。/friends/migrations。
@@ -81,12 +82,12 @@ export default function CsvMigrationsV8() {
           <h3 id="csv-export-title" className={styles.cardTitle}>CSVで書き出す</h3>
           <div className={styles.field}>
             <span className={styles.fieldLabel}>アカウント</span>
-            <SaveErrorField names={["accountId","m.accountId","account_id","m.account_id"]}><Select
+            <SaveErrorField names={["accountId","m.accountId","account_id","m.account_id"]}><EntitySelect
               aria-label="書き出すLINEアカウント"
               size="full"
               value={m.accountId}
               onChange={m.setAccountId}
-              options={[{ value: '', label: 'アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]}
+              options={[{ value: '', label: 'アカウントを選択' }, ...m.accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]}
             /></SaveErrorField>
           </div>
           <fieldset className={styles.fieldset}>

@@ -8,7 +8,7 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { ACTION_LABELS } from './version-diff'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import BranchActionList from '@/components/automations/branch-action-list'
-
+import EntitySelect from '@/components/shared/entity-select'
 
 /* 写し：app/common-actions/branch-editor.tsx（src/v8 は古い画面ファイルを import できない）。中身は変えていない。 */
 

@@ -16,6 +16,7 @@ import { ACTION_ADDERS, describeAfterAction, emptyAction } from './model'
 import styles from './edit.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * 「答え終わったあと」のタブ（XXFT4）。お礼の画面と、答え終わったら行うこと。

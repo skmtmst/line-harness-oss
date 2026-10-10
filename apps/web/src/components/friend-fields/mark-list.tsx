@@ -18,6 +18,7 @@ import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -127,11 +128,11 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
           {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact && needsReplacement ? (
             <div>
               <label className="block text-sm font-semibold text-ink">置き換え先
-                <SaveErrorField names={["replacementMarkId","replacement_mark_id"]}><Select
+                <SaveErrorField names={["replacementMarkId","replacement_mark_id"]}><EntitySelect
                   aria-label="置き換え先"
                   value={replacementMarkId}
                   onChange={onReplacement}
-                  options={[{ value: '', label: '選んでください' }, ...impact.replacementOptions.map((option) => ({ value: option.id, label: `${option.name}${option.isDefault ? '（初期値）' : ''}` }))]}
+                  options={[{ value: '', label: '選んでください' }, ...impact.replacementOptions.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: `${option.name}${option.isDefault ? '（初期値）' : ''}` }))]}
                   size="full"
                   className="mt-1.5"
                 /></SaveErrorField>

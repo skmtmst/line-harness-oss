@@ -82,7 +82,6 @@ import type {
   ConversionPoint,
   ConversionMeasureMethod,
   Affiliate,
-  Template,
   Automation,
   AutomationLog,
   Chat,
@@ -3919,8 +3918,6 @@ export type FriendListItem = FriendWithTags & Partial<{
 export function friendAddStopIdempotencyKey(ruleId: string, version: number): string {
   return `friend-add-rule-stop:${encodeURIComponent(ruleId)}:v${version}`
 }
-
-
 
 /** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
 export type ListStats = {
@@ -13581,7 +13578,7 @@ export const api = {
   // 同ページから参照する。Worker の applyRefAttribution は entry_routes → tracked_links
   // の順でフォールバックするので、tracked_links 登録済み ref は実際にはシナリオ発火している。
   trackedLinks: {
-    list: () =>
+    list: (accountId?: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -13599,7 +13596,7 @@ export const api = {
             updatedAt: string
           }>
         >
-      >('/api/tracked-links'),
+      >(`/api/tracked-links${accountId ? `?lineAccountId=${encodeURIComponent(accountId)}` : ''}`),
   },
   pools: {
     list: (options?: FetchApiOptions) =>

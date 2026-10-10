@@ -1,6 +1,6 @@
 'use client'
-import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar';
 
+import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
@@ -27,6 +27,7 @@ import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type 
 import styles from './pets.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B 登録ペットの一覧（wTIej・1152 は t2SMXX）。
@@ -103,14 +104,14 @@ export default function PetsListV8({
           onChange={(value) => change({ species: value })}
           options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
         /></SaveErrorField>
-        <SaveErrorField names={["product","query.product"]}><Select
+        <SaveErrorField names={["product","query.product"]}><EntitySelect
           aria-label="主食で絞り込む"
           width={140}
           value={query.product}
           onChange={(value) => change({ product: value })}
           options={[
             { value: '', label: '主食：すべて' },
-            ...(data?.products ?? []).map((p) => ({ value: p.id, label: `主食：${p.name}` })),
+            ...(data?.products ?? []).map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: `主食：${p.name}` })),
             { value: 'none', label: '主食：未設定' },
           ]}
         /></SaveErrorField>

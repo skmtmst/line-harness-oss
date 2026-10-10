@@ -38,16 +38,18 @@ import {
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import dynamic from 'next/dynamic'
-/*
- * ★V8 の作るウィザード（直すとき）と詳細は、V8 のときだけ読み込む（v7 の編集画面と試験に V8 の部品を持ち込まない）。
- */
-const RichMenuCreateV8 = dynamic(() => import('../new/create-v8'), { ssr: false })
-const RichMenuDetailV8 = dynamic(() => import('@/v8/rich-menu-edit/detail'), { ssr: false })
 import { PublishHistorySection } from './publish-history'
 import { PublishProgressSection } from './publish-progress-section'
 import { PrepublishCheckSection } from './prepublish-check-section'
 import { TestApplySection } from './test-apply-section'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * ★V8 の作るウィザード（直すとき）と詳細は、V8 のときだけ読み込む（v7 の編集画面と試験に V8 の部品を持ち込まない）。
+ */
+const RichMenuCreateV8 = dynamic(() => import('../new/create-v8'), { ssr: false })
+const RichMenuDetailV8 = dynamic(() => import('@/v8/rich-menu-edit/detail'), { ssr: false })
 
 /**
  * 保存されている条件を読む。
@@ -2140,7 +2142,7 @@ function PublishStep({
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
               <span className="text-ink-secondary text-xs font-semibold">出しはじめ<DateTimeField aria-label="出しはじめ" value={startsAt} onChange={(v) => onPublishChange({ startsAt: v })} className="mt-1" /></span>
               {mode === 'period' ? <span className="text-ink-secondary text-xs font-semibold">出しおわり<DateTimeField aria-label="出しおわり" value={endsAt} onChange={(v) => onPublishChange({ endsAt: v })} className="mt-1" /></span> : null}
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<Select aria-label="終わったらどうする" value={restoreGroupId} onChange={(value) => onPublishChange({ restoreGroupId: value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<EntitySelect kind="rich_menu" aria-label="終わったらどうする" value={restoreGroupId} onChange={(value) => onPublishChange({ restoreGroupId: value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
             </div>
           ) : null}
 

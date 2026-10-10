@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
@@ -38,7 +39,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 流入と計測の詳細（Pencil `Q5le3`）。
@@ -808,7 +809,7 @@ function InflowDetailContent() {
             {deleteChoice === 'redirect' ? (
               <div className={styles.deleteField}>
                 <span className={styles.deleteChoiceTitle}>転送先のリンク</span>
-                <SaveErrorField names={["redirectTargetId","redirect_target_id"]}><Select
+                <SaveErrorField names={["redirectTargetId","redirect_target_id"]}><EntitySelect
                   aria-label="転送先のリンク"
                   id="inflow-redirect-target"
                   value={redirectTargetId}
@@ -817,7 +818,7 @@ function InflowDetailContent() {
                   size="full"
                   options={[
                     { value: '', label: '選んでください' },
-                    ...routes.filter((candidate) => candidate.id !== route.id).map((candidate) => ({ value: candidate.id, label: `${candidate.name}（${candidate.refCode}）` })),
+                    ...routes.filter((candidate) => candidate.id !== route.id).map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `${candidate.name}（${candidate.refCode}）` })),
                   ]}
                 /></SaveErrorField>
                 <span className={styles.note}>先頭を自動で選ぶことはしません。必ず選んでください。</span>

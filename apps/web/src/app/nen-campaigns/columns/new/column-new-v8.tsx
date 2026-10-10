@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -39,7 +40,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B コラムを書く（`yRDwW`）。
@@ -196,12 +197,12 @@ export default function ColumnNewV8() {
                 /></SaveErrorField></Field>
             </div>
             {draft.targetMode === 'tag' ? (
-              <Field label="対象タグ"><SaveErrorField names={["targetTagId","draft.targetTagId","target_tag_id","draft.target_tag_id"]}><Select
+              <Field label="対象タグ"><SaveErrorField names={["targetTagId","draft.targetTagId","target_tag_id","draft.target_tag_id"]}><EntitySelect kind="tag"
                   aria-label="対象タグ"
                   value={draft.targetTagId}
                   options={[
                     { value: '', label: 'タグを選択' },
-                    ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
+                    ...accountTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ targetTagId: value })}
                 /></SaveErrorField></Field>
@@ -217,12 +218,12 @@ export default function ColumnNewV8() {
             <h2 className={styles.cardTitle}>読んだ人にすること</h2>
             <div className={styles.row2}>
               <Field label="読了イベント名"><SaveErrorField names={["completionEventName","draft.completionEventName","completion_event_name","draft.completion_event_name"]}><TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例：秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} /></SaveErrorField></Field>
-              <Field label="読了後に付けるタグ"><SaveErrorField names={["completionTagId","draft.completionTagId","completion_tag_id","draft.completion_tag_id"]}><Select
+              <Field label="読了後に付けるタグ"><SaveErrorField names={["completionTagId","draft.completionTagId","completion_tag_id","draft.completion_tag_id"]}><EntitySelect kind="tag"
                   aria-label="読了後に付けるタグ"
                   value={draft.completionTagId}
                   options={[
                     { value: '', label: '付けない' },
-                    ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
+                    ...accountTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name })),
                   ]}
                   onChange={(value) => set({ completionTagId: value })}
                 /></SaveErrorField></Field>

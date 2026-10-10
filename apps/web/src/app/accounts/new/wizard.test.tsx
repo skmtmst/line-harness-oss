@@ -1,3 +1,4 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -180,7 +181,7 @@ it('V8の登録前タグを接続確認と登録へ渡す', async () => {
  try {
   render(<NewLineAccountPage />);
   next();fill('v8-channel-id','123456789');fill('v8-channel-secret','synthetic-secret');fill('v8-login-channel-id','2007123456');fill('v8-login-channel-secret','synthetic-login-secret');next();
-  fireEvent.click(await screen.findByRole('button',{name:'店舗'}));next();
+  await pickEntities('タグ', ['店舗']);next();
   fireEvent.click(screen.getByRole('button',{name:'接続して設定する'}));
   await waitFor(()=>expect(calls.connectCheck).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']})));
   fireEvent.click(await screen.findByRole('checkbox',{name:/応答メッセージ.*オフ/}));

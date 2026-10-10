@@ -1,4 +1,6 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+
 import { jstDate } from '@/lib/jst-datetime'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { notifySaved } from '@/components/shared/toast'
@@ -61,6 +63,7 @@ import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-d
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`・1152 `U5rxyH`）。
@@ -241,6 +244,7 @@ export default function ScenarioFirstStepV8() {
 
         if (caught instanceof ApiError && caught.status === 404) {
           { if (!fieldFailure)
+
 
           setError('') }
           setLoadMissing(true)
@@ -452,6 +456,7 @@ export default function ScenarioFirstStepV8() {
       const detail = submitError instanceof ApiError ? submitError.message : ''
       { if (!fieldFailure)
 
+
       setError(
         detail
           ? `保存できませんでした（${detail}）。入力内容は残っています。もう一度お試しください。`
@@ -654,12 +659,12 @@ export default function ScenarioFirstStepV8() {
         {targetMode === 'tag' ? (
           <div className={styles.inlineField}>
             <span className={styles.inlineLabel}>絞り込むタグ</span>
-            <SaveErrorField names={["targetTagId","target_tag_id"]}><Select
+            <SaveErrorField names={["targetTagId","target_tag_id"]}><EntitySelect kind="tag"
               value={targetTagId}
               onChange={(value) => { setTargetTagId(value); setTargetError('') }}
               error={targetError || undefined}
               aria-label="絞り込みに使うタグ"
-              options={[{ value: '', label: '選んでください' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]}
+              options={[{ value: '', label: '選んでください' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]}
             /></SaveErrorField>
           </div>
         ) : null}

@@ -23,6 +23,7 @@ import { SIZE_DIMENSIONS, TEMPLATES, type RichMenuTemplate } from '@/lib/rich-me
 import type { SegmentCondition } from '@/lib/segment-condition'
 import type { RichMenuAreaIntent } from '@line-crm/shared'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 export type RichMenuOption = { id: string; name: string }
 export type RichMenuFolderOption = RichMenuOption
@@ -303,13 +304,13 @@ export default function RichMenuCreateForm({
               {value.tabCount > 0 ? (
                 <div>
                   <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-default-page">最初に見せるページ</label>
-                  <SaveErrorField names={["defaultPageIndex","value.defaultPageIndex","default_page_index","value.default_page_index"]}><Select
+                  <SaveErrorField names={["defaultPageIndex","value.defaultPageIndex","default_page_index","value.default_page_index"]}><EntitySelect
                     id="rich-menu-default-page"
                     aria-label="最初に見せるページ"
                     value={String(value.defaultPageIndex)}
                     disabled={locked}
                     onChange={(value) => patch({ defaultPageIndex: Number(value) })}
-                    options={createPages.map((page) => ({ value: page.id, label: page.name }))}
+                    options={createPages.map((page) => ({ ...entityOptionMetadata(page), value: page.id, label: page.name }))}
                   /></SaveErrorField>
                   <p className="text-ink-faint mt-1 text-xs">タブを切り替えていない人が最初に見るページです。</p>
                 </div>

@@ -1,4 +1,5 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
 
 import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
@@ -52,6 +53,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 来店スタンプ（G-8a〜a3）。マイル（オンライン・特定の動き）とは別のスタンプカード。
@@ -518,9 +520,9 @@ function VisitStampsScreen() {
                   </div>
                   <div className={styles.field}>
                     <span className={styles.label}>ゴールしたら <HelpTip label="ゴールしたらの説明">ゴールの特典を使うと、次のカードを受け取れます。</HelpTip></span>
-                    <SaveErrorField names={["nextCardId","settings.nextCardId","next_card_id","settings.next_card_id"]}><Select id="stamp-nextCardId" error={issue?.field === 'nextCardId' ? issue.message : undefined} aria-label="ゴールしたら" size="full" disabled={ro} value={settings.completion === 'next_card' ? settings.nextCardId ?? 'repeat' : 'repeat'}
+                    <SaveErrorField names={["nextCardId","settings.nextCardId","next_card_id","settings.next_card_id"]}><EntitySelect id="stamp-nextCardId" error={issue?.field === 'nextCardId' ? issue.message : undefined} aria-label="ゴールしたら" size="full" disabled={ro} value={settings.completion === 'next_card' ? settings.nextCardId ?? 'repeat' : 'repeat'}
                       onChange={v => set({ completion: v === 'repeat' ? 'repeat' : 'next_card', nextCardId: v === 'repeat' ? null : v })}
-                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ value: c.id, label: `次のカードへ：${c.name}` })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} /></SaveErrorField>
+                      options={[{ value: 'repeat', label: '同じカードをもう一度' }, ...nextCards.map(c => ({ ...entityOptionMetadata(c), value: c.id, label: `次のカードへ：${c.name}` })), ...(settings.completion === 'next_card' && settings.nextCardId && !nextCards.some(c => c.id === settings.nextCardId) ? [{ value: settings.nextCardId, label: '次のカードを選び直してください', disabled: true }] : [])]} /></SaveErrorField>
                   </div>
                 </div>
                 <span className={styles.label}>特典</span>
@@ -766,8 +768,8 @@ function VisitStampsScreen() {
                   {!card ? <p className={styles.sub}>カードを保存すると、店で押せるようになります。</p> : null}
                   <div className={styles.field}>
                     <span className={styles.label}>友だち</span>
-                    <SaveErrorField names={["friendId","friend_id"]} key={selectedFriend ? `f-${friendId}` : 'none'}><Combobox key={selectedFriend ? `f-${friendId}` : 'none'} aria-label="友だちを探す" placeholder="名前で探す" value={friendId} onChange={(v) => { setFriendId(v) }} options={friendOptions}
-                      disabled={!card} emptyText={(q) => `「${q}」に合う友だちはいません`} /></SaveErrorField>
+                    <SaveErrorField names={["friendId","friend_id"]} key={selectedFriend ? `f-${friendId}` : 'none'}><EntitySelect clearable size="full" key={selectedFriend ? `f-${friendId}` : 'none'} aria-label="友だちを探す" placeholder="名前で探す" value={friendId} onChange={(v) => { setFriendId(v) }} options={friendOptions}
+                      disabled={!card} noun="友だち" /></SaveErrorField>
                   </div>
                   {stampable ? (
                     <>

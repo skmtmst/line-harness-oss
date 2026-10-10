@@ -1,4 +1,5 @@
 'use client'
+
 import { useState } from 'react'
 import { CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
@@ -24,7 +25,7 @@ import styles from './migrations.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 UID移行（Pencil `Z0jHp` 要確認の判断・`L48eY` 本移行と照合の完了）。/friends/migrations?tab=uid（`&run=` で履歴を選ぶ）。
@@ -111,11 +112,11 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       <div className={styles.pair}>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>移行元</span>
-          <SaveErrorField names={["fromAccountId","m.fromAccountId","from_account_id","m.from_account_id"]}><Select aria-label="移行元アカウント" size="full" value={m.fromAccountId} onChange={m.setFromAccountId} options={[{ value: '', label: '移行元アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} /></SaveErrorField>
+          <SaveErrorField names={["fromAccountId","m.fromAccountId","from_account_id","m.from_account_id"]}><EntitySelect aria-label="移行元アカウント" size="full" value={m.fromAccountId} onChange={m.setFromAccountId} options={[{ value: '', label: '移行元アカウントを選択' }, ...m.accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} /></SaveErrorField>
         </div>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>移行先</span>
-          <SaveErrorField names={["toAccountId","m.toAccountId","to_account_id","m.to_account_id"]}><Select aria-label="移行先アカウント" size="full" value={m.toAccountId} onChange={m.setToAccountId} options={[{ value: '', label: '移行先アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} /></SaveErrorField>
+          <SaveErrorField names={["toAccountId","m.toAccountId","to_account_id","m.to_account_id"]}><EntitySelect aria-label="移行先アカウント" size="full" value={m.toAccountId} onChange={m.setToAccountId} options={[{ value: '', label: '移行先アカウントを選択' }, ...m.accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} /></SaveErrorField>
         </div>
       </div>
       <div className={styles.field}>

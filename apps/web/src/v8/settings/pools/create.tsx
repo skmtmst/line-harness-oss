@@ -1,4 +1,5 @@
 'use client'
+
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
@@ -16,7 +17,7 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import styles from './create.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B プール管理「プールを作る」（Pencil `D0AOyx`・/pools/new）。
@@ -129,6 +130,7 @@ export default function PoolCreateV8() {
 
       { if (!fieldFailure)
 
+
       setError(createPageErrorMessage(e)) }
     } finally {
       setSaving(false)
@@ -193,7 +195,7 @@ export default function PoolCreateV8() {
             {pickerOpen ? (
               <div className={styles.picker}>
                 <span className={styles.pickerSelect}>
-                  <SaveErrorField names={["pickerValue","picker_value"]}><Select value={pickerValue} onChange={setPickerValue} aria-label="足すアカウント" size="full" options={addableAccounts.map((account) => ({ value: account.id, label: account.name }))} /></SaveErrorField>
+                  <SaveErrorField names={["pickerValue","picker_value"]}><EntitySelect value={pickerValue} onChange={setPickerValue} aria-label="足すアカウント" size="full" options={addableAccounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))} /></SaveErrorField>
                 </span>
                 <Button type="button" onClick={addAccount} disabled={!pickerValue}>追加</Button>
               </div>

@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
@@ -27,7 +28,7 @@ import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B 配信を直す（`w5pwG`）。
@@ -204,6 +205,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
 
   const sendTest = async (friendId: string) => {
     if (!selectedAccountId)
+
  return
     setTesting(true)
     setError('')
@@ -221,6 +223,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError('テスト送信できませんでした') }
     } finally {
@@ -291,6 +294,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
           // 読み直しに失敗しても入力は残す。文面だけで理由を伝える。
         }
         { if (!fieldFailure)
+
 
         setError('ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。') }
         return
@@ -424,12 +428,12 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             ) : (
               <label className={styles.fieldLabel}>
                 回答フォームを開かせる（任意）
-                <Combobox
+                <EntitySelect clearable size="full" kind="form"
                   aria-label="回答フォームを開かせる（任意）"
                   placeholder="回答フォームを選ぶ"
                   value=""
                   onChange={(formId) => addFormAction(formId)}
-                  options={forms.map((form) => ({ value: form.id, label: form.name, dot: form.isActive ? 'green' : 'gray', disabled: !form.isActive, hint: form.isActive ? undefined : '公開されていないため選べません' }))}
+                  options={forms.map((form) => ({ ...entityOptionMetadata(form), value: form.id, label: form.name, dot: form.isActive ? 'green' : 'gray', disabled: !form.isActive, hint: form.isActive ? undefined : '公開されていないため選べません' }))}
                 />
               </label>
             )}

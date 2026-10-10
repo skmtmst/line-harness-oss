@@ -1,4 +1,7 @@
 'use client'
+import { canEditFeature } from '@/lib/staff-capability';
+import Toggle from '@/components/shared/toggle';
+
 import { jstDate } from '@/lib/jst-datetime'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useStaffRole } from '@/lib/staff-role'
@@ -40,7 +43,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
@@ -611,6 +614,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setRuleError(staffErrorMessage(error, '保存')) }
     } finally {
       if (saveGeneration !== requestRef.current)
+
  return
       setSavingRules(false)
     }
@@ -768,6 +772,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setShiftError(staffErrorMessage(error, '保存')) }
     } finally {
       if (saveGeneration !== requestRef.current)
+
  return
       setSavingShift(false)
     }
@@ -822,6 +827,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setShiftError(staffErrorMessage(error, '追加')) }
     } finally {
       if (saveGeneration !== requestRef.current)
+
  return
       setDayAddBusy(false)
     }
@@ -853,6 +859,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setShiftError(staffErrorMessage(error, '削除')) }
     } finally {
       if (saveGeneration !== requestRef.current)
+
  return
       setDeleting(false)
     }
@@ -892,6 +899,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setGenError(staffErrorMessage(error, '作成')) }
     } finally {
       if (saveGeneration !== requestRef.current)
+
  return
       setGenerating(false)
     }
@@ -1056,12 +1064,12 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               <div className={styles.switcherField}>
                 <span className={layout.smallLabel} id="bks-switch-label">担当者を切り替える</span>
                 <span className={styles.selectBox}>
-                  <SaveErrorField names={["staffId","scopeId","staff_id"]}><Select
+                  <SaveErrorField names={["staffId","scopeId","staff_id"]}><EntitySelect
                     aria-label="担当者を切り替える"
                     size="full"
                     value={staffId}
                     onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
-                    options={staffList.map((item) => ({ value: item.id, label: staffLabel(item) }))}
+                    options={staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: staffLabel(item) }))}
                   /></SaveErrorField>
                 </span>
               </div>

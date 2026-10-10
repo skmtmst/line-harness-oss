@@ -1137,3 +1137,6 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(pressable.length).toBeGreaterThan(0)
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))

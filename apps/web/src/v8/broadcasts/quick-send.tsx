@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ListOrdered, Send, Users } from 'lucide-react'
@@ -18,7 +19,7 @@ import styles from './quick-send.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 一斉配信 かんたんに送る（板 `P6vbxn`・小窓 640）。
@@ -242,6 +243,7 @@ export default function QuickSendV8({
 
       { if (!fieldFailure)
 
+
       setError(e instanceof Error ? e.message : '送れませんでした。もう一度お試しください。') }
     } finally {
       sendingRef.current = false
@@ -331,12 +333,12 @@ export default function QuickSendV8({
           {needsApproval ? (
             <div className={styles.approval}>
               <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)} 人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
-              <SaveErrorField names={["approverId","approverStaffId","approver_id"]}><Select
+              <SaveErrorField names={["approverId","approverStaffId","approver_id"]}><EntitySelect
                 aria-label="承認する人"
                 size="full"
                 value={approverId}
                 onChange={setApproverId}
-                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ value: item.id, label: `承認する人：${item.name}${ROLE_LABELS[item.role] ? `（${ROLE_LABELS[item.role]}）` : ''}` }))]}
+                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `承認する人：${item.name}${ROLE_LABELS[item.role] ? `（${ROLE_LABELS[item.role]}）` : ''}` }))]}
               /></SaveErrorField>
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
             </div>

@@ -1,4 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
+
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -44,7 +46,7 @@ import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * ★V8「予約メニューを作る」（板 QqER7・競合時 v5L19Z）。
@@ -858,7 +860,7 @@ export default function MenuFormV8() {
                 ) : null}</Field>
               <span className={`${styles.field} ${styles.categoryField}`}>
                 <span className={styles.labelSmall}>分類</span>
-                <SaveErrorField names={["categoryLabel","categoryPicking","category_label","category_picking"]}><Select
+                <SaveErrorField names={["categoryLabel","categoryPicking","category_label","category_picking"]}><EntitySelect
                   size="full"
                   aria-label="分類"
                   value={categoryPicking ? '__new__' : categoryLabel}
@@ -1118,13 +1120,13 @@ export default function MenuFormV8() {
                 <p className="text-ink-faint text-sm">このアカウントに使えるタグがありません。タグなしで保存できます。</p>
               ) : (
                 /* 打って絞り込める1つ選び（タグが多いアカウントでも探せる）。 */
-                <SaveErrorField names={["autoTagId","auto_tag_id"]}><Combobox
+                <SaveErrorField names={["autoTagId","auto_tag_id"]}><EntitySelect clearable size="full" kind="tag"
                   aria-label="予約後に付けるタグ"
                   value={autoTagId ?? ''}
                   onChange={(value) => setAutoTagId(value === '' ? null : value)}
                   placeholder="付けるタグ：なし"
                   /* 「なし」は候補に入れず、空のときの見出し（placeholder）と × で表す。 */
-                  options={tagCandidates.map((tag) => ({ value: tag.id, label: `付けるタグ：${tag.name}` }))}
+                  options={tagCandidates.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `付けるタグ：${tag.name}` }))}
                 /></SaveErrorField>
               )}
               <div className={styles.toggleLineLead}>

@@ -1,4 +1,5 @@
 'use client'
+
 import { Field as SharedField } from '@/components/shared/form-controls'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
@@ -26,7 +27,7 @@ import styles from './organization.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 組織・権限（Pencil `bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`）。
@@ -242,7 +243,7 @@ function LoginConnection({ member, logins, busy, save }: { member: RestaurantMem
       <p className={styles.muted}>{loginSummary(member)}</p>
       {logins.length ? (
         <div className={styles.loginRow}>
-          <SaveErrorField names={["selected"]}><Select aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{ value: '', label: '連携しない' }, ...logins.map((l) => ({ value: l.id, label: l.name }))]} /></SaveErrorField>
+          <SaveErrorField names={["selected"]}><EntitySelect aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{ value: '', label: '連携しない' }, ...logins.map((l) => ({ ...entityOptionMetadata(l), value: l.id, label: l.name }))]} /></SaveErrorField>
           <Button disabled={busy || selected === (member.staff_id || '')} onClick={() => save(selected || null)}>ログインと連携</Button>
         </div>
       ) : null}

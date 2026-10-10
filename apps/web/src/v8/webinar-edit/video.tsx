@@ -1,4 +1,5 @@
 'use client'
+
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
@@ -36,6 +37,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
@@ -194,6 +196,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
+
 
       setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store')) }
       return false
@@ -455,6 +458,7 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
 
       { if (!fieldFailure)
 
+
       setError('定員を保存できませんでした。入力は残しています。もう一度お試しください。') }
     } finally {
       lock.current = false
@@ -591,6 +595,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
 
       { if (!fieldFailure)
 
+
       setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store')) }
     } finally {
       setBusy(false)
@@ -607,6 +612,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
 
       { if (!fieldFailure)
 
+
       setError('段を進められませんでした。権限か段の順番を確かめてください。') }
     } finally {
       setBusy(false)
@@ -617,10 +623,10 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
     <SaveErrorScope errors={saveErrors}><Dialog open title="動画を差し替える" description="登録メディアの動画から選びます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。" confirmLabel="保存する" busy={busy} error={error || undefined} onConfirm={() => save()} onCancel={() => { if (!busy) onClose() }}>
       <div className={styles.dialogBody}>
         {mediaError ? <Notice tone="info">登録メディアの動画を読み込めませんでした。</Notice> : null}
-        <SaveErrorField names={["choice","videoMediaId"]}><Select label="動画" aria-label="動画" size="full" value={choice} disabled={media === null && !mediaError} onChange={setChoice} options={[
+        <SaveErrorField names={["choice","videoMediaId"]}><EntitySelect label="動画" aria-label="動画" size="full" value={choice} disabled={media === null && !mediaError} onChange={setChoice} options={[
           { value: '', label: '選ばない' },
           ...(webinar.videoPrefix && !webinar.videoMediaId ? [{ value: EXTERNAL, label: `今の動画のまま（${webinar.videoPrefix}）` }] : []),
-          ...(media ?? []).map((item) => ({ value: item.id, label: item.filename })),
+          ...(media ?? []).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.filename })),
           ...(choice && choice !== EXTERNAL && media && !media.some((item) => item.id === choice) ? [{ value: choice, label: '今の動画' }] : []),
         ]} /></SaveErrorField>
         <div className={form.field}><Field label="動画の長さ（分）" htmlFor="wd-minutes"><SaveErrorField names={["minutes"]}><NumberInput numericText unit="分" id="wd-minutes" inputMode="numeric" value={minutes} invalid={Boolean(minutesError)} aria-describedby={minutesError ? 'wd-minutes-error' : undefined} onChange={(event) => { setMinutes(event.target.value); setMinutesError('') }} /></SaveErrorField>

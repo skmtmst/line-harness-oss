@@ -1,4 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
+
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
@@ -25,7 +27,7 @@ import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 アフィリエイターを作る（板 `RaMf3`、競合の絵 `Gqve5` は同時編集APIが必要）。
@@ -415,7 +417,7 @@ export default function CreateAffiliateV8() {
                   <SaveErrorField names={["friendSearchInput","friend_search_input"]}><TextField aria-label="友だちの名前で探す" value={friendSearchInput} onChange={(event) => setFriendSearchInput(event.target.value)} placeholder="友だちの名前で探す" /></SaveErrorField>
                   <Button type="submit">検索</Button>
                 </form>
-                <SaveErrorField names={["friendId","friend_id"]}><Select
+                <SaveErrorField names={["friendId","friend_id"]}><EntitySelect
                   id="af-friend"
                   aria-label="LINEの友だちと結びつける"
                   value={friendId}
@@ -426,7 +428,7 @@ export default function CreateAffiliateV8() {
                   }}
                   options={[
                     { value: '', label: friendLoading ? '読み込んでいます' : '結びつけない' },
-                    ...friendOptions.map((friend) => ({ value: friend.id, label: friend.displayName })),
+                    ...friendOptions.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName })),
                   ]}
                 /></SaveErrorField>
                 {friendError ? (

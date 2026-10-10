@@ -9,6 +9,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 type Tag = { id: string; name: string; color: string }
 
@@ -190,7 +191,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 </RadioCardGroup></SaveErrorField>
                 {mode.kind === 'tag' && (
                   <div className="mt-2">
-                    <SaveErrorField names={["tagId","mode.tagId","tag_id","mode.tag_id"]}><Select
+                    <SaveErrorField names={["tagId","mode.tagId","tag_id","mode.tag_id"]}><EntitySelect kind="tag"
                       value={mode.tagId}
                       onChange={(value) =>
                         pickMode({ kind: 'tag', tagId: value })
@@ -199,7 +200,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                       options={
                         tags.length === 0
                           ? [{ value: '', label: tagsLoading ? 'タグを読み込んでいます' : 'タグがありません' }]
-                          : tags.map((t) => ({ value: t.id, label: t.name }))
+                          : tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))
                       }
                       size="full"
                     /></SaveErrorField>

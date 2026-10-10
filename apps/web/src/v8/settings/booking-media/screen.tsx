@@ -1,4 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -36,6 +38,7 @@ import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 予約サイト・グルメ媒体（提案 E-4 `aSmph`。設定の中の1画面）。
@@ -456,7 +459,7 @@ export default function BookingMediaPage() {
             <span className={styles.headActions}>
               {stores.length > 1 ? (
                 <span>
-                  <SaveErrorField names={["storeId","pendingStoreId","store_id","pending_store_id"]}><StoreFilterTabs  value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} /></SaveErrorField>
+                  <SaveErrorField names={["storeId","pendingStoreId","store_id","pending_store_id"]}><StoreFilterTabs  value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))} /></SaveErrorField>
                 </span>
               ) : null}
               {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}

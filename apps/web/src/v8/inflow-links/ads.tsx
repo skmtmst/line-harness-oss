@@ -1,4 +1,5 @@
 'use client'
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AtSign, Check, Eye, Music, MoreHorizontal, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
@@ -27,7 +28,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 広告連携（Pencil：画面 `qSTVR`・広告費を手で入れる `ZxKL5`）。
@@ -538,7 +539,7 @@ export default function AdsV8() {
 {manualFieldErrors['ad-cost-name'] ? <span id="ad-cost-name-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-name']}</span> : null}</Field>
           <div className={styles.field}>
             <span className={styles.pickLabel}>計測リンク（分かれば）</span>
-            <SaveErrorField names={["manualRouteId","entryRouteId","manual_route_id"]}><Select
+            <SaveErrorField names={["manualRouteId","entryRouteId","manual_route_id"]}><EntitySelect
               aria-label="計測リンク（分かれば）"
               size="full"
               value={manualRouteId}
@@ -547,7 +548,7 @@ export default function AdsV8() {
                 const route = entryRoutes.find((item) => item.id === value)
                 if (route && !manualLabel.trim()) setManualLabel(route.name)
               }}
-              options={[{ value: '', label: '結びつけない' }, ...entryRoutes.map((route) => ({ value: route.id, label: route.name }))]}
+              options={[{ value: '', label: '結びつけない' }, ...entryRoutes.map((route) => ({ ...entityOptionMetadata(route), value: route.id, label: route.name }))]}
             /></SaveErrorField>
           </div>
           <div className={styles.fieldRow}>

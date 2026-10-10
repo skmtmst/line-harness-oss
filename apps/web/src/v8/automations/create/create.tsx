@@ -57,6 +57,8 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
+import FriendPickerField from '@/components/shared/friend-picker-field'
+import EntityRemoteField from '@/components/shared/entity-remote-field'
 
 /*
  * 「だれに」の条件は、一斉配信・シナリオと同じ共通部品で作る。
@@ -1714,7 +1716,6 @@ export function NewAutomationV8({
       if (selectedAccountRef.current === accountId) {
         { if (!fieldFailure)
 
-
         setError('最新の内容を読み込めませんでした。通信状態を確かめて、もう一度お試しください。') }
       }
     }
@@ -2084,7 +2085,6 @@ export function NewAutomationV8({
       const fieldFailure = saveErrors.capture(caught)
       { if (!fieldFailure)
 
-
       setError(
         caught instanceof ApiError || caught instanceof Error
           ? caught.message
@@ -2379,12 +2379,10 @@ export function NewAutomationV8({
           </div>
           <p className={styles.sideNote}>選んだ友だち1人だけに動かします</p>
         </div>
-        <Field label="友だち" htmlFor="v8-test-friend"><SaveErrorField names={["testFriendId","test_friend_id"]}><TextField
-            id="v8-test-friend"
-            aria-label="1人テストの友だちID"
+        <Field label="友だち" htmlFor="v8-test-friend"><SaveErrorField names={["testFriendId","test_friend_id"]}><FriendPickerField
+            label="試す友だち" accountId={selectedAccountId ?? null}
             value={testFriendId}
-            onChange={(event) => setTestFriendId(event.target.value)}
-            placeholder="試す友だちのID"
+            onChange={setTestFriendId} id="v8-test-friend"
           /></SaveErrorField></Field>
         {canEdit ? (
           <div>
@@ -2634,11 +2632,11 @@ export function NewAutomationV8({
             <div className={styles.formGrid}>
               {eventType === 'tag_change' ? <SaveErrorField names={["tagId","triggerConfig.tagId","triggerConfig"]}><EntityKindField kind="tag" label="きっかけのタグ" placeholder="（どのタグか選ぶ）" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={tags} /></SaveErrorField> : null}
               {eventType === 'tag_change' ? <SaveErrorField names={["action","triggerConfig.action","trigger_config.action","trigger_config"]}><Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} size="full" /></SaveErrorField> : null}
-              {eventType === 'form_submitted' ? <SaveErrorField names={["formId","triggerConfig.formId","form_id","trigger_config.form_id","trigger_config"]}><TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /></SaveErrorField> : null}
-              {eventType === 'link_clicked' ? <SaveErrorField names={["trackedLinkId","triggerConfig.trackedLinkId","tracked_link_id","trigger_config.tracked_link_id","trigger_config"]}><TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /></SaveErrorField> : null}
+              {eventType === 'form_submitted' ? <SaveErrorField names={["formId","triggerConfig.formId","form_id","trigger_config.form_id","trigger_config"]}><EntityRemoteField kind="form" label="回答フォーム" value={String(triggerConfig.formId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, formId: value })} /></SaveErrorField> : null}
+              {eventType === 'link_clicked' ? <SaveErrorField names={["trackedLinkId","triggerConfig.trackedLinkId","tracked_link_id","trigger_config.tracked_link_id","trigger_config"]}><EntityRemoteField kind="tracked_link" label="計測リンク" value={String(triggerConfig.trackedLinkId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, trackedLinkId: value })} /></SaveErrorField> : null}
               {eventType === 'calendar_booked' ? <SaveErrorField names={["bookingType","triggerConfig.bookingType","booking_type","trigger_config.booking_type","trigger_config"]}><Select aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, bookingType: value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} size="full" /></SaveErrorField> : null}
-              {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <SaveErrorField names={["menuId","triggerConfig.menuId","menu_id","trigger_config.menu_id","trigger_config"]}><TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, menuId: e.target.value })} /></SaveErrorField> : null}
-              {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <SaveErrorField names={["eventId","triggerConfig.eventId","event_id","trigger_config.event_id","trigger_config"]}><TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, eventId: e.target.value })} /></SaveErrorField> : null}
+              {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <SaveErrorField names={["menuId","triggerConfig.menuId","menu_id","trigger_config.menu_id","trigger_config"]}><EntityRemoteField kind="booking_menu" label="予約メニュー" value={String(triggerConfig.menuId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, menuId: value })} /></SaveErrorField> : null}
+              {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <SaveErrorField names={["eventId","triggerConfig.eventId","event_id","trigger_config.event_id","trigger_config"]}><EntityRemoteField kind="event" label="対象イベント" value={String(triggerConfig.eventId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, eventId: value })} /></SaveErrorField> : null}
               {eventType === 'datetime' ? <SaveErrorField names={["at","triggerConfig.at","trigger_config.at","trigger_config"]}><DateTimeField id="v8-trigger-at" invalid={inputError?.target === 'v8-trigger-at'} aria-describedby={inputError?.target === 'v8-trigger-at' ? 'v8-trigger-error' : undefined} aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /></SaveErrorField> : null}
               {eventType === 'weekly' ? (
                 <WeekdaySelect

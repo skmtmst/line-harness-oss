@@ -57,9 +57,6 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('@/components/shared/overlay-utils', () => ({
-  useOverlayFocus: () => null,
-}))
 
 let host: HTMLDivElement
 let root: Root
@@ -115,17 +112,17 @@ describe('保存した検索の読み込み状態（FRIEND-18/19）', () => {
     net.next.push({ ok: false }, { ok: true, items: [view('v1', 'VIPだけ')] })
     await renderDialog('account-a')
     await eventually(() => {
-      expect(host.textContent).toContain('サーバーエラー')
+      expect(document.body.textContent).toContain('サーバーエラー')
     })
-    expect(host.textContent).not.toContain('保存した条件はまだありません')
+    expect(document.body.textContent).not.toContain('保存した条件はまだありません')
 
-    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '再読み込み')
+    const retry = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '再読み込み')
     expect(retry).toBeTruthy()
     await act(async () => {
       retry!.click()
     })
     await eventually(() => {
-      expect(host.textContent).toContain('VIPだけ')
+      expect(document.body.textContent).toContain('VIPだけ')
     })
     expect(net.calls.length).toBe(2)
   })
@@ -134,7 +131,7 @@ describe('保存した検索の読み込み状態（FRIEND-18/19）', () => {
     net.next.push({ ok: true, items: [] })
     await renderDialog('account-a')
     await eventually(() => {
-      expect(host.textContent).toContain('保存した条件はまだありません')
+      expect(document.body.textContent).toContain('保存した条件はまだありません')
     })
   })
 
@@ -142,7 +139,7 @@ describe('保存した検索の読み込み状態（FRIEND-18/19）', () => {
     net.next.push({ ok: true, items: [view('v-a', 'アカウントAの検索')] })
     await renderDialog('account-a')
     await eventually(() => {
-      expect(host.textContent).toContain('アカウントAの検索')
+      expect(document.body.textContent).toContain('アカウントAの検索')
     })
 
     net.next.push({ ok: false })
@@ -158,9 +155,9 @@ describe('保存した検索の読み込み状態（FRIEND-18/19）', () => {
       )
     })
     await eventually(() => {
-      expect(host.textContent).toContain('サーバーエラー')
+      expect(document.body.textContent).toContain('サーバーエラー')
     })
-    expect(host.textContent).not.toContain('アカウントAの検索')
+    expect(document.body.textContent).not.toContain('アカウントAの検索')
     expect(net.calls.at(-1)?.accountId).toBe('account-b')
   })
 })

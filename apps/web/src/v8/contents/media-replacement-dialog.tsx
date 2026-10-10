@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useRef, useState } from 'react'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
@@ -11,7 +12,7 @@ import ListState from '@/components/shared/list-state'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /* ★V8 写し：src/app/contents/media-replacement-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
@@ -109,6 +110,7 @@ export default function MediaReplacementDialog({
       setPhase('error')
       { if (!fieldFailure)
 
+
       setError(caught instanceof Error ? caught.message : '差し替えたときの影響を確認できませんでした') }
     }
   }
@@ -147,6 +149,7 @@ export default function MediaReplacementDialog({
         ? caught.message
         : '使用先を差し替えられませんでした'
       { if (!fieldFailure)
+
 
       setError(message) }
       setBusy(false)
@@ -221,10 +224,10 @@ export default function MediaReplacementDialog({
             />
           ) : (
             <>
-              <SaveErrorField names={["replacementId","replacement_id"]}><Select
+              <SaveErrorField names={["replacementId","replacement_id"]}><EntitySelect
                 aria-label="差し替え先"
                 value={replacementId}
-                options={[{ value: '', label: '別のメディアを選択' }, ...candidates.map((item) => ({ value: item.id, label: item.filename }))]}
+                options={[{ value: '', label: '別のメディアを選択' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.filename }))]}
                 onChange={(value) => void selectReplacement(value)}
               /></SaveErrorField>
               {candidateTotal > 50 ? (

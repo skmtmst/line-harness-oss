@@ -1,4 +1,5 @@
 'use client'
+
 import { useCallback, useEffect, useState } from 'react'
 import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -19,7 +20,7 @@ import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
@@ -170,7 +171,7 @@ export default function UsersV8() {
           /></SaveErrorField>
         </div>
         <div className={styles.selectWrap}>
-          <SaveErrorField names={["account","u.account"]}><Select
+          <SaveErrorField names={["account","u.account"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
             size="full"
@@ -178,7 +179,7 @@ export default function UsersV8() {
             onChange={u.setAccount}
             options={[
               { value: '', label: '所属：すべて' },
-              ...u.accountOptions.map((a) => ({ value: a.id, label: a.name })),
+              ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name })),
             ]}
           /></SaveErrorField>
         </div>

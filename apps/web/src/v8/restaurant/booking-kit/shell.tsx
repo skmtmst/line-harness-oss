@@ -1,4 +1,5 @@
 'use client'
+
 import { notifySaved } from '@/components/shared/toast'
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
@@ -21,7 +22,7 @@ import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 飲食店向け（テスト）の器 — 在庫・予約台帳・座席・メニューの4画面用。
@@ -219,7 +220,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
 
         value={selectedStoreId}
         onChange={setSelectedStoreId}
-        options={snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
+        options={snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` }))}
       /></SaveErrorField>
     </span>
   ) : null

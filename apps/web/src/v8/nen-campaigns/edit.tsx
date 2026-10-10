@@ -1,4 +1,5 @@
 'use client'
+
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
@@ -33,7 +34,7 @@ import { tapActionLiffUrl } from '@/lib/tap-actions'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B 配信を直す（`w5pwG`、例：口コミのお願い）。
@@ -268,6 +269,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
 
   const sendTest = async () => {
     if (!selectedAccountId || !testTarget)
+
  return
     setTesting(true)
     setError('')
@@ -285,6 +287,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError('テスト送信できませんでした') }
     } finally {
@@ -342,7 +345,8 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
         saveConflict.mark();
 
-        setError('')
+        setError('');
+
         return
       }
       { if (!fieldFailure)
@@ -402,7 +406,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           </span>
           {/* 相手が2人以上いるときだけ、送る相手を選ぶ欄を出す（ボタンの下：上の並びを動かさない）。 */}
           {testCandidates.length > 1 ? (
-            <SaveErrorField names={["testTarget","friendId","test_target"]}><Select aria-label="テスト送信の相手" size="full" value={testTarget} onChange={setTestTarget} options={testCandidates.map((candidate) => ({ value: candidate.id, label: `送る相手：${candidate.displayName ?? '名前なし'}` }))} /></SaveErrorField>
+            <SaveErrorField names={["testTarget","friendId","test_target"]}><EntitySelect aria-label="テスト送信の相手" size="full" value={testTarget} onChange={setTestTarget} options={testCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `送る相手：${candidate.displayName ?? '名前なし'}` }))} /></SaveErrorField>
           ) : null}
         </Card>
       ) : null}

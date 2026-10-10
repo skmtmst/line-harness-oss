@@ -1,16 +1,5 @@
 'use client'
 
-/*
- * 一斉配信の二者承認の見た目（m12a / 設計 A）。
- *
- * A-1 送る前の確認（承認する人の選択・ひとこと）
- * A-2 承認待ちの札・帯（依頼の取り消し・もう一度知らせる）
- * A-3 承認する人の操作（承認する人にだけ出す）
- * A-4 1人運用の人数の確認
- *
- * 既存の共有部品だけを使う。新しい見た目の決まりは作らない。
- * 緑の塗りボタンは置かない（押すボタンは呼び出し側の確認ダイアログが持つ）。
- */
 import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
@@ -24,6 +13,20 @@ import type {
 } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+
+/*
+ * 一斉配信の二者承認の見た目（m12a / 設計 A）。
+ *
+ * A-1 送る前の確認（承認する人の選択・ひとこと）
+ * A-2 承認待ちの札・帯（依頼の取り消し・もう一度知らせる）
+ * A-3 承認する人の操作（承認する人にだけ出す）
+ * A-4 1人運用の人数の確認
+ *
+ * 既存の共有部品だけを使う。新しい見た目の決まりは作らない。
+ * 緑の塗りボタンは置かない（押すボタンは呼び出し側の確認ダイアログが持つ）。
+ */
 
 export type ApprovalStatus = NonNullable<ApiBroadcast['approvalStatus']>
 
@@ -109,7 +112,7 @@ export function ApprovalRequestFields({
           ) : candidatesState === 'error' ? (
             <p className="text-danger text-xs">承認できる人を読み込めませんでした。開き直してください。</p>
           ) : (
-            <SaveErrorField names={["approverId","approver_id"]}><Select
+            <SaveErrorField names={["approverId","approver_id"]}><EntitySelect
               aria-label="承認をお願いする人"
               size="full"
               id="approval-approver"
@@ -118,7 +121,7 @@ export function ApprovalRequestFields({
               onChange={(value) => onApproverChange(value)}
               options={[
                 { value: '', label: candidates.length === 0 ? '承認できる人がいません' : '選んでください' },
-                ...candidates.map((item) => ({ value: item.id, label: item.name })),
+                ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
               ]}
             /></SaveErrorField>
           )}

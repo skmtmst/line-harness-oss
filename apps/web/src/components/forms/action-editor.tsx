@@ -5,6 +5,7 @@ import { Bell, FileText, MessageSquare, Tag, User, Workflow } from 'lucide-react
 import type { FormAction } from '@line-crm/shared'
 import ActionList, { type ActionChoice } from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import type { FormRefs } from './form-refs'

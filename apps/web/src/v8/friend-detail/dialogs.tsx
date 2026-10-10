@@ -1,4 +1,5 @@
 'use client'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Chat, Scenario } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
@@ -12,7 +13,7 @@ import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * 個別操作から開く2つの窓：対応状況を編集（N-035）・シナリオに登録する（NEXT-09）。
@@ -123,6 +124,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
       } else {
         if (!fieldFailure)
 
+
         setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
       }
     } finally {
@@ -155,13 +157,13 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
               { value: 'resolved', label: '対応済み' },
             ]}
           /></SaveErrorField></Field>
-        <Field label="担当者"><SaveErrorField names={["operatorId","operator_id"]}><Select
+        <Field label="担当者"><SaveErrorField names={["operatorId","operator_id"]}><EntitySelect
             size="full"
             value={operatorId}
             disabled={busy}
             onChange={(value) => setOperatorId(value)}
             aria-label="担当者を変える"
-            options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ value: o.id, label: o.name }))]}
+            options={[{ value: '', label: '未割り当て' }, ...operators.map((o) => ({ ...entityOptionMetadata(o), value: o.id, label: o.name }))]}
           /></SaveErrorField></Field>
       </div>
     </Dialog></SaveErrorScope>

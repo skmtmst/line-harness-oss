@@ -1,4 +1,6 @@
 'use client'
+import { useOverlayFocus } from '@/components/shared/overlay-utils';
+
 import { Field } from '@/components/shared/form-controls'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
@@ -11,7 +13,7 @@ import Dialog from '@/components/shared/dialog'
 import { api, type BookingStaff } from '@/lib/api'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * 予約スタッフの作成・編集の窓。v7 一覧（staff/page.tsx）と V8 予約設定の
@@ -144,14 +146,14 @@ export function StaffEditModal({
           <Field note={<>
               紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。
             </>} label="ログインユーザー（本人の勤務）">
-            <SaveErrorField names={["staff_member_id","form.staff_member_id"]}><Select
+            <SaveErrorField names={["staff_member_id","form.staff_member_id"]}><EntitySelect
               aria-label="ログインユーザーとの紐づけ"
               size="full"
               value={form.staff_member_id ?? ''}
               onChange={(v) => set('staff_member_id', v || null)}
               options={[
                 { value: '', label: '紐づけない' },
-                ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
+                ...members.map((m) => ({ ...entityOptionMetadata(m), value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
               ]}
             /></SaveErrorField>
 

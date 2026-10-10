@@ -68,6 +68,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import FriendPickerField from '@/components/shared/friend-picker-field'
 
 /*
  * ★V8 オートメーションのルール一覧（Pencil：一覧 `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`）。
@@ -655,12 +656,10 @@ export default function AutomationListV8() {
             <div className={styles.testBody}>
               <Field note={<>
                 すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
-              </>} label="試す友だちのID">
-                <SaveErrorField names={["testFriendId","test_friend_id"]}><TextField
-                  aria-label="試す友だちのID"
+              </>} label="試す友だち">
+                <SaveErrorField names={["testFriendId","test_friend_id"]}><FriendPickerField label="試す友だち" accountId={selectedAccountId ?? null}
                   value={testFriendId}
-                  onChange={(event) => setTestFriendId(event.target.value)}
-                  placeholder="試す友だちID"
+                  onChange={ setTestFriendId}
                   disabled={testBusy || testDone}
                 /></SaveErrorField>
               </Field>

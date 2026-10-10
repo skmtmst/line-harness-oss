@@ -1,4 +1,5 @@
 'use client'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import StatusPill from '@/components/shared/status-pill'
@@ -36,6 +37,7 @@ import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
@@ -535,7 +537,7 @@ export default function OpsSupportV8() {
           <div className={styles.field}>
             <span className={styles.smallLabel}>契約先</span>
             <div className={styles.fullSelect} {...createFields.bind('tenant')}>
-              <SaveErrorField names={["tenantId","form.tenantId","tenant_id","form.tenant_id"]}><Select size="full" aria-label="契約先" error={createFields.error('tenant') ?? undefined} value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))} options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} /></SaveErrorField>
+              <SaveErrorField names={["tenantId","form.tenantId","tenant_id","form.tenant_id"]}><EntitySelect size="full" aria-label="契約先" error={createFields.error('tenant') ?? undefined} value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))} options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))]} /></SaveErrorField>
             </div>
             <FieldError id="sup-tenant-error">{createFields.error('tenant')}</FieldError>
           </div>

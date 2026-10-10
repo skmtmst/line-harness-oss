@@ -1,7 +1,7 @@
 'use client'
+
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveConversionToFolder } from '@/lib/move-to-folder'
@@ -93,6 +93,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 コンバージョンの一覧（Pencil：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・
@@ -1033,12 +1034,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       </RadioCardGroup></SaveErrorField>
       {stopAction === 'replace' ? (
         <div className={styles.fieldBox}>
-          <SaveErrorField names={["replacementId","replacement_id"]}><Select
+          <SaveErrorField names={["replacementId","replacement_id"]}><EntitySelect
             aria-label="差し替え先の成果地点"
             value={replacementId}
             options={[
               { value: '', label: '差し替え先を選ぶ' },
-              ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: `差し替え先：${item.name}` })),
+              ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `差し替え先：${item.name}` })),
             ]}
             onChange={setReplacementId}
           /></SaveErrorField>

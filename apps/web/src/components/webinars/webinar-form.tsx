@@ -15,6 +15,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { webinarErrorText } from './webinar-error-text'
 import Notice from '@/components/shared/notice'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -230,7 +231,8 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
 
-      { if (!fieldFailure) setError(webinarErrorText(err, '公開できませんでした。確認ステップから公開してください。')) }
+      { if (!fieldFailure)
+ setError(webinarErrorText(err, '公開できませんでした。確認ステップから公開してください。')) }
       return false
     }
   }
@@ -284,7 +286,8 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
 
-      { if (!fieldFailure) setError(webinarErrorText(err, '保存できませんでした。入力を見直してください。')) }
+      { if (!fieldFailure)
+ setError(webinarErrorText(err, '保存できませんでした。入力を見直してください。')) }
       return false
     } finally {
       setSaving(false)
@@ -359,7 +362,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                   <button type="button" onClick={() => setMediaLoadKey((key) => key + 1)} className="ml-2 font-medium underline">もう一度読み込む</button>
                 </p>
               ) : (
-                <SaveErrorField names={["videoChoice","videoMediaId","video_choice"]}><Select
+                <SaveErrorField names={["videoChoice","videoMediaId","video_choice"]}><EntitySelect
                   aria-label="配信動画"
                   size="full"
                   value={videoChoice}
@@ -370,7 +373,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                     ...(videoChoice === EXTERNAL_VIDEO
                       ? [{ value: EXTERNAL_VIDEO, label: '現在の設定を維持（ライブラリ外の動画）' }]
                       : []),
-                    ...(videoMedia ?? []).map((item) => ({ value: item.id, label: item.filename })),
+                    ...(videoMedia ?? []).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.filename })),
                     ...(videoMedia && videoChoice && videoChoice !== EXTERNAL_VIDEO &&
                     !videoMedia.some((item) => item.id === videoChoice)
                       ? [{ value: videoChoice, label: '現在の動画（ライブラリで見つかりません）' }]

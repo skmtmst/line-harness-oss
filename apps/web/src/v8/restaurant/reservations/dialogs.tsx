@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 import { Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -15,7 +16,7 @@ import { formatYen as polishFormatYen } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect from '@/components/shared/entity-select'
 
 /*
  * ★V8 予約台帳の窓：予約の変更（取消・復活・押さえの解除もここ）・取消の確認・受信データの試し。
@@ -147,7 +148,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             </Field>
             <Field labelSize="compact" label="卓">
               {canWrite ? (
-                <SaveErrorField names={["tableId","draft.tableId","table_id","draft.table_id"]}><Select aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} /></SaveErrorField>
+                <SaveErrorField names={["tableId","draft.tableId","table_id","draft.table_id"]}><EntitySelect aria-label="卓" size="full" value={draft.tableId} onChange={(value) => setDraft({ ...draft, tableId: value })} options={tableOptions} /></SaveErrorField>
               ) : <ReadOnlyChoice label="卓" value={draft.tableId} options={tableOptions} />}
             </Field>
           </div>
@@ -161,7 +162,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
           </div>
           <Field labelSize="compact" label="コース">
             {canWrite ? (
-              <SaveErrorField names={["courseId","draft.courseId","course_id","draft.course_id"]}><Select aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} /></SaveErrorField>
+              <SaveErrorField names={["courseId","draft.courseId","course_id","draft.course_id"]}><EntitySelect aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} /></SaveErrorField>
             ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
           </Field>
           <Field label="アレルギー・特記事項" htmlFor="rs-edit-allergy">

@@ -1,6 +1,6 @@
 'use client'
-import Toggle from '@/components/shared/toggle';
 
+import Toggle from '@/components/shared/toggle';
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -35,6 +35,7 @@ import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 流入リンクを作る（Pencil：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`）。
@@ -466,7 +467,7 @@ function InflowCreate() {
                 : '画面上部でLINEアカウントを選んでください。'}
             </HelpTip>
           </span>
-          <SaveErrorField names={["poolId","pool_id"]}><Select
+          <SaveErrorField names={["poolId","pool_id"]}><EntitySelect
             id="ir-pool"
             value={poolId}
             onChange={(next) => setPoolId(next)}
@@ -474,7 +475,7 @@ function InflowCreate() {
             size="full"
             options={[
               { value: '', label: 'メインプールで自動振り分け' },
-              ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
+              ...pools.map((pool) => ({ ...entityOptionMetadata(pool), value: pool.id, label: pool.name })),
             ]}
           /></SaveErrorField>
         </div>

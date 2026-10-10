@@ -1,4 +1,5 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
 
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -80,6 +81,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
@@ -510,7 +512,7 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: { friends:
       </span>
     )
   }
-  return <SaveErrorField names={["value"]}><Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} /></SaveErrorField>
+  return <SaveErrorField names={["value"]}><EntitySelect aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName || '名前未取得' }))} /></SaveErrorField>
 }
 
 /* ───────────── 誕生日クーポンの決めごと（oqSJP） ───────────── */

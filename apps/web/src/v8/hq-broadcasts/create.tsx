@@ -1,4 +1,6 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+
 import { jstDateOffset, scheduledJstIso } from '@/lib/jst-datetime'
 import { notifySaved } from '@/components/shared/toast'
 import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
@@ -68,6 +70,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 統括 一括配信を作る（B-37・絵 V8.pen の BBRDb：① lmWCZ・② AL5vR・③ lLyFR・④ ZU4Ae・⑤ H9eG3n）。
@@ -561,6 +564,7 @@ export default function HqBroadcastCreate() {
 
       { if (!fieldFailure)
 
+
       setError(errorText(caught, '送る前の確かめができませんでした。もう一度お試しください。')) }
       return null
     } finally {
@@ -584,6 +588,7 @@ export default function HqBroadcastCreate() {
       const fieldFailure = saveErrors.capture(caught, fields)
 
       { if (!fieldFailure)
+
 
       setError(errorText(caught, 'アカウントを外せませんでした。もう一度お試しください。')) }
     }
@@ -627,6 +632,7 @@ export default function HqBroadcastCreate() {
       const fieldFailure = saveErrors.capture(caught, fields)
       setConfirmOpen(false)
       { if (!fieldFailure)
+
 
       setError(errorText(caught, '送れませんでした。もう一度確かめてください。')) }
       setRunKey('')
@@ -801,7 +807,7 @@ export default function HqBroadcastCreate() {
 
   if (!canManage) {
     return (
-      <SaveErrorScope errors={fields}><SaveErrorScope errors={saveErrors}><div className={formStyles.root}>
+      <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><div className={formStyles.root}>
         <PageHeading title={<>一括配信を作る</>} />
         <div className={formStyles.input}>
           <Notice tone="info">一括配信を作れるのは、統括全体の編集権限がある人（オーナー・管理者）だけです。</Notice>
@@ -814,7 +820,7 @@ export default function HqBroadcastCreate() {
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
   return (
-    <SaveErrorScope errors={fields}><SaveErrorScope errors={saveErrors}><>
+    <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
       <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
         <PageHeading title={<>一括配信を作る</>}
         crumbs={<><p aria-live="polite">{draftLabel}</p></>}
@@ -957,7 +963,7 @@ export default function HqBroadcastCreate() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
                   <span className={formStyles.excludeTag}>
-                    <SaveErrorField names={["savedName","savedSearchId","saved_name"]}><Select
+                    <SaveErrorField names={["savedName","savedSearchId","saved_name"]}><EntitySelect
                       aria-label="保存した条件から選ぶ"
                       value={savedName}
                       onChange={(value) => { setSavedName(value); if (value) setAudience('advanced') }}
@@ -1001,7 +1007,7 @@ export default function HqBroadcastCreate() {
                   onPickTemplate={(index, kind) => { setPickerKind(kind); setOpenBubble(index); setPickerOpen(true) }}
                   onSaveTemplate={(index) => { setOpenBubble(index); setSaveTplName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}
                   onCompose={(index, kind) => { setOpenBubble(index); setCarouselError(''); setComposer(kind === 'carousel' ? 'carousel' : 'rich') }}
-                  extraFields={(index, item) => item.type === 'coupon' ? <SaveErrorField names={["assetId","item.content.assetId","content.assetId","bubbles","asset_id","item.content.asset_id","content.asset_id"]}><Select aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ value: a.id, label: a.name }))]} size="full" /></SaveErrorField> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
+                  extraFields={(index, item) => item.type === 'coupon' ? <SaveErrorField names={["assetId","item.content.assetId","content.assetId","bubbles","asset_id","item.content.asset_id","content.asset_id"]}><EntitySelect aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} size="full" /></SaveErrorField> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
                 />
               </section>
             ) : null}

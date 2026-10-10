@@ -1,4 +1,5 @@
 'use client'
+
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -25,7 +26,7 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 友だち情報欄の移行（種類を変える。Pencil `GobMd`）。
@@ -252,6 +253,7 @@ function FieldMigrate() {
       } catch (saveFailure) {
         saveErrors.capture(saveFailure) /* 取り直せないときは下の説明へ */ }
       if (!gateRef.current.current(token) || accountRef.current !== account)
+
  return null
       const status = (reason as { status?: number } | null)?.status
       if (status === 409) {
@@ -293,6 +295,7 @@ function FieldMigrate() {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
+
 
       setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした') }
     } finally {
@@ -347,6 +350,7 @@ function FieldMigrate() {
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
+
       setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。') }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
@@ -392,6 +396,7 @@ function FieldMigrate() {
       } catch (saveFailure) {
         saveErrors.capture(saveFailure) /* 下の説明へ */ }
       { if (!fieldFailure)
+
 
       setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。') }
     } finally {
@@ -587,14 +592,14 @@ function FieldMigrate() {
               <div className={styles.field}>
                 <span className={styles.label}>移行先</span>
                 <span className={styles.selectBox}>
-                  <SaveErrorField names={["existingTargetId","targetFieldId","existing_target_id"]}><Select
+                  <SaveErrorField names={["existingTargetId","targetFieldId","existing_target_id"]}><EntitySelect
                     value={existingTargetId}
                     onChange={(value) => { setExistingTargetId(value); resetConfirmation() }}
                     aria-label="移行先の既存項目"
                     size="full"
                     options={[
                       { value: '', label: '項目を選ぶ' },
-                      ...fields.filter((field) => field.id !== source.id).map((field) => ({ value: field.id, label: `${field.name}（${FIELD_TYPE_WORDS[field.type]}）` })),
+                      ...fields.filter((field) => field.id !== source.id).map((field) => ({ ...entityOptionMetadata(field), value: field.id, label: `${field.name}（${FIELD_TYPE_WORDS[field.type]}）` })),
                     ]}
                   /></SaveErrorField>
                 </span>

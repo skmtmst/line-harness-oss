@@ -1,35 +1,6 @@
 'use client'
+
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
-/*
- * シナリオのアクションを編集する窓（設計 `V6 5 hz9ti 送信後のアクションを設定`）。
- *
- * 段の並びは設計に合わせて **「追加する動作を選ぶ」が先、「実行する動作」が後**。
- * 先に一覧を出して最後に追加口を置くと、まだ1つも無いときに何をすれば
- * いいのかが画面の一番下にしか無く、空の枠だけを見て手が止まる。
- *
- * 動作を番号つきのカードで積む形は変えていない。カードごとに条件・
- * 並べ替え・削除を置く。種別ごとに窓を分けると、「タグを付けてから、
- * そのタグを条件に次を動かす」が書けなくなる。
- *
- * 保存は操作のたびにすぐ行う。まとめて保存にすると、途中で閉じたときに
- * どこまで残ったかが分からない。打った値はまず画面に写し、保存は裏で
- * 1本の列に並べる（R244）。キャンセルは開いたときの状態に戻す（R242）。
- * 条件だけは下書きを持ち、「条件を保存」で保存する（R243）。
- *
- * 設計にあって、ここに置いていないもの:
- *
- *   - 共通設定の「アクション名」「フォルダ」と「保存済みセットの呼出し」…
- *     `scenario_actions` に名前もフォルダもセットの口も無く、読む口も
- *     書く口も無い。入口だけ置くと、書いたものが消えたように見える・
- *     保存できるように見えて設定済みだと誤認させる（R241）。
- *   - 8つの動作 … 現行の編集口が持つ種別は `ScenarioActionType` の5つ。
- *     変更時は、安全に変換できる設定をV6下書きAPIへ同時保存する
- *   - 「発動2回目以降も各動作を実行」をセクションに1つ … `repeatOnRefire` は
- *     動作1件ごとの列。1つにまとめると、動作ごとに違う値を持てなくなり、
- *     既にある設定を黙って上書きすることになる
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
@@ -61,6 +32,36 @@ import ConditionBuilder, {
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+
+/*
+ * シナリオのアクションを編集する窓（設計 `V6 5 hz9ti 送信後のアクションを設定`）。
+ *
+ * 段の並びは設計に合わせて **「追加する動作を選ぶ」が先、「実行する動作」が後**。
+ * 先に一覧を出して最後に追加口を置くと、まだ1つも無いときに何をすれば
+ * いいのかが画面の一番下にしか無く、空の枠だけを見て手が止まる。
+ *
+ * 動作を番号つきのカードで積む形は変えていない。カードごとに条件・
+ * 並べ替え・削除を置く。種別ごとに窓を分けると、「タグを付けてから、
+ * そのタグを条件に次を動かす」が書けなくなる。
+ *
+ * 保存は操作のたびにすぐ行う。まとめて保存にすると、途中で閉じたときに
+ * どこまで残ったかが分からない。打った値はまず画面に写し、保存は裏で
+ * 1本の列に並べる（R244）。キャンセルは開いたときの状態に戻す（R242）。
+ * 条件だけは下書きを持ち、「条件を保存」で保存する（R243）。
+ *
+ * 設計にあって、ここに置いていないもの:
+ *
+ *   - 共通設定の「アクション名」「フォルダ」と「保存済みセットの呼出し」…
+ *     `scenario_actions` に名前もフォルダもセットの口も無く、読む口も
+ *     書く口も無い。入口だけ置くと、書いたものが消えたように見える・
+ *     保存できるように見えて設定済みだと誤認させる（R241）。
+ *   - 8つの動作 … 現行の編集口が持つ種別は `ScenarioActionType` の5つ。
+ *     変更時は、安全に変換できる設定をV6下書きAPIへ同時保存する
+ *   - 「発動2回目以降も各動作を実行」をセクションに1つ … `repeatOnRefire` は
+ *     動作1件ごとの列。1つにまとめると、動作ごとに違う値を持てなくなり、
+ *     既にある設定を黙って上書きすることになる
+ */
 
 export const ACTION_KINDS: {
   feature?: 'friend_fields' | 'support_marks' | 'common_vars'
@@ -1052,13 +1053,13 @@ export function ActionConfigEditor({
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">対応マーク</span>
-          <SaveErrorField names={["markId","c.markId","mark_id","c.mark_id"]}><Select
+          <SaveErrorField names={["markId","c.markId","mark_id","c.mark_id"]}><EntitySelect
             aria-label="対応マーク"
             value={String(c.markId ?? '')}
             onChange={(value) => onChange({ ...c, markId: value || null })}
             options={[
               { value: '', label: 'マークを外す' },
-              ...marks.map((m) => ({ value: m.id, label: m.name })),
+              ...marks.map((m) => ({ ...entityOptionMetadata(m), value: m.id, label: m.name })),
             ]}
           /></SaveErrorField>
         </div>
@@ -1120,13 +1121,13 @@ export function ActionConfigEditor({
     case 'common_var':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <SaveErrorField names={["varKey","c.varKey","var_key","c.var_key"]}><Select
+          <SaveErrorField names={["varKey","c.varKey","var_key","c.var_key"]}><EntitySelect
             aria-label="共通情報"
             value={String(c.varKey ?? '')}
             onChange={(value) => onChange({ ...c, varKey: value })}
             options={[
               { value: '', label: '共通情報を選ぶ' },
-              ...vars.map((v) => ({ value: v.varKey, label: v.name })),
+              ...vars.map((v) => ({ ...entityOptionMetadata(v), value: v.varKey, label: v.name })),
             ]}
           /></SaveErrorField>
           <span className="text-ink-secondary text-sm">に</span>

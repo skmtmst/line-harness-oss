@@ -386,7 +386,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         ? '#fa-name'
         : fieldError.step === 'routes'
           ? '[data-friend-add-routes] input[type=checkbox]'
-          : '#fa-scenario button[aria-haspopup], #fa-returning-scenario button[aria-haspopup]')
+          : '#fa-scenario[aria-haspopup], #fa-returning-scenario[aria-haspopup]')
       field?.focus()
       field?.scrollIntoView({ block: 'center' })
     })

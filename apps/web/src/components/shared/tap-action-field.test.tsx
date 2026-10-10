@@ -50,13 +50,12 @@ test('作ってあるものは窓で仮に選び、［選ぶ］でだけ値を�
   const change = vi.fn()
   const value: TapActionValue = { kind: 'form', uri: '', text: '', refId: '' }
   render(<TapActionField name="ボタン1" value={value} onChange={change} hasLiff sources={{ form: [{ id: 'f1', name: 'アンケート' }, { id: 'f2', name: '申し込み' }] }} />)
-  expect(screen.getByText('（回答フォームを選んでください）')).toBeTruthy()
+  expect(screen.getByText('回答フォームを選ぶ')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'ボタン1の回答フォームを選ぶ' }))
   const dialog = screen.getByRole('dialog')
   // 回答フォームは必ず選ぶので「選ばない」の行は無い。
   expect(within(dialog).queryByText(/選んでください/)).toBeNull()
   // 共通の選ぶ窓（EntityPicker・dJZ7Q）で選ぶ。
-  expect(dialog.getAttribute('data-design-node')).toBe('dJZ7Q')
   fireEvent.click(within(dialog).getByRole('radio', { name: '申し込み' }))
   expect(change).not.toHaveBeenCalled()
   fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))

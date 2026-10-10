@@ -12,7 +12,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import TargetMissing from '@/components/shared/target-missing'
-import Select from '@/components/shared/select'
+
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
@@ -215,18 +215,7 @@ function RecipeClone() {
                 <label className={styles.accountLabel} htmlFor="recipe-clone-account">
                   どのLINEアカウントに作るか<RequiredBadge />
                 </label>
-                <Select
-                  aria-label="どのLINEアカウントに作るか"
-                  id="recipe-clone-account"
-                  size="full"
-                  value={selectedAccountId ?? ''}
-                  disabled={!selectedAccountId}
-                  onChange={() => undefined}
-                  options={[{
-                    value: selectedAccountId ?? '',
-                    label: selectedAccount?.name ?? 'アカウントが選ばれていません',
-                  }]}
-                />
+                <p id="recipe-clone-account">{selectedAccount?.name ?? 'アカウントが選ばれていません'}</p>
                 <p className={styles.hint}>
                   作る先はいま選んでいるアカウントです。変えるときは上のLINEアカウントから選び直します。
                 </p>

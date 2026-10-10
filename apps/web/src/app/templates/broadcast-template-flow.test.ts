@@ -43,7 +43,8 @@ describe('コンテンツテンプレートから一斉配信への引用導線'
 
   it('drops previous-account templates and bubbles on account switch', () => {
     // 独立審査指摘4: 旧候補・選択・吹き出しを残さない。持ち主不明は保つ。
-    expect(formSource).toContain('setSelectedTemplate(null)')
+    // 仮選択はアカウントごとに窓を作り直して捨てる。
+    expect(formSource).toContain("<EntityPickerDialog key={selectedAccountId ?? ''}")
     expect(formSource).toContain('templateAccountId')
     expect(formSource).toContain('owner == null || owner === selectedAccountId')
   })

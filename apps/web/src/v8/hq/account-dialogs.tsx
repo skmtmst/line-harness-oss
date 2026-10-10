@@ -1,4 +1,5 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 import { CircleHelp, RotateCcw, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
@@ -15,7 +16,7 @@ import styles from './account-dialogs.module.css'
 import { FALLBACK_REASON, connectionReasons, lineHandle } from './connection-reasons'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 統括のアカウントの3つの窓（板 `HMpVx` 設定・`D6ljr` アーカイブ・`HFsO9` 戻す）。
@@ -118,6 +119,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
 
       { if (!fieldFailure)
 
+
       setError('保存できませんでした。通信を確認して、もう一度お試しください。') }
     } finally {
       setBusy(false)
@@ -162,7 +164,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             className={styles.full}
           /></SaveErrorField>
 {nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
-        <div className={styles.field}><Field label="親アカウント" htmlFor="hq-account-settings-parent"><SaveErrorField names={["parent"]}><Select
+        <div className={styles.field}><Field label="親アカウント" htmlFor="hq-account-settings-parent"><SaveErrorField names={["parent"]}><EntitySelect
             id="hq-account-settings-parent"
             aria-label="親アカウント"
             size="full"
@@ -172,7 +174,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             options={[
               { value: '', label: parentName ? (parentName.displayName || parentName.name) : '変えない' },
               { value: 'none', label: 'なしにする' },
-              ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ value: item.id, label: item.displayName || item.name })),
+              ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.displayName || item.name })),
             ]}
           /></SaveErrorField></Field></div>
         <div className={styles.field}><Field note={<>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</>} label="フォルダ" htmlFor="hq-account-folder"><SaveErrorField names={["folderId","folder_id"]}><FolderSelect

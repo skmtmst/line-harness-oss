@@ -1,4 +1,5 @@
 'use client'
+
 import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -22,6 +23,7 @@ import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 分析「ファネル」（Pencil `DkRDE`）。
@@ -319,8 +321,8 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         : funnels.length === 0 ? <ListState kind="empty" title="ファネルがまだありません" description={canManage ? '段を2つ以上つないで、どこで離れているかを見られます。' : '段を2つ以上つないで、どこで離れているかを見られます。作成は統括・管理者へ依頼してください。'} action={canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : undefined} />
         : <>
           <div className={styles.controls}>
-            <Field label="ファネル"><SaveErrorField names={["selected"]}><Select id="funnel-select" value={selected} onChange={(value) => setSelected(value)} aria-label="ファネル" size="full" options={funnels.some((f) => f.status === 'active' || f.id === selected)
-                ? funnels.filter((f) => f.status === 'active' || f.id === selected).map((f) => ({ value: f.id, label: f.status === 'active' ? f.name : `${f.name}（${f.status === 'stopped' ? '停止中' : 'アーカイブ'}）` }))
+            <Field label="ファネル"><SaveErrorField names={["selected"]}><EntitySelect id="funnel-select" value={selected} onChange={(value) => setSelected(value)} aria-label="ファネル" size="full" options={funnels.some((f) => f.status === 'active' || f.id === selected)
+                ? funnels.filter((f) => f.status === 'active' || f.id === selected).map((f) => ({ ...entityOptionMetadata(f), value: f.id, label: f.status === 'active' ? f.name : `${f.name}（${f.status === 'stopped' ? '停止中' : '保管済み'}）` }))
                 : [{ value: '', label: '使えるファネルがありません' }]} /></SaveErrorField></Field>
             <Field label="何日以内の通過で数えるか"><SaveErrorField names={["windowDays","selectedFunnel?.windowDays","window_days","selected_funnel?.window_days"]}><Select aria-label="何日以内の通過で数えるか" disabled size="full" onChange={() => {}} value={String(selectedFunnel?.windowDays ?? '')} options={[{ value: String(selectedFunnel?.windowDays ?? ''), label: selectedFunnel ? `${selectedFunnel.windowDays}日以内` : '未取得' }]} /></SaveErrorField></Field>
             {run ? <Field label="比較する条件"><SaveErrorField names={["groupKey","group_key"]}><Select id="funnel-group" value={groupKey} onChange={(value) => { setGroupKey(value); setPicked(null) }} aria-label="比較する条件" size="full" options={run.groups.map((group) => ({ value: group.key, label: `${group.label}（入口 ${formatNumber(group.entrants)}人）` }))} /></SaveErrorField></Field> : null}

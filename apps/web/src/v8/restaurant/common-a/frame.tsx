@@ -1,4 +1,5 @@
 'use client'
+
 import { notifySaved } from '@/components/shared/toast'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
@@ -16,7 +17,7 @@ import Select from '@/components/shared/select'
 import styles from './frame.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 飲食店向け（テスト）の器（担当 a：ダッシュボード・承認・組織・LINE来店フォロー・Googleビジネス）。
@@ -149,7 +150,7 @@ export default function RestaurantFrame({
       onChange={setSelectedStoreId}
       options={[
         ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
-        ...snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` })),
+        ...snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` })),
       ]}
     /></SaveErrorField>
   ) : null

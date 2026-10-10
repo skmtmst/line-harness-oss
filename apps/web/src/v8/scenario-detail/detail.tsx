@@ -1,4 +1,6 @@
 'use client'
+import { canManageRole } from '@/lib/staff-role';
+
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { DetailLoading } from '@/components/templates/detail-page'
@@ -124,6 +126,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
@@ -656,6 +659,7 @@ export default function ScenarioDetailV8({
       } else {
         { if (!fieldFailure)
 
+
         setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。') }
       }
     } finally {
@@ -1112,6 +1116,7 @@ export default function ScenarioDetailV8({
         }
       } else {
         { if (!fieldFailure)
+
 
         setError('保存に失敗しました。通信を確かめて、もう一度お試しください。') }
       }
@@ -1707,6 +1712,7 @@ export default function ScenarioDetailV8({
 
       { if (!fieldFailure)
 
+
       setError('並び替えに失敗しました。通信を確かめて、もう一度お試しください。') }
     }
   }
@@ -2048,13 +2054,13 @@ export default function ScenarioDetailV8({
           <div className="space-y-3">
             <div><Field note={<>
                 このステップが配信完了したら、選んだタグを友だちに付与します
-              </>} label="到達したらタグ付与"><SaveErrorField names={["onReachTagId","stepForm.onReachTagId","on_reach_tag_id","step_form.on_reach_tag_id","step_form"]}><Select
+              </>} label="到達したらタグ付与"><SaveErrorField names={["onReachTagId","stepForm.onReachTagId","on_reach_tag_id","step_form.on_reach_tag_id","step_form"]}><EntitySelect kind="tag"
                 aria-label="到達したらタグ付与"
                 value={stepForm.onReachTagId ?? ''}
                 onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
                 options={[
                   { value: '', label: '-- なし --' },
-                  ...tags.map((t) => ({ value: t.id, label: t.name })),
+                  ...tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name })),
                 ]}
                 size="full"
               /></SaveErrorField>

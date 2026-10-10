@@ -7,14 +7,14 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const FORM = readFileSync(join(HERE, 'menu-form-v8.tsx'), 'utf8')
 
 /*
- * v7 のメニュー作成にある「タグを検索」は V8 にも要る。
+ * 予約メニューのタグは共通窓で名前を検索できる。
  * タグが多いと選ぶ欄だけでは探せない。ここでは結び付けだけを見る。
  */
 describe('予約メニュー作成のタグ検索', () => {
   it('タグの絞り込み欄がある', () => {
-    expect(FORM).toMatch(/<Combobox\s+aria-label="予約後に付けるタグ"/)
+    expect(FORM).toMatch(/<EntitySelect\s+[^>]*aria-label="予約後に付けるタグ"/)
     expect(FORM).toContain('options={tagCandidates.map')
-    const picker = readFileSync(join(HERE, '../../../../components/shared/combobox.tsx'), 'utf8')
-    expect(picker).toContain('option.label.toLowerCase().includes(loweredQuery)')
+    const picker = readFileSync(join(HERE, '../../../../components/shared/entity-picker.tsx'), 'utf8')
+    expect(picker).toContain('item.name.toLocaleLowerCase().includes(q)')
   })
 })

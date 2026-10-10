@@ -1,4 +1,5 @@
 'use client'
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -19,7 +20,7 @@ import styles from './bookings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
@@ -447,12 +448,12 @@ function Bookings({ eventId }: { eventId: string }) {
             <Download size={15} aria-hidden="true" />CSVで書き出す
           </Button>
           <div className={styles.occurrencePick}>
-            <SaveErrorField names={["selectedOccurrenceId","selected_occurrence_id"]}><Select
+            <SaveErrorField names={["selectedOccurrenceId","selected_occurrence_id"]}><EntitySelect
               size="full"
               value={selectedOccurrenceId}
               onChange={setSelectedOccurrenceId}
               aria-label="開催回を選ぶ"
-              options={slots.map((slot) => ({ value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
+              options={slots.map((slot) => ({ ...entityOptionMetadata(slot), value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
             /></SaveErrorField>
           </div>
         </div>

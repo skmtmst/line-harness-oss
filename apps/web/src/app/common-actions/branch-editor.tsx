@@ -6,6 +6,7 @@ import BranchActionList from '@/components/automations/branch-action-list'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { ACTION_LABELS } from './version-diff'
+import EntitySelect from '@/components/shared/entity-select'
 
 export function newBranchStep(): CommonActionStep {
   return {
@@ -205,7 +206,7 @@ export default function BranchEditors({
               {condition.rules.map((rule, ruleIndex) => rule.type === 'tag_exists' || rule.type === 'tag_not_exists' ? (
                 <div key={`${step.id}-rule-${ruleIndex}`} className="flex items-center gap-2">
                   <label className="text-ink-secondary flex-1 text-sm">条件{ruleIndex + 1}（{RULE_TYPE_LABEL[rule.type]}）
-                    <Select
+                    <EntitySelect kind="tag"
                       size="full"
                       aria-label={`条件${ruleIndex + 1}のタグ`}
                       className="mt-1"

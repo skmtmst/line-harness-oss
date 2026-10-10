@@ -1,6 +1,6 @@
 'use client'
-import { CommonActionConfig, commonActionChoices } from '@/components/automations/common-action-editor';
 
+import { CommonActionConfig, commonActionChoices } from '@/components/automations/common-action-editor';
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -27,6 +27,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B 共通アクションを作る（Pencil `j2hfkS`）。
@@ -178,7 +179,6 @@ export function CommonActionNew() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-
 
       setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store')) }
     } finally {

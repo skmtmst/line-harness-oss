@@ -1,4 +1,5 @@
 'use client'
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
@@ -26,6 +27,7 @@ import ch from './channels.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -136,6 +138,7 @@ function ConnectDialog({
 
       { if (!fieldFailure)
 
+
       setError(describeApiFailure(e, 'つなげませんでした。ID を確かめてやり直してください。')) }
     } finally {
       setBusy(false)
@@ -225,7 +228,7 @@ export function ConflictDialog({
         {conflict.reason ? <p className={ch.conflictReason}>{conflict.reason}</p> : null}
         {canEdit ? <>
         <p className={ch.conflictLabel}>①の予約を移す先のスタッフ</p>
-        <SaveErrorField names={["targetId","staffId","target_id"]}><Select
+        <SaveErrorField names={["targetId","staffId","target_id"]}><EntitySelect
           aria-label="移す先のスタッフ"
           size="full"
           disabled={busy}
@@ -233,7 +236,7 @@ export function ConflictDialog({
           onChange={setTargetId}
           options={[
             { value: '', label: '移す先を選ぶ' },
-            ...targets.map((t) => ({ value: t.staffId, label: `${t.displayName}へ移す` })),
+            ...targets.map((t) => ({ ...entityOptionMetadata(t), value: t.staffId, label: `${t.displayName}へ移す` })),
           ]}
         /></SaveErrorField>
         <div className={ch.detailRow}>
@@ -333,12 +336,14 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [] }: { acco
       }));
 
       if (!alive())
+
  return
       setCalendars(Object.fromEntries(details.filter(([, id]) => id)))
     } catch (e) {
       if (!alive()) return
       const fieldFailure = saveErrors.capture(e)
       { if (!fieldFailure)
+
 
       setError(describeApiFailure(e, '予約経路を読み込めませんでした。')) }
       setStatus('error')

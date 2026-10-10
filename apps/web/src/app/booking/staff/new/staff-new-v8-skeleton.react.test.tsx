@@ -1,3 +1,4 @@
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -126,6 +127,7 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     await waitFor(() => { expect(document.querySelector('[data-skeleton]')).toBeTruthy() })
 
     await act(async () => { gate.resolve({ menus: MENUS }) })
+    fireEvent.click(await screen.findByRole('button', { name: '予約を受けられるメニュー' }))
     expect(await screen.findByRole('checkbox', { name: /カット/ })).toBeTruthy()
   })
 
@@ -147,10 +149,10 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     const gate = deferred<unknown>()
     fixture.createStaff = vi.fn(() => gate.promise)
     render(<NewBookingStaffPage />)
-    await screen.findByRole('checkbox', { name: /カット/ })
+    await screen.findByRole('button', { name: '予約を受けられるメニュー' })
 
     fireEvent.change(screen.getByPlaceholderText('田中 美咲'), { target: { value: '田中' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: /カット/ }))
+    await pickEntities('予約を受けられるメニュー', ['カット'])
     fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
 
     // ボタンの内側だけ登録中に変わり、入力欄は触れるまま。
@@ -162,3 +164,5 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
     await waitFor(() => { expect(fixture.push).toHaveBeenCalled() })
   })
 })
+
+// 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。

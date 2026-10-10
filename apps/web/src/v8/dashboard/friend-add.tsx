@@ -1,4 +1,5 @@
 'use client'
+
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useState } from 'react'
@@ -13,6 +14,7 @@ import SectionHeader from './head'
 import QrDialog from '@/components/dashboard/qr-dialog'
 import styles from './dashboard.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * 友だち追加リンク（WQmep 段C）。動きは v7 の FriendAddLinkCard と同じ：
@@ -79,13 +81,13 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
       <div className={styles.linkRow}>
         <span className={styles.linkKey}>発行中</span>
         <span className={styles.routeSelect}>
-          <SaveErrorField names={["routeId","route_id"]}><Select
+          <SaveErrorField names={["routeId","route_id"]}><EntitySelect
             value={routeId}
             onChange={(value) => setRouteId(value)}
             aria-label="発行中の追加URL"
             options={[
               { value: '', label: '基本の追加URL' },
-              ...(routes ?? []).map((entry) => ({ value: entry.id, label: entry.name })),
+              ...(routes ?? []).map((entry) => ({ ...entityOptionMetadata(entry), value: entry.id, label: entry.name })),
             ]}
           /></SaveErrorField>
         </span>

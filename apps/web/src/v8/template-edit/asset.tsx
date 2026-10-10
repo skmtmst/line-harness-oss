@@ -1,6 +1,7 @@
 'use client'
-import { canManageRole } from '@/lib/staff-role';
+import Toggle from '@/components/shared/toggle';
 
+import { canManageRole } from '@/lib/staff-role';
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -47,6 +48,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8「クーポンを作る」（絵 S6FEuB）・「リサーチを作る」（絵 EsYo4）。
@@ -703,12 +705,12 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <h2 className={styles.cardTitle}>答えてもらう人</h2>
                 <p className={styles.cardNote}>タグで絞れます。選ばなければ全員が対象です。</p>
               </div>
-              <SaveErrorField names={["targetTagId","target_tag_id"]}><Combobox
+              <SaveErrorField names={["targetTagId","target_tag_id"]}><EntitySelect clearable size="full" kind="tag"
                 aria-label="答えてもらう人"
                 placeholder="友だち全員"
                 value={targetTagId}
                 onChange={setTargetTagId}
-                options={actionOptions.tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                options={actionOptions.tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
               /></SaveErrorField>
             </Card>
             </>

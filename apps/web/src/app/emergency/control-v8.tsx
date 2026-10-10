@@ -1,4 +1,5 @@
 'use client'
+
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Eye, PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
@@ -33,7 +34,7 @@ import styles from './control-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）。
@@ -615,7 +616,7 @@ const EmergencyControlV8 = (
         </div>
         <div className={styles.accountRow}>
           <div className={styles.accountField}><Field label="止めるアカウント" htmlFor="emergency-account-v8"><span className={styles.accountSelect}>
-            <SaveErrorField names={["targetAccountId","impact","target_account_id"]}><Select
+            <SaveErrorField names={["targetAccountId","impact","target_account_id"]}><EntitySelect
               size="full"
               id="emergency-account-v8"
               value={targetAccountId}
@@ -633,7 +634,7 @@ const EmergencyControlV8 = (
               aria-label="緊急停止の対象アカウント"
               options={[
                 { value: 'all', label: 'すべてのアカウント' },
-                ...accounts.map((account) => ({ value: account.id, label: `${account.name}（いまのアカウント）` })),
+                ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: `${account.name}（いまのアカウント）` })),
               ]}
             /></SaveErrorField>
             </span></Field></div>

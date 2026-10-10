@@ -1,3 +1,12 @@
+
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import NewRichMenuPage from './page'
+
+;
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * R23: リッチメニュー作成のタグ候補は、いま選んでいるアカウントのものだけ。
@@ -5,10 +14,6 @@
  * - タグ一覧の取得に選択accountが付く（別アカウントの同名タグが混ざらない）
  * - アカウントを切り替えたら、前の候補にしかない選択を外して知らせる
  */
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const accountState = { id: 'acc-1' }
 // 描画ごとに同じ参照を返す（本物のProviderと同じ）。新しい字面を作ると
@@ -31,9 +36,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }))
 
-import NewRichMenuPage from './page'
-
-;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
 let root: Root

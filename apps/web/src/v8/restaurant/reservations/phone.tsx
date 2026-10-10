@@ -1,4 +1,5 @@
 'use client'
+
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Lock, UserPlus } from 'lucide-react'
 import type { RestaurantCustomerHistory, RestaurantOpeningDay } from '@line-crm/shared'
@@ -32,7 +33,7 @@ import { formatYen as polishFormatYen } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 電話の予約を入れる（板 `rm92Y`）。作る型（CreatePage）で、左に入れる中身、右に確かめる物。
@@ -388,15 +389,15 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             </div>
             <div className={styles.pair}>
               <Field labelSize="compact" label="卓">
-                <SaveErrorField names={["tableMode","table_mode"]}><Select aria-label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
+                <SaveErrorField names={["tableMode","table_mode"]}><EntitySelect aria-label="卓" size="full" value={tableMode} onChange={setTableMode} options={[
                   { value: 'auto', label: recommended ? `自動で選ぶ（おすすめ：${recommended.code} ${recommended.label} ${recommended.max_capacity}名）` : '自動で選ぶ' },
-                  ...activeTables.map((t) => ({ value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
+                  ...activeTables.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` })),
                 ]} /></SaveErrorField>
               </Field>
               <Field labelSize="compact" label="コース">
-                <SaveErrorField names={["courseId","course_id"]}><Select aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
+                <SaveErrorField names={["courseId","course_id"]}><EntitySelect aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
                   { value: '', label: '席のみ' },
-                  ...courses.map((c) => ({ value: c.id, label: `${c.name} ${polishFormatYen(c.price)}` })),
+                  ...courses.map((c) => ({ ...entityOptionMetadata(c), value: c.id, label: `${c.name} ${c.price.toLocaleString()}円` })),
                 ]} /></SaveErrorField>
               </Field>
             </div>

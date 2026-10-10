@@ -1,4 +1,5 @@
 'use client'
+
 import { Field as SharedField } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
@@ -38,7 +39,7 @@ import styles from './reward-edit.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 マイル「使い道を作る・編集する」（板 `L2Bzp`）。
@@ -428,7 +429,7 @@ function RewardEditorInner() {
           <SelectField label="交換後に渡すもの" htmlFor="reward-action"
             help={form.rewardKind === 'coupon' ? 'クーポンは引換コードで渡すので、選ばなくても出せます' : '共通アクションの版を指定します'}
           >
-            <SaveErrorField names={["commonActionVersionId","form.commonActionVersionId","common_action_version_id","form.common_action_version_id"]}><Select
+            <SaveErrorField names={["commonActionVersionId","form.commonActionVersionId","common_action_version_id","form.common_action_version_id"]}><EntitySelect kind="common_action"
               id="reward-action"
               error={errorOf('交換後に渡すものを選んでください')}
               aria-label="交換後に渡すもの"
@@ -440,7 +441,7 @@ function RewardEditorInner() {
                 ...(form.commonActionVersionId && !commonActions.some((item) => item.id === form.commonActionVersionId)
                   ? [{ value: form.commonActionVersionId, label: '現在選択中の公開版' }]
                   : []),
-                ...commonActions.map((item) => ({ value: item.id, label: item.label })),
+                ...commonActions.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.label })),
               ]}
               disabled={commonActionsFailed}
             /></SaveErrorField>

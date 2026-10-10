@@ -1,6 +1,6 @@
 'use client'
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import TagOverflow from '@/components/shared/tag-overflow'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { collectListRows } from '@/components/shared/collect-list-rows'
@@ -77,6 +77,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { ListPager } from '@/components/templates/list-page'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
@@ -656,18 +657,18 @@ export default function FriendsListV8() {
           />
         </ListToolbarSearchSlot>
         {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
-        <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><Select aria-label="タグで絞り込む" width={119} value={selectedTagId}
+        <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><EntitySelect kind="tag" aria-label="タグで絞り込む" width={119} value={selectedTagId}
           onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
-          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ value: tag.id, label: tag.name }))])} /></SaveErrorField>
+          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
         <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
           options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
-        <SaveErrorField names={["operatorId","operator_id"]}><Select aria-label="担当で絞り込む" width={132} value={operatorId}
+        <SaveErrorField names={["operatorId","operator_id"]}><EntitySelect aria-label="担当で絞り込む" width={132} value={operatorId}
           onChange={(value) => resetPageWith(() => setOperatorId(value))}
-          options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))])} /></SaveErrorField>
-        <SaveErrorField names={["scenarioId","scenario_id"]}><Select aria-label="シナリオで絞り込む" width={147} value={scenarioId}
+          options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name }))])} /></SaveErrorField>
+        <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" width={147} value={scenarioId}
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
-          options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
+          options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
         <button
           type="button"
           aria-pressed={advanced !== null}

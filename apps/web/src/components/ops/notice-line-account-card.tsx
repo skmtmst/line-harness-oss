@@ -6,6 +6,7 @@ import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * 契約者専用LINEに使うアカウントの指定（決定 2026-09-18 案A）。
@@ -43,12 +44,12 @@ export default function NoticeLineAccountCard() {
         <p className="text-micro text-ink-secondary">契約先の権限者へ大事なお知らせを送る公式アカウントです。運営会社のアカウントとして登録したものから選びます。</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <SaveErrorField names={["selected"]}><Select
+        <SaveErrorField names={["selected"]}><EntitySelect
           aria-label="契約者専用LINEに使うアカウント"
           className="w-80"
           value={selected}
           onChange={(value) => setSelected(value)}
-          options={[{ value: '', label: '（指定しない）' }, ...(data?.candidates ?? []).map((c) => ({ value: c.id, label: c.basicId ? `${c.name}（${c.basicId}）` : c.name }))]}
+          options={[{ value: '', label: '（指定しない）' }, ...(data?.candidates ?? []).map((c) => ({ ...entityOptionMetadata(c), value: c.id, label: c.basicId ? `${c.name}（${c.basicId}）` : c.name }))]}
         /></SaveErrorField>
         <Button variant="primary" onClick={() => void save()} disabled={busy || !data || selected === (data.currentId ?? '')}>保存する</Button>
       </div>

@@ -10,6 +10,7 @@ import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatDateTime } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * 友だち追加のQRコード（設計 V2 1-1-1）。
@@ -376,7 +377,7 @@ export default function QrDialog({
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
-              <SaveErrorField names={["routeId","route_id"]}><Select
+              <SaveErrorField names={["routeId","route_id"]}><EntitySelect
                 aria-label="発行中の追加URL"
                 size="full"
                 id="qr-route"
@@ -388,7 +389,7 @@ export default function QrDialog({
                 className="w-full"
                 options={[
                   { value: '', label: '基本の追加URL' },
-                  ...routes.filter((r) => r.isActive).map((r) => ({ value: r.id, label: r.name })),
+                  ...routes.filter((r) => r.isActive).map((r) => ({ ...entityOptionMetadata(r), value: r.id, label: r.name })),
                 ]}
               /></SaveErrorField>
               {routeStopped ? (

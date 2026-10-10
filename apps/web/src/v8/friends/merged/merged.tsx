@@ -1,4 +1,5 @@
 'use client'
+
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -26,7 +27,7 @@ import { useMergedUsers, USERS_PAGE_SIZES } from './use-merged-users'
 import styles from './merged.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 統合ユーザー（Pencil `ADjK8`）。/friends?tab=merged。
@@ -171,7 +172,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
               { value: 'unlinked', label: 'UID連携：未連携・要確認' },
             ]}
           /></SaveErrorField>
-          <SaveErrorField names={["MULTI_ACCOUNTS","account","u.account","_m_u_l_t_i__a_c_c_o_u_n_t_s"]}><Select
+          <SaveErrorField names={["MULTI_ACCOUNTS","account","u.account","_m_u_l_t_i__a_c_c_o_u_n_t_s"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
             width={200}
             value={u.onlyDups ? MULTI_ACCOUNTS : u.account}
@@ -186,7 +187,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             }}
             options={[
               { value: '', label: '所属アカウント：すべて' },
-              ...u.accountOptions.map((a) => ({ value: a.id, label: `所属アカウント：${a.name}` })),
+              ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: `所属アカウント：${a.name}` })),
               { value: MULTI_ACCOUNTS, label: '所属アカウント：複数アカウントのみ' },
             ]}
           /></SaveErrorField>

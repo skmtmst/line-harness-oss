@@ -1,4 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
+
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useStaffRole } from '@/lib/staff-role'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -103,6 +105,7 @@ import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-cr
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 リッチメニューを作る（作る①〜④のウィザード）。
@@ -911,6 +914,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
         { if (!fieldFailure)
 
+
         setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e)) }
         return null
       }
@@ -981,6 +985,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         const fieldFailure = saveErrors.capture(e)
         // 下書き自体はできている。画像だけ失敗として知らせる。
         { if (!fieldFailure)
+
 
         setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。') }
       }
@@ -1057,6 +1062,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       }
       const raw = e instanceof Error ? e.message : ''
       { if (!fieldFailure)
+
 
       setError(
         /targetingPriority/.test(raw)
@@ -1240,6 +1246,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
         { if (!fieldFailure)
 
+
         setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e)) }
       }
       return
@@ -1256,6 +1263,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
       { if (!fieldFailure)
 
+
       setError(imageUploadErrorText(e)) }
     }
   }
@@ -1270,6 +1278,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       const fieldFailure = saveErrors.capture(e)
 
       { if (!fieldFailure)
+
 
       setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。') }
     }
@@ -1452,6 +1461,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
       { if (!fieldFailure)
 
+
       setError('LINEの検査を通せませんでした。しばらくおいてから、もう一度お試しください。') }
     } finally {
       setValidating(false)
@@ -1470,6 +1480,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError('実機で見た記録を残せませんでした。もう一度お試しください。') }
     } finally {
@@ -1553,6 +1564,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       const raw = e instanceof Error ? e.message : ''
       const isValidationMessage = /[ぁ-んァ-ヶ一-龠]/u.test(raw) && raw !== 'publish failed'
       { if (!fieldFailure)
+
 
       setError(
         /targetingPriority/.test(raw)
@@ -2540,14 +2552,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 /></SaveErrorField>
               </span>
               <span>に終わり、</span>
-              <SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><Select
+              <SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
                 value={publishPlan.restoreGroupId}
                 onChange={(v) => setPublishPlan({ ...publishPlan, restoreGroupId: v })}
                 disabled={!endEnabled}
                 options={[
                   { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
-                  ...restoreMenus.map((item) => ({ value: item.id, label: item.name })),
+                  ...restoreMenus.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name })),
                 ]}
               /></SaveErrorField>
               <span>に戻す</span>

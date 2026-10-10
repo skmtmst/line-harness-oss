@@ -19,6 +19,7 @@ import type { Area } from './canvas-editor'
 import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import TapSideEffects from '@/components/shared/tap-side-effects'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 type Option = { id: string; name: string }
 
@@ -289,14 +290,14 @@ export function AreaProperties({
   /* URLを開く：計測リンクを選べる（選ぶと飛び先は計測リンクの設定）。 */
   const urlBody = (
     <>
-      <SaveErrorField names={["trackedLinkId","area.trackedLinkId","tracked_link_id","area.tracked_link_id"]}><Select
+      <SaveErrorField names={["trackedLinkId","area.trackedLinkId","tracked_link_id","area.tracked_link_id"]}><EntitySelect
         value={area.trackedLinkId ?? ''}
         onChange={(value) => onUpdate({ trackedLinkId: value || null })}
         aria-label="計測リンクを使う"
         disabled={readOnly}
         options={[
           { value: '', label: '計測リンクを使わない（下のURLをそのまま開く）' },
-          ...trackedLinks.map((l) => ({ value: l.id, label: l.name })),
+          ...trackedLinks.map((l) => ({ ...entityOptionMetadata(l), value: l.id, label: l.name })),
         ]}
         size="full"
       /></SaveErrorField>
@@ -478,14 +479,14 @@ export function AreaProperties({
 
       {intent === 'switch' && (
         <Field label="切り替え先のページ">
-          <SaveErrorField names={["targetPageId","data.targetPageId","target_page_id","data.target_page_id"]}><Select
+          <SaveErrorField names={["targetPageId","data.targetPageId","target_page_id","data.target_page_id"]}><EntitySelect
             value={(data.targetPageId as string) ?? ''}
             onChange={(value) => onUpdate({ actionData: { ...data, targetPageId: value } })}
             aria-label="切り替え先のページ"
             invalid={Boolean(error)}
             options={[
               { value: '', label: '選択...' },
-              ...pages.map((p) => ({ value: p.id, label: p.name })),
+              ...pages.map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: p.name })),
             ]}
             size="full"
           /></SaveErrorField>

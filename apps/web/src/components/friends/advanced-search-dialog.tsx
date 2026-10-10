@@ -1,7 +1,6 @@
 'use client'
 
 import TagOverflow from '@/components/shared/tag-overflow'
-
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import TagPill from '@/components/shared/tag-pill'
@@ -29,6 +28,7 @@ import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -892,13 +892,13 @@ function OrAxisPicker({
       <span className="text-xs font-semibold text-ink-secondary">{axis.label}</span>
       <div className="flex items-center gap-1.5">
         {axis.input === 'mark' || axis.input === 'scenario' ? (
-          <SaveErrorField names={["draft"]}><Combobox
+          <SaveErrorField names={["draft"]}><EntitySelect clearable size="full"
             aria-label={`${axis.label}を選ぶ`}
             placeholder="選ぶ"
             value={draft}
             onChange={setDraft}
             disabled={waitingForOptions}
-            options={options.map((option) => ({ value: option.id, label: option.name }))}
+            options={options.map((option) => ({ ...entityOptionMetadata(option), value: option.id, label: option.name }))}
             className="min-w-0 flex-1"
           /></SaveErrorField>
         ) : axis.input === 'date' ? (
@@ -960,7 +960,7 @@ function TagPicker({
         同じ行に並べると狭いパネルでタグ名が数文字に切れて読めなかった。
         選んだタグの札は下で複数行に広がり、全文を確認できる。
       */}
-      <SaveErrorField names={["pick"]}><Combobox
+      <SaveErrorField names={["pick"]}><EntitySelect clearable size="full" kind="tag"
         aria-label="タグ名を選ぶ"
         placeholder="タグ名を選ぶ"
         value={pick}
@@ -973,7 +973,7 @@ function TagPicker({
           }
           setPick('')
         }}
-        options={tags.map((t) => ({ value: t.id, label: t.name }))}
+        options={tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: t.name }))}
         className="w-full"
       /></SaveErrorField>
       <div className="mt-2 flex flex-wrap items-center gap-2">

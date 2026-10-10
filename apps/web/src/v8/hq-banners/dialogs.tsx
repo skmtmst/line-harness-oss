@@ -1,4 +1,5 @@
 'use client'
+
 import { Archive, Plus, Upload } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import Button from '@/components/shared/button'
@@ -12,7 +13,7 @@ import styles from './dialogs.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 バナー生成の小さな窓。共通の窓（Dialog）に絵の幅・上からの位置を渡し、中身だけを絵どおりに組む。
@@ -209,14 +210,14 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
         ) : (
           <>
             <div className={styles.field}><Field label="入れるプロジェクト" htmlFor={`${uid}-project`}><div className={styles.full}>
-                <SaveErrorField names={["projectId","project_id"]}><Select
+                <SaveErrorField names={["projectId","project_id"]}><EntitySelect
                   aria-label="入れるプロジェクト"
                   size="full"
                   id={`${uid}-project`}
                   value={projectId}
                   disabled={loading}
                   onChange={setProjectId}
-                  options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                  options={projects.map((p) => ({ ...entityOptionMetadata(p), value: p.id, label: p.name }))}
                 /></SaveErrorField>
               </div></Field></div>
             <SaveErrorField names={["filePreview","file_preview"]}><MediaSlot

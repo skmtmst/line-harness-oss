@@ -1,4 +1,5 @@
 'use client'
+
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -24,7 +25,7 @@ import styles from './members.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B 会員 › ランク設定（fb9NJ）・ランクを消す（確認）（dEv6G）・競合（e5yBLx）。
@@ -221,6 +222,7 @@ export default function RankSettingsV8({
       } else {
         { if (!fieldFailure)
 
+
         setError(describeApiFailure(caught, 'ランクの削除', {
           scope: 'store',
         })) }
@@ -253,6 +255,7 @@ export default function RankSettingsV8({
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
+
 
       setError(describeApiFailure(caught, 'ECへの同期', {
         scope: 'store',
@@ -433,14 +436,14 @@ export default function RankSettingsV8({
           {moving > 0 ? (<>
             <div className={styles.removeField}>
               <span className={styles.removeLabel} id="nen-rank-move-label">移す先のランク（必須）</span>
-              <SaveErrorField names={["replacement"]}><Select
+              <SaveErrorField names={["replacement"]}><EntitySelect
                 aria-label="移す先のランク（必須）"
                 size="full"
                 value={replacement}
                 onChange={setReplacement}
                 options={[
                   { value: '', label: '移す先のランクを選ぶ' },
-                  ...removeCandidates.map((row) => ({ value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
+                  ...removeCandidates.map((row) => ({ ...entityOptionMetadata(row), value: row.id ?? '', label: row.name.trim() || '（名前なし）' })),
                 ]}
               /></SaveErrorField>
             </div>

@@ -1,4 +1,5 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
 
 import { Field } from '@/components/shared/form-controls'
 import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
@@ -36,6 +37,7 @@ import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
+import EntitySelect from '@/components/shared/entity-select'
 
 /*
  * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
@@ -403,7 +405,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
     <div className={styles.saveTo}>
       <span className={styles.fieldLabel}>答えを保存する先</span>
       <span className={styles.saveSelect}>
-        <SaveErrorField names={["current"]}><Select
+        <SaveErrorField names={["current"]}><EntitySelect
           aria-label="答えを保存する先"
           value={current}
           onChange={(value) => {

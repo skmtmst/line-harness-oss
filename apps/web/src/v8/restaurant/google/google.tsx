@@ -1,4 +1,5 @@
 'use client'
+
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -21,7 +22,7 @@ import SettingsBoard from './settings'
 import styles from './google.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 Googleビジネス（Pencil：口コミ `j0Wcg`・返信を作る `x9HIR`・投稿 `Cfed0`・投稿を作る `T1j2Sw`・
@@ -84,6 +85,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       setData(null)
       { if (!fieldFailure)
 
+
       setError(err instanceof ApiError && err.status === 404
         ? 'このLINEアカウントには店舗が紐付いていません。先に店舗管理でLINEアカウントを割り当ててください。'
         : errorMessage(err, 'Googleビジネスの状態を読み込めませんでした。'))
@@ -141,7 +143,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
         const next = stores.find((item) => item.id === value)
         if (next?.line_account_id && next.line_account_id !== selectedAccountId) setSelectedAccountId(next.line_account_id)
       }}
-      options={stores.map((item) => ({ value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
+      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
     /></SaveErrorField>
   ) : null
 

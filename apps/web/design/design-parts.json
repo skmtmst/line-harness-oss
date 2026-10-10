@@ -3829,6 +3829,32 @@
           "resolved": "#087a3e"
         }
       ]
+    },
+    "entity-picker": {
+      "name": "V8 作った物を選ぶ窓・選ぶ欄",
+      "pencilNodes": [
+        "f63Jza"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/entity-picker.tsx",
+      "implementationFiles": [
+        "src/components/shared/entity-select.tsx",
+        "src/components/shared/entity-remote-field.tsx",
+        "src/components/shared/friend-picker-field.tsx"
+      ],
+      "cssModule": "src/components/shared/entity-picker.module.css",
+      "components": [
+        "EntityPickerDialog",
+        "EntityMultiPickerDialog",
+        "EntityPickerField",
+        "EntityPickerSummary"
+      ],
+      "cssPrefix": "entity-picker",
+      "note": "B-155/163/164/165/175。640の器と欄全体で開く操作を共有。フォルダ以外の増える候補はこの部品へ集約。 正本の担当・幅640は依頼と受信箱の実装で確認。画素の合格は別の照合記録を参照。",
+      "declarations": [],
+      "lastCheckedAt": "2026-10-10"
     }
   },
   "investigations": {

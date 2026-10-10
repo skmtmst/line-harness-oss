@@ -1,7 +1,6 @@
 'use client'
 
 import { DragHandle } from '@/components/shared/row-actions'
-
 import SharedToggle from '@/components/shared/toggle'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -27,6 +26,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 export type LinkedAction = {
   id: string
@@ -251,7 +251,7 @@ export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes,
             ) : selected[0] === 'マイル付与' ? (
               <SaveErrorField names={["amount"]}><input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} aria-label="付与マイル" /></SaveErrorField>
             ) : (
-              <><SaveErrorField names={["resourceId","resource_id"]}><Combobox aria-label={`${selected[0]}に使う内容を選択`} placeholder={unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'} value={resourceId} onChange={setResourceId} disabled={unavailable || !resources} loading={!unavailable && !resources} options={choices.map((choice) => ({ value: choice.id, label: choice.name }))} className="w-full" /></SaveErrorField>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
+              <><SaveErrorField names={["resourceId","resource_id"]}><EntitySelect clearable size="full" aria-label={`${selected[0]}に使う内容を選択`} placeholder={unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'} value={resourceId} onChange={setResourceId} disabled={unavailable || !resources} loading={!unavailable && !resources} options={choices.map((choice) => ({ ...entityOptionMetadata(choice), value: choice.id, label: choice.name }))} className="w-full" /></SaveErrorField>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
             )}
             <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">
               <span className="font-semibold">実行内容の確認：</span> {selected[0]}を{timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後に`}実行します。

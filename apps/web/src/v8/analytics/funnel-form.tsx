@@ -1,4 +1,5 @@
 'use client'
+
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
@@ -14,6 +15,9 @@ import { TextField } from '@/components/shared/text-field'
 import type { FunnelEditDraft } from './funnel'
 import styles from './funnel-form.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect from '@/components/shared/entity-select'
+import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/entity-remote-field'
+
 
 /*
  * ★V8-B 分析「ファネルを作る」（板 `VDPz5`）と「ファネルを直す」（同じ形）。
@@ -21,27 +25,28 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 今の作る・直すフォーム（app/analytics/page.tsx の FunnelForm）の動きを写して一から書いた。
  * 絵は「段Nの名前 ｜ 何をしたら」の2列。何をしたらは、種類と相手（成果地点・タグ・フォーム）を
  * 1つの選ぶ欄にまとめる（例：成果「商品を買った」）。一覧に無い相手・IDで決める種類
- * （情報欄・サイトのページ・リンク・オートメーション）は「ほかの条件（IDで決める）」を選ぶと、
- * その段の下に種類とIDの欄が出る。保存の形（kind・match・版の追加）は今と同じ。
+ * （情報欄・サイトのページ・リンク・オートメーション）は「ほかの条件」を選ぶと、
+ * その段の下に種類と候補を選ぶ欄が出る。保存の形（kind・match・版の追加）は今と同じ。
  */
 
 /** 段の種類（今の画面と同じ並び・同じ言葉）。hint は ID の欄の名前。 */
 export const FUNNEL_STEP_KINDS = [
   { key: 'friend_add', label: '友だち追加', hint: '' },
-  { key: 'tag', label: 'タグが付いた', hint: 'タグのID' },
-  { key: 'field', label: '情報欄に値が入った', hint: '項目のID（値は問いません）' },
-  { key: 'form', label: 'フォームに答えた', hint: 'フォームのID' },
+  { key: 'tag', label: 'タグが付いた', hint: 'タグ' },
+  { key: 'field', label: '情報欄に値が入った', hint: '情報欄（値は問いません）' },
+  { key: 'form', label: 'フォームに答えた', hint: '回答フォーム' },
   { key: 'site_event', label: 'サイトのページを見た', hint: 'パスのまとまり（例：thanks）' },
   { key: 'purchase', label: '購入が確定した', hint: '' },
-  { key: 'link_click', label: 'リンクを踏んだ', hint: '計測リンクのID' },
-  { key: 'conversion', label: '成果が記録された', hint: '成果地点のID' },
+  { key: 'link_click', label: 'リンクを踏んだ', hint: '計測リンク' },
+  { key: 'conversion', label: '成果が記録された', hint: '成果地点' },
   { key: 'message', label: 'メッセージを受信した', hint: '' },
   { key: 'booking', label: '予約が確定した', hint: '' },
-  { key: 'automation', label: 'オートメーションが動いた', hint: 'オートメーションのID' },
+  { key: 'automation', label: 'オートメーションが動いた', hint: 'ルール' },
 ] as const
 
 const NO_VALUE_KINDS = ['friend_add', 'purchase', 'message', 'booking']
 const OTHER = '__other__'
+const ENTITY_TARGETS: Record<string, RemoteEntityKind> = { tag: 'tag', field: 'friend_field', form: 'form', link_click: 'tracked_link', conversion: 'conversion', automation: 'automation' }
 const MAX_STEPS = 10
 const MIN_STEPS = 2
 
@@ -182,7 +187,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
     list.push({ value: 'booking', label: '予約が確定した' }, { value: 'purchase', label: '購入が確定した' }, { value: 'message', label: 'メッセージを受信した' })
     for (const t of targets.filter((x) => x.kind === 'form')) list.push({ value: `form:${t.id}`, label: `フォーム「${t.name}」` })
     for (const t of targets.filter((x) => x.kind === 'tag')) list.push({ value: `tag:${t.id}`, label: `タグ「${t.name}」` })
-    list.push({ value: OTHER, label: 'ほかの条件（IDで決める）' })
+    list.push({ value: OTHER, label: 'ほかの条件' })
     return list
   }, [targets])
 
@@ -247,7 +252,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
     if (!name.trim()) errors['fn-v8-name'] = '名前を入力してください'
     steps.forEach((step, index) => {
       if (!step.label.trim()) errors[`fn-v8-step-${index}`] = 'この段に名前を付けてください'
-      if (kindNeedsValue(step.kind) && !step.value.trim()) errors[`fn-v8-${step.other ? 'value' : 'choice'}-${index}`] = step.other ? 'IDを入力してください' : '何をしたら進むかを選んでください'
+      if (kindNeedsValue(step.kind) && !step.value.trim()) errors[`fn-v8-${step.other ? 'value' : 'choice'}-${index}`] = step.kind === 'site_event' ? 'パスのまとまりを入力してください' : '何をしたら進むかを選んでください'
     })
     focusTarget.current = Object.keys(errors)[0] ?? null
     setFieldErrors(errors)
@@ -290,9 +295,11 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
         onCreated(res.data.funnelId, res.data.usageWarnings)
       }
     } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught)
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && (caught.status === 409 || isConflict(caught.code))) { conflict.mark(); return }
-      if (!fieldFailure) setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      if (!fieldFailure)
+ setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -365,7 +372,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
                   </div>
                   <div className={styles.stepCol}>
                     <span className={styles.subLabel}>何をしたら</span>
-                    <SaveErrorField names={["step","targets"]}><Select
+                    <SaveErrorField names={["step","targets"]}><EntitySelect
                       id={`fn-v8-choice-${i}`}
                       error={fieldErrors[`fn-v8-choice-${i}`]}
                       aria-label={`${i + 1}段目で何をしたら進むか`}
@@ -384,13 +391,15 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
                         aria-label={`${i + 1}段目の種類`}
                         size="full"
                         value={step.kind}
-                        onChange={(value) => update(i, { kind: value, matchBase: undefined })}
+                        onChange={(value) => update(i, { kind: value, value: '', matchBase: undefined })}
                         options={FUNNEL_STEP_KINDS.map((k) => ({ value: k.key, label: k.label }))}
                       /></SaveErrorField>
                     </div>
                     <div className={styles.stepCol}>
                       <Field label={kindHint || '追加の指定はありません'} htmlFor={`fn-v8-value-${i}`} error={fieldErrors[`fn-v8-value-${i}`]}>
-                        <SaveErrorField names={[`steps.${i}.value`,"value","step.value"]}><TextField id={`fn-v8-value-${i}`} value={step.value} disabled={!kindNeedsValue(step.kind)} onChange={(e) => update(i, { value: e.target.value })} /></SaveErrorField>
+                        {ENTITY_TARGETS[step.kind] ? <EntityRemoteField kind={ENTITY_TARGETS[step.kind]} label={kindHint} accountId={accountId} id={`fn-v8-value-${i}`} value={step.value} onChange={(value) => update(i, { value })} />
+                          :
+                        <SaveErrorField names={[`steps.${i}.value`,"value","step.value"]}><TextField id={`fn-v8-value-${i}`} value={step.value} disabled={!kindNeedsValue(step.kind)} onChange={(e) => update(i, { value: e.target.value })} /></SaveErrorField>}
                       </Field>
                     </div>
                   </div>

@@ -1,8 +1,8 @@
 'use client'
+
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-
 import SharedStatusPill from '@/components/shared/status-pill'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -92,6 +92,7 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 共通情報の一覧（Pencil「★V8 画面の地図」の共通情報の行：
@@ -302,7 +303,6 @@ function CommonVarsListInner() {
         { if (!fieldFailure)
         setListFailure(e) }
         { if (!fieldFailure)
-
 
         setError(e instanceof ApiError && e.status === 403
           ? permissionDeniedMessage('store')
@@ -571,6 +571,7 @@ function CommonVarsListInner() {
 
   const selectReplacement = async (nextId: string) => {
     if (!deleteTarget || !selectedAccountId)
+
 
  return
     setReplacementId(nextId)
@@ -848,12 +849,12 @@ function CommonVarsListInner() {
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
 
-
       setError('使用先を確認できないため削除できません。もう一度お試しください。') }
       return
     }
 
     if (!isCurrentRequest())
+
 
  return
     const targets = items.filter((item) => selected.has(item.id))
@@ -894,11 +895,13 @@ function CommonVarsListInner() {
       }
       if (!isCurrentRequest())
 
+
  return
     }
 
     try {
       if (!isCurrentRequest())
+
 
  return
       if (failed.length > 0) {
@@ -1628,14 +1631,14 @@ function CommonVarsListInner() {
                     </div>
                     {deleteChoice === 'replace' ? (
                       <>
-                        <SaveErrorField names={["replacementId","replacement_id"]}><Select
+                        <SaveErrorField names={["replacementId","replacement_id"]}><EntitySelect
                           size="full"
                           value={replacementId}
                           disabled={deleteBusy || replacementCandidates.length === 0}
                           onChange={(value) => void selectReplacement(value)}
                           aria-label="差し替え先"
                           options={replacementCandidates.length > 0
-                            ? replacementCandidates.map((candidate) => ({
+                            ? replacementCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate),
                               value: candidate.id,
                               label: `差し替え先：${candidate.name} ${placeholderText(candidate.varKey)}`,
                             }))

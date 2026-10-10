@@ -1,4 +1,5 @@
 'use client'
+
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -18,7 +19,7 @@ import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect from '@/components/shared/entity-select'
 
 /*
  * ★V8 分析「クロス分析」（Pencil `u5CuB8`）。
@@ -195,6 +196,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
           setCrossAutoStopped(true)
           { if (!fieldFailure)
 
+
           setError('ログインを確認できません。ログインし直した後、同じ集計を確認できます') }
           setLoading(false)
           return
@@ -257,6 +259,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
 
       const code = caught instanceof Error ? caught.message : ''
       { if (!fieldFailure)
+
 
       setError(explainStartError(code, code || 'クロス分析を開始できませんでした')) }
       setLoading(false)
@@ -330,6 +333,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       const fieldFailure = saveErrors.capture(caught)
       { if (!fieldFailure)
 
+
       setError(caught instanceof Error ? caught.message : '対象者を準備できませんでした') }
     } finally { setAudienceBusy(false) }
   }
@@ -359,8 +363,8 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       <div className={styles.controls}>
         <Field label="数えるもの"><SaveErrorField names={["measureKind","measure_kind"]}><Select id="cross-measure" value={measureKind} onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')} aria-label="数えるもの" size="full" options={[{ value: 'unique_friends', label: '友だちの人数（重複なし）' }, { value: 'events', label: 'イベントの回数' }]} /></SaveErrorField></Field>
         {measureKind === 'events' ? <Field label="数えるイベント"><SaveErrorField names={["measureEventType","eventType","measure_event_type"]}><Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} /></SaveErrorField></Field> : null}
-        <Field label="たての軸"><SaveErrorField names={["rowAxis","row_axis"]}><Select aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} /></SaveErrorField></Field>
-        <Field label="よこの軸"><SaveErrorField names={["columnAxis","column_axis"]}><Select id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} /></SaveErrorField></Field>
+        <Field label="たての軸"><SaveErrorField names={["rowAxis","row_axis"]}><EntitySelect aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} /></SaveErrorField></Field>
+        <Field label="よこの軸"><SaveErrorField names={["columnAxis","column_axis"]}><EntitySelect id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} /></SaveErrorField></Field>
         <SaveErrorField names={["crossDays","cross_days"]}><PeriodPicker days={crossDays} onChange={setCrossDays} customRange={customRange} onRangeChange={setRange} /></SaveErrorField>
         <Button variant="primary" onClick={() => void runCross()} disabled={loading || !crossStorageRestored || sameAxis || Boolean(crossRunId)} busy={loading} busyLabel="集計中" title={sameAxis ? 'たてとよこに同じ軸は選べません' : '期間や軸を変えた場合は、新しい結果として集計します'}>集計する</Button>
         <span className={styles.spacer} />

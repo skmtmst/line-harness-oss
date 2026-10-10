@@ -1,7 +1,7 @@
 'use client'
+
 import { api, type CommonActionResources } from '@/lib/api';
 import Toggle from '@/components/shared/toggle';
-
 import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -40,6 +40,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
+import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/entity-remote-field'
 
 /*
  * ★V8 ウェビナーの ④通知（Pencil E7iAYs）。
@@ -201,7 +202,6 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
           { if (!fieldFailure)
 
-
           setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。') }
           return false
         }
@@ -225,7 +225,6 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
-
 
       setError(webinarErrorText(cause, '保存できませんでした。入力を残しました。もう一度お試しください。')) }
       return false

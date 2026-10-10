@@ -1,4 +1,6 @@
 'use client'
+import Toggle from '@/components/shared/toggle';
+
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
@@ -36,7 +38,7 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8-B 統括 LINEアカウントを登録（板 ①xj3zz ②JYfda ③GwKE2 ④v2KMj ⑤TvXII・結果の窓 qw80E）。
@@ -124,6 +126,7 @@ export default function AccountRegisterV8() {
  return null } })();
 
     if (!draft)
+
  return
     setAccountMethod(draft.accountMethod)
     setCurrentStep(draft.step)
@@ -181,6 +184,7 @@ export default function AccountRegisterV8() {
       } catch (saveFailure) {
         const fieldFailure = saveErrors.capture(saveFailure);
  if (active) { if (!fieldFailure)
+
  setOptionsError('親アカウント・担当者を読み込めませんでした。選択する場合は画面を開き直してください。') } }
     })();
 
@@ -299,6 +303,7 @@ export default function AccountRegisterV8() {
 
       { if (!fieldFailure)
 
+
       setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。') }
       return false
     } finally {
@@ -340,6 +345,7 @@ export default function AccountRegisterV8() {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError('LINEに接続できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
@@ -442,6 +448,7 @@ export default function AccountRegisterV8() {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError('タグを追加できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
@@ -574,12 +581,8 @@ export default function AccountRegisterV8() {
               <div className={styles.field}>
                 <span className={styles.groupLabel}>タグ</span>
                 <div className={styles.tagRow}>
-                  {(tags ?? []).map((tag) => {
-                    const on = form.tagIds.includes(tag.id)
-                    return (
-                      <TagToggle key={tag.id} name={tag.name} selected={on} onToggle={() => toggleTag(tag.id)} />
-                    )
-                  })}
+                  <EntitySelect aria-label="タグ" noun="タグ" values={form.tagIds} onChange={(ids) => update('tagIds', ids)} options=
+                  {(tags ?? []).map((tag) =>({ value:tag.id, label:tag.name}))} />
                   {tagInputOpen ? (
                     <span className={styles.tagAdd}>
                       <SaveErrorField names={["newTagName","new_tag_name"]}><TextField value={newTagName} onChange={(event) => setNewTagName(event.target.value)} placeholder="新しいタグの名前" aria-label="新しいタグの名前" maxLength={100} autoFocus /></SaveErrorField>
@@ -597,12 +600,12 @@ export default function AccountRegisterV8() {
               {moreOpen && (
                 <div className={styles.moreBox}>
                   <div className={styles.twoCol}>
-                    <div className={styles.field}><span className={styles.label}>親アカウント</span><SaveErrorField names={["parentId","form.parentId","parent_id","parentLineAccountId","form.parent_id"]}><Select aria-label="親アカウント" value={form.parentId} onChange={(value) => update('parentId', value)} options={[{ value: '', label: '親なし' }, ...parents.map((a) => ({ value: a.id, label: a.name }))]} /></SaveErrorField></div>
+                    <div className={styles.field}><span className={styles.label}>親アカウント</span><SaveErrorField names={["parentId","form.parentId","parent_id","parentLineAccountId","form.parent_id"]}><EntitySelect aria-label="親アカウント" value={form.parentId} onChange={(value) => update('parentId', value)} options={[{ value: '', label: '親なし' }, ...parents.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} /></SaveErrorField></div>
                     <div className={styles.field}><Field label="既存のLIFF ID" htmlFor="v8-existing-liff"><SaveErrorField names={["liffId","form.liffId","liff_id","form.liff_id"]}><TextField id="v8-existing-liff" value={form.liffId} onChange={(event) => update('liffId', event.target.value)} placeholder="未入力なら自動で用意します" /></SaveErrorField></Field></div>
                   </div>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.label}>このアカウントを担当範囲に追加する人</legend>
-                    <div className={styles.tagRow}>{staffOptions.map((member, saveFieldIndex) => <SaveErrorField names={[`staffOptions.${saveFieldIndex}.id`,"id","member.id"]} key={member.id}><Checkbox key={member.id} aria-label={member.name} checked={form.staffIds.includes(member.id)} onCheckedChange={(checked) => update('staffIds', checked ? [...form.staffIds, member.id] : form.staffIds.filter((id) => id !== member.id))}>{member.name}</Checkbox></SaveErrorField>)}</div>
+                    <SaveErrorField names={["staffIds", "staff_ids"]}><EntitySelect aria-label="このアカウントを担当範囲に追加する人" noun="スタッフ" values={form.staffIds} onChange={(ids) => update('staffIds', ids)} options={staffOptions.map((member) => ({ value: member.id, label:member.name}))}/></SaveErrorField>
                     <p className={styles.help}>全アカウント担当者は追加操作なしで閲覧できます。</p>
                   </fieldset>
                   {optionsError ? <p role="alert" className={styles.fieldError}>{optionsError}</p> : null}

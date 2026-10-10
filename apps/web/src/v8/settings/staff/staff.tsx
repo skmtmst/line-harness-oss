@@ -1,4 +1,6 @@
 'use client'
+import { useOverlayFocus } from '@/components/shared/overlay-utils';
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -59,6 +61,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -537,7 +540,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
   return <SaveErrorScope errors={saveErrors}><div data-design-node="EOTS4" className="flex flex-col gap-4 pb-28">
     {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
     <div className="flex items-center justify-between"><nav className="text-xs text-ink-faint"><span className="font-semibold text-action">ログインユーザー</span>　›　<span className="font-semibold text-action">{user.name}</span>　›　見せる範囲</nav><Button variant="secondary" disabled={!writable || copyCandidates.length === 0} onClick={() => setCopyOpen((current) => !current)}>ほかの人と同じにする</Button></div>
-    {copyOpen && <section className="rounded-card border border-hairline bg-canvas p-4" aria-label="ほかの人の権限をコピー"><p className="mb-2 text-xs text-ink-secondary">同じ組織の人を選ぶと、その人の権限のかたまりを下書きへ反映します。コピーするとすべての行がコピー元の内容に置き換わり、一部だけ許可の細かい設定は残りません。</p><SaveErrorField names={["copySourceId","copy_source_id"]}><Select aria-label="コピー元のログインユーザー" value={copySourceId} onChange={copyBundle} size="full" options={[{ value: '', label: 'コピー元を選ぶ', disabled: true }, ...copyCandidates.map((candidate) => ({ value: candidate.id, label: `${candidate.name}（${ACCESS_ROLE_LABEL[candidate.roleBundle]}）` }))]} /></SaveErrorField>{copyNotice && <p className="mt-2 text-xs font-medium text-success" role="status">{copyNotice}</p>}</section>}
+    {copyOpen && <section className="rounded-card border border-hairline bg-canvas p-4" aria-label="ほかの人の権限をコピー"><p className="mb-2 text-xs text-ink-secondary">同じ組織の人を選ぶと、その人の権限のかたまりを下書きへ反映します。コピーするとすべての行がコピー元の内容に置き換わり、一部だけ許可の細かい設定は残りません。</p><SaveErrorField names={["copySourceId","copy_source_id"]}><EntitySelect aria-label="コピー元のログインユーザー" value={copySourceId} onChange={copyBundle} size="full" options={[{ value: '', label: 'コピー元を選ぶ', disabled: true }, ...copyCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `${candidate.name}（${ACCESS_ROLE_LABEL[candidate.roleBundle]}）` }))]} /></SaveErrorField>{copyNotice && <p className="mt-2 text-xs font-medium text-success" role="status">{copyNotice}</p>}</section>}
     {/*
       LAY-07: 狭い幅は1列で「いまの権限→変更項目→影響の確認」の順にする。
       説明欄（390px）と横に並べるのは、設定欄に十分な幅が残る1024px以上だけ。
@@ -657,6 +660,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   const toggleActive = async (stepUpToken?: string) => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }, stepUpToken); await onSaved(); notifyToast(member.isActive ? '無効にしました。「利用状態」で「無効のみ」を選ぶと、この人を一覧に戻せます。' : '有効にしました。対象者はもう一度ログインが必要です。'); onClose() } catch (caught) {
     const fieldFailure = saveErrors.capture(caught);
  if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: toggleActive }); return } { if (!fieldFailure)
+
  setError(messageOf(caught)) } } finally { setStatusSaving(false) } }
   return <SaveErrorScope errors={saveErrors}><Modal title="見せる範囲を決める" onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
@@ -691,11 +695,13 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
   useEffect(() => { void (async () => { try { const res = await api.staff.beginTwoFactorSetup(member.id); if (res.success) { setUri(res.data.provisioningUri); setManualKey(res.data.manualKey) } } catch (caught) {
     const fieldFailure = saveErrors.capture(caught)
  { if (!fieldFailure)
+
  setError(messageOf(caught)) } } })() }, [member.id, saveErrors])
   useEffect(() => { if (uri) void qrToDataURL(uri, { width: 240, margin: 1, color: qrColors() }).then(setQr) }, [uri])
   const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { await api.staff.confirmTwoFactorSetup(member.id, value); await onSaved(); onClose() } catch (caught) {
     const fieldFailure = saveErrors.capture(caught)
  { if (!fieldFailure)
+
  setError(otpFailureMessage(messageOf(caught))) } } finally { setSaving(false) } }
   return <SaveErrorScope errors={saveErrors}><Modal title="二段階認証を設定" onClose={onClose} wide><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">認証アプリを登録して、ログインを安全にします。</p></div></div>
     <div className="mt-5 grid grid-cols-2 gap-2 text-sm"><div className="rounded-control bg-accent-soft px-4 py-3 font-medium text-accent-deep">1　QRコードを読み取る</div><div className="rounded-control bg-canvas-sunken px-4 py-3 text-ink-secondary">2　6桁コードを入力</div></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}
@@ -835,6 +841,7 @@ function StaffPageHost() {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
+
 
       setError('ログインユーザーを読み込めませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
