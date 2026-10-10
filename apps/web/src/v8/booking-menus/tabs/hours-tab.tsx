@@ -45,9 +45,20 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   const [draft, setDraft] = useState<BusinessHoursDay[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveConflict, setSaveConflict] = useState(false)
   const [badHours, setBadHours] = useState<{ weekday: number; index: number; parts: Array<'start' | 'end' | 'capacity'> } | null>(null)
   const [addingResource, setAddingResource] = useState(false)
   const inFlightRef = useRef(false)
+
+  const saveGenerationRef = useRef(0)
+  useEffect(() => {
+    saveGenerationRef.current += 1
+    inFlightRef.current = false
+    setSaving(false)
+    setSaveError(null)
+    setSaveConflict(false)
+    return () => { saveGenerationRef.current += 1 }
+  }, [accountId])
 
   useEffect(() => {
     if (settings) setDraft(initialBusinessHours(settings))
@@ -77,7 +88,9 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   const isBad = (weekday: number, index: number, part: 'start' | 'end' | 'capacity') => Boolean(badHours && badHours.weekday === weekday && badHours.index === index && badHours.parts.includes(part))
 
   async function submit() {
-    if (!settings || !draft || inFlightRef.current) return
+    if (!canEdit || !settings || !draft || inFlightRef.current) return
+    const generation = saveGenerationRef.current
+    const alive = () => generation === saveGenerationRef.current
     const validationError = validateBusinessHours(draft)
     if (validationError) {
       setSaveError(validationError.message)
@@ -100,6 +113,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
     inFlightRef.current = true
     setSaving(true)
     setSaveError(null)
+    setSaveConflict(false)
     try {
       const response = await bookingApi.saveSettings(accountId, {
         expectedVersion: settings.version,
@@ -115,17 +129,23 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         reminderHoursBefore: settings.reminderHoursBefore,
         businessHours: draft,
       })
+      if (!alive()) return
       if (!response.success) throw new Error('booking_business_hours_save_failed')
       notifySaved('受付時間を保存しました。')
       onSaved(response.data)
+      onReload()
     } catch (error) {
+      if (!alive()) return
+      setSaveConflict(error instanceof ApiError && error.status === 409)
       const fieldFailure = saveErrors.capture(error)
 
       { if (!fieldFailure)
       setSaveError(businessHoursSaveError(error)) }
     } finally {
-      inFlightRef.current = false
-      setSaving(false)
+      if (alive()) {
+        inFlightRef.current = false
+        setSaving(false)
+      }
     }
   }
 
@@ -250,7 +270,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             )
           })}
         </div>
-        {saveError ? <Notice tone="danger" className="mt-3" >{saveError}</Notice> : null}
+        {saveError ? <Notice tone="danger" className="mt-3" >{saveError}{saveConflict ? <Button onClick={onReload}>最新の内容を読み直す</Button> : null}</Notice> : null}
 
         {/* 絵 yRPxl：設備と空きの確かめは、開ける時間の白い板の中の入れ子の箱（枠・角12・内側16）。 */}
         <div className={styles.innerStack}>
@@ -322,9 +342,21 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inFlightRef = useRef(false)
+  const generationRef = useRef(0)
+  useEffect(() => {
+    generationRef.current += 1
+    inFlightRef.current = false
+    setBusy(false)
+    setError(null)
+    setEditing(false)
+    setConfirmDelete(false)
+    return () => { generationRef.current += 1 }
+  }, [accountId])
 
   async function setActive(nextActive: boolean) {
-    if (inFlightRef.current) return
+    if (!canEdit || inFlightRef.current) return
+    const generation = generationRef.current
+    const alive = () => generation === generationRef.current
     inFlightRef.current = true
     setBusy(true)
     setError(null)
@@ -333,37 +365,41 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
         expectedVersion: resource.version,
         isActive: nextActive,
       })
+      if (!alive()) return
       onSaved(response.data)
     } catch (cause) {
+      if (!alive()) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
 
       setError(resourceSaveError(cause)) }
     } finally {
-      inFlightRef.current = false
-      setBusy(false)
+      if (alive()) { inFlightRef.current = false; setBusy(false) }
     }
   }
 
   async function remove() {
-    if (inFlightRef.current) return
+    if (!canEdit || inFlightRef.current) return
+    const generation = generationRef.current
+    const alive = () => generation === generationRef.current
     inFlightRef.current = true
     setBusy(true)
     setError(null)
     try {
       await bookingApi.deleteResource(accountId, resource.id, resource.version)
+      if (!alive()) return
       setConfirmDelete(false)
       onDeleted(resource.id)
     } catch (cause) {
+      if (!alive()) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
 
       setError(resourceSaveError(cause)) }
     } finally {
-      inFlightRef.current = false
-      setBusy(false)
+      if (alive()) { inFlightRef.current = false; setBusy(false) }
     }
   }
 
@@ -392,7 +428,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.equipRow}>
-      <span className={styles.equipName}>
+      <span className={styles.equipName} title={`メニュー ${resource.usage?.menuCount ?? '—'}件・予約 ${resource.usage?.bookingCount ?? '—'}件・休業日 ${resource.usage?.exceptionCount ?? '—'}件`}>
         {resource.name}
         {!resource.isActive ? <span className={styles.cellWarn}>（受付停止中）</span> : null}
       </span>
@@ -445,6 +481,14 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inFlightRef = useRef(false)
+  const generationRef = useRef(0)
+  useEffect(() => {
+    generationRef.current += 1
+    inFlightRef.current = false
+    setSaving(false)
+    setError(null)
+    return () => { generationRef.current += 1 }
+  }, [accountId])
 
   useEffect(() => {
     if (!open) return
@@ -452,10 +496,12 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
     setType(resource?.type ?? '')
     setCapacity(String(resource?.capacity ?? 1))
     setError(null)
-  }, [open, resource])
+  }, [open, resource, accountId])
 
   async function submit() {
     if (inFlightRef.current) return
+    const generation = generationRef.current
+    const alive = () => generation === generationRef.current
     const parsedCapacity = Number(capacity)
     if (!name.trim() || name.trim().length > 100 || !type.trim() || type.trim().length > 50
       || !Number.isInteger(parsedCapacity) || parsedCapacity < 1 || parsedCapacity > 1000) {
@@ -475,22 +521,24 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
           capacity: parsedCapacity,
           isActive: resource.isActive,
         })
+        if (!alive()) return
         onSaved(response.data)
       } else {
         const response = await bookingApi.createResource(accountId, {
           name: name.trim(), type: type.trim(), capacity: parsedCapacity,
         })
+        if (!alive()) return
         onSaved(response.data)
       }
     } catch (cause) {
+      if (!alive()) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
 
       setError(resourceSaveError(cause)) }
     } finally {
-      inFlightRef.current = false
-      setSaving(false)
+      if (alive()) { inFlightRef.current = false; setSaving(false) }
     }
   }
 
@@ -500,16 +548,17 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
       title={resource ? `「${resource.name}」を編集` : '設備を追加する'}
       onCancel={() => { if (!saving) onClose() }}
       busy={saving}
+      footer={<div className="flex justify-end gap-2">
+          <Button onClick={() => { if (!saving) onClose() }} disabled={saving}>キャンセル</Button>
+          <Button variant="primary" onClick={() => void submit()} disabled={saving} busy={saving}>保存する</Button>
+        </div>}
     >
       <div className="grid gap-3">
         <Field label="設備名"><SaveErrorField names={["name"]}><input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
         <Field label="種類"><SaveErrorField names={["type"]}><input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
         <Field label="受付上限"><SaveErrorField names={["capacity"]}><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></SaveErrorField></Field>
         {error ? <Notice tone="danger" >{error}</Notice> : null}
-        <div className="flex justify-end gap-2">
-          <Button onClick={() => { if (!saving) onClose() }} disabled={saving}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void submit()} disabled={saving} busy={saving}>保存する</Button>
-        </div>
+
       </div>
     </Dialog></SaveErrorScope>
   )
@@ -623,6 +672,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
                 </ul>
               </div>
             )}
+            {result.per_staff?.map((entry) => entry.remaining !== null && entry.capacity !== null ? <p key={entry.staff_id}>{entry.display_name}: 残り {entry.remaining}/{entry.capacity}</p> : null)}
           </div>
         ) : null}
       </div>

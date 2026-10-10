@@ -22,12 +22,12 @@ const fixture = vi.hoisted(() => ({
 // 試験でも同じにして、参照の変わり目での余計な再取得を起こさない。
 const stableRouter = { replace: (...args: unknown[]) => fixture.replace(...args), push: vi.fn() }
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => stableRouter,
   useSearchParams: () => new URLSearchParams(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 

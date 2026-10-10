@@ -190,6 +190,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   const [resources, setResources] = useState<BookingResource[] | null>(null)
   const [resourcesStatus, setResourcesStatus] = useState<LoadStatus>('loading')
   const [resourcesError, setResourcesError] = useState<string | null>(null)
+  const [resourcesRevision, setResourcesRevision] = useState(0)
   const [preview, setPreview] = useState<{
     status: LoadStatus
     slots: BookingAvailabilitySlot[]
@@ -363,7 +364,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         setResourcesError('設備を読み込めませんでした。')
       })
     return () => { cancelled = true }
-  }, [tab, accountId, resources])
+  }, [tab, accountId, resources, resourcesRevision])
 
   /* ---- 休業日タブ: 休みにした日に入っている予約の件数 ---- */
   const storeExceptions = useMemo(
@@ -470,6 +471,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
   }, [])
   const retryResources = useCallback(() => {
     setResources(null)
+    setResourcesRevision((n) => n + 1)
     setResourcesError(null)
   }, [])
 
