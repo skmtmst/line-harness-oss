@@ -1,4 +1,6 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { uploadFormDocument } from './form-documents.js';
+import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
 import {
@@ -97,9 +99,12 @@ import {
 } from '../services/form-layout-effects.js';
 import {
   collectInputs,
+  formFileKind,
   formatAddressValue,
   layoutToFields,
   normalizeLayout,
+  formBlockTypeError,
+  legacyFormFieldTypeError,
   parseLayout,
   validateFormDefinition,
   validateFormForPublish,
@@ -799,6 +804,8 @@ async function writeLegacyFriendFields(
  * 見出しが読んでいて、layout だけ更新すると両者がずれる。
  */
 function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | { error: string } | null {
+  const typeError = formBlockTypeError(raw);
+  if (typeError) return { error: typeError };
   const layout = normalizeLayout(raw);
   if (!layout) return null;
   // 保存できる定義かをここで止める。画面側と同じ `validateFormDefinition`
@@ -1118,6 +1125,10 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
       return c.json({ success: false, error: 'Not found' }, 404);
     }
 
+    if (body.fields !== undefined && body.layout === undefined) {
+      const fieldError = legacyFormFieldTypeError(body.fields);
+      if (fieldError) return c.json({ success: false, error: fieldError }, 400);
+    }
     const normalized = body.layout !== undefined ? normalizeLayoutInput(body.layout) : null;
     if (normalized && 'error' in normalized) {
       return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
@@ -1342,6 +1353,10 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
     if ('folderId' in body) updates.folderId = nextFolderId;
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
+    if (body.fields !== undefined && body.layout === undefined) {
+      const fieldError = legacyFormFieldTypeError(body.fields);
+      if (fieldError) return c.json({ success: false, error: fieldError }, 400);
+    }
     if (body.fields !== undefined) updates.fields = JSON.stringify(body.fields);
     // layout を受け取ったときは、fields もそこから作り直す。片方だけ新しい
     // 状態にすると、送信時の必須チェックが古い項目を見に行く。
@@ -1642,7 +1657,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
       const postActions = await describePostActionsForSubmissions(c.env.DB, submissions, form);
       return c.json({
         success: true,
-        data: submissions.map((row) => serializeSubmission(row, postActions.get(row.id))),
+        data: await Promise.all(submissions.map(async row => ({ ...serializeSubmission(row, postActions.get(row.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(row.data), c.get('staff')?.role, row.id) }))),
       });
     }
     const page = listPage(c.req.query('page'));
@@ -1665,7 +1680,7 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     return c.json({
       success: true,
       data: {
-        items: submissions.items.map((row) => serializeSubmission(row, postActions.get(row.id))),
+        items: await Promise.all(submissions.items.map(async row => ({ ...serializeSubmission(row, postActions.get(row.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(row.data), c.get('staff')?.role, row.id) }))),
         total: submissions.total,
         page: submissions.page,
         limit: submissions.limit,
@@ -1691,7 +1706,7 @@ forms.get('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'admi
       return c.json({ success: false, error: '回答が見つかりません' }, 404);
     }
     const actions = await describePostActionsForSubmissions(c.env.DB, [submission], form);
-    return c.json({ success: true, data: serializeSubmission(submission, actions.get(submission.id)) });
+    return c.json({ success: true, data: { ...serializeSubmission(submission, actions.get(submission.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(submission.data), c.get('staff')?.role, submission.id) } });
   } catch {
     console.error('フォーム回答の詳細を取得できませんでした');
     return c.json({ success: false, error: 'フォーム回答の詳細を取得できませんでした' }, 500);
@@ -2212,7 +2227,8 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
     }
 
     const layout = parseLayout(form.layout, form.fields);
-    const acceptsFile = collectInputs(layout).some((block) => block.type === 'file');
+    const fileBlocks = collectInputs(layout).filter(block => block.type === 'file');
+    const acceptsFile = fileBlocks.length > 0;
     if (!acceptsFile) {
       return inputError(c, { success: false, error: 'このフォームはファイルを受け付けていません' }, 400, []);
     }
@@ -2233,6 +2249,14 @@ forms.post('/api/forms/:id/files', inputJsonBoundary(), async (c) => {
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
+
+    const blockId = c.req.query('block_id');
+    if (blockId) {
+      const block = fileBlocks.find(b => b.id === blockId);
+      if (!block) return c.json({ success: false, error: '添付の質問が見つかりません' }, 400);
+      return await uploadFormDocument(c, block, { accountId: identity.lineAccountId, formId, friendId: friend.id, versionId: form.current_published_version_id ?? null });
+    }
+    if (!fileBlocks.some(b => formFileKind(b) === 'image')) return c.json({ success: false, error: '添付する質問を選んでください' }, 400);
 
     const mimeType = (c.req.header('Content-Type') || '').split(';')[0].trim();
     const extension = FORM_UPLOAD_TYPES[mimeType];
@@ -2489,6 +2513,8 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
       if (testRejected) {
         return inputError(c, { success: false, error: testRejected }, 400, []);
       }
+      const testDocumentsError = await validateDocumentAnswers(c.env.DB, draftLayout, submissionData, { accountId: identity.lineAccountId, formId, friendId, versionId: testDraft.current_published_version_id ?? null });
+      if (testDocumentsError) return c.json({ success: false, error: testDocumentsError }, 400);
       const testSubmission = await insertFormSubmissionRecord(c.env.DB, {
         id: crypto.randomUUID(),
         formId,
@@ -2496,7 +2522,9 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
         friendId,
         data: JSON.stringify(submissionData),
         isTest: true,
+        fileIds: documentIds(submissionData, draftLayout),
       });
+      await attachDocumentAnswers(c.env.DB, submissionData, testSubmission.id, friendId, draftLayout);
       return c.json(
         { success: true, data: { ...serializeSubmission(testSubmission), isTest: true } },
         201,
@@ -2507,10 +2535,15 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     let peekScope: FormSubmitClaimScope | null = null;
     let peekHash: string | null = null;
     let resumeSavedAnswer = false;
+    let resumeSubmissionId: string | null = null;
     if (idempotencyKey) {
       const hashSource: Record<string, unknown> = { ...submissionData };
       delete hashSource._webhookVerified;
       delete hashSource._skipWebhook;
+      for (const block of collectInputs(parseLayout(form.layout, form.fields)).filter(b => b.type === 'file')) {
+        const value = hashSource[block.name];
+        if (Array.isArray(value)) hashSource[block.name] = value.map(v => v && typeof v === 'object' && typeof v.fileId === 'string' ? { fileId: v.fileId } : v);
+      }
       peekHash = await hashIdempotentSubmission(canonicalizeIdempotencyInput({
         data: hashSource,
         trackedLinkId: trackedLinkId ?? null,
@@ -2540,6 +2573,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
             form = {...form, ...snapshot, current_published_version_id: id};
           }
           resumeSavedAnswer = true;
+          resumeSubmissionId = saved.id;
         }
       }
       if (peeked
@@ -2565,6 +2599,9 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     // layout が無い（昔のまま編集していない）フォームは、これまでどおり
     // fields の必須だけを見る。
     const layout: FormLayout | null = form.layout ? parseLayout(form.layout) : null;
+
+    const documentsError = await validateDocumentAnswers(c.env.DB, layout, submissionData, { accountId: identity.lineAccountId, formId, friendId, versionId: form.current_published_version_id ?? null, submissionId: resumeSubmissionId });
+    if (documentsError) return c.json({ success: false, error: documentsError }, 400);
 
     if (layout) {
       const rejected = await checkFormGates({
@@ -2823,6 +2860,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
               formVersionId: form.current_published_version_id,
               friendId,
               data,
+              fileIds: documentIds(submissionData, layout),
             });
           } catch (error) {
             await failFormSubmitClaim(c.env.DB, ctx.scope, ctx.owner, ctx.version).catch(() => {});
@@ -2832,6 +2870,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
         const lost = await claimCheckpoint('answer');
         if (lost) throw new ClaimOwnershipLost(lost);
       }
+      await attachDocumentAnswers(c.env.DB, submissionData, ctx.submissionId, friendId, layout);
       return (await getFormSubmissionById(c.env.DB, ctx.submissionId))!;
     };
     // 受付数の再計算は何度実行しても同じ値になる。再開時に重ねても狂わない。
@@ -3320,7 +3359,7 @@ async function runFormPostEffects(input: {
 
   // layout を持つフォームは、こちらで回答を配る。
   //
-  // 登録先（情報欄・本名・システム表示名・個別メモ）、選択肢ごとの
+  // 登録先（情報欄・本名・システム表示名・メモ）、選択肢ごとの
   // タグ／情報欄／動作、日付から動かすリマインダ、回答後の動作までを
   // まとめて実行する。失敗しても送信は成功のまま（保存は済んでいる）。
   if (layout) {
@@ -3332,6 +3371,7 @@ async function runFormPostEffects(input: {
       step: 'layout_effects',
       run: () => applyFormLayoutEffects({
         db,
+        env: input.env,
         layout,
         friendId,
         answers: submissionData,

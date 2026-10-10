@@ -24,6 +24,8 @@ import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
+import { formatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const GOOGLE_STATE: Record<string, string> = {
   connected: '接続しています',
@@ -178,9 +180,10 @@ export default function SnsSettingsPage() {
             <>
               <Row label="いまの状態" value={GOOGLE_STATE[google.connection.status] ?? '—'} />
               <Row label="接続しているビジネス" value={google.connection.locationTitle ?? '—'} />
+              <Row label="最終同期" value={formatDate(google.connection.lastSyncedAt, { style: 'detail', fallback: '—' })} />
               <div className={styles.actions}>
                 <Button variant="secondary" href="/restaurant-test/google?tab=settings">
-                  <Settings size={15} />
+                  <Settings size={16} />
                   Googleビジネスの設定を開く
                 </Button>
                 {googleConnected && canManage ? (
@@ -212,7 +215,7 @@ export default function SnsSettingsPage() {
                 <>
                   <Row
                     label="接続しているアカウント"
-                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || '—'}
+                    value={igConnection.username ? `@${igConnection.username}（ビジネス）` : igConnection.pageName || emptyValue('unknown')}
                   />
                   <Row label="できること" value="写真つき投稿の同時公開" />
                 </>
@@ -227,12 +230,12 @@ export default function SnsSettingsPage() {
               {canManage && igState !== 'unconfigured' ? (
                 <div className={styles.actions}>
                   {igState === 'connected' ? (
-                    <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy}>
+                    <Button variant="secondary" onClick={() => void checkInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
                       <RefreshCw size={15} />
                       接続を確かめる
                     </Button>
                   ) : (
-                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy}>
+                    <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
                       <Camera size={15} aria-hidden />
                       Instagram にログインして接続
                     </Button>
@@ -259,7 +262,7 @@ export default function SnsSettingsPage() {
         description="解除すると、口コミの取り込みと投稿の公開が止まります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => void runDisconnect()}
+        onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
       <ConfirmDialog
@@ -269,7 +272,7 @@ export default function SnsSettingsPage() {
         description="解除すると、Googleビジネスの投稿を Instagram へ同時に出せなくなります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => void runDisconnect()}
+        onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
     </PageFrame>

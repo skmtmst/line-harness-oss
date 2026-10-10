@@ -6,6 +6,7 @@
  * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
  * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, RefreshCw, Send } from 'lucide-react'
 import type { InstagramConnectionStatus, MediaItem } from '@line-crm/shared'
@@ -27,7 +28,7 @@ import { Field } from '@/components/shared/form-controls'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
@@ -42,6 +43,8 @@ import {
 import { errorMessage, formatShortDay, formatShortStamp } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 端末からのアップロードの道具（今の画面の app/contents/media-direct-upload を入口が渡す）。 */
 export interface MediaUploadHelpers {
@@ -64,7 +67,7 @@ const CTA_LABELS: Record<GooglePostCtaType, string> = { book: '予約', order: '
 function statusBadge(post: GooglePost): { label: string; tone: StatusBadgeTone } {
   switch (post.status) {
     case 'draft': return { label: '下書き', tone: 'neutral' }
-    case 'scheduled': return { label: '予約済み', tone: 'info' }
+    case 'scheduled': return { label: '予約中', tone: 'info' }
     case 'pending_confirm': return { label: '送信確認中', tone: 'warning' }
     case 'accepted': return { label: '審査中', tone: 'info' }
     case 'published': return { label: '公開済み', tone: 'success' }
@@ -108,9 +111,9 @@ function instagramFact(ig: NonNullable<GooglePost['instagram']>): string {
 }
 
 export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav }) {
-  const [filter, setFilter] = useState<GooglePostFilter>('all')
+  const [filter, setFilter] = useListUrlValue<GooglePostFilter>('filter', 'all')
   const [kind, setKind] = useState<'all' | GooglePostKind>('all')
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [data, setData] = useState<GooglePostListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -196,7 +199,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
     const items: ActionMenuItem[] = [
       { id: 'open', label: actionable ? '編集' : '中身を見る', onSelect: () => go({ tab: 'posts', view: 'edit', id: post.id }) },
     ]
-    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, onSelect: () => window.open(post.searchUrl ?? '', '_blank', 'noopener') })
+    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, href: post.searchUrl ?? '', onSelect: () => window.open(post.searchUrl ?? '', '_blank', 'noopener') })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', disabled: busyId === post.id, onSelect: () => void retryInstagram(post) })
     if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, disabled: busyId === post.id, onSelect: () => setConfirmRemove(post) })
@@ -232,7 +235,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
                 return (
                   <div key={post.id} className={styles.postRow}>
                     <KindChip kind={post.kind} />
-                    <span className={styles.postTitle} title={name}>{name}</span>
+                    <span className={styles.postTitle} ><TruncatedText value={String(name ?? '')} /></span>
                     {post.origin === 'google' ? <span className={styles.postMeta}>Googleで作成</span> : null}
                     <span className={styles.postMeta}>{postWhen(post)}</span>
                     <Chip tone={badge.tone === 'success' ? 'ok' : badge.tone === 'warning' ? 'warn' : badge.tone === 'danger' ? 'danger' : badge.tone === 'info' ? 'info' : 'neutral'}>{badge.label}</Chip>
@@ -246,7 +249,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
             </div>
           )}
           {data.total > 0 && pageCount > 1 ? (
-            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${data.total}件・時刻はすべて日本時間（Asia/Tokyo）`} />
+            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${data.total} 件・時刻はすべて日本時間（Asia/Tokyo）`} />
           ) : null}
           <p className={styles.grayNote}>{`行の「…」から 中身を見る・Google から削除・Instagram へ再送。削除は元に戻せません（確認の小窓が出ます）。Instagram が失敗した投稿は再送でき、Google への公開はそのまま残ります。${data.writeEnabled ? '' : '検証環境では Google へは送りません。'}`}</p>
         </Card>
@@ -254,11 +257,12 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
       <ConfirmDialog
         open={confirmRemove !== null}
         title="この投稿をGoogleから削除しますか？"
+        deleteName={confirmRemove?.title || confirmRemove?.summary || 'この投稿'}
         description="削除すると元に戻せません。もう一度公開するには、新しく投稿を作り直してください。"
         confirmLabel="削除する"
         destructive
         busy={busyId === confirmRemove?.id}
-        onConfirm={() => void removePost()}
+        onConfirm={() => removePost()}
         onCancel={() => setConfirmRemove(null)}
       />
     </>
@@ -524,7 +528,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             previewAlt={form.mediaFilename ?? '投稿の画像'}
             value={form.mediaSourceUrl}
             accept={mediaUpload?.accept}
-            limitText="4:3推奨・1枚まで"
+            help="4:3推奨・1枚まで"
             readOnly={!editable}
             disabled={busy !== null}
             busy={upload.busy}
@@ -578,7 +582,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
               size="full"
               value={form.kind === 'offer' ? '' : form.ctaType}
               onChange={(v) => set({ ctaType: v as GooglePostCtaType | '' })}
-              options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : 'なし' }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
+              options={[{ value: '', label: form.kind === 'offer' ? 'なし（特典は Google の決まりで付けられません）' : emptyValue('none') }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]}
               disabled={!editable || form.kind === 'offer'}
             />
           </Field>
@@ -601,7 +605,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             <div className={styles.igToggleRow}>
               {editable ? (
                 <>
-                  <Toggle checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} />
+                  <SettingCheckbox checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} />
                   <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
                 </>
               ) : (
@@ -719,7 +723,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
       {!done && post.status !== 'cancelled' ? (
         <>
           <Checkbox checked={checked} onCheckedChange={setChecked}>公開先・本文・画像・リンク・日時を確認しました</Checkbox>
-          <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleの状態を取得し、予約済み・公開済み・不承認を区別します。通信結果が不明な場合は、重複投稿を避けるため先にGoogle側の状態を確認します。</p>
+          <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleの状態を取得し、予約中・公開済み・不承認を区別します。通信結果が不明な場合は、重複投稿を避けるため先にGoogle側の状態を確認します。</p>
           <div className={styles.formActions}>
             <Button onClick={() => go({ tab: 'posts', view: 'edit', id })} disabled={busy}>修正する</Button>
             <Button variant="primary" onClick={() => void publish()} disabled={!canPress} busy={busy} busyLabel="送信中…">この内容で予約する</Button>

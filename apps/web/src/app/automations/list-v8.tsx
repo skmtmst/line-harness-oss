@@ -32,6 +32,8 @@ import {
   type Automation as SharedAutomation,
 } from '@line-crm/shared'
 import styles from './automation-api-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { PageHeading } from '@/components/templates/page-frame'
 
 /*
  * ★V8 オートメーション一覧（板 `LWQXd`）。
@@ -279,18 +281,18 @@ export default function AutomationListV8() {
   }
 
   const tabs = [
-    { key: 'rules', label: `ルール ${loadStatus === 'ready' ? items.length : '—'}` },
-    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? '—'}`, href: '/common-actions' },
+    { key: 'rules', label: `ルール ${loadStatus === 'ready' ? items.length : emptyValue('unknown')}` },
+    { key: 'common-actions', label: `共通アクション ${commonActionCount ?? emptyValue('unknown')}`, href: '/common-actions' },
     { key: 'runs', label: '動いた記録', href: '/automations/runs' },
-    { key: 'templates', label: `見本 ${templateCount ?? '—'}`, href: '/automations?tab=templates' },
+    { key: 'templates', label: `見本 ${templateCount ?? emptyValue('unknown')}`, href: '/automations?tab=templates' },
   ]
 
   return (
     <div className={styles.board} data-design-node="LWQXd">
       <div className={styles.head}>
         <div>
-          <h1 className={styles.title}>オートメーション</h1>
-          <p className={styles.lead}>「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</p>
+          <PageHeading title="オートメーション" help={<> 「○○したら△△する」を決めておくと、友だちの動きに合わせて自動で動きます。</>} />
+
         </div>
         <Button href="/automations?tab=templates" variant="secondary">見本から作る</Button>
       </div>
@@ -311,7 +313,7 @@ export default function AutomationListV8() {
           kind="error"
           title="ルールを表示できませんでした"
           description="ルールは消えていません。通信を確かめて、もう一度お試しください。"
-          action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
+          onRetry={() => void load()}
         />
       ) : null}
 

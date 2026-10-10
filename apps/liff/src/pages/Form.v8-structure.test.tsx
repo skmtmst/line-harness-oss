@@ -220,3 +220,25 @@ describe('送ったら終わりの画面', () => {
     expect(screen.getByRole('button', { name: 'LINEに戻る' })).toBeTruthy();
   });
 });
+
+it('基本7項目を表示し、生年月日・年齢の検査と画像の代わりの文・横幅を守る', async () => {
+  const { emptyLayout, FIXED_FRIEND_FIELDS } = await import('@line-crm/shared');
+  const fixed = emptyLayout();
+  fixed.sections[0].blocks = [
+    { id: 'image', kind: 'image', mediaUrl: 'https://example.test/photo.png', alt: 'ご案内', size: 'full', linkUrl: 'https://example.test/guide' },
+    ...FIXED_FRIEND_FIELDS.map(spec => ({ id: spec.key, kind: 'input' as const, name: spec.key, label: spec.label, type: spec.type, fixedField: spec.key })),
+  ];
+  fixed.options.confirmDialog = { enabled: false };
+  getForm.mockResolvedValue({ id: 'f1', name: '基本情報', description: null, layout: fixed, isActive: true });
+  render(<MemoryRouter initialEntries={['/forms/f1?liffId=test']}><Routes><Route path="/forms/:id" element={<Form />} /></Routes></MemoryRouter>);
+  expect(await screen.findByRole('heading', { name: '基本情報' })).toBeTruthy();
+  for (const spec of FIXED_FRIEND_FIELDS) expect(screen.getByText(spec.label)).toBeTruthy();
+  const img = screen.getByRole('img', { name: 'ご案内' });
+  expect(img.className).toContain('w-full');
+  expect(img.className).not.toContain('h-24');
+  expect(screen.getByRole('link', { name: 'ご案内' }).getAttribute('href')).toBe('https://example.test/guide');
+  fireEvent.change(screen.getByLabelText('年齢'), { target: { value: '151' } });
+  fireEvent.click(screen.getByRole('button', { name: '送信する' }));
+  expect(await screen.findByText('年齢 は0〜150の整数で入力してください')).toBeTruthy();
+  expect(submitForm).not.toHaveBeenCalled();
+});

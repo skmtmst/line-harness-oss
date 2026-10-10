@@ -26,7 +26,7 @@ export function conditionRows(image: BannerImage, presets: BannerPreset[]): Arra
       const colors = [g.baseColor, g.mainColor, g.subColor, g.accentColor].filter(Boolean)
       return colors.length > 0 ? { label: '色', value: colors.join('・') } : row
     }
-    if (row.label === '作成') return { label: '作成', value: `${monthDayTime(image.createdAt)}・${image.sequence}枚目` }
+    if (row.label === '作成') return { label: '作成', value: `${monthDayTime(image.createdAt)}・${image.sequence} 枚目` }
     return row
   })
 }
@@ -87,7 +87,7 @@ export function BannerImageDetailV8({
         busy={busy}
         error={error}
         designNode="B24oNg"
-        onConfirm={() => void onRemove().then((ok) => { if (ok) setConfirmRemove(false) })}
+        onConfirm={() => onRemove().then((ok) => { if (ok) setConfirmRemove(false) })}
         onCancel={() => setConfirmRemove(false)}
       />
     )

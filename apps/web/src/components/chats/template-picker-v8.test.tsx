@@ -80,7 +80,7 @@ describe('★V8 テンプレートを選ぶ', () => {
   test('続けて送る：選んだ順に番号と帯、「2通を続けて送る」で選んだ順の本文', async () => {
     const onPickPack = vi.fn()
     await mount({ onPickPack })
-    fireEvent.click(screen.getByRole('switch', { name: '2通以上を続けて送る' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '2通以上を続けて送る' }))
     fireEvent.click(screen.getByRole('button', { name: /テンプレ3/ }))
     fireEvent.click(screen.getByRole('button', { name: /テンプレ1/ }))
     expect(screen.getByText('① テンプレ3 → ② テンプレ1')).toBeTruthy()

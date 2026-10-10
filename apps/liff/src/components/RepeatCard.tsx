@@ -1,3 +1,4 @@
+import Button from './ui/Button.js';
 import { useEffect, useState } from 'react';
 import { api, type LastBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
@@ -72,11 +73,10 @@ export default function RepeatCard({
   if (!ready) return null;
 
   return (
-    <button
+    <Button variant="option"
       type="button"
       onClick={() => onRepeat(ready.menu, ready.staff)}
       aria-label="前回と同じで予約する"
-      className="liff-press flex w-full items-center gap-3 rounded-(--liff-radius-lg) bg-canvas p-3.5 text-left outline-1 -outline-offset-1 outline-liff-line"
     >
       {ready.photoUrl ? (
         <img
@@ -99,6 +99,6 @@ export default function RepeatCard({
         </span>
       </span>
       <Icon name="chevron-right" className="h-[18px] w-[18px] shrink-0 text-liff-idle" />
-    </button>
+    </Button>
   );
 }

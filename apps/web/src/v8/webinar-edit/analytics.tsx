@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 /*
  * ★V8 ウェビナーの分析（Pencil z2dgw）。
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 「どこで人数が減っているか」→「どこまで見られたか」。
@@ -22,6 +24,10 @@ import { DetailHead } from './chrome'
 import { fmtSec, percent, thisMonthReservations } from './helpers'
 import type { DetailChrome, EditContext } from './types'
 import styles from './analytics.module.css'
+import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrome: DetailChrome }) {
   const { webinar, analytics, analyticsState } = ctx
@@ -52,11 +58,11 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
     locked.current = true
     setBusy(true)
     setError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id), 'webinar-participants.csv').catch((cause) => {
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id), csvFileName("動画セミナー参加者")).catch((cause) => {
       if (request !== generation.current) return
       if (cause instanceof ApiError && cause.status === 403) {
         setPermission('denied')
-        setError('参加者のCSVを書き出す権限がありません。管理者に確認してください。')
+        setError(permissionDeniedMessage('store'))
       } else setError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
     }).finally(() => {
       locked.current = false
@@ -65,15 +71,15 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
   }, [permission, webinar.id])
 
   const csvButton = permission === 'ready' && analyticsState === 'ready'
-    ? <Button onClick={download} disabled={busy} busy={busy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    ? <Button onClick={download} disabled={busy} busy={busy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
     : null
 
   const summary = analytics?.summary ?? null
   const kpis = [
-    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : '—', help: '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
-    { key: 'viewers', title: '参加', icon: LogIn, value: summary?.viewers ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.viewers, summary.reservations)}` : '—', help: '入場した人の数です。予約せず直接入場した人も含みます。' },
-    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `参加の ${percent(summary.completed, summary.viewers)}` : '—', help: '動画の9割以上を実際に見た人です。' },
-    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '人', detail: summary ? `CTA を押した ${formatNumber(summary.ctaClicks)} 人のうち` : '—', help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
+    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : emptyValue('unknown'), help: '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
+    { key: 'viewers', title: '参加', icon: LogIn, value: summary?.viewers ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.viewers, summary.reservations)}` : emptyValue('unknown'), help: '入場した人の数です。予約せず直接入場した人も含みます。' },
+    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `参加の ${percent(summary.completed, summary.viewers)}` : emptyValue('unknown'), help: '動画の9割以上を実際に見た人です。' },
+    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '人', detail: summary ? `CTA を押した ${formatNumber(summary.ctaClicks)} 人のうち` : emptyValue('unknown'), help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
   ]
 
   return (
@@ -94,7 +100,7 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
         ) : (
           <>
             {permission === 'error'
-              ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>CSVを書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice>
+              ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>CSVで書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice>
               : error ? <Notice tone="info">{error}</Notice> : null}
             <Funnel summary={analytics.summary} />
             <Retention analytics={analytics} durationSeconds={webinar.durationSeconds} />
@@ -128,23 +134,7 @@ function Funnel({ summary }: { summary: WebinarAnalytics['summary'] }) {
       <p className={styles.cardDesc}>
         {biggest.drop > 0 ? `申込から相談の申込まで。いちばん減っているのは「${biggest.from} → ${biggest.to}」です` : '申込から相談の申込まで。'}
       </p>
-      <ol className={styles.funnel}>
-        {stages.map((stage, index) => {
-          const drop = index === 0 ? null : stages[index - 1].value - stage.value
-          return (
-            <li key={stage.label} className={styles.funnelRow}>
-              <span className={styles.funnelLabel}>{stage.label}</span>
-              <svg className={styles.funnelTrack} aria-hidden="true">
-                <rect className={styles.funnelBar} width={`${(stage.value / top) * 100}%`} height="100%" rx="4" />
-              </svg>
-              <span className={styles.funnelValue}>{`${formatNumber(stage.value)} ${stage.unit}`}</span>
-              <span className={styles.funnelDrop} aria-label={drop === null ? undefined : `${formatNumber(Math.abs(drop))}${drop >= 0 ? '減' : '増'}`}>
-                {drop === null ? '' : `${drop >= 0 ? '−' : '+'}${formatNumber(Math.abs(drop))}`}
-              </span>
-            </li>
-          )
-        })}
-      </ol>
+      <FunnelChart label="どこで人数が減っているか" items={stages.map((stage,i)=>({key:stage.label,label:stage.label,value:stage.value,detail:i>0?<span>{`${stages[i-1].value>=stage.value?'−':'+'}${formatNumber(Math.abs(stages[i-1].value-stage.value))}`}</span>:undefined}))} />
     </section>
   )
 }
@@ -163,11 +153,11 @@ function Retention({ analytics, durationSeconds }: { analytics: WebinarAnalytics
   const completed = analytics.summary.completed
   const empty = points.length === 0 || started === 0
   const maxX = Math.max(bucketSeconds, durationSeconds, ctaAt ?? 0, ...points.map((point) => point.atSeconds))
-  const rateOf = (viewers: number | null): string => (viewers === null || started <= 0 ? '—' : `${Math.round((viewers / started) * 100)}%`)
+  const rateOf = (viewers: number | null): string => (viewers === null || started <= 0 ? emptyValue('unknown') : `${Math.round((viewers / started) * 100)}%`)
   const at = (sec: number): number | null => points.find((point) => point.atSeconds >= sec)?.viewers ?? null
   const half = durationSeconds > 0 ? at(durationSeconds / 2) : null
   const ctaViewers = ctaAt !== null ? at(ctaAt) : null
-  const completedRate = started > 0 ? `${Math.round((completed / started) * 100)}%` : '—'
+  const completedRate = started > 0 ? `${Math.round((completed / started) * 100)}%` : emptyValue('unknown')
   const path = points
     .map((point, index) => `${index === 0 ? 'M' : 'L'}${((point.atSeconds / maxX) * 1000).toFixed(1)} ${((1 - Math.min(point.viewers, started) / Math.max(started, 1)) * 100).toFixed(1)}`)
     .join(' ')
@@ -177,27 +167,12 @@ function Retention({ analytics, durationSeconds }: { analytics: WebinarAnalytics
       <h3 id="webinar-retention-title" className={styles.cardTitle}>どこまで見られたか</h3>
       <p className={styles.cardText}>見ていた人の割合の線です。縦線は申し込みボタンを出した時刻。一時停止や隠れている時間は数えていません。</p>
       {empty ? <p className={styles.cardText}>まだ視聴データがありません</p> : (
-        <div className={styles.chart}>
-          <div className={styles.plot}>
-            <svg className={styles.line} viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={`見ていた人の割合の線。始まりに見ていた${started}人。`}>
-              <path d={path} fill="none" className={styles.linePath} vectorEffect="non-scaling-stroke" />
-            </svg>
-            <svg className={styles.marks} aria-hidden="true">
-              {ctaPct !== null ? <>
-                <line className={styles.ctaLine} x1={`${ctaPct}%`} x2={`${ctaPct}%`} y1="-8" y2="162" />
-                <text className={styles.ctaText} x={`${ctaPct}%`} dx="8" y="-6" dominantBaseline="hanging">{`${fmtClock(ctaAt ?? 0)} 申し込みボタンを出した`}</text>
-              </> : null}
-              <text className={styles.axisText} x="0" y="160" dominantBaseline="hanging">0:00</text>
-              <text className={styles.axisText} x="100%" y="160" textAnchor="end" dominantBaseline="hanging">{fmtClock(maxX)}</text>
-              <text className={styles.axisSmall} x="-16" y="0" dominantBaseline="hanging">100%</text>
-            </svg>
-          </div>
-        </div>
+        <LineChart label={`見ていた人の割合の線。始まりに見ていた${started}人。`} unit="%" maxX={maxX} maxY={100} points={points.map(p=>({x:p.atSeconds,label:fmtClock(p.atSeconds),value:Math.min(p.viewers,started)/started*100}))} marker={ctaAt!==null?{x:ctaAt,label:`${fmtClock(ctaAt)} 申し込みボタンを出した`}:undefined} />
       )}
       <p className={styles.cardText}>
-        {`最後まで見た人 ${completedRate}（${formatNumber(completed)}人）・半分まで ${rateOf(half)}・申し込みボタンを出したとき ${rateOf(ctaViewers)}`}
+        {`最後まで見た人 ${completedRate}（${formatNumber(completed)} 人）・半分まで ${rateOf(half)}・申し込みボタンを出したとき ${rateOf(ctaViewers)}`}
       </p>
-      {(analytics.heartbeatRejects ?? 0) > 0 ? <p className={styles.warn}>異常な報告を{formatNumber(analytics.heartbeatRejects ?? 0)}件除いています（視聴時間に数えていません）。</p> : null}
+      {(analytics.heartbeatRejects ?? 0) > 0 ? <p className={styles.warn}>異常な報告を{formatNumber(analytics.heartbeatRejects ?? 0)} 件除いています（視聴時間に数えていません）。</p> : null}
     </section>
   )
 }
@@ -215,10 +190,10 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
               <thead><TableHeadRow><Th>開催日時</Th><Th align="right">参加</Th><Th align="right">平均視聴</Th><Th align="right">CTA</Th></TableHeadRow></thead>
               <tbody>{analytics.sessions.map((session) => (
                 <Tr key={session.sessionStartAt}>
-                  <Td>{formatDateTime(session.sessionStartAt * 1000)}</Td>
-                  <Td align="right">{formatNumber(session.viewers)}人</Td>
+                  <Td>{polishFormatListDateTime(session.sessionStartAt * 1000)}</Td>
+                  <Td align="right">{formatNumber(session.viewers)} 人</Td>
                   <Td align="right">{fmtSec(session.avgWatchedSeconds)}</Td>
-                  <Td align="right">{`${formatNumber(session.ctaClicks)}人（${percent(session.ctaClicks, session.viewers)}）`}</Td>
+                  <Td align="right">{`${formatNumber(session.ctaClicks)} 人（${percent(session.ctaClicks, session.viewers)}）`}</Td>
                 </Tr>
               ))}</tbody>
             </table>
@@ -242,7 +217,7 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
               {([
                 ['CTA表示', funnel.ctaImpressions], ['CTAを押した', funnel.ctaClicks], ['フォームを開いた', funnel.formOpens],
                 ['入力を始めた', funnel.formStarts], ['送信を試みた', funnel.submitAttempts], ['送信できた', funnel.submitSuccesses], ['送信エラー', funnel.submitErrors],
-              ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{formatNumber(Number(value))}人</dd></div>)}
+              ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{formatNumber(Number(value))} 人</dd></div>)}
             </dl>
           ) : <p className={styles.cardText}>フォームの集計を取得できていません。</p>}
         </div>
@@ -264,12 +239,12 @@ function ViewerComments({ webinarId }: { webinarId: string }) {
       if (!Array.isArray(response.data)) throw new Error('invalid_comments')
       if (active) setComments(response.data)
     }).catch((cause) => {
-      if (active) setError(cause instanceof ApiError && cause.status === 403 ? '視聴者コメントを確認する権限がありません。管理者に確認してください。' : '視聴者コメントを読み込めませんでした。')
+      if (active) setError(cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '視聴者コメントを読み込めませんでした。')
     })
     return () => { active = false }
   }, [webinarId, attempt])
   return (
-    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${comments.length}件` : '—'}>
+    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${comments.length}件` : emptyValue('unknown')}>
       {error ? <div role="alert" className={styles.cardText}>{error}<Button size="compact" onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button></div>
         : comments === null ? <p role="status" className={styles.cardText}>コメントを読み込んでいます…</p>
           : comments.length === 0 ? <p className={styles.cardText}>まだコメントはありません。</p>

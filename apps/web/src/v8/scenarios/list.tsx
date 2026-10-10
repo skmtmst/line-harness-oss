@@ -1,5 +1,8 @@
 'use client'
 
+import StatusBadge from '@/components/shared/status-badge'
+
+
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
  * 一覧 `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態の板は `BxGhV`）。
@@ -10,6 +13,10 @@
  * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import BulkBar from '@/components/shared/bulk-bar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
@@ -48,8 +55,7 @@ import { isForbidden } from '@/components/shared/api-error-message'
 import NoPermissionBoard from '@/v8/no-permission/no-permission'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
-import { runUndoable } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { runUndoable, runOptimistic } from '@/lib/undoable'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -81,6 +87,10 @@ import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -88,10 +98,10 @@ const UNFILED = '__unfiled__'
 /** 1ページに出す件数の選択肢（表示は PageSizeSelect が「N件表示」にする）。 */
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
-/** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「稼働中のみ」。 */
+/** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「有効のみ」。 */
 const SAVED_FILTER_OPTIONS = [
   { value: '', label: 'よく使う絞り込み' },
-  { value: 'active', label: '稼働中のみ' },
+  { value: 'active', label: '有効のみ' },
 ]
 
 type ScenarioRow = Scenario & {
@@ -145,7 +155,7 @@ export default function ScenariosListV8() {
   /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
   const [nameQuery, setNameQuery] = useListUrlParam('q')
   const [serverQuery, setServerQuery] = useState(() => clampSearchQuery(readListUrlParam('q').trim()))
-  /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「稼働中のみ」。 */
+  /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「有効のみ」。 */
   const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
   const [createdThisMonthOnly, setCreatedThisMonthOnly] = useListUrlFlag('thisMonth')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
@@ -182,6 +192,8 @@ export default function ScenariosListV8() {
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。開いている行のID。 */
+  const [pendingStop, setPendingStop] = useState<string[] | null>(null)
+  const toggleBusyRef = useRef(false)
   const [panelId, setPanelId] = useState<string | null>(null)
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
@@ -206,6 +218,8 @@ export default function ScenariosListV8() {
     setStats(null)
     setStatsFailed(false)
     setSelectedIds(new Set())
+    setPendingStop(null)
+    toggleBusyRef.current = false
   }, [selectedAccountId])
 
   const loadFolders = useCallback(async () => {
@@ -265,11 +279,10 @@ export default function ScenariosListV8() {
   }, [loadStats])
 
   useEffect(() => {
-    const timer = setTimeout(() => setServerQuery(clampSearchQuery(nameQuery.trim())), 300)
-    return () => clearTimeout(timer)
+    setServerQuery(clampSearchQuery(nameQuery.trim()))
   }, [nameQuery])
 
-  /* 「停止中のみ」と「稼働中のみ」は同時に掛からない（札が勝つ）。 */
+  /* 「停止中のみ」と「有効のみ」は同時に掛からない（札が勝つ）。 */
   const activeParam: 0 | 1 | undefined = stoppedOnly ? 0 : savedFilter === 'active' ? 1 : undefined
 
   const loadScenarioPage = useCallback(async (
@@ -291,7 +304,7 @@ export default function ScenariosListV8() {
   }, [accountLoading, activeParam, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery])
 
   /* 板 `axFrW`：右端は「20件表示」。 */
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const scenarioList = useOffsetServerList<ScenarioRow>({
     requestKey: JSON.stringify({
       ready: !accountLoading,
@@ -321,11 +334,10 @@ export default function ScenariosListV8() {
     page: scenarioList.page,
   })
   /* 取り消し待ちの削除（5秒）の行は一覧から外して描く（動きの点検 17 番）。 */
-  const deferredDelete = useDeferredDelete()
   const shownRows = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
   const scenarios = useMemo(
-    () => (deferredDelete.hiddenCount === 0 ? shownRows : shownRows.filter((s) => !deferredDelete.isHidden(s.id))),
-    [deferredDelete, shownRows],
+    () => shownRows,
+    [shownRows],
   )
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(scenarioList.loaded)
@@ -403,41 +415,8 @@ export default function ScenariosListV8() {
     }
   }
 
-  /*
-   * 影響の無い削除だけ、確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる
-   * （動きの点検 17 番）。止まっていて・購読中が 0 人で・このアカウントだけのもので・
-   * ほかのシナリオの終了後の移動先になっていないもの。どれか分からないときは今までどおり窓。
-   */
-  const requestDelete = async (s: ScenarioRow) => {
-    setDeleteError('')
-    const candidate = !s.isActive && s.subscriberCount === 0 && s.lineAccountId !== null
-    let unreferenced = false
-    if (candidate) {
-      try {
-        const res = await api.scenarios.moveReferrers(s.id)
-        unreferenced = res.success && res.data.items.length === 0
-      } catch {
-        unreferenced = false
-      }
-    }
-    if (!unreferenced) {
-      setDeleteTarget(s)
-      return
-    }
-    if (panelId === s.id) setPanelId(null)
-    deferredDelete.schedule({
-      ids: [s.id],
-      message: `シナリオ「${s.name}」を削除しました`,
-      commit: () => api.scenarios.delete(s.id),
-      onCommitted: () => {
-        void loadFolders()
-        void loadOverallTotal()
-        void loadStats()
-        return loadScenarios()
-      },
-      failureMessage: 'シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (s: ScenarioRow) => { setDeleteError(''); setDeleteTarget(s) }
 
   /* ===== まとめて「止める／再開」 ===== */
 
@@ -446,7 +425,14 @@ export default function ScenariosListV8() {
   /* 選んでいる間は Esc で選択を外す（動きの点検 12 番）。 */
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   useEscapeToClearSelection(selectedCount > 0, clearSelection)
-  const selectedRows = scenarios.filter((s) => selectedIds.has(s.id))
+  const [selectionRows, setSelectionRows] = useState<ScenarioRow[]>([])
+  const selectedRows = [...new Map([...scenarios, ...selectionRows].map(row => [row.id, row])).values()].filter(row => selectedIds.has(row.id))
+  const selectAllScenarios = async () => {
+    const account = selectedAccountId
+    const rows = await collectListRows(scenarioList.total, (offset, limit) => loadScenarioPage({ page: Math.floor(offset / limit) + 1, limit }, new AbortController().signal))
+    if (activeAccountRef.current !== account) return
+    setSelectionRows(rows); setSelectedIds(new Set(rows.map(row => row.id)))
+  }
   const stoppableIds = selectedRows.filter((s) => s.isActive).map((s) => s.id)
   const resumableIds = selectedRows.filter((s) => !s.isActive).map((s) => s.id)
 
@@ -473,24 +459,27 @@ export default function ScenariosListV8() {
    * 「元に戻す」で送らずに戻せる。1本ずつの開始前チェックは詳細画面で行う。
    */
   const runBulkToggle = (next: boolean, ids: string[]) => {
-    if (ids.length === 0 || !canEdit) return
+    if (ids.length === 0 || !canEdit || toggleBusyRef.current) return
+    toggleBusyRef.current = true
+    const account = selectedAccountId
     const key = listContextKey
     setOptimisticRows({
       key,
       rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, isActive: next } : s)),
     })
-    runUndoable({
-      message: next ? `${ids.length}件の配信を始めました` : `${ids.length}件を停止しました`,
-      commit: async () => {
+    runOptimistic({
+      isCurrent: () => activeAccountRef.current === account,
+      request: async () => {
         const results = await Promise.all(
           ids.map((id) => api.scenarios.update(id, { isActive: next }).catch(() => null)),
         )
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
+        if (failed > 0) throw new Error(`${failed} 件の保存に失敗しました`)
       },
-      undo: () => setOptimisticRows(null),
+      revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
       failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
-      onCommitted: () => {
+      onSuccess: () => {
+        toggleBusyRef.current = false
         setOptimisticRows(null)
         setSelectedIds(new Set())
         void loadScenarios()
@@ -528,7 +517,7 @@ export default function ScenariosListV8() {
           ids.map((id) => api.scenarios.update(id, { folderId }).catch(() => null)),
         )
         const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${failed}件のフォルダ移動に失敗しました`)
+        if (failed > 0) throw new Error(`${failed} 件のフォルダ移動に失敗しました`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダを移動できませんでした。',
@@ -600,7 +589,7 @@ export default function ScenariosListV8() {
   /** 複製の窓の「引き継ぐもの」：通の数と配信方式は対象のシナリオから書く。 */
   const duplicateCarries = duplicateTarget
     ? [
-        `メッセージ ${duplicateTarget.stepCount === undefined ? '' : `${duplicateTarget.stepCount}通`}（質問を含む）`,
+        `メッセージ ${duplicateTarget.stepCount === undefined ? '' : `${duplicateTarget.stepCount} 通`}（質問を含む）`,
         '開始のきっかけ',
         'アクション',
         '配信対象の条件',
@@ -688,11 +677,11 @@ export default function ScenariosListV8() {
       unfiledId={UNFILED}
       allCount={overallTotal}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_新規フォロー"
+      placeholder="例：01_新規フォロー"
     >
       {sharedScenarioCount > 0 ? (
         <p className={styles.folderNote}>
-          全アカウントに共通で適用されるシナリオが{sharedScenarioCount}件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
+          全アカウントに共通で適用されるシナリオが{sharedScenarioCount} 件あります。「すべて」の件数には含まれますが、フォルダ別の件数と「未分類」には含まれません。
         </p>
       ) : null}
     </ManagedFolderPanel>
@@ -700,7 +689,7 @@ export default function ScenariosListV8() {
 
   /* ===== 数の帯（4つ） ===== */
 
-  /* 板 `axFrW`：1つ目の補足は「稼働中 3・停止中 2」。止めた数は合計から出す。 */
+  /* 板 `axFrW`：1つ目の補足は「有効 3・停止中 2」。止めた数は合計から出す。 */
   const scenarioStopped = stats ? Math.max(0, stats.scenarios.total - stats.scenarios.active) : null
   const kpis = [
     {
@@ -708,7 +697,7 @@ export default function ScenariosListV8() {
       icon: Workflow,
       value: overallTotal,
       unit: '件',
-      detail: `稼働中 ${stats ? stats.scenarios.active : '—'}・停止中 ${scenarioStopped ?? '—'}`,
+      detail: `有効 ${stats ? stats.scenarios.active : emptyValue('unknown')}・停止中 ${scenarioStopped ?? emptyValue('unknown')}`,
     },
     {
       title: '購読中',
@@ -722,7 +711,7 @@ export default function ScenariosListV8() {
       icon: UserCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
-      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : '—',
+      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
     },
     {
       title: '今週送った数',
@@ -864,7 +853,7 @@ export default function ScenariosListV8() {
         </span>
         <p className={styles.stateTitle}>シナリオを読み込めませんでした</p>
         <p className={styles.stateDesc}>作ったシナリオは消えていません。通信を確かめて、もう一度試してください。</p>
-        <Button type="button" onClick={() => void loadScenarios()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button>
       </div>
     ) : scenarios.length === 0 ? (
       /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */
@@ -910,12 +899,12 @@ export default function ScenariosListV8() {
                 const showFolder = folders.length > 0 || s.folderId
                 const meta = [
                   deliveryModeLabels[s.deliveryMode ?? 'relative'],
-                  s.stepCount === undefined ? '—通' : `${s.stepCount}通`,
+                  s.stepCount === undefined ? '—通' : `${s.stepCount} 通`,
                   ...(showFolder ? [folderName] : []),
                 ].join('・')
                 /* 絵：送り方・通数・フォルダのあとに全角の間を空けて説明。1つの文字列で書く。 */
                 const sub = s.description ? `${meta}　${s.description}` : meta
-                const subscribers = s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)
+                const subscribers = s.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(s.subscriberCount)
                 return (
                   <Tr
                     interactive
@@ -933,7 +922,7 @@ export default function ScenariosListV8() {
                         event.preventDefault()
                         setPanelId(s.id)
                       }
-                    }}
+                    }} data-row-id={s.id}
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canEdit && <Checkbox
@@ -965,7 +954,7 @@ export default function ScenariosListV8() {
                           <FolderDotName folder={rowFolder ? { name: rowFolder.name, color: rowFolder.color } : null}>
                             <Link
                               href={`/scenarios/detail?id=${s.id}`}
-                              title={s.name}
+
                               className={styles.cellTitle}
                               onClick={(event) => {
                                 event.stopPropagation()
@@ -974,7 +963,7 @@ export default function ScenariosListV8() {
                                 goDetail(s.id)
                               }}
                             >
-                              {s.name}
+                              <TruncatedText value={String(s.name ?? '')} />
                             </Link>
                           </FolderDotName>
                           {s.lineAccountId === null && (
@@ -988,16 +977,13 @@ export default function ScenariosListV8() {
                     />
                     <Td
                       className={styles.countCell}
-                      title={`購読中 ${subscribers}人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)}人`}
+                      title={`購読中 ${subscribers} 人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}
                     >
-                      <div className={styles.countMain}>{`${subscribers}人`}</div>
-                      <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)}人`}</div>
+                      <div className={styles.countMain}>{`${subscribers} 人`}</div>
+                      <div className={styles.countSub}>{`読み終えた ${formatNumber(s.completedCount ?? 0)} 人`}</div>
                     </Td>
                     <Td>
-                      <span className={`${styles.statePill} ${s.isActive ? styles.statePillActive : styles.statePillStopped}`}>
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {s.isActive ? '稼働中' : '停止中'}
-                      </span>
+                      <SharedStatusPill tone={s.isActive ? 'success' : 'neutral'}>{s.isActive ? '有効' : '停止中'}</SharedStatusPill>
                     </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
@@ -1021,19 +1007,16 @@ export default function ScenariosListV8() {
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {canEdit && selectedCount > 0 ? (
-          <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
-            <Button
+          <BulkBar count={selectedCount} total={scenarioList.total} onSelectAll={selectAllScenarios} onClear={clearSelection}><Button
               type="button"
               variant="secondary"
               disabled={stoppableIds.length === 0}
-              title={stoppableIds.length === 0 ? '稼働中のシナリオが選ばれていません' : undefined}
-              onClick={() => runBulkToggle(false, stoppableIds)}
+              title={stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
+              onClick={() => setPendingStop(stoppableIds)}
             >
               <Square size={13} aria-hidden="true" />
               止める
-            </Button>
-            <Button
+            </Button><Button
               type="button"
               variant="secondary"
               disabled={resumableIds.length === 0}
@@ -1042,19 +1025,16 @@ export default function ScenariosListV8() {
             >
               <Play size={13} aria-hidden="true" />
               再開
-            </Button>
-            <Button
+            </Button><Button
               type="button"
               variant="secondary"
               onClick={() => openMove([...selectedIds])}
             >
               <FolderIcon size={13} aria-hidden="true" />
               フォルダへ移す
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+            </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
               選択を外す
-            </Button>
-          </div>
+            </Button></BulkBar>
         ) : null}
       </>
     )
@@ -1063,7 +1043,7 @@ export default function ScenariosListV8() {
   const listPager = scenarioList.pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(scenarioList.page - 1) * scenarioList.limit + 1}〜{Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)} / {formatNumber(scenarioList.total)}件
+        {(scenarioList.page - 1) * scenarioList.limit + 1}〜{Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)} / {formatNumber(scenarioList.total)} 件
       </span>
       <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
     </ListPagePagination>
@@ -1141,7 +1121,7 @@ export default function ScenariosListV8() {
 
   const filteredCount =
     scenarioFilterActive && scenarioList.loaded ? (
-      <p className={styles.filteredCount}>条件に一致したシナリオ：{formatNumber(scenarioList.total)}件</p>
+      <p className={styles.filteredCount}>条件に一致したシナリオ：{formatNumber(scenarioList.total)} 件</p>
     ) : null
 
   /*
@@ -1157,7 +1137,7 @@ export default function ScenariosListV8() {
         <div className={styles.narrowSearch}>
           <SearchField
             placeholder="シナリオ名で探す"
-            aria-label="シナリオ名で検索"
+            aria-label="シナリオ名で探す"
             value={nameQuery}
             onChange={(value) => setNameQuery(clampSearchQuery(value))}
             onClear={() => setNameQuery('')}
@@ -1181,7 +1161,7 @@ export default function ScenariosListV8() {
       <ListToolbar
         search={{
           placeholder: 'シナリオ名で探す',
-          label: 'シナリオ名で検索',
+          label: 'シナリオ名で探す',
           width: 240,
           value: nameQuery,
           onChange: (value) => setNameQuery(clampSearchQuery(value)),
@@ -1212,14 +1192,14 @@ export default function ScenariosListV8() {
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
       title="シナリオ配信"
-      description="きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"
-      help="左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"
+
+      help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
         {!canEdit && (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
           </div>
         )}
         <KpiBand data-design="KPIs">
@@ -1245,7 +1225,7 @@ export default function ScenariosListV8() {
             title={panelRow.name}
             description={[
               deliveryModeLabels[panelRow.deliveryMode ?? 'relative'],
-              panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount}通`,
+              panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount} 通`,
             ].join('・')}
             onClose={() => setPanelId(null)}
             onPrev={panelIndex > 0 ? () => setPanelId(scenarios[panelIndex - 1].id) : undefined}
@@ -1283,8 +1263,8 @@ export default function ScenariosListV8() {
             }
           >
             <p>
-              {panelRow.isActive ? '稼働中' : '停止中'} ／ 購読{' '}
-              {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)}人 ／
+              {panelRow.isActive ? '有効' : '停止中'} ／ 購読{' '}
+              {panelRow.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(panelRow.subscriberCount)}人 ／
               読了 {formatNumber(panelRow.completedCount ?? 0)}人
             </p>
             {panelRow.description && <p>{panelRow.description}</p>}
@@ -1305,7 +1285,7 @@ export default function ScenariosListV8() {
           title={
             moveIds && moveIds.length === 1
               ? `「${scenarios.find((s) => s.id === moveIds[0])?.name ?? 'シナリオ'}」のフォルダを移動`
-              : `${moveIds?.length ?? 0}件のシナリオのフォルダを移動`
+              : `${moveIds?.length ?? 0} 件のシナリオのフォルダを移動`
           }
           description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
           confirmLabel="移動する"
@@ -1336,7 +1316,7 @@ export default function ScenariosListV8() {
           destructive
           busy={deleting}
           error={deleteError}
-          onConfirm={targetStillListed ? () => void runDelete() : undefined}
+          onConfirm={targetStillListed ? () => runDelete() : undefined}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)
@@ -1347,8 +1327,8 @@ export default function ScenariosListV8() {
             <div className={styles.deleteBody}>
               <MoveReferrersNotice scenarioId={deleteTarget.id} />
               <p>
-                購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)}人 ／ 通数{' '}
-                {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount}通`}
+                購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)} 人 ／ 通数{' '}
+                {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount} 通`}
               </p>
               {deleteTarget.lineAccountId === null && (
                 <p className={styles.deleteWarn}>全アカウント共通のシナリオです。すべてのアカウントから消えます。</p>
@@ -1375,7 +1355,7 @@ export default function ScenariosListV8() {
           confirmIcon={<Copy size={14} aria-hidden="true" />}
           busy={duplicating}
           error={duplicateError}
-          onConfirm={() => void runDuplicate()}
+          onConfirm={() => runDuplicate()}
           onCancel={() => {
             if (duplicating) return
             setDuplicateTarget(null)
@@ -1383,16 +1363,13 @@ export default function ScenariosListV8() {
           }}
         >
           <div className={styles.dupBody}>
-            <label className={styles.dupField}>
-              <span className={styles.dupLabel}>新しい名前</span>
-              <TextField
+            <Field label="新しい名前"><TextField
                 value={duplicateName}
                 onChange={(event) => setDuplicateName(event.target.value)}
                 disabled={duplicating}
                 maxLength={80}
                 aria-label="新しい名前"
-              />
-            </label>
+              /></Field>
             <div className={styles.dupBox}>
               <p className={styles.dupBoxTitle}>引き継ぐもの</p>
               <p className={styles.dupBoxText}>{`・${duplicateCarries}`}</p>
@@ -1409,7 +1386,8 @@ export default function ScenariosListV8() {
         </Dialog>
       </>}
       folders={<>
-        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
+        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
+      {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
         {createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         {folderPanel}
       </>}

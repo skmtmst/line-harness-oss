@@ -9,6 +9,7 @@
  * api.lineAccountTags、api.lineAccounts.list・api.staff.list）。違いは見せ方だけ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, CircleCheck, CircleDashed, CircleX,
@@ -32,7 +33,7 @@ import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import StatusBadge from '@/components/shared/status-badge'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
@@ -41,6 +42,9 @@ import {
   type DraftState, type StepNumber, type V8CheckRow,
 } from './logic'
 import styles from './register.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string; lead: string }> = [
   { number: 1, label: 'LINE準備', node: 'xj3zz', lead: '5段すべて通ってから登録します。接続確認が通るまで、アカウントは作られません。' },
@@ -97,7 +101,7 @@ export default function AccountRegisterV8() {
   const rowsPassed = allV8RowsPassed(checkRows)
   const createdId = connection?.id ?? ''
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : '—'
+  const callbackUrl = workerBase ? `${workerBase}/auth/callback` : emptyValue('unknown')
   const importingIds = (importState?.phase ?? connection?.followerImport.phase) === 'importing_ids'
   const selectedTags = tags?.filter((tag) => form.tagIds.includes(tag.id)) ?? []
   const shownStep = V8_STEPS[(createdId ? 5 : currentStep) - 1]
@@ -428,7 +432,7 @@ export default function AccountRegisterV8() {
     <PageFrame kind="wizard" boardId={shownStep.node}>
       <PageHeading
         title="LINEアカウントを登録"
-        description={shownStep.lead}
+        help={shownStep.lead}
         steps={(
           <Steps
             label="登録の進捗"
@@ -448,7 +452,7 @@ export default function AccountRegisterV8() {
         <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
           {currentStep === 1 && !createdId && (
             <div className={styles.split} data-design-node="xj3zz">
-              <Card surface="inset" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
                 {draftRestored && (
                   <Notice tone="info" message="端末の下書きから続けます。チャネルシークレットだけ入れ直してください。" onClose={() => setDraftRestored(false)} />
                 )}
@@ -466,9 +470,9 @@ export default function AccountRegisterV8() {
                   <p>・Messaging API と LINE Login は同じプロバイダーで作成してください<br />・Webhook の利用は LINE Developers でオンにしてください</p>
                 </Card>
                 <div className={styles.buttonRow}>
-                  <Button href="https://manager.line.biz/" target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />LINE公式アカウントを作る</Button>
-                  <Button href="https://developers.line.biz/console/" target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />LINE Developersを開く</Button>
-                  <Button href={`${MANUAL}#m1`} target="_blank" rel="noreferrer"><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
+                  <Button external href="https://manager.line.biz/"  >LINE公式アカウントを作る</Button>
+                  <Button external href="https://developers.line.biz/console/"  >LINE Developersを開く</Button>
+                  <Button external href={`${MANUAL}#m1`}  ><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
                 </div>
               </Card>
               <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="この5段でやること">
@@ -484,7 +488,7 @@ export default function AccountRegisterV8() {
 
           {currentStep === 2 && !createdId && (
             <div className={styles.split} data-design-node="JYfda">
-              <Card surface="inset" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続に必要な4項目">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続に必要な4項目">
                 <h2 className={styles.panelTitle}>接続に必要な4項目</h2>
                 <p className={styles.groupLabel}>Messaging API</p>
                 <div className={styles.twoCol}>
@@ -506,7 +510,7 @@ export default function AccountRegisterV8() {
                 </div>
                 <div className={styles.secretRow}>
                   <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />秘密値は保存後に画面へ表示されません。</span>
-                  <Button href={`${MANUAL}#m1`} target="_blank" rel="noreferrer"><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
+                  <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
                 </div>
               </Card>
               <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" role="complementary" aria-label="どこにある？">
@@ -518,14 +522,14 @@ export default function AccountRegisterV8() {
           )}
 
           {currentStep === 3 && !createdId && (
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-acct-basic-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-acct-basic-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="基本情報" data-design-node="GwKE2" data-step="3">
               <h2 className={styles.panelTitle}>基本情報</h2>
               <div className={styles.basicGrid}>
-                <label className={styles.label} htmlFor="v8-display-name">表示名</label>
-                <label className={styles.label} htmlFor="v8-line-id">LINE ID</label>
+
+
                 <span aria-hidden="true" />
-                <TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} />
-                <TextField id="v8-line-id" value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly />
+                <Field label="表示名" htmlFor="v8-display-name"><TextField id="v8-display-name" value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="未入力なら LINE公式アカウントの名前を使います" aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "v8-display-name-error" : undefined} /></Field>
+                <Field label="LINE ID" htmlFor="v8-line-id"><TextField id="v8-line-id" value={form.lineId} readOnly placeholder="「LINEから取得」を押すと入ります" aria-readonly /></Field>
                 <Button type="button" onClick={() => void fetchLineId()} disabled={busyAction === 'check'} busy={busyAction === 'check'} busyLabel="取得しています…"><Download size={15} aria-hidden="true" />LINEから取得</Button>
               </div>
               {fieldErrors.name && <p id="v8-display-name-error" role="alert" className={styles.fieldError}>{fieldErrors.name}</p>}
@@ -556,7 +560,7 @@ export default function AccountRegisterV8() {
                 <div className={styles.moreBox}>
                   <div className={styles.twoCol}>
                     <div className={styles.field}><span className={styles.label}>親アカウント</span><Select aria-label="親アカウント" value={form.parentId} onChange={(value) => update('parentId', value)} options={[{ value: '', label: '親なし' }, ...parents.map((a) => ({ value: a.id, label: a.name }))]} /></div>
-                    <div className={styles.field}><label className={styles.label} htmlFor="v8-existing-liff">既存のLIFF ID（任意）</label><TextField id="v8-existing-liff" value={form.liffId} onChange={(event) => update('liffId', event.target.value)} placeholder="未入力なら自動で用意します" /></div>
+                    <div className={styles.field}><Field label="既存のLIFF ID" htmlFor="v8-existing-liff"><TextField id="v8-existing-liff" value={form.liffId} onChange={(event) => update('liffId', event.target.value)} placeholder="未入力なら自動で用意します" /></Field></div>
                   </div>
                   <fieldset className={styles.fieldset}>
                     <legend className={styles.label}>このアカウントを担当範囲に追加する人</legend>
@@ -569,7 +573,7 @@ export default function AccountRegisterV8() {
               <div className={styles.field}>
                 <span className={styles.groupLabel}>Callback URL</span>
                 <Card layout="horizontal" surface="muted" corner="control" contentPadding="var(--tpl-htn-endpoint-pad)" gap="var(--tpl-htn-panel-gap)">
-                  <span className={styles.endpointValue} title={callbackUrl}>{callbackUrl}</span>
+                  <span className={styles.endpointValue} ><TruncatedText value={String(callbackUrl ?? '')} url /></span>
                   <CopyButton value={callbackUrl} />
                 </Card>
               </div>
@@ -583,7 +587,7 @@ export default function AccountRegisterV8() {
                   {checkRows.map((row) => <CheckRow key={row.key} row={row} />)}
                 </ol>
                 <Card className={styles.importBox} surface="inset" contentPadding="var(--tpl-htn-import-pad)" gap="var(--tpl-htn-panel-gap)">
-                  <Toggle checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} />
+                  <SettingCheckbox checked={form.importFriends} label="既存の友だちの取り込み" onChange={(next) => update('importFriends', next)} />
                   <span className={styles.importText}>
                     <strong>既存の友だちの取り込み</strong>
                     <span>登録のあと、いまの友だちを musubo に取り込みます（数分かかります）</span>
@@ -594,15 +598,15 @@ export default function AccountRegisterV8() {
                 <h2>登録内容を確認する</h2>
                 <p>{`表示名：${form.name.trim() || (connection?.displayName ? `${connection.displayName}（LINEから取得）` : 'LINEから取得')}`}</p>
                 <p>{`LINE ID：${form.lineId || '接続確認で取得します'}`}</p>
-                <p>{`親アカウント：${parentName ?? 'なし'}`}</p>
-                <p>{`タグ：${selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : 'なし'}`}</p>
-                <p>{`担当：${staffNames.length > 0 ? staffNames.join('・') : 'なし'}`}</p>
+                <p>{`親アカウント：${parentName ?? emptyValue('none')}`}</p>
+                <p>{`タグ：${selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : emptyValue('none')}`}</p>
+                <p>{`担当：${staffNames.length > 0 ? staffNames.join('・') : emptyValue('none')}`}</p>
               </Card>
             </div>
           )}
 
           {createdId && connection && (
-            <Card surface="inset" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="登録完了" data-design-node="TvXII">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="登録完了" data-design-node="TvXII">
               <h2 className={styles.panelTitle}>登録が完了しました</h2>
               <p className={styles.doneLine}>
                 <CircleCheck size={22} aria-hidden="true" />
@@ -612,7 +616,7 @@ export default function AccountRegisterV8() {
                 {connection.followerImport.capability === 'available' && form.importFriends ? <>
                   <div className={styles.progressHead}>
                     <strong>{importingIds ? '既存の友だちを取り込んでいます' : '既存の友だちを取り込みました'}</strong>
-                    <strong>{importingIds ? `${importedCount.toLocaleString('ja-JP')}人 / ${progressTotal !== null ? `${progressTotal.toLocaleString('ja-JP')}人` : '確認中'}` : `${importedCount.toLocaleString('ja-JP')}人`}</strong>
+                    <strong>{importingIds ? `${polishFormatNumber(importedCount)} 人 / ${progressTotal !== null ? `${polishFormatNumber(progressTotal)} 人` : '確認中'}` : `${polishFormatNumber(importedCount)} 人`}</strong>
                   </div>
                   <div className={styles.progressTrack} role="progressbar" aria-valuenow={progressRate} aria-valuemin={0} aria-valuemax={100} aria-label="友だちの取り込み">
                     <span className={styles.progressFill} style={{ width: `${progressRate}%` }} />
@@ -631,7 +635,7 @@ export default function AccountRegisterV8() {
               )}
               <p className={styles.groupLabel}>次にすること</p>
               <div className={styles.buttonRow}>
-                <Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}><ArrowUpRight size={15} aria-hidden="true" />登録したアカウントを見る</Button>
+                <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
                 <Button href="/friends"><Users size={15} aria-hidden="true" />友だち一覧</Button>
                 <Button href="/friend-add-settings"><QrCode size={15} aria-hidden="true" />友だち追加URL・QR</Button>
                 <Button href="/emergency"><Activity size={15} aria-hidden="true" />運用状態の接続監視</Button>
@@ -690,7 +694,7 @@ export default function AccountRegisterV8() {
               <ResultRow label="Webhook の利用" value={checkRows[2].state === 'passed' ? 'LINE 側で「オン」でした' : 'まだ確かめていません'} state={checkRows[2].state} />
               <ResultRow
                 label="ボットの情報"
-                value={connection?.displayName ? `表示名「${connection.displayName}」${connection.verification?.followerTotal != null ? `・友だち ${connection.verification.followerTotal.toLocaleString('ja-JP')} 人` : ''}` : 'まだ確かめていません'}
+                value={connection?.displayName ? `表示名「${connection.displayName}」${connection.verification?.followerTotal != null ? `・友だち ${polishFormatNumber(connection.verification.followerTotal)} 人` : ''}` : 'まだ確かめていません'}
                 state={!connection ? 'todo' : connection.displayName ? 'passed' : 'failed'}
               />
               <Tr>
@@ -736,17 +740,8 @@ function ResultRow({ label, value, state }: { label: string; value: string; stat
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
-  const copy = async () => {
-    if (value === '—') return
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1200)
-    } catch { /* 表示値を選択してコピーできる。 */ }
-  }
+
   return (
-    <Button type="button" onClick={() => void copy()} disabled={value === '—'}>
-      <Copy size={15} aria-hidden="true" />{copied ? 'コピー済み' : 'コピー'}
-    </Button>
+    <CopyTextButton value={value} aria-label="値をコピー" disabled={value === '—'} />
   )
 }

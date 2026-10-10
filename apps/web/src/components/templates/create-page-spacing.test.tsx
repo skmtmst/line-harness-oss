@@ -38,14 +38,14 @@ describe('作成の型の余白の口', () => {
     expect(preview.getAttribute('data-preview-surface')).toBe('plain')
   })
 
-  it('口の寸法は型の CSS と globals の値に1か所（E-9 p17Qku：上 4・左右 24・下 24、段の間 28）', () => {
+  it('口の寸法は型の CSS と globals の値に1か所（E-9 p17Qku：B-152：上8・左右24・下24、段の間24）', () => {
     const css = read('src/components/templates/page-templates.module.css')
     expect(css).toContain(".createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }")
     expect(css).toContain(".preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }")
     expect(css).toContain(".preview[data-preview-surface='plain'] { background: transparent; }")
     const globals = read('src/app/globals.css')
-    expect(globals).toMatch(/--tpl-create-flush-pad:\s*4px 24px 24px;/)
-    expect(globals).toMatch(/--tpl-create-flush-gap:\s*28px;/)
+    expect(globals).toMatch(/--tpl-create-flush-pad:\s*var\(--polish-space-row\) var\(--polish-space-section\) var\(--polish-space-section\);/)
+    expect(globals).toMatch(/--tpl-create-flush-gap:\s*var\(--polish-space-section\);/)
   })
 
   it('統括の一括配信を作るは店の一斉配信を作る画面と同じ枠（店の CSS）を使い、画面の CSS で型の余白を上書きしない', () => {

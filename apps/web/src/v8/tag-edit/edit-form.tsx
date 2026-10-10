@@ -10,7 +10,7 @@ import KpiCard from '@/components/shared/kpi-card'
  * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
  * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。
  * 「タグ連動」「マイル」は畳んで1行の要約を出し、「開く」で中身を出す（絵どおり）。
- * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・保管済み）は今の画面（app/tags/edit-tag-page-v8）と同じ。
+ * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
  */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -31,10 +31,14 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
 import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model'
 import styles from './edit.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 export interface TagEditHost {
   initialValues: TagEditorValues
@@ -127,6 +131,9 @@ export function TagEditForm({
   }, [accountId, host])
   const nameDuplicates = useMemo(() => findDuplicateNames(siblingNames, name, tag.id), [siblingNames, name, tag.id])
 
+  const fingerprint = JSON.stringify({ name, groupId, isStarred, linked, reward, referralReward, multiplier, priority, applyToExisting, reapplyMode, actions })
+  const baseline = useRef({ version: tag.version, fingerprint })
+  if (baseline.current.version !== tag.version) baseline.current = { version: tag.version, fingerprint }
   const groupName = groups.find((group) => group.id === groupId)?.name ?? '未分類'
   const values = useMemo<TagEditorValues>(() => ({
     name: name.trim(), groupId, isStarred, linked,
@@ -206,7 +213,7 @@ export function TagEditForm({
             <dd>
               {row.count > 0 && row.href
                 ? <Link href={row.href} className={styles.useLink}>{`${row.count} 件 →`}</Link>
-                : <span className={row.count > 0 ? styles.useCount : styles.useNone}>{row.count > 0 ? `${row.count} 件` : row.known ? 'なし' : '—'}</span>}
+                : <span className={row.count > 0 ? styles.useCount : styles.useNone}>{row.count > 0 ? `${row.count} 件` : row.known ? emptyValue('none') : emptyValue('unknown')}</span>}
             </dd>
           </div>
         ))}
@@ -217,7 +224,7 @@ export function TagEditForm({
               <button type="button" className={styles.useLink} onClick={() => { setActionsOpen(true); window.requestAnimationFrame(() => actionsRef.current?.scrollIntoView({ block: 'start' })) }}>
                 {`${actions.length} つ →`}
               </button>
-            ) : <span className={styles.useNone}>なし</span>}
+            ) : <span className={styles.useNone}>{emptyValue('none')}</span>}
           </dd>
         </div>
       </dl>
@@ -231,18 +238,14 @@ export function TagEditForm({
   return (
     <div className={styles.page}>
       <CreatePage
+        dirty={!readOnly && fingerprint !== baseline.current.fingerprint}
+        busy={saving}
         boardId={host ? 'MFgPZ' : 'Qat9s'}
         footerOutlined={Boolean(host)}
-        notice={host?.notice}
+        notice={<>{host?.notice}{readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</p> : null}{conflictBand}</>}
         title={host?.title ?? (tag.name || 'タグを編集')}
         identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
-        description={host ? <>{host.description}{readOnly ? <p className={styles.roBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}</> : (
-          <>
-            {`${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
-            {readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}
-            {conflictBand}
-          </>
-        )}
+        help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
         preview={host ? host.preview(values) : side}
         destructive={host || readOnly ? undefined : <Button variant="danger" type="button" onClick={onDelete}>タグを削除する</Button>}
         footerActions={(
@@ -264,11 +267,8 @@ export function TagEditForm({
         <fieldset disabled={saving || readOnly} className={styles.fieldset}>
           <section className={styles.card} aria-label="基本">
             <h2 className={styles.cardTitle}>基本</h2>
-            <div className={styles.field}>
-              <label htmlFor="tag-edit-name" className={styles.labelStrong}>タグ名</label>
-              {readOnly ? <span className={styles.roValue}>{name}</span> : <Field error={nameError}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例: 定期購入者" aria-required="true" /></Field>}
-              <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" />
-            </div>
+            <div className={styles.field}><Field label="タグ名" htmlFor="tag-edit-name">{readOnly ? <span className={styles.roValue}>{name}</span> : <Field error={nameError}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：定期購入者" aria-required="true" /></Field>}
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></Field></div>
             <div className={styles.field}>
               <span className={styles.label}>所属フォルダ</span>
               <div className={styles.folderBox}>
@@ -282,7 +282,7 @@ export function TagEditForm({
                 <span className={styles.label}>友だち一覧に出す</span>
                 <span className={styles.hint}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
               </div>
-              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />}
+              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />}
             </div>
           </section>
 
@@ -294,7 +294,7 @@ export function TagEditForm({
                   <HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。</HelpTip>
                   <span className={styles.titleSpacer} />
                   <span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>
-                  {readOnly ? null : <Toggle checked={linked} onChange={setLinked} label="タグ連動" />}
+                  {readOnly ? null : <SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" />}
                 </div>
                 <div className={styles.noteRow}>
                   <p className={styles.cardNote}>上から順に動きます。並べ替えは上下の印で</p>
@@ -372,7 +372,7 @@ export function TagEditForm({
                       <span className={styles.label}>今付いている人にもさかのぼって積む（倍率は次の付与から）</span>
                       <span className={styles.hint}>{`オンにすると、すでに付いている ${tag.friendCount ?? 0} 人にも本人・紹介者のマイルをさかのぼって積みます（倍率は次の付与から）。積む前に人数の確認が開きます`}</span>
                     </div>
-                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <Toggle checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />}
+                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <SettingCheckbox checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />}
                   </div>
                   }
                   {applyToExisting ? (
@@ -383,22 +383,16 @@ export function TagEditForm({
                     </KpiBand>
                   ) : null}
                   {retroPreview && (retroPreview.selfExcluded > 0 || retroPreview.referralExcluded > 0) ? (
-                    <p className={styles.hint}>{`すでに付与済みの人（本人${retroPreview.selfExcluded}人・紹介者${retroPreview.referralExcluded}人）は対象から外れています。`}</p>
+                    <p className={styles.hint}>{`すでに付与済みの人（本人${retroPreview.selfExcluded} 人・紹介者${retroPreview.referralExcluded} 人）は対象から外れています。`}</p>
                   ) : null}
                   <div className={styles.subHead}>
                     <h3 className={styles.subTitle}>タグが付いたときに積むマイル</h3>
                   </div>
                   <div className={styles.pair}>
-                    <label className={styles.field}>
-                      <span className={styles.label}>本人へのマイル付与</span>
-                      <span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
-                      <span className={styles.hint}>このタグが付いた本人へ、一度だけ積みます。</span>
-                    </label>
-                    <label className={styles.field}>
-                      <span className={styles.label}>紹介者へのマイル付与</span>
-                      <span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
-                      <span className={styles.hint}>紹介経由の友だちなら、その紹介者にも積みます。</span>
-                    </label>
+                    <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label="本人へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <NumberInput type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
+</Field>
+                    <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label="紹介者へのマイル付与"><span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <NumberInput type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
+</Field>
                   </div>
                   {readOnly ? (
                     <div className={styles.field}>

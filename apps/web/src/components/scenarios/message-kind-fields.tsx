@@ -531,7 +531,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             return (
               <Button variant="secondary" className={(`rounded-card border p-1.5 transition-colors ${
                   on ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
-                }`) + ' h-auto whitespace-normal'} key={`${s.packageId}-${s.stickerId}`} type="button" onClick={() => set({ packageId: s.packageId, stickerId: s.stickerId })} title={s.label} aria-pressed={on}>
+                }`) + ' h-auto whitespace-normal'} key={`${s.packageId}-${s.stickerId}`} type="button" onClick={() => set({ packageId: s.packageId, stickerId: s.stickerId })} title={s.label} aria-label={s.label} aria-pressed={on}>
                 <StickerThumb stickerId={s.stickerId} label={s.label} />
               </Button>
             )

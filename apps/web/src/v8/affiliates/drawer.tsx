@@ -1,5 +1,8 @@
 'use client'
 
+import { Tabs } from '@/components/shared/tabs'
+import { useUrlTab } from '@/lib/use-url-tab'
+
 /*
  * ★V8 アフィリエイターの詳細の引き出し（板 `tnTn9`。右から出る 620px）。
  * 「成果を見る」・名前・`?affiliate=` で開く。上のタブで 概要・内訳・友だち・支払い。
@@ -9,6 +12,8 @@
  * （断る・認める）と「支払いを確定する」は、成果承認・支払いのタブと同じ口を使う。
  * 世代番号で、別の人へ開き直した途中に届いた古い応答を捨てる。
  */
+import { notifySaved } from '@/components/shared/toast'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, PauseCircle } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
@@ -41,6 +46,8 @@ import {
 import { AffiliatePaymentConfirmDialog } from './dialogs'
 import { StatusPill } from './parts'
 import styles from './affiliate-drawer.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const JOURNEY_PAGE_SIZE = 30
 
@@ -83,7 +90,7 @@ export default function AffiliateDrawer({
   onStopRequest: (id: string, name: string) => void
 }) {
   const period = useMemo(() => currentSettlementPeriod(), [])
-  const [tab, setTab] = useState<DrawerTab>(startInEdit ? 'payment' : 'summary')
+  const [tab, setTab] = useUrlTab(DRAWER_TABS.map(t => t.key), startInEdit ? 'payment' : 'summary', 'affiliates')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [report, setReport] = useState<ReportV2 | null>(null)
@@ -213,15 +220,8 @@ export default function AffiliateDrawer({
 
   useEffect(() => { reloadAll() }, [reloadAll])
 
-  const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
-    const url = distributionUrl(link.ref_code, linkBaseUrl)
-    if (!url) return
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedLinkId(link.id)
-      window.setTimeout(() => setCopiedLinkId((current) => (current === link.id ? null : current)), 2000)
-    } catch { /* 書けないときはURLが表示のまま */ }
-  }, [linkBaseUrl])
+
+
 
   const decide = useCallback(async (item: ConversionApprovalItem, status: 'approved' | 'rejected') => {
     setDeciding(item.eventId)
@@ -287,9 +287,7 @@ export default function AffiliateDrawer({
                     <span className={styles.listName}>{link.offer_name ?? link.label ?? link.ref_code}{link.is_active ? '' : '（止めている）'}</span>
                     <span className={styles.listSub} title={url}>{`${shown}・${count}`}</span>
                   </span>
-                  <Button type="button" onClick={() => { void copyLinkUrl(link) }}>
-                    <Copy size={14} aria-hidden="true" /> {copiedLinkId === link.id ? 'コピーしました' : 'コピー'}
-                  </Button>
+                  <CopyTextButton value={distributionUrl(link.ref_code, linkBaseUrl) ?? ""} aria-label="紹介リンクをコピー"  />
                 </div>
               )
             })}
@@ -346,7 +344,7 @@ export default function AffiliateDrawer({
       kind="error"
       title="この期間の集計を読み込めませんでした"
       description="選んだ期間にこの人の成果が1件も無いか、集計が読めませんでした。リンクと成果の記録は消えていません。"
-      action={<Button type="button" onClick={reloadAll}>もう一度試す</Button>}
+      onRetry={reloadAll}
     />
   ) : (
     <>
@@ -396,13 +394,13 @@ export default function AffiliateDrawer({
       kind="error"
       title="紹介で増えた友だちを読み込めませんでした"
       description="記録は消えていません。"
-      action={<Button type="button" onClick={() => { void loadJourneys(affiliate.id, genRef.current) }}>もう一度試す</Button>}
+      onRetry={() => { void loadJourneys(affiliate.id, genRef.current) }}
     />
   ) : journeys.length === 0 ? (
     <p className={styles.empty}>この人の紹介で増えた友だちはまだいません。</p>
   ) : (
     <section className={styles.section} aria-label="紹介で増えた友だち">
-      <h3 className={styles.sectionTitle}>{`紹介で増えた友だち（${formatNumber(journeys.length)}人${journeyMore ? 'ほか' : ''}）`}</h3>
+      <h3 className={styles.sectionTitle}>{`紹介で増えた友だち（${formatNumber(journeys.length)} 人${journeyMore ? 'ほか' : ''}）`}</h3>
       <div className={styles.list}>
         {journeys.map((journey) => {
           const duplicate = report?.duplicateFlags.some((flag) => flag.friendId === journey.friendId)
@@ -410,7 +408,7 @@ export default function AffiliateDrawer({
             <div key={journey.friendId} className={styles.listRow}>
               <span className={styles.listText}>
                 <span className={styles.listName}>{personName(journey.displayName)}</span>
-                <span className={styles.listSub}>{`${formatDate(journey.addedAt)} に追加・リンク ${journey.refCode ?? '—'}`}</span>
+                <span className={styles.listSub}>{`${formatDate(journey.addedAt)} に追加・リンク ${journey.refCode ?? emptyValue('unknown')}`}</span>
               </span>
               {duplicate ? <StatusPill tone="warn">重複の疑い</StatusPill> : null}
               <span className={styles.listValue}>{`${formatNumber(journey.conversionCount)} 件`}</span>
@@ -438,7 +436,7 @@ export default function AffiliateDrawer({
           <KpiBand density="compact">
             <KpiCard icon={null} title="今回の金額" value={null} valueText={formatYen(settlement.amount)} unit="" detail={null} />
             <KpiCard icon={null} title="成果" value={settlement.conversionCount} unit="件" detail={null} />
-            <KpiCard icon={null} title="振込先" value={null} valueText={settlement.bankProfileRegistered ? '登録済み' : '未登録'} unit="" detail={null} />
+            <KpiCard icon={null} title="振込先" value={null} valueText={settlement.bankProfileRegistered ? '登録済み' : emptyValue('unconfigured')} unit="" detail={null} />
           </KpiBand>
         ) : (
           <p className={styles.empty}>この人には、今回締められる報酬がありません。</p>
@@ -456,7 +454,7 @@ export default function AffiliateDrawer({
         <section className={styles.card} aria-label="支払いの取り決め">
           <h3 className={styles.cardTitle}>支払いの取り決め</h3>
           <p className={styles.cardText}>
-            {`連絡先 ${affiliate.email ?? 'なし'}・確定までの保留 ${affiliate.holdDays == null ? 'なし' : `${affiliate.holdDays}日`}・支払いサイクル ${affiliate.payoutCycle ?? 'なし'}・成果が出たら本人へ${affiliate.notifyOnConversion ? '知らせる' : '知らせない'}`}
+            {`連絡先 ${affiliate.email ?? emptyValue('none')}・確定までの保留 ${affiliate.holdDays == null ? emptyValue('none') : `${affiliate.holdDays}日`}・支払いサイクル ${affiliate.payoutCycle ?? emptyValue('none')}・成果が出たら本人へ${affiliate.notifyOnConversion ? '知らせる' : '知らせない'}`}
           </p>
         </section>
       )}
@@ -467,21 +465,7 @@ export default function AffiliateDrawer({
     <>
       <Drawer open title={`${affiliate.name}の詳細`} description={subLine} designWidth={620} layout="inset" busy={paymentOpen} onClose={onClose}
         heading={<span className={styles.titleRow}><span>{affiliate.name}</span><StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
-        toolbar={(<div className={styles.tabs} role="tablist" aria-label="詳細の中身">
-          {DRAWER_TABS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === item.key}
-              className={styles.tab}
-              data-current={tab === item.key || undefined}
-              onClick={() => setTab(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>)}
+        toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
         footer={(<>{readonly ? <span /> : (
             <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
               <PauseCircle size={14} aria-hidden="true" />
@@ -575,7 +559,7 @@ function SettlementEditor({
         setError(res.error)
         return
       }
-      notifyToast('支払いの取り決めを保存しました。')
+      notifySaved('支払いの取り決めを保存しました。')
       onSaved()
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存できませんでした。通信を確かめて、もう一度お試しください。')
@@ -593,15 +577,15 @@ function SettlementEditor({
           { value: 'fixed', label: '成果1件ごとに定額' },
           { value: 'rate', label: '売上に対する割合' },
         ]} />
-        {rewardMode === 'rate' ? <TextField aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /> : null}
+        {rewardMode === 'rate' ? <NumberInput aria-label="報酬の割合（%）" type="number" min={0} max={100} step="0.1" value={rate} onChange={(e) => setRate(e.target.value)} /> : null}
         <Field label="連絡先" htmlFor="af-settlement-email" error={fieldErrors.email}>
           <TextField id="af-settlement-email" ref={emailRef} type="email" value={email} onChange={(event) => { setEmail(event.target.value); setFieldErrors((old) => ({ ...old, email: undefined })) }} placeholder="partner@example.com" />
         </Field>
         <Field label="確定までの保留（日）" htmlFor="af-settlement-hold" error={fieldErrors.hold}>
-          <TextField id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" />
+          <NumberInput unit="日" id="af-settlement-hold" ref={holdRef} type="number" min={0} max={365} value={holdDays} onChange={(event) => { setHoldDays(event.target.value); setFieldErrors((old) => ({ ...old, hold: undefined })) }} placeholder="なし" />
         </Field>
         <Field label="支払いサイクル" htmlFor="af-settlement-cycle">
-          <TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例: 月末締め翌月末払い" maxLength={100} />
+          <TextField id="af-settlement-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め翌月末払い" maxLength={100} />
         </Field>
       </div>
       <Checkbox checked={notify} onCheckedChange={setNotify}>成果が出たときに本人へ知らせる</Checkbox>

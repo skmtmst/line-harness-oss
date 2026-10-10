@@ -268,6 +268,16 @@ jobs:
           grep -q "^account_id = \"$CLOUDFLARE_ACCOUNT_ID\"$" \
             "$worker_root/apps/worker/wrangler.staging.toml"
 
+      - name: Record the source revisions and public build metadata
+        id: build_metadata
+        run: |
+          worker_root="${{ steps.worker_source.outputs.root }}"
+          admin_root="${{ steps.admin_source.outputs.root }}"
+          echo "worker_sha=$(git -C "$worker_root" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "admin_sha=$(git -C "$admin_root" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "worker_version=$(node -p "require('$worker_root/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "released_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Build Worker and LIFF assets
         if: env.DELIVERY_TARGET != 'admin'
         run: |
@@ -280,7 +290,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
         run: |
           cd "${{ steps.worker_source.outputs.root }}"
-          npx wrangler deploy --config apps/worker/wrangler.staging.toml --dry-run
+          npx wrangler deploy --config apps/worker/wrangler.staging.toml --dry-run \
+            --var "BUILD_GIT_COMMIT:${{ steps.build_metadata.outputs.worker_sha }}" \
+            --var "BUILD_VERSION:${{ steps.build_metadata.outputs.worker_version }}" \
+            --var "BUILD_RELEASED_AT:${{ steps.build_metadata.outputs.released_at }}"
 
       - name: Deploy Worker to staging
         id: worker_deploy
@@ -290,12 +303,17 @@ jobs:
         run: |
           set -o pipefail
           cd "${{ steps.worker_source.outputs.root }}"
+          build_vars=(
+            --var "BUILD_GIT_COMMIT:${{ steps.build_metadata.outputs.worker_sha }}"
+            --var "BUILD_VERSION:${{ steps.build_metadata.outputs.worker_version }}"
+            --var "BUILD_RELEASED_AT:${{ steps.build_metadata.outputs.released_at }}"
+          )
           if [ "$WORKER_CONFIG_REPLAY" = "true" ]; then
             npx wrangler deploy --config apps/worker/wrangler.staging.toml \
-              --message "staging config replay from $WORKER_SOURCE_SHA" 2>&1 \
+              --message "staging config replay from $WORKER_SOURCE_SHA" "${build_vars[@]}" 2>&1 \
               | tee "$RUNNER_TEMP/worker-deploy.log"
           else
-            npx wrangler deploy --config apps/worker/wrangler.staging.toml 2>&1 \
+            npx wrangler deploy --config apps/worker/wrangler.staging.toml "${build_vars[@]}" 2>&1 \
               | tee "$RUNNER_TEMP/worker-deploy.log"
           fi
           version_id=$(sed -n 's/.*Current Version ID: //p' "$RUNNER_TEMP/worker-deploy.log" | tail -1)
@@ -337,6 +355,8 @@ jobs:
           cd "${{ steps.admin_source.outputs.root }}"
           pnpm --filter web build
         env:
+          APP_COMMIT_SHA: ${{ steps.build_metadata.outputs.admin_sha }}
+          APP_BUILD_TIME: ${{ steps.build_metadata.outputs.released_at }}
           NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
           NEXT_PUBLIC_HQ_TEMPLATE_DISTRIBUTION_ENABLED: '1'
@@ -383,6 +403,21 @@ jobs:
             test "$deployed_id" != "$EXPECTED_PAGES_DEPLOYMENT_ID"
           fi
           echo "Admin Deployment ID: $deployed_id" >> "$GITHUB_STEP_SUMMARY"
+
+      # 配備runの成功に加え、ログインなしの公開口から実際のコードSHAを照合する。
+      - name: Verify public source revisions
+        if: env.DELIVERY_MODE == 'apply'
+        run: |
+          worker_url="-"; worker_sha="-"; admin_url="-"; admin_sha="-"
+          if [ "$DELIVERY_TARGET" != "admin" ]; then
+            worker_url="$STAGING_API_URL"
+            worker_sha="${{ steps.build_metadata.outputs.worker_sha }}"
+          fi
+          if [ "$DELIVERY_TARGET" != "worker" ]; then
+            admin_url="https://stg-admin.musubo.jp"
+            admin_sha="${{ steps.build_metadata.outputs.admin_sha }}"
+          fi
+          node scripts/deploy/verify-public-build.mjs "$worker_url" "$worker_sha" "$admin_url" "$admin_sha"
 
       - name: Summarize
         if: always()

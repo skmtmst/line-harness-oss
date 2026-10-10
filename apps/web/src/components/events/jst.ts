@@ -1,3 +1,5 @@
+
+import { datetimeLocalJstToUtcIso, jstDate } from '@/lib/jst-datetime'
 /**
  * イベントの日時まわり。
  *
@@ -7,11 +9,7 @@
 
 /** 「2026-09-05」＋「14:00」（JST）→ UTC の ISO 文字列。 */
 export function jstHHMMToUtcIso(date: string, hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  const totalMin = h * 60 + m - 9 * 60
-  const [y, mo, d] = date.split('-').map(Number)
-  const t = Date.UTC(y, mo - 1, d) + totalMin * 60_000
-  return new Date(t).toISOString()
+  return datetimeLocalJstToUtcIso(`${date}T${hhmm}`)
 }
 
 const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
@@ -38,12 +36,12 @@ export function formatSlotJp(startsAt: string, endsAt: string): string {
 
 /** 今日（JST）の YYYY-MM-DD。日付入力の初期値。 */
 export function todayJst(): string {
-  return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
+  return jstDate()
 }
 
 /** UTC の ISO → JST の YYYY-MM-DD。枠の編集窓で保存値を日付入力へ戻す。 */
 export function utcIsoToJstDate(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+  return jstDate(new Date(iso))
 }
 
 /** UTC の ISO → JST の HH:MM。枠の編集窓で保存値を時刻入力へ戻す。 */

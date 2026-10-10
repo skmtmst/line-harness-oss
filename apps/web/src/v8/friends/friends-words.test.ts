@@ -18,8 +18,8 @@ describe('友だち一覧の言葉', () => {
 
   it('受信の時刻は記録の文字のまま（時差を足さない）', () => {
     const year = new Date().getFullYear()
-    expect(monthDayTime(`${year}-08-14T07:58:00.000Z`)).toBe('8月14日 7:58')
-    expect(monthDayTime('2020-01-02T10:05:00')).toBe('2020年1月2日 10:05')
+    expect(monthDayTime(`${year}-08-14T07:58:00.000Z`)).toBe('08/14 07:58')
+    expect(monthDayTime('2020-01-02T10:05:00')).toBe('2020/01/02')
     expect(monthDayTime('壊れた値')).toBe('—')
   })
 
@@ -80,6 +80,6 @@ describe('重複検出の言葉', () => {
   })
 
   it('見直した時刻は日本時間の M/D HH:mm', () => {
-    expect(slashDateTime('2026-08-30T10:00:00.000Z')).toBe('8/30 19:00')
+    expect(slashDateTime('2026-08-30T10:00:00.000Z')).toBe('08/30 19:00')
   })
 })

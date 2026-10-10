@@ -13,11 +13,14 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { formatNumber } from '@/lib/format'
 import '../affiliates/create-v8.css'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -213,8 +216,8 @@ export function NewOfferV8() {
     <div data-design-node="Td4TN" className="af-create-board">
       <div className="af-create-head">
         <Link href="/affiliates" className="af-create-backLink">← 成果とアフィリエイトへ</Link>
-        <h1 className="af-create-headTitle">案件を作る</h1>
-        <p className="af-create-headDescription">「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。</p>
+        <PageHeading title="案件を作る" help={<> 「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。</>} />
+
       </div>
 
       <div className="af-create-columns">
@@ -222,26 +225,20 @@ export function NewOfferV8() {
           <section className="af-create-card" aria-label="どんな案件か">
             <h2 className="af-create-cardTitle">どんな案件か</h2>
             <p className="af-create-cardNote">アフィリエイターの画面に出ます</p>
-            <label className="af-create-fieldLabel" htmlFor="of-name">
-              案件名
-              <TextField
+            <Field label="案件名" htmlFor="of-name"><TextField
                 id="of-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：定期便の初回"
                 maxLength={120}
-              />
-            </label>
-            <label className="af-create-fieldLabel" htmlFor="of-description">
-              説明 任意
-              <TextArea
+              /></Field>
+            <Field label="説明" htmlFor="of-description"><TextArea
                 id="of-description"
                 rows={3}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="例：初回の定期便をお申し込みいただいた方が対象です。"
-              />
-            </label>
+              /></Field>
           </section>
 
           {/*
@@ -252,9 +249,7 @@ export function NewOfferV8() {
           <section className="af-create-card" aria-label="何を成果として数えるか">
             <h2 className="af-create-cardTitle">何を成果として数えるか</h2>
             <p className="af-create-cardNote">コンバージョンで作った成果地点から選びます</p>
-            <label className="af-create-fieldLabel" htmlFor="v8-offer-point">
-              成果地点
-              <Select
+            <Field label="成果地点" htmlFor="v8-offer-point"><Select
                 id="v8-offer-point"
                 aria-label="成果地点"
                 value=""
@@ -262,8 +257,7 @@ export function NewOfferV8() {
                 options={[{ value: '', label: 'この画面では選べません' }]}
                 disabled
                 size="standard"
-              />
-            </label>
+              /></Field>
             <p className="af-create-footnote">成果地点と案件をつなぐ操作にはまだ対応していません。</p>
           </section>
 
@@ -271,9 +265,7 @@ export function NewOfferV8() {
             <h2 className="af-create-cardTitle">いくら払うか</h2>
             <p className="af-create-cardNote">アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
             <div className="af-create-grid2">
-              <label className="af-create-fieldLabel" htmlFor="of-amount">
-                報酬額（円）
-                <TextField
+              <Field label="報酬額（円）" htmlFor="of-amount"><NumberInput
                   id="of-amount"
                   type="number"
                   min={0}
@@ -281,11 +273,8 @@ export function NewOfferV8() {
                   value={rewardAmount}
                   onChange={(event) => setRewardAmount(event.target.value)}
                   placeholder="2000"
-                />
-              </label>
-              <label className="af-create-fieldLabel" htmlFor="of-miles">
-                マイル（任意） 任意
-                <TextField
+                /></Field>
+              <Field label="マイル" htmlFor="of-miles"><NumberInput
                   id="of-miles"
                   type="number"
                   min={0}
@@ -293,8 +282,7 @@ export function NewOfferV8() {
                   value={rewardMiles}
                   onChange={(event) => setRewardMiles(event.target.value)}
                   placeholder="200"
-                />
-              </label>
+                /></Field>
             </div>
             <p className="af-create-footnote">現金とマイルは併用できます。マイルは標準プログラムで付けます。</p>
             <div className="af-create-staticBox">
@@ -308,7 +296,7 @@ export function NewOfferV8() {
             <h2 className="af-create-cardTitle">成果を認めたときにすること</h2>
             <p className="af-create-cardNote">任意</p>
             <div className="af-create-switchRow">
-              <Toggle checked={tagEnabled} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} />
+              <SettingCheckbox checked={tagEnabled} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} />
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">タグを付ける</p>
                 <p className="af-create-switchNote">{tagName ?? 'まだ決めていません'}</p>
@@ -337,7 +325,7 @@ export function NewOfferV8() {
               </div>
             </div>
             <div className="af-create-switchRow">
-              <Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} />
+              <SettingCheckbox checked={scenarioEnabled} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} />
               <div className="af-create-switchBody">
                 <p className="af-create-switchName">シナリオ配信を始める</p>
                 <p className="af-create-switchNote">{scenarioName ?? 'まだ決めていません'}</p>

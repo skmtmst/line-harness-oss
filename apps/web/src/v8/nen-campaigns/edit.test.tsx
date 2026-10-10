@@ -5,6 +5,7 @@
  * V8 のテーマで出す・選んだ値が保存に乗る・閲覧のみの人には押せない保存を置かない・
  * コラムは配信対象を1つの欄で選び、足りないと保存せずに理由を出す。
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
@@ -77,7 +78,7 @@ const REVIEW = {
 let host: HTMLDivElement
 let root: Root
 
-beforeEach(() => {
+beforeEach(() => { clearToastsForTest();
   document.documentElement.dataset.theme = 'v8'
   role.value = 'owner'
   for (const fn of Object.values(calls)) fn.mockReset()
@@ -131,7 +132,7 @@ describe('狭い板の配信プレビュー', () => {
 
 describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
   it('V8 のテーマで節が並び、選んだ日数・時刻・マイルが保存に乗る', async () => {
-    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
     expect(document.documentElement.dataset.theme).toBe('v8')
     expect(host.querySelector('[data-design-node="w5pwG"]')).not.toBeNull()
@@ -154,7 +155,7 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
 
   it('B-139：本文が空のまま保存すると、口を呼ばず本文の欄が赤くなり、真下に理由が出て、本文へ移る', async () => {
     calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: '' }] })
-    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
     await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
@@ -167,7 +168,7 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
 
   it('閲覧のみの人には帯を出し、保存・テスト送信・押せない選ぶ欄を置かない', async () => {
     role.value = 'staff'
-    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+    await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(button('配信内容を保存する')).toBeUndefined()
@@ -188,15 +189,16 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     await act(async () => { fireEvent.change(input('記事の URL'), { target: { value: 'https://nen.example.jp/columns/autumn-food' } }) })
     // 配信対象は選ぶ窓の1つの欄。空＝友だち全員、タグを選ぶとそのタグで絞る。
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="配信対象：選ぶ"]')!.click() })
-    const picker = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!
-    await act(async () => { picker.querySelector<HTMLInputElement>('input[type="radio"][aria-label="ペット登録あり"]')!.click() })
-    await act(async () => { [...picker.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選ぶ')!.click() })
     await flush()
-    expect(host.textContent).toContain('1,240人に届きます')
+    const picker = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!
+    await act(async () => { picker.querySelector<HTMLInputElement>('input[type="checkbox"][aria-label="ペット登録あり"]')!.click() })
+    await act(async () => { [...picker.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選ぶ（1件）')!.click() })
+    await flush()
+    expect(host.textContent).toContain('1,240 人に届きます')
     await act(async () => { fireEvent.click(button('下書きを保存')!) })
     await flush()
     expect(calls.createColumn).toHaveBeenCalledWith('account-a', expect.objectContaining({ title: '秋の食事、量はどれくらい？', targetMode: 'tag', targetTagId: 'tag-pet' }))
-    expect(calls.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns')
+    expect(calls.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns&highlight=c-new')
   })
 
   it('題名と記事の URL が無いまま押すと、保存せずに理由を出す', async () => {
@@ -228,4 +230,26 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     expect(host.querySelector('input[aria-label="題名"]')).toBeNull()
     expect([...document.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
   })
+})
+
+it('保存のぶつかりでは入力を残し、比較では変えず、読み直すときだけ最新を入れる', async () => {
+  const { ApiError } = await import('@/lib/api')
+  await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) })
+  await flush()
+  const input = document.getElementById('nen-edit-body') as HTMLElement
+  await act(async () => { input.textContent = '自分の入力'; fireEvent.input(input) })
+  calls.updateSetting.mockRejectedValueOnce(new ApiError(409, '競合', 'VERSION_CONFLICT'))
+  calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: 'ほかの担当者の入力', updatedAt: '2026-10-09T08:00:00Z' }] })
+  await act(async () => { fireEvent.click(button('配信内容を保存する')!) })
+  await flush()
+  expect(input.textContent).toBe('自分の入力')
+  expect(button('違いを比べる')).toBeTruthy()
+  await act(async () => { fireEvent.click(button('違いを比べる')!) })
+  await flush()
+  expect(input.textContent).toBe('自分の入力')
+  expect(document.body.textContent).toContain('ほかの担当者の入力')
+  const reload = [...document.querySelectorAll('button')].find((item) => item.textContent?.includes('最新を読み込んで続ける'))!
+  await act(async () => { fireEvent.click(reload) })
+  await flush()
+  expect((document.getElementById('nen-edit-body') as HTMLElement).textContent).toBe('ほかの担当者の入力')
 })

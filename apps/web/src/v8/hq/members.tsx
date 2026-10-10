@@ -25,6 +25,9 @@ import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersB
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -52,7 +55,7 @@ const STATUS_TONES: Record<MemberStatus, StatusBadgeTone> = {
   inactive: 'neutral',
 }
 
-const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更はオーナーか管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更は統括の管理者に頼んでください。'
 
 export default function HqMembersV8() {
   return (
@@ -166,7 +169,7 @@ function MembersInner() {
       }
       // M026：原文のまま出さず、共通の状態別案内へ渡す（本人確認の分岐は先に残す）。
       setDialogError(japaneseDetailOf(caught) || describeApiFailure(caught, '保存', {
-        forbidden: '権限者の招待・変更はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+        scope: 'hq',
       }))
     } finally {
       setDialogBusy(false)
@@ -184,7 +187,7 @@ function MembersInner() {
     } catch (caught) {
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
       setActionError(japaneseDetailOf(caught) || describeApiFailure(caught, '招待メールの再送', {
-        forbidden: '招待メールの再送はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+        scope: 'hq',
       }))
     } finally {
       setResendingId(null)
@@ -199,7 +202,7 @@ function MembersInner() {
     <ListPage
       boardId="r4ARpV"
       title="メンバー"
-      description="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
+      help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
       actions={ready && canManage ? (
         <Button variant="primary" onClick={openInvite}>
           <Plus aria-hidden="true" className={styles.buttonIcon} />
@@ -214,13 +217,13 @@ function MembersInner() {
         {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
 
         {status === 'loading' ? (
-          <ListState kind="loading" title="権限者を読み込んでいます" />
+          <ListState permissionScope="hq" kind="loading" title="権限者を読み込んでいます" />
         ) : status === 'forbidden' ? (
-          <ListState kind="forbidden" />
+          <ListState permissionScope="hq" kind="forbidden" />
         ) : status === 'error' ? (
-          <ListState kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
+          <ListState permissionScope="hq" kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
         ) : restricted ? (
-          <ListState kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" description="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
+          <ListState permissionScope="hq" kind="forbidden" title="全アカウントの担当者だけが権限者を管理できます" permissionReason="担当アカウントが限定されているため、権限者の一覧と変更はできません。" />
         ) : (
           <>
             <KpiBand aria-label="権限者の数">
@@ -249,7 +252,7 @@ function MembersInner() {
                 return (
                   <div key={member.id} className={styles.row} role="row">
                     <span role="cell" className={styles.cell} title={member.name}>{member.name}{isSelf ? '（あなた）' : ''}</span>
-                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? '—'}</span>
+                    <span role="cell" className={styles.cell} title={member.email ?? ''}>{member.email ?? emptyValue('unknown')}</span>
                     <span role="cell" className={styles.cell}>{ROLE_WORDS[member.role] ?? member.role}</span>
                     <span role="cell" className={styles.cell} title={scope}>{scope}</span>
                     <span role="cell"><StatusBadge tone={STATUS_TONES[state]}>{STATUS_WORDS[state]}</StatusBadge></span>
@@ -308,7 +311,7 @@ function MembersInner() {
           onConfirm={() => {
             const pending = confirmChange
             setConfirmChange(null)
-            void submitDialog(pending.value)
+            return submitDialog(pending.value)
           }}
         />
       ) : null}

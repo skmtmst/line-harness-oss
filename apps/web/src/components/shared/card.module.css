@@ -1,9 +1,10 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .card {
-  border: 1px solid var(--color-hairline);
+
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
 }
 
@@ -28,7 +29,7 @@
 }
 
 .paddingRoomy {
-  padding: 18px;
+  padding: 24px;
 }
 
 /*
@@ -63,7 +64,7 @@
 
 .headerRoomy {
   min-height: 58px;
-  padding: 0 18px;
+  padding: 0 24px;
 }
 
 .titleGroup {
@@ -78,7 +79,7 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-lead);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.43;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -103,9 +104,9 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: var(--color-action);
+  color: var(--color-link);
   font-size: var(--text-label);
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -139,7 +140,11 @@
   gap: var(--tpl-cn-panel-inner-gap);
   padding: var(--tpl-cn-panel-pad);
 }
-[data-theme='v8'] .card[data-appearance="outlined"] { border: 0; border-radius: var(--tpl-rt-card-radius); outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); min-width: 0; }
+[data-theme='v8'] .card[data-appearance="outlined"] {  border-radius: var(--tpl-rt-card-radius);    min-width: 0;
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
 [data-theme='v8'] .card[data-gap="normal"] { gap: var(--tpl-rt-section-gap); }
 [data-theme='v8'] .card[data-gap="tight"] { gap: var(--tpl-e49-section-gap); }
 [data-theme='v8'] .card[data-gap="loose"] { gap: var(--tpl-e1-sns-card-gap); }
@@ -157,23 +162,42 @@
 [data-theme='v8'] .card[data-spacing='settings'] {
   display: flex; flex-direction: column; min-width: 0;
   gap: var(--tpl-rest3-ec-card-gap); padding: var(--tpl-rest3-ec-card-pad);
-  border: 0; border-radius: var(--tpl-rest3-ec-radius);
-  outline: 1px solid var(--color-hairline); outline-offset: -1px; box-shadow: none;
+   border-radius: var(--tpl-rest3-ec-radius);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 /* 外部連携の設定・見本カードだけ（spacing='integration' | 'preview'）。既定のカードは変えない。 */
 [data-theme='v8'] .spacedInset {
-  display: flex; flex-direction: column; border: 0; box-shadow: none;
-  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 [data-theme='v8'] .integration { gap: var(--tpl-rule-row-gap); padding: var(--tpl-cn-card-pad); }
 [data-theme='v8'] .preview { gap: var(--tpl-toolbar-gap); padding: var(--tpl-side-card-pad); }
 
 /* NEN の設定フォーム。既定の面と余白は保つ。 */
 [data-theme='v8'] .inset { min-width: 0; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
-[data-theme='v8'] .bordered { min-width: 0; box-shadow: none; }
+[data-theme='v8'] .bordered { min-width: 0;
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
 [data-theme='v8'] .spacingNormal { gap: var(--tpl-nm-card-gap); }
 [data-theme='v8'] .spacingRoomy { gap: var(--tpl-nc-card-gap-wide); }
 
 [data-theme='v8'] .paddingCompact { padding: var(--tpl-nc-side-pad); }
 [data-theme='v8'] .spacingTight { gap: var(--tpl-nc-field-gap); }
 [data-theme='v8'] .spacingControls { gap: var(--tpl-toolbar-gap); }
+
+/* B-152・仕上げ1 */
+[data-theme='v8'] .paddingDefault, [data-theme='v8'] .paddingCompact { padding: var(--polish-space-card); }
+[data-theme='v8'] .paddingRoomy, [data-theme='v8'] .paddingSpacious { padding: var(--polish-space-section); }
+[data-theme='v8'] .header { padding-inline: var(--polish-space-card); gap: var(--polish-space-field); }
+[data-theme='v8'] .gapTight { gap: var(--polish-space-row); }
+
+/* B-152・仕上げ2 */
+[data-theme='v8'] :is(.title, .headerStacked .title, .headerPanel .title) { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
+[data-theme='v8'] .meta { font-weight: var(--polish-weight-body); }
+[data-theme='v8'] .action { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }

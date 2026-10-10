@@ -53,7 +53,7 @@ describe('保存した検索の編集の計算', () => {
       { label: 'シナリオ', value: '3日後（固定）' },
     ])
     expect(usageRowsOf(undefined)).toEqual([{ label: '一斉配信', value: '—' }, { label: '自動処理', value: '—' }])
-    expect(headUsageText(usedIn)).toBe('一斉配信「秋の案内」で使っている（ほか1件）')
+    expect(headUsageText(usedIn)).toBe('一斉配信「秋の案内」で使っている（ほか1 件）')
     expect(headUsageText([])).toBe('使っている所はありません')
   })
 

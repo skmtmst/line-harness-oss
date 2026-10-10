@@ -8,9 +8,12 @@
  * 下の帯：キャンセル／下書きを保存／保存して公開。
  * 動き（読み込み・保存・公開・409・利用先の確認）は BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
@@ -31,9 +34,9 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { notifyToast } from '@/components/shared/toast'
-import FlexPreview from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
 import {
   ACCOUNT_MISMATCH_MESSAGE,
@@ -65,6 +68,8 @@ import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared
 import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
 import styles from './edit.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
@@ -329,9 +334,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     save: async () => (await saveNow({ silent: true })) !== null,
   })
 
-  const leave = () => {
-    disarm()
-    router.push('/templates')
+  const leave = (savedId: string) => {
+    if (!id) { disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
 
   const publishNow = async (templateId: string): Promise<boolean> => {
@@ -372,8 +376,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     const savedId = await saveNow()
     if (savedId) autosave.markSaved()
     if (savedId) {
-      notifyToast('下書きを保存しました')
-      leave()
+      notifySaved('下書きを保存しました')
+      leave(savedId)
     }
   }
 
@@ -396,7 +400,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       }
       if (await publishNow(savedId)) {
         notifyToast('公開しました')
-        leave()
+        leave(savedId)
       }
     } finally {
       setPublishing(false)
@@ -492,25 +496,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         title={title}
         description={description}
         band={conflict ? (
-          <div className={styles.band} role="alert" data-design-node="NCbYn">
-            <CircleAlert size={18} aria-hidden="true" className={styles.bandIcon} />
-            <div className={styles.bandText}>
-              <p className={styles.bandTitle} title={conflict.name}>
-                {`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
-              </p>
-              <p className={styles.bandDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。</p>
-            </div>
-            <div className={styles.bandActions}>
-              <Button type="button" onClick={() => void openCompare()} disabled={compareBusy}>
-                <GitCompare size={15} aria-hidden="true" />
-                違いを比べる
-              </Button>
-              <Button type="button" variant="primary" onClick={reloadLatest}>
-                <RotateCcw size={15} aria-hidden="true" />
-                最新を読み込んで続ける
-              </Button>
-            </div>
-          </div>
+          <SaveConflictBand designNode="NCbYn"
+            title={`ほかの人が${conflict.at ? ` ${conflict.at} に` : '先に'}テンプレート「${conflict.name}」を保存しました`}
+            compareBusy={compareBusy} onCompare={openCompare} onReload={reloadLatest} />
         ) : undefined}
         side={(
           <>
@@ -569,14 +557,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                 <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
               </div>
               <div className={styles.pair}>
-                <div className={`${styles.field} ${styles.grow}`}>
-                  <label htmlFor="te-name" className={styles.label}>テンプレート名</label>
-                  <TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} />
-                  <FieldError id="te-name-error">{fields.error('name')}</FieldError>
-                </div>
-                <div className={`${styles.field} ${styles.folderField}`}>
-                  <label htmlFor="te-folder" className={styles.labelSmall}>フォルダ</label>
-                  <FolderSelect
+                <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-name"><TextField {...fields.bind('name')} id="te-name" value={name} onChange={(event) => updateDraft({ name: event.target.value })} placeholder="例：予約前日のご案内" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-name-error' : undefined} />
+<FieldError id="te-name-error">{fields.error('name')}</FieldError></Field></div>
+                <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-folder"><FolderSelect
                     id="te-folder"
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
@@ -588,8 +571,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                       : canMutate && editorAccountId
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
-                  />
-                </div>
+                  /></Field></div>
               </div>
             </Card>
 
@@ -646,9 +628,9 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   {urls.map((url) => (
                     <div key={url} className={styles.urlRow}>
                       <Link2 size={14} aria-hidden="true" className={styles.urlIcon} />
-                      <span className={styles.urlText} title={url}>{url}</span>
+                      <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
                       <span className={styles.urlNote}>短縮して、押された数を数える</span>
-                      <Toggle checked locked label={`${url}を短縮して数える（いつもオン）`} />
+                      <SettingCheckbox checked locked label={`${url}を短縮して数える（いつもオン）`} />
                     </div>
                   ))}
                   <p className={styles.hint}>リンク名（計測に出る名前）と短縮URLは、配信のときに自動で付きます。</p>
@@ -697,7 +679,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             if (await publishNow(publishCheck.id)) {
               setPublishCheck(null)
               notifyToast('公開しました')
-              leave()
+              leave(publishCheck.id)
             }
           } finally {
             setPublishing(false)

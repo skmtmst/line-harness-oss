@@ -20,7 +20,7 @@ describe('一覧KPIの取得失敗時', () => {
     // 板 `apLqS`・`axFrW`：ListKpis は使わず、取れない値は「—」。
     // シナリオの入口は src/v8/scenarios/list.tsx（古い app/scenarios/list-v8.tsx はもう描かれない）。
     for (const path of ['app/reminders/list-v8.tsx', 'v8/scenarios/list.tsx']) {
-      expect(read(path), `${path} に「—」の欠け表示がありません`).toContain("? '—'")
+      expect(read(path), `${path} に「—」の欠け表示がありません`).toContain("? emptyValue('unknown')")
     }
   })
 

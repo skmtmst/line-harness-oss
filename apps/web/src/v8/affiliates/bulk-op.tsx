@@ -71,7 +71,7 @@ export default function BulkOpWizard({
       <div className={styles.bulkTargets}>
         <ListChecks size={15} aria-hidden="true" />
         <span className={styles.bulkTargetsText}>
-          {`選択した成果 ${formatNumber(targets.length)}件：${shownNames}${restCount > 0 ? `ほか${formatNumber(restCount)}件` : ''}（報酬 ¥${formatNumber(totalYen)}）`}
+          {`選択した成果 ${formatNumber(targets.length)} 件：${shownNames}${restCount > 0 ? `ほか${formatNumber(restCount)} 件` : ''}（報酬 ¥${formatNumber(totalYen)}）`}
         </span>
         <button type="button" className={styles.linkButton} onClick={onReselect}>選び直す</button>
       </div>

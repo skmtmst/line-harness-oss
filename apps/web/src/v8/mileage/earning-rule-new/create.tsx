@@ -9,6 +9,9 @@
  * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/mileage/earning-rules/new/v8-earning-rule-new.tsx）と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftRight, Check, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
@@ -38,6 +41,8 @@ import {
   earningRuleCancellationEvent,
 } from './rule-fields'
 import styles from './create.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const DAILY_CAPS = [
   ['', '制限なし'],
@@ -52,7 +57,7 @@ const LIST_HREF = '/mileage?tab=earning-rules'
 
 /** 数を桁区切りで出す。取れていない数は「—」。 */
 const miles = (value: number | null | undefined) =>
-  typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : '—'
+  typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : emptyValue('unknown')
 
 /** 競合の帯の「だれが・いつ」。口が返したときだけ使う（無ければ言い切らない）。 */
 function conflictWho(data: unknown): { who: string | null; at: string | null } {
@@ -62,7 +67,7 @@ function conflictWho(data: unknown): { who: string | null; at: string | null } {
   const raw = typeof record.updatedAt === 'string' ? record.updatedAt : null
   const date = raw ? new Date(raw) : null
   const at = date && !Number.isNaN(date.getTime())
-    ? new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }).format(date)
+    ? polishFormatDate(date, { style: 'time' })
     : null
   return { who, at }
 }
@@ -214,7 +219,7 @@ export default function EarningRuleCreateV8() {
         }
         throw new Error(draftResponse.error)
       }
-      router.push(continueAfter ? '/mileage/earning-rules/new' : LIST_HREF)
+      router.push(continueAfter ? '/mileage/earning-rules/new' : createPageReturnHref(LIST_HREF, res.data.id))
     } catch (caught) {
       /* BnrQp：同時に作られた・版がずれたときは競合の帯で知らせる。 */
       if (caught instanceof ApiError && caught.status === 409) {
@@ -249,18 +254,10 @@ export default function EarningRuleCreateV8() {
     ? `${conflict.who}さんが${conflict.at ? ` ${conflict.at} に` : ''}この決めごとを保存しました`
     : `ほかの人が${conflict?.at ? ` ${conflict.at} に` : ''}この決めごとを保存しました`
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert" aria-label="ほかの人が先に保存しました">
-      <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>{conflictTitle}</p>
-        <p className={styles.conflictNote}>{conflict.who ? `このまま保存すると、${conflict.who}さんの変更が消えます` : 'このまま保存すると、先に保存された変更が消えます'}</p>
-      </div>
-      <Button href={LIST_HREF}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
-      <Button href={LIST_HREF}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
-    </div>
+    <SaveConflictBand title={conflictTitle} description={conflict.who ? `このまま保存すると、${conflict.who}さんの変更が消えます` : 'このまま保存すると、先に保存された変更が消えます'} compareHref={LIST_HREF} reloadHref={LIST_HREF} />
   ) : null
 
-  const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : '—')
+  const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : emptyValue('unknown'))
   const preview = (
     <div className={styles.side}>
       <section className={styles.sideCard} aria-labelledby="er-new-trial">
@@ -275,7 +272,7 @@ export default function EarningRuleCreateV8() {
         <dl className={styles.trialRows}>
           <div className={styles.trialRow}>
             <dt>当てはまる人</dt>
-            <dd>{trialValue(`${miles(trial?.matchedFriends)}人`)}</dd>
+            <dd>{trialValue(`${miles(trial?.matchedFriends)} 人`)}</dd>
           </div>
           <div className={styles.trialRow}>
             <dt>付くマイル</dt>
@@ -289,7 +286,7 @@ export default function EarningRuleCreateV8() {
                 <HelpTip label="倍率の説明">倍率はタグ側の設定で決まります。優先度がいちばん高いタグ1枚だけが効きます。</HelpTip>
               ) : null}
             </dt>
-            <dd>{`${validAmount ? miles(value) : '—'}${dailyCap ? `（1日${dailyCap}回まで）` : ''}`}</dd>
+            <dd>{`${validAmount ? miles(value) : emptyValue('unknown')}${dailyCap ? `（1日${dailyCap}回まで）` : ''}`}</dd>
           </div>
         </dl>
       </section>
@@ -308,7 +305,7 @@ export default function EarningRuleCreateV8() {
     <CreatePage
       boardId={conflict ? 'BnrQp' : 'ctLwT'}
       title="たまる決めごとを作る"
-      description="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
+      help="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
       notice={conflictBand}
       preview={preview}
       footerActions={(
@@ -321,7 +318,7 @@ export default function EarningRuleCreateV8() {
             <Check size={15} aria-hidden="true" />{conflict ? '比べてから保存' : '保存して動かす'}
           </Button>
         </>
-      )}
+      )} dirty={false}
     >
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError('')} /> : null}
 
@@ -379,7 +376,7 @@ export default function EarningRuleCreateV8() {
         <div className={styles.fieldRow}>
           <div className={styles.field}>
             <Field label="マイル" htmlFor="er-amount" error={errorOf('er-amount')}>
-              <TextField id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <NumberInput id="er-amount" type="number" min={1} aria-label="マイル" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </Field>
           </div>
           <div className={styles.field}>
@@ -463,7 +460,7 @@ export default function EarningRuleCreateV8() {
           <div className={styles.detailsBody}>
             <Field label="付いたマイルの有効期限" htmlFor="er-expiry" error={errorOf('er-expiry')}>
               <span className={styles.inlineRow}>
-                <TextField id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
+                <NumberInput id="er-expiry" type="number" min={1} max={3650} value={expiresAfterDays} onChange={(e) => setExpiresAfterDays(e.target.value)} aria-label="有効期限の日数" />
                 <span className={styles.cardNote}>日後（空欄なら期限なし）</span>
               </span>
             </Field>

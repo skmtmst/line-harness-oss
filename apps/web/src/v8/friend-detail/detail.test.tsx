@@ -187,9 +187,9 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     role.current = 'staff'
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(links('編集')).toHaveLength(0)
+    expect(links('編集する')).toHaveLength(0)
     expect(links('＋ 追加')).toHaveLength(0)
-    expect(links('変更')).toHaveLength(0)
+    expect(links('変更する')).toHaveLength(0)
     expect(host.textContent).not.toContain('シナリオに登録する')
   })
 
@@ -198,7 +198,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     store.set('lh_staff_permissions', JSON.stringify(['/chats']))
     await render()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
-    expect(links('編集').length).toBeGreaterThanOrEqual(3)
+    expect(links('編集する').length).toBeGreaterThanOrEqual(3)
     // シナリオ登録はオーナー・管理者だけ。
     expect(host.textContent).not.toContain('シナリオに登録する')
   })
@@ -242,6 +242,27 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     getFriend.mockImplementation(async () => { throw new ApiError(403, 'forbidden') })
     await render()
     expect(host.textContent).toContain('この友だちを見る権限がありません')
-    expect(host.textContent).not.toContain('もう一度')
+    expect(host.textContent).toContain('もう一度')
   })
+})
+
+it('本名の固定欄とシステム表示名を、LINE登録名や通常の情報欄と分けて表示する', async () => {
+  getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: '以前の本名', systemDisplayName: '社内の呼び名' } })
+  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '本名の値', true), fixedKey: 'name' }, field('other-name', '本名', '山田 花子')], hiddenPersonalCount: 0 } })
+  await render()
+  const basic = host.querySelector('[aria-label="基本"]')!
+  expect(basic.textContent).toContain('本名の値')
+  expect(basic.textContent).not.toContain('以前の本名')
+  expect(basic.textContent).not.toContain('山田 花子')
+  act(() => { (links('顧客情報をすべて表示')[0] as HTMLButtonElement).click() })
+  await flush()
+  expect(host.querySelector('[aria-label="友だち情報"]')!.textContent).toContain('社内の呼び名')
+})
+it('本名の固定欄が未設定でも、同じ名前の通常情報欄を代わりに表示しない', async () => {
+  getFriend.mockResolvedValue({ success: true, data: { ...friend, realName: null, systemDisplayName: null } })
+  forFriend.mockResolvedValue({ success: true, data: { items: [{ ...field('fixed-name', '名前', '', true), fixedKey: 'name', value: null }, field('other-name', '本名', '山田 花子')], hiddenPersonalCount: 0 } })
+  await render()
+  const basic = host.querySelector('[aria-label="基本"]')!
+  expect(basic.textContent).not.toContain('山田 花子')
+  expect(basic.textContent).toContain('未設定')
 })

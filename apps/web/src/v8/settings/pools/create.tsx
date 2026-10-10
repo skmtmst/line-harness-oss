@@ -24,6 +24,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import styles from './create.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** slug は URL に出る。日本語や記号を許すと /pool/xxx が壊れる。 */
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,31}$/
@@ -129,7 +130,7 @@ export default function PoolCreateV8() {
       boardId="D0AOyx"
       layout="narrow-nav"
       title={TITLE}
-      description={DESCRIPTION}
+      help={DESCRIPTION}
       savePlacement="content"
       saveActions={(
         <>
@@ -146,16 +147,16 @@ export default function PoolCreateV8() {
           <section className={styles.card} aria-labelledby="pool-create-what">
             <h2 id="pool-create-what" className={styles.cardTitle}>1. どのプールか</h2>
             <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
-              <TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例: 渋谷エリア" maxLength={100} />
+              <TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例：渋谷エリア" maxLength={100} />
             </Field>
-            <Field label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
-              <TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} />
-            </Field>
-            <p className={styles.hint}>
+            <Field note={<>
               {slugValid
                 ? `保存すると、このURLが発行されます：${publicUrl}`
                 : '半角英小文字・数字・ハイフンで2〜32文字。配ったURLが使えなくなるため、あとから変えられません。'}
-            </p>
+            </>} label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
+              <TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} />
+            </Field>
+
           </section>
 
           <section className={styles.card} aria-labelledby="pool-create-where">
@@ -165,7 +166,7 @@ export default function PoolCreateV8() {
             </div>
             {selectedAccounts.map((account) => (
               <div key={account.id} className={styles.account}>
-                <span className={styles.accountName} title={account.name}>{account.name}</span>
+                <span className={styles.accountName} ><TruncatedText value={String(account.name ?? '')} /></span>
                 {accountHandle(account) ? <span className={styles.accountSub}>{accountHandle(account)}</span> : null}
                 <span className={styles.spacer} />
                 <Button
@@ -194,7 +195,7 @@ export default function PoolCreateV8() {
             {accountsError ? (
               <p role="alert" className={styles.error}>
                 {accountsError}{' '}
-                <button type="button" className={styles.retry} onClick={() => void loadAccounts()}>再読み込み</button>
+                <button type="button" className={styles.retry} onClick={() => void loadAccounts()}>もう一度読み込む</button>
               </p>
             ) : null}
           </section>
@@ -210,7 +211,7 @@ export default function PoolCreateV8() {
               </div>
               <div className={styles.fact}>
                 <dt>現在の受け入れ先</dt>
-                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（稼働中の所属先からランダムに振り分け）` : '未選択'}</dd>
+                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（有効の所属先からランダムに振り分け）` : '未選択'}</dd>
               </div>
             </dl>
           </section>

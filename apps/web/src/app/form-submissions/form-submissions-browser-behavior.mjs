@@ -469,8 +469,8 @@ try {
 
     assert.equal(await rows(page).count(), 20, '既定は20件表示')
 
-    await page.getByRole('button', { name: '並び順' }).click()
-    await page.getByRole('button', { name: '回答が多い順', exact: true }).click()
+    await page.getByRole('button', { name: '並び', exact: true }).click()
+    await page.getByRole('option', { name: '回答が多い順', exact: true }).click()
     await waitForQuery(page, 'sort', 'answers')
     // URL の更新と、API が返した並びの描画は別。先頭行が更新されるまで待つ。
     await page.waitForFunction(
@@ -487,13 +487,13 @@ try {
     assert.equal((await rows(page).first().innerText()).includes('フォーム03'), true, '2ページ目の先頭が変わらない')
 
     await page.getByRole('button', { name: '表示件数' }).click()
-    await page.getByRole('button', { name: '50件表示', exact: true }).click()
+    await page.getByRole('option', { name: '50 件表示', exact: true }).click()
     await waitForQuery(page, 'limit', '50')
     await waitForRowCount(page, 23)
     assert.equal(/page=2/.test(page.url()), false, '件数を増やしたら1ページ目へ戻る')
     await reloadList(page)
     assert.equal(await rows(page).count(), 23, '再読み込みしても50件表示のまま')
-    assert.equal((await page.getByRole('button', { name: '表示件数' }).innerText()).includes('50件表示'), true)
+    assert.equal((await page.getByRole('button', { name: '表示件数' }).innerText()).includes('50 件表示'), true)
     await context.close()
   }
 

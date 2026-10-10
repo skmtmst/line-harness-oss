@@ -2,6 +2,8 @@
 
 /* ⑤ 担当スタッフ（VLEaj）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
 import Link from 'next/link'
 import { ListChecks, Plus } from 'lucide-react'
@@ -22,6 +24,8 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const STAFF_PAGE_SIZE = 4
 
@@ -51,7 +55,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   const [pauseTarget, setPauseTarget] = useState<BookingStaff | null>(null)
   const [pausing, setPausing] = useState(false)
   const [pauseError, setPauseError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
 
   const pageCount = Math.max(1, Math.ceil(staff.length / STAFF_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
@@ -76,7 +80,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       onReload()
     } catch (cause) {
       setPauseError(cause instanceof ApiError && cause.status === 403
-        ? 'スタッフの受付状態を変える権限がありません。'
+        ? permissionDeniedMessage('store')
         : '変更できませんでした。もう一度お試しください。')
     } finally {
       setPausing(false)
@@ -94,7 +98,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
       onReload()
     } catch (cause) {
       setRemoveError(cause instanceof ApiError && cause.status === 403
-        ? 'スタッフを消す権限がありません。'
+        ? permissionDeniedMessage('store')
         : '消せませんでした。もう一度お試しください。')
     } finally {
       setRemoving(false)
@@ -116,7 +120,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         icon={<AccountIcon />}
         title="スタッフを読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -124,7 +128,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   return (
     <div className={styles.tabStack} data-design="Table">
       <div className={styles.staffHeadRow}>
-        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length}人`}</h2>
+        <h2 className={styles.staffHeadTitle}>{`担当スタッフ ${staff.length} 人`}</h2>
         <div className={styles.staffHeadActions}>
           <Button href="/booking/menus/staff"><ListChecks size={15} aria-hidden="true" />担当メニューをまとめて決める</Button>
           {canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}><Plus size={15} aria-hidden="true" />スタッフを登録</Button> : null}
@@ -158,7 +162,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
             id: 'shifts',
             label: '勤務とシフト',
             external: true,
-            onSelect: () => router.push(`/booking/staff/shifts?staff_id=${person.id}`),
+            href: `/booking/staff/shifts?staff_id=${person.id}`, onSelect: () => router.push(`/booking/staff/shifts?staff_id=${person.id}`),
           },
           ...(canEdit ? [
             { id: 'edit', label: '中身を編集', onSelect: () => setEditing(person) },
@@ -194,7 +198,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
               )}
             </span>
             <span className={styles.staffColNoAssign}>
-              <span className={styles.staffCellMain}>{person.is_designation_optional ? '入る' : '—'}</span>
+              <span className={styles.staffCellMain}>{person.is_designation_optional ? '入る' : emptyValue('unknown')}</span>
             </span>
             <span className={styles.staffColWork}>
               {extra?.work ? (() => {
@@ -215,10 +219,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
               <span className={styles.staffCellSub}>ログイン：{memberLabel(person)}</span>
             </span>
             <span className={styles.staffColStatus}>
-              <span className={`${styles.statePill} ${person.is_active ? styles.statePillOn : styles.statePillOff}`}>
-                <span className={styles.stateDot} aria-hidden="true" />
-                {person.is_active ? '受付中' : '止めている'}
-              </span>
+              <SharedStatusPill tone={person.is_active ? 'success' : 'neutral'}>{person.is_active ? '受付中' : '停止中'}</SharedStatusPill>
             </span>
             <span className={styles.staffColMenu}>
               <RowMenu
@@ -280,7 +281,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         busy={removing}
         error={removeError || undefined}
         onCancel={() => { if (!removing) setRemoveTarget(null) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
 
     </div>

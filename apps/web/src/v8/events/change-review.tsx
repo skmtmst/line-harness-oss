@@ -23,15 +23,18 @@ import TargetMissing from '@/components/shared/target-missing'
 import { isoToLocalInput, localInputToIso, noticeMessage, previewErrorMessage, useChangeReview, type SlotEdit } from './change-review-model'
 import { jstDay, jstTime } from './shared'
 import styles from './change-review.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /** datetime-local（日本時間の壁時計）→「10:30」。 */
 function localTime(local: string): string {
-  return local.split('T')[1]?.slice(0, 5) ?? '—'
+  return local.split('T')[1]?.slice(0, 5) ?? emptyValue('unknown')
 }
 /** datetime-local → 「10/12（月）」。 */
 function localDay(local: string): string {
   const date = local.split('T')[0]
-  return date ? jstDay(`${date}T00:00:00+09:00`) : '—'
+  return date ? jstDay(`${date}T00:00:00+09:00`) : emptyValue('unknown')
 }
 
 export default function EventChangeReviewV8() {
@@ -85,7 +88,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
       <CreatePage
         boardId="hmr2P"
         title="変更の確認"
-        description={description}
+        help={description}
         footerActions={<Button href="/events">一覧へ戻る</Button>}
       >
         {!selectedAccountId ? (
@@ -205,7 +208,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
     <CreatePage
       boardId="hmr2P"
       title={`変更の確認：${event.name}`}
-      description={description}
+      help={description}
       preview={side}
       footerActions={(
         <>
@@ -260,13 +263,13 @@ function ChangeReview({ eventId }: { eventId: string }) {
                   onClick={() => setSelectedSlotId(slot.id)}
                 >
                   <span className={styles.cellStart}>{`${jstDay(slot.starts_at)}${jstTime(slot.starts_at)}〜${jstTime(slot.ends_at)}`}</span>
-                  <span className={styles.cellNum}>{slot.capacity ?? '—'}</span>
-                  <span className={styles.cellNum}>{impact ? impact.confirmed_seats : (slot.active_count ?? '—')}</span>
-                  <span className={styles.cellNum}>{impact ? impact.waiting_seats : '—'}</span>
+                  <span className={styles.cellNum}>{slot.capacity ?? emptyValue('unknown')}</span>
+                  <span className={styles.cellNum}>{impact ? impact.confirmed_seats : (slot.active_count ?? emptyValue('unknown'))}</span>
+                  <span className={styles.cellNum}>{impact ? impact.waiting_seats : emptyValue('unknown')}</span>
                   <span className={styles.cellState}>
                     {ended ? <span className={styles.chip}>終了</span>
                       : slot.is_active === 1 ? <span className={`${styles.chip} ${styles.chipOn}`}>受付する</span>
-                        : <span className={styles.chip}>止めている</span>}
+                        : <span className={styles.chip}>停止中</span>}
                   </span>
                 </button>
               )
@@ -282,21 +285,13 @@ function ChangeReview({ eventId }: { eventId: string }) {
             <p className={styles.cardNote}>{`${jstDay(activeSlot.starts_at)}の回`}</p>
           </div>
           <div className={`${styles.pair} ${styles.datePair}`}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="ev-cr-start">開始日時</label>
-              <DateTimeField size="compact" id="ev-cr-start" invalid={Boolean(startError)} aria-describedby={startError ? 'ev-cr-start-error' : undefined} value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} />
-              {startError ? <p id="ev-cr-start-error" className={styles.fieldError} role="alert">{startError}</p> : null}
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="ev-cr-end">終了日時</label>
-              <DateTimeField size="compact" id="ev-cr-end" invalid={Boolean(endError)} aria-describedby={endError ? 'ev-cr-end-error' : undefined} value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} />
-              {endError ? <p id="ev-cr-end-error" className={styles.fieldError} role="alert">{endError}</p> : null}
-            </div>
+            <div className={styles.field}><Field label="開始日時" htmlFor="ev-cr-start"><DateTimeField size="compact" id="ev-cr-start" invalid={Boolean(startError)} aria-describedby={startError ? 'ev-cr-start-error' : undefined} value={activeEdit.startsAt} onChange={(next) => updateActive({ startsAt: next })} />
+{startError ? <p id="ev-cr-start-error" className={styles.fieldError} role="alert">{startError}</p> : null}</Field></div>
+            <div className={styles.field}><Field label="終了日時" htmlFor="ev-cr-end"><DateTimeField size="compact" id="ev-cr-end" invalid={Boolean(endError)} aria-describedby={endError ? 'ev-cr-end-error' : undefined} value={activeEdit.endsAt} onChange={(next) => updateActive({ endsAt: next })} />
+{endError ? <p id="ev-cr-end-error" className={styles.fieldError} role="alert">{endError}</p> : null}</Field></div>
           </div>
           <div className={styles.pair}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="ev-cr-cap">定員</label>
-              <TextField
+            <div className={styles.field}><Field label="定員" htmlFor="ev-cr-cap"><NumberInput numericText
                 id="ev-cr-cap"
                 inputMode="numeric"
                 aria-invalid={Boolean(capacityError) || undefined}
@@ -305,8 +300,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
                 placeholder="空欄で定員なし"
                 onChange={(e) => updateActive({ capacity: e.target.value.replace(/[^0-9]/g, '') })}
               />
-              {capacityError ? <p id="ev-cr-cap-error" className={styles.fieldError} role="alert">{capacityError}</p> : null}
-            </div>
+{capacityError ? <p id="ev-cr-cap-error" className={styles.fieldError} role="alert">{capacityError}</p> : null}</Field></div>
             <div className={styles.field}>
               <span className={styles.pickLabel}>受付の有無</span>
               <RadioCardGroup legend="受付の有無" className={styles.radioRow}>
@@ -315,9 +309,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
               </RadioCardGroup>
             </div>
           </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="ev-cr-reason">変える理由</label>
-            <TextField
+          <div className={styles.field}><Field label="変える理由" htmlFor="ev-cr-reason"><TextField
               id="ev-cr-reason"
               aria-invalid={Boolean(reasonError) || undefined}
               aria-describedby={reasonError ? 'ev-cr-reason-error' : undefined}
@@ -327,21 +319,14 @@ function ChangeReview({ eventId }: { eventId: string }) {
               aria-required={isPublished || undefined}
               onChange={(e) => { setReason(e.target.value); setReasonError('') }}
             />
-            {reasonError ? <p id="ev-cr-reason-error" className={styles.fieldError} role="alert">{reasonError}</p> : null}
-          </div>
+{reasonError ? <p id="ev-cr-reason-error" className={styles.fieldError} role="alert">{reasonError}</p> : null}</Field></div>
           <p className={styles.note}>
             {isPublished ? '理由は変更の記録に残ります。友だちには送りません。公開中なので書かないと変えられません。' : '理由は変更の記録に残ります。友だちには送りません。'}
           </p>
           {venueOpen ? (
             <div className={styles.pair}>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="ev-cr-venue">会場</label>
-                <TextField id="ev-cr-venue" value={venueName} placeholder="未設定" onChange={(e) => { setVenueName(e.target.value); touchEdits() }} />
-              </div>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="ev-cr-url">オンラインの URL（確定した申込にだけ見せます）</label>
-                <TextField id="ev-cr-url" type="url" value={venueUrl} placeholder="未設定" onChange={(e) => { setVenueUrl(e.target.value); touchEdits() }} />
-              </div>
+              <div className={styles.field}><Field label="会場" htmlFor="ev-cr-venue"><TextField id="ev-cr-venue" value={venueName} placeholder="未設定" onChange={(e) => { setVenueName(e.target.value); touchEdits() }} /></Field></div>
+              <div className={styles.field}><Field label="オンラインの URL（確定した申込にだけ見せます）" htmlFor="ev-cr-url"><TextField id="ev-cr-url" type="url" value={venueUrl} placeholder="未設定" onChange={(e) => { setVenueUrl(e.target.value); touchEdits() }} /></Field></div>
             </div>
           ) : (
             <div className={styles.linkRow}>
@@ -361,7 +346,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
         cancelLabel="戻って直す"
         confirmLabel={`変えて ${preview?.total_confirmed ?? 0} 人にお知らせする`}
         busy={applyBusy}
-        onConfirm={() => { setConfirmOpen(false); void runApply() }}
+        onConfirm={() => { setConfirmOpen(false); return runApply() }}
         onCancel={() => setConfirmOpen(false)}
       >
         <div className={styles.confirmBody}>

@@ -10,6 +10,8 @@
  * 保存した URL は「今日のお店」の右の列と「枠を閉じる知らせ」の［管理画面を開く ↗］に使われる。
  * 動きは BEHAVIOR.md。
  */
+import { notifySaved } from '@/components/shared/toast'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, MessageCircle, Plus } from 'lucide-react'
 import { PageFrame, PageHeading, PageFooter } from '@/components/templates/page-frame'
@@ -21,7 +23,7 @@ import Notice from '@/components/shared/notice'
 import SectionHeader from '@/components/shared/section-header'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import { Field } from '@/components/shared/form-controls'
@@ -38,6 +40,11 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export type MediaRow = {
   code: string
@@ -93,7 +100,7 @@ export function recipientText(settings: Pick<NoticeSettings, 'recipientMode' | '
   if (settings.recipientMode === 'manager') return '店長'
   if (settings.recipientMode === 'selected') {
     const names = settings.membershipIds.map((id) => members.find((m) => m.id === id)?.staff_name).filter((name): name is string => !!name)
-    return names.length > 0 ? `${names.join('・')}（${names.length}人）` : `選んだスタッフ（${settings.membershipIds.length}人）`
+    return names.length > 0 ? `${names.join('・')}（${names.length} 人）` : `選んだスタッフ（${settings.membershipIds.length} 人）`
   }
   return '当日の責任者（いなければ店長）'
 }
@@ -124,11 +131,11 @@ export function withSavedVersion(list: MediaRow[], code: string, version: number
 }
 
 function UrlCell({ url }: { url: string | null }) {
-  if (!url) return <span className={styles.none}>—</span>
+  if (!url) return <span className={styles.none}>{emptyValue('unknown')}</span>
   return (
-    <a className={styles.url} href={url} target="_blank" rel="noopener noreferrer" title={url}>
-      {`${shortUrl(url)} ↗`}
-    </a>
+    <TextLink external className={styles.url} href={url}   title={url}>
+      {`${shortUrl(url)}`}
+    </TextLink>
   )
 }
 
@@ -350,11 +357,11 @@ export default function BookingMediaPage() {
           setNotice(next); setNoticeSaved(next)
         }
       }
-      notifyToast('予約サイト・グルメ媒体の設定を保存しました')
+      notifySaved('予約サイト・グルメ媒体の設定を保存しました')
       await Promise.all([load(), loadNotice()])
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) setConflict(true)
-      else setSaveError(caught instanceof ApiError && caught.status === 400 ? 'URL は https:// で始まるものだけ保存できます。行の「…」から直してください。' : describeSaveFailure(caught))
+      else setSaveError(caught instanceof ApiError && caught.status === 400 ? 'URL は https:// で始まるものだけ保存できます。行の「…」から直してください。' : withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
       /* 途中まで保存できた行があるので、版を読み直す（入力は残す）。 */
     } finally {
       setSaving(false)
@@ -362,10 +369,7 @@ export default function BookingMediaPage() {
   }
 
   const askLink = () => setLinkAsked(true)
-  const copyText = async (text: string, what: string) => {
-    if (!link?.available) { askLink(); return }
-    try { await navigator.clipboard.writeText(text); notifyToast(`${what}をコピーしました`) } catch { notifyToast(`${what}をコピーできませんでした`) }
-  }
+
 
   let table
   if (loadError && !saved) table = <ListState kind="error" error={loadError} onRetry={() => void load()} />
@@ -392,7 +396,7 @@ export default function BookingMediaPage() {
                 <Td className={styles.colName}>
                   <span className={styles.nameCell}>
                     <span className={styles.mark} aria-hidden="true">{row.name.slice(0, 1)}</span>
-                    <span className={styles.name} title={row.name}>{row.name}</span>
+                    <span className={styles.name} ><TruncatedText value={String(row.name ?? '')} /></span>
                   </span>
                 </Td>
                 <Td className={styles.colPage}><UrlCell url={row.pageUrl} /></Td>
@@ -412,8 +416,8 @@ export default function BookingMediaPage() {
                           icon: row.closeOnBooking ? <Check size={14} aria-hidden="true" /> : undefined,
                           onSelect: () => setRow(row.code, { closeOnBooking: !row.closeOnBooking }),
                         }] : []),
-                        ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, onSelect: () => { window.open(row.pageUrl!, '_blank', 'noopener,noreferrer') } }] : []),
-                        ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, onSelect: () => { window.open(row.loginUrl!, '_blank', 'noopener,noreferrer') } }] : []),
+                        ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, href: row.pageUrl!, onSelect: () => { window.open(row.pageUrl!, '_blank', 'noopener,noreferrer') } }] : []),
+                        ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, href: row.loginUrl!, onSelect: () => { window.open(row.loginUrl!, '_blank', 'noopener,noreferrer') } }] : []),
                       ]}
                     />
                   ) : null}
@@ -438,8 +442,8 @@ export default function BookingMediaPage() {
           actions={(
             <span className={styles.headActions}>
               {stores.length > 1 ? (
-                <span className={styles.storeSelect}>
-                  <Select aria-label="店舗" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
+                <span>
+                  <StoreFilterTabs  value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ value: s.id, label: s.name }))} />
                 </span>
               ) : null}
               {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={15} aria-hidden="true" />媒体を足す</Button> : null}
@@ -448,7 +452,7 @@ export default function BookingMediaPage() {
         />
         <div className={styles.body}>
           {conflict ? (
-            <Notice tone="warn" role="alert" action={<Button size="compact" onClick={() => void load()}>読み直す</Button>}>
+            <Notice tone="warn" role="alert" action={<Button size="compact" onClick={() => void load()}>もう一度読み込む</Button>}>
               ほかの人が先にこの店の媒体の設定を変えました。読み直してから、もう一度変えてください。
             </Notice>
           ) : null}
@@ -476,7 +480,7 @@ export default function BookingMediaPage() {
                 {canManage ? (
                   <div className={styles.urlRow}>
                     <span className={styles.urlBox} title={link?.url}>{link?.url ?? (linkError || '読み込んでいます…')}</span>
-                    <Button onClick={() => void copyText(link?.url ?? '', '予約ページの URL')} disabled={!link}><Copy size={15} aria-hidden="true" />コピー</Button>
+                    <CopyTextButton value={link?.url ?? ""} aria-label="予約ページのURLをコピー" disabled={!link} />
                   </div>
                 ) : (
                   <p className={styles.cardText}>予約ページの URL は、管理者が確かめられます。</p>
@@ -495,7 +499,7 @@ export default function BookingMediaPage() {
                   <>
                     <code className={styles.code} title={link?.html}>{link?.html ?? (linkError || '読み込んでいます…')}</code>
                     <span className={styles.copyRow}>
-                      <Button onClick={() => void copyText(link?.html ?? '', '貼り付けるコード')} disabled={!link}><Copy size={15} aria-hidden="true" />コードをコピー</Button>
+                      <CopyTextButton value={link?.html ?? ""} aria-label="コードをコピー" disabled={!link} />
                     </span>
                   </>
                 ) : null}
@@ -513,7 +517,7 @@ export default function BookingMediaPage() {
             <div className={styles.switchRow}>
               {/* 閲覧のみには押せる形のスイッチを置かない。オン・オフは札で見せる。 */}
               {canManage ? (
-                <Toggle checked={closeOn} label="LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す" onChange={(next) => setAllClose(next)} />
+                <SettingCheckbox checked={closeOn} label="LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す" onChange={(next) => setAllClose(next)} />
               ) : <StatusBadge tone={closeOn ? 'success' : 'neutral'}>{closeOn ? 'オン' : 'オフ'}</StatusBadge>}
               <span className={styles.switchText}>
                 <span className={styles.switchTitle}>LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す</span>
@@ -523,7 +527,7 @@ export default function BookingMediaPage() {
             <div className={styles.switchRow}>
               {/* オフにすると LINE の知らせだけ止める（管理画面の「もう開けてよい」は残る）。閲覧のみは札。 */}
               {canManage && notice ? (
-                <Toggle checked={notice.notifyReopen} label="キャンセルで席が空いたら「もう開けてよい」を知らせる" onChange={(next) => setNotice({ ...notice, notifyReopen: next })} />
+                <SettingCheckbox checked={notice.notifyReopen} label="キャンセルで席が空いたら「もう開けてよい」を知らせる" onChange={(next) => setNotice({ ...notice, notifyReopen: next })} />
               ) : <StatusBadge tone={notice?.notifyReopen === false ? 'neutral' : 'success'}>{notice?.notifyReopen === false ? 'オフ' : 'オン'}</StatusBadge>}
               <span className={styles.switchText}>
                 <span className={styles.switchTitle}>キャンセルで席が空いたら「もう開けてよい」を知らせる</span>
@@ -561,7 +565,7 @@ export default function BookingMediaPage() {
                   </Button>
                 </>
               )}
-              status={changes > 0 ? <span aria-live="polite">{dirty.length > 0 ? `変えた媒体 ${dirty.length}件${noticeDirty ? '・知らせの設定' : ''}（まだ保存していません）` : '知らせの設定を変えました（まだ保存していません）'}</span> : undefined}
+              status={changes > 0 ? <span aria-live="polite">{dirty.length > 0 ? `変えた媒体 ${dirty.length} 件${noticeDirty ? '・知らせの設定' : ''}（まだ保存していません）` : '知らせの設定を変えました（まだ保存していません）'}</span> : undefined}
           />
         ) : null}
       </PageFrame>
@@ -646,7 +650,7 @@ export default function BookingMediaPage() {
         description="予約を受けないグルメ媒体（口コミ・紹介のサイトなど）を足します。予約メールは取り込みません。足したら行の「…」から URL を入れます。"
         confirmLabel="足す"
         busy={addBusy}
-        onConfirm={() => void addMedium()}
+        onConfirm={() => addMedium()}
         onCancel={() => setAdding(false)}
         error={addError || undefined}
       >

@@ -81,7 +81,9 @@
 .editSplit { display: flex; align-items: flex-start; gap: var(--tpl-htn-edit-gap); }
 .editPanel {
   flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); padding: var(--tpl-htn-panel-pad);
-  border-radius: var(--tpl-htn-radius-l); box-shadow: var(--tpl-htn-ring); background: var(--color-canvas);
+  border-radius: var(--tpl-htn-radius-l);  background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 .editTitle { margin: 0; font-size: var(--tpl-htn-text-14); line-height: var(--tpl-htn-lh-20); font-weight: 700; }
 .twoCol { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--tpl-htn-panel-gap); }
@@ -129,7 +131,10 @@
 /* 配る（meBRB） */
 .progressPanel {
   display: flex; flex-direction: column; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn-progress-pad);
-  border-radius: var(--tpl-htn-radius-l); box-shadow: var(--tpl-htn-ring);
+  border-radius: var(--tpl-htn-radius-l);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 .progressPanel h2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; }
 .progressRow { display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); }

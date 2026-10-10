@@ -5,6 +5,7 @@
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
  * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bookmark, CircleCheck, CircleSlash, Download, History, LogOut, Undo2 } from 'lucide-react'
@@ -44,6 +45,9 @@ import {
 } from './helpers'
 import type { DetailChrome, EditContext } from './types'
 import styles from './participants.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 
@@ -63,14 +67,14 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const [loadingMore, setLoadingMore] = useState(false)
   const [moreError, setMoreError] = useState('')
   const [attempt, setAttempt] = useState(0)
-  const [filter, setFilter] = useState<'' | WebinarParticipantClassification>('')
+  const [filter, setFilter] = useListUrlValue<'' | WebinarParticipantClassification>('filter', '')
   const [rule, setRule] = useState<WebinarParticipantPage['rule'] | null>(null)
   const [measurement, setMeasurement] = useState<WebinarParticipantPage['measurement'] | null>(null)
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvError, setCsvError] = useState('')
-  const [query, setQuery] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const generation = useRef(0)
   const csvLock = useRef(false)
   const moreLock = useRef(false)
@@ -81,7 +85,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
     const request = generation.current
     setCsvBusy(true)
     setCsvError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id, filter || undefined), 'webinar-participants.csv')
+    void downloadApiFile(webinarApi.participantsCsvUrl(webinar.id, filter || undefined), csvFileName("動画セミナー参加者"))
       .catch(() => { if (request === generation.current) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') })
       .finally(() => { csvLock.current = false; setCsvBusy(false) })
   }, [webinar.id, filter])
@@ -156,8 +160,8 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const to = Math.min(searched.length, currentPage * pageSize)
 
   const kpis = [
-    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : '—', help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
-    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.completed, summary.reservations)}` : '—', help: '動画の9割以上を見た人です。' },
+    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : emptyValue('unknown'), help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
+    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.completed, summary.reservations)}` : emptyValue('unknown'), help: '動画の9割以上を見た人です。' },
     { key: 'dropped', title: '途中で離れた', icon: LogOut, value: dropped, unit: '人', detail: '平均離脱時間 —', help: '入場した人から、視聴完了の人を引いた数です。途中で離れた人だけの平均離脱時間は、まだ数えていません。' },
     { key: 'unviewed', title: '見ていない', icon: Undo2, value: unviewed, unit: '人', detail: '見逃し案内の対象', help: '申し込んだが入場の記録がない人です。' },
   ]
@@ -174,7 +178,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   } else if (state === 'loading') {
     body = <p className={styles.state} role="status">読み込み中...</p>
   } else if (state === 'error') {
-    body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" action={<Button onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button>} />
+    body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={() => setAttempt((count) => count + 1)} />
   } else if (pageItems.length === 0) {
     body = <ListState kind="empty" title={filter || query.trim() !== '' ? 'この条件に当てはまる人はいません' : 'まだ参加者はいません'} />
   } else {
@@ -195,14 +199,14 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, webinar.durationSeconds)) * 100))
             const badge = actionBadge(participant)
             return (
-              <Tr key={participant.friendId} className={styles.row} data-table-layout="columns">
+              <Tr key={participant.friendId} className={styles.row} data-table-layout="columns" data-row-id={participant.friendId}>
                 <Td className={styles.colName}>
-                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className={styles.name}>{name}</Link>
+                  <Link href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}  className={styles.name}><TruncatedText value={String(name ?? '')} /></Link>
                   <span className={styles.sub}>{`${joinNote(participant)}${joinKindLabel(participant)}`}</span>
                 </Td>
                 <Td className={styles.colWhen}><span className={styles.main}>{shortDateTime(participant.latestJoinedAt)}</span></Td>
                 <Td className={styles.colWatch}>
-                  <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : '—'}</span>
+                  <span className={styles.main}>{participant.maxWatchedSeconds > 0 ? `${fmtJaDuration(participant.maxWatchedSeconds)}（${rate}%）` : emptyValue('unknown')}</span>
                   <span className={styles.sub}>{participantStateLabel(participant, webinar.durationSeconds)}</span>
                 </Td>
                 <Td className={styles.colAction}>
@@ -223,7 +227,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   }
 
   const csvButton = state === 'ready'
-    ? <Button onClick={downloadCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    ? <Button onClick={downloadCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
     : null
 
   return (
@@ -272,7 +276,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
         pagination={<>
           {state === 'ready' && searched.length > 0 ? (
             <ListPagePagination>
-              <span className={styles.pagerCount}>{`${formatNumber(searched.length)}件中 ${from}〜${to}件`}</span>
+              <span className={styles.pagerCount}>{`${formatNumber(searched.length)} 件中 ${from}〜${to} 件`}</span>
               <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="参加者一覧のページ送り" />
             </ListPagePagination>
           ) : null}

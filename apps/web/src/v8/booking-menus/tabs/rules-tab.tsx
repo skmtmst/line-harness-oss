@@ -2,12 +2,13 @@
 
 /* ④ 予約のルール（x1OZS6）。絵に無い設定は「ほかの設定」で開く。 */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
 import HelpTip from '@/components/shared/help-tip'
 import { notifyToast } from '@/components/shared/toast'
@@ -25,6 +26,9 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /* 候補は v7（/booking/menus の BookingRulesEditor）と同じ。 */
 const TIME_ZONE_CHOICES = [
@@ -85,10 +89,8 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
       : Number(shown)
   const hint = hintNumber === null || Number.isNaN(hintNumber) ? null : humanize?.(hintNumber)
   return (
-    <label className={styles.fieldLabel}>
-      {label}
-      <span className="mt-1 flex items-center gap-2">
-        <input
+    <Field label={<>{label}</>}><span className="mt-1 flex items-center gap-2">
+        <NumberInput unit={unit}
           aria-label={label}
           type="number"
           min={min}
@@ -107,10 +109,9 @@ function RuleNumberFieldV8({ label, unit, min, max, value, onChange, trackEmpty,
           }}
           className={styles.numInput}
         />
-        <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
+
       </span>
-      {hint ? <span className="text-ink-faint mt-1 block text-xs">＝{hint}</span> : null}
-    </label>
+{hint ? <span className="text-ink-faint mt-1 block text-xs">＝{hint}</span> : null}</Field>
   )
 }
 
@@ -213,7 +214,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       setDraft(response.data)
       setCutoffEmpty(false)
       setCancelEmpty(false)
-      notifyToast('予約のルールを保存しました。')
+      notifySaved('予約のルールを保存しました。')
       onSaved(response.data)
       if (noAssign !== null && noAssign !== initialNoAssign) onReload()
     } catch (cause) {
@@ -231,7 +232,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         icon={<AccountIcon />}
         title="予約のルールを読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -245,7 +246,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   const cancelOptions = withCurrent(BEFORE_MINUTE_CHOICES, draft.cancelDeadlineMinutesBefore)
     .map((minutes) => ({ value: String(minutes), label: beforeLabel(minutes) }))
   const maxOptions = withCurrent(MAX_ACTIVE_CHOICES, draft.maxActiveBookingsPerFriend)
-    .map((count) => ({ value: String(count), label: `${count}件` }))
+    .map((count) => ({ value: String(count), label: `${count} 件` }))
   const dayBeforeText = draft.reminderDayBeforeTime
     ? `前日の ${draft.reminderDayBeforeTime} に送ります`
     : '24時間前に送ります'
@@ -303,7 +304,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
           <div className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>お店が承認してから確定する</span>
             {canEdit ? (
-              <Toggle
+              <SettingCheckbox
                 label="お店が承認してから確定する"
                 checked={draft.approvalMode === 'manual'}
                 onChange={(next) => set('approvalMode', next ? 'manual' : 'automatic')}
@@ -311,7 +312,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
             ) : <span className="text-sm text-ink-secondary">{draft.approvalMode === 'manual' ? 'オン' : 'オフ'}</span>}
           </div>
           <div className={styles.ruleLine}>
-            <span className={styles.ruleLineLabel}>{`同じ人の予約は同時に ${draft.maxActiveBookingsPerFriend}件 まで`}</span>
+            <span className={styles.ruleLineLabel}>{`同じ人の予約は同時に ${draft.maxActiveBookingsPerFriend} 件 まで`}</span>
             {canEdit ? (
               <span className={styles.ruleLineSelect}>
                 <Select
@@ -329,7 +330,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               <HelpTip label="「指名なし」の説明">オンにすると、受付中のスタッフ全員が「指名なし」での予約の対象になります。</HelpTip>
             </span>
             {canEdit ? (
-              <Toggle
+              <SettingCheckbox
                 label="「指名なし」を出す"
                 checked={noAssign ?? initialNoAssign}
                 onChange={(next) => setNoAssign(next)}
@@ -362,25 +363,20 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         {/* 絵に無いが機能がある欄（送る時刻・当日・枠の間隔・仮押さえ・タイムゾーン・日時の最初の形）は「ほかの設定」で開く。 */}
         <Disclosure title="ほかの設定（お知らせの時刻・予約枠の間隔・仮押さえ・タイムゾーン・日時の最初の形）">
           <div className={styles.ruleFields}>
-            <label className={styles.fieldLabel}>
-              前日のお知らせを送る時刻
-              <span className="mt-1 flex items-center gap-2">
+            <Field label="前日のお知らせを送る時刻"><span className="mt-1 flex items-center gap-2">
                 {canEdit ? (
                   <TimeField
                     aria-label="前日のお知らせを送る時刻"
                     value={draft.reminderDayBeforeTime ?? ''}
                     onChange={(value) => set('reminderDayBeforeTime', value || null)}
                   />
-                ) : <ReadOnlyText label="前日のお知らせを送る時刻" value={draft.reminderDayBeforeTime || '未設定'} />}
+                ) : <ReadOnlyText label="前日のお知らせを送る時刻" value={draft.reminderDayBeforeTime || emptyValue('unconfigured')} />}
                 <span className="text-ink-faint whitespace-nowrap text-xs">空欄は24時間前</span>
-              </span>
-            </label>
+              </span></Field>
             <RuleNumberFieldV8 readOnly={!canEdit} label="当日のお知らせ" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={(value) => formatHoursBeforeHint(value) || null} />
             <RuleNumberFieldV8 readOnly={!canEdit} label="予約枠の間隔" unit="分" min={5} max={60} value={draft.slotGranularityMinutes} onChange={(value) => set('slotGranularityMinutes', value as BookingSettings['slotGranularityMinutes'])} />
             <RuleNumberFieldV8 readOnly={!canEdit} label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
-            <label className={styles.fieldLabel}>
-              タイムゾーン
-              {canEdit ? (
+            <Field label="タイムゾーン">{canEdit ? (
                 <Select size="full"
                   aria-label="タイムゾーン"
                   value={draft.timeZone}
@@ -392,13 +388,10 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                   ).map((zone) => ({ value: zone, label: zone }))}
                 />
               ) : <ReadOnlyText label="タイムゾーン" value={draft.timeZone} spaced />}
-              {isUnknownTimeZone(draft.timeZone) ? (
+{isUnknownTimeZone(draft.timeZone) ? (
                 <span className="text-danger mt-1 block text-xs">一覧にないタイムゾーンです。綴りを確認してください（よく使う値: Asia/Tokyo）。</span>
-              ) : null}
-            </label>
-            <label className={styles.fieldLabel}>
-              日時を選ぶ画面の最初の形
-              {canEdit ? (
+              ) : null}</Field>
+            <Field label="日時を選ぶ画面の最初の形">{canEdit ? (
                 <Select size="full"
                   aria-label="日時を選ぶ画面の最初の形"
                   value={draft.liffDateView ?? 'list'}
@@ -409,8 +402,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                     { value: 'calendar', label: 'カレンダー' },
                   ]}
                 />
-              ) : <ReadOnlyText label="日時を選ぶ画面の最初の形" value={draft.liffDateView === 'calendar' ? 'カレンダー' : '週で見る（日付の横ならび）'} spaced />}
-            </label>
+              ) : <ReadOnlyText label="日時を選ぶ画面の最初の形" value={draft.liffDateView === 'calendar' ? 'カレンダー' : '週で見る（日付の横ならび）'} spaced />}</Field>
           </div>
         </Disclosure>
 

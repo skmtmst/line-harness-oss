@@ -58,7 +58,7 @@ describe('V6 自動応答一覧の契約', () => {
   })
 
   it('取得できなかった過去28日の数を0件に見せない', () => {
-    expect(PUBLISH).toContain("matchedLast28Days == null ? '—'")
+    expect(PUBLISH).toContain("matchedLast28Days == null ? emptyValue('unknown')")
     expect(PUBLISH).toContain('`${formatNumber(matchedLast28Days)}件`')
   })
 

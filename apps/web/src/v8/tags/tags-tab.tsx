@@ -30,7 +30,6 @@ import {
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type ListStats } from '@/lib/api'
 import { useRowLeaving } from '@/lib/use-row-leaving'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
@@ -38,13 +37,14 @@ import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import StatusBadge from '@/components/shared/status-badge'
+import FilterChip from '@/components/shared/filter-chip'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -74,6 +74,7 @@ import {
 } from '@/components/friend-fields/tags-page-v4'
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
@@ -84,7 +85,7 @@ const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   manual: '手動',
   birthday: '誕生日のきまり',
 }
-const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—')
+const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : emptyValue('unknown'))
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -119,7 +120,7 @@ export function tagLinkText(tag: Tag): string {
   if (tag.mileageMultiplierBps) main.push(`${tag.mileageMultiplierBps / 10000}倍`)
   const parts = main.length ? [main.join('・')] : []
   if (tag.otherActionCount) parts.push(`他${tag.otherActionCount}`)
-  return parts.length ? parts.join(' ') : '—'
+  return parts.length ? parts.join(' ') : emptyValue('unknown')
 }
 
 /**
@@ -170,7 +171,7 @@ function TagFolderDialog({
       description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
       name={name} onNameChange={setName} color={color} onColorChange={setColor}
       colors={TAG_FOLDER_COLORS}
-      placeholder="例: VIP" busy={saving} error={error || undefined}
+      placeholder="例：VIP" busy={saving} error={error || undefined}
       onCancel={onClose} onConfirm={() => void save()} confirmLabel={group ? '保存する' : 'フォルダを作る'}
     />
   )
@@ -204,7 +205,8 @@ export default function TagsTab({
    * タグを開いて「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
    * （同じ書き込みの中で戻す。効果で戻すと、来た瞬間に URL から戻したページまで消える）。
    */
-  const [view, setView] = useListUrlState({ q: '', folder: '', usage: 'all', source: 'all', quick: '', size: '20', page: '1' })
+  const [view, setView] = useListUrlState({ q: '', folder: '', usage: 'all', source: 'all', quick: '', archived: '', size: '20', page: '1' })
+  const onlyArchived = view.archived === '1'
   const query = view.q
   const folder = view.folder
   const usageFilter = view.usage
@@ -225,9 +227,11 @@ export default function TagsTab({
   const [quickOpen, setQuickOpen] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
+  const [restoreTarget, setRestoreTarget] = useState<Tag | null>(null)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreError, setRestoreError] = useState('')
   const { leavingId, leave } = useRowLeaving()
   // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
-  const deferredDelete = useDeferredDelete()
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -294,7 +298,7 @@ export default function TagsTab({
 
   const filtered = useMemo(() => items.filter((tag) => {
     // 保管して「元に戻す」を待っている行は出さない。
-    if (deferredDelete.isHidden(tag.id)) return false
+    if ((tag.status === 'archived') !== onlyArchived) return false
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
     if (folder && folder !== UNGROUPED && tag.groupId !== folder) return false
@@ -310,7 +314,7 @@ export default function TagsTab({
       if (key === 'linked' && !linked) return false
     }
     return true
-  }), [items, query, folder, usageFilter, sourceFilter, quick, deferredDelete])
+  }), [items, query, folder, usageFilter, sourceFilter, quick, onlyArchived])
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -342,7 +346,7 @@ export default function TagsTab({
       if (!result.success) message = `並び順を保存できませんでした（${result.error}）`
     } catch (caught) {
       const detail = japaneseDetailOf(caught)
-      message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''}通信を確かめて、もう一度お試しください。`
+      message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''} 通信を確かめて、もう一度お試しください。`
     }
     if (message !== null) {
       setItems(previous)
@@ -476,42 +480,43 @@ export default function TagsTab({
       ]
     }
     const list: ActionMenuItem[] = [
-      { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
-      { id: 'copy', label: '複製して作る', external: true, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
+      { id: 'edit', label: '編集', external: true, href: `/tags/edit?id=${tag.id}`, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
+      { id: 'copy', label: '複製して作る', external: true, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    /* 保管済みに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
-    if (tag.status !== 'archived') {
-      list.push({
+    if (tag.status === 'archived') return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(tag) } }]
+    list.push({
         id: 'archive',
         label: '保管する',
         tone: 'danger',
         dividerBefore: true,
         onSelect: () => requestArchive(tag),
-      })
-    }
+    })
     return list
   }
 
-  /*
-   * 保管の入口。使っている所が0（友だち0人・どこからも使われていない）と分かっているタグは、
-   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる。送る直前に影響を読み直し、
-   * その間に使われ始めていたら保管せずに行を戻す。それ以外は今までどおり確かめの窓。
-   */
-  const requestArchive = (tag: Tag) => {
-    if (!isUnused(tag) || !accountId) {
-      setDeleteTarget(tag)
-      return
-    }
-    if (activeTagId === tag.id) setActiveTagId(null)
-    deferredDelete.schedule({
-      ids: [tag.id],
-      message: `タグ「${tag.name}」を保管しました`,
-      commit: () => archiveIfStillUnused(tag.id, accountId),
-      onCommitted: () => load(),
-      failureMessage: 'タグを保管できませんでした。使われ始めていないか確かめて、もう一度お試しください。',
-    })
+  const confirmRestore = async () => {
+    if (!restoreTarget || !accountId || restoring) return
+    const tag = restoreTarget
+    const account = accountId
+    setRestoring(true)
+    setRestoreError('')
+    try {
+      const res = await api.tags.restore(tag.id, account, tag.version ?? 1)
+      if (loadRequestRef.current.accountId !== account) return
+      if (!res.success) throw new Error(res.error)
+      setItems((current) => current.map((item) => item.id === tag.id ? { ...item, status: 'active', version: res.data.version } : item))
+      setRestoreTarget(null)
+      notifyToast(`「${tag.name}」を保管から戻しました`)
+      await load()
+    } catch (error) {
+      if (loadRequestRef.current.accountId === account) setRestoreError(describeApiFailure(error, '保管から戻す操作', { forbidden: 'この操作はオーナーか管理者に頼んでください。' }))
+    } finally { setRestoring(false) }
   }
+  useEffect(() => { setRestoreTarget(null); setRestoreError('') }, [accountId])
+
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestArchive = (tag: Tag) => { setDeleteTarget(tag) }
 
   /* 右クリックのメニュー。行の「…」と同じ操作。移し先はそのまま並べる。 */
   const tagContextItems = (tag: Tag): ContextMenuItem[] => {
@@ -561,8 +566,8 @@ export default function TagsTab({
     { title: '整理の候補', icon: Sparkles, value: cleanupCount, unit: '件', detail: '未使用・名前が重なっている' },
   ]
 
-  const filterActive = Boolean(query || folder || usageFilter !== 'all' || sourceFilter !== 'all' || quick.length)
-  const clearFilters = () => { setView({ q: '', folder: '', usage: 'all', source: 'all', quick: '', page: '1' }) }
+  const filterActive = Boolean(query || folder || usageFilter !== 'all' || sourceFilter !== 'all' || quick.length || onlyArchived)
+  const clearFilters = () => { setView({ q: '', folder: '', usage: 'all', source: 'all', quick: '', archived: '', page: '1' }) }
 
   // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = (wide: boolean) => status === 'forbidden' || !canEdit ? null : (
@@ -580,6 +585,7 @@ export default function TagsTab({
       />
     </span>
   )
+  const archiveChip = <FilterChip selected={onlyArchived} onChange={(next) => setView({ archived: next ? '1' : '', page: '1' })}>保管</FilterChip>
   const usageSelect = (
     <Select
       aria-label="使用状態で絞り込む"
@@ -622,7 +628,7 @@ export default function TagsTab({
         variant="secondary"
         aria-haspopup="menu"
         aria-expanded={quickOpen}
-        aria-label={quick.length ? `よく使う絞り込み（${quick.length}件選択中）` : 'よく使う絞り込み'}
+        aria-label={quick.length ? `よく使う絞り込み（${quick.length} 件選択中）` : 'よく使う絞り込み'}
         title="よく使う絞り込み"
         data-active={quick.length > 0 || undefined}
         className={styles.quickButton}
@@ -662,7 +668,7 @@ export default function TagsTab({
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>タグを読み込めませんでした</p>
       <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
     </div>
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
@@ -714,20 +720,20 @@ export default function TagsTab({
                     event.preventDefault()
                     openTagDetail(tag.id)
                   }
-                }}
+                }} data-row-id={tag.id}
               >
                 <Td className={styles.colName}>
                   <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
                     <div className={styles.nameRow}>
                       <span
                         className={styles.gripBox}
-                        draggable={canEdit}
+                        draggable={canEdit && tag.status !== 'archived'}
                         onClick={(event) => event.stopPropagation()}
                         onDragStart={() => setDragId(tag.id)}
                         onDragEnd={() => setDragId(null)}
                       >
                         {/* 閲覧のみ：つまみは隠し、幅だけ空けて名前の位置を保つ */}
-                        {canEdit ? (
+                        {canEdit && tag.status !== 'archived' ? (
                           <ReorderHandle label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}>
                             <GripVertical className={styles.gripIcon} aria-hidden="true" />
                           </ReorderHandle>
@@ -736,7 +742,7 @@ export default function TagsTab({
                         )}
                       </span>
                       <TagPill name={tag.name} color={group ? folderDisplayColor(group) : null} size="sm" compactAtNarrow href={editHref} />
-                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
+                      {tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>アーカイブ</StatusBadge> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
                       ) : null}
@@ -759,7 +765,7 @@ export default function TagsTab({
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
                 <Td className={styles.colCount} onClick={(event) => event.stopPropagation()}>
                   <Link href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
-                    {tag.friendCount ?? 0}人
+                    {tag.friendCount ?? 0} 人
                   </Link>
                 </Td>
                 <Td className={styles.colSource}><span className={styles.cellText} title={sourceLabel(tag)}>{sourceLabel(tag)}</span></Td>
@@ -789,7 +795,7 @@ export default function TagsTab({
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}
       <div className={styles.pager}>
         <span className={styles.pagerCount}>
-          {`${filtered.length}件中 ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filtered.length)}件`}
+          {`${filtered.length} 件中 ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filtered.length)} 件`}
         </span>
         {pages > 1 ? (
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り" />
@@ -837,6 +843,7 @@ export default function TagsTab({
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}
           {search}
           {usageSelect}
+          {archiveChip}
           <div className={styles.toolbarRow2}>
             {sourceSelect}
             {quickButton}
@@ -846,6 +853,7 @@ export default function TagsTab({
         </> : <>
           {search}
           {usageSelect}
+          {archiveChip}
           {sourceSelect}
           <span className={styles.toolbarSpacer} />
           {quickButton}
@@ -856,7 +864,7 @@ export default function TagsTab({
           <p role="alert" className={styles.errorBand}>
             <AlertCircle className={styles.errorIcon} aria-hidden="true" />
             {actionError}
-            <button type="button" onClick={() => { setActionError(''); void load() }}>読み直す</button>
+            <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
           </p>
         ) : null}
         {table}
@@ -867,7 +875,7 @@ export default function TagsTab({
         <DetailPanel
           open={activeTag !== null}
           title={activeTag?.name ?? ''}
-          description={activeTag ? `${activeGroup?.name ?? '未分類'}・${activeTag.friendCount ?? 0}人` : undefined}
+          description={activeTag ? `${activeGroup?.name ?? '未分類'}・${activeTag.friendCount ?? 0} 人` : undefined}
           onClose={() => setActiveTagId(null)}
           hasPrev={activeTagIndex > 0}
           hasNext={activeTagIndex >= 0 && activeTagIndex < visible.length - 1}
@@ -887,7 +895,7 @@ export default function TagsTab({
                 <dt>人数</dt>
                 <dd>
                   <Link href={`/friends?tag=${encodeURIComponent(activeTag.id)}`} className={styles.countLink}>
-                    {activeTag.friendCount ?? 0}人
+                    {activeTag.friendCount ?? 0} 人
                   </Link>
                 </dd>
               </div>
@@ -920,9 +928,13 @@ export default function TagsTab({
         busy={folderBusy}
         error={folderError || undefined}
         onCancel={() => { if (!folderBusy) setDeletingGroup(null) }}
-        onConfirm={() => void removeGroup()}
+        onConfirm={() => removeGroup()}
       />
 
+      <ConfirmDialog open={restoreTarget !== null} title={`「${restoreTarget?.name ?? ''}」を保管から戻しますか？`}
+        description="同じタグを通常の一覧へ戻します。保管時に付け替えた友だちは、そのまま残ります。"
+        confirmLabel="保管から戻す" busy={restoring} error={restoreError}
+        onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       {deleteTarget && (
         <DeleteTagDialog
           tag={deleteTarget}

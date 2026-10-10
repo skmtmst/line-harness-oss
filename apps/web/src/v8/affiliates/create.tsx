@@ -12,6 +12,8 @@
  *   「すぐに計測を始める」（今の画面にある）を同じ形で置く。
  * - Gqve5 の同時編集の比較・再読込はAPIが無いため出さない。紹介コードの重複は欄で知らせる。
  */
+import { notifySaved } from '@/components/shared/toast'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, Link as LinkIcon } from 'lucide-react'
@@ -30,9 +32,11 @@ import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { distributionUrl } from './display'
 import styles from './create.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const FRIEND_PAGE_SIZE = 20
 const LIST_PATH = '/affiliates'
@@ -93,7 +97,6 @@ export default function CreateAffiliateV8() {
   const [friendReload, setFriendReload] = useState(0)
   const [friendPickerOpen, setFriendPickerOpen] = useState(false)
   const [linkBaseUrl, setLinkBaseUrl] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [issuedUrl, setIssuedUrl] = useState<string | null>(null)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [partialSave, setPartialSave] = useState(false)
@@ -204,7 +207,6 @@ export default function CreateAffiliateV8() {
     setSelectedFriend(null)
     setNotifyOnConversion(true)
     setStartTracking(true)
-    setCopied(false)
     setCreatedId(null)
     setIssuedUrl(null)
     setPartialSave(false)
@@ -282,7 +284,7 @@ export default function CreateAffiliateV8() {
         router.push(`${LIST_PATH}?affiliate=${encodeURIComponent(affiliateId)}&highlight=${encodeURIComponent(affiliateId)}`)
       } else {
         reset()
-        setSaveNote('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
       }
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : '保存できませんでした'
@@ -314,12 +316,12 @@ export default function CreateAffiliateV8() {
         variant="link"
         description={issuedUrl ? '発行しました' : '登録すると発行されます'}
         rows={[
-          { label: 'リンク', value: <span title={previewUrl ?? undefined}>{previewUrl ?? '—'}</span> },
+          { label: 'リンク', value: <span title={previewUrl ?? undefined}>{previewUrl ?? emptyValue('unknown')}</span> },
           { label: '報酬', value: payoutKind === 'none' ? '計測のみ' : payoutKind === 'rate' ? `売上の ${commissionRate.trim() || '◯'}%` : '1件ごと（案件の額）' },
-          { label: '締め', value: payoutCycle.trim() || '—' },
+          { label: '締め', value: payoutCycle.trim() || emptyValue('unknown') },
         ]}
       >
-        {issuedUrl ? <div><Button type="button" onClick={() => { void navigator.clipboard?.writeText(issuedUrl).then(() => setCopied(true), () => setCopied(false)) }}>{copied ? 'コピーしました' : 'リンクをコピー'}</Button></div> : null}
+        {issuedUrl ? <div><CopyTextButton value={issuedUrl} label="リンクをコピー" aria-label="リンクをコピー" /></div> : null}
       </CreateSummaryCard>
       <CreateSummaryCard title="気をつけること" variant="link" rows={[]}>
         <p className={styles.sideList}>・紹介コードはあとから変えられません（配ったリンクが動かなくなるため）<br />・報酬を払う人は、振込先の登録が要ります</p>
@@ -331,7 +333,7 @@ export default function CreateAffiliateV8() {
     <CreatePage
       boardId="RaMf3"
       title="アフィリエイターを作る"
-      description="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
+      help="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
       preview={preview}
       status={saving ? '登録しています' : partialSave ? '基本情報は保存済み・追加情報は未保存' : 'まだ保存していません'}
       footerActions={<>
@@ -342,7 +344,7 @@ export default function CreateAffiliateV8() {
         <Button variant="primary" disabled={saving} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
           <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
         </Button>
-      </>}
+      </>} dirty={false}
     >
 
       {partialSave && createdId ? (
@@ -375,10 +377,7 @@ export default function CreateAffiliateV8() {
             <TextField id="af-code" value={code} onChange={(event) => { setCode(event.target.value); clearField('code') }} placeholder="petlife2026" maxLength={64} />
           </Field>
         </div>
-        <label className={styles.field} htmlFor="af-email">
-          <span className={styles.label}>連絡先メール</span>
-          <TextField id="af-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="contact@example.com" maxLength={200} />
-        </label>
+        <Field label="連絡先メール" htmlFor="af-email"><TextField id="af-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="contact@example.com" maxLength={200} /></Field>
         <div className={styles.friendRow}>
           <Button type="button" aria-expanded={friendPickerOpen} onClick={() => setFriendPickerOpen((open) => !open)}>
             <LinkIcon size={15} aria-hidden="true" /> LINE の友だちと結びつける
@@ -402,7 +401,7 @@ export default function CreateAffiliateV8() {
                     setFriendReload((value) => value + 1)
                   }}
                 >
-                  <TextField aria-label="友だちの名前で検索" value={friendSearchInput} onChange={(event) => setFriendSearchInput(event.target.value)} placeholder="友だちの名前で探す" />
+                  <TextField aria-label="友だちの名前で探す" value={friendSearchInput} onChange={(event) => setFriendSearchInput(event.target.value)} placeholder="友だちの名前で探す" />
                   <Button type="submit">検索</Button>
                 </form>
                 <Select
@@ -426,7 +425,7 @@ export default function CreateAffiliateV8() {
                   </div>
                 ) : (
                   <div className={styles.friendSearch}>
-                    <p className={styles.cardNote}>{friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)}件`}</p>
+                    <p className={styles.cardNote}>{friendLoading ? '友だちを読み込んでいます' : `全${formatNumber(friendTotal)} 件`}</p>
                     {friendPageCount > 1 ? (
                       <Select
                         id="af-friend-page"
@@ -465,14 +464,11 @@ export default function CreateAffiliateV8() {
         </RadioCardGroup>
         {payoutKind === 'rate' ? (
           <Field label="売上に対する割合（%）" htmlFor="af-rate" error={fieldErrors.rate}>
-            <TextField id="af-rate" type="number" min={0} step="0.1" value={commissionRate} onChange={(event) => { setCommissionRate(event.target.value); clearField('rate') }} placeholder="10" />
+            <NumberInput unit="%" id="af-rate" type="number" min={0} step="0.1" value={commissionRate} onChange={(event) => { setCommissionRate(event.target.value); clearField('rate') }} placeholder="10" />
           </Field>
         ) : null}
         <div className={styles.grid2}>
-          <label className={styles.field} htmlFor="af-cycle">
-            <span className={styles.label}>締めと支払い</span>
-            <TextField id="af-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め・翌月末払い" maxLength={100} />
-          </label>
+          <Field label="締めと支払い" htmlFor="af-cycle"><TextField id="af-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め・翌月末払い" maxLength={100} /></Field>
           <Field label="保留期間" htmlFor="af-hold" error={fieldErrors.hold} help="返品・キャンセルを待つ期間です。過ぎた成果が次の締めに入ります。">
             <Select id="af-hold" aria-label="保留期間" size="full" value={holdDays} onChange={(value) => { setHoldDays(value); clearField('hold') }} options={holdOptions} />
           </Field>
@@ -485,14 +481,14 @@ export default function CreateAffiliateV8() {
           <p className={styles.cardNote}>任意</p>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={notifyOnConversion} label="本人に LINE で知らせる" onChange={setNotifyOnConversion} />
+          <SettingCheckbox checked={notifyOnConversion} label="本人に LINE で知らせる" onChange={setNotifyOnConversion} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>本人に LINE で知らせる</p>
             <p className={styles.switchNote}>成果 1 件ごとに</p>
           </div>
         </div>
         <div className={styles.switchRow}>
-          <Toggle checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
+          <SettingCheckbox checked={startTracking} label="すぐに計測を始める" onChange={setStartTracking} />
           <div className={styles.switchBody}>
             <p className={styles.switchName}>すぐに計測を始める</p>
             <p className={styles.switchNoteFaint}>{startTracking ? '登録したらすぐに数え始めます' : 'オフでもリンクは発行されます'}</p>

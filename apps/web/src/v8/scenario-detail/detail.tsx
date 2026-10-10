@@ -2,10 +2,11 @@
 
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
- * 板：稼働中 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
+ * 板：有効 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
  * 窓：止める確認 `OPGU2`・複製 `Al4Ek`・開始の確認 `F1LK4e`。
  *
  * 動き（読み込み・保存・複製・削除・開始/停止・通の編集）は今までの
@@ -16,6 +17,8 @@ import KpiCard from '@/components/shared/kpi-card'
  * 閲覧のみの人には、変える操作のボタンを置かない（オーナー決定 2026-10-06）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -56,7 +59,7 @@ import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TargetMissing from '@/components/shared/target-missing'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
@@ -145,6 +148,11 @@ import { formatNumber } from '@/lib/format'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -179,35 +187,16 @@ const ON_COMPLETE_SENTENCE: Record<OnCompleteMode, string> = {
   move: '次のシナリオへ移す',
 }
 
-const jstParts = (iso: string | null | undefined) => {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('ja-JP', {
-      timeZone: 'Asia/Tokyo',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    })
-      .formatToParts(d)
-      .map((p) => [p.type, p.value]),
-  )
-  return parts as Record<string, string>
-}
+
 
 /** ①の箱「保存済み 10月1日 14:02」。 */
 function formatSavedAt(iso: string | null | undefined): string {
-  const p = jstParts(iso)
-  return p ? `${p.month}月${p.day}日 ${p.hour}:${p.minute}` : ''
+  return polishFormatDate(iso, { style: 'detail', fallback: '' })
 }
 
 /** 競合の帯「〇〇 が 14:02 に保存しました」。 */
 function formatClock(iso: string | null | undefined): string {
-  const p = jstParts(iso)
-  return p ? `${p.hour}:${p.minute}` : '少し前'
+  return polishFormatDate(iso, { style: 'time', fallback: '少し前' })
 }
 
 /** 行の札。絵は「テキスト・カルーセル・質問・テンプレート」の短い名前。 */
@@ -410,7 +399,7 @@ function FormSection({
   return (
     <section
       data-design-node={node}
-      className="bg-canvas border-hairline rounded-card border p-4"
+      className="bg-canvas content-card rounded-card border p-4"
     >
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
@@ -573,7 +562,7 @@ export default function ScenarioDetailV8({
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
-  usePageTitle(editingStepId ? `${stepForm.stepOrder}通目を編集` : 'シナリオ配信')
+  usePageTitle(editingStepId ? `${stepForm.stepOrder} 通目を編集` : 'シナリオ配信')
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
   /* 通の保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。検査は保存の直前に1つずつ見る形なので fail で結び付ける。 */
@@ -936,7 +925,7 @@ export default function ScenarioDetailV8({
           isDraft: step.isDraft === true,
         }).catch((cause) => ({ success: false as const, error: cause instanceof Error && cause.message ? cause.message : '通をコピーできませんでした' }))
         // 途中で止める。続けると通が欠けた別物の流れが残る。
-        if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder}通目のコピー`, new Error(copied.error))
+        if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder} 通目のコピー`, new Error(copied.error))
         stepIdMap.set(step.id, copied.data.id)
       }
 
@@ -1119,8 +1108,8 @@ export default function ScenarioDetailV8({
 
   const describeScenarioSummary = (input: { name: string; isActive: boolean; stepCount: number }): string =>
     [
-      `名前：${input.name || '（未入力）'}`,
-      `状態：${input.isActive ? '稼働中' : '停止中'}`,
+      `名前：${input.name || emptyValue('unconfigured')}`,
+      `状態：${input.isActive ? '有効' : '停止中'}`,
       `通の数：${input.stepCount}`,
     ].join('\n')
 
@@ -1747,16 +1736,13 @@ export default function ScenarioDetailV8({
           description="いつ送るか。送ったあと次の通へ進むかどうかも、設計どおりここでそろえて決めます。"
         >
           <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-ink-secondary mb-1">ステップ順序</label>
-          <input
+        <div><Field label="ステップ順序"><NumberInput
             type="number"
             min={1}
             className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             value={stepForm.stepOrder}
             onChange={(e) => setStepForm({ ...stepForm, stepOrder: Number(e.target.value) })}
-          />
-        </div>
+          /></Field></div>
         <div {...stepFields.bind('time')} aria-invalid={stepFields.invalid('time') || undefined}>
           <ScheduleInput
             mode={deliveryMode}
@@ -1773,9 +1759,9 @@ export default function ScenarioDetailV8({
           以前は画面のいちばん下、到達タグと同じ束に置いていたので、
           「いつ送るか」を決めているときに目に入らなかった。
         */}
-        <div>
-          <label className="block text-xs font-medium text-ink-secondary mb-1">送信後</label>
-          <Select
+        <div><Field note={<>
+            一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
+          </>} label="送信後"><Select
             aria-label="送信後"
             value={stepForm.afterSend}
             onChange={(value) =>
@@ -1787,10 +1773,7 @@ export default function ScenarioDetailV8({
             ]}
             size="full"
           />
-          <p className="text-xs text-ink-faint mt-0.5">
-            一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
-          </p>
-        </div>
+</Field></div>
           </div>
         </FormSection>
 
@@ -1896,16 +1879,13 @@ export default function ScenarioDetailV8({
 
         {!stepForm.question && stepForm.inputMode === 'direct' && (
           <>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージタイプ</label>
-              <Select
+            <div><Field label="メッセージタイプ"><Select
                 aria-label="メッセージタイプ"
                 value={stepForm.messageType}
                 onChange={(value) => setStepForm({ ...stepForm, messageType: value as MessageType })}
                 options={messageTypeOptions}
                 size="full"
-              />
-            </div>
+              /></Field></div>
             {/*
               位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
               中身は JSON なので、生のまま書かせると必ず壊れる。
@@ -1938,11 +1918,7 @@ export default function ScenarioDetailV8({
                 }}
               />
             ) : (
-              <div>
-                <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-danger">*</span></label>
-                {/* 差し込みは本文のときだけ。Flex は JSON なので、入れる位置を
-                    間違えると本文が壊れる。 */}
-                {stepForm.messageType === 'text' && (
+              <div><Field label="メッセージ内容" required>{stepForm.messageType === 'text' && (
                   <div className="mb-2">
                     <InsertToolbar
                       targetRef={stepBodyRef}
@@ -1951,7 +1927,7 @@ export default function ScenarioDetailV8({
                     />
                   </div>
                 )}
-                <InsertTextField
+<InsertTextField
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
@@ -1960,8 +1936,7 @@ export default function ScenarioDetailV8({
                   onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
                   aria-invalid={stepFields.invalid('content') || undefined}
                   aria-describedby={stepFields.invalid('content') ? 'step-content-error' : undefined}
-                />
-              </div>
+                /></Field></div>
             )}
             <FieldError id="step-content-error">{stepFields.error('content')}</FieldError>
             </div>
@@ -2015,7 +1990,7 @@ export default function ScenarioDetailV8({
                     hook: 'step_sent',
                     stepId: editingStepId,
                     choiceIndex: null,
-                    title: `${stepForm.stepOrder}通目を送ったあと`,
+                    title: `${stepForm.stepOrder} 通目を送ったあと`,
                   })
                 }
                 className="text-action shrink-0 text-xs hover:underline"
@@ -2026,9 +2001,9 @@ export default function ScenarioDetailV8({
           }
         >
           <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
-              <Select
+            <div><Field note={<>
+                このステップが配信完了したら、選んだタグを友だちに付与します
+              </>} label="到達したらタグ付与"><Select
                 aria-label="到達したらタグ付与"
                 value={stepForm.onReachTagId ?? ''}
                 onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
@@ -2038,10 +2013,7 @@ export default function ScenarioDetailV8({
                 ]}
                 size="full"
               />
-              <p className="text-xs text-ink-faint mt-0.5">
-                このステップが配信完了したら、選んだタグを友だちに付与します
-              </p>
-            </div>
+</Field></div>
             {!editingStepId && (
               <p className="text-ink-faint text-xs">
                 そのほかのアクションは、この通を保存してから設定できます。
@@ -2108,7 +2080,7 @@ export default function ScenarioDetailV8({
           afterSend={stepForm.afterSend}
         />
 
-        <div className="bg-canvas border-hairline rounded-card border p-4">
+        <div className="bg-canvas content-card rounded-card border p-4">
           <h4 className="text-ink text-sm font-bold">設定内容</h4>
           <dl className="mt-3 space-y-2 text-xs">
             <div className="flex items-baseline justify-between gap-3">
@@ -2137,7 +2109,7 @@ export default function ScenarioDetailV8({
                 数を作らずに、繋がっていないことをそのまま書く。 */}
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-ink-faint shrink-0">配信前チェック</dt>
-              <dd className="text-ink-faint min-w-0 text-right">—</dd>
+              <dd className="text-ink-faint min-w-0 text-right">{emptyValue('unknown')}</dd>
             </div>
           </dl>
           <p className="text-ink-faint mt-2 text-xs leading-relaxed">
@@ -2149,23 +2121,12 @@ export default function ScenarioDetailV8({
     </div>
   )
 
-  /* ===== ここから下は ★V8 の描画（PMLkX 稼働中 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
+  /* ===== ここから下は ★V8 の描画（PMLkX 有効 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
 
   if (loading) {
     return (
       <div className={styles.board}>
-        <DelayedSkeleton
-          loading
-          skeleton={
-            <div className="flex flex-col gap-4">
-              <Skeleton className="block h-4 w-24" />
-              <Skeleton className="block h-8 w-1/3" />
-              <Skeleton className="block h-24 w-full" />
-              <Skeleton className="block h-14 w-full" />
-              <Skeleton className="block h-14 w-full" />
-            </div>
-          }
-        />
+        <DetailLoading />
       </div>
     )
   }
@@ -2279,7 +2240,7 @@ export default function ScenarioDetailV8({
         ...item,
         state: complete ? ('ok' as const) : ('warn' as const),
         detail: complete
-          ? `${simulation.steps.length}通すべての配信日時を試算しました`
+          ? `${simulation.steps.length} 通すべての配信日時を試算しました`
           : '配信日時を試算できない通があります',
       }
     }
@@ -2289,7 +2250,7 @@ export default function ScenarioDetailV8({
         state: runs.testSends.length > 0 ? ('ok' as const) : ('warn' as const),
         detail:
           runs.testSends.length > 0
-            ? `最新のテスト送信は${runs.testSends[0].messageCount}通です`
+            ? `最新のテスト送信は${runs.testSends[0].messageCount} 通です`
             : 'テスト送信の記録がありません',
       }
     }
@@ -2306,7 +2267,7 @@ export default function ScenarioDetailV8({
             ? '送信数の上限はありません'
             : runs.quota.remaining === null
               ? (runs.quota.reason ?? '送信枠を読み込めませんでした')
-              : `残り${formatNumber(runs.quota.remaining)}通です`,
+              : `残り${formatNumber(runs.quota.remaining)} 通です`,
       }
     }
     return item
@@ -2320,12 +2281,12 @@ export default function ScenarioDetailV8({
   return (
     <PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
       {/* 板の頭：題＋状態の札＋鉛筆・説明の1行。右に操作（配信結果・下見・まとめてテスト・その他）。 */}
-      <header className={styles.head} data-design="Head">
-        <div className={styles.headText}>
-          <div className={styles.titleRow}>
-            <h1 className={styles.title} title={scenario.name}>{scenario.name}</h1>
-            <StatusChip status={scenario.isActive ? 'running' : 'paused'} />
-            {canEdit ? (
+      <PageHeading title={scenario.name}
+        crumbs={<><p className={styles.meta}>
+            {`フォルダ：${scenarioFolderName}・配信方式：${modeLabel}（作ったあとは変えられません）・${(scenario.allowConcurrent ?? true) ? '同時購読を許可中' : '同時に1つだけ'}`}
+          </p></>}
+        titleAccessory={<><StatusChip status={scenario.isActive ? 'running' : 'paused'} /></>}
+        actions={<>{canEdit ? (
               <button
                 type="button"
                 className={styles.iconButton}
@@ -2335,18 +2296,10 @@ export default function ScenarioDetailV8({
               >
                 <Pencil aria-hidden />
               </button>
-            ) : null}
-          </div>
-          <p className={styles.meta}>
-            {`フォルダ：${scenarioFolderName}・配信方式：${modeLabel}（作ったあとは変えられません）・${(scenario.allowConcurrent ?? true) ? '同時購読を許可中' : '同時に1つだけ'}`}
-          </p>
-        </div>
-        <div className={styles.headActions}>
-          <Button variant="secondary" href={`/scenarios/results?id=${id}`}>
+            ) : null}<Button variant="secondary" href={`/scenarios/results?id=${id}`}>
             <BarChart3 aria-hidden />
             配信結果を見る
-          </Button>
-          <Button
+          </Button><Button
             variant="secondary"
             onClick={() => setPreviewOpen(true)}
             disabled={sortedSteps.length === 0}
@@ -2354,8 +2307,7 @@ export default function ScenarioDetailV8({
           >
             <Eye aria-hidden />
             まとめて下見
-          </Button>
-          {canEdit ? (
+          </Button>{canEdit ? (
             <Button
               variant="secondary"
               onClick={() => setTestSend({ stepId: null, label: 'すべての通' })}
@@ -2365,8 +2317,7 @@ export default function ScenarioDetailV8({
               <Send aria-hidden />
               まとめてテストを送る
             </Button>
-          ) : null}
-          {canEdit ? (
+          ) : null}{canEdit ? (
             <span className={styles.menuBox}>
               <RowMenu
                 appearance="plain"
@@ -2395,34 +2346,14 @@ export default function ScenarioDetailV8({
                 ]}
               />
             </span>
-          ) : null}
-        </div>
-      </header>
+          ) : null}</>} />
 
       {/* 競合（kz2B6）：ほかの人の保存と食い違った。板の頭のすぐ下に、幅いっぱいで出す。 */}
       {conflict && (
         <div className={styles.conflictWrap}>
-          <div className={styles.conflictBar} data-design-node="kz2B6" role="alert">
-            <CircleAlert className={styles.conflictIcon} aria-hidden />
-            <div className={styles.conflictText}>
-              <p className={styles.conflictTitle}>
-                {conflictLatest
+          <SaveConflictBand designNode="kz2B6" title={conflictLatest
                   ? `ほかの人が ${formatClock(conflictLatest.updatedAt)} にシナリオ「${conflictLatest.name}」を保存しました`
-                  : 'ほかの人がこのシナリオを保存しました'}
-              </p>
-              <p className={styles.conflictBody}>
-                あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
-              </p>
-            </div>
-            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
-              <GitCompareArrows aria-hidden />
-              違いを比べる
-            </Button>
-            <Button type="button" variant="primary" onClick={() => void acceptLatestAndContinue()}>
-              <RefreshCw aria-hidden />
-              最新を読み込んで続ける
-            </Button>
-          </div>
+                  : 'ほかの人がこのシナリオを保存しました'} description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。" onCompare={() => setCompareOpen(true)} compareDisabled={!conflictLatest} onReload={() => void acceptLatestAndContinue()} />
         </div>
       )}
 
@@ -2431,7 +2362,7 @@ export default function ScenarioDetailV8({
           {!canEdit ? (
             <div className={styles.viewerBand} role="status">
               <Eye aria-hidden />
-              <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+              <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
             </div>
           ) : null}
 
@@ -2577,7 +2508,7 @@ export default function ScenarioDetailV8({
           </div>
 
           {/* メッセージの行。選んだ通が右の欄に出る。 */}
-          <h2 className={styles.sectionTitle}>{`メッセージ（${sortedSteps.length}通）`}</h2>
+          <h2 className={styles.sectionTitle}>{`メッセージ（${sortedSteps.length} 通）`}</h2>
           {sortedSteps.length === 0 ? (
             <p className={styles.emptyNote}>
               まだ配るものがありません。下の「メッセージを追加する」から1通目を作ってください。
@@ -2599,7 +2530,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             onClick={() => openInsertStep(sortedSteps[index - 1].stepOrder)}
-                            title={`${sortedSteps[index - 1].stepOrder}通目と${step.stepOrder}通目のあいだに足します`}
+                            title={`${sortedSteps[index - 1].stepOrder} 通目と${step.stepOrder} 通目のあいだに足します`}
                           >
                             ＋ ここに挿入
                           </button>
@@ -2612,7 +2543,7 @@ export default function ScenarioDetailV8({
                       className={isShown ? styles.stepRowSelected : styles.stepRow}
                       onClick={() => setSelectedStepId(step.id)}
                     >
-                      <span className={styles.stepNo}>{`${step.stepOrder}通目`}</span>
+                      <span className={styles.stepNo}>{`${step.stepOrder} 通目`}</span>
                       <span className={styles.stepWhen}>
                         <span className={styles.stepWhenMain}>{stepWhenLabel(deliveryMode, step, index)}</span>
                         {previewLabels[step.stepOrder] ? (
@@ -2645,7 +2576,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             className={styles.iconButton}
-                            aria-label={`${step.stepOrder}通目を上へ`}
+                            aria-label={`${step.stepOrder} 通目を上へ`}
                             disabled={index === 0}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2657,7 +2588,7 @@ export default function ScenarioDetailV8({
                           <button
                             type="button"
                             className={styles.iconButton}
-                            aria-label={`${step.stepOrder}通目を下へ`}
+                            aria-label={`${step.stepOrder} 通目を下へ`}
                             disabled={index === sortedSteps.length - 1}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2669,8 +2600,8 @@ export default function ScenarioDetailV8({
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
                             <RowMenu
                               appearance="plain"
-                              label={`${step.stepOrder}通目のその他操作`}
-                              menuLabel={`${step.stepOrder}通目の操作`}
+                              label={`${step.stepOrder} 通目のその他操作`}
+                              menuLabel={`${step.stepOrder} 通目の操作`}
                               open={stepMenuId === step.id}
                               onOpenChange={(next) => setStepMenuId(next ? step.id : null)}
                               items={[
@@ -2679,7 +2610,7 @@ export default function ScenarioDetailV8({
                                 {
                                   id: 'test',
                                   label: 'テスト',
-                                  onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` }),
+                                  onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder} 通目` }),
                                 },
                                 /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
                                 {
@@ -2690,7 +2621,7 @@ export default function ScenarioDetailV8({
                                       hook: 'step_sent',
                                       stepId: step.id,
                                       choiceIndex: null,
-                                      title: `${step.stepOrder}通目を送ったあと`,
+                                      title: `${step.stepOrder} 通目を送ったあと`,
                                     }),
                                 },
                                 {
@@ -2743,7 +2674,7 @@ export default function ScenarioDetailV8({
                   const audience = describeStepAudience(step.targetCondition, tags)
                   return (
                     <li key={step.id} className={styles.statRow}>
-                      <span className={styles.statNo}>{`${step.stepOrder}通目`}</span>
+                      <span className={styles.statNo}>{`${step.stepOrder} 通目`}</span>
                       <span className={styles.statAudience} title={audience}>
                         {audience}
                       </span>
@@ -2759,7 +2690,7 @@ export default function ScenarioDetailV8({
                       </span>
                       <span className={styles.statReachText}>
                         {step.isDraft === true || !stat
-                          ? '—'
+                          ? emptyValue('unknown')
                           : `到達 ${scenarioReachCountLabel(stat.reachedCount)}${pct !== null ? `・${scenarioReachPercentLabel(pct)}` : ''}`}
                       </span>
                       <span className={after.paused && !reachTag ? styles.statAfterPause : styles.statAfter}>
@@ -2798,7 +2729,7 @@ export default function ScenarioDetailV8({
         {/* 右の欄：選んだ通のスマホ。 */}
         <aside className={styles.right}>
           <h2 className={styles.rightTitle}>
-            {`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : '—'}）の見え方`}
+            {`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : emptyValue('unknown')}）の見え方`}
           </h2>
           <div className={styles.phoneSlot}>
             <LinePreview
@@ -2888,7 +2819,7 @@ export default function ScenarioDetailV8({
                   }}
                   disabled={saving || !editForm.name.trim()}
                   busy={saving}
-                  done={saveDone}
+
                 >
                   {conflict ? <GitCompareArrows aria-hidden /> : <Check aria-hidden />}
                   {conflict ? '比べてから保存' : '保存する'}
@@ -2945,26 +2876,20 @@ export default function ScenarioDetailV8({
         }
       >
         <div className="flex flex-col gap-4">
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ名</span>
-            <TextField
+          <Field label="シナリオ名" required><TextField
               value={editForm.name}
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               maxLength={80}
               required
               aria-label="シナリオ名"
-            />
-          </label>
-          <label className="block">
-            <span className="text-ink-secondary mb-1 block text-xs font-medium">説明（任意）</span>
-            <TextArea
+            /></Field>
+          <Field label="説明"><TextArea
               value={editForm.description}
               onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               rows={3}
               maxLength={500}
               aria-label="説明"
-            />
-          </label>
+            /></Field>
           <div className="flex flex-col gap-1">
             <span className="text-ink-secondary text-xs font-semibold">置き場（フォルダ）</span>
             <FolderSelect
@@ -3022,7 +2947,7 @@ export default function ScenarioDetailV8({
         confirmLabel="この内容ではじめる"
         busy={startBusy}
         error={startError}
-        onConfirm={preflightLoading || preflightFailed ? undefined : () => void handleStart()}
+        onConfirm={preflightLoading || preflightFailed ? undefined : () => handleStart()}
         // WEB228：「内容と対象を確かめました」のチェックが入るまで「この内容ではじめる」を押せない。
         confirmDisabled={!startConfirmed}
         onCancel={() => {
@@ -3045,7 +2970,7 @@ export default function ScenarioDetailV8({
             <p className="text-ink text-sm font-semibold">
               きっかけ：{triggerHeadline}
               {simulation
-                ? ` → 対象：${formatNumber(simulation.audience.newStartPlanned)}人`
+                ? ` → 対象：${formatNumber(simulation.audience.newStartPlanned)} 人`
                 : preflightLoading
                   ? ' → 対象：試算中…'
                   : ' → 対象：まだ分かりません'}
@@ -3054,7 +2979,7 @@ export default function ScenarioDetailV8({
           <div>
             <p className="text-ink-faint text-xs">通数・終了後</p>
             <p className="text-ink text-sm font-semibold">
-              {sortedSteps.length}通・最後の1通のあと「{startCompleteSummary}」
+              {sortedSteps.length} 通・最後の1通のあと「{startCompleteSummary}」
             </p>
           </div>
         </div>
@@ -3087,7 +3012,7 @@ export default function ScenarioDetailV8({
                       : styles.checkUnknown
                 }`}
               >
-                {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
+                {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : emptyValue('unknown')}
               </span>
               <span>
                 <span className="text-ink block font-medium">{item.label}</span>
@@ -3144,7 +3069,7 @@ export default function ScenarioDetailV8({
             <dd>
               {stats?.activeNow === undefined
                 ? '確認できません'
-                : `${formatNumber(stats.activeNow)}人（止まっているあいだ、新しい人は入りません）`}
+                : `${formatNumber(stats.activeNow)} 人（止まっているあいだ、新しい人は入りません）`}
             </dd>
           </dl>
           <div className={styles.stopFooter}>
@@ -3169,20 +3094,17 @@ export default function ScenarioDetailV8({
         }}
       >
         <div className={styles.dupBody}>
-          <label className={styles.dupField}>
-            <span className={styles.dupLabel}>新しい名前</span>
-            <TextField
+          <Field label="新しい名前" required><TextField
               value={duplicateName}
               onChange={(e) => setDuplicateName(e.target.value)}
               maxLength={80}
               required
               aria-label="新しい名前"
-            />
-          </label>
+            /></Field>
           <div className={styles.dupBox}>
             <p className={styles.dupBoxTitle}>引き継ぐもの</p>
             <p className={styles.dupBoxBody}>
-              {`・メッセージ ${sortedSteps.length}通${sortedSteps.some((s) => s.question) ? '（質問を含む）' : ''}・開始のきっかけ・アクション・配信対象の条件・最後の1通の後・配信方式（${modeLabel}）・フォルダ`}
+              {`・メッセージ ${sortedSteps.length} 通${sortedSteps.some((s) => s.question) ? '（質問を含む）' : ''}・開始のきっかけ・アクション・配信対象の条件・最後の1通の後・配信方式（${modeLabel}）・フォルダ`}
             </p>
           </div>
           <div className={styles.dupBox}>
@@ -3220,15 +3142,15 @@ export default function ScenarioDetailV8({
 
       <ConfirmDialog
         open={deleteStepTarget !== null}
-        title={deleteStepTarget ? `${deleteStepTarget.stepOrder}通目を削除しますか？` : 'この通を削除しますか？'}
+        title={deleteStepTarget ? `${deleteStepTarget.stepOrder} 通目を削除しますか？` : 'この通を削除しますか？'}
         description={deleteStepTarget
-          ? `${deleteStepTarget.stepOrder}通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
+          ? `${deleteStepTarget.stepOrder} 通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
           : ''}
         confirmLabel="この通を削除する"
         destructive
         busy={deletingStepId !== null}
         error={deleteStepError}
-        onConfirm={() => void handleDeleteStep()}
+        onConfirm={() => handleDeleteStep()}
         onCancel={() => {
           if (deletingStepId) return
           setDeleteStepTarget(null)
@@ -3244,7 +3166,7 @@ export default function ScenarioDetailV8({
             ? '購読中の人数は確認できません。'
             : stats.activeNow === 0
               ? '現在購読中の友だちは0人です。'
-              : `現在${formatNumber(stats.activeNow)}人が購読中です。途中の人は続きを受け取れません。`,
+              : `現在${formatNumber(stats.activeNow)} 人が購読中です。途中の人は続きを受け取れません。`,
           'シナリオの設定と今後の配信が削除されます。',
           'これまでの配信履歴は監査記録として残ります。',
           'この操作は取り消せません。',
@@ -3253,7 +3175,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={deletingScenario}
         error={deleteScenarioError}
-        onConfirm={() => void handleDeleteScenario()}
+        onConfirm={() => handleDeleteScenario()}
         onCancel={() => {
           if (deletingScenario) return
           setDeleteScenarioOpen(false)
@@ -3275,7 +3197,7 @@ export default function ScenarioDetailV8({
         destructive
         busy={discardingDuplicate}
         error={discardDuplicateError}
-        onConfirm={() => void handleDiscardDuplicate()}
+        onConfirm={() => handleDiscardDuplicate()}
         onCancel={() => {
           if (discardingDuplicate) return
           setDiscardDuplicateOpen(false)

@@ -40,6 +40,6 @@ export function GridRow({ children, className, ...props }: HTMLAttributes<HTMLDi
   return <div role="row" className={[styles.row, className].filter(Boolean).join(' ')} {...props}>{children}</div>
 }
 
-export function GridCell({ children, className, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return <span role="cell" className={[styles.cell, className].filter(Boolean).join(' ')} {...props}>{children}</span>
+export function GridCell({ children, className, align, ...props }: HTMLAttributes<HTMLSpanElement> & { align?: 'left' | 'right' }) {
+  return <span role="cell" data-align={align} className={[styles.cell, className].filter(Boolean).join(' ')} {...props}>{children}</span>
 }

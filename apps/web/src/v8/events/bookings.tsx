@@ -9,6 +9,7 @@
  * 行の操作は絵どおり行に直接出す（承認する／断る・キャンセルにする／参加済／無断・予約に繰上げ・待ち順を変える）。
  */
 
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check, Download, Send } from 'lucide-react'
@@ -25,6 +26,8 @@ import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { jstShort } from './shared'
 import styles from './bookings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 type ChipTone = 'warning' | 'success' | 'info' | 'neutral' | 'danger'
@@ -58,19 +61,7 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
 
 /** 開催回の選び口の表示（板：`10/12（月）14:00`）。曜日は日付から作る。 */
 function formatOccurrence(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}（${get('weekday')}）${get('hour')}:${get('minute')}`
+  return polishFormatDate(iso, { style: 'detail', fallback: iso })
 }
 
 function participationSub(applicant: EventOccurrenceApplicant): string {
@@ -416,7 +407,7 @@ function Bookings({ eventId }: { eventId: string }) {
     <DetailPage
       boardId="Mu8qW"
       title={title}
-      description={(
+      help={(
         <span className={styles.subLine}>
           {subLine ? <span>{subLine}</span> : null}
         </span>
@@ -424,7 +415,7 @@ function Bookings({ eventId }: { eventId: string }) {
       actions={(
         <div className={styles.headActions}>
           <Button onClick={() => void exportCsv()} disabled={csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
-            <Download size={15} aria-hidden="true" />CSV を書き出す
+            <Download size={15} aria-hidden="true" />CSVで書き出す
           </Button>
           <div className={styles.occurrencePick}>
             <Select
@@ -463,9 +454,9 @@ function Bookings({ eventId }: { eventId: string }) {
             <p className={styles.cardNote}>承認待ちは期限までに承認か断るを選びます。断る・キャンセルにすると LINE でお知らせが届き、枠が空きます</p>
           </div>
           <div className={styles.attendance} aria-label="当日の受付">
-            <span className={styles.attendanceStrong}>{`参加済 ${attendance?.attendedSeats ?? 0}人`}</span>
-            <span className={styles.attendanceDanger}>{`無断欠席 ${attendance?.noShowSeats ?? 0}人`}</span>
-            <span>{`受付前 ${Math.max(0, confirmedSeats - (attendance?.attendedSeats ?? 0) - (attendance?.noShowSeats ?? 0))}人`}</span>
+            <span className={styles.attendanceStrong}>{`参加済 ${attendance?.attendedSeats ?? 0} 人`}</span>
+            <span className={styles.attendanceDanger}>{`無断欠席 ${attendance?.noShowSeats ?? 0} 人`}</span>
+            <span>{`受付前 ${Math.max(0, confirmedSeats - (attendance?.attendedSeats ?? 0) - (attendance?.noShowSeats ?? 0))} 人`}</span>
             <span className={styles.attendanceNote}>当日、来た人に「参加済」、来なかった人に「無断」を付けます</span>
           </div>
         </div>
@@ -501,12 +492,12 @@ function Bookings({ eventId }: { eventId: string }) {
                 </span>
                 <span role="cell">{chip(row.status)}</span>
                 <span role="cell" className={styles.cellText} title={row.offerExpiresAt ? jstShort(row.offerExpiresAt) : undefined}>
-                  {row.offerExpiresAt ? jstShort(row.offerExpiresAt) : row.status === 'waiting' ? '案内前' : '—'}
+                  {row.offerExpiresAt ? jstShort(row.offerExpiresAt) : row.status === 'waiting' ? '案内前' : emptyValue('unknown')}
                 </span>
                 <span role="cell" className={styles.rowActions}>
                   {row.source === 'booking' && row.status === 'requested' ? (
                     <>
-                      <Button onClick={() => void decide(row, 'confirm')} disabled={busy}>承認する</Button>
+                      <Button onClick={() => void decide(row, 'confirm')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認する</Button>
                       <Button
                         onClick={() => {
                           setRejectReason('')
@@ -591,7 +582,7 @@ function Bookings({ eventId }: { eventId: string }) {
               <span role="cell">{chip(row.status)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(row.appliedAt)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(row.offeredAt)}</span>
-              <span role="cell" className={styles.cellText}>—</span>
+              <span role="cell" className={styles.cellText}>{emptyValue('unknown')}</span>
             </div>
           ))}
           {historyRows.map((entry) => (
@@ -634,9 +625,7 @@ function Bookings({ eventId }: { eventId: string }) {
             <h2 className={styles.cardTitle} id="ev-bk-broadcast">お知らせを送る</h2>
             <p className={styles.cardNote}>この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）</p>
           </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="ev-bk-message">申込者へ送るメッセージ</label>
-            <div className={styles.broadcastRow}>
+          <div className={styles.field}><Field label="申込者へ送るメッセージ" htmlFor="ev-bk-message"><div className={styles.broadcastRow}>
               <input
                 id="ev-bk-message"
                 value={broadcastMessage}
@@ -647,8 +636,7 @@ function Bookings({ eventId }: { eventId: string }) {
               <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確かめています…">
                 送る
               </Button>
-            </div>
-          </div>
+            </div></Field></div>
           {broadcastError ? <p className={styles.error} role="alert">{broadcastError}</p> : null}
         </section>
       ) : null}
@@ -662,7 +650,7 @@ function Bookings({ eventId }: { eventId: string }) {
         confirmLabel="キャンセルする"
         busy={cancelling}
         error={cancelError}
-        onConfirm={() => void runAdminCancel()}
+        onConfirm={() => runAdminCancel()}
         onCancel={() => {
           if (cancelling) return
           setCancelError('')
@@ -687,15 +675,12 @@ function Bookings({ eventId }: { eventId: string }) {
         }}
       >
         {rejectApplicant ? (
-          <label className={styles.dialogLabel}>
-            断る理由（任意・内部メモ）
-            <textarea
+          <Field label="断る理由（・内部メモ）"><textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
               className={styles.textarea}
-            />
-          </label>
+            /></Field>
         ) : null}
       </ConfirmDialog>
 
@@ -718,7 +703,7 @@ function Bookings({ eventId }: { eventId: string }) {
         confirmLabel={waitlistDialog?.kind === 'reorder' ? '入れ替える' : '実行する'}
         busy={waitlistBusy}
         error={waitlistError}
-        onConfirm={() => void runWaitlistOperation()}
+        onConfirm={() => runWaitlistOperation()}
         onCancel={() => {
           if (waitlistBusy) return
           setWaitlistError('')
@@ -770,27 +755,24 @@ function Bookings({ eventId }: { eventId: string }) {
                 </Button>
               </div>
             ) : null}
-            <label className={styles.dialogLabel}>
-              理由（必須・記録に残ります）
-              <textarea
+            <Field label="理由（・記録に残ります）" required><textarea
                 value={waitlistReason}
                 onChange={(e) => setWaitlistReason(e.target.value)}
                 rows={2}
                 className={styles.textarea}
-              />
-            </label>
+              /></Field>
           </>
         ) : null}
       </ConfirmDialog>
 
       <ConfirmDialog
         open={broadcastConfirmOpen && broadcastPreview !== null}
-        title={`${broadcastPreview?.recipientCount ?? 0}人に送りますか？`}
+        title={`${broadcastPreview?.recipientCount ?? 0} 人に送りますか？`}
         description="この回の申込者へLINEでまとめて送ります。送ったお知らせは取り消せません。"
         confirmLabel="送る"
         busy={broadcastBusy}
         error={broadcastError}
-        onConfirm={() => void sendBroadcast()}
+        onConfirm={() => sendBroadcast()}
         onCancel={() => {
           if (broadcastBusy) return
           setBroadcastError('')

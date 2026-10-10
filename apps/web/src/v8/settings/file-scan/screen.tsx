@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FormDocumentRetention from '@/components/shared/form-document-retention'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -27,6 +28,7 @@ import type { FileScanItem } from '@/lib/api'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import styles from './screen.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
@@ -154,7 +156,7 @@ export default function FileScanScreen() {
               releaseReasonRef.current?.scrollIntoView({ block: 'center' })
               return
             }
-            void release()
+            return release()
           }}
         >
           <Field label="理由（必須）" htmlFor="file-scan-release-reason" error={releaseReasonError || undefined}>
@@ -188,7 +190,7 @@ export default function FileScanScreen() {
           busy={configBusy}
           error={stopError || undefined}
           onCancel={() => { setStopExternal(false); setStopError('') }}
-          onConfirm={() => void stopExternalConfig()}
+          onConfirm={() => stopExternalConfig()}
         />
       ) : null}
 
@@ -196,6 +198,7 @@ export default function FileScanScreen() {
         <ConfirmDialog
           open
           title="ファイルを削除する"
+          deleteName={deleteTarget.filename}
           description={`${deleteTarget.filename} を消します。中身は画面に出ません。監査の記録は残ります。`}
           confirmLabel="削除する"
           cancelLabel="キャンセル"
@@ -203,7 +206,7 @@ export default function FileScanScreen() {
           busy={deleteBusy}
           error={deleteError || undefined}
           onCancel={() => { setDeleteTarget(null); setDeleteError('') }}
-          onConfirm={() => void remove()}
+          onConfirm={() => remove()}
         />
       ) : null}
     </>
@@ -211,7 +214,7 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -241,7 +244,7 @@ export default function FileScanScreen() {
   const externalOn = Boolean(config?.externalProvider && config?.externalEndpointUrl)
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} description={DESCRIPTION}>
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
       <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
       {actionError && !configServerError ? <Notice tone="danger" message={actionError} /> : null}
@@ -296,7 +299,7 @@ export default function FileScanScreen() {
                   {item.filename}
                   {item.releasedAt ? <span className={styles.released}>戻した</span> : null}
                 </GridCell>
-                <GridCell role="cell" className={styles.cell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</GridCell>
+                <GridCell role="cell" className={styles.cell} title={item.uploaderLabel ?? emptyValue('unknown')}>{item.uploaderLabel ?? emptyValue('unknown')}</GridCell>
                 <GridCell role="cell" className={styles.cell} data-tone={reasonTone(item)} title={item.reasonLabel ?? '確認が必要です'}>
                   {item.reasonLabel ?? '確認が必要です'}
                 </GridCell>
@@ -318,7 +321,7 @@ export default function FileScanScreen() {
                       />
                     </span>
                   ) : (
-                    <span className={styles.muted}>—</span>
+                    <span className={styles.muted}>{emptyValue('unknown')}</span>
                   )}
                 </GridCell>
               </GridRow>
@@ -378,6 +381,7 @@ export default function FileScanScreen() {
         ) : null}
       </section>
 
+      {selectedAccountId ? <FormDocumentRetention key={selectedAccountId} accountId={selectedAccountId} /> : null}
       {dialogs}
     </SbSettingsScreen>
   )

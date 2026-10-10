@@ -18,6 +18,7 @@ import ListState from '@/components/shared/list-state'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { LINK_STATUS_LABEL, checkedLabel, urlLabel } from './manual-link-view'
 import { useManualLinks } from './use-manual-links'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
 
 const TITLE = 'マニュアルの正本表'
@@ -48,11 +49,13 @@ export default function ManualLinksScreen() {
     startEdit,
     cancelEdit,
     saveEdit,
+    guard,
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
-    <SbSettingsScreen boardId="cIdA2" title={TITLE} description={DESCRIPTION}>
+    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION}>
       {children}
+      <UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </SbSettingsScreen>
   )
 
@@ -114,7 +117,7 @@ export default function ManualLinksScreen() {
           ) : undefined}
         />
       ) : (
-        <GridTable className={styles.table} label={`画面とマニュアルの対応 ${total}件`} design={{ columns: 'var(--sett-manual-columns)', gap: 'var(--tpl-sb-tbl-gap)', padding: 'var(--tpl-sb-tbl-pad)', rowPadding: 'var(--tpl-sb-tbl-row-pad)', fontSize: 'var(--tpl-sb-tbl-head)', color: 'var(--color-ink)' }}>
+        <GridTable className={styles.table} label={`画面とマニュアルの対応 ${total} 件`} design={{ columns: 'var(--sett-manual-columns)', gap: 'var(--tpl-sb-tbl-gap)', padding: 'var(--tpl-sb-tbl-pad)', rowPadding: 'var(--tpl-sb-tbl-row-pad)', fontSize: 'var(--tpl-sb-tbl-head)', color: 'var(--color-ink)' }}>
           <div role="rowgroup">
             <GridHeadRow>
               <GridCell role="columnheader">画面ID</GridCell>
@@ -168,7 +171,7 @@ export default function ManualLinksScreen() {
       )}
 
       {notice ? <p className={styles.footDanger}>{notice}</p> : null}
-      {total > rows.length ? <p className={styles.foot}>{`ほか ${total - rows.length}件。`}</p> : null}
+      {total > rows.length ? <p className={styles.foot}>{`ほか ${total - rows.length} 件。`}</p> : null}
     </>,
   )
 }

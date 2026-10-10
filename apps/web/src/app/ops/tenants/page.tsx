@@ -153,7 +153,7 @@ function OpsTenantsV7() {
   return (
     <div data-design-node="XWtYC" className={`ops-tenants-page flex flex-col gap-4`}>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <PageHeader breadcrumb={[]} title="契約先アカウント" description="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。" actions={<Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus size={16} aria-hidden="true" />契約先を作る</Button>} />
+      <PageHeader breadcrumb={[]} title="契約先アカウント" help="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。" actions={<Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus size={16} aria-hidden="true" />契約先を作る</Button>} />
 
       <div className="ops-tenants-metrics">
         <KpiCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="" help="請求が生きている契約先（決済失敗を含む）" loading={loading && !summary} />

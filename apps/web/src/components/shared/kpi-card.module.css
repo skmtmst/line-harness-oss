@@ -6,9 +6,9 @@
   flex-direction: column;
   justify-content: space-between;
   min-height: 100px;
-  padding: 14px 16px;
+  padding: 16px 24px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
+  border-radius: 0;
   background: var(--color-canvas);
   box-shadow: var(--card-shadow);
 }
@@ -68,8 +68,8 @@
 
 .label {
   color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
+  font-size: var(--text-body);
+  font-weight: 500;
 }
 
 .labelV6 {
@@ -79,7 +79,7 @@
 
 .labelBroadcast {
   color: var(--color-ink-faint);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
 }
 
 .labelSkeleton {
@@ -92,11 +92,11 @@
 
 .badge {
   flex-shrink: 0;
-  padding: 3px 8px;
-  border-radius: var(--radius-card);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-  font-size: var(--text-nano);
+  padding: 2px 8px;
+  border-radius: var(--radius-mini);
+  background: var(--color-notice-success-bg);
+  color: var(--color-kpi-positive);
+  font-size: var(--text-caption);
   font-weight: 600;
 }
 
@@ -150,8 +150,8 @@
 }
 
 .detail {
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
   /* 補足の行の高さは1行ぶんにそろえる。空でも潰さない。 */
   min-height: 1lh;
 }
@@ -186,7 +186,7 @@
 .unit, .labelText, .number { display: contents; }
 [data-theme='v8'] .card {
   justify-content: flex-start; min-width: 0; min-height: 0;
-  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: 12px;
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: var(--radius-card);
   outline: 1px solid var(--card-edge); outline-offset: -0.5px;
   background: var(--color-canvas); box-shadow: var(--card-shadow);
 }

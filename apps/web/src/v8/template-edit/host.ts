@@ -20,6 +20,7 @@ export type TemplateHostContent =
   | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null; templateId?: string; carouselActions?: Record<string, Record<string, unknown[]>>; media?: MessageTemplateMediaDefinition[] }
   /** リッチメッセージ（g8d6ai）：統括の口で作った5サイズの画像（media）と、店と同じ形の payload（面と URL）。 */
   | { kind: 'rich_message'; name: string; payload: Record<string, unknown>; media: TemplateImagemapUpload['media'] }
+  | { kind: 'rich_video'; name: string; messageContent: string; media: MessageTemplateMediaDefinition[] }
 
 export interface TemplateEditHost {
   /** G-9: テンプレートの同じ編集部品を吹き出しへ入れる引き出しで使う。 */
@@ -57,4 +58,7 @@ export interface TemplateEditHost {
   uploadRichImage?: (file: File) => Promise<TemplateImagemapUpload>
   /** カルーセルの画像はメッセージと同じ統括の口。受け取りを先に記録してからカードに入れる（R568）。 */
   uploadCarouselImage?: (file: File) => Promise<MessageTemplateMediaDefinition>
+  /** 統括の動画と5サイズのプレビュー画像。店のアカウントは使わない。 */
+  uploadRichVideo?: (file: File) => Promise<MessageTemplateMediaDefinition>
+  uploadRichVideoPreview?: (file: File) => Promise<TemplateImagemapUpload>
 }

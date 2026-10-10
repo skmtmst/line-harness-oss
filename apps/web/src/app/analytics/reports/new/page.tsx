@@ -19,7 +19,10 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import './report-v8.css'
 import { TextField } from '@/components/shared/text-field'
+import NumberInput from '@/components/shared/number-field'
 import HelpTip from '@/components/shared/help-tip'
+import { Field } from '@/components/shared/form-controls'
+import PeriodPicker from '@/components/shared/period-picker'
 import { Check, ChevronDown, GitCompareArrows, RefreshCw, TriangleAlert } from 'lucide-react'
 import { formatDateTime, formatTime } from '@/lib/format'
 import ReportHeadV8 from './report-head-v8'
@@ -221,7 +224,7 @@ function OneTimeResultView({ accountId, schedule, runs, canManage, onRetryDone }
       <PageHeader
         breadcrumb={[{ label: '分析', href: '/analytics' }, { label: '1回送信の結果' }]}
         title="1回送信の結果"
-        description=""
+        help=""
       />
       <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
         <h2 className="truncate text-lg font-semibold" title={schedule.name}>{schedule.name}</h2>
@@ -1057,10 +1060,7 @@ function AnalyticsReportFormPage() {
           <legend className="sr-only">レポートの設定</legend>
           <section className="report-v8-card">
             <h2 className="report-v8-cardTitle">名前を付けます</h2>
-            <label className="report-v8-field report-v8-inputField">
-              <span className="report-v8-label">名前</span>
-              <TextField id="report-name" aria-describedby={nameError ? 'report-name-error' : undefined} value={name} onChange={(event) => { setName(event.target.value); setNameError(''); setValidation(null) }} placeholder="例: 週次まとめ" aria-invalid={nameError ? true : undefined} />
-            </label>
+            <Field label="名前" required><TextField id="report-name" aria-describedby={nameError ? 'report-name-error' : undefined} value={name} onChange={(event) => { setName(event.target.value); setNameError(''); setValidation(null) }} placeholder="例：週次まとめ" aria-invalid={nameError ? true : undefined} /></Field>
             {nameError && <p id="report-name-error" className="report-v8-fieldError" role="alert">{nameError}</p>}
           </section>
           <section className="report-v8-card">
@@ -1146,10 +1146,10 @@ function AnalyticsReportFormPage() {
           <section className="report-v8-card">
             <h2 className="report-v8-cardTitle">いつ送りますか<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip></h2>
             <div className="report-v8-scheduleGrid">
-              <label className="report-v8-field">間かく<Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></label>
-              {cadence === 'weekly' ? <label className="report-v8-field">送る曜日<Select aria-label="送る曜日" value={weekday} onChange={setWeekday} options={WEEKDAY_JA.map((day, value) => ({ value: String(value), label: `${day}曜` }))} size="full" /></label> : <label className="report-v8-field">送る日<Select aria-label="送る日" value={monthDay} onChange={setMonthDay} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></label>}
-              <span className="report-v8-field">送る時刻<TimeField id="report-send-time" invalid={!!fieldMessage('report-send-time')} aria-describedby={fieldMessage('report-send-time') ? 'report-send-time-error' : undefined} value={sendTime} onChange={(value) => { setSendTime(value); setValidation(null) }} aria-label="送る時刻" />{fieldMessage('report-send-time') && <p id="report-send-time-error" className="report-v8-fieldError" role="alert">{fieldMessage('report-send-time')}</p>}</span>
-              <label className="report-v8-field">集計する期間<Select aria-label="集計する期間" value={periodDays} onChange={setPeriodDays} options={[{ value: '7', label: '前の7日' }, { value: '30', label: '前の30日' }, { value: '90', label: '前の90日' }]} size="full" /></label>
+              <Field label="間かく" required><Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></Field>
+              {cadence === 'weekly' ? <Field label="送る曜日" required><Select aria-label="送る曜日" value={weekday} onChange={setWeekday} options={WEEKDAY_JA.map((day, value) => ({ value: String(value), label: `${day}曜` }))} size="full" /></Field> : <Field label="送る日" required><Select aria-label="送る日" value={monthDay} onChange={setMonthDay} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></Field>}
+              <Field label="送る時刻" required><TimeField id="report-send-time" invalid={!!fieldMessage('report-send-time')} aria-describedby={fieldMessage('report-send-time') ? 'report-send-time-error' : undefined} value={sendTime} onChange={(value) => { setSendTime(value); setValidation(null) }} aria-label="送る時刻" />{fieldMessage('report-send-time') && <p id="report-send-time-error" className="report-v8-fieldError" role="alert">{fieldMessage('report-send-time')}</p>}</Field>
+              <Field label="集計する期間" required><PeriodPicker days={Number(periodDays)} onChange={(days) => setPeriodDays(String(days))} /></Field>
             </div>
           </section>
           <section className="report-v8-card">
@@ -1169,8 +1169,8 @@ function AnalyticsReportFormPage() {
                 return <li className="report-v8-alertCard" key={def.id}>
                   <Checkbox checked={draft.enabled} disabled={!alertsEnabled} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong className="report-v8-choiceTitle">{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
                   <div className="report-v8-alertGrid">
-                    <label className="report-v8-field report-v8-inputField"><span className="report-v8-label">{def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値（%）' : 'しきい値（%）'}</span><TextField id={`report-alert-${def.id}-threshold`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-threshold`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-threshold`) ? `report-alert-${def.id}-threshold-error` : undefined} type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-threshold`) && <p id={`report-alert-${def.id}-threshold-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-threshold`)}</p>}</label>
-                    <label className="report-v8-field report-v8-inputField"><span className="report-v8-label">判定に必要な最低件数<HelpTip label={`${def.name}の最低件数`}>集計できた件数が、この数以上のときだけ判定します。</HelpTip></span><TextField id={`report-alert-${def.id}-sample`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-sample`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-sample`) ? `report-alert-${def.id}-sample-error` : undefined} type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-sample`) && <p id={`report-alert-${def.id}-sample-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-sample`)}</p>}</label>
+                    <Field label={def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値' : 'しきい値'} required><NumberInput unit={def.id === 'conversions' ? '日' : '%'} id={`report-alert-${def.id}-threshold`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-threshold`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-threshold`) ? `report-alert-${def.id}-threshold-error` : undefined} type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-threshold`) && <p id={`report-alert-${def.id}-threshold-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-threshold`)}</p>}</Field>
+                    <Field label="判定に必要な最低件数" required help="集計できた件数が、この数以上のときだけ判定します。"><NumberInput unit="件" id={`report-alert-${def.id}-sample`} aria-invalid={!!fieldMessage(`report-alert-${def.id}-sample`) || undefined} aria-describedby={fieldMessage(`report-alert-${def.id}-sample`) ? `report-alert-${def.id}-sample-error` : undefined} type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} />{fieldMessage(`report-alert-${def.id}-sample`) && <p id={`report-alert-${def.id}-sample-error`} className="report-v8-fieldError" role="alert">{fieldMessage(`report-alert-${def.id}-sample`)}</p>}</Field>
                   </div>
                 </li>
               })}

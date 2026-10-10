@@ -32,6 +32,7 @@ import { EVENT_LABELS, eventLabel } from '@/components/friend-fields/support-mar
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
 import styles from './mark-editor-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 const COLORS = [
   { value: '#EF4B55', name: '赤' },
@@ -439,7 +440,7 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
                   </fieldset>
                   <div className={styles.field}>
                     <span className={styles.fieldLabel}>並び順</span>
-                    <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className={styles.inputNarrow} />
+                    <NumberInput type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className={styles.inputNarrow} />
                   </div>
                   <div>
                     <Checkbox

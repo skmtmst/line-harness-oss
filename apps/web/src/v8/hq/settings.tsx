@@ -8,6 +8,8 @@
  * （型のフォルダの列。板が狭いときは型が「設定：〇〇」の選ぶ欄に畳む）・統括名のカード。
  * 絵の「運営による操作」は契約先には出さない（2026-10-06 利用者指定。v7 と同じ）。
  */
+import { notifySaved } from '@/components/shared/toast'
+import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -20,6 +22,8 @@ import { useStaffRole } from '@/lib/staff-role'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import CompanyContactCard from './company-contact'
 import styles from './settings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const TITLE = '統括の情報'
 const DESCRIPTION = '統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。'
@@ -34,7 +38,7 @@ export default function HqSettingsV8() {
   const canEdit = role === 'owner' || role === 'admin'
 
   return (
-    <ListPage boardId="K7HYu" title={TITLE} description={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderNav={settingsNav}>
+    <ListPage boardId="K7HYu" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderNav={settingsNav}>
       <div className={styles.body}>
         {role && !canEdit ? <Notice tone="info">閲覧のみで見ています。統括名の変更と会社・連絡先の登録は管理者だけができます。</Notice> : null}
         <TenantNameCard canEdit={canEdit} />
@@ -48,6 +52,7 @@ export default function HqSettingsV8() {
 function TenantNameCard({ canEdit }: { canEdit: boolean }) {
   const uid = useId()
   const [name, setName] = useState('')
+  const [baseline, setBaseline] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -58,7 +63,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
     let cancelled = false
     void api.tenants.me()
       .then((response) => {
-        if (!cancelled && response.success) setName(response.data.name ?? '')
+        if (!cancelled && response.success) { setName(response.data.name ?? ''); setBaseline(response.data.name ?? '') }
       })
       .catch(() => {
         if (!cancelled) setError('統括名を読み込めませんでした。時間をおいてもう一度お試しください。')
@@ -88,11 +93,12 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       const response = await api.tenants.updateName(trimmed)
       if (!response.success) throw new Error(response.error)
       setName(response.data.name ?? trimmed)
-      setSaved(true)
+      setBaseline(response.data.name ?? trimmed)
+      setSaved(true); notifySaved()
     } catch (caught) {
       // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
       setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
-        forbidden: '統括名の変更は管理者だけができます。必要なときは管理者の方に操作してもらってください。',
+        scope: 'hq',
       }))
     } finally {
       setSaving(false)
@@ -104,7 +110,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
       <section className={styles.card} aria-label="統括名">
         <dl className={styles.field}>
           <dt className={styles.label}>統括名</dt>
-          <dd className={styles.value}>{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || '—'}</dd>
+          <dd className={styles.value}>{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || emptyValue('unknown')}</dd>
         </dl>
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         <p className={styles.hint}>統括名の変更は管理者だけができます。</p>
@@ -114,9 +120,8 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
 
   return (
     <form onSubmit={save} className={styles.card}>
-      <div className={styles.field}>
-        <label htmlFor={`${uid}-name`} className={styles.label}>統括名</label>
-        <TextField
+      <FormLeaveGuard dirty={name !== baseline} busy={saving} />
+      <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`}><TextField
           id={`${uid}-name`}
           value={name}
           maxLength={100}
@@ -126,11 +131,10 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
           aria-describedby={nameError ? `${uid}-name-error` : undefined}
           className={styles.full}
         />
-        {nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}
-      </div>
+{nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
       <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      {saved ? <p className={styles.saved} role="status">保存しました。</p> : null}
+      {null}
       <div className={styles.actions}>
         <Button variant="primary" type="submit" disabled={loading || saving} busy={saving}>統括名を保存する</Button>
       </div>

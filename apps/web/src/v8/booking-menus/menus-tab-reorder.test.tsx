@@ -12,6 +12,7 @@
 import React, { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import type { BookingMenu } from '@/lib/api'
 
 const updateMenu = vi.hoisted(() => vi.fn())
@@ -22,7 +23,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return { ...actual, bookingApi: { ...actual.bookingApi, updateMenu, reorderMenus } }
 })
-vi.mock('@/components/shared/toast', () => ({ notifyToast: (message: string) => { toasts.push(message) } }))
+vi.mock('@/components/shared/toast', () => ({ notifyToast: (message: string) => { toasts.push(message) }, notifySaved: (message: string) => { toasts.push(message) } }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
@@ -59,6 +60,8 @@ function Harness({ canEdit = true }: { canEdit?: boolean }) {
 }
 
 beforeEach(() => {
+  flushListUrlState()
+  window.history.replaceState(null, "", "/")
   server = [
     { id: 'a', name: 'カット', sort_order: 10, version: 1 },
     { id: 'b', name: 'カラー', sort_order: 20, version: 1 },
@@ -146,6 +149,7 @@ describe('予約メニューの並び替え', () => {
   it('検索中・閲覧のみはつまみを出さず、「…」にも上へ・下へを出さない', async () => {
     const { container, unmount } = render(<Harness />)
     fireEvent.change(screen.getByRole('searchbox', { name: 'メニュー名で探す' }), { target: { value: 'カ' } })
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 320)) })
     expect(container.querySelector('[data-reorder-handle]')).toBeNull()
     expect(container.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('検索を外すと動かせます')
     fireEvent.click(screen.getByRole('button', { name: '「カット」のそのほかの操作' }))

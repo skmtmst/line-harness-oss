@@ -12,7 +12,7 @@
 .field {
   display: block;
   width: 100%;
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border: 1px solid var(--color-field-border); /* stroke: $hairline */
   border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-ink); /* fill: $ink */
@@ -23,6 +23,7 @@
   font-size: var(--text-body);
   font-weight: 400; /* fontWeight: normal */
   font-family: inherit;
+  box-shadow: var(--shadow-field);
 }
 
 .field::placeholder {
@@ -42,7 +43,7 @@
 
 /* ytG7l 共通 入力欄 */
 .single {
-  height: 40px; /* height: 40 */
+  height: 36px; /* height: 40 */
   padding: 0 12px; /* padding: [0, 12] */
 }
 
@@ -115,6 +116,9 @@
 .multi {
   resize: vertical;
   max-width: 100%;
+  min-height: 120px;
+  padding: 14px;
+  line-height: 1.7;
 }
 
 /* 2行の説明用。指定した欄だけを小さくする。 */
@@ -131,3 +135,7 @@
 /* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
 [data-theme='v8'] .multiSingleRow { min-height: 36px; height: 36px; border: 0; padding: 7.5px 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: 21px; box-shadow: var(--control-shadow); }
 [data-theme='v8'] .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }
+
+/* B-152・仕上げ7 */
+[data-theme='v8'] .field:disabled { opacity: var(--polish-disabled-opacity); }
+html[data-theme='v8'] .field:is(.single, .multi)[aria-invalid='true']:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); box-shadow: var(--polish-error-ring); }

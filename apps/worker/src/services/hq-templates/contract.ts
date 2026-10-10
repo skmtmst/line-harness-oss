@@ -126,6 +126,8 @@ export interface HqTemplateOwnedR2Object {
   key: string;
   ownerToken: string;
   bytes: Uint8Array;
+  /** Large immutable media is copied lazily, with length/ETag/SHA-256 verification. */
+  streamSource?: import('../hq-media-stream.js').HqMediaStreamSource;
   contentType?: string;
 }
 

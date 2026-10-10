@@ -157,3 +157,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* B-152・仕上げ2 */
+.summaryTitle, .starterTitle { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
+.rowValue { font-weight: var(--polish-weight-body); }

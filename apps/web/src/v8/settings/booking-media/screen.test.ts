@@ -33,8 +33,8 @@ describe('予約サイト・グルメ媒体', () => {
     const members = [{ id: 'm1', staff_name: '店長' }, { id: 'm2', staff_name: 'ホール責任者' }]
     expect(recipientText({ recipientMode: 'responsible', membershipIds: [] }, members)).toBe('当日の責任者（いなければ店長）')
     expect(recipientText({ recipientMode: 'manager', membershipIds: [] }, members)).toBe('店長')
-    expect(recipientText({ recipientMode: 'selected', membershipIds: ['m1', 'm2'] }, members)).toBe('店長・ホール責任者（2人）')
-    expect(recipientText({ recipientMode: 'selected', membershipIds: ['gone'] }, members)).toBe('選んだスタッフ（1人）')
+    expect(recipientText({ recipientMode: 'selected', membershipIds: ['m1', 'm2'] }, members)).toBe('店長・ホール責任者（2 人）')
+    expect(recipientText({ recipientMode: 'selected', membershipIds: ['gone'] }, members)).toBe('選んだスタッフ（1 人）')
   })
 })
 

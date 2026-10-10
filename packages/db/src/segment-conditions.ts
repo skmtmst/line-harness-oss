@@ -366,11 +366,12 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
       return { sql: `(${perWord.join(' OR ')})`, bindings }
     }
 
+    // 保存済み条件の名前は互換性のため維持し、内容は受信箱のメモだけで探す。
     case 'private_memo': {
       const text = asString(rule.value, 'private_memo')
       if (text === '') throw new Error('private_memo rule requires a non-empty value')
       bindings.push(`%${text}%`)
-      return { sql: `f.private_memo LIKE ?`, bindings }
+      return { sql: `EXISTS (SELECT 1 FROM chats memo_chat WHERE memo_chat.friend_id = f.id AND memo_chat.notes LIKE ?)`, bindings }
     }
 
     case 'status_message': {

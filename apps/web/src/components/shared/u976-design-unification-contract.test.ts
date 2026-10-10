@@ -32,7 +32,7 @@ describe('#976 デザイン統一', () => {
 
   it('U077/U084: 危険操作は共通Buttonの danger 役割で $danger + 白文字', () => {
     expect(buttonTsx).toContain("'danger'")
-    expect(button).toMatch(/\.danger\s*{[^}]*background:\s*var\(--color-danger\)/s)
+    expect(button).toMatch(/\.danger\s*{[^}]*background:\s*var\(--color-danger-action\)/s)
     expect(button).toMatch(/\.danger\s*{[^}]*color:\s*var\(--color-on-accent\)/s)
   })
 

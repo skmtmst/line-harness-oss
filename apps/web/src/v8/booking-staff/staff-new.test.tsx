@@ -66,26 +66,26 @@ describe('予約スタッフを登録（V8）', () => {
   test('メニューは4つまで並べ、残りは「ほかのメニュー」で開く', async () => {
     render(<StaffNewV8 />)
     await screen.findByRole('checkbox', { name: 'カット' })
-    expect(screen.getAllByRole('checkbox')).toHaveLength(4)
+    expect(screen.getAllByRole('checkbox').filter(item => item.closest('[data-setting-checkbox]') === null)).toHaveLength(4)
     expect(screen.queryByRole('checkbox', { name: '足裏ケア' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'ほかのメニュー（2）' }))
-    expect(screen.getAllByRole('checkbox')).toHaveLength(6)
+    expect(screen.getAllByRole('checkbox').filter(item => item.closest('[data-setting-checkbox]') === null)).toHaveLength(6)
     expect(screen.getByRole('checkbox', { name: '足裏ケア' })).toBeTruthy()
   })
 
   test('指名なしの枠に入る担当がいなければ、見本に「指名なし」を出さない。スイッチを入れると出る', async () => {
     render(<StaffNewV8 />)
-    const phone = await screen.findByRole('img', { name: 'お客さまの予約画面の見本' })
+    const phone = await screen.findByRole('region', { name: 'お客さまの予約画面の見本' })
     await screen.findByRole('checkbox', { name: 'カット' })
     expect(within(phone).queryByText('指名なし')).toBeNull()
-    fireEvent.click(screen.getByRole('switch', { name: '「指名なし」の枠にも含める' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '「指名なし」の枠にも含める' }))
     expect(within(phone).getByText('指名なし')).toBeTruthy()
   })
 
   test('登録済みの担当に指名なしの人がいれば、最初から「指名なし」を出す', async () => {
     fixture.staff = [...fixture.staff, { id: 'bs-2', name: '中川 由美', display_name: '中川', role: '受付', sort_order: 2, is_designation_optional: 1, is_active: 1 }]
     render(<StaffNewV8 />)
-    const phone = await screen.findByRole('img', { name: 'お客さまの予約画面の見本' })
+    const phone = await screen.findByRole('region', { name: 'お客さまの予約画面の見本' })
     expect(await within(phone).findByText('指名なし')).toBeTruthy()
   })
 })

@@ -5,6 +5,12 @@
  * 「押したら」の共通の欄（YPzmo）。値は globals.css の [data-theme="v8"] の --tap-action-*。
  * 画面側で上書きしない（幅は呼び出し側の箱で決める）。
  */
+.withExtras, .pickWrap { width: 100%; min-width: 0; }
+.withExtras { container: tap-action / inline-size; }
+.pickRow { text-align: left; cursor: pointer; }
+.pickRow:disabled { cursor: default; }
+.pickRow:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+.pickChange { color: var(--color-action); font-size: var(--text-caption); white-space: nowrap; }
 .root {
   display: flex;
   min-width: 0;
@@ -163,6 +169,11 @@
 .liffLink:focus-visible {
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
+}
+
+@container tap-action (max-width: 479px) {
+  .row { flex-direction: column; align-items: stretch; }
+  .row .kind { flex: none; width: 100%; }
 }
 
 /* 選ぶ窓（共通の EntityPicker）で候補を読めなかったときの理由。 */

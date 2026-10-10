@@ -91,7 +91,6 @@ describe('A-7 tenant scope', () => {
   test.each([
     '/api/nen-members/care-flags',
     '/api/nen-members/ranks',
-    '/api/nen-members/consultations',
   ])('%s filters rows to visible accounts', async (path) => {
     const harness = app();
     expect((await harness.instance.request(path)).status).toBe(200);

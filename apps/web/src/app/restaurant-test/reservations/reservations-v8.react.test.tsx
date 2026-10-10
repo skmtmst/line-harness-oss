@@ -99,6 +99,7 @@ test('v8 では今日（時間×卓）が出て、表の列と操作は出ない
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   expect(text()).toContain('予約台帳')
+  await act(async () => { (host.querySelector('button[aria-label="予約台帳の説明"]') as HTMLButtonElement).click() })
   expect(text()).toContain('時間と卓で確認します')
   expect(host.querySelector('[aria-label$="時間×卓"]')).not.toBeNull()
   expect(text()).toContain('電話の予約を入れる')

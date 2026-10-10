@@ -35,6 +35,8 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './results.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]
@@ -78,7 +80,7 @@ function subscriptionState(sub: Subscription): { label: string; tone: StatusBadg
 function nextLabel(sub: Subscription): string {
   if (sub.status === 'completed') return '—'
   if (sub.status === 'paused') return '—（止めている）'
-  return sub.nextDeliveryAt ? formatDateTime(sub.nextDeliveryAt) : '—'
+  return sub.nextDeliveryAt ? formatDateTime(sub.nextDeliveryAt) : emptyValue('unknown')
 }
 
 export default function ScenarioResultsV8() {
@@ -267,8 +269,8 @@ export default function ScenarioResultsV8() {
       ...sortedSteps.map((step) => {
         const result = statsByOrder.get(step.stepOrder)
         return [
-          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? '—',
-          result ? percentLabel(result.reachedCount, stats.enrolledTotal) : '—', '—', '—',
+          `${step.stepOrder}通目`, scheduleLabel(step), result?.reachedCount ?? emptyValue('unknown'),
+          result ? percentLabel(result.reachedCount, stats.enrolledTotal) : emptyValue('unknown'), '—', '—',
         ]
       }),
     ]
@@ -276,7 +278,7 @@ export default function ScenarioResultsV8() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `scenario-results-${id}.csv`
+    anchor.download = csvFileName("シナリオ配信の結果")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -429,7 +431,7 @@ export default function ScenarioResultsV8() {
       boardId="X4STXS"
       identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
       title={scenario ? `配信結果：${scenario.name}` : '配信結果'}
-      description="始まった・読み終えた・どの通まで届いたかを見ます。"
+      help="始まった・読み終えた・どの通まで届いたかを見ます。"
       actions={(
         <span className={styles.headActions}>
           <Button href={`/scenarios/detail?id=${encodeURIComponent(id)}`}>
@@ -455,7 +457,7 @@ export default function ScenarioResultsV8() {
               title="読み終えた"
               value={completedCount}
               unit="人"
-              detail={enrolled && completedCount !== null ? percentLabel(completedCount, enrolled) : '—'}
+              detail={enrolled && completedCount !== null ? percentLabel(completedCount, enrolled) : emptyValue('unknown')}
             />
             <KpiCard icon={null} title="途中" value={inProgress} unit="人" detail="いま途中にいる人" />
             <KpiCard
@@ -464,7 +466,7 @@ export default function ScenarioResultsV8() {
               title="離れた"
               value={leftCount}
               unit="人"
-              detail={drop ? `${drop.order}通目で多い` : '終わらずに抜けた人'}
+              detail={drop ? `${drop.order} 通目で多い` : '終わらずに抜けた人'}
             />
           </KpiBand>
           </div>
@@ -473,7 +475,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.sectionHead}>
               <h2 id="scenario-results-steps" className={styles.sectionTitle}>通ごとの反応</h2>
               {deliveringCount > 0 ? (
-                <span className={styles.sectionNote} role="status">いま送っています（送信中 {formatNumber(deliveringCount)}人）</span>
+                <span className={styles.sectionNote} role="status">いま送っています（送信中 {formatNumber(deliveringCount)} 人）</span>
               ) : null}
             </div>
             <NoteBar tone="info">
@@ -489,22 +491,22 @@ export default function ScenarioResultsV8() {
                   const pct = reached !== null && stats.enrolledTotal > 0
                     ? Math.min(100, (reached / stats.enrolledTotal) * 100)
                     : 0
-                  const opened = run?.opened.state === 'available' && run.opened.value !== null ? `${formatNumber(run.opened.value)}人` : '—'
-                  const clicked = run?.clicked.state === 'available' && run.clicked.value !== null ? `${formatNumber(run.clicked.value)}人` : '—'
+                  const opened = run?.opened.state === 'available' && run.opened.value !== null ? `${formatNumber(run.opened.value)}人` : emptyValue('unknown')
+                  const clicked = run?.clicked.state === 'available' && run.clicked.value !== null ? `${formatNumber(run.clicked.value)}人` : emptyValue('unknown')
                   return (
                     <li key={step.id} className={styles.stepRow}>
                       <div className={styles.stepTop}>
-                        <span className={styles.stepNo}>{step.stepOrder}通目</span>
+                        <span className={styles.stepNo}>{step.stepOrder} 通目</span>
                         <span className={styles.stepWhen}>{scheduleLabel(step)}</span>
-                        <span className={styles.stepReach}>{reached === null ? '—' : `${formatNumber(reached)}人に届いた`}</span>
+                        <span className={styles.stepReach}>{reached === null ? emptyValue('unknown') : `${formatNumber(reached)}人に届いた`}</span>
                         <span className={styles.stepMeta}>
-                          {`届いた率 ${reached === null ? '—' : percentLabel(reached, stats.enrolledTotal)}・開いた ${opened}・押した ${clicked}`}
+                          {`届いた率 ${reached === null ? emptyValue('unknown') : percentLabel(reached, stats.enrolledTotal)}・開いた ${opened}・押した ${clicked}`}
                         </span>
                         {drop && drop.order === step.stepOrder ? (
-                          <span className={styles.stepDrop}>{`ここで ${formatNumber(drop.count)}人（${Math.round((drop.count / drop.base) * 100)}%）離れた`}</span>
+                          <span className={styles.stepDrop}>{`ここで ${formatNumber(drop.count)} 人（${Math.round((drop.count / drop.base) * 100)}%）離れた`}</span>
                         ) : null}
                       </div>
-                      <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder}通目の届いた率`} />
+                      <progress className={styles.stepBar} max={100} value={pct} aria-label={`${step.stepOrder} 通目の届いた率`} />
                     </li>
                   )
                 })}
@@ -521,7 +523,7 @@ export default function ScenarioResultsV8() {
               <h2 id="scenario-results-friends" className={styles.sectionTitle}>参加中の友だち</h2>
               {failedTotal > 0 ? (
                 <button type="button" className={styles.sectionLink} onClick={() => setSubscriptionStatus('paused')}>
-                  {`送れずに止まった人が ${formatNumber(failedTotal)}人・止まっている人だけを見る`}
+                  {`送れずに止まった人が ${formatNumber(failedTotal)} 人・止まっている人だけを見る`}
                 </button>
               ) : null}
             </div>
@@ -543,7 +545,7 @@ export default function ScenarioResultsV8() {
                 />
               </span>
               {runs ? (
-                <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)}人`}</span>
+                <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)} 人`}</span>
               ) : null}
               <span className={styles.toolsSpacer} />
               <Button
@@ -625,7 +627,7 @@ export default function ScenarioResultsV8() {
                         <span className={styles.colState} role="cell">
                           <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>
                         </span>
-                        <span className={styles.colNow} role="cell">{`${sub.currentStepOrder}通目まで`}</span>
+                        <span className={styles.colNow} role="cell">{`${sub.currentStepOrder} 通目まで`}</span>
                         <span className={styles.colNext} role="cell">{nextLabel(sub)}</span>
                         <span className={styles.colPlan} role="cell">
                           <Button
@@ -682,7 +684,7 @@ export default function ScenarioResultsV8() {
         />
       ) : null}
 
-      {/* 「別のシナリオへ移す」の窓。移し先は稼働中の別シナリオだけ選べる。 */}
+      {/* 「別のシナリオへ移す」の窓。移し先は有効の別シナリオだけ選べる。 */}
       <Dialog
         open={moveTarget !== null}
         title={moveTarget ? `${moveTarget.friendName} を別のシナリオへ移す` : ''}
@@ -724,7 +726,7 @@ export default function ScenarioResultsV8() {
             placeholder={moveOptions === null
               ? '（読み込んでいます）'
               : moveChoices.length === 0
-                ? '（稼働中の他のシナリオがありません）'
+                ? '（有効の他のシナリオがありません）'
                 : '（シナリオを選んでください）'}
             options={moveChoices}
           />

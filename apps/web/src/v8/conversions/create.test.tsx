@@ -122,7 +122,7 @@ describe('V8 成果地点を作る', () => {
     expect(scroll).toHaveBeenCalledWith({ block: 'center' })
     const error = screen.getByRole('alert')
     expect(error.textContent).toBe('成果地点の名前を入力してください')
-    expect(nameInput().getAttribute('aria-describedby')).toBe(error.id)
+    expect(nameInput().getAttribute('aria-describedby')?.split(/\s+/)).toContain(error.id)
     expect(error.closest('[data-template-region="content"]')).toBeTruthy()
     expect(screen.getAllByText('成果地点の名前を入力してください')).toHaveLength(1)
     expect(posted).toHaveLength(0)
@@ -187,7 +187,7 @@ describe('V8 成果地点を作る', () => {
   it('閲覧のみ：帯を出し、保存のボタン・使う場所を足すは置かない', async () => {
     role.value = 'staff'
     await mount()
-    expect(screen.getByText('閲覧のみで見ています。作る操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /保存して/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /使う場所を足す/ })).toBeNull()
     expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()

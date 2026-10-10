@@ -249,6 +249,9 @@ export interface FriendField {
   /** GET /api/friends/:id/fields のときだけ付く */
   value?: string | null;
   updatedBy?: string | null;
+  fixedKey?: import("./fixed-friend-fields").FixedFriendFieldKey | null;
+  valueUpdatedAt?: string | null;
+  valueSource?: { type: string; id: string | null; name: string | null } | null;
   /** ?withUsage=1 のときだけ付く */
   usageCount?: number;
   /** この項目へ回答を保存する回答フォーム数。未取得時は省略する。 */
@@ -297,6 +300,7 @@ export interface Folder {
 
 /** 対応マーク */
 export interface SupportMark {
+  archivedAt?: string | null;
   id: string;
   name: string;
   color: string;
@@ -1261,6 +1265,9 @@ export interface EntryRoute {
   redirectUrl: string | null;
   poolId: string | null;
   introTemplateId: string | null;
+  couponAssetId?: string | null;
+  couponEnabled?: boolean;
+  couponAudience?: 'new_friends' | 'all_friends';
   runAccountFriendAddScenarios: boolean;
   isActive: boolean;
   /** 受付を止めた時刻。受付中・記録の無い古い行は null。 */
@@ -1280,6 +1287,17 @@ export interface EntryRouteGenre {
   updatedAt: string;
 }
 
+/** 本人確認済みLIFFの受け取り。使用操作はreceiptIdとrequestIdを送る。 */
+export interface EntryRouteCouponReceived {
+  receiptId: string;
+  assetId: string;
+  name: string;
+  payload: Record<string, unknown>;
+  receivedAt: string | null;
+  usedCount: number;
+  postbackData: string;
+}
+
 export interface CreateEntryRouteInput {
   refCode: string;
   genre?: string | null;
@@ -1289,6 +1307,9 @@ export interface CreateEntryRouteInput {
   redirectUrl?: string | null;
   poolId?: string | null;
   introTemplateId?: string | null;
+  couponAssetId?: string | null;
+  couponEnabled?: boolean;
+  couponAudience?: 'new_friends' | 'all_friends';
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
   /** 作成時に所属させるLINEアカウント。Worker の必須検査と保存に使う。 */
@@ -1309,6 +1330,10 @@ export interface EntryRouteFunnel {
   conversionValueSum?: number;
   valuePerFriend?: number | null;
   monthly?: EntryRouteMonth[];
+  /** 実際の初回追加イベントの人数。既存友だちの読取を含めない。 */
+  new_friend_add_count?: number;
+  coupon_received_count?: number;
+  coupon_used_count?: number;
   click_count: number;
   friend_add_count: number;
   form_submission_count: number;

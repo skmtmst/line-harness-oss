@@ -9,6 +9,7 @@
  * プール一覧・LINEアカウント一覧・プールごとの所属アカウント・追加・外す・削除。
  * 「新規プール」は V8 の作る画面（/pools/new・`D0AOyx`）へ移る。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Copy, Info, Plus } from 'lucide-react'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
@@ -26,11 +27,14 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import frame from '../sa-frame.module.css'
 import styles from './pools.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
 
 const TITLE = 'プール管理'
-const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、稼働中の所属アカウントからランダムに振り分けます。'
+const DESCRIPTION = '来たお客さまを振り分ける LINE アカウントをまとめる入れ物です。公開 URL から来た人を、有効の所属アカウントからランダムに振り分けます。'
 
 /** 既定のプール（main）を先頭に、あとは作った順。 */
 export function orderPools(pools: readonly TrafficPool[]): TrafficPool[] {
@@ -85,7 +89,7 @@ export default function PoolsV8() {
   if (featureOff) {
     return (
       <div className={frame.screen}>
-        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} description={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
+        <SettingsPage layout="accounts" boardId="u3iab3" title={TITLE} help={DESCRIPTION} navigation={<SettingsInnerNav inline />}>
           <FeatureDisabledScreen featureId="multi_store_hierarchy" />
         </SettingsPage>
       </div>
@@ -106,7 +110,7 @@ export default function PoolsV8() {
       <SettingsPage layout="accounts"
         boardId="u3iab3"
         title={TITLE}
-        description={DESCRIPTION}
+        help={DESCRIPTION}
         actions={canManage && !isEmpty ? createButton : undefined}
         navigation={<SettingsInnerNav inline />}
       >
@@ -153,16 +157,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const onCopy = async () => {
-    try {
-      setCopyError('')
-      await navigator.clipboard.writeText(publicUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    } catch {
-      setCopyError('コピーできませんでした。公開URLを選んでコピーしてください。')
-    }
-  }
+
 
   const onDelete = async () => {
     // 押している間は受け付けない（二度押しの2回目は404になり、消えているのに失敗と出る）。
@@ -201,10 +196,8 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         ) : null}
       </div>
       <div className={styles.urlRow}>
-        <span className={styles.url} title={publicUrl}>{publicUrl}</span>
-        <Button variant="secondary" onClick={() => void onCopy()}>
-          <Copy size={15} aria-hidden="true" />{copied ? 'コピー済' : '公開 URL コピー'}
-        </Button>
+        <span className={styles.url} ><TruncatedText value={String(publicUrl ?? '')} url /></span>
+        <CopyTextButton value={publicUrl} aria-label="公開URLをコピー"  />
       </div>
       {copyError ? <p role="alert" className={styles.inlineError}>{copyError}</p> : null}
       <PoolMembers poolId={pool.id} accounts={accounts} canManage={canManage} onChange={onChange} />
@@ -217,7 +210,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         destructive
         busy={deleting}
         error={deleteError}
-        onConfirm={() => void onDelete()}
+        onConfirm={() => onDelete()}
         onCancel={() => {
           if (deleting) return
           setConfirmOpen(false)
@@ -300,10 +293,10 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         {members.map((m) => {
           const acc = accounts.find((a) => a.id === m.lineAccountId)
           const name = acc?.name ?? m.lineAccountId
-          const friends = acc?.stats?.friendCount == null ? '—' : acc.stats.friendCount.toLocaleString('ja-JP')
+          const friends = acc?.stats?.friendCount == null ? '—' : polishFormatNumber(acc.stats.friendCount)
           return (
             <li key={m.id} className={styles.member}>
-              <span className={styles.memberName} title={name}>{name}</span>
+              <span className={styles.memberName} ><TruncatedText value={String(name ?? '')} /></span>
               <span className={styles.memberFriends}>{`友だち ${friends}`}</span>
               {canManage ? (
                 <Button variant="secondary" onClick={() => { setRemoveError(''); setRemoveTarget({ id: m.id, name }) }}>外す</Button>
@@ -316,7 +309,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
       {listError ? (
         <p role="alert" className={styles.inlineError}>
           {listError}{' '}
-          <button type="button" className={styles.textButton} onClick={() => void reload()}>読み直す</button>
+          <button type="button" className={styles.textButton} onClick={() => void reload()}>もう一度読み込む</button>
         </p>
       ) : null}
       {canManage && candidates.length > 0 ? (
@@ -348,7 +341,7 @@ function PoolMembers({ poolId, accounts, canManage, onChange }: {
         confirmLabel="外す"
         busy={removing}
         error={removeError}
-        onConfirm={() => void onRemove()}
+        onConfirm={() => onRemove()}
         onCancel={() => {
           if (removing) return
           setRemoveTarget(null)

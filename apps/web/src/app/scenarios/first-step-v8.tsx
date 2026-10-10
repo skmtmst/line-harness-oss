@@ -59,6 +59,8 @@ import {
 } from './first-step/first-step-form'
 import { formatNumber } from '@/lib/format'
 import styles from './first-step-v8.module.css'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -614,7 +616,7 @@ export default function ScenarioFirstStepV8() {
                         <div className={styles.field}>
                           <span className={styles.fieldLabel}>購読開始から</span>
                           <div className={styles.whenInputs}>
-                            <input
+                            <NumberInput
                               type="number"
                               min={0}
                               value={offsetDays}
@@ -648,7 +650,7 @@ export default function ScenarioFirstStepV8() {
                           <div className={styles.field}>
                             <span className={styles.fieldLabel}>さらに</span>
                             <div className={styles.whenInputs}>
-                              <input
+                              <NumberInput unit="時間"
                                 type="number"
                                 min={0}
                                 max={23}
@@ -659,8 +661,8 @@ export default function ScenarioFirstStepV8() {
                                 className={styles.whenNumber}
                                 aria-label="さらに何時間後"
                               />
-                              <span className={styles.whenUnit}>時間</span>
-                              <input
+
+                              <NumberInput
                                 type="number"
                                 min={0}
                                 max={59}
@@ -712,21 +714,12 @@ export default function ScenarioFirstStepV8() {
                       {contentMode === 'compose' ? (
                         <MessageTypeTabs value={kind} onChange={changeKind}>
                           {kind === 'text' && (
-                            <div>
-                              {/*
-                                「本文」の字と入力欄を結び付ける。押したら欄へ移る
-                                （共通方針 UX-01 のラベル→入力の構造）。
-                              */}
-                              <label
-                                htmlFor="first-step-body"
-                                className={styles.fieldLabel}
-                              >
+                            <div><Field label={<>
                                 本文
-                              </label>
-                              <div className="mb-2">
+                              </>} htmlFor="first-step-body"><div className="mb-2">
                                 <InsertToolbar targetRef={bodyRef} value={body} onChange={editBody} />
                               </div>
-                              <textarea
+<textarea
                                 id="first-step-body"
                                 ref={bodyRef}
                                 value={body}
@@ -734,8 +727,7 @@ export default function ScenarioFirstStepV8() {
                                 placeholder="はじめまして。友だち追加ありがとうございます。"
                                 className={`${styles.bodyField} border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none`}
                               />
-                              <CharCounter length={bodyLength} />
-                            </div>
+<CharCounter length={bodyLength} /></Field></div>
                           )}
 
                           {kind === 'image' && (

@@ -12,6 +12,7 @@
  * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
+import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -51,6 +52,9 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { originInfoOf } from './origin-labels'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /* 数えるきっかけ6種（今の作る画面と同じ中身）。 */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'
@@ -393,7 +397,7 @@ function ConversionCreate() {
       if (!res.success) throw new Error(res.error)
       if (andContinue) {
         resetForm()
-        setSavedNotice('保存しました。続けて作れます。')
+        notifySaved('保存しました。続けて作れます。')
       } else {
         router.push(`/conversions?tab=points${res.data.id ? `&highlight=${encodeURIComponent(res.data.id)}` : ''}`)
       }
@@ -438,7 +442,7 @@ function ConversionCreate() {
   const previewNote = previewFailed
     ? '保存前の試算を読み込めませんでした。入力内容は保存されていません。'
     : preview
-      ? `入力中の条件だけで試算しています。重複除外 ${formatNumber(preview.duplicateExcludedCount)}件・取消 ${formatNumber(preview.cancellationCount)}件・1日あたり ${formatNumber(preview.dailyAverage)}件。試算では成果を追加しません。`
+      ? `入力中の条件だけで試算しています。重複除外 ${formatNumber(preview.duplicateExcludedCount)} 件・取消 ${formatNumber(preview.cancellationCount)} 件・1日あたり ${formatNumber(preview.dailyAverage)} 件。試算では成果を追加しません。`
       : '入力中の条件を試算しています。'
 
   const previewColumn = (
@@ -452,10 +456,10 @@ function ConversionCreate() {
           </p>
         </div>
         <dl className={styles.previewRows}>
-          <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : '—'}</dd></div>
-          <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? '—' : `${formatNumber(excluded)}件`}</dd></div>
+          <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? emptyValue('unknown') : `${formatNumber(excluded)}件`}</dd></div>
         </dl>
         {preview && !previewFailed && preview.excludedReasons.length > 0 ? (
           <ul className={styles.previewReasons}>
@@ -477,12 +481,12 @@ function ConversionCreate() {
             const stateText = result.state === 'loading' || result.state === 'idle'
               ? '読み込み中'
               : result.state === 'forbidden'
-                ? '見る権限なし'
+                ? permissionDeniedMessage('store')
                 : result.state === 'error'
                   ? '読み込めません'
                   : all === 0
                     ? 'まだ無い'
-                    : chosen === 0 ? '使わない' : chosen === all ? '使う' : `${chosen}/${all}件`
+                    : chosen === 0 ? '使わない' : chosen === all ? '使う' : `${chosen}/${all} 件`
             return (
               <div key={group.kind} className={styles.usageRow}>
                 <Checkbox
@@ -492,7 +496,7 @@ function ConversionCreate() {
                   onCheckedChange={(next) => toggleUsageGroup(group.kind, next)}
                 >{group.label}</Checkbox>
                 {result.state === 'error' ? (
-                  <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>読み直す</Button>
+                  <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>もう一度読み込む</Button>
                 ) : (
                   <span className={styles.usageState} role={result.state === 'forbidden' ? 'status' : undefined}>{stateText}</span>
                 )}
@@ -544,14 +548,14 @@ function ConversionCreate() {
     <CreatePage
       boardId="j8p3yj"
       title="成果地点を作る"
-      description="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
+      help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
       /* 競合の帯は型の notice に渡し、入力欄と右の列の上に置く。 */
       notice={conflictBand}
       preview={viewerOnly ? undefined : previewColumn}
-      footerActions={footerActions}
+      footerActions={footerActions} dirty={false}
     >
       {viewerOnly ? (
-        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作は管理者に頼んでください。</div>
+        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</div>
       ) : null}
       {savedNotice ? <Notice tone="success">{savedNotice}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
@@ -688,7 +692,7 @@ function ConversionCreate() {
         {valueModeNotice ? <p className={styles.fieldNote} role="status">{valueModeNotice}</p> : null}
         {valueMode === 'fixed' ? (
           <Field label="1件あたりの金額（円）" htmlFor="cv-value" error={fieldIssue?.field === 'cv-value' ? fieldIssue.message : undefined}>
-            <TextField
+            <NumberInput numericText unit="円"
               aria-label="決まった金額"
               inputMode="numeric"
               value={value}
@@ -704,9 +708,7 @@ function ConversionCreate() {
           <h2 className={styles.cardTitle} id="cv-new-exclusion">数えない条件</h2>
           <p className={styles.cardNote}>任意。テスト用の注文などを除きます</p>
         </div>
-        <label className={styles.field}>
-          <span className={styles.labelRow}><span className={styles.label}>メモ</span><span className={styles.optional}>任意</span></span>
-          <TextField
+        <Field label="メモ"><TextField
             id="cv-memo"
             aria-label="数えない条件のメモ"
             invalid={fieldIssue?.field === 'cv-memo'}
@@ -715,8 +717,7 @@ function ConversionCreate() {
             maxLength={500}
             placeholder="例：テスト用の注文は条件で除いています"
             onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-memo' ? null : current); setExclusionMemo(event.target.value) }}
-          />
-        </label>
+          /></Field>
         {fieldIssue?.field === 'cv-memo' ? <p id="cv-memo-error" className={styles.fieldError} role="alert">{fieldIssue.message}</p> : null}
         <div id="cv-exclusion-fields" aria-invalid={fieldIssue?.field === 'cv-exclusion-fields' || undefined}>
           <Field label="除く条件" error={fieldIssue?.field === 'cv-exclusion-fields' ? fieldIssue.message : undefined}>
@@ -741,15 +742,15 @@ function ConversionCreate() {
         >まだ計測せず、下書きとして保存する</Checkbox>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
           <div className={styles.fieldRow}>
-            <Field label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
-              <TextField
+            <Field note={<>空欄なら既定の90日です。</>} label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
+              <NumberInput numericText unit="日"
                 aria-label="友だち追加からの計測期間"
                 inputMode="numeric"
                 value={attributionDays}
                 placeholder="90"
                 onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-days' ? null : current); setAttributionDays(event.target.value) }}
               />
-              <span className={styles.fieldNote}>空欄なら既定の90日です。</span>
+
             </Field>
             <div className={styles.field}>
               <span className={styles.label}>集計対象アカウント</span>
@@ -786,7 +787,7 @@ function ConversionCreate() {
                 ) : (
                   <p className={styles.fieldNote}>
                     {result.state === 'ok' ? `使える${group.label}がまだありません`
-                      : result.state === 'forbidden' ? `このアカウントの${group.label}を見る権限がありません`
+                      : result.state === 'forbidden' ? permissionDeniedMessage('store')
                         : result.state === 'error' ? `使える${group.label}を読み込めませんでした`
                           : '候補を読み込んでいます'}
                   </p>

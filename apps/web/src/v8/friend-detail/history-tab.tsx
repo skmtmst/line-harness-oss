@@ -1,9 +1,12 @@
 'use client'
 
+import SegmentedControl from '@/components/shared/segmented'
+
 /*
  * 履歴タブ（Q5F2QE の 3.）。全部の出来事を時系列で、日ごとに区切って並べる。
  * 受信・送信・システム通知の切り替えは、読んだ行の中で絞る（口は今と同じ1本）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from 'lucide-react'
@@ -23,6 +26,8 @@ import {
   type TimelineFilter,
 } from './timeline'
 import styles from './detail.module.css'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const FILTERS: Array<{ value: TimelineFilter; label: string }> = [
   { value: 'all', label: '全件' },
@@ -43,7 +48,7 @@ function typeIcon(type: string) {
 }
 
 export default function HistoryTab({ friend, friendId, data }: { friend: FriendDetail; friendId: string; data: FriendDetailState }) {
-  const [filter, setFilter] = useState<TimelineFilter>('all')
+  const [filter, setFilter] = useListUrlValue<TimelineFilter>('filter', 'all')
   const { historyItems, historyStatus, historyNextCursor, historyLoadingMore, historyMoreError } = data
   const rows = historyItems.filter((item) => matchesTimelineFilter(item, filter))
   const complete = !historyNextCursor
@@ -51,13 +56,9 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
   return (
     <div className={styles.pane}>
       <div className={styles.tools}>
-        <div className={styles.seg} role="group" aria-label="履歴の種類">
-          {FILTERS.map((f) => (
-            <button key={f.value} type="button" className={styles.segBtn} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>{f.label}</button>
-          ))}
-        </div>
+        <SegmentedControl aria-label="履歴の種類" value={filter} onChange={setFilter} options={FILTERS} />
         {historyStatus === 'ready' ? (
-          <span className={styles.count}>{complete ? `${rows.length}件` : `${rows.length}件を表示中`}</span>
+          <span className={styles.count}>{complete ? `${rows.length} 件` : `${rows.length} 件を表示中`}</span>
         ) : null}
       </div>
 
@@ -73,7 +74,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
         ) : historyStatus === 'error' ? (
           <div className={`${styles.centered} ${styles.pane}`} role="alert">
             <p className={styles.paneNote}>履歴を読み込めませんでした。</p>
-            <Button onClick={() => void data.loadHistory()}>もう一度試す</Button>
+            <Button onClick={() => void data.loadHistory()}>もう一度読み込む</Button>
           </div>
         ) : (
           <>
@@ -94,11 +95,11 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
                       {status ? <span className={styles.statusChip}>{status}</span> : null}
                       {item.summary}
                     </span>
-                    <span role="cell" className={styles.cellClip} title={item.lineAccount?.name ?? undefined}>{item.lineAccount?.name ?? '—'}</span>
+                    <span role="cell" className={styles.cellClip} title={item.lineAccount?.name ?? undefined}>{item.lineAccount?.name ?? emptyValue('unknown')}</span>
                     <span role="cell">
                       {source ? (
                         source.external
-                          ? <a className={styles.srcLink} href={source.href} target="_blank" rel="noreferrer">{source.label} ↗</a>
+                          ? <TextLink external className={styles.srcLink} href={source.href}  >{source.label}</TextLink>
                           : <Link className={styles.srcLink} href={source.href}>{source.label} ↗</Link>
                       ) : null}
                     </span>
@@ -109,9 +110,9 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
             {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
             {complete && filter !== 'received' && filter !== 'sent' ? (
               <>
-                <div className={styles.day} role="row"><span role="cell">{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span></div>
+                <div className={styles.day} role="row"><span role="cell">{friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}</span></div>
                 <div className={styles.tr} role="row">
-                  <span role="cell">{friend.createdAt ? formatTime(friend.createdAt) : '—'}</span>
+                  <span role="cell">{friend.createdAt ? formatTime(friend.createdAt) : emptyValue('unknown')}</span>
                   <span role="cell" className={styles.cellType}><span className={styles.typeDot}>{typeIcon('friend_add')}</span>友だち追加</span>
                   <span role="cell" className={styles.cellMain}>{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
                   <span role="cell" className={styles.cellClip}>システム</span>

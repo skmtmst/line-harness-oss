@@ -60,8 +60,8 @@ function setInput(id: string, value: string) {
 
 async function openOptions(buttonId: string) {
   const switchName = buttonId === 'of-tag' ? 'タグを付ける' : 'シナリオ配信を始める'
-  const toggle = host.querySelector<HTMLButtonElement>(`[role=switch][aria-label="${switchName}"]`)
-  if (toggle?.getAttribute('aria-checked') === 'false') await act(async () => { toggle.click() })
+  const toggle = host.querySelector<HTMLInputElement>(`input[type=checkbox][aria-label="${switchName}"]`)
+  if (toggle && !toggle.checked) await act(async () => { toggle.click() })
   // タグは選ぶ窓（dJZ7Q）。欄の［選ぶ］で開き、窓の候補（radio）の名前を読む。
   const button = host.querySelector<HTMLButtonElement>(buttonId === 'of-tag' ? '#of-tag button[aria-haspopup="dialog"]' : `#${buttonId}`)
   expect(button).toBeTruthy()

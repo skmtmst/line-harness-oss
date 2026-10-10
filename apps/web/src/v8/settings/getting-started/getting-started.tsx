@@ -90,7 +90,7 @@ export default function GettingStartedV8() {
       <SettingsPage layout="accounts"
         boardId="xuJ7D"
         title="はじめの設定"
-        description="musubo を使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。"
+        help="musubo を使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。"
         navigation={<SettingsInnerNav inline />}
       >
         {status !== 'ready' ? (

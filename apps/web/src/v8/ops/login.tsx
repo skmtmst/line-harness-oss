@@ -11,6 +11,8 @@ import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './auth.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { PageHeading } from '@/components/templates/page-frame'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -121,12 +123,10 @@ export default function OpsLoginV8() {
         </span>
       </div>
       <section className={styles.card} aria-labelledby="ops-login-title">
-        <h1 id="ops-login-title" className={styles.title}>ログイン</h1>
+        <PageHeading title="ログイン" titleId="ops-login-title" titleAs="h1" help={<> 運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</>} />
         <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
           {error ? <Notice tone="danger" message={error} /> : null}
-          <div className={styles.field}>
-            <label htmlFor="ops-login-email" className={styles.label}>メールアドレス</label>
-            <TextField
+          <div className={styles.field}><Field label="メールアドレス" htmlFor="ops-login-email"><TextField
               id="ops-login-email"
               type="email"
               value={email}
@@ -137,12 +137,8 @@ export default function OpsLoginV8() {
               inputMode="email"
               placeholder="you@example.com"
             />
-            {emailMessage ? <p id="ops-login-email-error" className={styles.error}>{emailMessage}</p> : null}
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="ops-login-password" className={styles.label}>パスワード</label>
-            <PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" />
-          </div>
+{emailMessage ? <p id="ops-login-email-error" className={styles.error}>{emailMessage}</p> : null}</Field></div>
+          <div className={styles.field}><Field label={<>パスワード</>} htmlFor="ops-login-password"><PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" /></Field></div>
           <Button type="submit" variant="primary" disabled={busy !== null} className={styles.wide} busy={busy === 'password'} busyLabel="ログインしています…">
             <LogIn aria-hidden="true" />ログイン
           </Button>
@@ -156,7 +152,7 @@ export default function OpsLoginV8() {
           <MessageCircle aria-hidden="true" />LINE でログイン
         </Button>
         <Link href="/password/forgot" className={styles.forgot}>パスワードを忘れた方はこちら</Link>
-        <p className={styles.note}>運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</p>
+
       </section>
       <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
     </main>

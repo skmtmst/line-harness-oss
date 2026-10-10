@@ -23,7 +23,7 @@ const ACTION_LABELS: { kind: FormAction['kind']; label: string }[] = [
   { kind: 'reminder', label: 'リマインダを開始' },
 ]
 
-function emptyAction(kind: FormAction['kind']): FormAction {
+function emptyAction(kind: Exclude<FormAction['kind'], 'research_action'>): FormAction {
   switch (kind) {
     case 'send_text':
       return { kind: 'send_text', text: '' }
@@ -67,10 +67,13 @@ export default function ActionEditor({
         >
           <Select
             value={action.kind}
-            onChange={(value) => patch(index, emptyAction(value as FormAction['kind']))}
+            disabled={action.kind === 'research_action'}
+            onChange={(value) => patch(index, emptyAction(value as Exclude<FormAction['kind'], 'research_action'>))}
             aria-label="動作の種類"
-            options={ACTION_LABELS.map((a) => ({ value: a.kind, label: a.label }))}
+            options={[...ACTION_LABELS.map((a) => ({ value: a.kind, label: a.label })), ...(action.kind === 'research_action' ? [{ value: 'research_action', label: 'リサーチで設定した動作' }] : [])]}
           />
+
+          {action.kind === 'research_action' && <p>変更はリサーチの編集から行ってください。</p>}
 
           {/*
             R26追補: スマホ幅では文章の入力欄を種類の選択の下に全幅で置く。

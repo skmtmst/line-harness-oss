@@ -163,7 +163,7 @@ describe('V8 テンプレートの通し', () => {
     })
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
     await screen.findByText('下書きを保存しました')
-    expect(mocks.push).toHaveBeenCalledWith('/templates')
+    expect(mocks.push).toHaveBeenCalledWith('/templates?highlight=t-new')
   })
 
   it('作る画面で保存して公開すると知らせが出て一覧へ戻る', async () => {
@@ -179,7 +179,7 @@ describe('V8 テンプレートの通し', () => {
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(mocks.publish).toHaveBeenCalledTimes(1))
     await screen.findByText('公開しました')
-    expect(mocks.push).toHaveBeenCalledWith('/templates')
+    expect(mocks.push).toHaveBeenCalledWith('/templates?highlight=t-new')
   })
 
   it('公開する窓は開いて閉じる・公開すると札が変わる', async () => {

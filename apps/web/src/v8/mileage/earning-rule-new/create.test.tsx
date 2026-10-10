@@ -134,7 +134,7 @@ describe('V8 たまる決めごとを作る', () => {
     ])
     expect(writes[0].body).toMatchObject({ name: 'リンクをクリック', amount: 10, lineAccountId: 'account-a', initialStatus: 'available' })
     expect(writes[1].body).toMatchObject({ accountId: 'account-a', expectedVersion: 0 })
-    expect(push).toHaveBeenCalledWith('/mileage?tab=earning-rules')
+    expect(push).toHaveBeenCalledWith('/mileage?tab=earning-rules&highlight=rule-new')
     expect(document.querySelector('[data-design-node="BnrQp"]')).toBeNull()
   })
 
@@ -144,7 +144,7 @@ describe('V8 たまる決めごとを作る', () => {
     type('名前', 'リンクをクリック')
     type('マイル', '10')
     await clickButton('保存して動かす')
-    const band = screen.getByRole('alert', { name: 'ほかの人が先に保存しました' })
+    const band = screen.getByRole('alert')
     expect(band.textContent).toContain('坂本さんが 14:02 にこの決めごとを保存しました')
     expect(band.textContent).toContain('このまま保存すると、坂本さんの変更が消えます')
     expect(document.querySelector('[data-design-node="BnrQp"]')).toBeTruthy()

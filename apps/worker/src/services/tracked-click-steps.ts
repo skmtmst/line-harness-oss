@@ -1,3 +1,5 @@
+import { applyTapExtras } from './tap-extras.js';
+import type { TapExtras } from '@line-crm/shared';
 import {featureJobCanRun} from './feature-enforcement.js';
 import { ensureWorkflowStep,prepareWorkflowStep,getWorkflowStep,recordLinkClick,jstNow,enrollFriendInScenario,trackConversion } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -9,7 +11,7 @@ import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
 
 export interface TrackedClickPlan {
   linkId:string;friendId:string|null;accountId:string|null;tagId:string|null;scenarioId:string|null;
-  clickedAt:string;linkName:string;conversionPointIds:string[];
+  clickedAt:string;linkName:string;conversionPointIds:string[];tapExtras?:TapExtras;
 }
 export async function recordTrackedClick(db:D1Database,plan:Omit<TrackedClickPlan,'clickedAt'>){
   const id=crypto.randomUUID(),now=jstNow(),saved={...plan,clickedAt:now};
@@ -35,6 +37,7 @@ export async function processTrackedClick(env:Env['Bindings'],clickId:string,pla
     const step=<T>(key:string,work:(db:D1Database)=>Promise<T>)=>execution.step(key,()=>work(execution.mutationDb(key)));
     if(plan.friendId){
       const friendId=plan.friendId;
+      if(plan.tapExtras) await step('tap-extra',db=>applyTapExtras(db,friendId,plan.accountId,plan.tapExtras!,clickId));
       await step('mileage',db=>awardActivityMileage(db,{eventType:'link_clicked',source:'tracked_link',sourceEventId:clickId,
         friendId,subjectKey:plan.linkId,metadata:{trackedLinkId:plan.linkId,linkName:plan.linkName},occurredAt:plan.clickedAt}));
       if(plan.accountId){

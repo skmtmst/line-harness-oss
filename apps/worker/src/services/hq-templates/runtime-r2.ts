@@ -1,3 +1,5 @@
+import { copyHqMediaStream } from '../hq-media-stream.js';
+import { hqMediaGate } from '../hq-media.js';
 import { resolveHqLiffActions, messageLiffActions } from './liff-actions.js';
 import { captureDistributionName } from './distribution-display.js';
 import { withTextOverride } from './text-overrides.js';
@@ -54,7 +56,7 @@ async function cardReferences(b:R2RuntimeBinding, account:string, definition: im
     throw error;
   }
 }
-type RichReference = ReturnType<typeof richMenuReferences>[number] | Readonly<{kind:'friend_field';sourceId:string}>;
+type RichReference = ReturnType<typeof richMenuReferences>[number] | Readonly<{kind:'friend_field'|'mark'|'reminder'|'notification_rule'|'event'|'folder';sourceId:string}>;
 type DbRow = Record<string,string|number|null>;
 type RichReferenceMatch = RichReference & { name:string;targetId:string;expectedRevision:string;operation:'reuse'|'create';dbCommit:HqTemplateStatement[] };
 const richReferenceKey = (ref:RichReference) => `${ref.kind}:${ref.sourceId}`;
@@ -94,9 +96,32 @@ async function plannedTargetId(b:R2RuntimeBinding,account:string,ref:RichReferen
 
 /** Reuse an exact destination match or plan one private/local clone in the parent atomic batch. */
 async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:string,execution=false):Promise<RichReferenceMatch> {
-  if (!['tag','form','scenario','template','friend_field'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
+  if (!['tag','form','scenario','template','friend_field','mark','reminder','notification_rule','event','folder'].includes(ref.kind)) fail('UNSUPPORTED_REFERENCE');
   await targetAccount(b,account);
   const unavailable=()=>fail(execution?'VERSION_CONFLICT':'REFERENCE_UNAVAILABLE');
+  if (['mark','reminder','notification_rule','event','folder'].includes(ref.kind)) {
+    const table = { mark: 'support_marks', reminder: 'reminders', notification_rule: 'notification_rules', event: 'events', folder: 'folders' }[ref.kind as 'mark'|'reminder'|'notification_rule'|'event'|'folder'];
+    const active = { mark: 'r.archived_at IS NULL', reminder: "r.deleted_at IS NULL AND r.lifecycle_status='published'", notification_rule: 'r.is_active=1', event: "r.deleted_at IS NULL AND r.lifecycle_status='published'", folder: '1=1' }[ref.kind as 'mark'|'reminder'|'notification_rule'|'event'|'folder'];
+    const accountColumn = ref.kind === 'folder' ? 'account_id' : 'line_account_id';
+    const joins = ref.kind === 'mark' ? 'LEFT JOIN support_mark_scopes scope ON scope.mark_id=r.id' : `JOIN line_accounts a ON a.id=r.${accountColumn}`;
+    const sourceWhere = ref.kind === 'mark' ? "COALESCE(scope.tenant_id,'00000000-0000-4000-8000-000000000001')=?" : 'a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL';
+    const targetWhere = ref.kind === 'mark' ? "COALESCE(scope.tenant_id,'00000000-0000-4000-8000-000000000001')=? AND (scope.line_account_id=? OR scope.line_account_id IS NULL)" : `a.tenant_id=? AND r.${accountColumn}=?`;
+    const source = await b.db.prepare(`SELECT r.* FROM ${table} r ${joins} WHERE r.id=? AND ${sourceWhere} AND ${active}`).bind(ref.sourceId,b.authority.tenantId).first<DbRow>();
+    if (!source) unavailable();
+    const listSql = `SELECT json_group_array(json_object('id',r.id,'name',r.name)) FROM ${table} r ${joins} WHERE ${targetWhere} AND ${active} ORDER BY r.id`;
+    const list = (await b.db.prepare(`SELECT (${listSql}) AS snapshot`).bind(b.authority.tenantId,account).first<{snapshot:string}>())!.snapshot;
+    const matches = (JSON.parse(list) as {id:string;name:string}[]).filter(row => normalizeScopedTagName(row.name) === normalizeScopedTagName(String(source!.name)));
+    if (matches.length !== 1) unavailable();
+    const target = await b.db.prepare(`SELECT * FROM ${table} WHERE id=?`).bind(matches[0].id).first<DbRow>();
+    if (!target || (ref.kind === 'folder' && target.kind !== source!.kind) || (ref.kind === 'notification_rule' && target.version !== source!.version)) unavailable();
+    const dbCommit = [exactRowGuard(table,source!),exactRowGuard(table,target!),targetListGuard(listSql,[b.authority.tenantId,account],list)];
+    if (ref.kind !== 'mark') dbCommit.push(activeAccountGuard(String(source![accountColumn]),b.authority.tenantId));
+    if (ref.kind === 'mark') for (const id of [ref.sourceId, matches[0].id]) {
+      const scope = await b.db.prepare('SELECT tenant_id,line_account_id FROM support_mark_scopes WHERE mark_id=?').bind(id).first<DbRow>();
+      dbCommit.push(guard("COALESCE((SELECT json_array(tenant_id,line_account_id) FROM support_mark_scopes WHERE mark_id=?),'null') IS ?",[id,scope?JSON.stringify([scope.tenant_id,scope.line_account_id]):'null']));
+    }
+    return { ...ref, name: String(source!.name), targetId: matches[0].id, expectedRevision: await digest(JSON.stringify([source,target,list])), operation: 'reuse', dbCommit };
+  }
   if(ref.kind==='friend_field') {
     const source=await b.db.prepare(`SELECT ff.* FROM friend_fields ff LEFT JOIN friend_field_scopes fs ON fs.field_id=ff.id
       WHERE ff.id=? AND ff.status='active' AND COALESCE(fs.tenant_id,'00000000-0000-4000-8000-000000000001')=?
@@ -242,7 +267,7 @@ async function planResourceReferences(b:R2RuntimeBinding,direct:readonly RichRef
 
 function templateResourceReferences(definition: import('@line-crm/shared').MessageTemplateDefinition): RichReference[] {
   const refs=new Map<string,RichReference>();
-  const keys: Record<string,string>={fieldId:'friend_field',field_id:'friend_field',friendFieldId:'friend_field',friendFieldIds:'friend_field',tagId:'tag',tagIds:'tag',addTagIds:'tag',removeTagIds:'tag',targetTagId:'tag',tag_id:'tag',scenarioId:'scenario',scenario_id:'scenario',formId:'form',form_id:'form',templateId:'template',template_id:'template'};
+  const keys: Record<string,string>={fieldId:'friend_field',field_id:'friend_field',friendFieldId:'friend_field',friendFieldIds:'friend_field',tagId:'tag',tagIds:'tag',addTagIds:'tag',removeTagIds:'tag',targetTagId:'tag',tag_id:'tag',scenarioId:'scenario',scenario_id:'scenario',formId:'form',form_id:'form',templateId:'template',template_id:'template',markId:'mark',reminderId:'reminder',notificationRuleId:'notification_rule',eventId:'event',folderId:'folder'};
   const visit=(value:unknown):void=>{
     if(Array.isArray(value)){value.forEach(visit);return;}
     if(!value || typeof value!=='object')return;
@@ -256,6 +281,8 @@ function templateResourceReferences(definition: import('@line-crm/shared').Messa
   };
   if(definition.template.questionJson) visit(JSON.parse(definition.template.questionJson));
   if(definition.asset) visit(definition.asset.payload);
+  if(definition.card) visit(definition.card);
+  try { visit(JSON.parse(definition.template.messageContent)); } catch { /* text */ }
   return [...refs.values()];
 }
 async function templateReferencePlan(b:R2RuntimeBinding,definition:import('@line-crm/shared').MessageTemplateDefinition,account:string,execution=false) {
@@ -316,6 +343,7 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
     if(!normalizeSha256(media.contentHash)||(!hqAuthored&&(!row||normalizeSha256(row.content_hash)!==normalizeSha256(media.contentHash))))fail('SOURCE_MEDIA_UNAVAILABLE');
     const key=sourceKey(media.r2Key,b.authority.tenantId),object=await b.bucket.head(key);
     if(!object||object.size!==media.sizeBytes||(hqAuthored&&!isRegisteredHqMedia(object,media,b.authority.tenantId)))fail('SOURCE_MEDIA_UNAVAILABLE');
+    if (hqAuthored && ['video','audio'].includes(media.kind)) await hqMediaGate(b.db,b.bucket,key);
     bindings.push({tenantId:b.authority.tenantId,templateVersionId:b.templateVersionId,sourceAccountId,mediaId:media.id,mediaVersionId:media.versionId,versionNo:media.versionNo,r2Key:key,r2KeyPrefix:`hq-templates/${b.authority.tenantId}`,sizeBytes:media.sizeBytes,contentHash:media.contentHash,etag:object!.etag});
     if(!hqAuthored)sourceGuards.push(guard(`EXISTS(SELECT 1 FROM media_versions v JOIN media m ON m.id=v.media_id JOIN line_accounts a ON a.id=m.line_account_id WHERE v.id=? AND v.media_id=? AND v.version_no=? AND v.size_bytes=? AND v.content_hash=? AND m.line_account_id=? AND a.tenant_id=? AND a.is_active=1 AND a.archived_at IS NULL)`,[media.versionId,media.id,media.versionNo,media.sizeBytes,row!.content_hash,sourceAccountId,b.authority.tenantId]));
   }
@@ -323,6 +351,11 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
   const ids=new Map<string,string>();
   for(const [kind,id] of [['template',`template:${definition.template.id}`],...definition.media.flatMap(m=>[['media',`media:${m.id}`],['media_version',m.versionId]])])ids.set(`${kind}:${id}`,(await digest(JSON.stringify([owner,b.templateVersionId,kind,id]))).slice(0,32));
   const dependencies:MessageTemplateAdapterDependencies={
+    stageSourceObject: async (media, binding) => {
+      if (!hqAuthored || !binding.etag) fail('SOURCE_MEDIA_UNAVAILABLE');
+      await hqMediaGate(b.db, b.bucket, media.r2Key);
+      return { r2Key: binding.r2Key, etag: binding.etag!, sizeBytes: media.sizeBytes, contentHash: normalizeSha256(media.contentHash)! };
+    },
     cardTargets: references.targets,
     referenceTargets: Object.fromEntries(resourcePlan.matches.map(ref=>[ref.sourceId,ref.targetId])),
     liffTargets: Object.fromEntries(Object.entries(references.targets).filter(([key]) => key.startsWith('https://'))),
@@ -338,7 +371,7 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
       return {bytes:await readMessageTemplateSourceBytes(object.body,maxBytes),etag:object.etag};
     },
     createId:(kind,id)=>ids.get(`${kind}:${id}`)??fail('INVALID_SOURCE_ID'),
-    createTargetR2Key:(media,id)=> definition.asset?.kind==='rich_message' && /\/(240|300|460|700|1040)$/.test(media.r2Key)
+    createTargetR2Key:(media,id)=> (definition.asset?.kind==='rich_message' || definition.template.messageType === 'imagemap') && /\/(240|300|460|700|1040)$/.test(media.r2Key)
       ? `media/${safeId(context.targetAccountId)}/hq/${owner}/imagemap/${media.r2Key.split('/').at(-1)}`
       : `media/${safeId(context.targetAccountId)}/hq/${owner}/${safeId(id)}`,
     createTargetPublicUrl:key=>{
@@ -507,13 +540,14 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
       if(object.ownerToken !== expectedOwner || !new RegExp(`^${prefix}/${safeId(context.targetAccountId)}/hq/${expectedOwner}/(?:[a-f0-9]{32}|imagemap/(?:240|300|460|700|1040))$`).test(object.key)) fail('INVALID_OWNERSHIP_PLAN');
       const key = {runId,tenantId:authority.tenantId,targetAccountId:context.targetAccountId,objectKey:object.key,ownerToken:object.ownerToken};
       if(await recordHqTemplateOwnedR2Key(db,key)==='conflict_or_missing')fail('IMAGE_OWNER_CONFLICT');
-      const contentHash=await digest(object.bytes),existing=await options.bucket.head(object.key);
-      if(existing) { if(existing.customMetadata?.ownerToken!==object.ownerToken||existing.customMetadata?.contentHash!==contentHash)fail('IMAGE_OWNER_CONFLICT');continue; }
+      const contentHash=object.streamSource?.contentHash ?? await digest(object.bytes),existing=await options.bucket.head(object.key);
+      if(existing) { if(existing.customMetadata?.ownerToken!==object.ownerToken||existing.customMetadata?.contentHash!==contentHash || (object.streamSource && (existing.size !== object.streamSource.sizeBytes || existing.httpMetadata?.contentType !== object.contentType)))fail('IMAGE_OWNER_CONFLICT');continue; }
       let written = false;
       for (let putAttempt = 1; putAttempt <= MAX_IO_ATTEMPTS; putAttempt++) {
         await renewClaim();
         try {
-          const result=await options.bucket.put(object.key,object.bytes,{onlyIf:{etagDoesNotMatch:'*'},customMetadata:{ownerToken:object.ownerToken,contentHash},httpMetadata:{contentType:object.contentType}});
+          const putOptions: R2PutOptions = {onlyIf:{etagDoesNotMatch:'*'},customMetadata:{ownerToken:object.ownerToken,contentHash},httpMetadata:{contentType:object.contentType}};
+          const result = object.streamSource ? await copyHqMediaStream(options.bucket, object.streamSource, object.key, putOptions) : await options.bucket.put(object.key,object.bytes,putOptions);
           if(result){written=true;break;}
         } catch {
           // A timed-out PUT may still have committed. Verify the deterministic object.

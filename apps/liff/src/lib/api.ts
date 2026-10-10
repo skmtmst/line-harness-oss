@@ -1,3 +1,4 @@
+import type { EntryRouteCouponReceived } from '@line-crm/shared';
 import type { CustomerBookingWaitlist,CustomerSeatWaitlist,RegisterSeatWaitlistInput,AcceptBookingWaitlistInput } from '@line-crm/shared';
 import type { FormLayout } from '@line-crm/shared';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
@@ -20,6 +21,7 @@ export interface MenuItem {
   duration_minutes: number;
   buffer_after_minutes: number;
   base_price: number;
+  price_mode?: 'fixed' | 'free' | 'inquiry';
   sort_order: number;
   /** キャンセル期限 (開始の何時間前まで)。null は期限なし。 */
   cancel_deadline_hours_before?: number | null;
@@ -33,6 +35,7 @@ export interface StaffItem {
   bio: string | null;
   is_designation_optional: number;
   price: number;
+  price_mode?: 'fixed' | 'free' | 'inquiry';
   duration_minutes: number;
 }
 
@@ -374,6 +377,11 @@ export interface FormSubmitResponse {
 }
 
 export const api = {
+  researchForm: (id: string) => getData<{ formId: string }>(`/api/liff/research/${encodeURIComponent(id)}/form`),
+  entryRouteCoupon: {
+    receive: async (ref: string) => unwrapSuccessData<EntryRouteCouponReceived>(await post<unknown>('/api/liff/entry-route-coupon', { ref }), '/api/liff/entry-route-coupon'),
+    use: async (receiptId: string, requestId: string) => unwrapSuccessData<{ message: string; replayed: boolean }>(await post<unknown>('/api/liff/entry-route-coupon/use', { receiptId, requestId }), '/api/liff/entry-route-coupon/use'),
+  },
   /** 上の帯に出す店名など。liffId から店を決める公開口 (Worker は {success,data} で返す)。 */
   liffConfig: () =>
     get<{ success: boolean; data: { botBasicId: string; accountName: string; accountId: string } }>(
@@ -545,10 +553,10 @@ export const api = {
     }
     return { status: res.status, body: parsed };
   },
-  /** 回答に添付する画像を預ける。返ってきたURLを回答に入れる */
-  uploadFormFile: (id: string, file: File, testToken?: string) =>
-    postBinary<{ success: true; data: { key: string; url: string; mimeType: string; size: number } }>(
-      `/api/forms/${id}/files${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`,
+  /** 回答の添付を預ける。新しい質問は添付ID、従来の質問はURLを返す。 */
+  uploadFormFile: (id: string, file: File, testToken?: string, blockId?: string, side = 'single') =>
+    postBinary<{ success: true; data: { key?: string; url?: string; mimeType?: string; size?: number; file?: import('@line-crm/shared').FormFileAnswer; scanStatus?: string } }>(
+      `/api/forms/${id}/files?${new URLSearchParams({ ...(testToken ? { test_token: testToken } : {}), ...(blockId ? { block_id: blockId, side, filename: file.name } : {}) })}`,
       file,
     ),
   /**

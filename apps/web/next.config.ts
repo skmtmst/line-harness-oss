@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
   env: {
     APP_VERSION: pkg.version,
     APP_COMMIT_SHA: buildSha.slice(0, 12),
+    APP_COMMIT_SHA_FULL: buildSha,
     APP_BUILD_TIME: buildTime,
   },
 }

@@ -101,7 +101,7 @@ describe('V8 タグ タグの一覧', () => {
     narrow.value = false
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="fkGUR"]')).not.toBeNull()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'CSVで一括登録する' })).toBeNull()
     expect(screen.queryAllByRole('button', { name: 'タグを作る' })).toHaveLength(0)
     expect(screen.queryAllByRole('link', { name: 'タグを作る' })).toHaveLength(0)
@@ -127,7 +127,7 @@ describe('V8 タグ タグの一覧', () => {
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '未使用のタグ' })) })
     const unused = FRIEND_ATTRIBUTES_QA_TAGS.filter(isUnused).length
     expect(container.querySelectorAll('tbody tr').length).toBe(unused)
-    expect(screen.getByRole('button', { name: /よく使う絞り込み（1件選択中）/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /よく使う絞り込み（1 件選択中）/ })).toBeTruthy()
   })
 
   it('タブを押すとそのタブの本文に切り替わる', async () => {

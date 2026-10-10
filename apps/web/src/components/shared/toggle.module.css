@@ -101,5 +101,5 @@
 [data-theme='v8'] .on { background: var(--color-accent-deep); }
 [data-theme='v8'] .locked { background: var(--color-toggle-locked); }
 [data-theme='v8'] .toggle::after { border-radius: 50%; box-shadow: var(--shadow-controls-toggle); }
-[data-theme='v8'] .toggle { gap: 0; border-radius: 999px; }
+[data-theme='v8'] .toggle { gap: 0; border-radius: var(--polish-radius-pill); }
 }

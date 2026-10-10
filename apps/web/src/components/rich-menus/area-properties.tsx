@@ -1,5 +1,7 @@
 'use client'
 
+import TagPickerField from '@/components/shared/tag-picker-field'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useId } from 'react'
 import { ArrowLeftRight, CalendarClock, Copy, Phone, Send, Zap } from 'lucide-react'
 import MultiSelect from '@/components/shared/multi-select'
@@ -230,6 +232,7 @@ export function AreaProperties({
   const inputId = useId()
   const data = (area.actionData ?? {}) as Record<string, unknown>
   const intent = intentOf(area)
+  const theme = useAdminTheme()
   const selectedTagIds = area.tagIds ?? []
   const intentOptions = allowedIntents
     ? INTENT_OPTIONS.filter((option) => allowedIntents.includes(option.value))
@@ -590,7 +593,7 @@ export function AreaProperties({
             */}
             <div>
               <span className="text-ink-secondary text-xs font-medium">タグを付ける</span>
-              {tags.length === 0 ? (
+              {theme === 'v8' ? <TagPickerField label="タグを付ける" options={tags} accountId={isHq ? null : account?.selectedAccountId} value={selectedTagIds} onChange={tagIds => onUpdate({ tagIds })} readOnly={readOnly} /> : tags.length === 0 ? (
                 <p className="text-ink-faint mt-1 text-micro">タグがまだありません。</p>
               ) : (
                 <MultiSelect

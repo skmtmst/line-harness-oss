@@ -15,6 +15,9 @@ import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor
 import { ctaCardProblems } from './cta-card-validation'
 import { extractEditConflict } from './webinar-edit-conflict-band'
 import type { CompareMine } from './webinar-edit-compare-dialog'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -279,7 +282,7 @@ export default function CtaV8({
   return (
     <>
       {conflict ? <div data-design-node="pvimJ"><Notice tone="warn" action={<Button disabled={readingLatest} busy={readingLatest} onClick={() => void compareLatest()}>違いを比べる</Button>}>別の画面でこのウェビナーが更新されました。申込フォームの入力は残しています。最新版を確認してから保存してください。</Notice>
-        {latestEditor ? <div className="border-hairline mt-3 rounded-control border p-3 text-sm"><p>保存されている申込フォーム：{latestEditor.publicPage.form?.name ?? (latestEditor.registrationFormId ? publishedForms.find((form) => form.id === latestEditor.registrationFormId)?.name ?? '選択済みのフォーム' : '未設定')}</p><p className="mt-2">この画面の入力：{publishedForms.find((form) => form.id === selectedRegistrationFormId)?.name ?? (selectedRegistrationFormId ? '選択済みのフォーム' : '未設定')}</p><Button className="mt-3" onClick={() => setReplaceConfirm(true)}>最新を読み込んで続ける</Button></div> : null}
+        {latestEditor ? <div className="border-hairline mt-3 rounded-control border p-3 text-sm"><p>保存されている申込フォーム：{latestEditor.publicPage.form?.name ?? (latestEditor.registrationFormId ? publishedForms.find((form) => form.id === latestEditor.registrationFormId)?.name ?? '選択済みのフォーム' : emptyValue('unconfigured'))}</p><p className="mt-2">この画面の入力：{publishedForms.find((form) => form.id === selectedRegistrationFormId)?.name ?? (selectedRegistrationFormId ? '選択済みのフォーム' : emptyValue('unconfigured'))}</p><Button className="mt-3" onClick={() => setReplaceConfirm(true)}>最新を読み込んで続ける</Button></div> : null}
       </div> : null}
 
     <div className="min-w-0" data-webinar-pane="cta" data-design-node="Q0Jrk">
@@ -289,7 +292,7 @@ export default function CtaV8({
             CTAカード {ctas === null ? '' : `${ctas.length}枚`}
           </h2>
           <p className="text-ink-faint mt-1 text-xs">動画の途中で出す申し込みボタンです。出す時刻は分:秒で入れます。</p>
-          {message ? <Notice tone="error" title="CTAカード" action={ctas === null ? <Button onClick={() => void loadCtas()}>もう一度読み込む</Button> : undefined}>{message}</Notice> : null}
+          {message ? <Notice tone="danger" title="CTAカード" action={ctas === null ? <Button onClick={() => void loadCtas()}>もう一度読み込む</Button> : undefined}>{message}</Notice> : null}
           {ctas === null ? (
             <>{message ? null : <ListState kind="loading" />}<Button disabled>CTAカードを保存する</Button></>
           ) : (
@@ -322,22 +325,23 @@ export default function CtaV8({
                 </Button>
               </div>
               {current ? (
-                <div className="bg-canvas-sunken mt-3 space-y-3 rounded-control p-3">
-                  <p className="text-ink text-sm font-semibold">
+                <div className="bg-canvas-sunken mt-3 space-y-3 rounded-control p-3"><Field label={<>
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">ボタンの言葉</span>
+                    <input
+                      value={current.buttonLabel}
+                      onChange={(e) => update(currentIndex, { buttonLabel: e.target.value })}
+                      className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
+                    />
+                  </>}><p className="text-ink text-sm font-semibold">
                     選んでいるカード：{fmtMinSec(current.atSeconds)}
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="text-ink-secondary mb-1 block text-xs font-medium">見出し</span>
-                      <input
+<div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="見出し"><input
                         value={current.title}
                         onChange={(e) => update(currentIndex, { title: e.target.value })}
                         className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-ink-secondary mb-1 block text-xs font-medium">出す時刻（分:秒）</span>
-                      <input
+                      /></Field>
+                    <Field label="出す時刻（分:秒）"><NumberInput numericText
                         value={times[currentIndex] ?? ''}
                         onChange={(e) =>
                           setTimes((prev) => prev.map((t, j) => (j === currentIndex ? e.target.value : t)))
@@ -345,18 +349,9 @@ export default function CtaV8({
                         inputMode="numeric"
                         placeholder="12:00"
                         className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm tabular-nums"
-                      />
-                    </label>
+                      /></Field>
                   </div>
-                  <label className="block">
-                    <span className="text-ink-secondary mb-1 block text-xs font-medium">ボタンの言葉</span>
-                    <input
-                      value={current.buttonLabel}
-                      onChange={(e) => update(currentIndex, { buttonLabel: e.target.value })}
-                      className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
+<div className="grid gap-3 sm:grid-cols-2">
                     <Select
                       label="リンクの種類"
                       aria-label="リンクの種類"
@@ -379,25 +374,21 @@ export default function CtaV8({
                         ]}
                       />
                     ) : (
-                      <label className="block">
-                        <span className="text-ink-secondary mb-1 block text-xs font-medium">開くURL</span>
-                        <input
+                      <Field label="開くURL"><input
                           value={current.url ?? ''}
                           onChange={(e) => update(currentIndex, { url: e.target.value })}
                           inputMode="url"
                           placeholder="https://"
                           className="border-hairline bg-canvas text-ink w-full rounded-control border px-3 py-2 text-sm"
-                        />
-                      </label>
+                        /></Field>
                     )}
                   </div>
-                  <Checkbox
+<Checkbox
                     checked={current.autoOpen}
                     onCheckedChange={(checked) => update(currentIndex, { autoOpen: checked })}
                   >
                     ボタンを押したら、フォームを自動で開く
-                  </Checkbox>
-                </div>
+                  </Checkbox></Field></div>
               ) : null}
               <div className="mt-3">
                 <Button disabled={saving || ctas === null} busy={saving} busyLabel="保存しています…" onClick={save}>
@@ -411,7 +402,7 @@ export default function CtaV8({
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface" aria-label="申込に使う回答フォーム">
           <h2 className="text-ink text-base font-bold">申込に使う回答フォーム</h2>
           <p className="text-ink-faint mt-1 text-xs">申し込みのときに答えてもらうフォームです。公開中のフォームから1つ選びます。</p>
-          <p className="text-ink-faint mt-2 text-xs">CTAボタンで使うフォームとは別です。保存済み：{editor.publicPage?.form?.name ?? '未設定'}</p>
+          <p className="text-ink-faint mt-2 text-xs">CTAボタンで使うフォームとは別です。保存済み：{editor.publicPage?.form?.name ?? emptyValue('unconfigured')}</p>
           {formCandidates.state === 'loading' ? <p className="text-ink-faint mt-3 text-sm">回答フォームを読み込んでいます。</p> : null}
           {formCandidates.state === 'error' ? <p className="text-ink-secondary mt-3 text-sm" role="alert">回答フォームを読み込めませんでした。候補が取れない間は種類をURLに切り替えて保存できます。 <Button onClick={loadForms}>もう一度読み込む</Button></p> : null}
           {formCandidates.state === 'forbidden' ? <p className="text-ink-secondary mt-3 text-sm">回答フォームを見る権限がありません。管理者に権限の確認を依頼してください。</p> : null}

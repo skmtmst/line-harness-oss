@@ -72,7 +72,7 @@ describe('R186 複数行テキストの既定値', () => {
     })
     await chooseType('複数行テキスト')
 
-    const defaultField = screen.getByLabelText('既定値（任意）') as HTMLTextAreaElement
+    const defaultField = screen.getByLabelText('既定値') as HTMLTextAreaElement
     expect(defaultField.tagName.toLowerCase()).toBe('textarea')
     await act(async () => {
       fireEvent.change(defaultField, { target: { value: '1行目\n2行目' } })

@@ -35,6 +35,8 @@ import {
   type AutoV8Model,
 } from '@/app/automations/automations-v8'
 import styles from '@/app/automations/automations-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 
@@ -336,7 +338,7 @@ export function V8CommonActionsTab({
               {items.map((item) => (
                 <tr key={item.id}>
                   <td>
-                    <p className={styles.cellMain} title={item.name}>{item.name}</p>
+                    <p className={styles.cellMain} ><TruncatedText value={String(item.name ?? '')} /></p>
                     <p className={styles.cellSub} title={item.description ?? undefined}>{item.description || '説明はありません'}</p>
                   </td>
                   <td>
@@ -353,7 +355,7 @@ export function V8CommonActionsTab({
                   </td>
                   <td>
                     <span className={styles.cellMain} title={item.publishedVersion ? `v${item.publishedVersion}` : undefined}>
-                      {item.publishedVersion ? `v${item.publishedVersion}` : '—'}
+                      {item.publishedVersion ? `v${item.publishedVersion}` : emptyValue('unknown')}
                     </span>
                     {item.status === 'published' && item.draftVersion != null ? (
                       <span className={styles.cellSub} title={`下書きv${item.draftVersion}を編集中`}>下書きあり</span>
@@ -361,8 +363,8 @@ export function V8CommonActionsTab({
                   </td>
                   <td>
                     <div className={styles.rowActions}>
-                      <Button href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`} variant="secondary" size="compact">
-                        中身を見る <ExternalLink size={14} aria-hidden />
+                      <Button external href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`} variant="secondary" size="compact">
+                        中身を見る
                       </Button>
                       {canManage ? (
                         <>

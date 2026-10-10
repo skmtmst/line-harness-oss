@@ -205,25 +205,14 @@ jobs:
             fi
           fi
 
-          npx wrangler d1 execute "$DB_NAME" --remote --command \
-            "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
-
-          applied=$(npx wrangler d1 execute "$DB_NAME" --remote \
-            --command "SELECT name FROM _migrations" --json \
-            | node -e "
-              const d = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
-              const rows = d[0]?.results ?? [];
-              console.log(rows.map((r) => r.name).join('\n'));
-            ")
-
-          pending_count=0
-          for f in $(ls packages/db/migrations/*.sql | sort); do
-            name=$(basename "$f")
-            if ! printf '%s\n' "$applied" | grep -qxF "$name"; then
-              printf '%s\n' "$f" >> "$all_pending_file"
-              pending_count=$((pending_count + 1))
-            fi
-          done
+          # dry-run は SELECT のみ。台帳が無くても作成しない。
+          node scripts/deploy/d1-pending-readonly.mjs "$DB_NAME" > "$RUNNER_TEMP/d1-status.json"
+          pending_count=$(node -p "require('$RUNNER_TEMP/d1-status.json').count")
+          node -e '
+            const status = require(process.argv[1]);
+            for (const name of status.pending) console.log(`packages/db/migrations/${name}`);
+          ' "$RUNNER_TEMP/d1-status.json" > "$all_pending_file"
+          echo "COUNT: $pending_count"
 
           if [ -n "$TARGET_MIGRATION" ]; then
             target_path="packages/db/migrations/$TARGET_MIGRATION"
@@ -308,6 +297,8 @@ jobs:
         env:
           DB_NAME: ${{ steps.db.outputs.name }}
         run: |
+          npx wrangler d1 execute "$DB_NAME" --remote --command \
+            "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
           bash scripts/deploy/apply-d1-migrations.sh \
             "$DB_NAME" "$RUNNER_TEMP/d1-pending-migrations.txt"
 

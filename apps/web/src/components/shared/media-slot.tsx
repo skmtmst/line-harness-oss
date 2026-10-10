@@ -11,9 +11,11 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from 'react'
 import styles from './media-slot.module.css'
 import { TextField } from './text-field'
+import HelpTip from './help-tip'
 
 /**
  * 画像・動画・ファイルを入れる所。Pencil ★V8 の採用案 Z7vd2（B-128「画像を追加する所」）。
@@ -35,6 +37,8 @@ export type MediaSlotKind = 'image' | 'video' | 'audio' | 'file'
 const NOUN: Record<MediaSlotKind, string> = { image: '画像', video: '動画', audio: '音声', file: 'ファイル' }
 
 const FORMAT_NAMES: Record<string, string> = {
+  '.jpg': 'JPEG',
+  '.jpeg': 'JPEG',
   'image/jpeg': 'JPEG',
   'image/jpg': 'JPEG',
   'image/png': 'PNG',
@@ -60,7 +64,7 @@ export function formatNamesOf(accept?: string): string {
     const name = FORMAT_NAMES[rule] ?? (rule.startsWith('.') ? rule.slice(1).toUpperCase() : '')
     if (name && !names.includes(name)) names.push(name)
   }
-  return names.join('・')
+  return names.sort((a, b) => ['PNG', 'JPEG', 'GIF', 'WebP', 'MP4', 'MOV', 'MP3', 'M4A', 'PDF'].indexOf(a) - ['PNG', 'JPEG', 'GIF', 'WebP', 'MP4', 'MOV', 'MP3', 'M4A', 'PDF'].indexOf(b)).join('・')
 }
 
 /** バイト数を「12.4MB」「800KB」に。 */
@@ -70,6 +74,11 @@ export function formatBytes(bytes: number): string {
     return `${Number.isInteger(mb) ? mb : mb.toFixed(1)}MB`
   }
   return `${Math.max(1, Math.round(bytes / 1024))}KB`
+}
+
+/** 上限の文は、実際に受け付ける形式とバイト数から作る。 */
+export function mediaLimitLabel(accept?: string, maxBytes?: number): string {
+  return [formatNamesOf(accept), maxBytes ? `${formatBytes(maxBytes)} まで` : ''].filter(Boolean).join('・')
 }
 
 /** ファイルが accept に合うか。種類も名前も分からないときは断らない。 */
@@ -113,7 +122,12 @@ export interface MediaSlotProps {
   /** 上限の大きさ（バイト）。超えたら送らずに理由を出す。 */
   maxBytes?: number
   /** 制限の行を自分で書くとき（「1ファイル10メガバイト以内・JPEG・PNG」など。括弧は部品が付ける）。 */
+  /** @deprecated 上限はacceptとmaxBytesから出す。形式以外の説明はhelpへ。 */
   limitText?: string
+  help?: ReactNode
+  renderTrigger?: (choose: () => void) => ReactNode
+  fileInputRef?: RefObject<HTMLInputElement | null>
+  onFiles?: (files: File[]) => void
   /** 呼ぶ側の検査。理由を返すと送らない。 */
   validate?: (file: File) => string | Promise<string>
   /** 送り先。返した URL を `onChange` へ渡す。進みは `progress(0〜100)` で知らせる。 */
@@ -169,6 +183,10 @@ export default function MediaSlot({
   accept,
   maxBytes,
   limitText,
+  help,
+  renderTrigger,
+  fileInputRef,
+  onFiles,
   validate,
   upload,
   onChange,
@@ -205,7 +223,7 @@ export default function MediaSlot({
   const [ownError, setOwnError] = useState('')
   const [urlOpen, setUrlOpen] = useState(Boolean(urlEntry?.open))
   /** ファイルを受け取る口があるか。無ければ URL・登録メディアだけの形。 */
-  const canFile = Boolean(upload || onFile)
+  const canFile = Boolean(upload || onFile || onFiles)
 
   useEffect(() => {
     alive.current = true
@@ -244,15 +262,9 @@ export default function MediaSlot({
   const compact = size === 'compact'
   const noun = NOUN[kind]
   const formats = formatNamesOf(accept)
-  const limit =
-    limitText ??
-    (compact
-      ? maxBytes
-        ? `${formatBytes(maxBytes)} 以内`
-        : ''
-      : [maxBytes ? `1ファイル${formatBytes(maxBytes).replace('MB', 'メガバイト')}以内` : '', formats]
-          .filter(Boolean)
-          .join('・'))
+  const legacyMax = limitText?.match(/([\d.]+)\s*(?:MB|MiB|メガバイト)/)?.[1]
+  const limit = mediaLimitLabel(accept, maxBytes ?? (legacyMax ? Number(legacyMax) * 1024 * 1024 : undefined))
+  const extraHelp = help ?? (limitText && !legacyMax ? limitText : undefined)
 
   const setBusy = useCallback((next: boolean) => {
     busyRef.current = next
@@ -355,8 +367,9 @@ export default function MediaSlot({
     dragCount.current = 0
     setDrag('idle')
     if (!interactive) return
-    const file = event.dataTransfer?.files?.[0]
-    if (file) void take(file)
+    const files = Array.from(event.dataTransfer?.files ?? [])
+    if (onFiles) onFiles(files)
+    else if (files[0]) void take(files[0])
   }
   const paste = (event: ClipboardEvent) => {
     if (!acceptPaste || readOnly || disabled) return
@@ -486,6 +499,29 @@ export default function MediaSlot({
     )
   }
 
+  const picker = (
+        <input
+          ref={(node) => { inputRef.current = node; if (fileInputRef) fileInputRef.current = node }}
+          type="file"
+          multiple={Boolean(onFiles)}
+          accept={accept}
+          disabled={!interactive}
+          tabIndex={-1}
+          aria-hidden="true"
+          aria-label={`${title}（ファイル）`}
+          className={styles.input}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? [])
+            // 同じファイルを選び直せるよう、毎回空に戻す。
+            event.target.value = ''
+            if (onFiles) onFiles(files)
+            else if (files[0]) void take(files[0])
+          }}
+        />
+  )
+  if (renderTrigger) return <>{renderTrigger(openPicker)}{picker}{error ? <p role="alert">{error}</p> : null}</>
+
   return (
     <div className={styles.root} data-testid={testId}>
       <div
@@ -513,23 +549,8 @@ export default function MediaSlot({
         onPaste={paste}
       >
         {body}
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          disabled={!interactive}
-          tabIndex={-1}
-          aria-hidden="true"
-          aria-label={`${title}（ファイル）`}
-          className={styles.input}
-          onClick={(event) => event.stopPropagation()}
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            // 同じファイルを選び直せるよう、毎回空に戻す。
-            event.target.value = ''
-            if (file) void take(file)
-          }}
-        />
+        {extraHelp ? <HelpTip label={`${title}の補足`}>{extraHelp}</HelpTip> : null}
+        {picker}
       </div>
       {urlEntry && urlOpen && !readOnly ? (
         <TextField

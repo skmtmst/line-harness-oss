@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, expect, test, vi } from 'vitest'
 import type { Tag } from '@line-crm/shared'
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
@@ -28,7 +29,7 @@ test('タグ編集の未入力は名前欄へ移動し、保存も上の重複�
 test('保存済みの連動OFFは残ったマイルからONと推測しない（WEB089）', () => {
   const save = vi.fn()
   render(<TagEditForm tag={{ id: 't1', name: 'VIP', status: 'active', linkedEnabled: false, mileageReward: 500 } as Tag} groups={[]} dependencies={null} accountId="a1" readOnly={false} conflict={false} compareBusy={false} onCompare={vi.fn()} onReloadLatest={vi.fn()} retroactiveReference={false} initialActions={[]} saving={false} error="" onCancel={vi.fn()} onSave={save} onDelete={vi.fn()} />)
-  expect(screen.getByRole('switch', { name: 'タグ連動' }).getAttribute('aria-checked')).toBe('false')
+  expect((screen.getByRole('checkbox', { name: 'タグ連動' }) as HTMLInputElement).checked).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
   expect(save.mock.calls[0][0].linked).toBe(false)
 })

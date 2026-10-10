@@ -116,6 +116,9 @@ test('見本リンクの選択を初回読込後も保ち、実アカウント�
   // V8 はモーダルなので、背面のヘッダーを操作する前に窓を閉じる。
   // 開いたままの実アカウント切替は webhooks.test.tsx でも守る。
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click()
+  await page.getByRole('dialog', { name: '入力を破棄しますか？', exact: true })
+    .getByRole('button', { name: '破棄する', exact: true }).click()
+  await expect(dialog).toBeHidden()
   await switchAccount(page)
   await expect(dialog).toBeHidden()
   await page.getByRole('button', { name: '受け取り口を作る', exact: true }).click()
@@ -237,7 +240,9 @@ test('権限不足で切替が断られたら、元の状態と理由を出す',
   await openWebhooks(page)
   const name = 'Googleスプレッドシート ／ 顧客台帳'
   await toggleRow(page, name)
-  await expect(failureNotice(page)).toContainText('統括だけが切り替えできます')
-  await expect(page.getByRole('row').filter({ hasText: name })).toContainText('動いている')
+  await expect(page.getByRole('status', { name: '知らせ', exact: true }))
+    .toContainText('この操作の権限がありません。オーナーか管理者に頼んでください。')
+  // 広い幅では状態の同じセルに最終日時も出る。
+  await expect(page.getByRole('row').filter({ hasText: name }).getByRole('cell', { name: /^有効(?:\s|$)/ })).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: name })).not.toContainText('切り替え中')
 })

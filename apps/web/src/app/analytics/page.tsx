@@ -3230,7 +3230,7 @@ function AnalyticsInner() {
    * ファネル作成へ引き渡す。`?tab=funnel&conversionPointId=…` が入口。
    */
   const params = useSearchParams()
-  const tab = params.get('view') === 'conversion-report' ? 'conversion-report' : legacyTab
+  const tab = params.get('tab') === 'conversion-report' || params.get('view') === 'conversion-report' ? 'conversion-report' : legacyTab
   usePageTitle('分析')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const presetConversionId = params.get('conversionPointId')

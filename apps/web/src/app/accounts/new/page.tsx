@@ -254,7 +254,7 @@ export default function NewLineAccountPage() {
         <PageHeader
           breadcrumb={[{ label: 'アカウント', href: '/hq' }, { label: 'LINEアカウントを登録' }]}
           title="LINEアカウントを登録"
-          description={
+          help={
             currentStep === 1
               ? '画面に出る名前と、だれがこのアカウントを扱うかを決めます。'
               : currentStep === 3

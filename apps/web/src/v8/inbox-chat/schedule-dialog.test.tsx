@@ -4,7 +4,7 @@
  * - すぐ選ぶで日時が入り、ボタンの文字がその日時になる
  * - 予約するを押すと画面の予約の処理を呼ぶ（送らない）
  * - 夜中（22時〜8時）は注意を出す
- * - 予約済みは取り消せる。送信中のものは取り消せない
+ * - 予約中は取り消せる。送信中のものは取り消せない
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useState } from 'react'
@@ -58,7 +58,7 @@ describe('予約して送るの窓', () => {
     expect(screen.queryByText('相手が夜中の時間です。送ってよいか確かめてください。')).toBeNull()
   })
 
-  test('予約済みは取り消せる。送信中は取り消せない', () => {
+  test('予約中は取り消せる。送信中は取り消せない', () => {
     const onCancelRow = vi.fn()
     render(<Harness onConfirm={() => undefined} onCancelRow={onCancelRow} rows={[
       { id: 'a', label: '10/2 9:00', content: '前日のご案内', editable: true, defaultValue: '2026-10-02T09:00' },

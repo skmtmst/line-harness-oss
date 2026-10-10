@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import TemplateRichEditor from './rich'
+import type { TemplateEditHost } from './host'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', accounts: [] }) }))
@@ -59,4 +60,19 @@ it('画像の上の面か右の一覧で選んだ面だけ、下で動きを決�
   fireEvent.click(rows[0])
   fireEvent.change(screen.getByLabelText('面 A のURL'), { target: { value: 'https://nen.example/autumn' } })
   expect(within(screen.getByRole('list', { name: '面の一覧' })).getAllByRole('button')[0].textContent).toContain('https://nen.example/autumn')
+})
+
+it.each(['shop', 'hq'] as const)('%sでもテキストの追加処理を開き、加点を入力して面を替えても保つ', scope => {
+  const host: TemplateEditHost | undefined = scope === 'hq' ? {
+    description: '', folders: [], folder: '', onFolderChange: vi.fn(),
+    busy: false, onSave: vi.fn(), onCancel: vi.fn(),
+  } : undefined
+  render(<TemplateRichEditor visual host={host} />)
+  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '押されたときにあわせて行うことを足す' }))
+  const score = screen.getByRole('spinbutton', { name: /面 B.*の足すスコア/ }) as HTMLInputElement
+  fireEvent.change(score, { target: { value: '10' } })
+  fireEvent.click(screen.getByRole('button', { name: '面 A「上」を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選ぶ' }))
+  expect((screen.getByRole('spinbutton', { name: /面 B.*の足すスコア/ }) as HTMLInputElement).value).toBe('10')
 })

@@ -14,7 +14,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import styles from './mileage.module.css'
 
-export const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))
+export const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
 
 /** 道具の段の右：「よく使う絞り込み」（左に印）。 */
 export function SavedSelect({
@@ -141,5 +141,5 @@ export function StateCard({
 
 /** 失敗の1枚の「もう一度試す」。 */
 export function RetryButton({ onRetry }: { onRetry: () => void }) {
-  return <Button type="button" onClick={onRetry}>もう一度試す</Button>
+  return <Button type="button" onClick={onRetry}>もう一度読み込む</Button>
 }

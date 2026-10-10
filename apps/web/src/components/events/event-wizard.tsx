@@ -546,7 +546,7 @@ function OverviewStep({
   })()
   return (
     <div data-design="Body" className="flex flex-col items-start gap-4 xl:flex-row">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-3 border p-4">
+      <div data-design="Left" className="bg-canvas rounded-card content-card min-w-0 flex-1 space-y-3 border p-4">
       <FormSection step={1} label="イベントの中身" note="友だちの予約ページにそのまま出ます">
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="イベント名" htmlFor="ev-name" required error={nameError}>
@@ -805,7 +805,7 @@ function OverviewStep({
       <aside data-design="Right" className="w-full shrink-0 space-y-3 xl:w-96">
         {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。緑の二重枠はやめる。 */}
         <LinePreview>
-          <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <div className="bg-canvas rounded-card content-card overflow-hidden border">
               <div className="bg-canvas-sunken flex h-24 items-center justify-center text-xs text-ink-faint">
                 {draft.image_url ? '設定した画像が表示されます' : 'イベント画像'}
               </div>
@@ -1029,7 +1029,7 @@ function SlotsStep({
 
   return (
     <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
+      <div data-design="Left" className="bg-canvas rounded-card content-card min-w-0 flex-1 space-y-5 border p-6">
         <div>
           <h2 className="text-ink text-base font-semibold">予約枠を追加する</h2>
           <p className="text-ink-faint mt-0.5 text-xs">
@@ -1388,7 +1388,7 @@ function PublishStep({
 
   return (
     <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
+      <div data-design="Left" className="bg-canvas rounded-card content-card min-w-0 flex-1 space-y-5 border p-6">
         <div>
           <h2 className="text-ink text-base font-semibold">公開設定を決める</h2>
           <p className="text-ink-faint mt-0.5 text-xs">

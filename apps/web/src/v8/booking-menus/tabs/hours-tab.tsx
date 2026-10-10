@@ -2,6 +2,7 @@
 
 /* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -12,7 +13,7 @@ import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import { TimeField } from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { RowMenu } from '@/components/shared/row-actions'
 import { notifyToast } from '@/components/shared/toast'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
@@ -29,6 +30,9 @@ import {
   type LoadStatus,
 } from './shared'
 import styles from '../settings.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -121,7 +125,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         businessHours: draft,
       })
       if (!response.success) throw new Error('booking_business_hours_save_failed')
-      notifyToast('受付時間を保存しました。')
+      notifySaved('受付時間を保存しました。')
       onSaved(response.data)
     } catch (error) {
       setSaveError(businessHoursSaveError(error))
@@ -138,7 +142,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         icon={<AccountIcon />}
         title="受付枠を読み込めませんでした"
         description={settingsError ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>読み直す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -187,7 +191,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
-                  <Toggle
+                  <SettingCheckbox
                     label={`${label}を${isOpen ? '休みにする' : '開ける'}`}
                     checked={isOpen}
                     onChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}
@@ -218,7 +222,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       size="compact"
                     />
                     <span className={styles.sameTimeLabel}>同時</span>
-                    <input
+                    <NumberInput
                       aria-label={`${label}の同時受付数（${index + 1}区間目）`}
                       aria-invalid={isBad(weekday, index, 'capacity') || undefined}
                       type="number"
@@ -270,7 +274,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             icon={<AccountIcon />}
             title="設備を読み込めませんでした"
             description={resourcesError ?? 'もう一度お試しください。'}
-            action={<Button onClick={onResourcesRetry}>読み直す</Button>}
+            action={<Button onClick={onResourcesRetry}>もう一度読み込む</Button>}
           />
         ) : null}
         {resourcesStatus === 'ready' && resources ? (
@@ -416,7 +420,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
         busy={busy}
         error={error ?? undefined}
         onCancel={() => { if (!busy) setConfirmDelete(false) }}
-        onConfirm={() => void remove()}
+        onConfirm={() => remove()}
       />
     </div>
   )
@@ -487,15 +491,9 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
       busy={saving}
     >
       <div className="grid gap-3">
-        <label className={styles.fieldLabel}>設備名
-          <input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" />
-        </label>
-        <label className={styles.fieldLabel}>種類
-          <input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例: 部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" />
-        </label>
-        <label className={styles.fieldLabel}>受付上限
-          <input aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" />
-        </label>
+        <Field label="設備名"><input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
+        <Field label="種類"><input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
+        <Field label="受付上限"><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></Field>
         {error ? <p className="text-danger text-xs" role="alert">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={() => { if (!saving) onClose() }} disabled={saving}>キャンセル</Button>
@@ -560,7 +558,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
       if (requestId !== requestRef.current) return
       setResult(null)
       setCheckError(error instanceof ApiError && error.status === 403
-        ? 'このアカウントの予約を確かめる権限がありません。'
+        ? permissionDeniedMessage('store')
         : '空き状況を確かめられませんでした。もう一度お試しください。')
     } finally {
       if (requestId === requestRef.current) setChecking(false)
@@ -586,14 +584,8 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
           placeholder={activeMenus.length === 0 ? '（受付中のメニューがありません）' : '（メニューを選ぶ）'}
           meta={() => undefined}
         />
-        <label className={styles.fieldLabel}>
-          日付
-          <DateField aria-label="確かめる日付" value={date} onChange={(value) => { setDate(value); changeCriteria() }} className="mt-1" />
-        </label>
-        <label className={styles.fieldLabel}>
-          開始時刻
-          <TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" />
-        </label>
+        <Field label="日付"><DateField aria-label="確かめる日付" value={date} onChange={(value) => { setDate(value); changeCriteria() }} className="mt-1" /></Field>
+        <Field label="開始時刻"><TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" /></Field>
         <EntityKindField
           kind="staff"
           label="確かめる担当"
@@ -677,7 +669,7 @@ function resourceSaveError(error: unknown): string {
     return 'ほかの担当者が先にこの設備を変更しました。読み直してからもう一度お試しください。'
   }
   if (error instanceof ApiError && error.status === 403) {
-    return '設備を変更する権限がありません。'
+    return permissionDeniedMessage('store')
   }
   return '設備を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
 }

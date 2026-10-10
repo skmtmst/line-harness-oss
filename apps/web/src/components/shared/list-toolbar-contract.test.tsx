@@ -153,3 +153,9 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
     expect(perPageRule![0]).toMatch(/flex:\s*none/)
   })
 })
+
+it('並びは道具の段の共通欄だけで選ぶ', () => {
+  const html = renderToStaticMarkup(<ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} sort={{ value: 'recent', onChange: vi.fn(), options: [{ value: 'recent', label: '新しい順' }] }} />)
+  expect(html).toContain('data-list-sort')
+  expect(html).toContain('aria-label="並び"')
+})

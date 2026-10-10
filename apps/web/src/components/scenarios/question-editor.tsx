@@ -38,6 +38,7 @@ export interface QuestionChoice {
   hideUserMessage?: boolean
   reply?: string
   repeatReply?: string
+  scoreChange?: number | null
   addTagIds?: string[]
   removeTagIds?: string[]
   field?: { fieldId: string; value: string }
@@ -161,7 +162,8 @@ export function deadAnswerSettings(choice: QuestionChoice): string[] {
   if (choice.reply?.trim()) dead.push('選択時の返信')
   if (choice.repeatReply?.trim()) dead.push('二度押し時の返信')
   if (choice.userMessage?.trim()) dead.push('ユーザーメッセージ')
-  if ((choice.addTagIds?.length ?? 0) > 0) dead.push('追加するタグ')
+  if ((choice.addTagIds?.length ?? 0) > 0 && (choice.behavior === 'tel' || choice.behavior === 'mail')) dead.push('追加するタグ')
+  if (choice.scoreChange && (choice.behavior === 'tel' || choice.behavior === 'mail')) dead.push('足すスコア')
   if ((choice.removeTagIds?.length ?? 0) > 0) dead.push('はずすタグ')
   if (choice.field?.fieldId) dead.push('友だち情報欄')
   return dead
@@ -222,7 +224,8 @@ export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice 
     reply: undefined,
     repeatReply: undefined,
     userMessage: undefined,
-    addTagIds: undefined,
+    addTagIds: choice.behavior === 'tel' || choice.behavior === 'mail' ? undefined : choice.addTagIds,
+    scoreChange: choice.behavior === 'tel' || choice.behavior === 'mail' ? undefined : choice.scoreChange,
     removeTagIds: undefined,
     field: undefined,
   }

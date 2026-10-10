@@ -206,7 +206,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   return (
     <CreatePage
       title="下書きを仕上げる"
-      description="見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。"
+      help="見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。"
       parent={['オートメーション', '/automations?tab=templates']}
       saveLabel="下書きを保存する"
       validate={() => {

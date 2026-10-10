@@ -5,6 +5,7 @@
  * 左に流すコメントの表（秒数・名前・本文はその場で直せる。行の右端は消す）、右に視聴画面での見え方。
  * 口・件数の上限・JSON の読み込み・保存の決まりは app/webinars/edit/comments-v8.tsx と同じ（BEHAVIOR.md）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
 import { PageFrame } from '@/components/templates/page-frame'
@@ -20,6 +21,7 @@ import { DetailHead } from './chrome'
 import { fmtSec, parseSec } from './helpers'
 import type { DetailChrome, EditContext, PaneSaveProps } from './types'
 import styles from './comments.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 /** 1行の中身を確かめる。直せないときは理由の文を返す。 */
 function validateRow(raw: unknown): WebinarSakuraComment | string {
@@ -41,7 +43,7 @@ function SecondsInput({ value, label, disabled, onChange }: { value: number; lab
   const [draft, setDraft] = useState(fmtSec(value))
   useEffect(() => { setDraft(fmtSec(value)) }, [value])
   return (
-    <input
+    <NumberInput numericText
       className={`${styles.cell} ${styles.cellSec}`}
       value={draft}
       aria-label={label}
@@ -101,13 +103,13 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
     setMessage(null)
     if (importJson.trim()) { setMessage({ text: '貼り付けたJSONを読み込んでから保存してください。', error: true }); return false }
     if (comments.length > WEBINAR_SAKURA_COMMENTS_MAX) {
-      setMessage({ text: `コメントは${WEBINAR_SAKURA_COMMENTS_MAX}件までです（いま${comments.length}件）。減らしてから保存してください。`, error: true })
+      setMessage({ text: `コメントは${WEBINAR_SAKURA_COMMENTS_MAX} 件までです（いま${comments.length} 件）。減らしてから保存してください。`, error: true })
       return false
     }
     const cleaned: WebinarSakuraComment[] = []
     for (let index = 0; index < comments.length; index += 1) {
       const row = validateRow(comments[index])
-      if (typeof row === 'string') { setMessage({ text: `${index + 1}行目を確認してください：${row}`, error: true }); return false }
+      if (typeof row === 'string') { setMessage({ text: `${index + 1} 行目を確認してください：${row}`, error: true }); return false }
       cleaned.push(row)
     }
     const request = generation.current
@@ -119,7 +121,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
       if (request !== generation.current) return false
       setComments(sorted)
       setBaseline(JSON.stringify(sorted))
-      setMessage({ text: `${response.data.count}件保存しました`, error: false })
+      notifySaved(`${response.data.count}件保存しました`)
       return true
     } catch (cause) {
       if (request === generation.current) setMessage({ text: `保存できませんでした。入力を残しました。${webinarErrorText(cause, '通信を確認して、もう一度保存してください。')}`, error: true })
@@ -140,17 +142,17 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
     try {
       const parsed = JSON.parse(importJson) as unknown
       if (!Array.isArray(parsed)) throw new Error('配列ではありません')
-      if (parsed.length > WEBINAR_SAKURA_COMMENTS_MAX) throw new Error(`コメントは${WEBINAR_SAKURA_COMMENTS_MAX}件までです`)
+      if (parsed.length > WEBINAR_SAKURA_COMMENTS_MAX) throw new Error(`コメントは${WEBINAR_SAKURA_COMMENTS_MAX} 件までです`)
       const rows: WebinarSakuraComment[] = []
       for (let i = 0; i < parsed.length; i += 1) {
         const result = validateRow(parsed[i])
-        if (typeof result === 'string') throw new Error(`${i + 1}行目が不正です: ${result}`)
+        if (typeof result === 'string') throw new Error(`${i + 1} 行目が不正です: ${result}`)
         rows.push(result)
       }
       setComments(rows)
       setImportJson('')
       setShowImport(false)
-      setMessage({ text: `${rows.length}件読み込みました（保存ボタンで確定）`, error: false })
+      setMessage({ text: `${rows.length} 件読み込みました（保存ボタンで確定）`, error: false })
     } catch (err) {
       setMessage({ text: `JSON が不正です: ${err instanceof Error ? err.message : String(err)}`, error: true })
     }
@@ -208,9 +210,9 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
               {comments.length === 0 ? <p className={styles.state}>まだコメントがありません。下の「コメントを足す」から足してください。</p> : null}
               {comments.map((comment, index) => (
                 <div key={index} className={styles.row}>
-                  <SecondsInput value={comment.atSeconds} label={`${index + 1}行目の秒数`} disabled={locked2} onChange={(next) => update(index, { atSeconds: next })} />
-                  <input className={`${styles.cell} ${styles.cellName}`} value={comment.authorName} disabled={locked2} aria-label={`${index + 1}行目の名前`} onChange={(event) => update(index, { authorName: event.target.value })} />
-                  <input className={`${styles.cell} ${styles.cellBody}`} value={comment.body} disabled={locked2} aria-label={`${index + 1}行目の本文`} onChange={(event) => update(index, { body: event.target.value })} />
+                  <SecondsInput value={comment.atSeconds} label={`${index + 1} 行目の秒数`} disabled={locked2} onChange={(next) => update(index, { atSeconds: next })} />
+                  <input className={`${styles.cell} ${styles.cellName}`} value={comment.authorName} disabled={locked2} aria-label={`${index + 1} 行目の名前`} onChange={(event) => update(index, { authorName: event.target.value })} />
+                  <input className={`${styles.cell} ${styles.cellBody}`} value={comment.body} disabled={locked2} aria-label={`${index + 1} 行目の本文`} onChange={(event) => update(index, { body: event.target.value })} />
                   {readOnly ? null : (
                     <IconButton className={styles.remove} aria-label={`${comment.authorName || '名前未入力'}のコメントを消す`} title="このコメントを消す" disabled={saving} onClick={() => setComments((prev) => prev.filter((_, j) => j !== index))}>
                       <Trash2 size={15} aria-hidden="true" />
@@ -226,7 +228,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
               )}
               {showImport && !readOnly ? (
                 <div className={styles.import}>
-                  <p className={styles.cardDesc}>{`形：[{"atSeconds":10,"authorName":"田中","body":"こんばんは"}]（${WEBINAR_SAKURA_COMMENTS_MAX}件まで）`}</p>
+                  <p className={styles.cardDesc}>{`形：[{"atSeconds":10,"authorName":"田中","body":"こんばんは"}]（${WEBINAR_SAKURA_COMMENTS_MAX} 件まで）`}</p>
                   <TextArea value={importJson} onChange={(event) => setImportJson(event.target.value)} rows={4} aria-label="貼り付けるJSON" />
                   <div><Button onClick={doImport}>読み込む</Button></div>
                 </div>

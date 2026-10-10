@@ -7,13 +7,14 @@
  * （節目（累計）・称号・特典・到達した人・到達時の LINE 通知・行の「…」）。
  * 行の中身は「…」の「編集する」で開く窓で直し、下の中央の「保存して EC へ同期する」でまとめて保存する。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { RowActions } from '@/components/shared/row-actions'
 import { TextField } from '@/components/shared/text-field'
 import { FieldError } from '@/components/shared/form-controls'
@@ -25,6 +26,9 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { parseYen, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 type MilestoneDraft = { id: string | null; threshold: number; title: string; benefit: string | null; notify: boolean; reachedCount: number }
 
@@ -111,10 +115,11 @@ export default function LifetimeV8({
       if (!res.success) throw new Error(res.error)
       setDirty(false)
       onSaved(accountId, res.data)
-      setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
+      notifySaved(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。')
+      if (res.data.sync?.status !== 'synced') setError('ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
       setError(describeApiFailure(caught, '節目の保存', {
-        forbidden: '節目を保存する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -137,7 +142,7 @@ export default function LifetimeV8({
         </div>
       ) : null}
 
-      <Card layout="vertical" padding="spacious" surface="inset" spacing="normal" aria-labelledby="nen-lifetime-title">
+      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-lifetime-title">
         <div className={styles.lifetimeHead}>
           <div className={styles.cardHead}>
             <h2 id="nen-lifetime-title" className={styles.cardTitle}>節目（ライフタイム）</h2>
@@ -169,7 +174,7 @@ export default function LifetimeV8({
                 <span className={row.threshold === topThreshold ? styles.lifeTitleTop : styles.lifeTitle} title={row.title}>{row.title}</span>
                 {row.threshold === topThreshold && drafts.length > 1 ? <span className={styles.lifeTitleSub}>最上位</span> : null}
               </span>
-              <span className={styles.lifeColBenefit} role="cell" title={row.benefit ?? ''}>{row.benefit ?? '未設定'}</span>
+              <span className={styles.lifeColBenefit} role="cell" title={row.benefit ?? ''}>{row.benefit ?? emptyValue('unconfigured')}</span>
               <span className={styles.lifeColReached} role="cell">{formatNumber(row.reachedCount)} 人</span>
               <span className={styles.lifeColNotify} role="cell">{row.notify ? '通知する' : '通知しない'}</span>
               <span className={styles.lifeColAction} role="cell">
@@ -197,7 +202,7 @@ export default function LifetimeV8({
       {readonly ? null : (
         <div className={styles.saveRow}>
           <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty}>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={15} aria-hidden="true" />保存して EC へ同期する
           </Button>
         </div>
@@ -215,18 +220,12 @@ export default function LifetimeV8({
       >
         {editing ? (
           <div className={styles.editBody}>
-            <label className={styles.removeField}>
-              <span className={styles.removeLabel}>節目（累計の金額）</span>
-              <TextField {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
-              <FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError>
-            </label>
-            <label className={styles.removeField}>
-              <span className={styles.removeLabel}>称号</span>
-              <TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
-              <FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError>
-            </label>
+            <Field label="節目（累計の金額）"><NumberInput numericText {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} />
+<FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError></Field>
+            <Field label="称号"><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
+<FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError></Field>
             <div className={styles.editToggle}>
-              <Toggle checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} />
+              <SettingCheckbox checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} />
             </div>
           </div>
         ) : null}

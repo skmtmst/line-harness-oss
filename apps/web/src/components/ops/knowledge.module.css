@@ -15,7 +15,7 @@
 .supportMetric > div > div p, .supportMetric > div > p:last-child { font-size: var(--text-nano); }
 .supportMetric > div > p:not(:last-child) { font-size: var(--text-heading); }
 .supportColumns { display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr); gap: 16px; }
-.supportList, .supportDetail { min-width: 0; border: 1px solid var(--card-edge); border-radius: var(--radius-card); background: var(--color-canvas); min-height: calc(100svh - 310px); box-shadow: var(--card-shadow); }
+.supportList, .supportDetail { min-width: 0; border: 1px solid var(--card-edge); border-radius: var(--radius-card); background: var(--color-canvas); min-height: calc(100svh - 310px); box-shadow: var(--card-shadow); padding: 18px 22px; }
 .supportList > header { background: var(--color-shell); padding: 12px 14px; border-radius: var(--radius-card) var(--radius-card) 0 0; }
 .supportList h2, .supportList li button > span:nth-child(2) { font-size: var(--text-micro); }
 .supportList li button > span:first-child { font-size: var(--text-nano); }

@@ -1,4 +1,4 @@
-export const HQ_TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario', 'friend_field', 'mark'] as const;
+export const HQ_TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario', 'friend_field', 'mark', 'auto_reply', 'friend_add_rule', 'reminder'] as const;
 export type HqTemplateType = (typeof HQ_TEMPLATE_TYPES)[number];
 
 export const HQ_TEMPLATE_DISTRIBUTION_MODES = ['create', 'overwrite', 'alias'] as const;
@@ -158,14 +158,15 @@ export async function createHqTemplate(
 ): Promise<HqTemplate> {
   await db.prepare(
     `INSERT INTO hq_templates
-       (id, tenant_id, template_type, extended_type, friend_attribute_type, name, description, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, tenant_id, template_type, extended_type, friend_attribute_type, delivery_type, name, description, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     input.id,
     input.tenantId,
-    input.type==='scenario'?'template':input.type==='friend_field'||input.type==='mark'?'tag':input.type,
+    ['scenario','auto_reply','friend_add_rule','reminder'].includes(input.type)?'template':input.type==='friend_field'||input.type==='mark'?'tag':input.type,
     input.type==='scenario'?'scenario':null,
     input.type==='friend_field'||input.type==='mark'?input.type:null,
+    ['auto_reply','friend_add_rule','reminder'].includes(input.type)?input.type:null,
     input.name,
     input.description ?? null,
     input.createdBy ?? null,
@@ -179,7 +180,7 @@ export async function getHqTemplate(
   id: string,
 ): Promise<HqTemplate | null> {
   return db.prepare(
-    `SELECT *,COALESCE(friend_attribute_type,extended_type,template_type) AS template_type FROM hq_templates WHERE tenant_id = ? AND id = ?`,
+    `SELECT *,COALESCE(delivery_type,friend_attribute_type,extended_type,template_type) AS template_type FROM hq_templates WHERE tenant_id = ? AND id = ?`,
   ).bind(tenantId, id).first<HqTemplate>();
 }
 
@@ -190,12 +191,12 @@ export async function listHqTemplates(
 ): Promise<HqTemplate[]> {
   const query = type
     ? db.prepare(
-      `SELECT *,COALESCE(friend_attribute_type,extended_type,template_type) AS template_type FROM hq_templates
-       WHERE tenant_id = ? AND COALESCE(friend_attribute_type,extended_type,template_type) = ? AND archived_at IS NULL
+      `SELECT *,COALESCE(delivery_type,friend_attribute_type,extended_type,template_type) AS template_type FROM hq_templates
+       WHERE tenant_id = ? AND COALESCE(delivery_type,friend_attribute_type,extended_type,template_type) = ? AND archived_at IS NULL
        ORDER BY updated_at DESC, id`,
     ).bind(tenantId, type)
     : db.prepare(
-      `SELECT *,COALESCE(friend_attribute_type,extended_type,template_type) AS template_type FROM hq_templates
+      `SELECT *,COALESCE(delivery_type,friend_attribute_type,extended_type,template_type) AS template_type FROM hq_templates
        WHERE tenant_id = ? AND archived_at IS NULL ORDER BY updated_at DESC, id`,
     ).bind(tenantId);
   const result = await query.all<HqTemplate>();
@@ -222,9 +223,9 @@ export async function listHqTemplateDisplaySources(
 ): Promise<HqTemplateListSource[]> {
   const result = await db.prepare(`
     WITH templates AS (
-      SELECT *, COALESCE(friend_attribute_type,extended_type,template_type) AS display_type
+      SELECT *, COALESCE(delivery_type,friend_attribute_type,extended_type,template_type) AS display_type
       FROM hq_templates WHERE tenant_id=?1 AND archived_at IS NULL
-        AND (?2 IS NULL OR COALESCE(friend_attribute_type,extended_type,template_type)=?2)
+        AND (?2 IS NULL OR COALESCE(delivery_type,friend_attribute_type,extended_type,template_type)=?2)
     ), successful_accounts AS (
       SELECT DISTINCT r.template_id, a.id AS account_id, a.name
       FROM hq_template_distribution_results r

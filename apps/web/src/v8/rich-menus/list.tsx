@@ -8,8 +8,10 @@
  * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
  * 扱いは古い一覧と同じ（BEHAVIOR.md）。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
+import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -44,6 +46,7 @@ import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/a
 import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
+import DetailPanel from '@/components/shared/detail-panel'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -79,6 +82,9 @@ import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -150,7 +156,7 @@ function audienceMainText(g: RichMenuGroupListItem, tagNameById: Map<string, str
 function audienceSubText(g: RichMenuGroupListItem): string | null {
   if (g.publishingAt && g.isDefaultForAll) return `${shortDay(g.publishingAt)} から既定`
   if (g.targetingEnabled && g.targetingCondition) {
-    return g.audienceCount != null ? `対象 ${formatNumber(g.audienceCount)}人` : '対象の人数は未取得'
+    return g.audienceCount != null ? `対象 ${formatNumber(g.audienceCount)} 人` : '対象の人数は未取得'
   }
   if (g.isDefaultForAll) return '（既定）'
   return null
@@ -158,9 +164,7 @@ function audienceSubText(g: RichMenuGroupListItem): string | null {
 
 /** 「10/5」の形（予約の札・「から既定」）。 */
 const shortDay = (value: string): string => {
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(d)
+  return polishFormatDate(value, { style: 'list-day' })
 }
 
 /** 消せない理由の短い言い方（yOyCg：「何になっているか」だけ。外し方は右の操作）。 */
@@ -207,10 +211,11 @@ export default function RichMenusListV8() {
   const role = useStaffRole()
   const canEdit = role === null ? true : canManageRole(role)
 
-  const [showExternal, setShowExternal] = useState(false)
+  const [showExternal, setShowExternal] = useListUrlValue('showExternal', false)
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [external, setExternal] = useState<{ currentDefault: string | null; lineMenus: LineMenu[] } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -821,7 +826,7 @@ export default function RichMenusListV8() {
       allCount={groupFacets?.total ?? groupTotal}
       unfiledCount={groupFacets?.folderCounts[UNFILED] ?? 0}
       countOf={(f) => groupFacets?.folderCounts[f.id] ?? 0}
-      placeholder="例: 01_会員向け"
+      placeholder="例：01_会員向け"
     />
   )
 
@@ -857,7 +862,7 @@ export default function RichMenusListV8() {
   const sortBox = (
     <div className={styles.sortBox} title={`並び：${SORT_OPTIONS.find((o) => o.value === sortKey)?.label ?? ''}`}>
       <ArrowDownUp size={14} aria-hidden="true" className={styles.sortIcon} />
-      <Select
+      <ListToolbarSort
         aria-label="並び順"
         value={sortKey}
         onChange={(value) => setSortKey(value as SortKey)}
@@ -895,7 +900,7 @@ export default function RichMenusListV8() {
         <div className={styles.narrowSearch}>
           <SearchField
             placeholder="メニュー名・ボタン名"
-            aria-label="メニュー名・ボタン名で検索"
+            aria-label="メニュー名・ボタン名で探す"
             value={query}
             onChange={(value) => {
               setQuery(clampSearchQuery(value))
@@ -918,7 +923,7 @@ export default function RichMenusListV8() {
       <ListToolbar
         search={{
           placeholder: 'メニュー名・ボタン名',
-          label: 'メニュー名・ボタン名で検索',
+          label: 'メニュー名・ボタン名で探す',
           width: 200,
           value: query,
           onChange: (value) => {
@@ -996,7 +1001,7 @@ export default function RichMenusListV8() {
       loadFailure?.description
         ?? '登録したメニューは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。',
       loadFailure === null || loadFailure.retryable
-        ? <Button type="button" onClick={() => void reload()}>もう一度試す</Button>
+        ? <Button type="button" onClick={() => void reload()}>もう一度読み込む</Button>
         : null,
       'error',
     )
@@ -1042,14 +1047,14 @@ export default function RichMenusListV8() {
                   className={styles.row}
                   leaving={leavingId === g.id}
                   tabIndex={0}
-                  onClick={() => router.push(`/rich-menus/edit?id=${g.id}`)}
+                  onClick={() => setDetailId(g.id)}
                   onKeyDown={(event) => {
                     if (event.target !== event.currentTarget) return
                     if (event.key === 'Enter') {
                       event.preventDefault()
-                      router.push(`/rich-menus/edit?id=${g.id}`)
+                      setDetailId(g.id)
                     }
-                  }}
+                  }} data-row-id={g.id}
                 >
                   <Td
                     className={styles.orderCell}
@@ -1089,15 +1094,15 @@ export default function RichMenusListV8() {
                     <FolderDotName folder={folderDotOf(g.folderId)}>
                       <Link
                         href={`/rich-menus/edit?id=${g.id}`}
-                        title={g.name}
+
                         className={styles.name}
-                        onClick={(event) => event.stopPropagation()}
+                        onClick={(event) => { event.stopPropagation(); if (!event.ctrlKey && !event.metaKey && !event.shiftKey) { event.preventDefault(); setDetailId(g.id) } }}
                       >
-                        {g.name}
+                        <TruncatedText value={String(g.name ?? '')} />
                       </Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} title={`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}>
-                      {`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}
+                    <span className={`${styles.sub} ${styles.nameSub}`} >
+                      <TruncatedText value={String(`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`)} />
                     </span>
                   </Td>
                   <Td className={styles.audienceCell}>
@@ -1120,10 +1125,10 @@ export default function RichMenusListV8() {
                   <Td
                       className={styles.countMain}
                       title={g.monthlyStats?.uniqueAudience.value != null
-                        ? `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`
+                        ? `のべ${formatNumber(g.monthlyStats.uniqueAudience.value)} 人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`
                         : undefined}
                     >
-                      {taps == null ? '—' : `${formatNumber(taps)}回`}
+                      {taps == null ? emptyValue('unknown') : `${formatNumber(taps)}回`}
                     </Td>
                   <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                     <div className={styles.menuBox}>
@@ -1150,8 +1155,8 @@ export default function RichMenusListV8() {
     <div className={styles.pagerRow}>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)} / ${formatNumber(groupTotal)}件`
-          : `${formatNumber(groupTotal)}件`}
+          ? `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)} / ${formatNumber(groupTotal)} 件`
+          : `${formatNumber(groupTotal)} 件`}
       </span>
       {pageCount > 1 ? (
         <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
@@ -1206,7 +1211,7 @@ export default function RichMenusListV8() {
       footer={<>
         <Button type="button" variant="secondary" onClick={closeDelete} disabled={deleteBusy}>閉じる</Button>
         {managedDelete.status === 'published' && canEdit ? (
-          <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy}>
+          <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy} busy={Boolean(deleteBusy)} busyLabel="処理中…">
             <CloudOff size={15} aria-hidden="true" />
             LINEから取り下げる
           </Button>
@@ -1294,7 +1299,7 @@ export default function RichMenusListV8() {
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"
       title="リッチメニュー"
-      description="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
+      help="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
       actions={
         <Button
           type="button"
@@ -1311,7 +1316,7 @@ export default function RichMenusListV8() {
         {!canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         <KpiBand data-design="KPIs" className={styles.kpis}>
@@ -1323,7 +1328,7 @@ export default function RichMenusListV8() {
             unit={groupKpiReady && groupFacets?.published != null ? '件' : ''}
             detail={groupKpiReady
               ? groupFacets?.published != null
-                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published}件`
+                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published} 件`
                 : '下書き —'
               : groupKpiUnavailableText}
           />
@@ -1341,9 +1346,9 @@ export default function RichMenusListV8() {
             icon={<Trophy size={13} aria-hidden="true" />}
             value={null}
             unit=""
-            valueText={topArea ? topArea.label || '名前のないボタン' : '—'}
+            valueText={topArea ? topArea.label || '名前のないボタン' : emptyValue('unknown')}
             detail={topArea
-              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)}回`
+              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)} 回`
               : tapKpiReady
                 ? (tapStats?.total ?? 0) > 0
                   ? '内訳はまだ集まっていません'
@@ -1400,7 +1405,7 @@ export default function RichMenusListV8() {
             setDuplicateTarget(null)
             setDuplicateError(null)
           }}
-          onConfirm={() => void confirmDuplicate()}
+          onConfirm={() => confirmDuplicate()}
         />
 
         <ConfirmDialog
@@ -1416,7 +1421,7 @@ export default function RichMenusListV8() {
             setImportTarget(null)
             setImportError(null)
           }}
-          onConfirm={() => void confirmImport()}
+          onConfirm={() => confirmImport()}
         >
           <div className={styles.impact}>
             <p><strong>管理画面に追加するもの：</strong>名前・画像・ボタンの設定</p>
@@ -1435,12 +1440,15 @@ export default function RichMenusListV8() {
 
         {blockedDialog}
         {deleteConfirm}
-      </>}
+        <DetailPanel open={detailId !== null} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
+        <p>このリッチメニューの中身や設定は「{canEdit ? '編集する' : '詳しく見る'}」から確認できます。</p>
+      </DetailPanel>
+    </>}
     >
       {actionError ? (
         <p className={styles.errorBand} role="alert">
           {actionError}
-          <button type="button" onClick={() => void reload()}>読み直す</button>
+          <button type="button" onClick={() => void reload()}>もう一度読み込む</button>
         </p>
       ) : null}
       {listBody}

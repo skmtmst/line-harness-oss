@@ -77,3 +77,14 @@ it('統括のテスト送信も、予約と同じ店舗用の素材・IDを実�
  expect(column.thumbnailImageUrl).toBe('https://example.test/a/image');
  expect(column.actions[0].data).toBe('ctpl=a-template&c=0&a=0');
 });
+
+it('B-173: リサーチは配布先の公開版を使い、他店や未公開版を使わない', async () => {
+ const payload={questions:[{text:'店舗の質問',format:'free',required:true}],answerActions:[{actionType:'tag',config:{op:'add',tagIds:['local-tag']},onFailure:'continue'}]};
+ f.raw.prepare("UPDATE hq_template_versions SET definition_json=? WHERE id='v'").run(JSON.stringify({...definition,asset:{kind:'research',payload:{questions:[]}}}));
+ f.raw.prepare("INSERT INTO broadcast_message_assets(id,line_account_id,kind,name,payload_json,published_version,created_at,updated_at) VALUES ('a-template','a','research','店舗のリサーチ',?,1,'now','now')").run(JSON.stringify(payload));
+ const changed=JSON.parse(JSON.stringify(input));changed.messageBubbles[0]={id:'r',type:'research',content:{assetId:'hq',hqTemplateId:'hq',hqTemplateVersionId:'v',questions:[]}};
+ const content=(await resolveHqBroadcastMaterials(f.db,'tenant','a',changed)).messageBubbles![0].content;
+ expect(content).toMatchObject({...payload,assetId:'a-template',hqTemplateVersionId:'v'});
+ f.raw.exec("UPDATE broadcast_message_assets SET published_version=0 WHERE id='a-template'");
+ await expect(resolveHqBroadcastMaterials(f.db,'tenant','a',changed)).rejects.toMatchObject({status:409});
+});

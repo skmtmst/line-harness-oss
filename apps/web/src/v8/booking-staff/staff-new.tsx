@@ -23,7 +23,7 @@ import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -33,6 +33,9 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
 import layout from './layout.module.css'
 import styles from './staff-new.module.css'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /** 一度に見せるメニューの数。残りは「ほかのメニュー」で開く（1行に収める）。 */
 const MENU_FOLD = 4
@@ -283,7 +286,7 @@ export default function StaffNewV8() {
           <ListState
             kind="error"
             title="予約設定の変更権限がありません"
-            description="予約スタッフの登録は、予約設定の権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
+            description={permissionDeniedMessage('store')}
           />
         </div>
       </div>
@@ -317,10 +320,8 @@ export default function StaffNewV8() {
 
   return (
     <div ref={formRef} className={layout.shell} data-design-node="CcA4k">
-      <header className={layout.head} data-design="Head">
-        <h1 className={layout.title}>予約スタッフを登録</h1>
-        <p className={layout.desc}>お客さまが予約するときに指名できる担当者を登録します。</p>
-      </header>
+      <PageHeading title={<>予約スタッフを登録</>}
+        help={<>お客さまが予約するときに指名できる担当者を登録します。</>} />
 
       <div className={layout.body} data-design="Body">
         <div className={layout.main}>
@@ -329,9 +330,7 @@ export default function StaffNewV8() {
           <section className={layout.card} aria-labelledby="bs-card-info">
             <div className={layout.cardHead}><h2 id="bs-card-info" className={layout.cardTitle}>お客さまに見える情報</h2></div>
             <div className={styles.grid}>
-              <div className={layout.field}>
-                <label htmlFor="bs-name" className={layout.label}>スタッフ名（管理画面での呼び名）</label>
-                <input
+              <div className={layout.field}><Field label="スタッフ名（管理画面での呼び名）" htmlFor="bs-name"><input
                   id="bs-name"
                   type="text"
                   value={name}
@@ -345,16 +344,9 @@ export default function StaffNewV8() {
                   className={layout.input}
                   aria-invalid={fieldErrors.name !== undefined}
                 />
-                {fieldErrors.name !== undefined ? <span className={layout.fieldError} role="alert">{fieldErrors.name}</span> : null}
-              </div>
-              <div className={layout.field}>
-                <label htmlFor="bs-display" className={layout.label}>お客さま向けの表示名（空欄なら上の名前）</label>
-                <input id="bs-display" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.displayName} placeholder="みさき" className={layout.input} />
-              </div>
-              <div className={layout.field}>
-                <label htmlFor="bs-role" className={layout.label}>肩書き</label>
-                <input id="bs-role" type="text" value={role} onChange={(e) => setRole(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.role} placeholder="トリミング担当" className={layout.input} />
-              </div>
+{fieldErrors.name !== undefined ? <span className={layout.fieldError} role="alert">{fieldErrors.name}</span> : null}</Field></div>
+              <div className={layout.field}><Field label="お客さま向けの表示名（空欄なら上の名前）" htmlFor="bs-display"><input id="bs-display" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.displayName} placeholder="みさき" className={layout.input} /></Field></div>
+              <div className={layout.field}><Field label="肩書き" htmlFor="bs-role"><input id="bs-role" type="text" value={role} onChange={(e) => setRole(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.role} placeholder="トリミング担当" className={layout.input} /></Field></div>
               <div className={layout.field}>
                 <ImageUploader
                   mode="url"
@@ -367,11 +359,8 @@ export default function StaffNewV8() {
                 />
               </div>
             </div>
-            <div className={layout.field}>
-              <label htmlFor="bs-bio" className={layout.label}>紹介文</label>
-              {/* 絵は1行の高さ。改行も書けるよう textarea のまま、下の角で広げられる。 */}
-              <textarea id="bs-bio" rows={1} value={bio} onChange={(e) => setBio(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.bio} placeholder="トリミング歴10年。小型犬が得意です。" className={`${layout.input} ${styles.bio}`} />
-            </div>
+            <div className={layout.field}><Field label="紹介文" htmlFor="bs-bio">{/* 絵は1行の高さ。改行も書けるよう textarea のまま、下の角で広げられる。 */}
+<textarea id="bs-bio" rows={1} value={bio} onChange={(e) => setBio(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.bio} placeholder="トリミング歴10年。小型犬が得意です。" className={`${layout.input} ${styles.bio}`} /></Field></div>
           </section>
 
           {/* ② 予約を受けられるメニュー */}
@@ -415,15 +404,15 @@ export default function StaffNewV8() {
           <section className={layout.card} aria-labelledby="bs-card-accept">
             <div className={layout.cardHead}><h2 id="bs-card-accept" className={layout.cardTitle}>受付と表示</h2></div>
             <div className={styles.switchRow} title="個別に変えるときは、登録後に「勤務とシフト」で調整できます。">
-              <Toggle label="店舗の営業時間に合わせる" checked locked />
+              <SettingCheckbox label="店舗の営業時間に合わせる" checked locked />
               <span className={styles.switchLabel}>店舗の営業時間に合わせる</span>
             </div>
             <div className={styles.switchRow}>
-              <Toggle label="「指名なし」の枠にも含める" checked={isDesignationOptional} onChange={setIsDesignationOptional} />
+              <SettingCheckbox label="「指名なし」の枠にも含める" checked={isDesignationOptional} onChange={setIsDesignationOptional} />
               <span className={styles.switchLabel}>「指名なし」の枠にも含める（お客さまが担当者を選ばなかったときの割り当て先になる）</span>
             </div>
             <div className={styles.switchRow}>
-              <Toggle label="登録したらすぐ予約を受ける" checked={isActive} onChange={setIsActive} />
+              <SettingCheckbox label="登録したらすぐ予約を受ける" checked={isActive} onChange={setIsActive} />
               <span className={styles.switchLabel}>登録したらすぐ予約を受ける（オフにすると予約画面に出ません）</span>
             </div>
             <div className={styles.colorRow}>

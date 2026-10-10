@@ -11,6 +11,7 @@
  * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
  * restaurantTestApi.snapshot。取得失敗と未登録を混ぜない（D024）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
@@ -25,6 +26,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import styles from './frame.module.css'
+import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 
 export interface RestaurantContext {
   data: RestaurantSnapshot
@@ -63,7 +65,7 @@ export function RestaurantPage({ boardId, title, description, picker, children }
 }) {
   return (
     <PageFrame kind="list" boardId={boardId}>
-      <PageHeading title={title} description={description} actions={picker} />
+      <PageHeading title={title} help={description} actions={picker} />
       <div className={styles.body}>{children}</div>
     </PageFrame>
   )
@@ -122,7 +124,7 @@ export default function RestaurantFrame({
     try {
       await action()
       await load()
-      setNotice({ tone: 'success', text: success })
+      notifySaved(success)
       return true
     } catch (error) {
       setNotice({ tone: 'error', text: error instanceof ApiError ? error.message : '保存できませんでした。' })
@@ -138,9 +140,9 @@ export default function RestaurantFrame({
   )
 
   const picker = snapshot && snapshot.stores.length > 0 ? (
-    <Select
-      aria-label="店舗を選ぶ"
-      width={STORE_PICKER_WIDTH}
+    <StoreFilterTabs
+
+
       value={selectedStoreId}
       onChange={setSelectedStoreId}
       options={[

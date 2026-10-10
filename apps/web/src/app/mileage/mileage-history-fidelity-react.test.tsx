@@ -147,7 +147,7 @@ describe('履歴の絵合わせ（板 `oRbJi`）', () => {
     expect(body).not.toContain('この期間に付けた合計')
   })
 
-  it('頭に CSV で書き出すと増やす・減らすが出る', async () => {
+  it('頭に CSVで書き出すと増やす・減らすが出る', async () => {
     await waitForRows()
     expect(headerNode).not.toBeNull()
     const host = document.createElement('div')
@@ -155,9 +155,8 @@ describe('履歴の絵合わせ（板 `oRbJi`）', () => {
     const headerRoot = createRoot(host)
     await act(async () => { headerRoot.render(<>{headerNode}</>) })
     const text = host.textContent ?? ''
-    expect(text).toContain('CSV で書き出す')
+    expect(text).toContain('CSVで書き出す')
     expect(text).toContain('増やす・減らす')
-    expect(text).not.toContain('CSVで書き出す')
     await act(async () => { headerRoot.unmount() })
     host.remove()
   })

@@ -9,6 +9,8 @@
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
  */
+import { useListUrlValue, useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -46,6 +48,7 @@ import { CreateProjectDialogV8, UploadDialogV8 } from './dialogs'
 import BannerLimitNotice from './limit-notice'
 import { bannerFailureMessage, monthDay, shortPresetLabel } from './words'
 import styles from './list.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Tab = 'projects' | 'library'
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -61,6 +64,10 @@ const PROJECT_SORTS: Array<{ value: ProjectSort; label: string }> = [
 
 /** 画像ライブラリは 12 枚ずつ（絵 W5Wxr の「1–12 件 / 23 件」「次の 12 件」）。 */
 const LIBRARY_PAGE = 12
+
+function isCursorHistory(value: unknown): value is Array<string | null> {
+  return Array.isArray(value) && value.length > 0 && value[0] === null && value.every(item => item === null || typeof item === 'string')
+}
 
 export default function HqBannersListV8() {
   return (
@@ -159,9 +166,9 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   const [projects, setProjects] = useState<BannerProject[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, BannerImage[]>>({})
   const [status, setStatus] = useState<LoadStatus>('loading')
-  const [view, setView] = useState<ProjectView>('all')
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<ProjectSort>('updated')
+  const [view, setView] = useListUrlValue<ProjectView>('view', 'all')
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [sort, setSort] = useListUrlValue<ProjectSort>('sort', 'updated')
   const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -210,7 +217,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       if (!res.success) throw new Error(res.error)
       setFormOpen(false)
       onChanged()
-      router.push(`/hq/banners/project?id=${encodeURIComponent(res.data.id)}`)
+      router.push(createPageReturnHref('/hq/banners', res.data.id))
     } catch (caught) {
       // M022：原文のまま出さず、共通の状態別案内へ渡す。窓は開いたまま送り直せる。
       setFormError(bannerFailureMessage(caught, 'プロジェクトの作成'))
@@ -282,11 +289,11 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   )
 
   const body = status === 'loading' ? (
-    <ListState kind="loading" title="プロジェクトを読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" title="プロジェクトを読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
+    <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
   ) : status === 'error' ? (
-    <ListState
+    <ListState permissionScope="hq"
       kind="error"
       title="一覧を読み込めませんでした"
       description="通信の状態を確認して、もう一度お試しください。何度も続く場合はお問い合わせから知らせてください。"
@@ -294,9 +301,9 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     />
   ) : projects.length === 0 ? (
     archivedMode ? (
-      <ListState kind="empty" title="アーカイブしたプロジェクトはありません" description="進行中の一覧でアーカイブすると、ここに移ります。" />
+      <ListState permissionScope="hq" kind="empty" title="アーカイブしたプロジェクトはありません" description="進行中の一覧でアーカイブすると、ここに移ります。" />
     ) : (
-      <ListState
+      <ListState permissionScope="hq"
         kind="empty"
         title="まだプロジェクトがありません"
         description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像はアカウントへ配れます。"
@@ -309,7 +316,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     )
   ) : visible.length === 0 ? (
     // R605: 検索・絞り込みの結果が0件。条件を外す口を付ける（作る口は出さない）。
-    <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setView('all') }}>条件を外す</Button>} />
+    <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setView('all') }}>条件を外す</Button>} />
   ) : (
     <div className={styles.projectGrid}>
       {visible.map((project) => (
@@ -330,7 +337,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     <ListPage
       boardId="B9ZAr"
       title="バナー生成"
-      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
+      help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => setView('all'), createAction: createProject }}
     >
@@ -411,7 +418,7 @@ function ProjectCard({ project, thumbnails, busy, canManage, onOpen, onToggleFav
       </button>
       <div className={styles.cardBody}>
         <div className={styles.cardTitleRow}>
-          <button type="button" className={styles.cardTitle} onClick={onOpen} title={project.name}>{project.name}</button>
+          <button type="button" className={styles.cardTitle} onClick={onOpen} title={project.name} >{project.name}</button>
           {canManage ? (
             <button
               type="button"
@@ -463,11 +470,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const [counts, setCounts] = useState<import('@line-crm/shared').HqBannerImageCounts | null>(null)
   const [projects, setProjects] = useState<Record<string, BannerProject>>({})
   const [status, setStatus] = useState<LoadStatus>('loading')
-  const [view, setView] = useState<LibraryView>('all')
-  const [shape, setShape] = useState<ShapeFilter | null>(null)
-  const [query, setQuery] = useState('')
+  const [view, setView] = useListUrlValue<LibraryView>('view', 'all')
+  const [shape, setShape] = useListUrlValue<ShapeFilter | null>('shape', null)
+  const [query, setQuery] = useListUrlValue('q', '')
   /** ページごとの「この日時より前」。1ページ目は null。 */
-  const [cursors, setCursors] = useState<Array<string | null>>([null])
+  const [cursors, setCursors] = useListUrlJsonValue<Array<string | null>>('libraryCursors', [null], isCursorHistory)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [openImage, setOpenImage] = useState<BannerImage | null>(null)
@@ -606,11 +613,11 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const last = page * LIBRARY_PAGE + images.length
 
   const body = status === 'loading' ? (
-    <ListState kind="loading" title="画像を読み込んでいます" />
+    <ListState permissionScope="hq" kind="loading" title="画像を読み込んでいます" />
   ) : status === 'forbidden' ? (
-    <ListState kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
+    <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
   ) : status === 'error' ? (
-    <ListState
+    <ListState permissionScope="hq"
       kind="error"
       title="一覧を読み込めませんでした"
       description="通信の状態を確認して、もう一度お試しください。何度も続く場合はお問い合わせから知らせてください。"
@@ -618,8 +625,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     />
   ) : images.length === 0 ? (
     query || shape || view !== 'all'
-      ? <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setShape(null); setView('all'); resetPage() }}>条件を外す</Button>} />
-      : <ListState kind="empty" title="まだ画像がありません" description="プロジェクトの中で生成した画像と、取り込んだ画像がここに並びます。" />
+      ? <ListState permissionScope="hq" kind="empty" emptyPreset="filtered" action={<Button onClick={() => { setQuery(''); setShape(null); setView('all'); resetPage() }}>条件を外す</Button>} />
+      : <ListState permissionScope="hq" kind="empty" title="まだ画像がありません" description="プロジェクトの中で生成した画像と、取り込んだ画像がここに並びます。" />
   ) : (
     <>
       <div className={styles.imageGrid}>
@@ -640,7 +647,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
                   </button>
                 ) : null}
               </div>
-              <p className={styles.tileProject}>{projects[image.projectId]?.name ?? '—'}</p>
+              <p className={styles.tileProject}>{projects[image.projectId]?.name ?? emptyValue('unknown')}</p>
             </article>
           )
         })}
@@ -658,7 +665,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     <ListPage
       boardId="W5Wxr"
       title="バナー生成"
-      description="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
+      help="配信やリッチメニューに使う画像を AI で作り、各アカウントの登録メディアへ配ります。"
       folders={folders}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => selectView('all'), createAction: uploadImage }}
     >
@@ -668,8 +675,8 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
         <div className={styles.tools}>
           <div className={styles.librarySearch}>
             <SearchField
-              placeholder="テキスト・指示で検索"
-              aria-label="テキスト・指示で検索"
+              placeholder="テキスト・指示で探す"
+              aria-label="テキスト・指示で探す"
               value={query}
               onChange={(value) => { setQuery(value); resetPage() }}
               onClear={() => { setQuery(''); resetPage() }}

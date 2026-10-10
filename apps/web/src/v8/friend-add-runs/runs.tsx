@@ -1,5 +1,7 @@
 'use client'
 
+import SegmentedControl from '@/components/shared/segmented'
+
 /*
  * ★V8 友だち追加時の配信の実行結果（Pencil `REIxB`）。
  *
@@ -10,6 +12,7 @@
  * `app/friend-add-settings/runs/runs-v8.tsx` から写した（import はしない）。動きの一覧は BEHAVIOR.md。
  */
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -42,6 +45,8 @@ import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 import { useCursorStack } from '@/v8/friend-add/use-cursor-stack'
 import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status'
 import styles from './runs.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -56,7 +61,7 @@ const RUN_STATUSES_PARAM = new Set<FriendAddEventRoutingStatus>([
 /** CSV 書き出しの安全弁（今までと同じ：100件×50頁＝5,000件で止める）。 */
 const CSV_EXPORT_MAX_PAGES = 50
 const CSV_EXPORT_PAGE_SIZE = 100
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n}件表示` }))
+const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
 const NO_MANAGE_NOTE = '閲覧のみで見ています。一時停止・もう一度実行はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
 
 function routeNameOf(item: RunItem): string {
@@ -92,7 +97,7 @@ export function actionText(item: RunItem): string {
   }
   if (item.scenario?.started) return `案内＋シナリオ「${item.scenario.name ?? '名前は未取得'}」を開始`
   if (item.status === 'pending' && item.actions.total > 0) return `案内＋${item.actions.total}つの処理（テスト待ち）`
-  if (item.deliveryCount > 0) return `案内を${item.deliveryCount}通送信`
+  if (item.deliveryCount > 0) return `案内を${item.deliveryCount} 通送信`
   if (item.actions.total > 0) return `案内＋${item.actions.total}つの処理`
   return routingAction(item.status, item.errorCode)
 }
@@ -123,12 +128,12 @@ function FriendAddRunsInner() {
   const pagesParam = searchParams.get('pages')
   const { stack: cursorStack, cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } =
     useCursorStack(pagesParam ? [null, ...pagesParam.split(',').filter(Boolean)] : undefined)
-  const [perPage, setPerPage] = useState(20)
+  const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [csvBusy, setCsvBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [stopBusy, setStopBusy] = useState(false)
@@ -313,7 +318,7 @@ function FriendAddRunsInner() {
       if (await retryOne(item)) retried += 1
     }
     setRetrying(null)
-    setMessage(retried > 0 ? `失敗した処理を${retried}件もう一度実行しました。` : 'もう一度実行できる処理はありませんでした。')
+    setMessage(retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : 'もう一度実行できる処理はありませんでした。')
     await load()
   }
 
@@ -370,12 +375,12 @@ function FriendAddRunsInner() {
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = 'friend-add-runs.csv'
+      anchor.download = csvFileName("友だち追加の実行履歴")
       anchor.click()
       URL.revokeObjectURL(url)
       setMessage(exportCursor
-        ? `新しい順に${formatNumber(rows.length)}件まで書き出しました。それより古い記録は含まれていません。`
-        : `${formatNumber(rows.length)}件を書き出しました。`)
+        ? `新しい順に${formatNumber(rows.length)} 件まで書き出しました。それより古い記録は含まれていません。`
+        : `${formatNumber(rows.length)} 件を書き出しました。`)
     } catch {
       setMessage('書き出す記録を読み込めませんでした。通信を確認して、もう一度お試しください。')
     } finally {
@@ -462,7 +467,7 @@ function FriendAddRunsInner() {
       <div className={styles.kpis}>
         <KpiBand data-design="KPIs">
           <KpiCard presentation="band" icon={null} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
-            detail={`追加の記録 ${summary?.recentEvents == null ? '—' : formatNumber(summary.recentEvents)}件`} />
+            detail={`追加の記録 ${summary?.recentEvents == null ? emptyValue('unknown') : formatNumber(summary.recentEvents)}件`} />
           <KpiCard presentation="band" icon={null} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
           <KpiCard presentation="band" icon={null} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
             detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を始めてからの合計です'} />
@@ -474,7 +479,7 @@ function FriendAddRunsInner() {
         <div className={styles.failBand} role="alert">
           <TriangleAlert size={18} className={styles.failIcon} aria-hidden="true" />
           <div className={styles.failText}>
-            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)}件あります`}</p>
+            <p className={styles.failTitle}>{`失敗した処理が ${formatNumber(failedCount)} 件あります`}</p>
             <p className={styles.failNote}>案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</p>
           </div>
           <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>
@@ -498,13 +503,7 @@ function FriendAddRunsInner() {
               onClear={() => setSearch('')}
             />
           </div>
-          <div className={styles.chips} role="group" aria-label="結果で絞り込む">
-            {chips.map((chip) => (
-              <button key={chip.key} type="button" className={styles.chip} aria-pressed={activeChip === chip.key} onClick={() => pickChip(chip.key)}>
-                {chip.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="結果で絞り込む" value={activeChip} onChange={pickChip} options={chips.map(chip=>({value:chip.key,label:chip.label}))} />
           <span className={styles.toolsSpacer} aria-hidden="true" />
           <div className={styles.sizeBox}>
             <Select
@@ -524,7 +523,7 @@ function FriendAddRunsInner() {
             kind={errorStatus === 403 ? 'forbidden' : 'error'}
             title="実行結果を表示できませんでした"
             description={error}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : visibleItems.length === 0 ? (
           <ListState kind="empty" title="条件に合う実行結果はありません" description="絞り込みを変えるか、次の友だち追加を待ってください。" />
@@ -549,7 +548,7 @@ function FriendAddRunsInner() {
                 const done = actionText(item)
                 const kindLabel = item.friendKind === 'first_time' ? 'はじめて' : '再追加'
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)} className={styles.when}>{jstTime(item.receivedAt)}</time>
                     </Td>
@@ -584,7 +583,7 @@ function FriendAddRunsInner() {
               pageCount={pageCount}
               onPageChange={changePage}
               disabled={loading}
-              summary={`${formatNumber(data.total)}件中 ${(cursorPage - 1) * perPage + 1}〜${(cursorPage - 1) * perPage + items.length}件`}
+              summary={`${formatNumber(data.total)} 件中 ${(cursorPage - 1) * perPage + 1}〜${(cursorPage - 1) * perPage + items.length} 件`}
             />
           </div>
         ) : null}
@@ -600,7 +599,7 @@ function FriendAddRunsInner() {
               {routeBreakdown.map(([route, count]) => (
                 <div className={styles.kvRow} key={route}>
                   <dt>{route}</dt>
-                  <dd>{`${formatNumber(count)}人（${Math.round((count / items.length) * 100)}%）`}</dd>
+                  <dd>{`${formatNumber(count)} 人（${Math.round((count / items.length) * 100)}%）`}</dd>
                 </div>
               ))}
             </dl>
@@ -612,15 +611,15 @@ function FriendAddRunsInner() {
           <dl className={styles.kv}>
             <div className={styles.kvRow}>
               <dt>二重送信を防ぐ</dt>
-              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? '—' : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
+              <dd>{!ruleState || ruleState.resendSuppressionHours === null ? emptyValue('unknown') : ruleState.resendSuppressionHours > 0 ? '有効' : '無効'}</dd>
             </div>
             <div className={styles.kvRow}>
               <dt>失敗の知らせ</dt>
-              <dd>—</dd>
+              <dd>{emptyValue('unknown')}</dd>
             </div>
             <div className={styles.kvRow}>
               <dt>最後に送った</dt>
-              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : '—'}</dd>
+              <dd title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : emptyValue('unknown')}</dd>
             </div>
           </dl>
           <div className={styles.boxFoot}>
@@ -639,7 +638,7 @@ function FriendAddRunsInner() {
         busy={stopBusy}
         error={stopError || undefined}
         onCancel={() => { if (!stopBusy) setStopOpen(false) }}
-        onConfirm={() => void stopDelivery()}
+        onConfirm={() => stopDelivery()}
       />
     </DetailPage>
   )

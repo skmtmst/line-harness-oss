@@ -38,8 +38,10 @@ export function Tabs({
   label,
   size,
   spacing,
+  wrap = false,
 }: {
   items: TabItem[]
+  wrap?: boolean
   /**
    * タブ行の右端に置くもの。ヘッダー操作を独立した行にしないため
    * （`docs/v8-design-rules.md` §5、Pencil `aToSv` は space_between）。
@@ -92,7 +94,7 @@ export function Tabs({
   const itemWidthsKey = JSON.stringify(items.map(({ label, count, countTone, errorCount }) => [label, count, countTone, errorCount]))
   useLayoutEffect(() => {
     const measure = () => {
-      if (typeof document === 'undefined' || document.documentElement?.dataset?.theme !== 'v8') {
+      if (wrap || typeof document === 'undefined' || document.documentElement?.dataset?.theme !== 'v8') {
         setIndicator(null)
         return
       }
@@ -117,11 +119,11 @@ export function Tabs({
     }
     window.addEventListener('resize', measure)
     return () => { observer?.disconnect(); window.removeEventListener('resize', measure) }
-  }, [currentKey, itemWidthsKey])
+  }, [currentKey, itemWidthsKey, wrap])
   const sliding = indicator !== null
 
   return (
-    <nav className={[styles.list, className].filter(Boolean).join(' ')} data-size={size} data-spacing={spacing}>
+    <nav className={[styles.list, className].filter(Boolean).join(' ')} data-size={size} data-spacing={spacing} data-wrap={wrap || undefined}>
       <span
         ref={itemsRef}
         className={styles.items}
@@ -179,7 +181,7 @@ function Tab({ id, controls, label, href, count, countTone, errorCount, current,
 
   if (href && !current && !disabled) {
     return (
-      <Link href={href} {...shared}>
+      <Link href={href} replace {...shared}>
         {body}
       </Link>
     )

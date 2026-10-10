@@ -1,3 +1,4 @@
+import type { TapExtras } from '@line-crm/shared'
 /*
  * 写し：app/templates/carousel/carousel-core.ts（src/v8 は古い画面ファイルを import できない）。
  * 違うのは見本（?visual=1）：絵 J60utH の3枚にした。と、ボタンの「押したら」（絵 JkLOF・2026-10-08 オーナー）：
@@ -5,7 +6,7 @@
  */
 import { api } from '@/lib/api'
 import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
-import { tapActionDef, tapActionFromUri, tapActionLiffUrl, tapActionNeedsLiff, type LiffTapActionKind } from '@/lib/tap-actions'
+import { tapActionDef, tapActionFromUri, tapExtraSaveError, tapActionLiffUrl, tapActionNeedsLiff, type LiffTapActionKind } from '@/lib/tap-actions'
 
 export const MAX_COLUMNS = 10
 export const MAX_ACTIONS = 3
@@ -24,6 +25,7 @@ export const MESSAGE_TEXT_MAX = 300
 
 /** 選択肢1つぶん。 */
 export interface Choice {
+  tapExtras?: TapExtras
   label: string
   /**
    * 'uri'（URLを開く）・'message'（テキストを送る）・'form'（回答フォームを開く）・
@@ -111,7 +113,7 @@ export function buildCarouselContent(panels: Panel[], templateId: string, liffId
       text: p.text.trim(),
       actions: p.actions
         .filter((a) => a.label.trim())
-        .map((a, ai) => buildChoiceAction(a, `ctpl=${templateId}&c=${ci}&a=${ai}`, liffId)),
+        .map((a, ai) => ({ ...buildChoiceAction(a, `ctpl=${templateId}&c=${ci}&a=${ai}`, liffId), ...(a.tapExtras ? { tapExtras: a.tapExtras } : {}) })),
     })),
   )
 }
@@ -218,6 +220,7 @@ export type CarouselSaveResult =
        * 画面はこれを覚えて、再試行を「作成し直し」ではなく「更新」にする。
        */
       createdId?: string
+      tapExtraError?: string
     }
 
 export interface CarouselSaveOps {
@@ -291,6 +294,6 @@ export async function saveCarousel(
     }
     return { ok: true, id: createdId }
   } catch (e) {
-    return fail(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+    return { ...fail(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。'), ...(tapExtraSaveError(e) ? { tapExtraError: tapExtraSaveError(e)! } : {}) }
   }
 }

@@ -1,5 +1,8 @@
 'use client'
 
+import { LinePreviewFlex } from '@/components/shared/line-preview'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -177,7 +180,6 @@ const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
   rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
   card_message: 'カードタイプには未対応です。いまはカルーセルで作れます',
   coupon: 'クーポンには未対応です',
-  research: 'リサーチには未対応です',
 }
 
 /*
@@ -231,7 +233,7 @@ function formatScheduleTime(iso: string): string {
 const TITLE_MAX = 60
 
 const STANDARD_CONDITION_AXES = [
-  '名前', '個別メモ', 'ステータスメッセージ', '友だち登録日', 'タグ',
+  '名前', 'メモ', 'ステータスメッセージ', '友だち登録日', 'タグ',
   '友だち情報', 'シナリオ', 'イベント予約', 'カレンダー予約', '共通情報',
   'リマインダ', '回答フォーム', '最終反応日', 'その他', '対応マーク',
 ] as const
@@ -393,7 +395,7 @@ export function BubblePreview({ bubble, buttons = [], accountName, composer = fa
     </div>
   }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-card"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-micro text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
+  if (bubble.type === 'flex') return <LinePreviewFlex content={typeof bubble.content.flexJson === 'string' ? bubble.content.flexJson : JSON.stringify(bubble.content)} />
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
@@ -566,7 +568,6 @@ export default function BroadcastForm({
   const saveInFlightRef = useRef<{ accountId: string | null; promise: Promise<ApiBroadcast | null> } | null>(null)
   const draftSessionsByAccount = useRef(new Map<string | null, BroadcastDraftSession>())
   const createKeyByAccount = useRef(new Map<string | null, string>())
-  const autosaveRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const appliedInitialTemplate = useRef(false)
   // 独立審査(指摘4): テンプレート読み込みの世代照合と選択中アカウントの記録。
   const templateLoadGenerationRef = useRef(createLoadGeneration())
@@ -584,6 +585,24 @@ export default function BroadcastForm({
   const appliedDraftFrom = useRef<string | null>(null)
   const [editingDraft, setEditingDraft] = useState<ApiBroadcast | null>(null)
   const [draftError, setDraftError] = useState('')
+  const [draftReloadKey, setDraftReloadKey] = useState(0)
+  const [draftReloadId, setDraftReloadId] = useState<string | null>(null)
+  const saveConflict = useSaveConflict<ApiBroadcast>({
+    fetchLatest: async () => {
+      const accountId = selectedAccountIdRef.current
+      const id = draftSession.current.draftId
+      if (!id) return null
+      const result = await api.broadcasts.get(id)
+      return result.success && accountId === selectedAccountIdRef.current ? result.data : null
+    },
+    reload: () => {
+      appliedDraftFrom.current = null
+      setDraftReloadId(draftSession.current.draftId)
+      setDraftReloadKey((key) => key + 1)
+    },
+  })
+  useEffect(() => { saveConflict.clear(); setDraftReloadId(null) }, [selectedAccountId, saveConflict.clear])
+
   const [title, setTitle] = useState(visualQaAugustCampaign ? '8月キャンペーンのお知らせ' : '')
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
@@ -817,7 +836,7 @@ export default function BroadcastForm({
   useEffect(() => {
     // アカウントが確定する前に照合すると「別アカウントの下書き」と誤判定する。
     if (accountLoading) return
-    const draftId = searchParams.get('draft')?.trim()
+    const draftId = searchParams.get('draft')?.trim() || draftReloadId
     if (!draftId) return
     const restoreKey = `${draftId}:${selectedAccountId}`
     if (appliedDraftFrom.current === restoreKey) return
@@ -924,13 +943,14 @@ export default function BroadcastForm({
       }
       draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
       setEditingDraft(draft)
+      saveConflict.clear()
       // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
       cleanFingerprintRef.current = null
     }).catch(() => {
       if (generation !== accountGenerationRef.current) return
       setDraftError('下書きを読み込めませんでした。一覧から開き直してください。')
     })
-  }, [searchParams, accountLoading, selectedAccountId])
+  }, [searchParams, accountLoading, selectedAccountId, draftReloadKey, draftReloadId])
 
   // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
   useEffect(() => {
@@ -1456,6 +1476,7 @@ export default function BroadcastForm({
     scheduledAt: string | null,
     saveAsDraft = false,
     confirmedCount?: number,
+    autosaveStep?: typeof currentStep,
   ): Promise<ApiBroadcast | null> => {
     const accountId = selectedAccountIdRef.current || null
     /*
@@ -1485,6 +1506,7 @@ export default function BroadcastForm({
       if ((selectedAccountIdRef.current || null) !== accountId) return null
     }
     const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
+    if (saveAsDraft && autosaveStep) payload.draftStep = autosaveStep
     /*
      * R627: 作りかけの冪等キーはアカウントごとに1つ。
      * 初期セッション（accountId=null）のまま毎回新しい鍵を作ると、
@@ -1546,17 +1568,8 @@ export default function BroadcastForm({
           settleInFlight(null)
           return null
         }
-        const current = await api.broadcasts.get(sessionForAccount.draftId)
-        if (current.success && (selectedAccountIdRef.current || null) === accountId) {
-          const refreshed = { ...sessionForAccount, version: current.data.version ?? null }
-          draftSessionsByAccount.current.set(accountId, refreshed)
-          draftSession.current = refreshed
-        }
-        if ((selectedAccountIdRef.current || null) !== accountId) {
-          settleInFlight(null)
-          return null
-        }
-        setError('別の画面で更新されたため読み直しました')
+        saveConflict.mark()
+        setError('')
         settleInFlight(null)
         return null
       }
@@ -1581,113 +1594,31 @@ export default function BroadcastForm({
     (key, value) => (key === 'lineAccountId' ? undefined : value),
   )
   const cleanFingerprintRef = useRef<string | null>(null)
-  const formFingerprintRef = useRef(formFingerprint)
-  formFingerprintRef.current = formFingerprint
-  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
-  const [autosaving, setAutosaving] = useState(false)
-  const autosavingRef = useRef(false)
-  const [clockTick, setClockTick] = useState(() => Date.now())
-
   // 最初の描画と、下書き適用で内容が入れ替わった直後に「保存ずみの形」を採る。
   useEffect(() => {
     if (cleanFingerprintRef.current === null) cleanFingerprintRef.current = formFingerprint
   })
   const dirty = cleanFingerprintRef.current !== null && formFingerprint !== cleanFingerprintRef.current
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving })
-  const leaveTargetRef = useRef(leaveTarget)
-  leaveTargetRef.current = leaveTarget
-
-  /*
-   * 入力が2秒止まったら下書きへ静かに保存する。打つたびに送ると
-   * 通信だらけになるので指紋の変化から数える。通せない形（未入力など）、
-   * アカウントが決まっていない間、離脱の確認中は送らない。
-   */
-  const autosaveDraft = async () => {
-    if (autosavingRef.current || saving || testSending) return
-    if (!selectedAccountId || validate()) return
-    const requestAccountId = selectedAccountIdRef.current || null
-    autosavingRef.current = true
-    setAutosaving(true)
-    const fingerprintAtSave = formFingerprint
-    try {
-      const saved = await persistDraft(scheduledAtIso(), true)
-      /*
-       * R626: 別アカウントへ移っていたら今の画面へ混ぜない。
-       * persistDraftがnullで返すのでここでも世代で守る。
-       */
-      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-      if (saved) {
-        cleanFingerprintRef.current = fingerprintAtSave
-        setDraftSavedAt(Date.now())
-        // BROADCAST-16: 自動でも下書きが増えるので、一覧側へは同じ口で知らせる。
-        onDraftSaved?.(saved)
-      }
-    } catch {
-      /* 静かに未保存のまま。次の変更・手動保存・「保存して移る」でやり直せる。 */
-    } finally {
-      autosavingRef.current = false
-      setAutosaving(false)
-      /*
-       * R625/R626: 保存中に追記されていたら置き去りにしない。
-       * 同じアカウントなら進んだ指紋を2秒後にもう一度静かに送る。
-       * 違うアカウントへ移っていたら、Aの応答でBを保存ずみにはしない
-       * まま、今のアカウントが未保存なら送り直す（Bの間合いが先行の
-       * 保存中に捨てられていても、autosavingの変化だけでは effect が
-       * 起きないため、ここで拾う）。
-       */
-      if (leaveTargetRef.current === null) {
-        const stillSameAccount = (selectedAccountIdRef.current || null) === requestAccountId
-        const pendingFingerprint = stillSameAccount
-          ? formFingerprintRef.current !== fingerprintAtSave
-          : cleanFingerprintRef.current !== null
-            && formFingerprintRef.current !== cleanFingerprintRef.current
-        if (pendingFingerprint) {
-          if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
-          autosaveRetryTimer.current = setTimeout(() => autosaveDraftRef.current(), 2000)
-        }
-      }
-    }
-  }
-
-  /*
-   * R625: 置き去りの再送は最新の入力で送る。
-   * タイマーに閉じ込めた古い autosaveDraft を呼ぶと追記前の本文で
-   * 更新してしまう。毎描画で最新の関数へ付け替えて呼ぶ。
-   */
-  const autosaveDraftRef = useRef(() => {})
-  autosaveDraftRef.current = () => void autosaveDraft()
-
-  useEffect(() => {
-    if (!dirty || leaveTarget !== null) return
-    const timer = setTimeout(() => void autosaveDraft(), 2000)
-    return () => clearTimeout(timer)
-    // autosaveDraft は毎回作り直されるので依存に入れない。見たいのは中身の変化。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formFingerprint, dirty, selectedAccountId, saving, testSending, leaveTarget])
-
-  useEffect(() => () => {
-    if (autosaveRetryTimer.current) clearTimeout(autosaveRetryTimer.current)
-  }, [])
-
-  // 「下書き保存済み・◯秒前」の秒数だけ10秒ごとに進める。
-  useEffect(() => {
-    if (draftSavedAt === null) return
-    const timer = setInterval(() => setClockTick(Date.now()), 10_000)
-    return () => clearInterval(timer)
-  }, [draftSavedAt])
-
-  const draftSavedAgo = draftSavedAt === null
-    ? null
-    : Math.floor((clockTick - draftSavedAt) / 1000) < 60
-      ? `${Math.max(0, Math.floor((clockTick - draftSavedAt) / 1000))}秒前`
-      : formatRelative(draftSavedAt, clockTick)
-  const draftStatusLabel = autosaving
-    ? '下書きを保存しています…'
-    : dirty
-      ? '下書きはまだ保存していません'
-      : draftSavedAgo
-        ? `下書き保存済み・${draftSavedAgo}`
-        : null
+  const queuedAutosave = useRef({ fingerprint: formFingerprint, step: currentStep })
+  if (queuedAutosave.current.fingerprint !== formFingerprint) queuedAutosave.current = { fingerprint: formFingerprint, step: currentStep }
+  const draftAutosave = useDraftAutosave({
+    fingerprint: `${selectedAccountId}:${formFingerprint}`,
+    dirty,
+    enabled: Boolean(selectedAccountId) && !saveConflict.conflict && !validate(),
+    paused: saving || testSending || leaveTarget !== null,
+    save: async () => {
+      if (!selectedAccountId || validate()) return false
+      const account = selectedAccountIdRef.current || null
+      const fingerprint = formFingerprint
+      const saved = await persistDraft(scheduledAtIso(), true, undefined, queuedAutosave.current.step)
+      if (!saved || (selectedAccountIdRef.current || null) !== account) return false
+      cleanFingerprintRef.current = fingerprint
+      onDraftSaved?.(saved)
+      return true
+    },
+  })
+  const draftStatusLabel = draftAutosave.label
 
   const saveDraftNow = async (): Promise<boolean> => {
     /*
@@ -1711,7 +1642,7 @@ export default function BroadcastForm({
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
       if (saved) {
         cleanFingerprintRef.current = fingerprintAtSave
-        setDraftSavedAt(Date.now())
+        draftAutosave.markSaved()
         notifyToast('下書きを保存しました。')
         // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
         // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
@@ -2197,6 +2128,12 @@ export default function BroadcastForm({
       段ごとに分かれているときはここだけに出し、メッセージの段の中の帯は
       段分けなしの従来フォームのときだけ出す（下の `{!currentStep && ...}`）。
     */}
+    {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に配信を保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
+    <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? [
+      { text: `名前：入力 ${title} ／ 最新 ${saveConflict.latest.title}`, kind: title === saveConflict.latest.title ? undefined : 'change' },
+      { text: `本文：入力 ${bubbles.map((bubble) => String(bubble.content.text ?? '')).join(' / ')} ／ 最新 ${saveConflict.latest.messageContent}`, kind: 'change' },
+      { text: `配信時刻：入力 ${scheduledDate} ${scheduledTime} ／ 最新 ${saveConflict.latest.scheduledAt ?? '今すぐ'}`, kind: 'change' },
+    ] : null} />
     {currentStep && error ? (
       <Notice
         tone="danger"
@@ -2219,7 +2156,7 @@ export default function BroadcastForm({
       <div className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5">
+            <section className="rounded-card border content-card bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">配信内容</h3>
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
@@ -2227,7 +2164,7 @@ export default function BroadcastForm({
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-medium text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
               </dl>
             </section>
-            <section className="rounded-card border border-hairline bg-canvas p-5">
+            <section className="rounded-card border content-card bg-canvas p-5">
               <h3 className="text-lg font-bold text-ink">確認項目</h3>
               <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は配信できません。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
@@ -2429,7 +2366,7 @@ export default function BroadcastForm({
         <div className={shows('message') ? 'contents' : 'hidden'}>
         <section id="broadcast-step-message" className={showTemplatePicker ? 'hidden' : styles.section}>
           <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
-            unavailable={{ intro: '紹介メッセージは現在利用できません。', research: UNSENDABLE_TYPES.research }}
+            unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
             onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
             onAdd={() => setBubbles((items) => [...items, emptyBubble()])}
             onPickTemplate={(index, kind) => { setComposerTemplateKind(kind); setComposerTemplateIndex(index); setShowTemplatePicker(true) }}
@@ -2506,7 +2443,7 @@ export default function BroadcastForm({
             </div>
           </section>
         )}
-        {!showTemplatePicker && <section className="rounded-card border border-hairline bg-canvas p-4">
+        {!showTemplatePicker && <section className="rounded-card border content-card bg-canvas p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
             <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
@@ -2699,7 +2636,7 @@ export default function BroadcastForm({
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={openConfirm} busy={saving}>
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={openConfirm} busy={saving}>
               {sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
             </Button>
           )}
@@ -2707,8 +2644,8 @@ export default function BroadcastForm({
       ) : (
         <>
           <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
-          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
-          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
+          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>

@@ -1,4 +1,5 @@
 import type { ApiFieldErrors } from '@line-crm/shared'
+import { csvFileName } from './csv-file-name'
 import { getFeatureDisabledContext } from './feature-disabled-context'
 import type {QuestionAnswerRecovery,ResumeQuestionAnswerRequest,ResumeQuestionAnswerResponse} from '@line-crm/shared';
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
@@ -1965,6 +1966,8 @@ export type { BroadcastBubbleType, BroadcastBubble } from '@line-crm/shared';
 import type { BroadcastBubble } from '@line-crm/shared';
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
+  publishedPayload?: Record<string, unknown>;
+  publishedVersion?: number;
   id: string;
   lineAccountId: string | null;
   kind: BroadcastAssetKind;
@@ -2003,7 +2006,7 @@ export type CommonActionSummary = {
 export type AutomationListItem = Automation & {
   folderId?: string | null
   triggerConfig: Record<string, unknown>;
-  status: 'draft' | 'active' | 'stopped';
+  status: 'draft' | 'active' | 'stopped' | 'archived';
   versionId: string;
   version: number;
   executionCount30d: number;
@@ -2997,12 +3000,13 @@ export async function refreshCachedList<T>(path: string): Promise<T> {
   return body
 }
 
-export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null }): Promise<Blob> {
+export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null; body?: string }): Promise<Blob> {
   const context = apiAccountContext(path, init)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',
-    headers: adminSessionHeaders(),
+    headers: { ...adminSessionHeaders(), ...(init?.body ? { 'Content-Type': 'application/json' } : {}) },
+    body: init?.body,
   })
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
@@ -3087,7 +3091,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   try {
     const anchor = document.createElement('a')
     anchor.href = href
-    anchor.download = named ? decodeURIComponent(named) : fallbackFilename
+    anchor.download = /\.csv$/i.test(fallbackFilename) ? csvFileName(fallbackFilename) : named ? decodeURIComponent(named) : fallbackFilename
     anchor.click()
   } finally {
     URL.revokeObjectURL(href)
@@ -3220,6 +3224,8 @@ export type FriendFormSubmission = {
   createdAt: string
 }
 export type FriendDetail = FriendWithTags & {
+  realName?: string | null
+  systemDisplayName?: string | null
   formSubmissions: FriendFormSubmission[]
   /** フォーム回答の総数。submissions=0 の軽い応答でも返る（PERF-13）。 */
   formSubmissionTotal?: number | null
@@ -4094,6 +4100,7 @@ export type TemplateQuestion = {
     reply?: string
     repeatReply?: string
     addTagIds?: string[]
+    scoreChange?: number | null
     removeTagIds?: string[]
     field?: { fieldId: string; value: string }
   }>
@@ -6622,7 +6629,7 @@ export const api = {
       body: JSON.stringify({ lineAccountId: accountId, expectedVersion, ...data }),
     }),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
-    create: (data: { name: string; groupId?: string | null }) =>
+    create: (data: { name: string; groupId?: string | null; lineAccountId?: string }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -6676,6 +6683,10 @@ export const api = {
       ),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
+    restore: (id: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<{ restored: true; version: number }>>(`/api/tags/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST', body: JSON.stringify({ expectedVersion }),
+      }),
     archive: (id: string, accountId: string, data: {
       expectedVersion: number
       impactRevision: string
@@ -6834,11 +6845,15 @@ export const api = {
   },
   /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
   supportMarks: {
-    list: (accountId: string, options?: FetchApiOptions) =>
+    list: (accountId: string, options?: FetchApiOptions & { includeArchived?: boolean }) =>
       fetchApi<ApiResponse<SupportMarkListItem[]>>(
-        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
+        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}${options?.includeArchived ? '&includeArchived=1' : ''}`,
         options,
       ),
+    restore: (id: string, accountId: string, expectedVersion: number) =>
+      fetchApi<ApiResponse<{ restored: true; version: number }>>(`/api/support-marks/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST', body: JSON.stringify({ expectedVersion }),
+      }),
     /**
      * R512: 応答だけ失った再試行で二重に作らないため、要求キーを付ける。
      * 同じ作成のやり直しは同じキーを送り、内容を変えたら新しいキーにする。
@@ -10710,13 +10725,14 @@ export const api = {
   automations: {
     counts: (accountId: string) => fetchApi<ApiResponse<AutomationTabCounts>>(
       `/api/automations/counts?account_id=${encodeURIComponent(accountId)}`),
-    list: (params?: { accountId?: string; limit?: number; offset?: number }) => {
+    list: <IncludeArchived extends boolean = false>(params?: { accountId?: string; limit?: number; offset?: number; includeArchived?: IncludeArchived }) => {
       const query = new URLSearchParams()
+      if (params?.includeArchived) query.set('includeArchived', '1')
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
       const suffix = query.size ? `?${query}` : ''
-      return fetchApi<ApiResponse<AutomationListItem[]> & {
+      return fetchApi<ApiResponse<Array<IncludeArchived extends true ? AutomationListItem : AutomationListItem & { status: Exclude<AutomationListItem['status'], 'archived'> }>> & {
         summary?: { active: number; stopped: number; executionCount30d: number; failureCount30d: number }
         freshness?: 'available'
         pagination?: { total: number; limit: number | null; offset: number }
@@ -10820,7 +10836,9 @@ export const api = {
         `/api/automations/${encodeURIComponent(id)}/duplicate`,
         { method: 'POST', body: '{}' },
       ),
-    // #942 N-352: 稼働切替と「保管」。保管は一方通行。実行記録は残る。
+    restore: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; status: 'draft' | 'active' | 'stopped' }>>(`/api/automations/${encodeURIComponent(id)}/restore?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: '{}' }),
+    // 稼働切替と「保管」。実行記録は残る。
     setStatus: (id: string, status: 'active' | 'stopped' | 'archived') =>
       fetchApi<ApiResponse<{ id: string; status: 'active' | 'stopped' | 'archived' }>>(
         `/api/automations/${encodeURIComponent(id)}/status`,
@@ -11755,7 +11773,6 @@ export const api = {
     }),
     friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
     ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),
-    consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   instagram: {
@@ -13494,8 +13511,10 @@ export const api = {
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
     /** M (止めた経路のQR): 印刷用PDFをサーバーで作る。止めた経路は409。 */
-    qrPdf: (id: string): Promise<Blob> =>
-      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST' }),
+    qrPdf: (id: string, paper: 'A4' | 'A5' = 'A4'): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST', body: JSON.stringify({ paper }) }),
+    qrImage: (id: string, format: 'png' | 'svg', size: 'small' | 'medium' | 'large'): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-image`, { method: 'POST', body: JSON.stringify({ format, size }) }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
     /** クリックがどこから来ているか。utm_source > 参照元のホスト > 直接アクセス */

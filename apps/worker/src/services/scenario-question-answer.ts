@@ -1,3 +1,5 @@
+import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { applyTapExtras } from './tap-extras.js'
 /*
  * 質問メッセージの選択肢が押されたときの処理。
  *
@@ -18,7 +20,6 @@
 import {
   validateScenarioActionReferences,
   ensureWorkflowStep, getWorkflowStep, workflowJson,
-  addTagToFriend,
   removeTagFromFriend,
   getFriendFieldById,
   getPinnedScenarioStep,
@@ -107,6 +108,11 @@ export async function handleQuestionAnswer(
 
   const target = await resolveAnswerTarget(db, friend.id, input)
   if (!target) return result
+  if (target.scenarioAccountId !== null) {
+    const owner = await db.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(friend.id).first<{ line_account_id: string | null }>()
+    // 移行前の所属なしデータは保ち、別店舗の友だちへの実行を拒否する。
+    if (!owner || (owner.line_account_id !== null && owner.line_account_id !== target.scenarioAccountId)) return result
+  }
 
   const question = parseQuestion(target.questionJson)
   if (!question) return result
@@ -173,7 +179,12 @@ export async function executeQuestionAnswer(
   }
   for(const id of choice.addTagIds ?? []) await stage(`tag:add:${id}`,async owned=>{
     if(!await isResourceInScenarioAccount(db,'tag',id,target.scenarioAccountId)) throw new Error('answer_resource_unavailable')
-    await addTagToFriend(owned,friend.id,id)
+    await attachTagAndFireSideEffects(owned,friend.id,id)
+  })
+  if(choice.scoreChange) await stage('tap-extra-score',async owned=>{
+    const accountId=execution.ref.scopeId === 'line:default' ? null : execution.ref.scopeId.slice('line:'.length)
+    if(target.scenarioAccountId !== null && target.scenarioAccountId !== accountId) throw new Error('answer_scope_changed')
+    await applyTapExtras(owned,friend.id,accountId,{scoreChange:choice.scoreChange},execution.ref.subjectId)
   })
   for(const id of choice.removeTagIds ?? []) await stage(`tag:remove:${id}`,async owned=>{
     if(!await isResourceInScenarioAccount(db,'tag',id,target.scenarioAccountId)) throw new Error('answer_resource_unavailable')
@@ -203,7 +214,7 @@ export async function executeQuestionAnswer(
     && (a.choice_index ?? null)===choiceIndex)) await stage(`action:${action.id}`,async owned=>{
       const references=await validateScenarioActionReferences(db,target.scenarioAccountId,action.action_type,JSON.parse(action.config_json))
       if(!references.ok)throw new Error('answer_resource_unavailable')
-      const outcome=await runActionRows(owned,[action],friend.id,{fires:target.pinnedActions?'pinned':'live',accountId:target.scenarioAccountId})
+      const outcome=await runActionRows(owned,[action],friend.id,{fires:target.pinnedActions?'pinned':'live',accountId:target.scenarioAccountId,sourceEventId:execution.sourceEventId,executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}})
       if(outcome.failed || outcome.skippedIncomplete) throw new Error('answer_action_failed')
       return outcome
     })

@@ -2,7 +2,8 @@
   "$説明": [
     "本番の v7 の部品の値を写した検証用スナップショット（V5/V6 を優先する決まりは 2026-10-08 に外した）。見た目の正本は ★V8 の絵（docs/v8-design-rules.md）。値を写した元は Pencil の .pen ファイルであって、このJSONではない。",
     "Pencilは暗号化されていてCIから読めないため、値をここへ写して機械で照合できるようにしている。",
-    "値を変えるときは必ずPencilを先に直し、そのあとここへ写す。"
+    "値を変えるときは必ずPencilを先に直し、そのあとここへ写す。",
+    "2026-10-09: ★V8 の決まり B-146〜B-161（docs/v8-design-rules.md §6）と Pen（V8.pen の部品）に合わせて、決まりとぶつかる値を V8 の値へ写し直した。各宣言の pencil の欄の「→ 2026-10-09 V8」の後ろが根拠。コードがまだ古い値のうちは、この照合は落ちる（Codex の look・polish と同じ列車で入れる）。"
   ],
   "$pencilFile": "4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen",
   "$componentInventory": {
@@ -32,7 +33,7 @@
   },
   "required": {
     "$説明": "この数を下回るとCIを落とす。B3では入力・検索・選択まで契約へ追加した。減らす方向の変更は承認が要る。",
-    "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は 2026-09-03 のオーナー決定「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。2026-09-26: 必須節点の ApbSZ・zPRvi・I5rKbM を uR9s8（★V7 共通部品その2 §1・§2）へ置き換え。",
+    "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は 2026-09-03 のオーナー決定「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。2026-09-26: 必須節点の ApbSZ・zPRvi・I5rKbM を uR9s8（★V7 共通部品その2 §1・§2）へ置き換え。 2026-10-09: --text-nano（10px・段に無い）を外し、決まりの未実装の変数 9 件を pending で足した（21 → 29。作業役・司令塔の依頼「写しを Pen から作り直す」）。",
     "tokens": 21,
     "parts": 20,
     "componentInventory": 87,
@@ -113,19 +114,19 @@
     },
     "--color-hairline": {
       "pencil": "$hairline",
-      "source": "#dadde2",
-      "resolved": "#dadde2",
+      "source": "rgba(29, 29, 31, 0.07)",
+      "resolved": "#1d1d1f12",
       "status": "active",
-      "note": "変更。旧 #e2e4df",
-      "lastCheckedAt": "2026-08-24"
+      "note": "変更。旧 #e2e4df｜2026-10-09 V8 の値へ（B-149・§6.1 区切りの線は黒7%）。旧 #dadde2",
+      "lastCheckedAt": "2026-10-09"
     },
     "--color-surface-pearl": {
       "pencil": "$surface-pearl",
-      "source": "#fafafc",
-      "resolved": "#fafafc",
+      "source": "#f7f8fa",
+      "resolved": "#f7f8fa",
       "status": "active",
-      "note": "追加。表の見出し行の地",
-      "lastCheckedAt": "2026-08-24"
+      "note": "追加。表の見出し行の地｜2026-10-09 V8 の値へ（§6.5-3 表の見出しの地・Pen ASVsl）。旧 #fafafc",
+      "lastCheckedAt": "2026-10-09"
     },
     "--text-caption": {
       "pencil": "$size-caption",
@@ -137,19 +138,19 @@
     },
     "--text-label": {
       "pencil": "$size-label",
-      "source": "13px",
-      "resolved": "13px",
+      "source": "12px",
+      "resolved": "12px",
       "status": "active",
-      "note": "追加。カード見出し・ボタンの文字",
-      "lastCheckedAt": "2026-08-24"
+      "note": "追加。カード見出し・ボタンの文字｜2026-10-09 V8 の値へ（§6.5-2 ラベル 12/500・B-159）。旧 13px",
+      "lastCheckedAt": "2026-10-09"
     },
     "--text-metric": {
       "pencil": "$size-metric",
-      "source": "22px",
-      "resolved": "22px",
+      "source": "28px",
+      "resolved": "28px",
       "status": "active",
-      "note": "追加。カードの大きな数字",
-      "lastCheckedAt": "2026-08-24"
+      "note": "追加。カードの大きな数字｜2026-10-09 V8 の値へ（Pen Pp3nS 数 28/600）。旧 22px",
+      "lastCheckedAt": "2026-10-09"
     },
     "--text-micro": {
       "pencil": "$size-micro",
@@ -159,101 +160,165 @@
       "note": "追加。数字の下の内訳",
       "lastCheckedAt": "2026-08-24"
     },
-    "--text-nano": {
-      "pencil": "$size-nano",
-      "source": "10px",
-      "resolved": "10px",
-      "status": "active",
-      "note": "追加。バッジの中の文字",
-      "lastCheckedAt": "2026-08-24"
-    },
-    "--shadow-card": {
+    "--shadow-card-surface": {
       "pencil": "XywGr effect → #673 Beautiful shadows sm",
-      "source": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14",
-      "resolved": "0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14",
+      "source": "0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)",
+      "resolved": "0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14",
       "status": "active",
-      "note": "★V7 の段1。影の色は V6 の黒からインク色（#1d1d1f系）へ変え、ぼやけを抑えた。",
-      "lastCheckedAt": "2026-09-30"
+      "note": "★V7 の段1。影の色は V6 の黒からインク色（#1d1d1f系）へ変え、ぼやけを抑えた。｜2026-10-09 V8 の値へ（B-148・§6.2 案A（--card-shadow と同じ値））。旧 0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14",
+      "lastCheckedAt": "2026-10-09"
     },
     "--shadow-float": {
       "pencil": "hGpFq/z6TmF effect → #673 Beautiful shadows md",
-      "source": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14",
-      "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14",
+      "source": "0 8px 24px rgba(29, 29, 31, 0.12)",
+      "resolved": "0 8px 24px #1d1d1f1f",
       "status": "active",
-      "note": "★V7 の段2。浮いて追いつく物にだけ使う。影の色はインク色系へ統一。",
-      "lastCheckedAt": "2026-09-30"
+      "note": "★V7 の段2。浮いて追いつく物にだけ使う。影の色はインク色系へ統一。｜2026-10-09 V8 の値へ（B-161 浮く面の影（縁は --card-edge の線で別に描く）・Pen q3DPdz・StFE7）。旧 0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14",
+      "lastCheckedAt": "2026-10-09"
     },
     "--color-status-info": {
       "pencil": "$status-info",
-      "source": "#175cd3",
-      "resolved": "#175cd3",
+      "source": "#1d4ed8",
+      "resolved": "#1d4ed8",
       "status": "active",
-      "note": "状態バッジの情報色",
-      "lastCheckedAt": "2026-08-24"
+      "note": "状態バッジの情報色｜2026-10-09 V8 の値へ（§6.5-4 案内＝青の文字・Pen ekmYd）。旧 #175cd3",
+      "lastCheckedAt": "2026-10-09"
     },
     "--color-status-info-soft": {
       "pencil": "$status-info-soft",
-      "source": "#e9f1ff",
-      "resolved": "#e9f1ff",
+      "source": "#2563eb1a",
+      "resolved": "#2563eb1a",
       "status": "active",
-      "note": "状態バッジの情報背景",
-      "lastCheckedAt": "2026-08-24"
+      "note": "状態バッジの情報背景｜2026-10-09 V8 の値へ（§6.5-4 地は色の10%・Pen ekmYd）。旧 #e9f1ff",
+      "lastCheckedAt": "2026-10-09"
     },
     "--color-status-danger": {
       "pencil": "$status-danger",
-      "source": "#e5484d",
-      "resolved": "#e5484d",
+      "source": "#b91c1c",
+      "resolved": "#b91c1c",
       "status": "active",
-      "note": "状態バッジの危険色",
-      "lastCheckedAt": "2026-08-24"
+      "note": "状態バッジの危険色｜2026-10-09 V8 の値へ（§6.5-4 だめ＝赤の文字・Pen XwfSH）。旧 #e5484d",
+      "lastCheckedAt": "2026-10-09"
     },
     "--color-status-danger-soft": {
       "pencil": "$status-danger-soft",
-      "source": "#fef0f0",
-      "resolved": "#fef0f0",
+      "source": "#ef44441a",
+      "resolved": "#ef44441a",
       "status": "active",
-      "note": "状態バッジの危険背景",
-      "lastCheckedAt": "2026-08-24"
+      "note": "状態バッジの危険背景｜2026-10-09 V8 の値へ（§6.5-4 地は色の10%・Pen XwfSH）。旧 #fef0f0",
+      "lastCheckedAt": "2026-10-09"
     },
     "--radius-panel": {
       "pencil": "$radius-panel",
-      "source": "12px",
-      "resolved": "12px",
-      "status": "active",
-      "note": "大きなパネルとドロワーの角丸",
-      "lastCheckedAt": "2026-08-24"
-    },
-    "--radius-icon": {
-      "pencil": "$radius-xxs",
-      "source": "3px",
-      "resolved": "3px",
-      "status": "active",
-      "note": "アイコンだけの操作の角丸",
-      "lastCheckedAt": "2026-08-24"
-    },
-    "--text-body": {
-      "pencil": "$size-body",
-      "source": "14px",
-      "resolved": "14px",
-      "status": "active",
-      "note": "本文の文字サイズ",
-      "lastCheckedAt": "2026-08-24"
-    },
-    "--text-lead": {
-      "pencil": "$size-lead",
       "source": "16px",
       "resolved": "16px",
       "status": "active",
-      "note": "カード見出しの文字サイズ",
-      "lastCheckedAt": "2026-08-24"
+      "note": "大きなパネルとドロワーの角丸｜2026-10-09 V8 の値へ（§6.5-9 窓・引き出し 16・Pen q3DPdz）。旧 12px",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--radius-icon": {
+      "pencil": "$radius-xxs",
+      "source": "6px",
+      "resolved": "6px",
+      "status": "active",
+      "note": "アイコンだけの操作の角丸｜2026-10-09 V8 の値へ（§6.5-9 小さい部品 6（3 は段に無い））。旧 3px",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--text-body": {
+      "pencil": "$size-body",
+      "source": "13px",
+      "resolved": "13px",
+      "status": "active",
+      "note": "本文の文字サイズ｜2026-10-09 V8 の値へ（§6.5-2 本文 13/400・B-159）。旧 14px",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--text-lead": {
+      "pencil": "$size-lead",
+      "source": "15px",
+      "resolved": "15px",
+      "status": "active",
+      "note": "カード見出しの文字サイズ｜2026-10-09 V8 の値へ（§6.5-2 段の題 15/700（16 は段に無い））。旧 16px",
+      "lastCheckedAt": "2026-10-09"
     },
     "--text-display": {
       "pencil": "$size-display",
-      "source": "30px",
-      "resolved": "30px",
+      "source": "22px",
+      "resolved": "22px",
       "status": "active",
-      "note": "ページ見出しの文字サイズ",
-      "lastCheckedAt": "2026-08-24"
+      "note": "ページ見出しの文字サイズ｜2026-10-09 V8 の値へ（§6.5-2 ページの題 22/700・Pen EnlYo）。旧 30px",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--text-section": {
+      "pencil": "CugIm 題 fontSize 15",
+      "source": "15px",
+      "resolved": "15px",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。§6.5-2 段の題 15/700。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--color-field-border": {
+      "pencil": "Ume2U 枠 stroke",
+      "source": "#1d1d1f1f",
+      "resolved": "#1d1d1f1f",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。B-150・§6.3 欄・副ボタン・検索・絞り込みの札の枠 黒12%。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--shadow-field": {
+      "pencil": "Ume2U 枠 effect",
+      "source": "0 1px 2px #1d1d1f0f",
+      "resolved": "0 1px 2px #1d1d1f0f",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。B-150・§6.3 欄の影 案1。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--color-accent-edge": {
+      "pencil": "doYdE stroke",
+      "source": "#06612f",
+      "resolved": "#06612f",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。B-151・§6.4 主ボタンの縁。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--radius-button-primary": {
+      "pencil": "doYdE cornerRadius",
+      "source": "8px",
+      "resolved": "8px",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。B-151・§6.4 主ボタンの角丸 8。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--color-hover": {
+      "pencil": "FK5m7",
+      "source": "#1d1d1f0a",
+      "resolved": "#1d1d1f0a",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。§6.5-7 乗せる＝黒4%。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--color-press": {
+      "pencil": "FK5m7",
+      "source": "#1d1d1f14",
+      "resolved": "#1d1d1f14",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。§6.5-7 押す＝黒8%。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--focus-ring": {
+      "pencil": "FK5m7",
+      "source": "2px solid #2563eb",
+      "resolved": "2px solid #2563eb",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。§6.5-7 キーボードの青い輪 2px・すき間 2px。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
+    },
+    "--shadow-toggle-knob": {
+      "pencil": "bkjTv つまみ",
+      "source": "0 1px 2px #1d1d1f29",
+      "resolved": "0 1px 2px #1d1d1f29",
+      "status": "active",
+      "note": "2026-10-09 追加。決まりにあるがコードに無い変数（作る：未実装）。B-161 トグルのつまみ 黒16%。名前は Codex の look で決まったら合わせる",
+      "lastCheckedAt": "2026-10-09"
     }
   },
   "parts": {
@@ -433,7 +498,7 @@
       ],
       "cssPrefix": "kpi-card",
       "pencilUsage": 56,
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "数のカードをKpiCardへ1本化（旧SummaryCard）。V6の見せ方を基本とし、配信予定の告知はbroadcastの名前付きvariantで差を固定する。emergencyの文字列値だけは対象外。",
       "routes": {
         "v5": [
@@ -470,25 +535,26 @@
           "resolved": "100px"
         },
         {
-          "pencil": "XywGr padding: [14, 16]",
+          "pencil": "XywGr padding: [14, 16] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Pp3nS padding [16,24]（旧 14px 16px）",
           "class": "card",
           "prop": "padding",
-          "source": "14px 16px",
-          "resolved": "14px 16px"
+          "source": "16px 24px",
+          "resolved": "16px 24px"
         },
         {
-          "pencil": "XywGr stroke: $hairline / 1",
-          "class": "card",
-          "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "pencil": "XywGr stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-149 数の帯のマスは右の線だけ（旧 1px solid #dadde2）",
+          "class": "strip",
+          "selector": "[data-theme=v8] .strip[data-kpi-presentation=band] > *:not(:last-child)",
+          "prop": "border-right",
+          "source": "1px solid #00000012",
+          "resolved": "1px solid #00000012"
         },
         {
-          "pencil": "XywGr cornerRadius: $radius-md",
+          "pencil": "XywGr cornerRadius: $radius-md → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-153 数は線の帯（カードにしない）（旧 12px）",
           "class": "card",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "12px"
+          "resolved": "0"
         },
         {
           "pencil": "XywGr fill: $canvas",
@@ -498,11 +564,12 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "XywGr effect → 2026-10-09 オーナー採用 案A",
+          "pencil": "XywGr effect: #1920261A 1,1,2 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-153 数は線の帯（影なし）（旧 0px 2px 3px -1px #1d1d1f14,0px 1px 0px 0px #1d1d1f05,0px 0px 0px 1px #1d1d1f14）",
           "class": "card",
+          "selector": "[data-theme=v8] .strip[data-kpi-presentation=band] .card",
           "prop": "box-shadow",
-          "source": "var(--card-shadow)",
-          "resolved": "0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14"
+          "source": "none",
+          "resolved": "none"
         },
         {
           "pencil": "ラベル fill: $ink-secondary",
@@ -519,11 +586,11 @@
           "resolved": "13px"
         },
         {
-          "pencil": "ラベル fontWeight: 600",
+          "pencil": "ラベル fontWeight: 600 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Pp3nS 題 13/500（旧 600）",
           "class": "label",
           "prop": "font-weight",
-          "source": "600",
-          "resolved": "600"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "値 fill: $ink",
@@ -533,11 +600,11 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "値 fontSize: $size-metric",
+          "pencil": "値 fontSize: $size-metric → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Pp3nS 数 28/600（旧 22px）",
           "class": "value",
           "prop": "font-size",
           "source": "var(--text-metric)",
-          "resolved": "22px"
+          "resolved": "28px"
         },
         {
           "pencil": "値 fontWeight: 600（★V7 §2 3段化）",
@@ -547,32 +614,32 @@
           "resolved": "600"
         },
         {
-          "pencil": "説明 fill: $ink-faint",
+          "pencil": "説明 fill: $ink-faint → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 補足は ink-secondary・Pp3nS 補足（旧 #626a73）",
           "class": "detail",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
-          "pencil": "説明 fontSize: $size-micro",
+          "pencil": "説明 fontSize: $size-micro → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Pp3nS 補足 12（旧 11px）",
           "class": "detail",
           "prop": "font-size",
           "source": "var(--text-micro)",
-          "resolved": "11px"
+          "resolved": "12px"
         },
         {
-          "pencil": "バッジ padding: [3, 8]",
+          "pencil": "バッジ padding: [3, 8] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: C6DGX padding [2,8]（旧 3px 8px）",
           "class": "badge",
           "prop": "padding",
-          "source": "3px 8px",
-          "resolved": "3px 8px"
+          "source": "2px 8px",
+          "resolved": "2px 8px"
         },
         {
-          "pencil": "バッジ cornerRadius: $radius-md",
+          "pencil": "バッジ cornerRadius: $radius-md → 2026-10-09 V8（Pen 決まり B-146〜B-161）: C6DGX cornerRadius 6（旧 12px）",
           "class": "badge",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "12px"
+          "resolved": "6px"
         },
         {
           "pencil": "バッジ fill: $accent-soft",
@@ -582,18 +649,18 @@
           "resolved": "#e8f8ee"
         },
         {
-          "pencil": "バッジ文字 fill: $accent-deep（★V7 修正方針 u6pez）",
+          "pencil": "バッジ文字 fill: $accent-deep（★V7 修正方針 u6pez） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: C6DGX 文字（旧 #087a3e）",
           "class": "badge",
           "prop": "color",
           "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "resolved": "#047833"
         },
         {
-          "pencil": "バッジ fontSize: $size-nano",
+          "pencil": "バッジ fontSize: $size-nano → 2026-10-09 V8（Pen 決まり B-146〜B-161）: C6DGX 12/600（旧 10px）",
           "class": "badge",
           "prop": "font-size",
           "source": "var(--text-nano)",
-          "resolved": "10px"
+          "resolved": "12px"
         },
         {
           "pencil": "V6 KPI height: 106",
@@ -704,7 +771,7 @@
       ],
       "cssPrefix": "button",
       "pencilUsage": 49,
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "コード側は寸法が5通りに割れていた。第1段階で7画面の標準操作33個を共通Buttonへ移行した。V6代表10画面にnBRKk/uzNECのrefは0件でV6専用ボタン部品も無いため、V6画面でもV5の高さ36px・padding [9,13]・13pxを正本とする。",
       "routes": {
         "v5": {
@@ -739,25 +806,25 @@
       },
       "declarations": [
         {
-          "pencil": "nBRKk/uzNEC height: 36 → #976 U083 でPC標準40pxへ（入力・検索・選択と同一）",
+          "pencil": "nBRKk/uzNEC height: 36 → #976 U083 でPC標準40pxへ（入力・検索・選択と同一） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.4 ボタン 36・doYdE（旧 40px）",
           "class": "standard",
           "prop": "height",
-          "source": "40px",
-          "resolved": "40px"
+          "source": "36px",
+          "resolved": "36px"
         },
         {
-          "pencil": "nBRKk/uzNEC padding: [9, 13]",
+          "pencil": "nBRKk/uzNEC padding: [9, 13] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: doYdE padding [0,16]（旧 9px 13px）",
           "class": "button",
           "prop": "padding",
-          "source": "9px 13px",
-          "resolved": "9px 13px"
+          "source": "0 16px",
+          "resolved": "0 16px"
         },
         {
-          "pencil": "nBRKk/uzNEC gap: 6",
+          "pencil": "nBRKk/uzNEC gap: 6 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: doYdE gap 8（旧 6px）",
           "class": "button",
           "prop": "gap",
-          "source": "6px",
-          "resolved": "6px"
+          "source": "8px",
+          "resolved": "8px"
         },
         {
           "pencil": "nBRKk/uzNEC strokeWidth: 1",
@@ -767,18 +834,18 @@
           "resolved": "1px solid"
         },
         {
-          "pencil": "nBRKk/uzNEC cornerRadius: $radius-sm",
+          "pencil": "nBRKk/uzNEC cornerRadius: $radius-sm → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-9 ボタン 10（主ボタンだけ 8）（旧 8px）",
           "class": "button",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "8px"
+          "resolved": "10px"
         },
         {
-          "pencil": "nBRKk/uzNEC fontSize: $size-label → #976 U079 で $size-body(14px) へ",
+          "pencil": "nBRKk/uzNEC fontSize: $size-label → #976 U079 で $size-body(14px) へ → 2026-10-09 V8（Pen 決まり B-146〜B-161）: doYdE 文字 13/600（旧 14px）",
           "class": "button",
           "prop": "font-size",
           "source": "var(--text-body)",
-          "resolved": "14px"
+          "resolved": "13px"
         },
         {
           "pencil": "nBRKk/uzNEC fontWeight: 600",
@@ -795,11 +862,11 @@
           "resolved": "#087a3e"
         },
         {
-          "pencil": "nBRKk stroke: $accent（白文字が乗るので $accent-deep。2026-09-04）",
+          "pencil": "nBRKk stroke: $accent（白文字が乗るので $accent-deep。2026-09-04） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-151 濃い緑の縁（旧 #087a3e）",
           "class": "primary",
           "prop": "border-color",
           "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "resolved": "#06612f"
         },
         {
           "pencil": "nBRKk ラベル fill: $on-accent",
@@ -816,11 +883,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "uzNEC stroke: $hairline",
+          "pencil": "uzNEC stroke: $hairline → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-150 副ボタンの枠 黒12%（u101P）（旧 #dadde2）",
           "class": "secondary",
           "prop": "border-color",
           "source": "var(--color-hairline)",
-          "resolved": "#dadde2"
+          "resolved": "#1d1d1f1f"
         },
         {
           "pencil": "uzNEC ラベル fill: $ink",
@@ -849,6 +916,27 @@
           "prop": "color",
           "source": "var(--color-on-accent)",
           "resolved": "#ffffff"
+        },
+        {
+          "pencil": "2026-10-09 追加 V8: B-151 主ボタンの角丸 8（doYdE）",
+          "class": "primary",
+          "prop": "border-radius",
+          "source": "8px",
+          "resolved": "8px"
+        },
+        {
+          "pencil": "2026-10-09 追加 V8: B-151 主ボタンはカードと同じ影（doYdE）",
+          "class": "primary",
+          "prop": "box-shadow",
+          "source": "0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14",
+          "resolved": "0 1px 1px #1d1d1f29,0 2px 4px #1d1d1f14"
+        },
+        {
+          "pencil": "2026-10-09 追加 V8: B-150 副ボタンの影 案1（u101P）",
+          "class": "secondary",
+          "prop": "box-shadow",
+          "source": "0 1px 2px #1d1d1f0f",
+          "resolved": "0 1px 2px #1d1d1f0f"
         }
       ]
     },
@@ -867,7 +955,7 @@
       ],
       "cssPrefix": "pagination",
       "pencilUsage": 139,
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "Pencil全体で139回参照される共通部品。V5を基本とし、V6代表10画面のうち受信箱を除く9画面でも同じBlot6を使う。第1段階ではページ番号へ直接移動できる6利用先を移行し、前後移動だけの画面は動作差を確認して次段階で移す。",
       "routes": {
         "v5": [
@@ -898,11 +986,11 @@
       },
       "declarations": [
         {
-          "pencil": "Blot6 gap: 8",
+          "pencil": "Blot6 gap: 8 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: jX2Uw gap 6（旧 8px）",
           "class": "pagination",
           "prop": "gap",
-          "source": "8px",
-          "resolved": "8px"
+          "source": "6px",
+          "resolved": "6px"
         },
         {
           "pencil": "Blot6 item layout",
@@ -926,18 +1014,18 @@
           "resolved": "center"
         },
         {
-          "pencil": "Blot6 item height: 38",
+          "pencil": "Blot6 item height: 38 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: jX2Uw 頁 32（旧 38px）",
           "class": "item",
           "prop": "height",
-          "source": "38px",
-          "resolved": "38px"
+          "source": "32px",
+          "resolved": "32px"
         },
         {
-          "pencil": "Blot6 item stroke: $hairline / 1",
+          "pencil": "Blot6 item stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: jX2Uw 頁の枠 黒7%（旧 1px solid #dadde2）",
           "class": "item",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f12",
+          "resolved": "1px solid #1d1d1f12"
         },
         {
           "pencil": "Blot6 item cornerRadius: $radius-sm",
@@ -961,18 +1049,18 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "Blot6 label fontSize: $size-caption",
+          "pencil": "Blot6 label fontSize: $size-caption → 2026-10-09 V8（Pen 決まり B-146〜B-161）: jX2Uw 頁 13/500（旧 12px）",
           "class": "item",
           "prop": "font-size",
           "source": "var(--text-caption)",
-          "resolved": "12px"
+          "resolved": "13px"
         },
         {
-          "pencil": "Blot6 label fontWeight: 600",
+          "pencil": "Blot6 label fontWeight: 600 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: jX2Uw 頁 13/500（旧 600）",
           "class": "item",
           "prop": "font-weight",
-          "source": "600",
-          "resolved": "600"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "Blot6 prev/next width: 64",
@@ -989,18 +1077,18 @@
           "resolved": "38px"
         },
         {
-          "pencil": "Blot6 current stroke: $accent（白文字が乗るので $accent-deep。2026-09-04）",
+          "pencil": "Blot6 current stroke: $accent（白文字が乗るので $accent-deep。2026-09-04） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: jX2Uw 今の頁は枠なし（旧 #087a3e）",
           "class": "current",
           "prop": "border-color",
           "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "resolved": "transparent"
         },
         {
-          "pencil": "Blot6 current fill: $accent（白文字が乗るので $accent-deep。2026-09-04）",
+          "pencil": "Blot6 current fill: $accent（白文字が乗るので $accent-deep。2026-09-04） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: jX2Uw 今の頁は黒（旧 #087a3e）",
           "class": "current",
           "prop": "background",
           "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "resolved": "#1d1d1f"
         },
         {
           "pencil": "Blot6 current label fill: $on-accent",
@@ -1080,7 +1168,9 @@
       "reviewStatus": "confirmed",
       "code": "src/components/shared/table.tsx",
       "implementationFiles": [
-        "src/components/shared/grid-table.tsx"
+        "src/components/shared/grid-table.tsx",
+        "src/components/shared/truncated-text.tsx",
+        "src/components/shared/list-state.tsx"
       ],
       "cssModule": "src/components/shared/table.module.css",
       "components": [
@@ -1089,7 +1179,7 @@
       ],
       "cssPrefix": "table",
       "pencilUsage": 107,
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "6機能で最も多く使われている部品。第1段階で75セルを共通Thへ移行し、設計に無い uppercase / tracking-wider と画面別の色・余白を除いた。見出し行の寸法は友だち一覧 FG391 の f9yhp から採取。V6でも同じtPTMpを使う。",
       "routes": {
         "v5": {
@@ -1118,25 +1208,25 @@
       },
       "declarations": [
         {
-          "pencil": "見出し行 height: 44",
+          "pencil": "見出し行 height: 44 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-3 見出しの行 40・ASVsl（旧 44px）",
           "class": "headRow",
           "prop": "height",
-          "source": "44px",
-          "resolved": "44px"
+          "source": "40px",
+          "resolved": "40px"
         },
         {
-          "pencil": "見出し行 fill: $surface-pearl",
+          "pencil": "見出し行 fill: $surface-pearl → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-3 見出しの地・ASVsl（旧 #fafafc）",
           "class": "headRow",
           "prop": "background",
           "source": "var(--color-surface-pearl)",
-          "resolved": "#fafafc"
+          "resolved": "#f7f8fa"
         },
         {
-          "pencil": "見出し行 stroke: $hairline",
+          "pencil": "見出し行 stroke: $hairline → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-149 線は黒7%（旧 1px solid #dadde2）",
           "class": "headRow",
           "prop": "border-bottom",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f12",
+          "resolved": "1px solid #1d1d1f12"
         },
         {
           "pencil": "tPTMp padding: [0, 12]",
@@ -1146,11 +1236,11 @@
           "resolved": "0 12px"
         },
         {
-          "pencil": "tPTMp fill: $ink-faint",
+          "pencil": "tPTMp fill: $ink-faint → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-3 見出しは ink-secondary（旧 #626a73）",
           "class": "cell",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
           "pencil": "tPTMp fontSize: $size-caption",
@@ -1160,11 +1250,11 @@
           "resolved": "12px"
         },
         {
-          "pencil": "tPTMp fontWeight: 600",
+          "pencil": "tPTMp fontWeight: 600 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-3 見出し 12/500（旧 600）",
           "class": "cell",
           "prop": "font-weight",
-          "source": "600",
-          "resolved": "600"
+          "source": "500",
+          "resolved": "500"
         }
       ]
     },
@@ -1187,7 +1277,7 @@
       ],
       "cssPrefix": "sidebar",
       "pencilUsage": "未計測（全体ref走査は未検証）",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "V5 J33xqを正本とし、既存の権限非表示・アカウント切替・件数バッジ・モバイルドロワーを残した。V6差は未確認のため、確認できるまでV5を使う。",
       "routes": {
         "pilot": [
@@ -1222,39 +1312,39 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "J33xq stroke: $hairline / 1",
+          "pencil": "J33xq stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-149 線は黒7%（旧 1px solid #dadde2）",
           "class": "desktop",
           "prop": "border-right",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f12",
+          "resolved": "1px solid #1d1d1f12"
         },
         {
-          "pencil": "J33xq menu item height: 40",
+          "pencil": "J33xq menu item height: 40 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: zUg8S 項目 36（旧 40px）",
           "class": "item",
           "prop": "height",
-          "source": "40px",
-          "resolved": "40px"
+          "source": "36px",
+          "resolved": "36px"
         },
         {
-          "pencil": "J33xq menu item gap: 11",
+          "pencil": "J33xq menu item gap: 11 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: zUg8S 項目 gap 10（旧 11px）",
           "class": "item",
           "prop": "gap",
-          "source": "11px",
-          "resolved": "11px"
+          "source": "10px",
+          "resolved": "10px"
         },
         {
-          "pencil": "J33xq menu item padding: [0,12]",
+          "pencil": "J33xq menu item padding: [0,12] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: zUg8S 項目 padding [0,10]（旧 0 12px）",
           "class": "item",
           "prop": "padding",
-          "source": "0 12px",
-          "resolved": "0 12px"
+          "source": "0 10px",
+          "resolved": "0 10px"
         },
         {
-          "pencil": "J33xq menu item cornerRadius: $radius-md",
+          "pencil": "J33xq menu item cornerRadius: $radius-md → 2026-10-09 V8（Pen 決まり B-146〜B-161）: zUg8S 項目 角丸 8（旧 12px）",
           "class": "item",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "12px"
+          "resolved": "8px"
         },
         {
           "pencil": "J33xq menu label fontSize: $size-body",
@@ -1292,18 +1382,18 @@
           "resolved": "500"
         },
         {
-          "pencil": "J33xq section height: 34",
+          "pencil": "J33xq section height: 34 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: zUg8S 組 30（旧 34px）",
           "class": "sectionHeading",
           "prop": "height",
-          "source": "34px",
-          "resolved": "34px"
+          "source": "30px",
+          "resolved": "30px"
         },
         {
-          "pencil": "J33xq section padding: [12,12,5,12]",
+          "pencil": "J33xq section padding: [12,12,5,12] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: zUg8S 組 padding [10,10,3,10]（旧 12px 12px 5px）",
           "class": "sectionHeading",
           "prop": "padding",
-          "source": "12px 12px 5px",
-          "resolved": "12px 12px 5px"
+          "source": "10px 10px 3px",
+          "resolved": "10px 10px 3px"
         },
         {
           "pencil": "J33xq section fill: $ink-faint",
@@ -1343,7 +1433,7 @@
       ],
       "cssPrefix": "header",
       "pencilUsage": "画面内配置のためref参照なし",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "ダッシュボードV5のHeader RWNQPから共通化。長い題と複数操作は折り返し、機能を削らない。",
       "routes": {
         "pilot": [
@@ -1392,18 +1482,18 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "RWNQP title fontSize: $size-display",
+          "pencil": "RWNQP title fontSize: $size-display → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 ページの題 22/700・EnlYo（旧 30px）",
           "class": "title",
           "prop": "font-size",
-          "source": "30px",
-          "resolved": "30px"
+          "source": "22px",
+          "resolved": "22px"
         },
         {
-          "pencil": "RWNQP title fontWeight: 600",
+          "pencil": "RWNQP title fontWeight: 600 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 ページの題 22/700・EnlYo（旧 600）",
           "class": "title",
           "prop": "font-weight",
-          "source": "600",
-          "resolved": "600"
+          "source": "700",
+          "resolved": "700"
         },
         {
           "pencil": "V5 description fill: $ink-secondary",
@@ -1413,11 +1503,11 @@
           "resolved": "#4a5565"
         },
         {
-          "pencil": "V5 description fontSize: $size-body",
+          "pencil": "V5 description fontSize: $size-body → 2026-10-09 V8（Pen 決まり B-146〜B-161）: EnlYo 説明 13（旧 14px）",
           "class": "description",
           "prop": "font-size",
-          "source": "14px",
-          "resolved": "14px"
+          "source": "13px",
+          "resolved": "13px"
         }
       ]
     },
@@ -1521,7 +1611,7 @@
       ],
       "cssPrefix": "merged-tabs",
       "pencilUsage": "未計測（全体ref走査は未検証）",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "VPn1F/ISA1Qの下線タブとz9TQJの分割タブを同じURL連動APIの名前付きvariantへ統合した。",
       "routes": {
         "pilot": [
@@ -1540,11 +1630,11 @@
       },
       "declarations": [
         {
-          "pencil": "VPn1F/ISA1Q height: 44",
+          "pencil": "VPn1F/ISA1Q height: 44 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: clV5c タブ 32（旧 44px）",
           "class": "tab",
           "prop": "height",
-          "source": "44px",
-          "resolved": "44px"
+          "source": "32px",
+          "resolved": "32px"
         },
         {
           "pencil": "VPn1F/ISA1Q padding: [0,4]",
@@ -1554,11 +1644,11 @@
           "resolved": "0 4px"
         },
         {
-          "pencil": "VPn1F/ISA1Q fontSize: $size-body",
+          "pencil": "VPn1F/ISA1Q fontSize: $size-body → 2026-10-09 V8（Pen 決まり B-146〜B-161）: clV5c 13（旧 14px）",
           "class": "tab",
           "prop": "font-size",
-          "source": "14px",
-          "resolved": "14px"
+          "source": "13px",
+          "resolved": "13px"
         },
         {
           "pencil": "ISA1Q fontWeight: 500",
@@ -1568,46 +1658,46 @@
           "resolved": "500"
         },
         {
-          "pencil": "VPn1F stroke: $accent / bottom 2（白地の文字・線なので $accent-deep。#976 U084）",
+          "pencil": "VPn1F stroke: $accent / bottom 2（白地の文字・線なので $accent-deep。#976 U084） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: clV5c 選んだタブの線は黒（旧 #087a3e）",
           "class": "selected",
           "prop": "border-bottom-color",
           "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "resolved": "#1d1d1f"
         },
         {
-          "pencil": "VPn1F fill: $accent（白地の文字・線なので $accent-deep。#976 U084）",
+          "pencil": "VPn1F fill: $accent（白地の文字・線なので $accent-deep。#976 U084） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: clV5c 選んだタブの文字は黒（旧 #087a3e）",
           "class": "selected",
           "prop": "color",
           "source": "var(--color-accent-deep)",
-          "resolved": "#087a3e"
+          "resolved": "#1d1d1f"
         },
         {
-          "pencil": "VPn1F fontWeight: 500（★V7 §2 3段化）",
+          "pencil": "VPn1F fontWeight: 500（★V7 §2 3段化） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: clV5c 選んだタブ 13/600（旧 500）",
           "class": "selected",
           "prop": "font-weight",
-          "source": "500",
-          "resolved": "500"
+          "source": "600",
+          "resolved": "600"
         },
         {
-          "pencil": "z9TQJ height: 50",
+          "pencil": "z9TQJ height: 50 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: dtJVi 40（旧 50px）",
           "class": "segmented",
           "prop": "height",
-          "source": "50px",
-          "resolved": "50px"
+          "source": "40px",
+          "resolved": "40px"
         },
         {
-          "pencil": "z9TQJ gap: 5",
+          "pencil": "z9TQJ gap: 5 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: dtJVi gap 2（旧 5px）",
           "class": "segmented",
           "prop": "gap",
-          "source": "5px",
-          "resolved": "5px"
+          "source": "2px",
+          "resolved": "2px"
         },
         {
-          "pencil": "z9TQJ padding: 4",
+          "pencil": "z9TQJ padding: 4 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: dtJVi padding 2（旧 4px）",
           "class": "segmented",
           "prop": "padding",
-          "source": "4px",
-          "resolved": "4px"
+          "source": "2px",
+          "resolved": "2px"
         },
         {
           "pencil": "z9TQJ fill: $canvas-parchment",
@@ -1617,18 +1707,18 @@
           "resolved": "#f5f5f7"
         },
         {
-          "pencil": "z9TQJ cornerRadius: $radius-md",
+          "pencil": "z9TQJ cornerRadius: $radius-md → 2026-10-09 V8（Pen 決まり B-146〜B-161）: dtJVi 角丸 10（旧 12px）",
           "class": "segmented",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "12px"
+          "resolved": "10px"
         },
         {
-          "pencil": "z9TQJ item height: 42",
+          "pencil": "z9TQJ item height: 42 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: dtJVi 項目 36（旧 42px）",
           "class": "segmentedTab",
           "prop": "height",
-          "source": "42px",
-          "resolved": "42px"
+          "source": "36px",
+          "resolved": "36px"
         },
         {
           "pencil": "z9TQJ item cornerRadius: $radius-sm",
@@ -1656,7 +1746,7 @@
       ],
       "cssPrefix": "card",
       "pencilUsage": "ダッシュボード内の直接配置カード",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "V5ダッシュボードに繰り返し現れる面・縦配置・余白を名前付きpropsへ固定した。",
       "routes": {
         "active": [
@@ -1674,11 +1764,11 @@
       },
       "declarations": [
         {
-          "pencil": "X34VF stroke: $hairline / 1",
+          "pencil": "X34VF stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.2 ごく薄い線 --card-edge 8%（旧 1px solid #dadde2）",
           "class": "card",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f14",
+          "resolved": "1px solid #1d1d1f14"
         },
         {
           "pencil": "X34VF cornerRadius: $radius-md",
@@ -1723,11 +1813,11 @@
           "resolved": "16px"
         },
         {
-          "pencil": "roomy card padding: 18",
+          "pencil": "roomy card padding: 18 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-1 余白は 8・12・16・24（18 は段に無い）（旧 18px）",
           "class": "paddingRoomy",
           "prop": "padding",
-          "source": "18px",
-          "resolved": "18px"
+          "source": "24px",
+          "resolved": "24px"
         }
       ]
     },
@@ -1746,7 +1836,7 @@
       ],
       "cssPrefix": "card",
       "pencilUsage": "未計測（ダッシュボードへ適用開始）",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "標準48pxとダッシュボード用58pxを名前付きsizeへ固定し、長い見出しを省略する。",
       "routes": {
         "active": [
@@ -1806,11 +1896,11 @@
           "resolved": "58px"
         },
         {
-          "pencil": "dashboard roomy header padding: [0,18]",
+          "pencil": "dashboard roomy header padding: [0,18] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-1 余白の段（旧 0 18px）",
           "class": "headerRoomy",
           "prop": "padding",
-          "source": "0 18px",
-          "resolved": "0 18px"
+          "source": "0 24px",
+          "resolved": "0 24px"
         },
         {
           "pencil": "t0jk8p title group layout",
@@ -1841,18 +1931,18 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "t0jk8p title fontSize: $size-lead",
+          "pencil": "t0jk8p title fontSize: $size-lead → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 段の題 15/700・CugIm（旧 16px）",
           "class": "title",
           "prop": "font-size",
           "source": "var(--text-lead)",
-          "resolved": "16px"
+          "resolved": "15px"
         },
         {
-          "pencil": "t0jk8p title fontWeight: 600（★V7 §2 3段化）",
+          "pencil": "t0jk8p title fontWeight: 600（★V7 §2 3段化） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 段の題 15/700・CugIm（旧 600）",
           "class": "title",
           "prop": "font-weight",
-          "source": "600",
-          "resolved": "600"
+          "source": "700",
+          "resolved": "700"
         },
         {
           "pencil": "t0jk8p action fill: $action（#669: 緑は主操作専用。見出しリンクはaction色へ）",
@@ -1883,18 +1973,18 @@
           "resolved": "center"
         },
         {
-          "pencil": "t0jk8p action fontSize: $size-label",
+          "pencil": "t0jk8p action fontSize: $size-label → 2026-10-09 V8（Pen 決まり B-146〜B-161）: g5Db8 リンク 12/500（旧 13px）",
           "class": "action",
           "prop": "font-size",
           "source": "var(--text-label)",
-          "resolved": "13px"
+          "resolved": "12px"
         },
         {
-          "pencil": "t0jk8p action fontWeight: 600",
+          "pencil": "t0jk8p action fontWeight: 600 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: g5Db8 リンク 12/500（旧 600）",
           "class": "action",
           "prop": "font-weight",
-          "source": "600",
-          "resolved": "600"
+          "source": "500",
+          "resolved": "500"
         }
       ]
     },
@@ -1913,7 +2003,7 @@
       ],
       "cssPrefix": "status-badge",
       "pencilUsage": "ダッシュボードへ適用開始",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "意味をtoneで固定し、通常とダッシュボード表内compactの2サイズを持つ。",
       "routes": {
         "active": [
@@ -1938,11 +2028,11 @@
           "resolved": "9999px"
         },
         {
-          "pencil": "xRvDB padding: [7,12]",
+          "pencil": "xRvDB padding: [7,12] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: mpVfY padding [2,8]（旧 7px 12px）",
           "class": "badge",
           "prop": "padding",
-          "source": "7px 12px",
-          "resolved": "7px 12px"
+          "source": "2px 8px",
+          "resolved": "2px 8px"
         },
         {
           "pencil": "xRvDB fontSize: $size-caption",
@@ -1952,95 +2042,95 @@
           "resolved": "12px"
         },
         {
-          "pencil": "xRvDB fontWeight: 500（★V7 §2 3段化）",
+          "pencil": "xRvDB fontWeight: 500（★V7 §2 3段化） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 札 12/600（旧 500）",
           "class": "badge",
           "prop": "font-weight",
-          "source": "500",
-          "resolved": "500"
+          "source": "600",
+          "resolved": "600"
         },
         {
-          "pencil": "dashboard compact padding: [4,8]（★V7）",
+          "pencil": "dashboard compact padding: [4,8]（★V7） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 札は全部同じ形（旧 4px 8px）",
           "class": "compact",
           "prop": "padding",
-          "source": "4px 8px",
-          "resolved": "4px 8px"
+          "source": "2px 8px",
+          "resolved": "2px 8px"
         },
         {
-          "pencil": "dashboard compact fontSize: $size-micro（★V7：10px は読みにくい）",
+          "pencil": "dashboard compact fontSize: $size-micro（★V7：10px は読みにくい） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 札は全部同じ形 12/600（旧 11px）",
           "class": "compact",
           "prop": "font-size",
           "source": "var(--text-micro)",
-          "resolved": "11px"
+          "resolved": "12px"
         },
         {
-          "pencil": "neutral fill: $canvas-parchment",
+          "pencil": "neutral fill: $canvas-parchment → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 地は色の10%・hQeAo（旧 #f5f5f7）",
           "class": "neutral",
           "prop": "background",
           "source": "var(--color-shell)",
-          "resolved": "#f5f5f7"
+          "resolved": "#94a3b81a"
         },
         {
-          "pencil": "neutral label: $ink-secondary",
+          "pencil": "neutral label: $ink-secondary → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 文字は濃い方・hQeAo（旧 #4a5565）",
           "class": "neutral",
           "prop": "color",
           "source": "var(--color-ink-secondary)",
-          "resolved": "#4a5565"
+          "resolved": "#475569"
         },
         {
-          "pencil": "info fill: $status-info-soft",
+          "pencil": "info fill: $status-info-soft → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 地は色の10%・ekmYd（旧 #e9f1ff）",
           "class": "info",
           "prop": "background",
           "source": "var(--color-status-info-soft)",
-          "resolved": "#e9f1ff"
+          "resolved": "#2563eb1a"
         },
         {
-          "pencil": "info label: $status-info",
+          "pencil": "info label: $status-info → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 文字は濃い方・ekmYd（旧 #175cd3）",
           "class": "info",
           "prop": "color",
           "source": "var(--color-status-info)",
-          "resolved": "#175cd3"
+          "resolved": "#1d4ed8"
         },
         {
-          "pencil": "warning fill: $status-warn-soft",
+          "pencil": "warning fill: $status-warn-soft → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 地は色の10%・ii85L（旧 #fff7e6）",
           "class": "warning",
           "prop": "background",
           "source": "var(--color-status-warn-soft)",
-          "resolved": "#fff7e6"
+          "resolved": "#f973161a"
         },
         {
-          "pencil": "warning label: $status-warn-deep",
+          "pencil": "warning label: $status-warn-deep → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 文字は濃い方・ii85L（旧 #a15c00）",
           "class": "warning",
           "prop": "color",
           "source": "var(--color-status-warn-deep)",
-          "resolved": "#a15c00"
+          "resolved": "#c2410c"
         },
         {
-          "pencil": "success fill: $accent-soft",
+          "pencil": "success fill: $accent-soft → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 地は色の10%・mpVfY（旧 #e8f8ee）",
           "class": "success",
           "prop": "background",
           "source": "var(--color-accent-soft)",
-          "resolved": "#e8f8ee"
+          "resolved": "#16a34a1a"
         },
         {
-          "pencil": "success label: $success（#669: 成功色をsuccessへ1本化。accent-deepと同役だったため）",
+          "pencil": "success label: $success（#669: 成功色をsuccessへ1本化。accent-deepと同役だったため） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 文字は濃い方・mpVfY（旧 #047833）",
           "class": "success",
           "prop": "color",
           "source": "var(--color-success)",
-          "resolved": "#047833"
+          "resolved": "#087a3e"
         },
         {
-          "pencil": "danger fill: $status-danger-soft",
+          "pencil": "danger fill: $status-danger-soft → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 地は色の10%・XwfSH（旧 #fef0f0）",
           "class": "danger",
           "prop": "background",
           "source": "var(--color-status-danger-soft)",
-          "resolved": "#fef0f0"
+          "resolved": "#ef44441a"
         },
         {
-          "pencil": "danger label: $status-danger → $danger（#702: $status-danger は 3.53:1 で AA 未達。白背景・$status-danger-soft 上どちらでも 4.5:1 以上になる $danger へ寄せる）",
+          "pencil": "danger label: $status-danger → $danger（#702: $status-danger は 3.53:1 で AA 未達。白背景・$status-danger-soft 上どちらでも 4.5:1 以上になる $danger へ寄せる） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-4 文字は濃い方・XwfSH（旧 #b3261e）",
           "class": "danger",
           "prop": "color",
           "source": "var(--color-danger)",
-          "resolved": "#b3261e"
+          "resolved": "#b91c1c"
         }
       ]
     },
@@ -2062,7 +2152,7 @@
       ],
       "cssPrefix": "text-field",
       "pencilUsage": "スタッフ追加とリマインダ作成へ適用開始",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "1行と複数行を同じcontrolへまとめ、入力要素の属性と既存保存処理をそのまま渡す。focusはPencil未定義のためブラウザ既定を消さない。2026-10-08：入力欄を1本化。正本は text-field.tsx（.field／1行 .single／複数行 .multi）。form-controls の TextInput・TextArea は正本を呼ぶ薄い包み。複数行は縦にだけ広げられる。",
       "routes": {
         "active": [
@@ -2088,18 +2178,18 @@
           "resolved": "100%"
         },
         {
-          "pencil": "ytG7l/keKe3 stroke: $hairline / 1",
+          "pencil": "ytG7l/keKe3 stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-150 欄の枠 黒12%・Ume2U（旧 1px solid #dadde2）",
           "class": "field",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f1f",
+          "resolved": "1px solid #1d1d1f1f"
         },
         {
-          "pencil": "ytG7l/keKe3 cornerRadius: $radius-sm",
+          "pencil": "ytG7l/keKe3 cornerRadius: $radius-sm → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-9 欄 10・Ume2U（旧 8px）",
           "class": "field",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "8px"
+          "resolved": "10px"
         },
         {
           "pencil": "ytG7l/keKe3 fill: $canvas",
@@ -2116,18 +2206,18 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "ytG7l/keKe3 fontSize: $size-label → #976 U079 で $size-body(14px) へ",
+          "pencil": "ytG7l/keKe3 fontSize: $size-label → #976 U079 で $size-body(14px) へ → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Ume2U 値 13（旧 14px）",
           "class": "field",
           "prop": "font-size",
           "source": "var(--text-body)",
-          "resolved": "14px"
+          "resolved": "13px"
         },
         {
-          "pencil": "ytG7l height: 40",
+          "pencil": "ytG7l height: 40 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Ume2U 枠 36（旧 40px）",
           "class": "single",
           "prop": "height",
-          "source": "40px",
-          "resolved": "40px"
+          "source": "36px",
+          "resolved": "36px"
         },
         {
           "pencil": "ytG7l padding: [0,12]",
@@ -2163,6 +2253,13 @@
           "prop": "resize",
           "source": "vertical",
           "resolved": "vertical"
+        },
+        {
+          "pencil": "2026-10-09 追加 V8: B-150 欄の影 案1（Ume2U）",
+          "class": "field",
+          "prop": "box-shadow",
+          "source": "0 1px 2px #1d1d1f0f",
+          "resolved": "0 1px 2px #1d1d1f0f"
         }
       ]
     },
@@ -2181,7 +2278,7 @@
       ],
       "cssPrefix": "search-field",
       "pencilUsage": "一覧ツールバーへ適用開始",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "検索語・読込中・無効・クリア操作を同じ部品へ固定し、Lucideのsearchアイコンを使う。",
       "routes": {
         "active": [
@@ -2208,11 +2305,11 @@
           "resolved": "flex"
         },
         {
-          "pencil": "phlR1 height: 42 → #976 U083 で入力欄と同じ40pxへ",
+          "pencil": "phlR1 height: 42 → #976 U083 で入力欄と同じ40pxへ → 2026-10-09 V8（Pen 決まり B-146〜B-161）: TkVyB 36（旧 40px）",
           "class": "search",
           "prop": "height",
-          "source": "40px",
-          "resolved": "40px"
+          "source": "36px",
+          "resolved": "36px"
         },
         {
           "pencil": "phlR1 alignItems: center",
@@ -2222,32 +2319,32 @@
           "resolved": "center"
         },
         {
-          "pencil": "phlR1 gap: 10",
+          "pencil": "phlR1 gap: 10 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: TkVyB gap 8（旧 10px）",
           "class": "search",
           "prop": "gap",
-          "source": "10px",
-          "resolved": "10px"
+          "source": "8px",
+          "resolved": "8px"
         },
         {
-          "pencil": "phlR1 padding: [0,14]",
+          "pencil": "phlR1 padding: [0,14] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: TkVyB padding [0,12]（旧 0 14px）",
           "class": "search",
           "prop": "padding",
-          "source": "0 14px",
-          "resolved": "0 14px"
+          "source": "0 12px",
+          "resolved": "0 12px"
         },
         {
-          "pencil": "phlR1 stroke: $hairline / 1",
+          "pencil": "phlR1 stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-150 欄の枠 黒12%・TkVyB（旧 1px solid #dadde2）",
           "class": "search",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f1f",
+          "resolved": "1px solid #1d1d1f1f"
         },
         {
-          "pencil": "phlR1 cornerRadius: $radius-sm",
+          "pencil": "phlR1 cornerRadius: $radius-sm → 2026-10-09 V8（Pen 決まり B-146〜B-161）: TkVyB 角丸 10（旧 8px）",
           "class": "search",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "8px"
+          "resolved": "10px"
         },
         {
           "pencil": "phlR1 fill: $canvas",
@@ -2264,11 +2361,11 @@
           "resolved": "17px"
         },
         {
-          "pencil": "phlR1 icon height: 17",
+          "pencil": "phlR1 icon height: 17 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-5 印は 16（旧 17px）",
           "class": "searchIcon",
           "prop": "height",
-          "source": "17px",
-          "resolved": "17px"
+          "source": "16px",
+          "resolved": "16px"
         },
         {
           "pencil": "phlR1 icon fill: $ink-faint",
@@ -2285,11 +2382,18 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "phlR1 fontSize: $size-caption → #976 U079 で $size-body(14px) へ",
+          "pencil": "phlR1 fontSize: $size-caption → #976 U079 で $size-body(14px) へ → 2026-10-09 V8（Pen 決まり B-146〜B-161）: TkVyB 13（旧 14px）",
           "class": "input",
           "prop": "font-size",
           "source": "var(--text-body)",
-          "resolved": "14px"
+          "resolved": "13px"
+        },
+        {
+          "pencil": "2026-10-09 追加 V8: B-150 欄の影 案1（TkVyB）",
+          "class": "search",
+          "prop": "box-shadow",
+          "source": "0 1px 2px #1d1d1f0f",
+          "resolved": "0 1px 2px #1d1d1f0f"
         }
       ]
     },
@@ -2311,7 +2415,7 @@
       ],
       "cssPrefix": "select",
       "pencilUsage": "スタッフ追加と一覧ツールバーへ適用開始",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "閉・開・選択・無効・エラーを同じ部品の状態へ統合し、値変更は既存処理へ返す。V6専用選択部品は未確認。",
       "routes": {
         "active": [
@@ -2346,32 +2450,32 @@
           "resolved": "128px"
         },
         {
-          "pencil": "rpot9 height: 42 → #976 U083 で入力欄と同じ40pxへ",
+          "pencil": "rpot9 height: 42 → #976 U083 で入力欄と同じ40pxへ → 2026-10-09 V8（Pen 決まり B-146〜B-161）: wMMk6 36（旧 40px）",
           "class": "trigger",
           "prop": "height",
-          "source": "40px",
-          "resolved": "40px"
+          "source": "36px",
+          "resolved": "36px"
         },
         {
-          "pencil": "rpot9 padding: [0,13]",
+          "pencil": "rpot9 padding: [0,13] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: wMMk6 padding [0,12]（旧 0 13px）",
           "class": "trigger",
           "prop": "padding",
-          "source": "0 13px",
-          "resolved": "0 13px"
+          "source": "0 12px",
+          "resolved": "0 12px"
         },
         {
-          "pencil": "rpot9 stroke: $hairline / 1",
+          "pencil": "rpot9 stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-150 欄の枠 黒12%・wMMk6（旧 1px solid #dadde2）",
           "class": "trigger",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f1f",
+          "resolved": "1px solid #1d1d1f1f"
         },
         {
-          "pencil": "rpot9 cornerRadius: $radius-sm",
+          "pencil": "rpot9 cornerRadius: $radius-sm → 2026-10-09 V8（Pen 決まり B-146〜B-161）: wMMk6 角丸 10（旧 8px）",
           "class": "closedTrigger",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "8px"
+          "resolved": "10px"
         },
         {
           "pencil": "rpot9 fill: $canvas",
@@ -2381,18 +2485,18 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "rpot9 fontSize: $size-label → #976 U079 で $size-body(14px) へ",
+          "pencil": "rpot9 fontSize: $size-label → #976 U079 で $size-body(14px) へ → 2026-10-09 V8（Pen 決まり B-146〜B-161）: wMMk6 13/500（旧 14px）",
           "class": "trigger",
           "prop": "font-size",
           "source": "var(--text-body)",
-          "resolved": "14px"
+          "resolved": "13px"
         },
         {
-          "pencil": "rpot9 fontWeight: 600",
+          "pencil": "rpot9 fontWeight: 600 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: wMMk6 13/500（旧 600）",
           "class": "trigger",
           "prop": "font-weight",
-          "source": "600",
-          "resolved": "600"
+          "source": "500",
+          "resolved": "500"
         },
         {
           "pencil": "rpot9 justifyContent: space_between",
@@ -2437,11 +2541,11 @@
           "resolved": "#06c755"
         },
         {
-          "pencil": "Gfsb4 list stroke: $accent",
+          "pencil": "Gfsb4 list stroke: $accent → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面の縁 --card-edge・StFE7（旧 1px solid #06c755）",
           "class": "listbox",
           "prop": "border",
-          "source": "1px solid var(--color-accent)",
-          "resolved": "1px solid #06c755"
+          "source": "1px solid #1d1d1f14",
+          "resolved": "1px solid #1d1d1f14"
         },
         {
           "pencil": "Gfsb4 list fill: $canvas",
@@ -2458,25 +2562,25 @@
           "resolved": "38px"
         },
         {
-          "pencil": "Gfsb4 option gap: 10",
+          "pencil": "Gfsb4 option gap: 10 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: StFE7 項目 gap 8（旧 10px）",
           "class": "option",
           "prop": "gap",
-          "source": "10px",
-          "resolved": "10px"
+          "source": "8px",
+          "resolved": "8px"
         },
         {
-          "pencil": "Gfsb4 option padding: [0,13]",
+          "pencil": "Gfsb4 option padding: [0,13] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: StFE7 項目 padding [8,12]（旧 0 13px）",
           "class": "option",
           "prop": "padding",
-          "source": "0 13px",
-          "resolved": "0 13px"
+          "source": "0 12px",
+          "resolved": "0 12px"
         },
         {
-          "pencil": "Gfsb4 option fontSize: $size-label → #976 U079 で $size-body(14px) へ",
+          "pencil": "Gfsb4 option fontSize: $size-label → #976 U079 で $size-body(14px) へ → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 本文 13（旧 14px）",
           "class": "option",
           "prop": "font-size",
           "source": "var(--text-body)",
-          "resolved": "14px"
+          "resolved": "13px"
         },
         {
           "pencil": "Gfsb4 option fontWeight: 500",
@@ -2486,11 +2590,11 @@
           "resolved": "500"
         },
         {
-          "pencil": "Gfsb4 selected fill: $accent-soft",
+          "pencil": "Gfsb4 selected fill: $accent-soft → 2026-10-09 V8（Pen 決まり B-146〜B-161）: StFE7 項目/選んだ の地（旧 #e8f8ee）",
           "class": "selectedBackground",
           "prop": "background",
           "source": "var(--color-accent-soft)",
-          "resolved": "#e8f8ee"
+          "resolved": "#fafafc"
         },
         {
           "pencil": "Gfsb4 selected fontWeight: 500（★V7 §2 3段化）",
@@ -2554,6 +2658,13 @@
           "prop": "width",
           "source": "13px",
           "resolved": "13px"
+        },
+        {
+          "pencil": "2026-10-09 追加 V8: B-150 欄の影 案1（wMMk6）",
+          "class": "trigger",
+          "prop": "box-shadow",
+          "source": "0 1px 2px #1d1d1f0f",
+          "resolved": "0 1px 2px #1d1d1f0f"
         }
       ]
     },
@@ -2572,7 +2683,7 @@
       ],
       "cssPrefix": "icon-button",
       "pencilUsage": "画面適用待ち",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "見える文字がないためaria-labelを必須にし、フォーカスとdisabledをコード側で補う。",
       "routes": {
         "implemented": [],
@@ -2595,11 +2706,11 @@
           "resolved": "32px"
         },
         {
-          "pencil": "H0V8EK height: 32",
+          "pencil": "H0V8EK height: 32 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: KspUx 36（旧 32px）",
           "class": "button",
           "prop": "height",
-          "source": "32px",
-          "resolved": "32px"
+          "source": "36px",
+          "resolved": "36px"
         },
         {
           "pencil": "H0V8EK fixed size: 32",
@@ -2623,25 +2734,25 @@
           "resolved": "center"
         },
         {
-          "pencil": "H0V8EK stroke: none",
+          "pencil": "H0V8EK stroke: none → 2026-10-09 V8（Pen 決まり B-146〜B-161）: KspUx 枠 黒7%（旧 0）",
           "class": "button",
           "prop": "border",
-          "source": "0",
-          "resolved": "0"
+          "source": "1px solid #1d1d1f12",
+          "resolved": "1px solid #1d1d1f12"
         },
         {
-          "pencil": "H0V8EK cornerRadius: $radius-xxs",
+          "pencil": "H0V8EK cornerRadius: $radius-xxs → 2026-10-09 V8（Pen 決まり B-146〜B-161）: KspUx 角丸 10（旧 3px）",
           "class": "button",
           "prop": "border-radius",
-          "source": "var(--radius-icon)",
-          "resolved": "3px"
+          "source": "10px",
+          "resolved": "10px"
         },
         {
-          "pencil": "H0V8EK fill: transparent",
+          "pencil": "H0V8EK fill: transparent → 2026-10-09 V8（Pen 決まり B-146〜B-161）: KspUx 白地（旧 transparent）",
           "class": "button",
           "prop": "background",
-          "source": "transparent",
-          "resolved": "transparent"
+          "source": "#ffffff",
+          "resolved": "#ffffff"
         },
         {
           "pencil": "H0V8EK icon fill: $ink-faint",
@@ -2669,7 +2780,7 @@
       ],
       "cssPrefix": "dialog",
       "pencilUsage": "既存ConfirmDialog利用画面と友だち属性へ適用",
-      "lastCheckedAt": "2026-09-13",
+      "lastCheckedAt": "2026-10-09",
       "note": "標準確認と重要操作の警告面をtoneへ統合し、busy/error/focus/Escape/フォーカス循環をコード側で補った。V6代表11画面の直接refは0件のためV5を基準にする。長い操作名は112pxを最小幅として横に広げ、1行で表示する。",
       "routes": {
         "active": [
@@ -2695,18 +2806,18 @@
           "resolved": "min(844px, 100%)"
         },
         {
-          "pencil": "J6x4Q stroke: $hairline / 1",
+          "pencil": "J6x4Q stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: q3DPdz 縁 --card-edge（旧 1px solid #dadde2）",
           "class": "panel",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f14",
+          "resolved": "1px solid #1d1d1f14"
         },
         {
-          "pencil": "J6x4Q cornerRadius: $radius-panel",
+          "pencil": "J6x4Q cornerRadius: $radius-panel → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-9 窓 16・q3DPdz（旧 12px）",
           "class": "panel",
           "prop": "border-radius",
           "source": "var(--radius-panel)",
-          "resolved": "12px"
+          "resolved": "16px"
         },
         {
           "pencil": "J6x4Q fill: $canvas",
@@ -2716,11 +2827,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "J6x4Q effect: card",
+          "pencil": "J6x4Q effect: card → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面の影・q3DPdz（旧 0px 8px 16px -4px #1d1d1f1a,0px 24px 48px -8px #1d1d1f2e,0px 0px 0px 1px #1d1d1f14）",
           "class": "panel",
           "prop": "box-shadow",
           "source": "var(--shadow-overlay)",
-          "resolved": "0px 8px 16px -4px #1d1d1f1a,0px 24px 48px -8px #1d1d1f2e,0px 0px 0px 1px #1d1d1f14"
+          "resolved": "0 8px 24px #1d1d1f1f"
         },
         {
           "pencil": "J6x4Q gap: 12",
@@ -2730,11 +2841,11 @@
           "resolved": "12px"
         },
         {
-          "pencil": "J6x4Q padding: 18",
+          "pencil": "J6x4Q padding: 18 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: q3DPdz 中身 24（旧 18px）",
           "class": "standardPanel",
           "prop": "padding",
-          "source": "18px",
-          "resolved": "18px"
+          "source": "24px",
+          "resolved": "24px"
         },
         {
           "pencil": "J6x4Q title fill: $ink",
@@ -2744,11 +2855,11 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "J6x4Q title fontSize: $size-lead",
+          "pencil": "J6x4Q title fontSize: $size-lead → 2026-10-09 V8（Pen 決まり B-146〜B-161）: q3DPdz 題 18/600（旧 16px）",
           "class": "standardTitle",
           "prop": "font-size",
           "source": "var(--text-lead)",
-          "resolved": "16px"
+          "resolved": "18px"
         },
         {
           "pencil": "J6x4Q title fontWeight: 600（★V7 §2 3段化）",
@@ -2758,25 +2869,25 @@
           "resolved": "600"
         },
         {
-          "pencil": "J6x4Q description fill: $ink-faint",
+          "pencil": "J6x4Q description fill: $ink-faint → 2026-10-09 V8（Pen 決まり B-146〜B-161）: q3DPdz 説明は ink-secondary（旧 #626a73）",
           "class": "description",
           "prop": "color",
           "source": "var(--color-ink-faint)",
-          "resolved": "#626a73"
+          "resolved": "#4a5565"
         },
         {
-          "pencil": "J6x4Q description fontSize: $size-caption",
+          "pencil": "J6x4Q description fontSize: $size-caption → 2026-10-09 V8（Pen 決まり B-146〜B-161）: q3DPdz 説明 13（旧 12px）",
           "class": "description",
           "prop": "font-size",
           "source": "var(--text-caption)",
-          "resolved": "12px"
+          "resolved": "13px"
         },
         {
-          "pencil": "J6x4Q actions gap: 10",
+          "pencil": "J6x4Q actions gap: 10 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: q3DPdz 下の帯 gap 8（旧 10px）",
           "class": "actions",
           "prop": "gap",
-          "source": "10px",
-          "resolved": "10px"
+          "source": "8px",
+          "resolved": "8px"
         },
         {
           "pencil": "J6x4Q button minWidth: 112",
@@ -2823,7 +2934,7 @@
       ],
       "cssPrefix": "drawer",
       "pencilUsage": "友だち属性の連動アクションへ適用",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "VJKATの見出し・閉じる・詳細行を保ち、全高オーバーレイ時は同じ面を拡張して使う。",
       "routes": {
         "active": [
@@ -2856,11 +2967,11 @@
           "resolved": "190px"
         },
         {
-          "pencil": "VJKAT stroke: $hairline / 1",
+          "pencil": "VJKAT stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.2 ごく薄い線（旧 1px solid #dadde2）",
           "class": "inline",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f14",
+          "resolved": "1px solid #1d1d1f14"
         },
         {
           "pencil": "VJKAT cornerRadius: $radius-panel",
@@ -2950,7 +3061,7 @@
       ],
       "cssPrefix": "detail-panel",
       "pencilUsage": "一覧の行の詳細表示",
-      "lastCheckedAt": "2026-10-04",
+      "lastCheckedAt": "2026-10-09",
       "note": "窓の埋め込み面を土台にし、一覧は左に見えたままにする。↑↓で前・次の行、URLに行を残す。",
       "routes": {
         "active": [],
@@ -2987,11 +3098,11 @@
           "resolved": "600"
         },
         {
-          "pencil": "radius card",
+          "pencil": "radius card → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-9 引き出し 16（旧 12px）",
           "class": "panel",
           "prop": "border-radius",
           "source": "var(--radius-card)",
-          "resolved": "12px"
+          "resolved": "16px"
         }
       ]
     },
@@ -3105,7 +3216,7 @@
       ],
       "cssPrefix": "notice",
       "pencilUsage": "★V7 共通部品その2 §1 の帯へ適用",
-      "lastCheckedAt": "2026-09-26",
+      "lastCheckedAt": "2026-10-09",
       "note": "4種（案内・うまくいった・注意・危険）。高さは中身なり。旧 tone 名（validation・error）は同じ見た目の別名として残す。",
       "routes": {
         "active": [
@@ -3123,25 +3234,25 @@
       },
       "declarations": [
         {
-          "pencil": "uR9s8 gap: 8",
+          "pencil": "uR9s8 gap: 8 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: ThDed gap 12（旧 8px）",
           "class": "notice",
           "prop": "gap",
-          "source": "8px",
-          "resolved": "8px"
+          "source": "12px",
+          "resolved": "12px"
         },
         {
-          "pencil": "uR9s8 padding: 10 12",
+          "pencil": "uR9s8 padding: 10 12 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: ThDed padding [12,16]（旧 10px 12px）",
           "class": "notice",
           "prop": "padding",
-          "source": "10px 12px",
-          "resolved": "10px 12px"
+          "source": "12px 16px",
+          "resolved": "12px 16px"
         },
         {
-          "pencil": "uR9s8 cornerRadius: $radius-control",
+          "pencil": "uR9s8 cornerRadius: $radius-control → 2026-10-09 V8（Pen 決まり B-146〜B-161）: ThDed 角丸 10（旧 8px）",
           "class": "notice",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "8px"
+          "resolved": "10px"
         },
         {
           "pencil": "uR9s8 fontSize: $size-label",
@@ -3211,7 +3322,7 @@
       ],
       "cssPrefix": "toast",
       "pencilUsage": "★V7 共通部品その2 §2 の知らせへ適用",
-      "lastCheckedAt": "2026-09-30",
+      "lastCheckedAt": "2026-10-09",
       "note": "4秒で消える。role=status。取り消せる操作は「元に戻す」を1つ付ける。置き場所は外枠に1つ。「知らせは黒にしない」（2026-09-30 オーナー）— 白地・細い線・段2（浮く）の影で、成功・失敗は印の色（緑/赤）だけで分ける。",
       "routes": {
         "active": [
@@ -3235,18 +3346,18 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "uR9s8 §2: 細い線",
+          "pencil": "uR9s8 §2: 細い線 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Q6cQB 枠 黒7%（旧 1px solid #dadde2）",
           "class": "toast",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f12",
+          "resolved": "1px solid #1d1d1f12"
         },
         {
-          "pencil": "uR9s8 §2: 段2（浮く）の影",
+          "pencil": "uR9s8 §2: 段2（浮く）の影 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Q6cQB 影（旧 0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14）",
           "class": "toast",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14"
+          "resolved": "0 1px 2px #1d1d1f0f,0 8px 24px #1d1d1f14"
         },
         {
           "pencil": "uR9s8 §2: 文字は ink / caption semibold",
@@ -3256,18 +3367,18 @@
           "resolved": "#1d1d1f"
         },
         {
-          "pencil": "uR9s8 toast text: caption",
+          "pencil": "uR9s8 toast text: caption → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Q6cQB 文 13（旧 12px）",
           "class": "toast",
           "prop": "font-size",
           "source": "var(--text-caption)",
-          "resolved": "12px"
+          "resolved": "13px"
         },
         {
-          "pencil": "uR9s8 toast corner: control",
+          "pencil": "uR9s8 toast corner: control → 2026-10-09 V8（Pen 決まり B-146〜B-161）: Q6cQB 角丸 12（旧 8px）",
           "class": "toast",
           "prop": "border-radius",
           "source": "var(--radius-control)",
-          "resolved": "8px"
+          "resolved": "12px"
         },
         {
           "pencil": "uR9s8 §2: 成功の印は緑",
@@ -3308,7 +3419,7 @@
       ],
       "cssPrefix": "action-menu",
       "pencilUsage": "友だち属性のフォルダ行へ適用",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "項目・補足・別画面・区切り・見出し・危険操作・注記をデータで渡し、矢印キー/Escape/外側クリックを補う。",
       "routes": {
         "active": [
@@ -3340,11 +3451,11 @@
           "resolved": "min(320px, calc(100vw - 16px))"
         },
         {
-          "pencil": "xifuV stroke: $hairline / 1",
+          "pencil": "xifuV stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面の縁・StFE7（旧 1px solid #dadde2）",
           "class": "menu",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f14",
+          "resolved": "1px solid #1d1d1f14"
         },
         {
           "pencil": "xifuV cornerRadius: 12",
@@ -3361,11 +3472,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "xifuV effect: float",
+          "pencil": "xifuV effect: float → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面の影・StFE7（旧 0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14）",
           "class": "menu",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14"
+          "resolved": "0 8px 24px #1d1d1f1f"
         },
         {
           "pencil": "xifuV gap: 2",
@@ -3375,11 +3486,11 @@
           "resolved": "2px"
         },
         {
-          "pencil": "xifuV padding: 6",
+          "pencil": "xifuV padding: 6 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: StFE7 padding 8（旧 6px）",
           "class": "menu",
           "prop": "padding",
-          "source": "6px",
-          "resolved": "6px"
+          "source": "8px",
+          "resolved": "8px"
         },
         {
           "pencil": "xifuV item height: 36",
@@ -3396,25 +3507,25 @@
           "resolved": "52px"
         },
         {
-          "pencil": "xifuV item gap: 9",
+          "pencil": "xifuV item gap: 9 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: StFE7 項目 gap 8（旧 9px）",
           "class": "item",
           "prop": "gap",
-          "source": "9px",
-          "resolved": "9px"
+          "source": "8px",
+          "resolved": "8px"
         },
         {
-          "pencil": "xifuV item padding: [0,10]",
+          "pencil": "xifuV item padding: [0,10] → 2026-10-09 V8（Pen 決まり B-146〜B-161）: StFE7 項目 padding [8,12]（旧 0 10px）",
           "class": "item",
           "prop": "padding",
-          "source": "0 10px",
-          "resolved": "0 10px"
+          "source": "0 12px",
+          "resolved": "0 12px"
         },
         {
-          "pencil": "xifuV item cornerRadius: $radius-xs",
+          "pencil": "xifuV item cornerRadius: $radius-xs → 2026-10-09 V8（Pen 決まり B-146〜B-161）: StFE7 項目 角丸 8（旧 3px）",
           "class": "item",
           "prop": "border-radius",
           "source": "var(--radius-icon)",
-          "resolved": "3px"
+          "resolved": "8px"
         },
         {
           "pencil": "xifuV item icon: 16",
@@ -3424,11 +3535,11 @@
           "resolved": "16px"
         },
         {
-          "pencil": "xifuV item fontSize: $size-body",
+          "pencil": "xifuV item fontSize: $size-body → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 本文 13（旧 14px）",
           "class": "item",
           "prop": "font-size",
           "source": "var(--text-body)",
-          "resolved": "14px"
+          "resolved": "13px"
         },
         {
           "pencil": "xifuV danger fill: $status-danger",
@@ -3445,11 +3556,11 @@
           "resolved": "11px"
         },
         {
-          "pencil": "xifuV note fontSize: $size-nano",
+          "pencil": "xifuV note fontSize: $size-nano → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 注 11（10 は段に無い）（旧 10px）",
           "class": "note",
           "prop": "font-size",
           "source": "var(--text-nano)",
-          "resolved": "10px"
+          "resolved": "11px"
         }
       ]
     },
@@ -3506,7 +3617,7 @@
       ],
       "cssPrefix": "notification-panel",
       "pencilUsage": "通知データAPIと表示入口の要件待ち",
-      "lastCheckedAt": "2026-08-24",
+      "lastCheckedAt": "2026-10-09",
       "note": "開・読込・空・失敗・未読とフィルター操作まで実装した。既存に通知センターAPIとベル入口がないため実画面へはまだ接続しない。",
       "routes": {
         "implemented": [],
@@ -3529,11 +3640,11 @@
           "resolved": "min(380px, calc(100vw - 32px))"
         },
         {
-          "pencil": "z6TmF stroke: $hairline / 1",
+          "pencil": "z6TmF stroke: $hairline / 1 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面の縁（旧 1px solid #dadde2）",
           "class": "panel",
           "prop": "border",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f14",
+          "resolved": "1px solid #1d1d1f14"
         },
         {
           "pencil": "z6TmF cornerRadius: $radius-panel",
@@ -3550,11 +3661,11 @@
           "resolved": "#ffffff"
         },
         {
-          "pencil": "z6TmF effect: float",
+          "pencil": "z6TmF effect: float → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面の影（旧 0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14）",
           "class": "panel",
           "prop": "box-shadow",
-          "source": "var(--shadow-float)",
-          "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14"
+          "source": "0 8px 24px #1d1d1f1f",
+          "resolved": "0 8px 24px #1d1d1f1f"
         },
         {
           "pencil": "z6TmF header padding",
@@ -3564,11 +3675,11 @@
           "resolved": "14px 16px"
         },
         {
-          "pencil": "z6TmF title fontSize: $size-lead",
+          "pencil": "z6TmF title fontSize: $size-lead → 2026-10-09 V8（Pen 決まり B-146〜B-161）: §6.5-2 段の題 15（旧 16px）",
           "class": "title",
           "prop": "font-size",
-          "source": "var(--text-lead)",
-          "resolved": "16px"
+          "source": "15px",
+          "resolved": "15px"
         },
         {
           "pencil": "z6TmF title fontWeight: 600（★V7 §2 3段化）",
@@ -3627,11 +3738,11 @@
           "resolved": "12px 16px"
         },
         {
-          "pencil": "z6TmF item stroke top",
+          "pencil": "z6TmF item stroke top → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-149 線は黒7%（旧 1px solid #dadde2）",
           "class": "item",
           "prop": "border-top",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f12",
+          "resolved": "1px solid #1d1d1f12"
         },
         {
           "pencil": "z6TmF item title fontSize: $size-label",
@@ -3678,7 +3789,7 @@
       ],
       "cssPrefix": "bulk-bar",
       "pencilUsage": "★V7 仕上げ §2「一括バーは黒にしない」へ適用",
-      "lastCheckedAt": "2026-09-30",
+      "lastCheckedAt": "2026-10-09",
       "note": "表で1件でも選ぶと下端から8px上がって出る、0件で下がって消える。黒地は使わず surface-pearl＋上1pxの線＋段2（浮く）の影。件数は濃い緑の太字、操作は白地ボタン＋残りは「…」。",
       "routes": {
         "active": [
@@ -3690,25 +3801,25 @@
       },
       "declarations": [
         {
-          "pencil": "z97zZN §2: 一括バーの地は surface-pearl（黒にしない）",
+          "pencil": "z97zZN §2: 一括バーの地は surface-pearl（黒にしない） → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面（白いバー）（旧 #fafafc）",
           "class": "bar",
           "prop": "background",
           "source": "var(--color-surface-pearl)",
-          "resolved": "#fafafc"
+          "resolved": "#ffffff"
         },
         {
-          "pencil": "z97zZN §2: 上に1pxの細い線",
+          "pencil": "z97zZN §2: 上に1pxの細い線 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面の縁（旧 1px solid #dadde2）",
           "class": "bar",
           "prop": "border-top",
-          "source": "1px solid var(--color-hairline)",
-          "resolved": "1px solid #dadde2"
+          "source": "1px solid #1d1d1f14",
+          "resolved": "1px solid #1d1d1f14"
         },
         {
-          "pencil": "z97zZN §2: 段2（浮く）の影",
+          "pencil": "z97zZN §2: 段2（浮く）の影 → 2026-10-09 V8（Pen 決まり B-146〜B-161）: B-161 浮く面の影（旧 0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14）",
           "class": "bar",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
-          "resolved": "0px 4px 8px -2px #1d1d1f14,0px 12px 24px -4px #1d1d1f24,0px 0px 0px 1px #1d1d1f14"
+          "resolved": "0 8px 24px #1d1d1f1f"
         },
         {
           "pencil": "z97zZN §2: 件数は濃い緑の太字",

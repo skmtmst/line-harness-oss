@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import MenuPortal from './menu-portal'
@@ -10,6 +11,8 @@ export type ActionMenuItem = {
   id: string
   label: string
   icon?: ReactNode
+  /** 自分で結果を表示する共通操作（コピーなど）。 */
+  content?: ReactNode
   /** 先頭の主な操作を太字で示す。既存の項目の見た目は変えない。 */
   emphasis?: boolean
   /**
@@ -23,6 +26,7 @@ export type ActionMenuItem = {
    * 同じ画面の中の操作（モーダル・タブ切替）には付けない。
    */
   external?: boolean
+  href?: string
   disabled?: boolean
   /**
    * #985 LAY-18: 押せない理由（使用中・公開中など）。無効な項目の下に
@@ -178,7 +182,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {items.map((item) => (
+      {items.map((item) => item.content ?? (
         <div key={item.id}>
           {item.dividerBefore ? <hr className={styles.divider} /> : null}
           {item.sectionBefore ? (
@@ -186,7 +190,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               {item.sectionBefore}
             </p>
           ) : null}
-          <button
+          <MenuCommand href={item.href} external={item.external}
             type="button"
             role="menuitem"
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
@@ -198,7 +202,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               // 先に開いたボタンへ戻しておく。項目が窓を開くと、窓はこのボタンを
               // 「開く前の場所」として覚え、閉じた後にここへ戻す（消えた項目へは戻れない）。
               if (!inline) getFocusTarget()?.focus({ preventScroll: true })
-              item.onSelect()
+              if (!item.href) item.onSelect()
               onClose()
             }}
           >
@@ -215,7 +219,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
             {item.external ? (
               <ArrowUpRight size={14} aria-hidden="true" className={styles.externalIcon} />
             ) : null}
-          </button>
+          </MenuCommand>
         </div>
       ))}
       {note ? <p className={styles.note}>{note}</p> : null}
@@ -234,4 +238,9 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       </MenuPortal>
     </>
   )
+}
+
+function MenuCommand({ href, external, disabled, children, type, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { href?: string; external?: boolean }) {
+  if (href && !disabled) return <Link href={href} role={props.role} className={props.className} title={props.title} target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined} onClick={props.onClick as unknown as React.MouseEventHandler<HTMLAnchorElement>}>{children}</Link>
+  return <button {...props} type={type} disabled={disabled}>{children}</button>
 }

@@ -307,7 +307,7 @@ test('アカウントを切り替えて集計が403になっても、前のア�
   await expect(overviewNumbers(page, 111)).toBeVisible()
 
   await switchAccount(page, ACCOUNT_B)
-  await expect(page.getByText('集計を表示する権限がありません。一覧は取得できた範囲で表示しています。')).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'この操作の権限がありません。オーナーか管理者に頼んでください。' })).toBeVisible()
   await expect(overviewNumbers(page, 111)).toHaveCount(0)
   await expectNoOverviewNumbers(page)
   /* 権限が無いので取り直しは出さない。 */

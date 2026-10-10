@@ -3,7 +3,7 @@
  * R598 残件（独立オラクル由来）：権限不足（403）の言い分け。
  *
  * - 集計・候補の両方が403 → 権限の案内だけにし、押しても直らない
- *   再試行は出さない（汎用エラー「通信が切れたか…」にしない）。
+ *   再読み込みを出す（汎用エラー「通信が切れたか…」にしない）。
  * - 集計の取得済みがある状態で再検出→集計403 → 候補は残し、
  *   集計欄を権限の案内にし、「もう一度」は出さない。
  * - 503の振る舞い（再試行あり・候補残し）は変えない。
@@ -132,13 +132,13 @@ function hasRetryButton(): boolean {
 }
 
 describe('権限不足でも候補を残し再試行を出さない（R598残件）', () => {
-  it('集計・候補の両方403：権限の案内にし、再試行は出さない', async () => {
+  it('集計・候補の両方403：権限の案内にし、再読み込みを出す', async () => {
     fixture.stats.mockRejectedValue(new ApiError(403))
     fixture.list.mockRejectedValue(new ApiError(403))
     await renderPage()
 
     expect(host.textContent).toContain('権限')
-    expect(hasRetryButton()).toBe(false)
+    expect(hasRetryButton()).toBe(true)
     // 空の一覧と誤認させない。
     expect(host.textContent).not.toContain('条件に合う重複候補はありません')
   })

@@ -68,7 +68,7 @@ export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; o
         {failed ? (
           <p className={styles.faint}>
             案内を読み込めませんでした。{' '}
-            <button type="button" className="font-semibold underline" onClick={() => setAttempt((n) => n + 1)}>読み直す</button>
+            <button type="button" className="font-semibold underline" onClick={() => setAttempt((n) => n + 1)}>もう一度読み込む</button>
           </p>
         ) : !info ? (
           <p className={styles.faint}>読み込んでいます…</p>
@@ -84,7 +84,7 @@ export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; o
               <div className={styles.qrText}>
                 <p className={styles.lead}>スマートフォンの LINE でこの QR を読み取るか、下のボタンから友だち追加します。</p>
                 {info.addFriendUrl ? (
-                  <Button href={info.addFriendUrl} target="_blank" rel="noreferrer">
+                  <Button external href={info.addFriendUrl}  >
                     <Smartphone aria-hidden="true" className={styles.icon} />スマートフォンで開く（友だち追加）
                   </Button>
                 ) : null}

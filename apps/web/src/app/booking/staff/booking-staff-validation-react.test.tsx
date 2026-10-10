@@ -214,7 +214,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
     fireEvent.change(screen.getByLabelText(/スタッフ名/), { target: { value: '  田中  ' } })
     fireEvent.change(screen.getByLabelText(/お客様向けの表示名/), { target: { value: '  たなか  ' } })
     fireEvent.change(screen.getByLabelText(/肩書き/), { target: { value: '  店長  ' } })
-    fireEvent.change(screen.getByLabelText(/顔写真/), { target: { value: '  https://example.test/tanaka.png  ' } })
+    fireEvent.change(screen.getByRole('textbox', {name:'顔写真'}), { target: { value: '  https://example.test/tanaka.png  ' } })
     fireEvent.change(screen.getByLabelText(/紹介文/), { target: { value: '  丁寧に対応します。  ' } })
     fireEvent.click(await screen.findByRole('checkbox', { name: /カット/ }))
     fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))

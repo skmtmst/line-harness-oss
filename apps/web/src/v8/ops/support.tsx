@@ -1,5 +1,7 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { notifySaved } from '@/components/shared/toast'
 import StatusPill from '@/components/shared/status-pill'
 import { Building2, Check, CircleDot, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles, Star } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -30,6 +32,10 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './support.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
+import TextLink from '@/components/shared/text-link'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
@@ -81,10 +87,7 @@ const KIND_OPTIONS = [
 
 /** 「9/30 11:00」の形。 */
 function shortDateTime(value: string | null): string {
-  if (!value) return '—'
-  const full = formatDateTime(value)
-  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
-  return m ? `${Number(m[2])}/${Number(m[3])} ${m[4]}` : full
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 /** WEB218：チケットを1回に読む件数。 */
@@ -97,7 +100,7 @@ export default function OpsSupportV8() {
   const [loading, setLoading] = useState(true)
   const [stage, setStage] = useState<OpsSupportStage | 'all'>('all')
   const [priority, setPriority] = useState<'' | OpsSupportPriority>('')
-  const [sort, setSort] = useState<'newest' | 'oldest' | 'priority'>('priority')
+  const [sort, setSort] = useListUrlValue<'newest' | 'oldest' | 'priority'>('sort', 'priority')
   const [q, setQ] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<OpsSupportDetail | null>(null)
@@ -264,7 +267,7 @@ export default function OpsSupportV8() {
     if (!res.success) { setError(res.error || '下書きを保存できませんでした'); return }
     setReplyFromAi(null)
     setReferences([])
-    setNotice(res.data ? '下書きを保存しました' : '下書きを消しました')
+    notifySaved(res.data ? '下書きを保存しました' : '下書きを消しました')
   }
 
   const generateAi = async (excludeIds = excluded) => {
@@ -390,11 +393,11 @@ export default function OpsSupportV8() {
             <Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(value) => setSort(value as typeof sort)} size="full" />
           </div>
           {loading && tickets.length === 0 ? (
-            <ListState kind="loading" title="チケットを読み込んでいます" />
+            <ListState permissionScope="hq" kind="loading" title="チケットを読み込んでいます" />
           ) : listFailed && tickets.length === 0 ? (
-            <ListState kind="error" title="チケットを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={() => void loadList()} />
+            <ListState permissionScope="hq" kind="error" title="チケットを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={() => void loadList()} />
           ) : tickets.length === 0 ? (
-            <ListState kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
+            <ListState permissionScope="hq" kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
           ) : (
             <ul className={styles.tickets}>
               {tickets.map((t) => (
@@ -418,9 +421,9 @@ export default function OpsSupportV8() {
 
         <section aria-label="内容と返信" className={styles.detail}>
           {!ticket ? (
-            detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
-              <ListState kind="error" title="内容を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={selectedId ? () => void loadDetail(selectedId) : undefined} />
-            ) : <ListState kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
+            detailLoading ? <ListState permissionScope="hq" kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
+              <ListState permissionScope="hq" kind="error" title="内容を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={selectedId ? () => void loadDetail(selectedId) : undefined} />
+            ) : <ListState permissionScope="hq" kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <>
               <div className={styles.detailHead}>
@@ -431,11 +434,11 @@ export default function OpsSupportV8() {
                   </span>
                 )}
                 <Button href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
-                {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}><LogIn aria-hidden="true" />代理ログイン</Button>}
+                {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>}
               </div>
               <div className={styles.detailMeta}>
                 <StatusPill tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusPill>
-                <span>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : 'なし'}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
+                <span>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : emptyValue('none')}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
                 {ticket.subjectAuto ? <StatusBadge tone="neutral">自動で付けた件名</StatusBadge> : null}
               </div>
               {detail ? <TicketKnowledge key={ticket.id} detail={detail} onRefresh={() => void loadDetail(ticket.id)} /> : null}
@@ -464,10 +467,10 @@ export default function OpsSupportV8() {
                       ) : replyFromAi ? (
                         <>
                           <Button onClick={() => void discardAi()} disabled={busy}>下書きを削除する</Button>
-                          <Button onClick={() => void generateAi()} disabled={busy || !detail?.ai.available}><RefreshCw aria-hidden="true" />作り直す</Button>
+                          <Button onClick={() => void generateAi()} disabled={busy || !detail?.ai.available} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden="true" />作り直す</Button>
                         </>
                       ) : (
-                        <Button onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'}>
+                        <Button onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'} busy={Boolean(busy)} busyLabel="処理中…">
                           <Sparkles aria-hidden="true" />AIで下書きを作る
                         </Button>
                       )}
@@ -499,9 +502,9 @@ export default function OpsSupportV8() {
                   </div>
                   <div className={styles.actions}>
                     {ticket.stage === 'resolved' || ticket.stage === 'closed'
-                      ? <Button disabled={busy} onClick={() => void changeStage('in_progress')}>対応中に戻す</Button>
-                      : <Button disabled={busy} onClick={() => void changeStage('resolved')}><Check aria-hidden="true" />解決済みにする</Button>}
-                    {closed ? null : <Button disabled={busy} onClick={() => void changeStage('closed')}>クローズする</Button>}
+                      ? <Button disabled={busy} onClick={() => void changeStage('in_progress')} busy={Boolean(busy)} busyLabel="処理中…">対応中に戻す</Button>
+                      : <Button disabled={busy} onClick={() => void changeStage('resolved')} busy={Boolean(busy)} busyLabel="処理中…"><Check aria-hidden="true" />解決済みにする</Button>}
+                    {closed ? null : <Button disabled={busy} onClick={() => void changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
                     <span className={styles.spacer} />
                     <Button onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
                     <Select aria-label="送信後の状態" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} />
@@ -525,7 +528,7 @@ export default function OpsSupportV8() {
         busy={busy}
         error={createError || undefined}
         designNode="Izau1"
-        onConfirm={() => void create()}
+        onConfirm={() => create()}
         onCancel={() => { if (!busy) setCreating(false) }}
       >
         <div className={parts.dialogBody}>
@@ -550,16 +553,10 @@ export default function OpsSupportV8() {
               </div>
             </div>
           </div>
-          <div className={styles.field}>
-            <label htmlFor="sup-subject" className={styles.label}>件名</label>
-            <TextField {...createFields.bind('subject')} id="sup-subject" invalid={createFields.invalid('subject')} aria-describedby={createFields.invalid('subject') ? 'sup-subject-error' : undefined} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" />
-            <FieldError id="sup-subject-error">{createFields.error('subject')}</FieldError>
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="sup-body" className={styles.smallLabel}>内容</label>
-            <TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" />
-            <FieldError id="sup-body-error">{createFields.error('body')}</FieldError>
-          </div>
+          <div className={styles.field}><Field label="件名" htmlFor="sup-subject"><TextField {...createFields.bind('subject')} id="sup-subject" invalid={createFields.invalid('subject')} aria-describedby={createFields.invalid('subject') ? 'sup-subject-error' : undefined} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：電話で受けた配信の相談" maxLength={120} aria-label="件名" />
+<FieldError id="sup-subject-error">{createFields.error('subject')}</FieldError></Field></div>
+          <div className={styles.field}><Field label="内容" htmlFor="sup-body"><TextArea {...createFields.bind('body')} id="sup-body" invalid={createFields.invalid('body')} aria-describedby={createFields.invalid('body') ? 'sup-body-error' : undefined} className={styles.createBody} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="相手から聞いた内容をそのまま書きます" maxLength={4000} aria-label="内容" />
+<FieldError id="sup-body-error">{createFields.error('body')}</FieldError></Field></div>
           <p className={parts.dialogNote}>電話や LINE で受けた相談を、運営が代わりに起票します。相手にはメールは届きません。</p>
         </div>
       </Dialog>
@@ -577,7 +574,7 @@ export default function OpsSupportV8() {
           onCancel={() => { if (!busy) setConfirmReply(false) }}
           footer={(
             <div className={styles.confirmActions}>
-              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy}>下書きを削除</Button>
+              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>
               <span className={styles.spacer} />
               <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
               <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送信する</Button>
@@ -586,7 +583,7 @@ export default function OpsSupportV8() {
         >
           <div className={parts.dialogBody}>
             <dl className={styles.facts}>
-              <div className={styles.fact}><dt>宛先</dt><dd>{`${ticket.tenantName}（担当：${ticket.staffName || '—'}）・${ticket.channelLabel}`}</dd></div>
+              <div className={styles.fact}><dt>宛先</dt><dd>{`${ticket.tenantName}（担当：${ticket.staffName || emptyValue('unknown')}）・${ticket.channelLabel}`}</dd></div>
               <div className={styles.fact}><dt>状態</dt><dd>{`${ticket.stageLabel} → ${STAGE_CHIPS.find(item => item.key === replyStage)?.label ?? replyStage}（送ったあと）`}</dd></div>
               <div className={styles.fact}><dt>優先度</dt><dd>{ticket.priorityLabel}</dd></div>
             </dl>
@@ -617,9 +614,9 @@ function Message({ mine, author, body, attachments }: { mine: boolean; author: s
       {attachments.length > 0 ? (
         <span className={styles.attachments}>
           {attachments.map((a) => (
-            <a key={a.key} href={a.url} target="_blank" rel="noreferrer" className={parts.textLink}>
+            <TextLink external key={a.key} href={a.url}   className={parts.textLink}>
               <Paperclip aria-hidden="true" />{`${a.name}（${mine ? '運営から' : '契約先から'}）`}
-            </a>
+            </TextLink>
           ))}
         </span>
       ) : null}

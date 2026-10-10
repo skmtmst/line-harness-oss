@@ -13,6 +13,7 @@ import { createContext, useContext } from 'react'
  * を受け取る。Field を直せば、中に置いた全部の入力欄に行き渡る。
  */
 export type FieldContextValue = {
+  label?: string
   controlId?: string
   describedBy?: string
   invalid: boolean

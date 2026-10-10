@@ -64,7 +64,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !event.altKey && !event.shiftKey && !isImeComposing(event)) {
         if (!isV8()) return
         event.preventDefault()
         if (!openRef.current) {

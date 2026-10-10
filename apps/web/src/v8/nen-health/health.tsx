@@ -9,6 +9,8 @@
  * 健康日記はお客さまがマイページで付けるので、ここに変える操作は無い（閲覧のみでも同じ画面）。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react'
@@ -40,6 +42,7 @@ import HealthItemsV8 from './items'
 import SummaryDrawerV8, { SummarySheet } from './summary'
 import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts'
 import styles from './health.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type { HealthTabKey } from './parts'
 
@@ -59,7 +62,7 @@ export default function HealthV8({
 }) {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const [kpis, setKpis] = useState<NenHealthKpis | null>(null)
-  const [filters, setFilters] = useState<HealthFilters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useListUrlJsonValue<HealthFilters>('filters', EMPTY_FILTERS)
 
   /*
    * 「30日のまとめ」は対象スナップショットとして持つ（今の画面の DEEP-23 と同じ）。
@@ -176,7 +179,7 @@ export default function HealthV8({
       boardId={BOARD[tab]}
       headingSize="regular"
       title="健康日記"
-      description="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
+      help="お客さまがマイページで付けたペットの記録（体重・食事・うんち・元気）を見ます。気になる変化を見つけて声をかけられます。"
       actions={(
         <Button type="button" onClick={() => window.print()} disabled={!canPrint} title={canPrint ? 'ブラウザの印刷で PDF に保存します' : '一覧の行の「…」から「30日のまとめ」を開くと書き出せます'}>
           <FileText size={15} aria-hidden="true" />獣医師向け PDF を書き出す
@@ -234,8 +237,8 @@ function HealthListV8({
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenHealthListData | null>(null)
   const [draft, setDraft] = useState(filters.q)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const [savedOpen, setSavedOpen] = useState(false)
   const savedRef = useRef<HTMLSpanElement | null>(null)
   const requestRef = useRef(0)
@@ -270,11 +273,6 @@ function HealthListV8({
   }, [filters.q])
 
   // 探す欄は打ち終わってから（0.3秒）取り直す。
-  useEffect(() => {
-    if (draft.trim() === filters.q) return
-    const timer = window.setTimeout(() => { onFiltersChange({ ...filters, q: draft.trim() }); setPage(1) }, 300)
-    return () => window.clearTimeout(timer)
-  }, [draft, filters, onFiltersChange])
 
   const set = (patch: Partial<HealthFilters>) => { onFiltersChange({ ...filters, ...patch }); setPage(1) }
   const filtering = filters.q !== '' || (!concernOnly && filters.change !== '') || filters.last !== ''
@@ -305,7 +303,7 @@ function HealthListV8({
 
       <div className={styles.toolsRow} data-design="ListControls">
         <span className={styles.searchBox}>
-          <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={setDraft} onClear={() => setDraft('')} />
+          <SearchField aria-label="ペットを探す" placeholder="ペットを探す" value={draft} onChange={(value: string) => { setDraft(value); onFiltersChange({ ...filters, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onFiltersChange({ ...filters, q: '' }); setPage(1) }} />
         </span>
         {concernOnly ? null : (
           <span className={styles.chips} role="group" aria-label="よく使う札">
@@ -333,7 +331,7 @@ function HealthListV8({
               items={savedItems.map((item) => ({ ...item, onSelect: () => { setSavedOpen(false); item.onSelect() } }))}
             />
           </span>
-          <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))} />
+          <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
         </span>
       </div>
 
@@ -397,8 +395,8 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
     { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id) },
     /* 1匹の PDF は「30日のまとめ」を開いてから印刷する（開いた引き出しの「印刷・PDF に保存する」）。 */
     { id: 'pdf', label: '獣医師向け PDF', onSelect: () => onOpenPdf(row.pet.id) },
-    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
-    { id: 'talk', label: '飼い主にトークで声をかける', external: true, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
+    { id: 'owner', label: '飼い主を開く', external: true, href: `/friends/detail?id=${friendId}`, onSelect: () => { router.push(`/friends/detail?id=${friendId}`) } },
+    { id: 'talk', label: '飼い主にトークで声をかける', external: true, href: `/chats?friend=${friendId}`, onSelect: () => { router.push(`/chats?friend=${friendId}`) } },
   ]
   return (
     <Tr className={styles.row} data-table-layout="columns">
@@ -417,10 +415,10 @@ function HealthRow({ row, onOpenSummary, onOpenPdf }: { row: NenHealthRow; onOpe
         </span>
       </Td>
       <Td className={styles.colOwner}><span className={styles.cell} title={row.owner.name}>{row.owner.name || '（名前なし）'}</span></Td>
-      <Td className={styles.colLast}><span className={styles.cell} title={row.lastLoggedLabel}>{row.lastLoggedOn ? md(row.lastLoggedOn) : '—'}</span></Td>
+      <Td className={styles.colLast}><span className={styles.cell} title={row.lastLoggedLabel}>{row.lastLoggedOn ? md(row.lastLoggedOn) : emptyValue('unknown')}</span></Td>
       <Td className={styles.colCount}><span className={styles.num}>{`${row.count30d} 日`}</span></Td>
       <Td className={styles.colWeight}><WeightBars series={row.weightSeries} warn={weightWarn} /></Td>
-      <Td className={styles.colStool}><span className={styles.cell}>{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : '—'}</span></Td>
+      <Td className={styles.colStool}><span className={styles.cell}>{row.latestStool && row.latestAppetite ? `${row.latestStool}・${row.latestAppetite}` : emptyValue('unknown')}</span></Td>
       <Td className={styles.colChange}>
         <span className={styles.badges}>
           {changeBadges(row).map((badge) => <Pill key={badge.key} tone={badge.tone} title={badge.detail}>{badge.label}</Pill>)}

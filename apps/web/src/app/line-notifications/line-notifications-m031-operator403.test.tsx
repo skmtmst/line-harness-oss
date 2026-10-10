@@ -95,7 +95,7 @@ afterEach(() => {
 })
 
 describe('M031 運用者タブの403は取得失敗にしない', () => {
-  it('403はタブに「権限なし」と出し、再試行の口は出さない', async () => {
+  it('403はタブに「権限なし」と出し、権限変更後に読み直せる', async () => {
     fixture.operatorList.mockRejectedValueOnce(new ApiError(403))
     render(<LineNotificationsPage />)
 
@@ -104,7 +104,7 @@ describe('M031 運用者タブの403は取得失敗にしない', () => {
     expect(screen.queryByText('運用者へのお知らせ 取得失敗')).toBeNull()
     // 権限の案内は出す。押しても直らない再試行は出さない。
     await waitFor(() => expect(screen.getByText(/見る権限がありません/)).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'もう一度' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
 
   it('429は待ち案内と一緒に「もう一度」を出す', async () => {
@@ -112,7 +112,7 @@ describe('M031 運用者タブの403は取得失敗にしない', () => {
     render(<LineNotificationsPage />)
 
     await waitFor(() => expect(screen.getByText(/混み合っています/)).toBeTruthy())
-    expect(screen.getByRole('button', { name: 'もう一度' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   })
 
   it('429から「もう一度」で取り直せる', async () => {
@@ -121,8 +121,8 @@ describe('M031 運用者タブの403は取得失敗にしない', () => {
       .mockResolvedValueOnce({ success: true, data: { summary: { total: 7 }, items: [] } })
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'もう一度' })).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await waitFor(() => expect(fixture.operatorList).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByText('運用者へのお知らせ 7')).toBeTruthy())
   })

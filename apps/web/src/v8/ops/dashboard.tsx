@@ -1,5 +1,7 @@
 'use client'
 
+import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+
 import Link from 'next/link'
 import { Banknote, Hourglass, Sparkles, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -15,10 +17,11 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import kpiStyles from '@/components/shared/kpi-card.module.css'
 import ListState from '@/components/shared/list-state'
-import SegmentedControl from '@/components/shared/segmented'
+import PeriodPicker from '@/components/shared/period-picker'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './dashboard.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
  * 運営ダッシュボード V8（絵 `CyW0E`）。
@@ -110,21 +113,21 @@ export default function OpsDashboardV8() {
         title="ダッシュボード"
         description="契約先の売上・使用量・お問い合わせを見て、要対応から片づけます。"
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
-        actions={<SegmentedControl aria-label="期間" value={period} onChange={setPeriod} options={PERIODS} />}
+        actions={<PeriodPicker days={PERIODS.findIndex((item) => item.value === period)} choices={PERIODS.map((item, index) => ({ days: index, label: item.label }))} onChange={(value) => setPeriod(PERIODS[value].value)} />}
       />
 
       {!data && error ? (
         <div className={parts.panel}>
-          <ListState kind="error" title="ダッシュボードを表示できませんでした" description={error} onRetry={() => void load()} />
+          <ListState permissionScope="hq" kind="error" title="ダッシュボードを表示できませんでした" description={error} onRetry={() => void load()} />
         </div>
       ) : (
         <div className={parts.stack}>
           {error ? <p role="alert" className={parts.alert}>{error}</p> : null}
           <div className={`${parts.kpis} ${kpiStyles.strip}`}>
-            <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? `契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）` : '—'} loading={loading} />
-            <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data ? `決済失敗 ${data.alerts.pastDue} 社` : '—'} loading={loading} />
-            <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data ? `期限 3日以内 ${data.alerts.trialEndingSoon}` : '—'} loading={loading} />
-            <KpiCard presentation="cell" icon={<Sparkles size={13} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : '—'} loading={loading} />
+            <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? `契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）` : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data ? `決済失敗 ${data.alerts.pastDue} 社` : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data ? `期限 3日以内 ${data.alerts.trialEndingSoon}` : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Sparkles size={13} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : emptyValue('unknown')} loading={loading} />
           </div>
 
           <div className={parts.row}>
@@ -142,13 +145,13 @@ export default function OpsDashboardV8() {
                   <AlertRow label="LINEのトークン期限が近い店舗" count={data.alerts.lineTokenExpiring} href="/ops/tenants" />
                   <AlertRow label="未返信のお問い合わせ" count={data.alerts.unansweredTickets} href="/ops/support" />
                 </div>
-              ) : <ListState kind="loading" title="読み込んでいます" />}
+              ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
             <section aria-label="月ごとの売上" className={parts.panel}>
               <h3 className={parts.panelTitle}>月ごとの売上</h3>
-              {data ? <RevenueColumns rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
+              {data ? <RevenueColumns rows={data.revenueByMonth} /> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
               <div className={styles.chartFoot}>
-                <p className={parts.note}>単位：千円（月額の合計）・{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : '—'}</p>
+                <p className={parts.note}>単位：千円（月額の合計）・{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : emptyValue('unknown')}</p>
                 {canSyncBilling ? (
                   <Button size="compact" disabled={syncingBilling} busy={syncingBilling} busyLabel="同期しています…" onClick={() => void syncBilling()}>Stripe と同期</Button>
                 ) : null}
@@ -162,9 +165,9 @@ export default function OpsDashboardV8() {
             <section aria-label="上限に近い契約先" className={parts.panel}>
               <h3 className={parts.panelTitle}>上限に近い契約先</h3>
               {!data ? (
-                <ListState kind="loading" title="読み込んでいます" />
+                <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
               ) : data.usage.length === 0 ? (
-                <ListState kind="empty" title="今月はまだ使用量がありません" description="配信・バナー生成・メディア登録があると、上限に近い契約先から順に並びます。" />
+                <ListState permissionScope="hq" kind="empty" title="今月はまだ使用量がありません" description="配信・バナー生成・メディア登録があると、上限に近い契約先から順に並びます。" />
               ) : (
                 <div className={parts.mini}>
                   <div className={parts.miniHead}>
@@ -197,14 +200,14 @@ export default function OpsDashboardV8() {
                   </KpiBand>
                   <Link href="/ops/support" className={parts.textLink}>すべて見る →</Link>
                 </>
-              ) : <ListState kind="loading" title="読み込んでいます" />}
+              ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
           </div>
 
           <div className={parts.row}>
             <section aria-label="プラン別の契約" className={parts.panel}>
               <h3 className={parts.panelTitle}>プラン別の契約</h3>
-              {data ? <p className={parts.line}>{planShareLine(data.planShare.rows)}</p> : <ListState kind="loading" title="読み込んでいます" />}
+              {data ? <p className={parts.line}>{planShareLine(data.planShare.rows)}</p> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
             <section aria-label="契約者専用LINEに未登録の権限者" className={parts.panel}>
               <h3 className={parts.panelTitle}>契約者専用LINEに未登録の権限者</h3>
@@ -213,11 +216,11 @@ export default function OpsDashboardV8() {
                   <p className={parts.line}>{lineUnregisteredLine(data.lineRegistration.unregisteredCount, unregistered)}</p>
                   {data.lineRegistration.unregisteredCount > 0 ? (
                     <button type="button" className={parts.textLink} onClick={() => void openUnregistered()}>
-                      {`未登録の${data.lineRegistration.unregisteredCount}人を見る`}
+                      {`未登録の${data.lineRegistration.unregisteredCount} 人を見る`}
                     </button>
                   ) : null}
                 </div>
-              ) : <ListState kind="loading" title="読み込んでいます" />}
+              ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
           </div>
         </div>
@@ -244,8 +247,8 @@ export default function OpsDashboardV8() {
             </div>
           )
         ) : unregisteredError ? (
-          <ListState kind="error" title="未登録の人を表示できませんでした" description={unregisteredError} onRetry={() => void openUnregistered()} />
-        ) : <ListState kind="loading" title="読み込んでいます" />}
+          <ListState permissionScope="hq" kind="error" title="未登録の人を表示できませんでした" description={unregisteredError} onRetry={() => void openUnregistered()} />
+        ) : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
       </Dialog>
     </div>
   )
@@ -265,22 +268,7 @@ function AlertRow({ label, count, href }: { label: string; count: number; href: 
 
 /** 月ごとの売上の柱（千円）。いちばん高い月を柱の高さいっぱいにする。いまの月は濃い緑。 */
 function RevenueColumns({ rows }: { rows: Array<{ label: string; yen: number; current: boolean }> }) {
-  const max = Math.max(...rows.map((r) => r.yen), 0)
-  return (
-    <div className={styles.chart} role="img" aria-label={`月ごとの売上。${rows.map((r) => `${r.label} ${formatYen(r.yen)}`).join('、')}`}>
-      {rows.map((r) => (
-        <div key={r.label} className={styles.column}>
-          <span
-            className={`${styles.bar} ${r.current ? styles.barCurrent : ''}`}
-            // 柱の高さは売上の割合で決まる（データの値）。
-            style={{ blockSize: `${max > 0 ? Math.max((r.yen / max) * 100, 2) : 2}%` }}
-            title={`${r.label} ${formatYen(r.yen)}`}
-          />
-          <span className={styles.columnLabel}>{r.label}</span>
-        </div>
-      ))}
-    </div>
-  )
+  return <ValueBarChart label="月ごとの売上" unit="円" items={rows.map(r=>({key:r.label,label:r.label,value:r.yen,note:r.current?'今月':undefined}))} />
 }
 
 function revenueSourceLabel(pricing: 'stripe_actual' | 'list_price', lastSyncedAt: string | null): string {

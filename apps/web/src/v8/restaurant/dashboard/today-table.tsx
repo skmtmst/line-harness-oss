@@ -5,6 +5,7 @@
  * 列：時刻・名前・人数・卓・経路・状態・来店。予約中の行に［✓ 来店］（来店の印の口）と「…」。
  * 閲覧のみには［来店］と「…」の変える操作を置かない。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -19,10 +20,10 @@ import { isWalkIn } from '../front-desk/walk-in'
 import { sourceName } from '../reservations/format'
 import { canMarkVisited, visitState } from './summarize'
 import styles from './dashboard.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
 
 function hm(iso: string): string {
-  const day = new Date(iso)
-  return `${pad2(day.getHours())}:${pad2(day.getMinutes())}`
+  return polishFormatDate(iso, { style: 'time' })
 }
 
 export function routeLabel(r: Pick<RestaurantReservation, 'source' | 'note'>): string {
@@ -70,13 +71,13 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
               const state = visitState(r)
               const seated = r.status === 'seated' || r.status === 'visited'
               const menuItems = [
-                { id: 'open', label: '予約台帳で見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`) } },
+                { id: 'open', label: '予約台帳で見る', external: true, href: `/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`, onSelect: () => { router.push(`/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`) } },
                 ...(canWrite && seated ? [{ id: 'undo', label: '来店の印を取り消す', onSelect: () => onUndo(r.id) }] : []),
               ]
               return (
-                <Tr key={r.id} className={styles.row} data-table-layout="columns">
+                <Tr key={r.id} className={styles.row} data-table-layout="columns" data-row-id={r.id}>
                   <Td className={styles.colTime}><span className={styles.time}>{hm(r.starts_at)}</span></Td>
-                  <Td className={styles.colName}><span className={styles.name} title={r.customer_name}>{r.customer_name}</span></Td>
+                  <Td className={styles.colName}><span className={styles.name} ><TruncatedText value={String(r.customer_name ?? '')} /></span></Td>
                   <Td className={styles.colGuests}>{`${r.guest_count}名`}</Td>
                   <Td className={styles.colTable}>{r.table_label || '未配席'}</Td>
                   <Td className={styles.colRoute}><span className={styles.route}>{routeLabel(r)}</span></Td>

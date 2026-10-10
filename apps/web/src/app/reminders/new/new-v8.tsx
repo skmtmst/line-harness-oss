@@ -316,7 +316,7 @@ export default function NewReminderV8() {
     <CreatePage
       boardId="VE1u5"
       title="リマインダを作る"
-      description="いまは下書きとして作ります。最後の「確認」で有効にします。"
+      help="いまは下書きとして作ります。最後の「確認」で有効にします。"
       identity={<Link href="/reminders" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />リマインダへ</Link>}
       steps={<ReminderV8Stepper current="basics" reminderId={savedId} />}
       status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}

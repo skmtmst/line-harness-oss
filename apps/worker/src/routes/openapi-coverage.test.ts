@@ -122,7 +122,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 772;
+const ALLOWLIST_MAX = 771;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -133,6 +133,19 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'POST /api/tags/{id}/restore',
+  'POST /api/support-marks/{id}/restore',
+  'POST /api/automations/{id}/restore',
+  'GET /api/form-files/{id}/content',
+  'GET /api/forms/document-settings/{accountId}',
+  'PUT /api/forms/document-settings/{accountId}',
+  'POST /api/forms/{id}/files',
+  'POST /api/hq/templates/media/upload-sessions',
+  'POST /api/hq/templates/media/upload-sessions/{id}/complete',
+  'DELETE /api/hq/templates/media/upload-sessions/{id}',
+  'POST /api/entry-routes/{id}/qr-image',
+  'POST /api/liff/entry-route-coupon',
+  'POST /api/liff/entry-route-coupon/use',
   "GET /api/hq/banners/folders",
   "POST /api/hq/banners/folders",
   "PATCH /api/hq/banners/folders/{id}",
@@ -984,7 +997,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/liff/friend-add-intent',
   'POST /api/liff/link',
   'POST /api/liff/mileage/rewards/{id}/redeem',
-  'POST /api/liff/nen/consultations',
   'POST /api/liff/nen/health-logs',
   'POST /api/liff/nen/pets',
   'POST /api/liff/nen/pets/{id}/photo',
@@ -997,6 +1009,7 @@ const ALLOWLIST = new Set<string>([
   // 機能「webinars」の管理画面用API（OpenAPI未記載・順次記載）（33件）
   'DELETE /api/webinars/{id}',
   'GET /api/liff/webinars/{slug}',
+  'GET /api/liff/research/{id}/form',
   'GET /api/webinars',
   'GET /api/webinars/overview',
   'GET /api/webinars/{id}',
@@ -1181,7 +1194,6 @@ const ALLOWLIST = new Set<string>([
 
   // 機能「photo_review」の管理画面用API（OpenAPI未記載・順次記載）（24件）
   'GET /api/nen-members/care-flags',
-  'GET /api/nen-members/consultations',
   'GET /api/nen-members/friends/{friendId}',
   'GET /api/nen-members/overview',
   'GET /api/nen-members/photos',
@@ -1472,7 +1484,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/forms',
   'POST /api/forms/drafts',
   'POST /api/forms/{id}/archive',
-  'POST /api/forms/{id}/files',
   'PUT /api/forms/{id}',
 
   // 機能「scenarios」の管理画面用API（OpenAPI未記載・順次記載）（10件）

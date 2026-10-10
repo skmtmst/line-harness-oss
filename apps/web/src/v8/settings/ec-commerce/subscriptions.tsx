@@ -1,5 +1,6 @@
 'use client'
 
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CircleDot, Star, Repeat2, Play, Pause, CreditCard } from 'lucide-react'
 import Link from 'next/link'
@@ -21,11 +22,13 @@ import { ApiError, api, type EcSubscription, type EcSubscriptionList } from '@/l
 import { formatNumber } from '@/lib/format'
 import shared from './screen.module.css'
 import styles from './subscriptions.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
+
+import { emptyValue } from '@/components/shared/empty-value'
 
 function shortDate(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.valueOf()) ? '—' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 const FILTERS = [
@@ -45,11 +48,11 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
   const loadGeneration = useRef(0)
   const [data, setData] = useState<EcSubscriptionList | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
   // 行の「その他」メニューの開き先（#641）
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [page, setPage] = useListUrlValue('page', 1)
   /** 絞り込みに合う総数。サーバが数える(#731)。 */
   const [total, setTotal] = useState(0)
 
@@ -117,16 +120,16 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
       <KpiCard title="支払いを確認" icon={<CreditCard size={13} />} value={summary?.atRisk} unit="件" detail="ECから届いた決済状態" />
     </KpiBand>
     <div className={styles.toolbar}>
-      <SearchField className={styles.search} value={search} onChange={setSearch} placeholder="お客様の名前・ペット名・契約番号・中身で検索" aria-label="定期便を検索" />
+      <SearchField className={styles.search} value={search} onChange={setSearch} placeholder="お客様の名前・ペット名・契約番号・中身で探す" aria-label="定期便を検索" />
       {FILTERS.map((item) => <FilterChip key={item.key} selected={filter === item.key} icon={item.key === 'all' ? <CircleDot size={13} /> : <Star size={13} />} onChange={() => setFilter(item.key)}>{item.label}</FilterChip>)}
     </div>
     {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" action={filter !== 'all' || search ? <Button onClick={() => { setFilter('all'); setSearch('') }}>条件を外す</Button> : undefined} /> : <DataTable label="定期便" density="compact" columns="var(--tpl-ecc-sub-columns)">
       <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th>操作</Th></TableHeadRow></thead>
-      <tbody>{shown.map((item) => <Tr key={item.id}>
+      <tbody>{shown.map((item) => <Tr key={item.id} data-row-id={item.id}>
         <Td><span className={shared.stack}><span className={shared.main} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.petName ? `（${item.petName}）` : ''}</span><span className={shared.sub} title={item.items ?? undefined}>{[item.items ?? '中身 未取得', item.cycle].filter(Boolean).join('・')}</span></span></Td>
-        <Td align="right">{item.amount == null ? '—' : `¥${formatNumber(item.amount)}`}</Td>
+        <Td align="right">{item.amount == null ? emptyValue('unknown') : `¥${formatNumber(item.amount)}`}</Td>
         <Td>{shortDate(item.nextShippingAt)}</Td>
-        <Td align="right">{item.continuedCount == null ? '—' : `${item.continuedCount}回`}</Td>
+        <Td align="right">{item.continuedCount == null ? emptyValue('unknown') : `${item.continuedCount}回`}</Td>
         <Td><span className={shared.stack}><StatusBadge tone={STATUS_TONE[item.status]} size="compact">{FILTERS.find((f) => f.key === item.status)?.label ?? item.statusLabel}</StatusBadge>{item.riskReason || item.cancellationReason ? <span className={shared.sub} title={item.riskReason ?? item.cancellationReason ?? undefined}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
         <Td><span className={styles.ops}><Button href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`} variant="secondary">中身を見る</Button>{item.manageUrl ? <RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'manage', label: 'ECで変更', onSelect: () => window.open(item.manageUrl!, '_blank', 'noopener,noreferrer') }]} /> : null}</span></Td>
       </Tr>)}</tbody>
@@ -134,10 +137,10 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
     <NoteBar icon={null}>「支払いを確認」は EC から届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」は EC に登録された確定の予定日です。購入後の案内は <Link href="/nen-campaigns">NEN配信</Link> で管理します。</NoteBar>
     {canEdit ? <Button href="/broadcasts/new" variant="text">対象を選んで送る</Button> : null}
     <div className={shared.pager}>
-      <p className={shared.minorText}>{search.trim() ? `このページの ${formatNumber(shown.length)}件を表示（検索はページの中だけに効きます）` : <ListRange label={filter === 'all' ? '定期便' : '表示条件に合う定期便'} total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={(page - 1) * pageSize + shown.length} />}{data && data.skipped.malformedSnapshots > 0 ? `／形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)}件は数えていません` : ''}</p>
+      <p className={shared.minorText}>{search.trim() ? `このページの ${formatNumber(shown.length)} 件を表示（検索はページの中だけに効きます）` : <ListRange label={filter === 'all' ? '定期便' : '表示条件に合う定期便'} total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={(page - 1) * pageSize + shown.length} />}{data && data.skipped.malformedSnapshots > 0 ? `／形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)} 件は数えていません` : ''}</p>
       <PageSizeSelect value={v8PageSize} options={[10, 20, 50]} onChange={(value) => { setV8PageSize(value); setPage(1) }} />
       <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / pageSize))} onPageChange={setPage} ariaLabel="定期便のページ送り" />
     </div>
-    {(summary?.monthlyStats ?? []).length > 0 ? <Disclosure title="月別の定期便" size="compact" hint={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`}><DataTable><thead><TableHeadRow><Th>月</Th><Th>契約数</Th><Th align="right">金額</Th></TableHeadRow></thead><tbody>{summary?.monthlyStats.slice(-6).map((item) => <Tr key={item.month}><Td>{item.month}</Td><Td>{formatNumber(item.count)}件</Td><Td align="right">¥{formatNumber(item.amount)}</Td></Tr>)}</tbody></DataTable></Disclosure> : null}
+    {(summary?.monthlyStats ?? []).length > 0 ? <Disclosure title="月別の定期便" size="compact" hint={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`}><DataTable><thead><TableHeadRow><Th>月</Th><Th>契約数</Th><Th align="right">金額</Th></TableHeadRow></thead><tbody>{summary?.monthlyStats.slice(-6).map((item) => <Tr key={item.month}><Td>{item.month}</Td><Td>{formatNumber(item.count)} 件</Td><Td align="right">¥{formatNumber(item.amount)}</Td></Tr>)}</tbody></DataTable></Disclosure> : null}
   </>
 }

@@ -6,6 +6,7 @@
  * - 閲覧のみ（staff）には、押せないボタンを置かない（変える操作は隠す）
  * - コメント演出はその場で直して、秒の順に並べて保存する
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -77,6 +78,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  clearToastsForTest()
   document.documentElement.dataset.theme = 'v8'
   roleState.role = 'owner'
   puts.length = 0
@@ -124,7 +126,7 @@ afterEach(() => {
 })
 
 async function render(node: React.ReactNode) {
-  await act(async () => { root.render(node) })
+  await act(async () => { root.render(<>{node}<ToastHost /></>) })
   for (let i = 0; i < 6; i += 1) await act(async () => {})
 }
 
@@ -147,6 +149,7 @@ describe('V8 ウェビナーの編集', () => {
     nav.search = 'id=webinar-1&pane=participants'
     await render(<WebinarEditV8 />)
     expect(host.textContent).toContain('NEN活用スタートセミナー')
+    await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
     expect(host.textContent).toContain('オンデマンド・いつでも視聴・公開中（版 3）')
     const tabs = host.querySelector('[data-wc-tabs="true"]')
     expect(tabs?.textContent).toContain('参加者 124')
@@ -157,15 +160,15 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('見ていない・見逃し案内の対象')
     const chat = host.querySelector('a[href="/chats?friend=f-1"]')
     expect(chat?.textContent).toContain('チャットを見る')
-    expect(buttonText('CSV で書き出す')).toBeTruthy()
+    expect(buttonText('CSVで書き出す')).toBeTruthy()
   })
 
   it('分析のフォーム送信はAPIの重複を除いた人数として帯と棒の両方に表示する', async () => {
     nav.search = 'id=webinar-1&pane=analytics'
     await render(<WebinarEditV8 />)
     const funnel = host.querySelector('#webinar-analytics-funnel')
-    const row = [...(funnel?.querySelectorAll('li') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
-    expect(row?.textContent).toContain('9 人')
+    const row = [...(funnel?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
+    expect(row?.textContent).toContain('9人')
     const stats = host.querySelector('[data-template-region="stats"]')
     expect(stats?.textContent).toContain('フォーム送信?9人')
     expect(stats?.textContent).not.toContain('フォーム送信?9件')
@@ -216,7 +219,7 @@ describe('V8 ウェビナーの編集', () => {
   it('コメント演出（Omqd4）：その場で直して、秒の順に並べて保存する', async () => {
     nav.search = 'id=webinar-1&pane=comments'
     await render(<WebinarEditV8 />)
-    const body = host.querySelector('input[aria-label="1行目の本文"]') as HTMLInputElement
+    const body = host.querySelector('input[aria-label="1 行目の本文"]') as HTMLInputElement
     expect(body.value).toBe('わかりやすい！')
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
     await act(async () => {
@@ -232,7 +235,7 @@ describe('V8 ウェビナーの編集', () => {
       { atSeconds: -60, authorName: '田中', body: 'こんばんは' },
       { atSeconds: 45, authorName: 'まさ', body: 'とてもわかりやすい' },
     ] })
-    expect(host.textContent).toContain('2件保存しました')
+    expect(document.body.textContent).toContain('2件保存しました')
   })
   it('B-139 CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
     nav.search = 'id=webinar-1&pane=cta'
@@ -286,7 +289,7 @@ describe('V8 ウェビナーの編集', () => {
     await act(async () => { buttonText('下書きを保存')!.click() })
     for (let i = 0; i < 6; i += 1) await act(async () => {})
     const band = host.querySelector('[data-design-node="pvimJ"][role="alert"]')
-    expect(band?.textContent).toContain('このまま保存すると、ほかの人の変更が消えます')
+    expect(band?.textContent).toContain('このまま保存すると、相手の変更が消えます')
     expect(buttonText('下書きを保存')).toBeUndefined()
     expect(buttonText('比べてから保存')).toBeTruthy()
     expect([...host.querySelectorAll('a')].some((link) => link.textContent?.trim() === 'キャンセル')).toBe(true)

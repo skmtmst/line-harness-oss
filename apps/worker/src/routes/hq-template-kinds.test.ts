@@ -154,7 +154,7 @@ describe('統括テンプレート6種類の保存と店への配布',()=>{
     await save('template', value('coupon'));
     const filtered = await request('?kind=message');
     expect(filtered.body.data).toHaveLength(1);
-    expect(filtered.body.kind_counts).toEqual({message:1,carousel:0,rich_message:0,question:0,coupon:1,research:2});
+    expect(filtered.body.kind_counts).toEqual({message:1,carousel:0,rich_message:0,rich_video:0,question:0,coupon:1,research:2});
     expect((await request('/kind-counts')).body.data).toEqual(filtered.body.kind_counts);
     expect((await request('?type=rich_menu&kind=message')).status).toBe(400);
     const definition = value('research');

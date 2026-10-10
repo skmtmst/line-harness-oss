@@ -14,7 +14,7 @@
  * 状態で見る場所が変わる:
  *
  *   pending      コード未実装。報告するだけで落とさない
- *   implemented  CSSモジュールの**ソース**を見る（まだ画面で使われていない）
+ *   implemented  CSSモジュールの**ソース**で var() を解き写しの値と比べる（まだ画面で使われていない）
  *   active       **ビルド後のCSS**を見る。var() を解いて比べ、配信漏れも調べる
  *
  * `active` をビルド後で見るのは、部品があっても画面が使っていなければ
@@ -41,6 +41,13 @@ export function normalize(value) {
   v = v.replace(/#([0-9a-f])([0-9a-f])([0-9a-f])\b/g, '#$1$1$2$2$3$3')
   v = v.replace(/(^|[\s(,])\.(\d)/g, '$10.$2')
   v = v.replace(/\s*,\s*/g, ',')
+  // CSSの最適化は rgba() と8桁hexを相互に変える。色は8bitへそろえ、書式だけの違いで落とさない。
+  v = v.replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/g, (all, r, g, b, a = '1') => {
+    const channels = [Number(r), Number(g), Number(b), Math.round(Number(a) * 255)]
+    if (channels.some((c) => !Number.isFinite(c) || c < 0 || c > 255)) return all
+    return '#' + channels.map((c) => c.toString(16).padStart(2, '0')).join('')
+  })
+  v = v.replace(/#([0-9a-f]{6})ff\b/g, '#$1')
   return v
 }
 
@@ -105,17 +112,22 @@ function ruleBody(css, selector) {
  * 1つへ束ねる。単独セレクタだけを探すと、実際には配信されている宣言を
  * 「宣言なし」と誤判定するため、カンマ区切りのセレクタも読む。
  */
-export function builtRuleBody(css, prefix, cls) {
+export function builtRuleBody(css, prefix, cls, selector) {
   // hover・[hidden]・子孫指定は別状態なので、基準状態の完全一致だけを拾う。
   // @media などの条件付きブロックも同じ理由で先に除く。
   css = stripConditionalBlocks(css)
   const escaped = `${prefix}_${cls}__`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const target = new RegExp(`^\\.${escaped}[A-Za-z0-9_-]+$`)
+  const selectorKey = (value) => value.trim().replace(/\[([^\]=]+)=["']([^"']+)["']\]/g, '[$1=$2]')
+    .replace(/\s*>\s*\*?/g, '>').replace(/\s+/g, ' ')
+  const moduleClass = new RegExp(`\\.${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_([A-Za-z0-9_-]+?)__[A-Za-z0-9_-]+`, 'g')
   const re = /([^{}]+)\{([^{}]*)\}/g
   const bodies = []
   let m
   while ((m = re.exec(css))) {
-    if (m[1].split(',').some((selector) => target.test(selector.trim()))) bodies.push(m[2])
+    if (m[1].split(',').some((actual) => selector
+      ? selectorKey(actual.replace(moduleClass, '.$1')) === selectorKey(selector)
+      : target.test(actual.trim()))) bodies.push(m[2])
   }
   return bodies.join(';')
 }
@@ -147,7 +159,7 @@ function collectVariables(css) {
   return vars
 }
 
-function resolveVars(value, vars, depth = 0) {
+export function resolveVars(value, vars, depth = 0) {
   if (depth > 8 || !value.includes('var(')) return value
   const next = value.replace(/var\(\s*--([a-z0-9-]+)\s*(?:,[^)]*)?\)/gi, (whole, name) =>
     name in vars ? vars[name] : whole,
@@ -552,6 +564,8 @@ export function verify() {
 
   const built = loadBuiltCss()
   const builtVars = built ? collectVariables(built) : {}
+  // 未利用の部品もトークン参照を解く。写しの値は変えず、色・丸みの直書きを要求しない。
+  const sourceVars = collectVariables(readFileSync(join(WEB, 'src/app/globals.css'), 'utf8'))
 
   let checked = 0
   let matched = 0
@@ -586,9 +600,10 @@ export function verify() {
         continue
       }
     }
-    const ok = normalize(got) === want
+    const actual = normalize(t.status === 'active' ? resolveVars(got, builtVars) : got)
+    const ok = actual === want
     if (ok) matched++
-    else failures.push(`不一致: ${name}\n    設計 Pencil ${t.pencil} = ${want}\n    実際 ${normalize(got)}`)
+    else failures.push(`不一致: ${name}\n    設計 Pencil ${t.pencil} = ${want}\n    実際 ${actual}`)
     lines.push(`  ${pad(name, 24)}${pad(t.pencil, 18)}${pad(want, 24)}${ok ? '一致' : '★不一致'}`)
   }
 
@@ -622,11 +637,11 @@ export function verify() {
     lines.push(head)
     for (const d of part.declarations) {
       checked++
-      const want = normalize(part.status === 'active' ? d.resolved : d.source)
+      const want = normalize(d.resolved)
       const body =
         part.status === 'implemented'
           ? ruleBody(css, d.class)
-          : builtRuleBody(built, part.cssPrefix, d.class)
+          : builtRuleBody(built, part.cssPrefix, d.class, d.selector)
 
       if (!body) {
         const why =
@@ -645,7 +660,7 @@ export function verify() {
         continue
       }
 
-      const got = normalize(part.status === 'active' ? resolveVars(raw, builtVars) : raw)
+      const got = normalize(resolveVars(raw, part.status === 'active' ? builtVars : sourceVars))
       const ok = got === want
       if (ok) matched++
       else

@@ -2298,7 +2298,7 @@ CREATE TABLE coupon_redemptions (
   used_at TEXT NOT NULL,
   use_number INTEGER NOT NULL,
   payload_snapshot TEXT NOT NULL
-);
+, entry_route_coupon_receipt_id TEXT REFERENCES entry_route_coupon_receipts(id));
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -2537,6 +2537,20 @@ CREATE TABLE engagement_events (
   UNIQUE (program_id, idempotency_key)
 );
 
+CREATE TABLE entry_route_coupon_receipts (
+  id TEXT PRIMARY KEY,
+  entry_route_id TEXT NOT NULL REFERENCES entry_routes(id),
+  asset_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'received', 'sent', 'failed', 'unknown')),
+  asset_name TEXT NOT NULL,
+  payload_snapshot TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  received_at TEXT,
+  UNIQUE (entry_route_id, friend_id)
+);
+
 CREATE TABLE entry_route_genres (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
@@ -2566,7 +2580,7 @@ CREATE TABLE entry_routes (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT);
+, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT, coupon_asset_id TEXT REFERENCES broadcast_message_assets(id) ON DELETE SET NULL, coupon_enabled INTEGER NOT NULL DEFAULT 0 CHECK (coupon_enabled IN (0, 1)), coupon_audience TEXT NOT NULL DEFAULT 'new_friends' CHECK (coupon_audience IN ('new_friends', 'all_friends')));
 
 CREATE TABLE error_messages (
   -- エラーコード。code が無い現行 route は error 文字列そのものを鍵にする（§9-1）。
@@ -2880,6 +2894,27 @@ CREATE TABLE form_opens (
   opened_at TEXT NOT NULL DEFAULT (datetime('now'))
 , is_test INTEGER NOT NULL DEFAULT 0
   CHECK (is_test IN (0, 1)));
+
+CREATE TABLE form_submission_files (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  form_id TEXT NOT NULL REFERENCES forms(id),
+  form_version_id TEXT,
+  block_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  submission_id TEXT REFERENCES form_submissions(id),
+  file_kind TEXT NOT NULL CHECK (file_kind IN ('image', 'pdf', 'identity')),
+  side TEXT NOT NULL CHECK (side IN ('single', 'front', 'back')),
+  r2_key TEXT NOT NULL UNIQUE,
+  filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL CHECK (size_bytes > 0 AND size_bytes <= 10485760),
+  scan_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT,
+  deleted_at TEXT,
+  deletion_reason TEXT
+);
 
 CREATE TABLE form_submissions (
   id TEXT PRIMARY KEY,
@@ -3296,6 +3331,11 @@ CREATE TABLE friend_fields (
     'select','multi_select','checkbox','image','pdf'
   )), type_v8 TEXT
   CHECK (type_v8 IS NULL OR type_v8 = 'time'));
+
+CREATE TABLE friend_fixed_fields (
+  fixed_key TEXT PRIMARY KEY CHECK (fixed_key IN ('name','kana','birthday','age','email','tel','address')),
+  field_id TEXT NOT NULL UNIQUE REFERENCES friend_fields(id) ON DELETE RESTRICT
+);
 
 CREATE TABLE friend_identity_links (
   id TEXT PRIMARY KEY,
@@ -3747,7 +3787,8 @@ CREATE TABLE hq_templates (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   archived_at TEXT, folder_id TEXT, extended_type TEXT CHECK (extended_type IS NULL OR extended_type='scenario'), friend_attribute_type TEXT
-  CHECK (friend_attribute_type IS NULL OR friend_attribute_type IN ('friend_field','mark')),
+  CHECK (friend_attribute_type IS NULL OR friend_attribute_type IN ('friend_field','mark')), delivery_type TEXT
+  CHECK (delivery_type IS NULL OR delivery_type IN ('auto_reply','friend_add_rule','reminder')),
   PRIMARY KEY (id, tenant_id),
   FOREIGN KEY (current_version_id, id, tenant_id)
     REFERENCES hq_template_versions(id, template_id, tenant_id)
@@ -8745,6 +8786,8 @@ CREATE INDEX idx_conversion_points_tenant ON conversion_points(tenant_id);
 
 CREATE INDEX idx_coupon_redemptions_friend ON coupon_redemptions(asset_id, friend_id);
 
+CREATE INDEX idx_coupon_redemptions_receipt ON coupon_redemptions(entry_route_coupon_receipt_id);
+
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);
 
@@ -8801,6 +8844,8 @@ CREATE INDEX idx_engagement_events_actor_user
 
 CREATE INDEX idx_engagement_events_source
   ON engagement_events(source, source_event_id);
+
+CREATE INDEX idx_entry_coupon_receipts_asset_friend ON entry_route_coupon_receipts(asset_id, friend_id, received_at);
 
 CREATE INDEX idx_entry_route_genres_created
   ON entry_route_genres (created_at ASC);
@@ -8912,6 +8957,12 @@ CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
 CREATE INDEX idx_form_opens_test_month
   ON form_opens(form_id, is_test, opened_at);
+
+CREATE INDEX idx_form_submission_files_expiry ON form_submission_files(expires_at) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_form_submission_files_owner ON form_submission_files(line_account_id, form_id, friend_id, block_id);
+
+CREATE INDEX idx_form_submission_files_submission ON form_submission_files(submission_id);
 
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
 
@@ -10398,6 +10449,42 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
+CREATE TRIGGER fixed_friend_field_definition_guard BEFORE UPDATE ON friend_fields
+WHEN EXISTS (SELECT 1 FROM friend_fixed_fields WHERE field_id = OLD.id)
+  AND (NEW.name IS NOT OLD.name OR NEW.field_key IS NOT OLD.field_key
+    OR NEW.type IS NOT OLD.type OR NEW.type_v6 IS NOT OLD.type_v6 OR NEW.type_v8 IS NOT OLD.type_v8
+    OR NEW.folder_id IS NOT NULL OR NEW.is_personal <> 1 OR NEW.ec_is_master <> 0 OR NEW.status <> 'active')
+BEGIN SELECT RAISE(ABORT, 'FIXED_FRIEND_FIELD_IMMUTABLE'); END;
+
+CREATE TRIGGER fixed_name_friend_insert AFTER INSERT ON friends
+WHEN NEW.real_name IS NOT NULL AND TRIM(NEW.real_name) <> ''
+BEGIN   INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+  VALUES (NEW.id, 'fixed-name', NEW.real_name, 'manual', NEW.updated_at); END;
+
+CREATE TRIGGER fixed_name_friend_update AFTER UPDATE OF real_name ON friends
+WHEN OLD.real_name IS NOT NEW.real_name
+BEGIN   DELETE FROM friend_field_values WHERE friend_id = NEW.id AND field_id = 'fixed-name'
+    AND (NEW.real_name IS NULL OR TRIM(NEW.real_name) = '');   INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at, source_type, source_id)
+  SELECT NEW.id, 'fixed-name', NEW.real_name, 'manual', NEW.updated_at, NULL, NULL
+  WHERE NEW.real_name IS NOT NULL AND TRIM(NEW.real_name) <> ''
+  ON CONFLICT(friend_id, field_id) DO UPDATE SET value = excluded.value,
+    updated_by = excluded.updated_by, updated_at = excluded.updated_at, source_type = NULL, source_id = NULL
+  WHERE friend_field_values.value IS NOT excluded.value; END;
+
+CREATE TRIGGER fixed_name_value_delete AFTER DELETE ON friend_field_values
+WHEN OLD.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NULL WHERE id = OLD.friend_id AND real_name IS NOT NULL; END;
+
+CREATE TRIGGER fixed_name_value_insert AFTER INSERT ON friend_field_values
+WHEN NEW.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NEW.value, updated_at = NEW.updated_at
+  WHERE id = NEW.friend_id AND real_name IS NOT NEW.value; END;
+
+CREATE TRIGGER fixed_name_value_update AFTER UPDATE OF value ON friend_field_values
+WHEN NEW.field_id = 'fixed-name'
+BEGIN   UPDATE friends SET real_name = NEW.value, updated_at = NEW.updated_at
+  WHERE id = NEW.friend_id AND real_name IS NOT NEW.value; END;
+
 CREATE TRIGGER folders_friend_add_rename AFTER UPDATE OF name ON folders WHEN NEW.kind='friend_add_rule' AND NEW.name IS NOT OLD.name BEGIN UPDATE friend_add_rules SET folder_name=NEW.name,lock_version=lock_version+1,updated_at=NEW.updated_at WHERE folder_id=NEW.id AND line_account_id=NEW.account_id; END;
 
 CREATE TRIGGER folders_friend_add_rule_legacy_delete AFTER DELETE ON folders WHEN OLD.kind='friend_add_rule' BEGIN DELETE FROM friend_add_rule_folders WHERE id=OLD.id AND line_account_id=OLD.account_id; END;
@@ -10430,6 +10517,11 @@ CREATE TRIGGER friend_add_rules_folder_name_update AFTER UPDATE OF folder_name O
 
 CREATE TRIGGER friend_add_rules_folder_update BEFORE UPDATE OF folder_id,line_account_id ON friend_add_rules WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='friend_add_rule' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
+CREATE TRIGGER friend_field_value_source_clear AFTER UPDATE OF value, updated_by, updated_at ON friend_field_values
+WHEN NEW.updated_by IS NOT 'form' AND NEW.source_type = 'form'
+BEGIN   UPDATE friend_field_values SET source_type = NULL, source_id = NULL
+  WHERE friend_id = NEW.friend_id AND field_id = NEW.field_id; END;
+
 CREATE TRIGGER hq_attribute_skip_insert BEFORE INSERT ON hq_template_preflight_resolutions
 WHEN NEW.friend_attribute_mode IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM hq_templates t WHERE t.id=NEW.template_id AND t.tenant_id=NEW.tenant_id
@@ -10448,6 +10540,16 @@ WHEN NEW.id != OLD.id
   OR NEW.tenant_id != OLD.tenant_id
   OR NEW.template_type != OLD.template_type
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER hq_template_delivery_insert BEFORE INSERT ON hq_templates
+WHEN NEW.delivery_type IS NOT NULL AND
+  (NEW.template_type!='template' OR NEW.extended_type IS NOT NULL OR NEW.friend_attribute_type IS NOT NULL)
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_delivery_update BEFORE UPDATE ON hq_templates
+WHEN NEW.delivery_type IS NOT OLD.delivery_type OR
+  (NEW.delivery_type IS NOT NULL AND (NEW.template_type!='template' OR NEW.extended_type IS NOT NULL OR NEW.friend_attribute_type IS NOT NULL))
+BEGIN SELECT RAISE(ABORT,'HQ_TYPE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_extended_type_insert BEFORE INSERT ON hq_templates
 WHEN NEW.extended_type IS NOT NULL AND NEW.template_type!='template'
@@ -11247,3 +11349,18 @@ CREATE VIEW rt_inventory_occupancy AS SELECT i.*,
 -- Seed data required by tenant-aware inserts on a fresh database.
 INSERT OR IGNORE INTO tenants (id, name) VALUES
   ('00000000-0000-4000-8000-000000000001', '既定の統括');
+
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-name','名前','fixed_name','text','form',1,-7);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('name','fixed-name');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-kana','ふりがな','fixed_kana','text','form',1,-6);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('kana','fixed-kana');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-birthday','生年月日','fixed_birthday','date','form',1,-5);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('birthday','fixed-birthday');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-age','年齢','fixed_age','number','form',1,-4);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('age','fixed-age');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-email','メール','fixed_email','email','form',1,-3);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('email','fixed-email');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-tel','電話','fixed_tel','tel','form',1,-2);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('tel','fixed-tel');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-address','住所','fixed_address','textarea','form',1,-1);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('address','fixed-address');

@@ -53,7 +53,7 @@ it('外側の日時を消す操作は隣の終了日時を変えない', () => {
   expect(data.get('start')).toBe('')
   expect(data.get('end')).toBe('2026-10-01T22:00')
 })
-it.each(['消す', '空にしてEnter'])('予約済み時刻の%sは予約を変更・取消せず、取消ボタンは明示操作のまま', (method) => {
+it.each(['消す', '空にしてEnter'])('予約中時刻の%sは予約を変更・取消せず、取消ボタンは明示操作のまま', (method) => {
   const onReschedule = vi.fn(), onCancelRow = vi.fn()
   render(<ScheduleSendDialog open onClose={() => {}} content="案内" hasImage={false} value="" onChange={() => {}}
     onConfirm={() => {}} busy={false} rowsFailed={false} onRetryRows={() => {}} onReschedule={onReschedule} onCancelRow={onCancelRow}

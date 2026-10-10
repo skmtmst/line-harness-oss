@@ -1557,6 +1557,9 @@
       "parentColumn": "id"
     }
   },
+  "friend_fixed_fields": {
+    "category": "global"
+  },
   "friend_identity_links": {
     "category": "purge",
     "scope": {
@@ -4243,6 +4246,20 @@
     "scope": {
       "by": "tenant",
       "column": "tenant_id"
+    }
+  },
+  "entry_route_coupon_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "form_submission_files": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
     }
   }
 }

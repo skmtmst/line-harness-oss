@@ -13,7 +13,7 @@ describe('V8 のタグ札', () => {
     render(<TagPill name={name} color="#228855" />)
     const pill = screen.getByRole('group', { name: `タグ「${name}」` })
     expect(pill.getAttribute('data-size')).toBe('md')
-    expect(screen.getByTitle(name).textContent).toBe(name)
+    expect(screen.getByText(name).getAttribute('data-truncated-text')).toBe('')
     expect(pill.querySelector<HTMLElement>('[aria-hidden="true"]')?.style.backgroundColor).toBe('#228855')
     expect(screen.queryByRole('button')).toBeNull()
   })

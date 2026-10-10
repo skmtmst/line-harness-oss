@@ -35,6 +35,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
+import { screenReady } from './screen-ready.mjs'
+export { screenReady } from './screen-ready.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const BUDGET_PATH = join(HERE, 'speed-budget.json')
@@ -185,9 +187,15 @@ export async function stubApi(page, mockFetch) {
   })
 }
 
-async function gotoTarget(page, target) {
-  await page.goto(target, { waitUntil: 'networkidle', timeout: 20000 })
-    .catch(() => page.goto(target, { waitUntil: 'domcontentloaded', timeout: 20000 }))
+async function gotoTarget(page, target, waitUntil = 'networkidle') {
+  // 標準画面は従来の通信待ちを保つ。負荷画面は下の実データの印で判定する。
+  // 通信待ちがtimeoutしても、描画中の画面を再読込しない。
+  try {
+    await page.goto(target, { waitUntil, timeout: 20000 })
+  } catch (error) {
+    if (waitUntil !== 'networkidle' || error.name !== 'TimeoutError') throw error
+    await page.waitForLoadState('domcontentloaded', { timeout: 20000 })
+  }
 }
 
 export async function measureScreen(browser, target, name, route) {
@@ -266,24 +274,10 @@ export function assertStressResponse(state) {
   return state.rows
 }
 
-/** ブラウザ内の実データと読み込み状態を確認する。mainだけでは測定を始めない。 */
-export function screenReady({ route, expectedRows = null }) {
-  if (document.documentElement.dataset.theme !== 'v8') return false
-  const main = document.querySelector('main')
-  if (!main || !main.textContent?.trim()) return false
-  const text = main.textContent
-  if (/画面を表示できませんでした|Application error|読み込めませんでした|見る権限がありません/.test(text)
-    || main.querySelector('[data-list-state="error"], [data-list-state="forbidden"]')) return 'error'
-  if (main.querySelector('[aria-busy="true"], [data-list-state="loading"]')) return false
-  if (route === '/friends') {
-    if (!main.querySelector('[data-friend-row]')) return false
-    if (expectedRows !== null && !text.includes(`${expectedRows.toLocaleString('ja-JP')}人中`)) return false
-  }
-  return true
-}
-
 export async function waitForScreenReady(page, route, expectedRows = null) {
-  const handle = await page.waitForFunction(screenReady, { route, expectedRows }, { timeout: 15000 })
+  // 負荷画面は遅くても測り切って超過として報告する。速度の合格基準は変えない。
+  const timeout = expectedRows === null ? 15000 : 180000
+  const handle = await page.waitForFunction(screenReady, { route, expectedRows }, { timeout })
   const state = await handle.jsonValue()
   if (state !== true) throw new Error(`${route}: データを読み込めないため速度を測れません（${state}）`)
 }
@@ -294,7 +288,7 @@ async function measureStress(browser, target) {
   try {
   const responseState = await installStressApi(page, target)
   const start = Date.now()
-  await gotoTarget(page, target.url('/friends'))
+  await gotoTarget(page, target.url('/friends'), 'domcontentloaded')
   await waitForScreenReady(page, '/friends', 2000)
   const rows = assertStressResponse(responseState)
   const renderedRows = await page.locator('[data-friend-row]').count()

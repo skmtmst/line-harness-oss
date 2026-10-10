@@ -27,6 +27,7 @@ import RestaurantShell, { Panel, QuietError, StatRow, Status, type RestaurantV8C
 import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 const SEAT_TYPE_LABEL: Record<string, string> = {
   table: 'テーブル',
@@ -193,10 +194,10 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
     <>
       <div className={styles.pair}>
         <Field label="配置の列（0から）" htmlFor="rs-table-x" error={fieldErrors.floorX}>
-          <TextField id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} />
+          <NumberInput id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} />
         </Field>
         <Field label="配置の行（0から）" htmlFor="rs-table-y" error={fieldErrors.floorY}>
-          <TextField id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} />
+          <NumberInput id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} />
         </Field>
       </div>
       <DialogField label="結合グループ" htmlFor="rs-table-group">
@@ -320,10 +321,10 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </DialogField>
             <div className={styles.pair}>
               <Field label="最小人数" htmlFor="rs-table-min" error={fieldErrors.minCapacity}>
-                <TextField id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => setDraft({ ...draft, minCapacity: event.target.value })} />
+                <NumberInput id="rs-table-min" type="number" min={1} value={draft.minCapacity} onChange={(event) => setDraft({ ...draft, minCapacity: event.target.value })} />
               </Field>
               <Field label="最大人数" htmlFor="rs-table-max" error={fieldErrors.maxCapacity}>
-                <TextField id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} />
+                <NumberInput id="rs-table-max" type="number" min={1} value={draft.maxCapacity} onChange={(event) => setDraft({ ...draft, maxCapacity: event.target.value })} />
               </Field>
             </div>
             {showPlacement ? placementFields : null}

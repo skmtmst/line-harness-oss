@@ -8,11 +8,14 @@
  * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「ルールを作る」）・案内の帯・
  * 道具の段・表（絵の列の並び）を渡す。行の右端は「編集する」と「…」。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Activity,
+  Archive,
   Bookmark,
   FileWarning,
   Filter,
@@ -39,6 +42,8 @@ import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
+import { useListUrlState } from '@/components/shared/list-url-state'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
@@ -65,6 +70,9 @@ import {
   type BandCell,
 } from './shell'
 import styles from './list.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -117,12 +125,7 @@ export function actionSummary(item: Pick<Automation, 'actions'>): { title: strin
 
 /** 月/日（日本時間）。 */
 function monthDay(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const month = parts.find((part) => part.type === 'month')?.value ?? ''
-  const day = parts.find((part) => part.type === 'day')?.value ?? ''
-  return `${month}/${day}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 function TableHead() {
@@ -162,19 +165,21 @@ export default function AutomationListV8() {
   const [summary, setSummary] = useState<{ executionCount30d: number; failureCount30d: number } | null>(null)
   const [skipped, setSkipped] = useState<number | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   /* ?search= で開くと、その言葉で探した状態から始める（動いた記録の「ルールを開く」）。 */
-  const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
-  const [onlyActive, setOnlyActive] = useState(false)
-  const [onlyStopped, setOnlyStopped] = useState(false)
-  const [saved, setSaved] = useState<SavedKey>('')
-  const [sort, setSort] = useState<'updated' | 'runs' | 'name'>('updated')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useListUrlValue('search', '')
+  const [onlyActive, setOnlyActive] = useListUrlValue('onlyActive', false)
+  const [onlyStopped, setOnlyStopped] = useListUrlValue('onlyStopped', false)
+  const [saved, setSaved] = useListUrlValue<SavedKey>('saved', '')
+  const [sort, setSort] = useListUrlValue<'updated' | 'runs' | 'name'>('sort', 'updated')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [view, setView] = useListUrlState({ archived: '' })
+  const onlyArchived = view.archived === '1'
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rowBusyId, setRowBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
-  const [pending, setPending] = useState<{ kind: 'toggle' | 'archive'; item: Automation } | null>(null)
+  const [pending, setPending] = useState<{ kind: 'toggle' | 'archive' | 'restore'; item: Automation } | null>(null)
   const [working, setWorking] = useState(false)
   const [testing, setTesting] = useState<Automation | null>(null)
   const [testFriendId, setTestFriendId] = useState('')
@@ -189,7 +194,7 @@ export default function AutomationListV8() {
     setActionError('')
     try {
       const [listRes, runsRes] = await Promise.all([
-        api.automations.list({ accountId: selectedAccountId || undefined }),
+        api.automations.list({ accountId: selectedAccountId || undefined, includeArchived: true }),
         selectedAccountId
           ? fetchApi<ApiResponse<{ summary: RunsSummary }>>(
             `/api/automation-runs?lineAccountId=${encodeURIComponent(selectedAccountId)}&limit=1`,
@@ -229,12 +234,12 @@ export default function AutomationListV8() {
     return () => { requestRef.current += 1 }
   }, [accountLoading, load])
   useEffect(() => { void loadFolders() }, [loadFolders])
-  useEffect(() => { setFolderFilter('') }, [selectedAccountId])
+  useEffect(() => { setFolderFilter(''); setPending(null) }, [selectedAccountId])
 
   const tabCounts = useAutomationTabCounts(loadStatus === 'ready' ? items.length : null)
 
   const activeCount = useMemo(() => items.filter((item) => item.isActive).length, [items])
-  const stoppedCount = items.length - activeCount
+  const stoppedCount = items.filter((item) => item.status !== 'archived' && !item.isActive).length
   /** 動かしているのに、この30日に一度も動いていないルール（だれにも当たらない目安）。 */
   const neverRunCount = useMemo(() => items.filter((item) => item.isActive && item.executionCount30d === 0).length, [items])
 
@@ -243,6 +248,7 @@ export default function AutomationListV8() {
     const filtered = items.filter((item) => {
       // ルールを入れる口がまだ無いので、フォルダを選ぶと「未分類」以外は0件。
       if (folderFilter && folderFilter !== UNFILED) return false
+      if ((item.status === 'archived') !== onlyArchived) return false
       if (onlyActive && !item.isActive) return false
       if (onlyStopped && item.isActive) return false
       if (saved === 'failed' && item.failureCount30d === 0) return false
@@ -258,12 +264,12 @@ export default function AutomationListV8() {
       if (sort === 'runs') return b.executionCount30d - a.executionCount30d || a.name.localeCompare(b.name, 'ja')
       return b.updatedAt.localeCompare(a.updatedAt)
     })
-  }, [items, search, folderFilter, onlyActive, onlyStopped, saved, sort])
+  }, [items, search, folderFilter, onlyActive, onlyStopped, onlyArchived, saved, sort])
 
   const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
   const current = Math.min(Math.max(1, page), pageCount)
   const paged = visible.slice((current - 1) * pageSize, current * pageSize)
-  useEffect(() => { setPage(1) }, [search, folderFilter, onlyActive, onlyStopped, saved, sort, pageSize, selectedAccountId])
+  useEffect(() => { setPage(1) }, [search, folderFilter, onlyActive, onlyStopped, onlyArchived, saved, sort, pageSize, selectedAccountId])
 
   const runRowAction = async (fn: () => Promise<void>, id: string) => {
     if (rowBusyId) return
@@ -289,19 +295,23 @@ export default function AutomationListV8() {
   }
 
   const confirmPending = async () => {
-    if (!pending || working) return
+    if (!pending || working || !selectedAccountId) return
     setWorking(true)
     setActionError('')
     try {
       const status = pending.kind === 'archive' ? 'archived' : pending.item.isActive ? 'stopped' : 'active'
-      const res = await api.automations.setStatus(pending.item.id, status)
+      const res = pending.kind === 'restore'
+        ? await api.automations.restore(pending.item.id, selectedAccountId)
+        : await api.automations.setStatus(pending.item.id, status)
       if (!res.success) throw new Error(res.error)
+      notifyToast(pending.kind === 'restore' ? 'ルールを保管から戻しました' : pending.kind === 'archive' ? 'ルールを保管しました' : 'ルールの状態を変えました')
       setPending(null)
       await load()
     } catch {
       setActionError(
         pending.kind === 'archive'
-          ? 'このルールを削除できませんでした。状態を読み直してから、もう一度お試しください。'
+          ? 'このルールを保管できませんでした。状態を読み直してから、もう一度お試しください。'
+          : pending.kind === 'restore' ? '保管から戻せませんでした。状態を読み直してから、もう一度お試しください。'
           : '稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。',
       )
     } finally {
@@ -343,6 +353,7 @@ export default function AutomationListV8() {
     const busy = rowBusyId === item.id
     const runs: ActionMenuItem = { id: 'runs', label: '動いた記録を見る', onSelect: () => router.push(runsHref(item)) }
     if (!canEdit) return [runs]
+    if (item.status === 'archived') return [runs, { id: 'restore', label: '保管から戻す', disabled: busy, onSelect: () => { setActionError(''); setPending({ kind: 'restore', item }) } }]
     return [
       { id: 'edit', label: '編集する', disabled: busy, onSelect: () => void openEditor(item.id, false) },
       { id: 'duplicate', label: '複製する', disabled: busy, onSelect: () => void openEditor(item.id, true) },
@@ -354,17 +365,17 @@ export default function AutomationListV8() {
       },
       { id: 'toggle', label: item.isActive ? '止める' : '動かす', disabled: busy, onSelect: () => setPending({ kind: 'toggle', item }) },
       runs,
-      { id: 'archive', label: '削除する', tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => setPending({ kind: 'archive', item }) },
+      { id: 'archive', label: '保管する', tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => setPending({ kind: 'archive', item }) },
     ]
   }
 
   /* ===== 数の帯（4つ） ===== */
   const ready = loadStatus === 'ready'
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : '—' },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={13} aria-hidden="true" />, value: ready ? items.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
     { key: 'runs', title: '今月動いた', icon: <Activity size={13} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
     { key: 'failed', title: '失敗', icon: <FileWarning size={13} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `だれにも当たらないルール ${neverRunCount}` : '—' },
+    { key: 'skipped', title: '条件に外れた', icon: <Filter size={13} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `だれにも当たらないルール ${neverRunCount}` : emptyValue('unknown') },
   ]
 
   /* ===== フォルダ ===== */
@@ -386,12 +397,13 @@ export default function AutomationListV8() {
   /* ===== 道具の段 ===== */
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={onlyActive} onChange={(next) => { setOnlyActive(next); if (next) setOnlyStopped(false) }} icon={<Play size={13} aria-hidden="true" />}>
-        {`動いている ${ready ? activeCount : '—'}`}
+      <FilterChip selected={onlyActive} onChange={(next) => { setOnlyActive(next); if (next) { setOnlyStopped(false); setView({ archived: '' }) } }} icon={<Play size={13} aria-hidden="true" />}>
+        {`動いている ${ready ? activeCount : emptyValue('unknown')}`}
       </FilterChip>
-      <FilterChip selected={onlyStopped} onChange={(next) => { setOnlyStopped(next); if (next) setOnlyActive(false) }} icon={<Pause size={13} aria-hidden="true" />}>
-        {`止めている ${ready ? stoppedCount : '—'}`}
+      <FilterChip selected={onlyStopped} onChange={(next) => { setOnlyStopped(next); if (next) { setOnlyActive(false); setView({ archived: '' }) } }} icon={<Pause size={13} aria-hidden="true" />}>
+        {`止めている ${ready ? stoppedCount : emptyValue('unknown')}`}
       </FilterChip>
+      <FilterChip selected={onlyArchived} onChange={(next) => { setView({ archived: next ? '1' : '' }); if (next) { setOnlyActive(false); setOnlyStopped(false) } }} icon={<Archive size={13} aria-hidden="true" />}>保管</FilterChip>
     </div>
   )
   const savedBox = (
@@ -441,7 +453,7 @@ export default function AutomationListV8() {
       <ListToolbar
         search={{ placeholder: 'ルール名・きっかけで探す', label: 'ルールを検索', width: 240, value: search, onChange: setSearch }}
         filters={filterChips}
-        trailing={<>{savedBox}<Select aria-label="並び順" width={170} value={sort} onChange={(value) => {
+        trailing={<>{savedBox}<ListToolbarSort aria-label="並び順" width={170} value={sort} onChange={(value) => {
           setSort(value as 'updated' | 'runs' | 'name')
           if (saved === 'runs' || saved === 'name') setSaved('')
         }} options={[
@@ -465,7 +477,7 @@ export default function AutomationListV8() {
         kind="error"
         title="ルールを読み込めませんでした"
         description="ルールは消えていません。通信を確かめて、もう一度お試しください。"
-        action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (paged.length === 0) {
@@ -478,7 +490,7 @@ export default function AutomationListV8() {
         create={{ label: '最初のオートメーションを作る', href: '/automations/new' }}
         canCreate={canEdit}
         filtered={items.length > 0}
-        onClearFilters={() => { setSearch(''); setOnlyActive(false); setOnlyStopped(false); setSaved(''); setFolderFilter('') }}
+        onClearFilters={() => { setSearch(''); setOnlyActive(false); setOnlyStopped(false); setSaved(''); setFolderFilter(''); setView({ archived: '' }) }}
         filteredDescription="検索や絞り込みの札を外すと、すべて出ます"
       />
     )
@@ -500,7 +512,7 @@ export default function AutomationListV8() {
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
                       <FolderDotName folder={null}>
-                        <span className={styles.name} title={item.name}>{item.name}</span>
+                        <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                       </FolderDotName>
                     </Td>
                     <Td className={styles.colTrigger}><span className={styles.cell} title={trigger}>{trigger}</span></Td>
@@ -510,20 +522,20 @@ export default function AutomationListV8() {
                       {action.detail ? <span className={styles.sub} title={action.detail}>{action.detail}</span> : null}
                     </Td>
                     <Td className={styles.colRuns}>
-                      <span className={styles.numMain}>{`${formatNumber(item.executionCount30d)}回`}</span>
+                      <span className={styles.numMain}>{`${formatNumber(item.executionCount30d)} 回`}</span>
                       <span className={styles.numSub}>
-                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)}回` : `更新 ${monthDay(item.updatedAt)}`}
+                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : `更新 ${monthDay(item.updatedAt)}`}
                       </span>
                     </Td>
                     <Td className={styles.colState}>
                       <span className={styles.pill} data-tone={item.isActive ? 'active' : 'neutral'}>
                         <span className={styles.pillDot} aria-hidden="true" />
-                        {item.isActive ? '動いています' : '止めています'}
+                        {item.status === 'archived' ? '保管' : item.isActive ? '動いています' : '止めています'}
                       </span>
                     </Td>
                     <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
-                        {canEdit
+                        {canEdit && item.status !== 'archived'
                           ? <Button onClick={() => void openEditor(item.id, false)} disabled={busy}>編集する</Button>
                           : <span className={styles.editSpace} aria-hidden="true" />}
                         <RowMenu
@@ -548,7 +560,7 @@ export default function AutomationListV8() {
   const pager = ready && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(current - 1) * pageSize + 1}〜{(current - 1) * pageSize + paged.length} / {formatNumber(visible.length)}件
+        {(current - 1) * pageSize + 1}〜{(current - 1) * pageSize + paged.length} / {formatNumber(visible.length)} 件
       </span>
       <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="ルール一覧のページ送り" />
     </ListPagePagination>
@@ -556,13 +568,13 @@ export default function AutomationListV8() {
 
   return (
     <ListPage
-      help={canEdit
+      help={<>{AUTOMATIONS_DESCRIPTION}{canEdit
             ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
-            : '行の「…」から 動いた記録を見る。'}
+            : '行の「…」から 動いた記録を見る。'}</>}
       boardId={narrow ? 'En14p' : viewerOnly ? 'nH9L8' : 'LWQXd'}
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+
       actions={canEdit
         ? <Button href={automationTabHref('templates')}><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button>
         : <span className={styles.createSpaceInline} aria-hidden="true" />}
@@ -588,7 +600,7 @@ export default function AutomationListV8() {
           allCount={ready ? items.length : null}
           unfiledCount={ready ? items.length : null}
           countOf={() => null}
-          placeholder="例: 予約・購入"
+          placeholder="例：予約・購入"
         />
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
@@ -597,17 +609,17 @@ export default function AutomationListV8() {
       overlays={<>
         <ConfirmDialog
           open={pending !== null}
-          title={pending ? `「${pending.item.name}」を${pending.kind === 'archive' ? '削除' : pending.item.isActive ? '止め' : '動か'}ますか？` : ''}
+          title={pending ? `「${pending.item.name}」を${pending.kind === 'restore' ? '保管から戻し' : pending.kind === 'archive' ? '保管し' : pending.item.isActive ? '止め' : '動か'}ますか？` : ''}
           description={
-            pending?.kind === 'archive'
-              ? '一覧から隠します。動いた記録と設定は残りますが、この画面からは元に戻せません。必要なら複製して作り直してください。'
+            pending?.kind === 'restore' ? '通常の一覧へ戻します。動いた記録と設定は残り、稼働は再開しません。' : pending?.kind === 'archive'
+              ? '通常の一覧から外します。動いた記録と設定は残り、保管の札から戻せます。'
               : '切り替えても、動いた記録は残ります。'
           }
-          confirmLabel={pending?.kind === 'archive' ? '削除する' : pending?.item.isActive ? '止める' : '動かす'}
+          confirmLabel={pending?.kind === 'restore' ? '保管から戻す' : pending?.kind === 'archive' ? '保管する' : pending?.item.isActive ? '止める' : '動かす'}
           destructive={pending?.kind === 'archive'}
           busy={working}
           error={actionError}
-          onConfirm={() => void confirmPending()}
+          onConfirm={() => confirmPending()}
           onCancel={() => { if (!working) setPending(null) }}
         />
         <Dialog
@@ -626,7 +638,9 @@ export default function AutomationListV8() {
         >
           {testing ? (
             <div className={styles.testBody}>
-              <Field label="試す友だちのID">
+              <Field note={<>
+                すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
+              </>} label="試す友だちのID">
                 <TextField
                   aria-label="試す友だちのID"
                   value={testFriendId}
@@ -635,9 +649,7 @@ export default function AutomationListV8() {
                   disabled={testBusy || testDone}
                 />
               </Field>
-              <p className={styles.testNote}>
-                すること：{testing.actions.map((action) => automationActionLabel(action.type)).join('・') || '登録した処理'}
-              </p>
+
               {testError ? <Notice tone="danger">{testError}</Notice> : null}
               {testDone ? <Notice tone="info">試しに動かしました。「動いた記録」で結果を確かめてください。</Notice> : null}
             </div>

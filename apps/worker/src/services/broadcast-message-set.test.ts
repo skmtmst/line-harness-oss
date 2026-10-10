@@ -92,16 +92,16 @@ describe('一斉配信の複数吹き出し契約', () => {
       },
       {
         id: 's1', type: 'research',
-        content: { assetId: 'a4', assetName: '調査', description: '答えてください', actionUrl: 'https://example.com/f' },
+        content: { assetId: 'a4', assetName: '調査', description: '答えてください', questions: [{ text: '質問', format: 'free', required: true }] },
       },
     ];
     const parts = parseBroadcastMessageParts({ messageType: 'text', messageContent: 'legacy', messageBubbles: assetBubbles });
-    expect(parts.map((part) => part.messageType)).toEqual(['carousel', 'imagemap', 'flex', 'text']);
+    expect(parts.map((part) => part.messageType)).toEqual(['carousel', 'imagemap', 'flex', 'flex']);
     for (const part of parts) {
       expect(part.messageContent).not.toContain('assetId');
     }
     expect(parts[2].messageContent).toContain('coupon_use:a3');
-    expect(buildMessages(parts).map((message) => message.type)).toEqual(['template', 'imagemap', 'flex', 'text']);
+    expect(buildMessages(parts).map((message) => message.type)).toEqual(['template', 'imagemap', 'flex', 'flex']);
   });
 
   it('直せない素材は直し方で止める', () => {

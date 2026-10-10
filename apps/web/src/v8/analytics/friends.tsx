@@ -1,5 +1,7 @@
 'use client'
 
+import { BarChart, toBarChartItems } from '@/components/shared/bar-chart'
+
 /*
  * ★V8 分析「友だちの増減」（Pencil `ws9wt`・1152 `eEhYU`・閲覧のみ `L4Uov`）。
  * 数の帯（4つ）→ 左に日ごとの増減の棒、右に「どこから増えたか」「減った友だち」。
@@ -31,30 +33,15 @@ import {
   useRegisterExport,
 } from './parts'
 import styles from './analytics.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
 
 type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
 
 function DailyBars({ days, campaigns, selected, onSelect }: { days: Day[]; campaigns: Campaign[]; selected: string; onSelect: (date: string) => void }) {
-  const max = Math.max(1, ...days.map((day) => Math.max(day.added, day.removed)))
-  const ticks = days.length > 1 ? [0, 7, 14, 21].filter((index) => index < days.length - 1).map((index) => days[index].date).concat(days[days.length - 1].date) : days.map((day) => day.date)
-  return <>
-    <div className={styles.bars} role="list" aria-label="日ごとの増減">
-      {days.map((day) => {
-        const marks = campaigns.filter((item) => item.date === day.date)
-        const label = `${Number(day.date.slice(5, 7))}月${Number(day.date.slice(8, 10))}日（${analyticsWeekday(day.date)}） 増加 ${day.added}人・減少 ${day.removed}人・差し引き ${day.net}人${marks.length ? `　${marks.map((item) => item.name).join('、')}` : ''}`
-        return <button key={day.date} type="button" role="listitem" className={styles.day} data-selected={selected === day.date || undefined} aria-label={label} title={label} onClick={() => onSelect(selected === day.date ? '' : day.date)}>
-          <span className={styles.dayUp}>
-            {marks.map((item) => <i key={item.id} className={styles.dayMark} data-kind={item.kind} aria-hidden="true" />)}
-            {day.added > 0 ? <span className={styles.barUp} style={{ height: `${day.added / max * 100}%` }} /> : null}
-            <span className={styles.baseline} />
-          </span>
-          <span className={styles.dayDown}>{day.removed > 0 ? <span className={styles.barDown} style={{ height: `${day.removed / max * 100}%` }} /> : null}</span>
-        </button>
-      })}
-    </div>
-    <div className={styles.ticks} aria-hidden="true">{ticks.map((date) => <span key={date}>{shortDate(date)}</span>)}</div>
-  </>
+  return <BarChart items={toBarChartItems(days, {campaigns, formatTitle:(date)=>`${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日（${analyticsWeekday(date)}）`})} selectedKey={selected} onSelect={(date)=>onSelect(selected===date?'':date)} />
 }
 
 /** 経路の内訳は概要の後に読む（2つの重い集計を同時に走らせない）。 */
@@ -72,14 +59,13 @@ function RouteBreakdown({ accountId, from, to }: { accountId: string; from: stri
   const max = Math.max(1, ...routes.map((route) => shownValue(route.friendAdds) ?? 0))
   if (routes.length === 0) return <p className={styles.sideNote}>この期間に流入リンクから増えた友だちはいません</p>
   return <ul className={styles.routeRows}>{routes.map((route) => <li key={route.id} className={styles.routeRow}>
-    <div className={styles.sideRow}><span className={styles.sideName} title={route.name}>{route.name}</span><strong className={styles.sideValue}>{`${metricText(route.friendAdds)} 人`}</strong></div>
-    <div className={styles.track} title={`現在 ${metricText(route.currentFriends)}人・1人あたり ${metricText(route.costPerFriend)}円`}><span style={{ width: `${(shownValue(route.friendAdds) ?? 0) / max * 100}%` }} /></div>
+    <div className={styles.sideRow}><span className={styles.sideName} ><TruncatedText value={String(route.name ?? '')} /></span><strong className={styles.sideValue}>{`${metricText(route.friendAdds)} 人`}</strong></div>
+    <div className={styles.track} title={`現在 ${metricText(route.currentFriends)} 人・1人あたり ${metricText(route.costPerFriend)} 円`}><span style={{ width: `${(shownValue(route.friendAdds) ?? 0) / max * 100}%` }} /></div>
   </li>)}</ul>
 }
 
 export default function FriendsV8({ accountId }: { accountId: string }) {
-  const [days, setDays] = useState(30)
-  const range = useMemo(() => rangeFor(days - 1), [days])
+  const { days, setDays, range, customRange, setRange } = useReportPeriod()
   const [selectedDate, setSelectedDate] = useState('')
   const state = useOverview<AnalyticsFriendsOverview>(
     () => api.analytics.friendsOverview(accountId, range),
@@ -89,13 +75,13 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
   const daysShown = overview !== null && (overview.state === 'available' || overview.state === 'partial')
   const exportCsv = () => {
     if (!overview) return
-    downloadCsv('analytics-friends.csv', [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])
+    downloadCsv(csvFileName("友だち分析"), [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])
   }
   useRegisterExport(exportCsv, !daysShown)
 
   if (!state.data || !overview) {
     return <div className={styles.body}>
-      <div className={styles.periodRow}><RangePickerV8 size="small" days={days} onChange={setDays} /></div>
+      <div className={styles.periodRow}><RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={setDays} /></div>
       {state.loading ? <ListState kind="loading" title="分析を読み込んでいます" /> : <ListState kind="error" description={state.error} onRetry={state.retry} />}
     </div>
   }
@@ -110,7 +96,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
 
   return <>
     <KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="増えた" icon={<Users size={13} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人` }, state.retry)} />
+      <KpiCard presentation="band" title="増えた" icon={<Users size={13} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)} 人` }, state.retry)} />
       <KpiCard presentation="band" title="減った" icon={<UserMinus size={13} aria-hidden="true" />} value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, { detail: `この${days}日・解除を含む` }, state.retry)} />
       <KpiCard presentation="band" title="差し引き" icon={<ArrowLeftRight size={13} aria-hidden="true" />} value={netValue} unit="人" signed {...metricCardState(overview.metrics.net, { detail: `友だちは ${metricText(overview.metrics.currentFriends)} 人` }, state.retry)} />
       <KpiCard presentation="band" title="ブロック率" icon={<CircleHelp size={13} aria-hidden="true" />} value={null} unit="%" detail="ブロックの数は未取得" />
@@ -123,7 +109,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
             <h2 id="friends-daily-title" className={styles.cardTitle}>{`日ごとの増減（この${days}日）`}</h2>
             <HelpTip label="日ごとの増減の説明">{`棒を選ぶとその日の数と配信・シナリオが出ます。${caption}`}</HelpTip>
             <span className={styles.spacer} />
-            <RangePickerV8 size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />
+            <RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />
           </div>
           <div className={styles.legend}>
             <span data-swatch="up">増えた</span><span data-swatch="down">減った</span><span data-swatch="broadcast">配信した日</span><span data-swatch="scenario">シナリオを始めた日</span>
@@ -132,7 +118,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
             ? <DailyBars days={overview.days} campaigns={overview.campaigns} selected={selectedDate} onSelect={setSelectedDate} />
             : <div className={styles.emptyChart} role="status"><p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>{overview.state === 'pending' ? <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p> : null}</div>}
           {daysShown && (selectedDay || overview.campaigns.length > 0) ? <div className={styles.notes}>
-            {selectedDay ? <p className={styles.note}><i data-kind="selected" aria-hidden="true" />{`${shortDate(selectedDay.date)}（${analyticsWeekday(selectedDay.date)}） 増加 ${selectedDay.added}人・減少 ${selectedDay.removed}人・差し引き ${selectedDay.net}人`}</p> : null}
+            {selectedDay ? <p className={styles.note}><i data-kind="selected" aria-hidden="true" />{`${shortDate(selectedDay.date)}（${analyticsWeekday(selectedDay.date)}） 増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人・差し引き ${selectedDay.net} 人`}</p> : null}
             {overview.campaigns.map((item) => <p key={item.id} className={styles.note}><i data-kind={item.kind} aria-hidden="true" />{`${shortDate(item.date)} ${item.kind === 'scenario' ? 'シナリオを始めた' : '一斉配信'}「${item.name}」`}</p>)}
           </div> : null}
         </section>

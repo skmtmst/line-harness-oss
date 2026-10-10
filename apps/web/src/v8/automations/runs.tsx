@@ -9,6 +9,7 @@
  * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（絵の列の並び）を渡す。
  * 中身は右の詳細パネルで開く。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -40,6 +41,10 @@ import {
   type BandCell,
 } from './shell'
 import styles from './runs.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -112,13 +117,7 @@ function statusTone(status: RunStatus): 'active' | 'danger' | 'warn' | 'neutral'
 
 /** 「9/30 14:12」（日本時間）。 */
 export function shortDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '日時不明'
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: '日時不明' })
 }
 
 /** かかった時間（「0.8 秒」）。測れていないものは「—」。 */
@@ -181,8 +180,8 @@ export default function AutomationRunsV8() {
   })
   const [saved, setSaved] = useState<SavedKey>('')
   const includeTest = saved === 'include-test'
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [selectedRun, setSelectedRun] = useState<AutomationRunRow | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<AutomationRunDetail | null>(null)
@@ -363,11 +362,11 @@ export default function AutomationRunsV8() {
       search: query.trim() || undefined,
       status: resultFilter !== 'all' ? resultFilter : undefined,
       includeTest,
-    }), 'automation-runs.csv')
+    }), csvFileName("オートメーションの実行履歴"))
       .then((result) => {
         if (result.truncated && result.totalCount !== null) {
           const rest = result.totalCount - (result.returnedCount ?? 0)
-          setNotice(`5,000件までしか出ませんでした（対象${formatNumber(result.totalCount)}件・残り${formatNumber(rest)}件）。期間や絞り込みで分けて出してください。`)
+          setNotice(`5,000件までしか出ませんでした（対象${formatNumber(result.totalCount)} 件・残り${formatNumber(rest)} 件）。期間や絞り込みで分けて出してください。`)
         }
       })
       .catch(() => setNotice('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
@@ -440,7 +439,7 @@ export default function AutomationRunsV8() {
   ]
 
   /* ===== 道具の段 ===== */
-  const chipCount = (value: number | undefined) => (value === undefined ? '—' : formatNumber(value))
+  const chipCount = (value: number | undefined) => (value === undefined ? emptyValue('unknown') : formatNumber(value))
   const filterChips = (
     <div role="group" aria-label="結果で絞り込む" className={styles.chipGroup}>
       <FilterChip selected={resultFilter === 'executed'} onChange={(next) => toggleResult('executed', next)} icon={<Activity size={13} aria-hidden="true" />}>{`動いた ${chipCount(summary?.executed)}`}</FilterChip>
@@ -469,7 +468,7 @@ export default function AutomationRunsV8() {
       </div>
       {notice ? <div className={styles.noticeRow}><Notice tone="info" role="status">{notice}</Notice></div> : null}
       <ListToolbar
-        search={{ placeholder: '友だち・ルールの名前で探す', label: '友だちの名前・オートメーションの名前で検索', width: 240, value: query, onChange: changeQuery }}
+        search={{ placeholder: '友だち・ルールの名前で探す', label: '友だちの名前・オートメーションの名前で探す', width: 240, value: query, onChange: changeQuery }}
         filters={filterChips}
         trailing={<>{savedBox}<PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} /></>}
       />
@@ -486,7 +485,7 @@ export default function AutomationRunsV8() {
         kind="error"
         title="動いた記録を読み込めませんでした"
         description="記録は消えていません。通信を確かめて、もう一度お試しください。"
-        action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (!data || data.items.length === 0) {
@@ -530,7 +529,7 @@ export default function AutomationRunsV8() {
                       {reason ? <span className={styles.sub} title={reason}>{reason}</span> : null}
                     </Td>
                     <Td className={styles.colDone}>
-                      <span className={styles.main} title={done.join('・') || run.detail || ''}>{done.length > 0 ? done.join('・') : '—'}</span>
+                      <span className={styles.main} title={done.join('・') || run.detail || ''}>{done.length > 0 ? done.join('・') : emptyValue('unknown')}</span>
                       {done.length > 0 ? <span className={styles.sub}>{`${done.length} つ`}</span> : null}
                     </Td>
                     <Td className={styles.colTime}><span className={styles.main}>{durationText(run.durationMs)}</span></Td>
@@ -561,7 +560,7 @@ export default function AutomationRunsV8() {
     <>
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
-          {`${formatNumber(total)}件中 ${data.pagination.offset + 1}〜${data.pagination.offset + data.items.length}件`}
+          {`${formatNumber(total)} 件中 ${data.pagination.offset + 1}〜${data.pagination.offset + data.items.length} 件`}
         </span>
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="動いた記録のページ送り" /> : null}
       </div>
@@ -572,19 +571,19 @@ export default function AutomationRunsV8() {
   const runDetail = selectedDetail
   const deepLinkMessage = !run && deepLinkRunId
     ? deepLinkLoading ? '読み込んでいます'
-      : deepLinkError === 'forbidden' ? 'この実行を見る権限がありません。'
+      : deepLinkError === 'forbidden' ? permissionDeniedMessage('store')
         : deepLinkError === 'error' ? '詳細を読み込めませんでした。記録は消えていません。' : null
     : null
 
   return (
     <ListPage
-      help="行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"
+      help={<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}
       boardId="g98F9"
       headingSize="regular"
       title="オートメーション"
-      description={AUTOMATIONS_DESCRIPTION}
+
       actions={canExport
-        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
         : undefined}
       tabs={<AutomationTabs active="runs" counts={tabCounts} />}
       stats={<AutomationBand label="動いた記録の数の帯" cells={cells} />}
@@ -594,7 +593,7 @@ export default function AutomationRunsV8() {
         {deepLinkMessage ? (
           <DetailPanel open title="実行記録の中身" onClose={() => setDeepLinkRunId(null)}>
             <p className={styles.panelText}>{deepLinkMessage}</p>
-            {deepLinkError === 'error' ? <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読む</Button> : null}
+            {deepLinkError === 'error' ? <Button onClick={() => setDeepLinkReloadKey((key) => key + 1)}>もう一度読み込む</Button> : null}
           </DetailPanel>
         ) : null}
         <DetailPanel
@@ -642,14 +641,14 @@ export default function AutomationRunsV8() {
               ) : detailError === 'error' ? (
                 <div className={styles.panelActions}>
                   <p className={styles.panelText}>詳細を読み込めませんでした。記録は消えていません。</p>
-                  <Button onClick={() => setDetailReloadKey((key) => key + 1)}>もう一度読む</Button>
+                  <Button onClick={() => setDetailReloadKey((key) => key + 1)}>もう一度読み込む</Button>
                 </div>
               ) : runDetail && runDetail.steps.length > 0 ? (
                 <ul className={styles.steps}>
                   {runDetail.steps.map((step) => (
                     <li key={step.stepKey} className={styles.step}>
                       <span>{step.actionLabel}{step.commonActionVersionId ? '（共通アクション）' : ''}</span>
-                      <span className={styles.stepMeta}>{`${step.attemptNumber}回目・${STEP_STATUS_LABEL[step.status]}`}</span>
+                      <span className={styles.stepMeta}>{`${step.attemptNumber} 回目・${STEP_STATUS_LABEL[step.status]}`}</span>
                       {step.errorMessage ? <span className={styles.stepError}>{step.errorMessage}</span> : null}
                     </li>
                   ))}
