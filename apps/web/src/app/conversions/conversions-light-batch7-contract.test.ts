@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(import.meta.dirname, 'new', 'page.tsx'), 'utf8')
+const NEW_PAGE = readUiSource(join(import.meta.dirname, 'new', 'page.tsx'), 'utf8')
 
 describe('点検・軽 第7便コンバージョン(#585)', () => {
   it('飾りの表示件数切り替えを置かない(#513 L1)', () => {

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const LIST_PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
+const NEW_PAGE = readUiSource(new URL('./new/page.tsx', import.meta.url), 'utf8')
 const ANALYTICS_PAGE = readUiSource(new URL('../analytics/page.tsx', import.meta.url), 'utf8')
 
 /**
@@ -61,7 +61,7 @@ describe('N-264 作った行が分かる', () => {
   })
 
   it('作成画面は作ったIDを持って一覧へ戻る', () => {
-    expect(NEW_PAGE).toContain('successHref=')
+    expect(NEW_PAGE).toContain('router.push(`/conversions?tab=points')
     expect(NEW_PAGE).toContain('&highlight=')
   })
 })

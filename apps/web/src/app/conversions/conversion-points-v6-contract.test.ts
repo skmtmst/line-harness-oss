@@ -76,12 +76,12 @@ describe('V6 成果地点一覧の契約', () => {
 
 
   it('作成画面で重複を止め、入力中の条件だけを試算する', () => {
-    expect(NEW_PAGE).toContain('designNode="j8p3yj"')
+    expect(NEW_PAGE).toContain('boardId="j8p3yj"')
     expect(NEW_PAGE).toContain('const duplicateName = useMemo')
-    expect(NEW_PAGE).toContain('同じ意味の成果地点を2つ作らないでください')
+    expect(NEW_PAGE).toContain('分析の数字が二重になります')
     expect(NEW_PAGE).toContain('api.conversions.previewDefinition({')
-    expect(NEW_PAGE).toContain('入力中の条件だけで試算し、成果は追加しません。')
-    expect(NEW_PAGE).toContain('入力中の条件だけで試算し、成果は追加しません。')
+    expect(NEW_PAGE).toContain('入力中の条件だけで試算しています。')
+    expect(NEW_PAGE).toContain('試算では成果を追加しません。')
     expect(NEW_PAGE).not.toContain('保存前試算APIの接続後')
     expect(NEW_PAGE).not.toContain('準備中')
     expect(NEW_PAGE).not.toContain('Webhookで受け取った')
@@ -94,8 +94,8 @@ describe('V6 成果地点一覧の契約', () => {
     // 金額の出し方の選択肢は対応表(origin-labels)の valueModes から作る。
     // 注文の金額が無い起点では 'source' を出さないため、3択の直書きはしない。
     expect(NEW_PAGE).toContain('origin.valueModes')
-    expect(NEW_PAGE).toContain("source: '注文の金額をそのまま使う'")
-    expect(NEW_PAGE).toContain("value: 'source_cancelled', label: '返品されたら取り消す'")
+    expect(NEW_PAGE).toContain("source: '注文の金額'")
+    expect(NEW_PAGE).toContain("value: 'source_cancelled', label: '件数と金額を引く'")
     expect(NEW_PAGE).toContain('api.conversions.createDefinition({')
     // N-258: 送る利用先は実在するオブジェクトの実IDだけ。仮IDの固定一覧はない。
     expect(NEW_PAGE).toContain('usages: usageTargets')
