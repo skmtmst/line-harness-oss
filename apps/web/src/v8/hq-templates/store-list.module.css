@@ -5,3 +5,4 @@
 .colFormState { width: var(--tpl-hql-form-state-w); }
 .colFormDest { width: var(--tpl-hql-form-dest-w); }
 .colFormActions { width: var(--tpl-hql-form-actions-w); }
+.deliveryTabs { display: flex; flex-wrap: wrap; gap: var(--tpl-htn-chip-gap); margin-bottom: var(--tpl-htn-gap); }
