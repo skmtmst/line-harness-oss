@@ -133,6 +133,8 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'DELETE /api/forms/{id}/submissions/{submissionId}',
+  'DELETE /api/friends/{id}/data',
   'GET /api/booking/admin/board',
   'PATCH /api/booking/admin/board/{id}',
   'POST /api/tags/{id}/restore',
