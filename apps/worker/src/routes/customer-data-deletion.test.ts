@@ -208,23 +208,20 @@ function photo() {
 function photoAudit() {
   sqlite.raw.exec(`INSERT INTO nen_photo_original_download_audit(id,photo_id,line_account_id,requested_by,event,created_at) VALUES ('download-audit','photo','a','env-owner','downloaded','now');`);
 }
-it('deletes indirect photo derivatives and prevents retained audit cascades before any mutation', async () => {
+it('deletes indirect photo derivatives while retaining detached audit history', async () => {
   photo(); photoAudit();
-  const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
-  expect(response.status).toBe(409); expect((await response.json() as any).code).toBe('deletion_schema_approval_required');
-  expect(remove).not.toHaveBeenCalled(); expect(count('operation_audit')).toBe(0);
-  expect(count('nen_photo_original_download_audit')).toBe(1); expect(count('nen_photo_submissions')).toBe(1); expect(count('friends')).toBe(3);
-  // The following part verifies the supported no-protected-record path with the same photo fixture.
-  sqlite.raw.exec('DELETE FROM nen_photo_original_download_audit');
   expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(200);
+  expect(count('nen_photo_original_download_audit')).toBe(1);
+  expect(sqlite.raw.prepare('SELECT photo_id,photo_id_history FROM nen_photo_original_download_audit').get()).toEqual({photo_id:null,photo_id_history:'photo'});
   expect(count('nen_photo_submissions')).toBe(0); expect(count('nen_photo_derivatives')).toBe(0);
   expect(objects).toEqual(new Set(['private/other-doc']));
 });
-it('preserves a retained audit inserted during R2 deletion and rolls the database back', async () => {
+it('retains and detaches an audit inserted during R2 deletion in the same atomic batch', async () => {
   photo();
   remove.mockImplementationOnce(async (keys: string[]) => { keys.forEach(key => objects.delete(key)); photoAudit(); });
-  expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(503);
-  expect(count('nen_photo_original_download_audit')).toBe(1); expect(count('nen_photo_submissions')).toBe(1); expect(count('form_submission_files')).toBe(2); expect(count('friends')).toBe(3);
+  expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(200);
+  expect(count('nen_photo_original_download_audit')).toBe(1); expect(count('nen_photo_submissions')).toBe(0); expect(count('friends')).toBe(2);
+  expect(sqlite.raw.prepare('SELECT photo_id,photo_id_history FROM nen_photo_original_download_audit').get()).toEqual({photo_id:null,photo_id_history:'photo'});
 });
 it('records completion in the visible audit feed atomically, with no customer text', async () => {
   await app().request(answerUrl, { method: 'DELETE', headers: headers() }, env());
@@ -273,14 +270,15 @@ it('rolls back database deletion when the required completion audit cannot be sa
   expect(count('audit_events')).toBe(1);
 });
 
-it('preserves another customer conversion referenced by the deleted affiliate before R2 mutation', async () => {
+it('preserves another customer conversion and attribution while detaching a deleted referrer', async () => {
   sqlite.raw.exec(`INSERT INTO affiliates(id,name,code,friend_id) VALUES ('affiliate','Private referrer','ref','u');
     INSERT INTO conversion_points(id,name,event_type) VALUES ('point','P','purchase');
-    INSERT INTO conversion_events(id,conversion_point_id,friend_id,affiliate_id) VALUES ('other-conversion','point','v','affiliate');`);
-  const response = await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env());
-  expect(response.status).toBe(409); expect((await response.json() as any).code).toBe('deletion_schema_approval_required');
-  expect(count('conversion_events')).toBe(1); expect(count('friends')).toBe(3); expect(count('affiliates')).toBe(1);
-  expect(count('operation_audit')).toBe(0); expect(remove).not.toHaveBeenCalled();
+    INSERT INTO conversion_events(id,conversion_point_id,friend_id,affiliate_id,affiliate_code) VALUES ('other-conversion','point','v','affiliate','ref');
+    INSERT INTO affiliate_attribution_decisions(id,conversion_event_id,friend_id,conversion_point_id,affiliate_id,ref_code,reason,window_days,candidates_json) VALUES ('decision','other-conversion','v','point','affiliate','ref','matched_last_touch',30,'[{"affiliateId":"affiliate","affiliateName":"Private referrer","refCode":"ref"},{"affiliateId":"unrelated","affiliateName":"Keep this candidate","refCode":"other"}]');`);
+  expect((await app().request(friendUrl, { method: 'DELETE', headers: headers('delete-friend-data') }, env())).status).toBe(200);
+  expect(count('conversion_events')).toBe(1); expect(count('friends')).toBe(2); expect(count('affiliates')).toBe(0);
+  expect(sqlite.raw.prepare('SELECT friend_id,affiliate_id,affiliate_code FROM conversion_events').get()).toEqual({friend_id:'v',affiliate_id:null,affiliate_code:null});
+  expect(sqlite.raw.prepare('SELECT friend_id,affiliate_id,ref_code,candidates_json FROM affiliate_attribution_decisions').get()).toEqual({friend_id:'v',affiliate_id:null,ref_code:null,candidates_json:JSON.stringify([{affiliateId:'affiliate',affiliateName:'削除済みのお客さま',refCode:''},{affiliateId:'unrelated',affiliateName:'Keep this candidate',refCode:'other'}])});
 });
 
 it('denies post-action replay while the friend deletion is incomplete', async () => {
@@ -300,4 +298,96 @@ it.each(['answer', 'friend'])('fences %s ownership reassignment during R2 deleti
     { method: 'DELETE', headers: headers(kind === 'answer' ? 'delete-form-response' : 'delete-friend-data') }, env());
   expect(response.status).toBe(503); expect(count('friends')).toBe(3); expect(count('form_submissions')).toBe(2); expect(count('form_submission_files')).toBe(2);
   expect(count('audit_events')).toBe(0);
+});
+
+it('retains all 13 tables, all amounts and other customers through failure, retry and replay; readers/CSV stay complete', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  const { getClosedAccountSettlement, prepareAffiliateStatement, createAffiliateStatement, getAffiliatePayoutBatchExport, getAffiliateStatementReplay, listAffiliateStatementsForSelf, createAffiliatePayoutBatch, consumePhotoOriginalDownload, claimPhotoNotificationDelivery, getBookingSalesSummary, requestPhotoAssessment } = await import('@line-crm/db');
+  seedDeletionRecords(sqlite.raw, 'deleted', 'fixture-friend');
+  seedDeletionRecords(sqlite.raw, 'kept', 'kept-friend');
+  sqlite.raw.exec("UPDATE affiliate_settlements SET period_from='2025-10-01T00:00:00Z',period_to='2025-11-01T00:00:00Z' WHERE id='kept-0-settlement'");
+  const tables=Object.keys(protectedRelations);
+  const retained = () => Object.fromEntries(tables.map(t=>[t,sqlite.raw.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all() as Record<string,unknown>[]]));
+  const before=retained();
+  const ownTarget={kind:'friend_data' as const,id:'fixture-friend',friendId:'fixture-friend',accountId:'fixture-account',lineUserId:'LINE-fixture-friend'};
+  sqlite.raw.exec("CREATE TRIGGER fail_del36b BEFORE DELETE ON friends WHEN OLD.id='fixture-friend' BEGIN SELECT RAISE(ABORT,'test'); END");
+  await expect(deleteCustomerData(env(),ownTarget,'owner')).rejects.toMatchObject({status:503});
+  expect(retained()).toEqual(before);
+  expect(sqlite.raw.prepare("SELECT id FROM friends WHERE id='fixture-friend'").get()).toBeTruthy();
+  sqlite.raw.exec('DROP TRIGGER fail_del36b');
+  expect(await deleteCustomerData(env(),ownTarget,'owner')).toMatchObject({deleted:true,replayed:false});
+  expect(await deleteCustomerData(env(),ownTarget,'owner')).toMatchObject({deleted:true,replayed:true});
+  const after=retained();
+  for(const [table,refs] of Object.entries(protectedRelations)) {
+    expect(after[table]).toHaveLength(before[table].length);
+    const columns=refs.flatMap(r=>r.columns.map(c=>c.column));
+    for(let i=0;i<before[table].length;i++) {
+      const old=before[table][i], now=after[table][i];
+      const deleted=(old.id ?? old.token_hash as string).toString().startsWith('deleted-');
+      for(const [column,value] of Object.entries(old)) {
+        if(deleted && columns.includes(column)) expect(now[column]).toBeNull();
+        else expect(now[column]).toEqual(value);
+      }
+    }
+    for(const amount of ['amount','amount_minor','total_amount_minor','paid_amount_minor']) {
+      expect(after[table].reduce((n,r)=>n+Number(r[amount]??0),0)).toBe(before[table].reduce((n,r)=>n+Number(r[amount]??0),0));
+    }
+  }
+  expect(sqlite.raw.prepare("SELECT id FROM friends WHERE id='kept-friend'").get()).toBeTruthy();
+  expect(sqlite.raw.prepare("SELECT id FROM conversion_events WHERE id='kept-0-conversion'").get()).toBeTruthy();
+  expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  const scope={tenantId:'fixture-tenant',lineAccountId:'fixture-account'};
+  const resume=await getClosedAccountSettlement(sqlite.db,{...scope,periodFrom:'2026-10-01T00:00:00Z',periodTo:'2026-11-01T00:00:00Z'});
+  expect(resume?.totalAmount).toBe(900);
+  expect(resume?.affiliates).toEqual([expect.objectContaining({affiliateId:'deleted-0-affiliate',affiliateName:'削除済みのお客さま',amount:900,statementIssued:true})]);
+  const snapshot=await prepareAffiliateStatement(sqlite.db,{...scope,settlementId:'deleted-0-settlement',affiliateId:'deleted-0-affiliate'});
+  expect(snapshot).toMatchObject({affiliateName:'削除済みのお客さま',totalAmount:900,grossAmount:1000,deductionAmount:100,lineCount:2});
+  expect(await createAffiliateStatement(sqlite.db,{...scope,snapshot:snapshot!,objectKey:'synthetic.pdf',checksum:'fake',idempotencyKey:'deleted-statement',requestFingerprint:'fake',actorId:'owner',expiresAt:'2999-01-01'})).toMatchObject({affiliateId:'deleted-0-affiliate',totalAmount:900});
+  expect(await getAffiliateStatementReplay(sqlite.db,{...scope,idempotencyKey:'deleted-statement'})).toMatchObject({statement:{affiliateId:'deleted-0-affiliate'}});
+  expect(await listAffiliateStatementsForSelf(sqlite.db,{...scope,affiliateId:'deleted-0-affiliate'})).toEqual([]);
+  expect(await getAffiliatePayoutBatchExport(sqlite.db,{...scope,batchId:'deleted-0-batch'})).toMatchObject({lines:[{affiliateId:'deleted-0-affiliate',amount:900}]});
+  expect(await createAffiliatePayoutBatch(sqlite.db,{...scope,settlementId:'deleted-0-settlement',expectedVersion:1,idempotencyKey:'new-batch',requestFingerprint:'fake',actorId:'owner',bankFormat:'zengin_csv'})).toMatchObject({kind:'bank_missing',missingAffiliateIds:['deleted-0-affiliate']});
+  const sales=await getBookingSalesSummary(sqlite.db,'fixture-account','2026-10-01','2026-11-01');
+  expect(sales.total.paidRevenue).toBe(2000);
+  expect(sales.menus).toContainEqual(expect.objectContaining({menu_name:'削除済みのお客さま',paidRevenue:1000}));
+  expect(await requestPhotoAssessment(sqlite.db,{id:'replay-run',photoId:'deleted-0-photo',lineAccountId:'fixture-account',expectedVersion:1,actorId:'fixture-staff',idempotencyKey:'deleted-0',requestFingerprint:'deleted-0'})).toMatchObject({kind:'duplicate',run:{photoId:null,customerName:'削除済みのお客さま'}});
+  expect(await consumePhotoOriginalDownload(sqlite.db,{tokenHash:'deleted-0-grant',lineAccountId:'fixture-account',actorId:'fixture-staff'})).toBeNull();
+  expect(await claimPhotoNotificationDelivery(sqlite.db,{decisionId:'deleted-0-review',lineAccountId:'fixture-account',leaseId:'lease',leaseExpiresAt:'2999-01-01'})).toBeNull();
+});
+
+it('refuses a partial schema before intent, R2 or customer data changes', async () => {
+  sqlite.raw.exec(`DROP TRIGGER booking_payments_history_insert;
+    DROP TRIGGER booking_payments_history_detach;
+    ALTER TABLE booking_payments DROP COLUMN booking_id_history;`);
+  const response=await app().request(friendUrl,{method:'DELETE',headers:headers('delete-friend-data')},env());
+  expect(response.status).toBe(409);
+  expect((await response.json() as any).code).toBe('deletion_schema_approval_required');
+  expect(count('operation_audit')).toBe(0); expect(count('friends')).toBe(3); expect(remove).not.toHaveBeenCalled();
+});
+
+it('keeps two deleted customers separate in an existing CSV batch instead of merging NULL references', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  const { getAffiliatePayoutBatchExport } = await import('@line-crm/db');
+  seedDeletionRecords(sqlite.raw,'first','first-person');
+  seedDeletionRecords(sqlite.raw,'second','second-person');
+  sqlite.raw.exec("UPDATE affiliate_payout_batch_lines SET batch_id='first-0-batch' WHERE id='second-0-payout'; UPDATE affiliate_payout_batches SET total_amount_minor=1800,line_count=2 WHERE id='first-0-batch'");
+  for(const id of ['first-person','second-person']) {
+    await deleteCustomerData(env(),{kind:'friend_data',id,friendId:id,accountId:'fixture-account',lineUserId:`LINE-${id}`},'owner');
+  }
+  const exported=await getAffiliatePayoutBatchExport(sqlite.db,{tenantId:'fixture-tenant',lineAccountId:'fixture-account',batchId:'first-0-batch'});
+  expect(exported?.lines).toHaveLength(2);
+  expect(exported?.lines.map(l=>l.affiliateId).sort()).toEqual(['first-0-affiliate','second-0-affiliate']);
+  expect(exported?.lines.reduce((n,l)=>n+l.amount,0)).toBe(1800);
+});
+
+it('accepts a late payment result without recreating a deleted booking or adding another audit', async () => {
+  const { seedDeletionRecords } = await import('../../../../packages/db/test/fixtures/customer-deletion.mjs');
+  const { applyPaidBookingPayment } = await import('./booking-payments.js');
+  seedDeletionRecords(sqlite.raw,'late','late-person');
+  sqlite.raw.exec("UPDATE booking_payments SET status='pending',provider_payment_id='synthetic-provider' WHERE id='late-0-payment'");
+  await deleteCustomerData(env(),{kind:'friend_data',id:'late-person',friendId:'late-person',accountId:'fixture-account',lineUserId:'LINE-late-person'},'owner');
+  expect(await applyPaidBookingPayment(sqlite.db,'synthetic-provider')).toEqual({duplicate:false});
+  expect(await applyPaidBookingPayment(sqlite.db,'synthetic-provider')).toEqual({duplicate:true});
+  expect(sqlite.raw.prepare("SELECT booking_id,status,amount FROM booking_payments WHERE id='late-0-payment'").get()).toEqual({booking_id:null,status:'paid',amount:1000});
+  expect(count('bookings')).toBe(0); expect(count('booking_audit_logs')).toBe(1);
 });
