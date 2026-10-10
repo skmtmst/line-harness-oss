@@ -83,6 +83,22 @@ test('除外を実寸で確認し、表内の文字の重なりは見逃さな�
     assert.ok((await measurePage(page)).some(f=>f.kind==='clip'),'隠れた重なりを除いても、省略なしの切れは検出する')
   } finally { await browser.close() }
 })
+test('ページ内タブの段は空白ではなく、空のタブ枠は引き続き検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    const tabs = '<nav><div role="tablist" style="height:156px">' + ['予約', '在庫', '休業'].map(name =>
+      `<button role="tab" style="display:block;height:44px;margin-bottom:8px">${name}</button>`).join('') + '</div></nav>'
+    const markup = inner => shell('<p style="margin:0">見出し</p>' + inner + '<p style="margin:0">本文</p>')
+    await page.setContent(markup(tabs))
+    assert.equal((await measurePage(page)).some(f => f.kind === 'blank-vertical'), false,
+      'タブの文字と操作が占める段を空白と数えない')
+    await page.setContent(markup('<nav><div role="tablist" style="height:156px"></div></nav>'))
+    assert.ok((await measurePage(page)).some(f => f.kind === 'blank-vertical'),
+      '中身のない高さだけの枠は空白として止める')
+    await page.close()
+  } finally { await browser.close() }
+})
 test('既存だけ許可し、新しい場所・幅・種類・文字・件数・悪化を止める',()=>{
   const f={kind:'wrap',target:'span.name',text:'既存の名前',measure:{lines:2}}
   const allow=record([f],'/friends',1152,'既存の名前の折り返し。B-191の画面担当が修正予定')
