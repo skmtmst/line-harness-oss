@@ -1,3 +1,4 @@
+
 import type { ReactNode } from 'react'
 import { CollapsedFolderActions, type FolderPanelRow } from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
@@ -53,6 +54,7 @@ export interface ListPageBodyProps {
 }
 export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   boardId?: string
+  layout?: 'event-list'
   standalone?: boolean
   tabs?: ReactNode
 }
@@ -86,8 +88,8 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'ã
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, standalone, tabs, title, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
-  return <PageFrame kind="list" boardId={boardId} standalone={standalone} skeleton={body.skeleton}>
+export function ListPage({ boardId, layout, standalone, tabs, title, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
+  return <PageFrame kind="list" boardId={boardId} layout={layout} standalone={standalone} skeleton={body.skeleton}>
     <PageHeading {...{ title, help, identity, actions, crumbs, steps, headingSize }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...body} />

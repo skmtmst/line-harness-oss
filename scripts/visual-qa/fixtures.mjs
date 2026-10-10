@@ -6720,16 +6720,17 @@ const adminEvent = (id, name, nextSlot, capacity, active, pending, published = 1
   入っていないと帯が `NaN人` `NaN件` になる（一度そうなった）。
 */
 export const ADMIN_EVENTS = [
-  adminEvent('ev-1', '秋のしつけ教室（第1回）', '2026-09-25T05:00:00.000Z', 12, 9, 2),
-  adminEvent('ev-2', 'ごはん相談会', '2026-09-28T02:00:00.000Z', 8, 8, 1),
+  adminEvent('ev-1', '秋のしつけ教室（第1回）', '2026-10-12T05:00:00.000Z', 20, 18, 2),
+  adminEvent('ev-2', 'ごはん相談会', '2026-10-15T02:00:00.000Z', 12, 3, 0),
   /* 設計の「申し込みが少ない 1」。 */
-  adminEvent('ev-3', '爪切り体験', '2026-10-02T06:00:00.000Z', 10, 1, 0),
+  adminEvent('ev-3', '爪切り体験', '2026-10-19T04:00:00.000Z', 8, 8, 0),
   /* 設計の「受付前 2」。公開していないので、埋まり具合の分母にも入らない。 */
-  adminEvent('ev-4', '冬のしつけ教室', '2026-12-05T05:00:00.000Z', 12, 0, 0, 0),
+  adminEvent('ev-4', '冬のしつけ教室', '2026-12-07T05:00:00.000Z', 20, 0, 0, 0),
 ].map((event, index) => ({
   ...event,
   /* 板 `e2ekFu` の名前の前の丸：教室・体験・相談会・未分類（上から）。 */
-  folderId: ['event-folder-class', 'event-folder-trial', 'event-folder-consult', null][index] ?? null,
+  venue_name: ['渋谷ベース 3F', 'オンライン', '然 渋谷店', '渋谷ベース 3F'][index],
+  folderId: ['event-folder-class', 'event-folder-consult', 'event-folder-trial', 'event-folder-class'][index] ?? null,
 }))
 
 /** イベントのフォルダ（kind=event）。板 `e2ekFu` の左の列の名前と、行の丸の色。件数は上の4件から数える。 */

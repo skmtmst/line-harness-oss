@@ -50,6 +50,8 @@ describe('R240 動作名と要約は実際の設定から作る', () => {
       '来店回数',
     )
     expect(describeAction(makeAction('event_booking', { eventId: 'ev-1' }), LOOKUPS)).toContain('試食会')
+    expect(describeAction(makeAction('event_booking', { eventId: 'ev-1', op: 'cancel', slotId: 'slot-1' }), LOOKUPS)).toBe('申し込みを取り消す「試食会」（選んだ回）')
+    expect(describeAction(makeAction('event_booking', { eventId: 'ev-1', op: 'register' }), LOOKUPS)).toBe('イベントに申し込む「試食会」')
   })
 
   it('未入力・未選択はその旨を出し、別種別の文言を混ぜない', () => {
@@ -71,6 +73,13 @@ describe('R240 動作名と要約は実際の設定から作る', () => {
     expect(EDITOR).not.toContain('担当者へSlackと管理画面通知')
     expect(EDITOR).toContain('未設定')
     expect(EDITOR).toContain('describeAction(action, lookups)')
+  })
+
+  it('イベント操作の種別と任意の開催回を保存内容へ引き継ぐ', () => {
+    expect(EDITOR).toContain("type: 'event_booking', params: config")
+    expect(EDITOR).toContain('aria-label="イベント予約の操作"')
+    expect(EDITOR).toContain('aria-label="開催回"')
+    expect(EDITOR).toContain('slotId: value || null')
   })
 })
 

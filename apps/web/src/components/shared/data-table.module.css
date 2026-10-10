@@ -488,4 +488,17 @@
 [data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); }
 .row[data-highlighted] {
   background: var(--color-accent-soft);
+
+/* e2ekFu：列の余白・行の高さは表の部品が持つ。 */
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .table thead th:first-child,
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell:first-child {
+  padding-left: var(--tpl-ev-ls-first-pad);
+}
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .table thead th:nth-child(5),
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell:nth-child(5) {
+  padding-left: var(--tpl-ev-ls-state-pad);
+}
+[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell {
+  height: var(--tpl-ev-ls-row-h);
+  padding-block: 0;
 }

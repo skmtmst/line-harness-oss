@@ -10,6 +10,13 @@
   color: var(--color-ink); background: var(--color-canvas);
 }
 :global([data-theme='v8']) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
+:global([data-theme='v8']) .frame:is([data-template-layout='event-list'], [data-template-layout='event-roster'], [data-template-layout='distribution']) {
+  --tpl-head-pad-top: var(--tpl-head-pad-side);
+  --tpl-head-pad-bottom: var(--tpl-folder-pad-block);
+  --tpl-toolbar-pad-block: var(--tpl-folder-pad-block);
+}
+:global([data-theme='v8']) .frame[data-template-layout='event-list'] { --folder-row-pad-block: var(--tpl-toolbar-gap); }
+:global([data-theme='v8']) .frame[data-template-layout='event-list'] .toolbar { row-gap: var(--tpl-section-pad); }
 :global([data-theme='v8']) .heading {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field);
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom); flex-shrink: 0;
@@ -329,3 +336,7 @@
 
 /* 道具の段の左右・上下の余白は型が一度だけ持つ。 */
 :global([data-theme='v8']) [data-list-skeleton] .toolbar :global([data-list-toolbar]) { padding: 0; }
+
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] { --tpl-toolbar-pad-block: var(--tpl-distribution-toolbar-pad); }
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] .listBody { flex: none; }
+:global([data-theme='v8']) .frame[data-template-layout='distribution'] > .footer { margin: var(--tpl-toolbar-gap) 0 0; }

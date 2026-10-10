@@ -46,6 +46,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import StatusBadge from '@/components/shared/status-badge'
 
 /*
  * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
@@ -324,7 +325,7 @@ export default function EventsListV8() {
     },
     {
       key: 'active', title: '申込', icon: Users, value: dataReady ? kpi.upcoming_active : null, unit: '人',
-      detail: kpiDetail(kpi.fill_rate === null ? '今後の回への申込' : `定員 ${kpi.upcoming_capacity ?? emptyValue('unknown')} 人に対して ${kpi.fill_rate}%`),
+      detail: kpiDetail( '今後の回への申込'),
     },
     {
       key: 'nearly-full', title: 'あと少しで満席', icon: Hourglass, value: dataReady ? kpi.nearly_full : null, unit: '回',
@@ -332,9 +333,7 @@ export default function EventsListV8() {
     },
     {
       key: 'low', title: '申し込みが少ない', icon: TrendingDown, value: dataReady ? kpi.low_applications : null, unit: '回',
-      detail: kpiDetail(kpi.nearest_low_starts_at
-        ? `${jstDay(kpi.nearest_low_starts_at)}の回。あと ${daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')} 日`
-        : '声をかけると埋まります'),
+      detail: kpiDetail( '声をかけると埋まります'),
     },
   ]
 
@@ -445,11 +444,11 @@ export default function EventsListV8() {
       </colgroup>
       <thead>
         <TableHeadRow>
-          <Th className={`${styles.headName} ${styles.firstCell}`}>{folderMove.pageCheckbox}イベント名（場所）</Th>
+          <Th className={styles.headName}>{folderMove.pageCheckbox}イベント名（場所）</Th>
           <Th>開催日時</Th>
           <Th align="right">予約／定員</Th>
           <Th align="right">承認待ち</Th>
-          <Th className={styles.stateCell}>
+          <Th>
             <span className={styles.headWithTip}>
               状態
               <HelpTip label="状態の見方の説明">
@@ -482,7 +481,7 @@ export default function EventsListV8() {
         <DelayedSkeleton
           loading
           skeleton={(
-            <DataTable>
+            <DataTable presentation="event-list">
               {tableHead}
               <tbody aria-hidden="true">
                 {[0, 1, 2, 3].map((index) => (
@@ -527,7 +526,7 @@ export default function EventsListV8() {
   } else {
     listBody = (
       <div className={styles.tableBox}>
-        <DataTable>
+        <DataTable presentation="event-list">
           {tableHead}
           <tbody>
             {items.map((e) => {
@@ -537,8 +536,7 @@ export default function EventsListV8() {
               const when = whenText(e.next_slot_starts_at)
               return (
                 <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id}>
-                  <NameCell
-                    className={styles.firstCell} name={(
+                  <NameCell name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
                         <>{folderMove.checkbox(e)}
                           <Link
@@ -563,15 +561,14 @@ export default function EventsListV8() {
                       <Link href={`/events/bookings?id=${e.id}`} className={styles.pendingLink}>{e.pending_count}</Link>
                     ) : <span className={styles.faint}>{emptyValue('unknown')}</span>}
                   </Td>
-                  <Td className={styles.stateCell}>
+                  <Td>
                     <span className={styles.stateLine}>
-                      {low ? <span data-status-pill="" className={`${styles.pill} ${styles.pillLow}`}>申し込みが少ない</span>
+                      {low ? <StatusBadge tone="warning">申し込みが少ない</StatusBadge>
                         : state === 'open' && (e.total_capacity ?? 0) - e.total_active > 0 && (e.total_capacity ?? 0) - e.total_active <= 3
-                          ? <span className={`${styles.pill} ${styles.pillWarn}`}>あと少しで満席</span>
-                          : state === 'open' ? <span className={`${styles.pill} ${styles.pillOn}`}>公開中</span>
-                            : state === 'full' ? <span className={`${styles.pill} ${styles.pillWarn}`}>満席</span>
-                              : state === 'paused' ? <span className={`${styles.pill} ${styles.pillWarn}`}>停止中</span>
-                                : <span className={`${styles.pill} ${styles.pillOff}`}>{STATE_LABEL[state]}</span>}
+                          ? <StatusBadge tone="warning">あと少しで満席</StatusBadge>
+                          : <StatusBadge tone={ state === 'open' ? 'success'
+                            : state === 'full' ? 'danger'
+                              : 'neutral'}>{STATE_LABEL[state]}</StatusBadge>}
                       {e.visible_tag_id ? (
                         <TagPill name={e.visible_tag_name ?? '消えたタグ'} size="sm" />
                       ) : null}
@@ -669,11 +666,12 @@ export default function EventsListV8() {
 
   return (
     <ListPage
-      skeleton
-      help={<>{"教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"}{"行の「…」から 中身を見る・申込者を見る・日時と定員を変える・プレビュー・削除。申込中・キャンセル待ちがいるイベントは削除できません。"}</>}
       boardId="e2ekFu"
       headingSize="regular"
       title="イベント予約"
+      layout="event-list"
+      help="教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"
+      folderWidth={200}
 
       tabs={!canEdit ? (
         <div className={styles.viewerBand} role="status">

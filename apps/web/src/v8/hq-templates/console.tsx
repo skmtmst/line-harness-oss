@@ -1,6 +1,6 @@
 'use client'
-import { canManageRole } from '@/lib/staff-role';
 
+import { canManageRole } from '@/lib/staff-role';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
@@ -74,6 +74,10 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { DistributionPage } from '@/components/templates/distribution-page'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from '@/components/shared/distribution-table'
 
 /*
  * ★V8-B 統括のテンプレート（一覧 LRc93・メッセージのひな形を作る X4JcOf・アカウントへ配る meBRB）。
@@ -313,7 +317,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
       if (alive.current) {
         { if (!fieldFailure)
-
 
         setError(errorText(e));
 
@@ -562,6 +565,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
   const refreshResult = () => void perform(async () => {
     if (!detail || !pendingRun)
+
 
  return
     const loaded = await hqTemplatesApi.result(detail.template.id, pendingRun)
@@ -932,7 +936,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
           { if (!fieldFailure)
 
-
           setError(cause instanceof HqRichMenuCompatibilityError ? cause.reason : japaneseDetailOf(cause) || 'リッチメニューの中身を保存できる形にできませんでした。ボタンの動きと画像を確かめてください。') }
           return
         }
@@ -968,7 +971,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           const fieldFailure = saveErrors.capture(cause)
 
           { if (!fieldFailure)
-
 
           setError(errorText(cause)) }
           return
@@ -1106,34 +1108,23 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }
   const shortName = (accountName: string) => accountName.replace(/^然\s*-NEN-\s*/, '')
 
-  if (stage === 'result' && result && done) return (
-      <DistributionResultDialog
-        open title={`配った結果：${detail?.template.name ?? ''}`}
-        tag={type === 'tag' ? { name, color: tagColor } : undefined}
-        summary={result ? `${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}` : ''}
-        rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
-        busy={busy} onClose={toList} onRefresh={refreshResult}
-        onRetry={() => checkStores(failures.map((store) => store.accountId))}
-      />
-  )
-
   return (
-    <Dialog open designWidth={720} title={`アカウントへ配る：${name}`} busy={busy} onCancel={toList} footer={ <></>}>
-      {type === 'tag' ?<TagPill name={name} color={tagColor} /> : null}
-      {folderBatch ? <p className={styles.distributionNotice}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。すべて確かめてから配ります。`}</p> : null}
-      {error || message ? <div className={styles.distributionNotice}>{notices}</div> : null}
-      <ListPageBody
-        contentInset
-        folders={<DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={accountFolders.failed} />}
-        collapsedFolders={<>
-          <SaveErrorField names={["accountFolder","account_folder"]}><Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))} /></SaveErrorField>
-          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
+    <DistributionPage boardId={stage === 'result' && done ? 'dEvJM' : 'meBRB'} title={`配った結果：${detail?.template.name ?? ''}`}
+        tag={type === 'tag' ? { name, color: tagColor } : undefined}
+        summary="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。アカウントのフォルダで絞り込むこともできます。"
+      stats={<KpiBand>
+        <KpiCard title="配布先" value={accounts.length} unit="アカウント" detail="配ることのできるアカウント" />
+        <KpiCard title="選んだアカウント" value={selected.length} unit="アカウント" detail="この内容を配る先" />
+        <KpiCard title="配る版" value={detail?.template.revision} unit="版" detail="保存済みのひな形" />
+        <KpiCard title="配布完了" value={result ? successes.length : null} unit="アカウント" detail={result? '今回の配布結果': '配布前'}
+      />
+    </KpiBand>}
+      notices={ <>
+      {folderBatch ? <p className={styles.note}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。`}</p> : null}
+      {error || message ?notices : null}
         </>}
-        toolbar={<div className={styles.toolbar}>
-          <span className={styles.selectedTools}>
-            <strong className={styles.selectedCount}>{`選んだ ${selected.length} アカウント`}</strong>
+        toolbar={<DistributionToolbar>
           <Field label={<><Search size={14} aria-hidden="true" /></>}><SaveErrorField names={["search"]}><input aria-label="アカウントを検索" placeholder="アカウント名で探す" value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField></Field>
-          </span>
           <span className={styles.bulkPick}>
             <SaveErrorField names={["bulkMode","bulk_mode"]}><Select
               aria-label="一括の配布方法"
@@ -1144,21 +1135,40 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
               options={[{ value: '', label: '一括の配布方法：選ぶ' }, { value: 'overwrite', label: '一括の配布方法：上書き' }, { value: 'alias', label: '一括の配布方法：別名で作る' }]}
             /></SaveErrorField>
           </span>
-        </div>}
+        <Select aria-label="アカウントのフォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/>
+          {accountFolderRows.find((row) => row.id === accountFolder)?.leading}
+          {accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
+        </DistributionToolbar>}
+      actions={<>
+{stage === 'accounts' ? <>
+            <Button disabled={busy} onClick={toList}>キャンセル</Button>
+            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
+          </> : stage === 'duplicates' && preflight ? <>
+            <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
+            {expired ? <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button> : null}
+            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" /> < TruncatedText value ={folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}/></Button>
+          </> : <>
+            <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
+            {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
+            {done || !result ? <Button disabled={busy} onClick={refreshResult}>結果を再確認</Button> : null}
+            {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
+          </>}
+      </>}
+      overlays={<DistributionResultDialog
+        open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
+        title={`配った結果：${detail?.template.name ?? ''}`}
+        tag={type === 'tag' ? { name, color: tagColor } : undefined}
+        summary={result ? `${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}` : ''}
+        rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
+        busy={busy} onClose={() => setResultDialogFor(null)}
+        onRetry={() => { setResultDialogFor(null); checkStores(failures.map((store) => store.accountId)) }}
+      />}
       >
         <div className={styles.distributionContent}>
-        <div className={styles.tableBox}>
-          <table className={styles.table} data-kind="distribute">
-            <colgroup><col className={styles.colCheck} /><col /><col className={styles.colItem} /><col className={styles.colVersion} /><col className={styles.colMode} /></colgroup>
-            <thead><tr>
-              {/* G-4：表示中をまとめて選ぶ。一部選択は横棒。 */}
-              <Th><SaveErrorField names={["length","shownAccounts.length","selected","shown_accounts.length"]}><Checkbox aria-label="表示中のアカウントをすべて選ぶ" checked={shownAccounts.length > 0 && shownAccounts.every((account) => selected.includes(account.id))}
+        <DistributionTable selectAll={<SaveErrorField names={["length","shownAccounts.length","selected","shown_accounts.length"]}><Checkbox aria-label="表示中のアカウントをすべて選ぶ" checked={shownAccounts.length > 0 && shownAccounts.every((account) => selected.includes(account.id))}
                 indeterminate={shownAccounts.some((account) => selected.includes(account.id)) && !shownAccounts.every((account) => selected.includes(account.id))}
                 disabled={busy || stage !== 'accounts' || shownAccounts.length === 0}
-                onCheckedChange={(checked) => setSelected((current) => checked ? [...new Set([...current, ...shownAccounts.map((account) => account.id)])] : current.filter((id) => !shownAccounts.some((account) => account.id === id)))} /></SaveErrorField></Th>
-              <Th>アカウント</Th><Th>項目</Th><Th>配布先の版</Th><Th>配布方法</Th>
-            </tr></thead>
-            <tbody>
+                onCheckedChange={(checked) => setSelected((current) => checked ? [...new Set([...current, ...shownAccounts.map((account) => account.id)])] : current.filter((id) => !shownAccounts.some((account) => account.id === id)))} /></SaveErrorField>}>
               {rowsForTable.map((account) => {
                 const on = selected.includes(account.id)
                 const store = storeOf(account.id)
@@ -1169,19 +1179,17 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   <tr key={account.id} data-selected={on || undefined}>
                     <td><SaveErrorField names={["on","selected"]}><Checkbox id={`hq-dist-${account.id}`} aria-label={account.name} checked={on} disabled={busy || stage !== 'accounts'} onCheckedChange={(checked) => setSelected((current) => checked ? [...current, account.id] : current.filter((id) => id !== account.id))} /></SaveErrorField></td>
                     <td>
-                      <label className={styles.nameLabel} htmlFor={`hq-dist-${account.id}`}>
-                        <FolderDotName folder={accountFolders.membership?.get(account.id)?.folder}><span className={styles.name} ><TruncatedText value={String(account.name ?? '')} /></span></FolderDotName>
-                      </label>
+                      <DistributionAccountName name={account.name} folder={accountFolders.membership?.get(account.id)?.folder} htmlFor={`hq-dist-${account.id}`} note={on ? (stage === 'result' ? progressLabel(account.id) || '配る' : '配る') : '配らない'} />
                     </td>
                     <td>
                       {on ? <span className={styles.cellLine}>
                         <span className={styles.cell}>{type === 'tag' ? <TagPill name={name} color={tagColor} size="sm" /> : `${summary}（${textOverrides[account.id] !== undefined || store?.textOverride !== undefined ? '個別の本文' : '一括と同じ'}）`}</span>
                         {textMessage && stage === 'accounts' ? <Button size="compact" variant="text" disabled={busy} onClick={() => setOverrideOpen(overrideOpen === account.id ? null : account.id)}>本文を変える</Button> : null}
-                      </span> : <span className={`${styles.cell} ${styles.cellEmpty}`}>{emptyValue('unknown')}</span>}
+                      </span> : <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>}
                     </td>
-                    <td><span className={on ? styles.cell : `${styles.cell} ${styles.cellEmpty}`}>{on ? storeVersion(account.id) : emptyValue('unknown')}</span></td>
+                    <td><span className={on ? styles.cell : `${styles.cell} ${styles.cellEmpty}`}>{on ? storeVersion(account.id) : '—'}</span></td>
                     <td>
-                      {!on ? <span className={`${styles.cell} ${styles.cellEmpty}`}>{emptyValue('unknown')}</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
+                      {!on ? <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span> : !store ? <span className={styles.cell}>確認のあとで選ぶ</span>
                         : allowed.length === 0 ? <span className={styles.modePick}><Select aria-label={`${account.name}の配布方法`} size="full" disabled value="create" onChange={() => undefined} options={[{ value: 'create', label: MODE_LABELS.create }]} /></span>
                         : <span className={styles.modePick}><SaveErrorField names={["mode"]}><Select
                           aria-label={`${account.name}の配布方法`}
@@ -1195,7 +1203,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   </tr>,
                   overrideOpen === account.id && on && textMessage && stage === 'accounts' ? (
                     <tr key={`${account.id}-text`} className={styles.subRow}><td /><td colSpan={4}>
-                      <Field label={<><span className={styles.label}>{`${account.name}に配る本文`}</span></>}><SaveErrorField names={["messageContent","definition.template.messageContent","template.messageContent","textOverrides","message_content","definition.template.message_content","template.message_content","text_overrides"]}><textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} /></SaveErrorField></Field>
+                      < label className={styles.field}><span className={styles.label}>{`${account.name}に配る本文`}</span><SaveErrorField names={["messageContent","definition.template.messageContent","template.messageContent","textOverrides","message_content","definition.template.message_content","template.message_content","text_overrides"]}><textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} /></SaveErrorField></label>
                     </td></tr>
                   ) : null,
                   ...extraItems.map((item) => (
@@ -1208,43 +1216,20 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   )),
                 ]
               })}
-            </tbody>
-          </table>
+            </DistributionTable>
           {!rowsForTable.length && <p className={styles.empty}>選択できるアカウントがありません。</p>}
-        </div>
         {stage === 'duplicates' && expired ? <Notice tone="warn" message="確認の有効期限が切れました。アカウントの現在版をもう一度確認してください。" /> : null}
         {stage === 'result' || stage === 'duplicates' ? (
-          <section className={styles.progressPanel} aria-label="配布の進み具合">
-            <h2>配布の進み具合</h2>
-            <div className={styles.progressRow}>
-              <span className={styles.progressTrack} aria-hidden="true"><span className={styles.progressFill} style={{ width: `${progressTotal ? Math.round((finished / progressTotal) * 100) : 0}%` }} /></span>
-              <strong>{`${finished} / ${progressTotal}`}</strong>
-            </div>
+          <DistributionProgress finished={finished} total={progressTotal} action={stage=== 'result' && !done && result ?<Button size="inline" variant="text" disabled={busy} onClick={refreshResult } busy = { Boolean ( busy )} busyLabel = "処理中…">結果を再確認</Button> : undefined}>
             <p className={styles.note}>{stage === 'duplicates'
               ? '配布直前に版を再確認します。配布先で編集があれば、そのアカウントの変更を取り消します。成功したアカウントは保持され、失敗分だけ再確認できます。'
               : (result ? result.stores.map((store) => `${shortName(store.accountName ?? accountName(accounts, store.accountId))}：${store.status === 'succeeded' ? '完了' : failures.includes(store) ? '失敗' : '作成中'}`).join(' ・ ') : `配布番号：${pendingRun ?? '—'} の結果を確認しています。確認できるまでは再配布しません。`)}</p>
-            {result && failures.length ? failures.map((store) => <Notice key={store.accountId} tone="danger" message={`${store.accountName ?? accountName(accounts, store.accountId)}：${store.reason || '配布できませんでした。アカウントの現在版を再確認してください。'}${store.cleanupPending ? '（画像の後片付けを自動で再試行中です）' : ''}`} action={done ? <Button disabled={busy} onClick={() => checkStores([store.accountId])} busy={Boolean(busy)} busyLabel="処理中…">このアカウントだけ再確認して配布</Button> : undefined} />) : null}
+            {result && failures.length ? failures.map((store) => <Notice key={store.accountId} tone="danger" message={`${store.accountName ?? accountName(accounts, store.accountId)}：${store.reason || '配布できませんでした。アカウントの現在版を再確認してください。'}${store.cleanupPending ? '（画像の後片付けを自動で再試行中です）' : ''}`} action={done ? <Button disabled={busy} onClick={() => checkStores([store.accountId])}>このアカウントだけ再確認して配布</Button> : undefined} />) : null}
             {result && done ? <p className={styles.note}>{`新規 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.created, 0))}件・上書き ${formatNumber(successes.reduce((sum, s) => sum + s.counts.overwritten, 0))}件・別名 ${formatNumber(successes.reduce((sum, s) => sum + s.counts.aliased, 0))}件`}</p> : null}
-          </section>
+          </DistributionProgress>
         ) : null}
         </div>
-      </ListPageBody>
-        <div className={styles.footer}>
-          {stage === 'accounts' ? <>
-            <Button disabled={busy} onClick={toList}>キャンセル</Button>
-            <Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)} busy={Boolean(busy)} busyLabel="処理中…"><Check size={15} aria-hidden="true" />{selected.length === 1 ? '選んだ1アカウントを確かめる' : `選んだ${selected.length}アカウントを確かめる`}</Button>
-          </> : stage === 'duplicates' && preflight ? <>
-            <Button disabled={busy} onClick={() => { if (folderBatch) toList(); else { setPreflight(null); setStage('accounts') } }}><ArrowLeft size={15} aria-hidden="true" />戻る</Button>
-            {expired ? <Button disabled={busy} onClick={() => checkStores(selected)} busy={Boolean(busy)} busyLabel="処理中…">現在版を再確認</Button> : null}
-            <Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={folderBatch ? confirmFolder : run}><Send size={15} aria-hidden="true" />{folderBatch && folderBatch.index + 1 < folderBatch.runs.length ? `次のひな形を確かめる（${folderBatch.index + 1}/${folderBatch.runs.length}）` : folderBatch ? `${folderBatch.runs.length} 件を ${selected.length} アカウントへ配る` : `この内容で${preflight.stores.length}アカウントへ配る`}</Button>
-          </> : <>
-            <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
-            {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
-            {done ? <Button disabled={busy} onClick={refreshResult} busy={Boolean(busy)} busyLabel="処理中…">結果を再確認</Button> : <Button disabled={busy} onClick={refreshResult} busy={Boolean(busy)} busyLabel="処理中…">結果を再確認</Button>}
-            {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))} busy={Boolean(busy)} busyLabel="処理中…">{`失敗${failures.length}アカウントを再確認`}</Button> : null}
-          </>}
-        </div>
-      </Dialog>
+      </DistributionPage>
   )
 }
 
