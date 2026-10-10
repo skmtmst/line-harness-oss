@@ -36,3 +36,6 @@
 .railCompact { display: flex; align-self: flex-start; flex: none; padding: var(--space-16); }
 .profileName { flex: 1; }
 .profileDate { margin-left: auto; }
+
+/* B-212：追加した連絡欄も72の見出し幅で1行。 */
+.content dl dt { font-size: var(--text-label); white-space: nowrap; }

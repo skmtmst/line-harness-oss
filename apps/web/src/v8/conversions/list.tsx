@@ -3,7 +3,7 @@
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 
 import { canManageRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar';
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveConversionToFolder } from '@/lib/move-to-folder'
@@ -932,7 +932,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       <ListToolbarRow>
         <div className={styles.narrowChips}>{filterChips}</div>
         <span className={styles.spacer} aria-hidden="true" />
-        {savedBox}
+        <ListToolbarOptional compact label="保存した絞り込み">{savedBox}</ListToolbarOptional>
         {perPageBox}
       </ListToolbarRow>
     </ListToolbarFrame>

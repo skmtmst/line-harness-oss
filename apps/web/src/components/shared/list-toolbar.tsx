@@ -99,7 +99,7 @@ export function ListToolbarFrame({ children, ...props }: HTMLAttributes<HTMLDivE
 }
 
 export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'form' }) {
-  return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools>{children}</Tag>
+  return <Tag {...props} className={styles.slotsRow} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-row" data-toolbar-tools>{compactFilterGroups(children)}</Tag>
 }
 
 export function ListToolbarSearchSlot({ children }: { children: ReactNode }) {
@@ -158,11 +158,12 @@ function compactFilterGroups(node: ReactNode): ReactNode {
 export function ResponsiveFilterChips({ children, label = '状態' }: { children: ReactNode; label?: string }) {
   const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
   const text = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? text(child.props.children) : String(child)).join('')
-  const current = chips.findIndex(child => child.props.selected)
+  const selected = chips.map((child,index) => child.props.selected ? index : -1).filter(index => index >= 0)
+  const current = selected.length > 1 ? 'multiple' : selected.length === 1 ? String(selected[0]) : 'all'
   return <span className={styles.filterChoices}>
     <span className={styles.filterWide}>{children}</span>
-    <span className={styles.filterNarrow}><Select label={label} aria-label={label} value={String(current < 0 ? 0 : current)}
-      options={chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))}
-      onChange={next => chips[Number(next)]?.props.onChange(true)} /></span>
+    <span className={styles.filterNarrow}><Select label={label} aria-label={label} value={current}
+      options={[{ value: 'all', label: 'すべて', disabled: selected.length > 1 }, ...(selected.length > 1 ? [{ value: 'multiple', label: `${selected.length}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
+      onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span>
   </span>
 }
