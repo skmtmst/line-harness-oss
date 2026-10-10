@@ -194,6 +194,7 @@ export default function FriendsListV8() {
   const [visible, setVisible] = useState<Set<Column>>(() => new Set(COLUMNS.map((column) => column.key)))
   const [columnsReady, setColumnsReady] = useState(false)
   const [columnsOpen, setColumnsOpen] = useState(false)
+  const [fieldCatalogRevision, setFieldCatalogRevision] = useState(0)
   const columnsButtonRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     try {
@@ -337,7 +338,7 @@ export default function FriendsListV8() {
       if (folders?.success) setFieldFolders(folders.data)
     }).catch(() => { if (!cancelled) setOptionsFailed(true) })
     return () => { cancelled = true }
-  }, [selectedAccountId, fieldsEnabled])
+  }, [selectedAccountId, fieldsEnabled, fieldCatalogRevision])
 
   const loadOptions = useCallback(async () => {
     const requestedAccountId = selectedAccountId
@@ -718,7 +719,7 @@ export default function FriendsListV8() {
         ) : null}
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
-        {!readOnly ? <Button variant="text" onClick={() => setColumnsOpen(true)}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
+        {!readOnly ? <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="表示件数"

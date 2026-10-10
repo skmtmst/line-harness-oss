@@ -20,3 +20,10 @@ test('取消では変更を送らず、欄が無い時にも管理への入口�
  expect(screen.getByRole('link',{name:'情報欄を管理'})).toHaveProperty('href','http://localhost:3000/friend-fields');
  fireEvent.click(screen.getByRole('checkbox',{name:'アレルギー'}));fireEvent.click(screen.getByRole('button',{name:'キャンセル'}));fireEvent.click(screen.getByRole('button',{name:'破棄する'}));expect(cancel).toHaveBeenCalledOnce();expect(save).not.toHaveBeenCalled();
 })
+
+test('開いている間に消された欄は、上限にも保存内容にも残さない',()=>{
+ const save=vi.fn();const view=render(<DisplayItemsDialog items={items} selected={['a','field:c']} maxSelected={2} onCancel={()=>{}} onConfirm={save}/>);
+ view.rerender(<DisplayItemsDialog items={items.slice(0,2)} selected={['a']} maxSelected={2} onCancel={()=>{}} onConfirm={save}/>);
+ expect((screen.getByRole('checkbox',{name:'アレルギー'}) as HTMLInputElement).disabled).toBe(false);
+ fireEvent.click(screen.getByRole('button',{name:'保存する'}));expect(save).toHaveBeenCalledWith(['a']);
+})
