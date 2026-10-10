@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/edit.tsx'), 'utf8')
 const NOTIFICATION_SCREEN = fs.readFileSync(path.join(__dirname, 'notifications-v8.tsx'), 'utf8')
 const CTA = fs.readFileSync(path.join(__dirname, 'cta-v8.tsx'), 'utf8')
 const NOTIFICATIONS = fs.readFileSync(
@@ -28,7 +28,7 @@ describe('V6 ウェビナー通知・CTAの取得一本化の契約', () => {
     expect(PAGE).not.toContain('webinarApi.ctas(')
     expect(CTA.match(/webinarApi\.ctas\(/g)).toHaveLength(1)
     expect(CTA).toContain('onCtasReport?.(res.data)')
-    expect(PAGE).toContain('onCtasReport={handleCtasReport}')
+    expect(PAGE).toContain('onCtasReport: handleCtasReport')
   })
 
   it('保存したら取り直しのGETを挟まず親へ流す', () => {

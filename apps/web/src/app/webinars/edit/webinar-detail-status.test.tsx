@@ -117,7 +117,7 @@ describe('通知概要の状態表示(DETAIL-19)', () => {
       ['configured', 'success', '設定済み'],
       ['unset', 'neutral', '未設定'],
       ['pending', 'info', '確認中'],
-      ['failed', 'danger', '取得できません'],
+      ['failed', 'danger', '読み込めませんでした'],
     ]
     for (const [state, tone, label] of cases) {
       const html = renderToStaticMarkup(<NotificationStateBadge state={state} />)
@@ -167,9 +167,9 @@ describe('通知の要約は有効フラグから組み立てる(WEBINAR-10)', (
     // まだ読めていない
     expect(deliveryTimingSummary(on, false, false)).toContain('確認中')
     // 取得に失敗した
-    expect(deliveryTimingSummary(on, true, true)).toBe('取得できません')
-    expect(missedNoticeSummary(on, true, true)).toBe('取得できません')
-    expect(completedNoticeSummary(on, true, true)).toBe('取得できません')
+    expect(deliveryTimingSummary(on, true, true)).toBe('読み込めませんでした')
+    expect(missedNoticeSummary(on, true, true)).toBe('読み込めませんでした')
+    expect(completedNoticeSummary(on, true, true)).toBe('読み込めませんでした')
   })
 })
 

@@ -5,18 +5,21 @@ import { describe, expect, it } from 'vitest'
 
 const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'participants-v8.tsx'), 'utf8')
 const ANALYTICS = fs.readFileSync(path.join(__dirname, 'analytics-v8.tsx'), 'utf8')
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/edit.tsx'), 'utf8')
 
 describe('V6 ウェビナー編集の集計の遅延読み込みの契約', () => {
   it('集計の取得口は親の段条件つき1か所だけ', () => {
     /* 子(AnalyticsTab)は集計を取らず、親から受け取る。 */
     expect(PAGE.match(/webinarApi\.analytics\(/g)).toHaveLength(1)
-    expect(PAGE).toContain("if (pane !== 'participants' && pane !== 'analytics')")
+    expect(PAGE).toContain("const DETAIL_KEYS = ['participants', 'analytics', 'comments']")
+    expect(PAGE).toContain('if (!isDetailPane)')
   })
 
   it('参加者・分析の段に親の集計を渡す', () => {
     // v7 参加者・V8 参加者（uNsEy）・分析の3か所。子は集計を取らず、親から受ける。
-    expect(PAGE.match(/analytics=\{analytics\} analyticsState=\{analyticsState\}/g)).toHaveLength(2)
+    expect(PAGE).toContain('analytics,\n    analyticsState,')
+    expect(PAGE).toContain('<ParticipantsPane ctx={ctx}')
+    expect(PAGE).toContain('<AnalyticsPane ctx={ctx}')
   })
 
   it('参加者一覧はカーソルで最後まで読め、コメントとは取り口を分ける', () => {

@@ -6,7 +6,7 @@ export const NOTIFICATION_ROW_STATE = {
   configured: { label: '設定済み', tone: 'success' },
   unset: { label: '未設定', tone: 'neutral' },
   pending: { label: '—（確認中）', tone: 'info' },
-  failed: { label: '取得できません', tone: 'danger' },
+  failed: { label: '読み込めませんでした', tone: 'danger' },
 } as const
 
 export function NotificationStateBadge({ state }: { state: NotificationRowState }) {
@@ -70,4 +70,3 @@ export function completedNoticeSummary(
   if (!settings) return NOTIFICATION_ROW_STATE.unset.label
   return settings.completedEnabled ? '見終わった人へお礼を送信' : '送りません'
 }
-

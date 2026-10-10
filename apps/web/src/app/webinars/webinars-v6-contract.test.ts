@@ -135,13 +135,15 @@ describe('V6 ウェビナー一覧の契約', () => {
   })
 
   it('視聴後アクション・参加者・分析・公開プレビューを別の面で開ける', () => {
-    for (const label of ['視聴後アクション', '公開プレビュー', '参加者', '分析']) {
+    for (const label of ['participants', 'analytics', 'comments']) {
       expect(EDIT).toContain(`'${label}'`)
     }
+    expect(EDIT).toContain("if (value === 'actions') return 'notifications'")
+    expect(EDIT).toContain("if (value === 'preview') return 'review'")
     expect(EDIT).toContain('webinarApi.saveActions(webinarId, actions)')
     // #1053: 直リンクは Bearer 補完経路で401になるため、認証付き取得へ。
     expect(ANALYTICS).toContain('downloadApiFile(webinarApi.participantsCsvUrl(webinarId')
-    expect(EDIT).toContain('data-design-node="Xjk8q"')
+    expect(EDIT).toContain('boardId="uNsEy"')
     expect(ANALYTICS).toContain('data-design-node="z2dgw"')
   })
 
@@ -156,7 +158,7 @@ describe('V6 ウェビナー一覧の契約', () => {
   it('編集・公開前検査・運用・参加者・分析を実APIへ接続する', () => {
     for (const call of [
       'webinarApi.editor(id)',
-      'webinarApi.testPublicPage(webinar.id, editor.version)',
+      'webinarApi.testPublicPage(webinar.id, version.current)',
     ]) expect(EDIT).toContain(call)
     for (const call of [
       'webinarApi.pause(id, editor.version)',

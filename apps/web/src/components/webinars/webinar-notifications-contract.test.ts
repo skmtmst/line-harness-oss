@@ -91,7 +91,7 @@ describe('読めなかったとき', () => {
 describe('編集画面の STEP 4', () => {
   it('段の中身が「まだ繋がっていません」から実物へ変わった', () => {
     /* 段は畳まず隠すので、未保存の印と保存操作を親の固定バーへ渡す口がある。 */
-    expect(EDIT).toContain('<NotificationsV8 webinarId={webinar.id}')
+    expect(EDIT).toContain("keep('notifications', <NotificationsPane ctx={ctx}")
     expect(EDIT).toContain('onDirtyChange={dirtyReporterFor')
     expect(EDIT).toContain('registerSave={saveRegistrarFor')
     /* 取得は子の編集タブに一本化し、親は報告を受ける。同じ口を2回叩かない。 */

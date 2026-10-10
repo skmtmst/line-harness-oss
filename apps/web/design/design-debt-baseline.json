@@ -305,9 +305,6 @@
   "app/webhooks/outgoing-v8.tsx": {
     "direct-th": 6
   },
-  "app/webinars/edit/page.tsx": {
-    "arbitrary-value": 2
-  },
   "app/webinars/edit/participants-shared.tsx": {
     "unresolved-classname": 2
   },

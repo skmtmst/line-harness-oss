@@ -66,7 +66,6 @@ const KNOWN_FILES: string[] = [
   // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
   'app/settings/feature-settings-v8.tsx',
   'app/updates/page.tsx',
-  'app/webinars/edit/page.tsx',
   'app/webinars/edit/review-text.ts',
   'components/chats/friend-info-sidebar.tsx',
   'components/friend-fields/field-list.tsx',
