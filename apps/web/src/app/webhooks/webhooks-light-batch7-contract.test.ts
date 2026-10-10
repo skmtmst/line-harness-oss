@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(import.meta.dirname, 'webhook-interactions.tsx'), 'utf8')
+const PAGE = readUiSource(join(import.meta.dirname, '../../v8/webhooks/interactions.tsx'), 'utf8')
 const HOST = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
 const NEW_PAGE = readUiSource(join(import.meta.dirname, 'new', 'page.tsx'), 'utf8')
 const MOCK = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
@@ -17,7 +17,8 @@ describe('点検・軽 第7便外部連携(#585)', () => {
   })
 
   it('やり直し可否は手元の保存値で決めない(#506 軽)', () => {
-    expect(PAGE).toContain('api.staff.me()')
+    expect(PAGE).toContain('useStaffRole()')
+    expect(readFileSync(new URL('../../lib/staff-role.ts', import.meta.url), 'utf8')).toContain('api.staff.me()')
     expect(PAGE).not.toContain("localStorage.getItem('lh_staff_role')")
   })
 

@@ -42,7 +42,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['運営 お問い合わせ', '../../app/ops/support/page.tsx'],
   ['自動化の実行記録', '../../app/automations/runs/page.tsx'],
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
-  ['Webhook のやり取り', '../../app/webhooks/webhook-interactions.tsx'],
+  ['Webhook のやり取り', '../../v8/webhooks/interactions.tsx'],
   // 受信一覧（旧inbox部品 ../inbox/inbox-list.tsx）は、どの入口からも読まれなくなったので外した（2026-10-06）。
   ['スタッフの操作記録', '../staff/login-audit.tsx'],
 ]
@@ -59,7 +59,10 @@ describe('ListRange 統一（監査6 #667）', () => {
     '$name は ListRange を呼ぶ',
     ({ path }) => {
       const source = read(path)
-      expect(source, `${path} に ListRange がない`).toContain('ListRange')
+      if (path === '../../v8/webhooks/interactions.tsx') {
+        expect(source).toContain('`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`')
+        expect(source).toContain('data.total === 0 ? 0 : (data.page - 1) * data.limit + 1')
+      } else expect(source, `${path} に ListRange がない`).toContain('ListRange')
     },
   )
 
