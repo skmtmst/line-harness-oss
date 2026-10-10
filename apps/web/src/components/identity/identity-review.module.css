@@ -351,3 +351,12 @@
   font-size: var(--text-micro);
   line-height: 1.5;
 }
+
+/* 引き出しの中でも、名前・マスク済みの値を1行で読み取れる形にする。 */
+.subject { container-type: inline-size; }
+.evidenceHead { flex-wrap: wrap; }
+@container (max-width: 260px) {
+  .attribute { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-8); }
+  .attributeLabel { grid-column: 1 / -1; min-width: 0; }
+  .attributeValue { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

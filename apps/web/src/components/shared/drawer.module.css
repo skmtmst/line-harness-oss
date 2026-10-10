@@ -350,3 +350,6 @@
   font-size: var(--tpl-dialog-title-size);
   font-weight: var(--tpl-dialog-title-weight);
 }
+
+html[data-theme='v8'] .body[data-content-spacing='sections'] { display: flex; flex-direction: column; gap: var(--space-16); }
+html[data-theme='v8'] .body[data-content-spacing='sections'] > * { flex-shrink: 0; }

@@ -137,7 +137,12 @@ export default function scanOwnerRules() {
     const media = el.closest('[data-line-preview-part="talk"],video,[data-media-slot],[data-qr-code], [data-booking-calendar],[role="grid"]') || /写真|画像の枠|サムネ|時間×卓|スマホ|見え方/.test(name)
     // 主なページの器はスクロールする。内側の箱だけをtightで測る（ALLOWのパネルと同じ）。
     if (el !== root && !media && r.height >= 80 && r.width >= 120 && (hasBorder(c) || c.outlineStyle!=='none' || tinted(c) && c.borderRadius!=='0px') && !el.matches(tableSelector) && !el.querySelector('table,[role="table"]')) {
-      const leaves = textLeaves(el)
+      // 内側のスクロール欄の続きは、外側の窓の余白には数えない。
+      // その欄の中の箱は個別にspill・boxclipで測る。
+      const leaves = textLeaves(el).filter(d => {
+        for(let p=d.parentElement;p && p!==el;p=p.parentElement) if(['auto','scroll'].includes(css(p).overflowY) && p.scrollHeight>p.clientHeight+1) return false
+        return true
+      })
       if (leaves.length) {
         const top = Math.min(...leaves.map(d=>d.getBoundingClientRect().top))-r.top
         const bottom = r.bottom-Math.max(...leaves.map(d=>d.getBoundingClientRect().bottom))

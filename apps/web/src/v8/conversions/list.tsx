@@ -3,6 +3,7 @@
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
+import TruncatedText from '@/components/shared/truncated-text'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
 
@@ -33,7 +34,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/sh
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
@@ -968,7 +969,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   ) : null
 
   const stopCard = stopTarget ? (
-    <Dialog open title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<div className={styles.panelActions}>
+    <Dialog open contentLayout="form" title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
           variant="primary"
@@ -979,7 +980,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         >
           {stopAction === 'delete' ? '削除する' : '止める'}
         </Button>
-      </div>}>
+      </DialogActions>}>
 
       <p className={styles.stopDescription}>
         {stopImpactLoading
@@ -1128,7 +1129,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                       <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUsage} collapseAt="narrow">
-                      <span className={styles.usageMain} title={usageLabel(point)}>{usage.main}</span>
+                      <span className={styles.usageMain} title={usageLabel(point)}><TruncatedText value={usage.main} /></span>
                       {usage.sub ? <span className={styles.cellSub} title={usage.sub}>{usage.sub}</span> : null}
                     </Td>
                     <ActionCell className={styles.colOps}>

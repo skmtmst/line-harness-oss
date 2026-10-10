@@ -269,7 +269,7 @@ export default function EcIdentityCandidatesScreen() {
 
         {detail ? (
           <>
-          <Drawer open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</>}>
+          <Drawer contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</>}>
             <div className={styles.detailPair}>
               <IdentitySubjectCard side="ECの会員" subject={detail.left} />
               <IdentitySubjectCard side="LINE の友だち" subject={detail.right} />

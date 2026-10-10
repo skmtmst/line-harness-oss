@@ -99,3 +99,30 @@ test('LIFFの実物CSSは白いカードだけに影を付け、ラジオは18�
     assert.ok((await page.evaluate(scan)).some(f=>f.kind==='liffshadow'))
   } finally { await browser.close() }
 })
+
+test('実物CSS：停止確認のラジオ行はカードの選択枠を引き継がない', async () => {
+  const browser=await chromium.launch()
+  try {
+    const page=await browser.newPage()
+    const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
+    const radio=readFileSync(new URL('../../src/components/shared/radio-card.module.css',import.meta.url),'utf8')
+    await page.setContent(`<html data-theme="v8"><style>${globals}${radio}</style><main><label class="card row checked" data-variant="row"><input class="radio" type="radio" checked><span class="body"><b class="title">止める</b></span></label></main></html>`)
+    assert.equal(await page.locator('label').evaluate(el=>getComputedStyle(el).outlineColor),'rgba(0, 0, 0, 0)')
+    assert.equal(await page.locator('input').evaluate(el=>el.getBoundingClientRect().width),18)
+  } finally { await browser.close() }
+})
+
+test('実物CSS：差し込み行の項目は8px、印と字は4px。未定義の値でくっつかない', async () => {
+  const browser=await chromium.launch()
+  try {
+    const page=await browser.newPage()
+    const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
+    const insert=readFileSync(new URL('../../src/components/shared/message-insert-row.module.css',import.meta.url),'utf8')
+    await page.setContent(`<style>${globals}${insert}</style><main><div class="body" data-message-body><textarea>本文</textarea><div class="row" data-message-insert-row><div class="controls"><span class="label">差し込む</span><button class="button" data-message-insert-button><svg></svg>名前</button></div><span class="count">2 / 5,000</span></div></div></main>`)
+    assert.equal(await page.locator('.controls').evaluate(el=>getComputedStyle(el).columnGap),'8px')
+    assert.equal(await page.locator('.button').evaluate(el=>getComputedStyle(el).columnGap),'4px')
+    assert.equal(await page.locator('.row').evaluate(el=>getComputedStyle(el).columnGap),'12px')
+    await page.locator('.button').evaluate(el=>el.style.gap='0px')
+    assert.notEqual(await page.locator('.button').evaluate(el=>getComputedStyle(el).columnGap),'4px')
+  } finally { await browser.close() }
+})

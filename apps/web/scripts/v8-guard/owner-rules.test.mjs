@@ -152,3 +152,15 @@ test('編集用の吹き出しをLINEの見本と取り違えず、本当の重�
     assert.equal((await measurePage(page)).filter(f => /編集の文字/.test(f.text)).length, 0)
   } finally { await browser.close() }
 })
+
+test('窓の中のスクロールの続きを余白不足と誤判定せず、実際の下端の不足は落とす', async () => {
+  const browser=await chromium.launch()
+  try {
+    const page=await browser.newPage({viewport:{width:1152,height:900}})
+    const content='<section style="border:1px solid;width:320px;height:180px;padding:16px;display:flex;flex-direction:column"><h2 style="margin:0">題</h2><div style="min-height:0;flex:1;overflow-y:auto"><p style="height:300px">続きは送って読める内容</p></div><footer>下の操作</footer></section>'
+    await page.setContent(shell(content))
+    assert.deepEqual((await page.evaluate(scan)).filter(f=>f.kind==='tight'),[])
+    await page.locator('section').evaluate(el=>el.style.paddingBottom='0px')
+    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='tight'))
+  } finally { await browser.close() }
+})

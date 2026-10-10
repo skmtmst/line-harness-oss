@@ -9,6 +9,7 @@
 import { useRef, useState, type RefObject } from 'react'
 import Button from '@/components/shared/button'
 import ActionMenu from '@/components/shared/action-menu'
+import styles from './edit.module.css'
 import Dialog from '@/components/shared/dialog'
 import DateField from '@/components/shared/date-field'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
