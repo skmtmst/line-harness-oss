@@ -1,7 +1,7 @@
 'use client'
 import Link from '@/components/shared/list-navigation'
 import { Lock } from 'lucide-react'
-import type { FriendField } from '@line-crm/shared'
+import { BASIC_FRIEND_FIELDS, ageFromBirthday, type FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import DateField from '@/components/shared/date-field'
@@ -96,14 +96,20 @@ export default function InfoTab({ friendId, group, data, perms }: {
     )
   }
 
-  // 「基本」は分類のない項目、「すべて」は分類をまたいだ全項目。★つきは基本のときだけ先頭へ。
-  const inGroup = group === ALL_GROUP ? fields : group === BASIC_GROUP ? fields.filter((f) => f.fixedKey || !f.folderId) : fields.filter((f) => f.folderId === group)
-  const ordered = group === BASIC_GROUP ? [...inGroup.filter((f) => f.isStarred), ...inGroup.filter((f) => !f.isStarred)] : inGroup
+  const isBasic = (field: FriendField) => BASIC_FRIEND_FIELDS.some(spec => spec.key === field.fixedKey)
+  const basic = BASIC_FRIEND_FIELDS.flatMap(spec => fields.filter(field => field.fixedKey === spec.key))
+  const others = fields.filter(field => !isBasic(field))
+  const inGroup = group === ALL_GROUP ? [...basic,...others] : group === BASIC_GROUP ? basic : others.filter(field => field.folderId === group)
+  const ordered = inGroup.filter(field => field.status !== 'archived')
+  const groups = [...new Set(ordered.map(field => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId ?? 'unfiled'))]
+  const groupName = (key: string) => key === 'basic' ? '基本' : key === 'dining' ? '飲食の情報' : `お店が作った項目（${key === 'unfiled' ? '未分類' : fieldFolders.find(folder => folder.id === key)?.name ?? '分類'}）`
+  const groupOf = (field: FriendField) => isBasic(field) ? 'basic' : field.fixedKey ? 'dining' : field.folderId ?? 'unfiled'
 
   const folderCount = new Map<string, number>()
   let unfiled = 0
   for (const f of fields) {
-    if (f.fixedKey || !f.folderId) unfiled += 1
+    if (isBasic(f)) unfiled += 1
+    else if (!f.folderId) continue
     else folderCount.set(f.folderId, (folderCount.get(f.folderId) ?? 0) + 1)
   }
   const folderIds = new Set(fieldFolders.map((f) => f.id))
@@ -124,7 +130,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
           <Link
             key={chip.id}
             className={styles.chip}
-            href={chip.id === BASIC_GROUP ? base : `${base}&group=${encodeURIComponent(chip.id)}`}
+            href={chip.id === ALL_GROUP ? base : `${base}&group=${encodeURIComponent(chip.id)}`}
             aria-current={group === chip.id ? 'true' : undefined}
           >
             {`${chip.label} ${chip.count}`}
@@ -149,16 +155,21 @@ export default function InfoTab({ friendId, group, data, perms }: {
         </div>
       ) : (
         <>
+          {groups.map(groupKey => <section key={groupKey} className={styles.infoGroup} aria-label={groupName(groupKey)}>
+          <h3 className={styles.infoGroupTitle}>{groupName(groupKey)}</h3>
           <div className={styles.fieldGrid}>
-            {ordered.map((field) => {
+            {ordered.filter(field => groupOf(field) === groupKey).map((field) => {
               const id = `ff-${field.id}`
               const fixed = field.fixedKey ? fixedFieldValue(fields.map(f => ({ ...f, value: values[f.id] ?? f.value, valueSource: (values[f.id] ?? '') === (f.value ?? '') ? f.valueSource : null })), field.fixedKey) : null
+              const spec = BASIC_FRIEND_FIELDS.find(spec => spec.key === field.fixedKey)
+              const age = field.fixedKey === 'birthday' ? ageFromBirthday(values[field.id] ?? field.value) : null
+              const label = spec ? spec.label + (age !== null ? `（${age}歳）` : '') : field.name
               const changed = (field.value ?? '') !== (values[field.id] ?? '')
               return (
                 <div key={field.id} className={styles.field} data-changed={changed || undefined}>
-                  <label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel} title={`${field.name}（${FIELD_TYPE_LABELS[field.type] ?? field.type}）`}>
+                  <label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel} title={`${label}（${FIELD_TYPE_LABELS[field.type] ?? field.type}）`}>
                     {field.isStarred ? <span aria-label="★つき">★</span> : null}
-                    {field.name}
+                    {label}
                     {field.isPersonal ? <span className={styles.faint}>個人情報</span> : null}
                   </label>
                   <FieldInput
@@ -174,7 +185,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                 </div>
               )
             })}
-          </div>
+          </div></section>)}
 
           {hiddenPersonalCount > 0 ? <p className={styles.hiddenNote}>個人情報の項目が {hiddenPersonalCount} 件あります。表示には個人情報の閲覧権限が要ります。</p> : null}
           {data.warnings.length > 0 ? <ul className={styles.warnList}>{data.warnings.map((w) => <li key={w}>{w}</li>)}</ul> : null}

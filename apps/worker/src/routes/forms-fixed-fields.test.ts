@@ -28,6 +28,15 @@ beforeEach(() => {
 });
 afterEach(() => fixture.raw.close());
 
+test('友だち詳細に他店の欄を混ぜず、直接IDで送ってもまとめて保存しない',async()=>{
+  fixture.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('b','b','他店','t','s',?)").run(DEFAULT_TENANT_ID);
+  fixture.raw.prepare("INSERT INTO friend_fields(id,name,field_key,type) VALUES('other','他店の欄','other','text')").run();
+  fixture.raw.prepare("INSERT INTO friend_field_scopes(field_id,tenant_id,line_account_id,created_at) VALUES('other',?,'b','now')").run(DEFAULT_TENANT_ID);
+  expect(JSON.stringify(await (await request('/api/friends/f/fields')).json())).not.toContain('他店の欄');
+  expect((await request('/api/friends/f/fields','PUT',{values:{'other':'漏らさない','fixed-name':'保存しない'}})).status).toBe(403);
+  expect(fixture.raw.prepare("SELECT real_name FROM friends WHERE id='f'").get()).toEqual({real_name:null});
+});
+
 test('公開版では配布先のアレルギー選択肢を返し、下書きと旧いfieldsを壊さない',async()=>{
   const layout=emptyLayout(); layout.sections[0].blocks=[{id:'a',kind:'input',type:'checkbox',name:'allergy',label:'アレルギー',fixedField:'allergy',choices:[{id:'old',label:'古い選択肢'},{id:'other',label:'そのほか',isOther:true}]}];
   await saveVersionedAccountSetting(fixture.db,{accountId:'a',key:'friend.allergy_options_v1',data:['キウイ'],expectedVersion:0});
