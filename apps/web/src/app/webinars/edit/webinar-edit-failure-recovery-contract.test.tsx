@@ -87,7 +87,6 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
-vi.mock('@/components/webinars/webinar-notifications', () => ({ default: () => <div>通知設定</div> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], loading: false }) }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 

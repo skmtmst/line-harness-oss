@@ -1,8 +1,13 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
-import AnalyticsDetails from './analytics-details'
+import { describe, expect, it, vi } from 'vitest'
+import { WebinarAnalyticsPane, webinarAnalytics } from '@/test-utils/webinar-analytics'
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), webinarApi: { participants: async () => ({ data: { items: [] } }), userComments: async () => ({ data: [] }) } }))
+
 import type { WebinarAnalytics } from '@/lib/api'
 
 const ANALYTICS = {
@@ -13,27 +18,27 @@ const ANALYTICS = {
 
 function render(analytics = ANALYTICS) {
   const host = document.createElement('div')
-  host.innerHTML = renderToStaticMarkup(<AnalyticsDetails analytics={analytics} />)
-  return host
+  host.innerHTML = renderToStaticMarkup(<WebinarAnalyticsPane analytics={webinarAnalytics(analytics)} />)
+  return [...host.querySelectorAll('details')].find(el => el.querySelector('summary')?.textContent?.includes('回別・日別とフォームの詳しい数字'))!
 }
 
 describe('分析の詳細の数字を保つ', () => {
   it('回別の実数・平均視聴時間・参加者を分母にしたCTA率と日別の数を表示する', () => {
     const host = render()
     const tables = host.querySelectorAll('table')
-    expect(tables[0].textContent).toContain('40人')
+    expect(tables[0].textContent).toContain('40 人')
     expect(tables[0].textContent).toContain('5:30')
-    expect(tables[0].textContent).toContain('8人（20%）')
+    expect(tables[0].textContent).toContain('8 人（20%）')
     expect(tables[1].textContent).toContain('2026-10-08')
     expect(tables[1].textContent).toContain('52')
     expect(host.textContent).toContain('相談内容')
-    expect(host.querySelector('dl')?.textContent).toContain('送信できた3人')
-    expect(host.querySelector('details')?.open).toBe(false)
+    expect(host.querySelector('dl')?.textContent).toContain('送信できた3 人')
+    expect(host.open).toBe(false)
   })
 
   it('参加者ゼロの回は率を推測せず、フォーム集計がない時は未取得として示す', () => {
     const host = render({ ...ANALYTICS, sessions: [{ ...ANALYTICS.sessions[0], viewers: 0 }], formFunnel: undefined } as unknown as WebinarAnalytics)
-    expect(host.querySelector('table')?.textContent).toContain('8人（—）')
+    expect(host.querySelector('table')?.textContent).toContain('8 人（—）')
     expect(host.textContent).toContain('フォームの集計を取得できていません')
     expect(host.querySelector('dl')).toBeNull()
   })

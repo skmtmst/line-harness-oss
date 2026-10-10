@@ -3,8 +3,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 
 
 /*
- * ウェビナーの編集（V8）の小物。app/webinars/edit の participants-shared・
- * edit-steps と同じ決まり（src/v8 から app は読めないので写した）。
+ * ウェビナーの編集（V8）が使う時刻・分類・段の決まり。
  */
 
 /** 秒を「分:秒」に。負の数は開始前（待機ルーム）。-330 → -5:30。 */
@@ -85,7 +84,7 @@ export function actionBadge(participant: ParticipantRow): { label: string; done:
 
 /**
  * 参加者行の分類。サーバーの classification を優先し、無い古い応答だけ
- * 従来の推測へ落とす（app/webinars/edit/participants-shared と同じ）。
+ * 従来の推測へ落とす。
  */
 export function participantStateLabel(participant: ParticipantRow, durationSeconds: number): string {
   const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
@@ -149,7 +148,7 @@ export function nextStepOf(key: StepKey): StepKey | null {
 
 export const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
 
-/** 今月の申込（サーバーの集計日 UTC で数える。app/webinars/edit/analytics-funnel-v8 と同じ）。 */
+/** 今月の申込（サーバーの集計日 UTC で数える）。 */
 export function thisMonthReservations(daily: Array<{ date: string; reservations: number }>, now: Date = new Date()): number {
   const key = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
   return daily.filter((day) => day.date.slice(0, 7) === key).reduce((total, day) => total + day.reservations, 0)

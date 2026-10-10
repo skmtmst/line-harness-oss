@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PARTICIPANTS = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/participants.tsx'), 'utf8')
-const ANALYTICS = fs.readFileSync(path.join(__dirname, 'analytics-v8.tsx'), 'utf8')
+const ANALYTICS = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/analytics.tsx'), 'utf8')
 const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/edit.tsx'), 'utf8')
 
 describe('V8 ウェビナー編集の集計の遅延読み込みの契約', () => {
@@ -33,6 +33,7 @@ describe('V8 ウェビナー編集の集計の遅延読み込みの契約', () =
       消えないよう、Promise.all で束ねた取り方は無い（DETAIL-07）。
     */
     expect(PAGE).not.toContain('Promise.all([webinarApi.userComments')
-    expect(ANALYTICS).not.toContain('webinarApi.userComments(')
+    expect(ANALYTICS.split('/** 視聴者コメント。')[0]).not.toContain('webinarApi.userComments(')
+    expect(ANALYTICS).toContain('webinarApi.userComments(webinarId)')
   })
 })
