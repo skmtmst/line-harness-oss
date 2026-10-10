@@ -282,7 +282,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           <div className={styles.ctaCard}>
             <p className={styles.ctaTitle}>{current?.title || '（見出しなし）'}</p>
             {current?.body ? <p className={styles.ctaBody}>{current.body}</p> : null}
-            <p className={styles.ctaButton}>{current?.buttonLabel || 'ボタン'}</p>
+            {current?.buttonLabel.trim() ? <p className={styles.ctaButton} title="動画の下にボタンが出ます。">{current.buttonLabel}</p> : null}
           </div>
         </div>
       </>}

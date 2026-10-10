@@ -274,16 +274,16 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       steps={chrome.steps}
       help={scheduled
         ? '日時指定配信：開催回ごとに日時と定員を決めます。動画は準備（変換など）が済んでから公開できます。'
-        : '動画と、見られる期間を決めます。見終わったかどうかの決め方もここで決めます。'}
+        : `動画と、見られる期間を決めます。見終わったかどうかの決め方もここで決めます。${hasVideo ? '動画を再生すると、視聴状況が友だちごとに記録されます。' : ''}`}
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<>
         <h2 className={form.previewTitle}>公開ページでの見え方</h2>
         <div className={styles.pageCard}>
           <p className={styles.pageTitle} title={webinar.title}>{webinar.title}</p>
-          <span className={styles.player} aria-hidden="true"><Play size={32} /></span>
+          {hasVideo ? <span className={styles.player} aria-hidden="true"><Play size={32} /></span> : null}
           <p className={styles.pageNote}>
-            {scheduled && firstOnce?.at
+            {!hasVideo ? '動画を設定すると、友だちの画面での見え方がここに出ます。' : scheduled && firstOnce?.at
               ? `${shortJst(firstOnce.at)} から・${fmtJaDuration(webinar.durationSeconds)}`
               : `${webinar.publicationEndsAt ? '期間内だけ見られます' : 'いつでも見られます'}・${fmtJaDuration(webinar.durationSeconds)}`}
           </p>
