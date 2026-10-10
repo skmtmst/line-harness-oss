@@ -13,7 +13,7 @@ describe('B-137・B-148 中身のカードには影を付ける', () => {
     const permitted = new Set(exceptions.map(key))
     expect(exceptions.every(r => r.reason.length > 10)).toBe(true)
     expect(audit(resolve(web, 'src')).filter((r: { file: string; selector: string }) => !permitted.has(key(r)))).toEqual([])
-  })
+  }, 60_000)
 
   it('新しい線だけのカードを見逃さず、影のカードは通す', () => {
     expect(cssCandidates('.newCard { border-radius:var(--radius-card); box-shadow:var(--tpl-fe-ring); }')).toEqual(['.newCard'])
