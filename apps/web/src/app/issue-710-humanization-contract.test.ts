@@ -81,7 +81,7 @@ describe('Issue #710: 容量は1024MB超でGBへ切り替える1関数に統一'
 
   it('一覧・登録ダイアログの独自MB整形を廃止した', () => {
     const page = read('contents/page.tsx')
-    const upload = read('contents/media-upload-dialog.tsx')
+    const upload = read('../v8/contents/media-upload-dialog.tsx')
     expect(page).not.toContain('function formatStorage')
     expect(upload).not.toContain('(entry.file.size / 1024 / 1024).toFixed(1)')
     expect(upload).toContain('formatMediaSize(entry.file.size)')

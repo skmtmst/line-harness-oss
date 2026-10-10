@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-const UPLOAD = readFileSync(new URL('./media-upload-dialog.tsx', import.meta.url), 'utf8')
-const DETAIL = readFileSync(new URL('./media-detail-dialog.tsx', import.meta.url), 'utf8')
-const REPLACEMENT = readFileSync(new URL('./media-replacement-dialog.tsx', import.meta.url), 'utf8')
+const UPLOAD = readFileSync(new URL('../../v8/contents/media-upload-dialog.tsx', import.meta.url), 'utf8')
+const DETAIL = readFileSync(new URL('../../v8/contents/media-detail-dialog.tsx', import.meta.url), 'utf8')
+const REPLACEMENT = readFileSync(new URL('../../v8/contents/media-replacement-dialog.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts', import.meta.url), 'utf8')
 const DB = readFileSync(new URL('../../../../../packages/db/src/media.ts', import.meta.url), 'utf8')
-const GUIDANCE = readFileSync(new URL('./media-quota-guidance.tsx', import.meta.url), 'utf8')
+const GUIDANCE = readFileSync(new URL('../../v8/contents/media-quota-guidance.tsx', import.meta.url), 'utf8')
 const FOLDERS = readUiSource(new URL('../../components/shared/managed-folder-panel.tsx', import.meta.url), 'utf8')
 
 describe('V8 登録メディア一覧の契約', () => {

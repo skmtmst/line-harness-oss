@@ -34,6 +34,7 @@ const SCREENS = [
 ] as const
 
 function read(path: string): string {
+  if (['contents/media-detail-dialog.tsx', 'contents/media-replacement-dialog.tsx'].includes(path)) return readFileSync(new URL('../v8/' + path, import.meta.url), 'utf8')
   return readFileSync(new URL(`./${path}`, import.meta.url), 'utf8')
 }
 

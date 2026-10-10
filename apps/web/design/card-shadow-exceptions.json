@@ -500,11 +500,6 @@
     "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
   },
   {
-    "file": "app/contents/media-detail-dialog.tsx",
-    "selector": "className=\"bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline\"",
-    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
     "file": "app/emergency/send-path-coverage-panel.tsx",
     "selector": "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"",
     "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"

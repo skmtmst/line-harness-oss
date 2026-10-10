@@ -79,7 +79,7 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-const { default: MediaReplacementDialog } = await import('./media-replacement-dialog')
+const { default: MediaReplacementDialog } = await import('@/v8/contents/media-replacement-dialog')
 
 let host: HTMLDivElement
 let root: Root
@@ -118,7 +118,7 @@ async function waitForDialogText(text: string) {
 }
 
 function searchInput(): HTMLInputElement {
-  const input = dialog().querySelector<HTMLInputElement>('input[aria-label="差し替え候補を名前で検索"]')
+  const input = dialog().querySelector<HTMLInputElement>('input[aria-label="差し替え候補を名前で探す"]')
   if (!input) throw new Error('検索欄がありません')
   return input
 }
