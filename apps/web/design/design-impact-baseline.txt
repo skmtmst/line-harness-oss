@@ -770,3 +770,7 @@ shared-button-importer components/shared/reservation-board.tsx
 shared-button-importer components/shared/restaurant-floor-editor.tsx
 shared-button-importer v8/visit-stamps/qr.tsx
 shared-button-importer v8/restaurant/reservations/waitlist.tsx
+# B-234〜238：アレルギー・統括本文・お客さまデザインの共通操作。
+shared-button-importer components/shared/allergy-field.tsx
+shared-button-importer components/shared/hq-message-inserts.tsx
+shared-button-importer v8/settings/customer-look/screen.tsx

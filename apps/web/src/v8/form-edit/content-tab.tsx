@@ -1,4 +1,5 @@
 'use client'
+import {japaneseDetailOf} from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
 import { Field } from '@/components/shared/form-controls'
@@ -38,7 +39,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect from '@/components/shared/entity-select'
 
@@ -330,6 +331,7 @@ function InputFields({ block, refs, patch, accountId }: { block: FormInputBlock;
 }
 
 function AllergyOptionsSave({accountId, block, set}: {accountId: string; block: FormInputBlock; set: (next: Partial<FormInputBlock>) => void}) {
+  const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
   const [version, setVersion] = useState<number | null>(null)
   const [message, setMessage] = useState('')
@@ -346,7 +348,7 @@ function AllergyOptionsSave({accountId, block, set}: {accountId: string; block: 
     }).catch(() => { if (active) setMessage('店の選択肢を読み込めませんでした') })
     return () => { active = false }
   }, [accountId])
-  return <><p className={styles.cardNote}>この店の回答フォームと顧客情報で使う選択肢です。「そのほか」は自由に書けます。</p>
+  return <SaveErrorScope errors={saveErrors}><p className={styles.cardNote}>この店の回答フォームと顧客情報で使う選択肢です。「そのほか」は自由に書けます。</p>
     {role === 'owner' || role === 'admin' ? <Button disabled={version === null} busy={busy} onClick={async () => {
       if (version === null) return
       setBusy(true); setMessage('')
@@ -354,10 +356,10 @@ function AllergyOptionsSave({accountId, block, set}: {accountId: string; block: 
         const result = await api.accountSettings.saveAllergyOptions(accountId, (block.choices ?? []).filter(choice => !choice.isOther).map(choice => choice.label), version)
         if (!result.success || !result.data) throw new Error(result.error ?? '保存できませんでした')
         setVersion(result.data.version); setMessage('店の選択肢を保存しました')
-      } catch (error) { setMessage(error instanceof Error ? error.message : '保存できませんでした') }
+      } catch (error) { if(!saveErrors.capture(error)) setMessage(japaneseDetailOf(error) || '保存できませんでした') }
       finally { setBusy(false) }
     }}>店の選択肢を保存する</Button> : null}
-    {message ? <p role="status" className={styles.cardNote}>{message}</p> : null}</>
+    {message ? <p role="status" className={styles.cardNote}>{message}</p> : null}</SaveErrorScope>
 }
 
 function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Partial<FormInputBlock>) => void }) {

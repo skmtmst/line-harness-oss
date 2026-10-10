@@ -125,7 +125,7 @@ a.recentTitle:hover { text-decoration: underline; }
 .fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--tpl-fdt-info-col-gap); row-gap: var(--tpl-fdt-info-row-gap); }
 .infoGroup { display: flex; flex-direction: column; gap: var(--tpl-fdt-info-gap); }
 .infoGroup + .infoGroup { padding-top: var(--tpl-fdt-info-gap); border-top: 1px solid var(--color-hairline); }
-.infoGroupTitle { margin: 0; font-size: var(--text-label); font-weight: 600; color: var(--color-ink); }
+.infoGroupTitle { margin: var(--tpl-fdt-info-heading-margin); font-size: var(--tpl-fdt-text-size); font-weight: 600; color: var(--color-ink); }
 .field { display: flex; flex-direction: column; gap: var(--tpl-fdt-field-gap); min-width: 0; padding-left: 0; }
 .field[data-changed] { border-left: var(--tpl-fdt-changed-line) solid var(--color-accent-deep); padding-left: var(--tpl-fdt-group-gap); }
 .fieldLabel { display: flex; align-items: center; gap: var(--tpl-fdt-row-text-gap); font-size: var(--tpl-fdt-small-size); line-height: var(--tpl-fdt-small-lh); font-weight: 500; color: var(--color-ink-secondary); }

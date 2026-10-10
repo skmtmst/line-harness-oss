@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* B236-4b/HQ-6b2 の3列、B237-5a の2列。色見本は採用板の16px。 */
 .two, .three { gap: var(--tpl-fe-chip-gap); }

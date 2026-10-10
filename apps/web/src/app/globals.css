@@ -1582,7 +1582,7 @@
   --tpl-fdt-recent-h: 50px; --tpl-fdt-dot: 24px; --tpl-fdt-line-h: 26px;
   --tpl-fdt-hist-pad: 16px 24px 24px; --tpl-fdt-hist-gap: 16px; --tpl-fdt-seg-pad: 3px; --tpl-fdt-seg-gap: 2px; --tpl-fdt-seg-radius: var(--polish-radius-control); --tpl-fdt-seg-btn-pad: 6px 12px; --tpl-fdt-seg-btn-radius: var(--polish-radius-control);
   --tpl-fdt-col-time: 130px; --tpl-fdt-col-type: 130px; --tpl-fdt-col-account: 150px; --tpl-fdt-col-source: 90px; --tpl-fdt-cell-pad: 0 16px; --tpl-fdt-head-cell-pad: 10px 16px; --tpl-fdt-hist-row-h: var(--polish-table-row); --tpl-fdt-day-pad: 8px 16px; --tpl-fdt-type-dot: 22px;
-  --tpl-fdt-info-pad: 16px 24px 24px; --tpl-fdt-info-gap: 16px; --tpl-fdt-info-col-gap: 24px; --tpl-fdt-info-row-gap: 14px; --tpl-fdt-field-gap: var(--polish-space-field); --tpl-fdt-chip-pad: 4px 12px;
+  --tpl-fdt-info-pad: 16px 24px 24px; --tpl-fdt-info-heading-margin: 0; --tpl-fdt-info-gap: 16px; --tpl-fdt-info-col-gap: 24px; --tpl-fdt-info-row-gap: 14px; --tpl-fdt-field-gap: var(--polish-space-field); --tpl-fdt-chip-pad: 4px 12px;
   --tpl-fdt-form-pad: 16px 24px 24px; --tpl-fdt-form-gap: 14px; --tpl-fdt-card-pad: var(--polish-space-card); --tpl-fdt-card-head-gap: 10px; --tpl-fdt-form-icon: 28px; --tpl-fdt-form-label-w: 216px; --tpl-fdt-form-row-pad: 10px 0; --tpl-fdt-orphan-size: 11px; --tpl-fdt-changed-line: 2px;
   --tpl-fdt-empty-pad: 40px 24px; --tpl-fdt-empty-gap: 8px; --tpl-fdt-empty-icon: 40px;
   /* 手作業扱いだった板（hb2）：設定の板の頭と中身・運用者へのお知らせ（gjUz3・hiBO8）。 */

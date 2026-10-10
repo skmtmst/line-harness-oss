@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .body { display: flex; flex-direction: column; gap: var(--tpl-fdt-summary-gap); min-width: 0; }
 .heading { margin: 0; font-size: var(--text-caption); color: var(--color-ink-secondary); font-weight: 600; }

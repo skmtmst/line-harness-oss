@@ -331,10 +331,10 @@ export default function FriendsListV8() {
     let cancelled = false
     setFieldNames([]); setFieldDefinitions([]); setFieldFolders([]); setFieldsReady(false)
     if (!selectedAccountId || !fieldsEnabled) return
-    void Promise.all([api.friendFields.list(selectedAccountId), api.folders.list('friend_field', selectedAccountId)]).then(([response, folders]) => {
+    void Promise.all([api.friendFields.list(selectedAccountId), api.folders.list('friend_field', selectedAccountId).catch(() => null)]).then(([response, folders]) => {
       if (cancelled) return
       if (response.success) {setFieldNames(response.data.map(field => field.name)); setFieldDefinitions(response.data); setFieldsReady(true)}
-      if (folders.success) setFieldFolders(folders.data)
+      if (folders?.success) setFieldFolders(folders.data)
     }).catch(() => { if (!cancelled) setOptionsFailed(true) })
     return () => { cancelled = true }
   }, [selectedAccountId, fieldsEnabled])

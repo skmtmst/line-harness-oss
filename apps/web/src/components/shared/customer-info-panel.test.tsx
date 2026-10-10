@@ -6,7 +6,7 @@ import { BASIC_FRIEND_FIELDS as FIXED_FRIEND_FIELDS, type FriendField } from '@l
 import CustomerInfoPanel from './customer-info-panel'
 import { fixedFieldValue } from './fixed-friend-field-values'
 vi.mock('next/link', () => ({default:({children,...props}: React.ComponentProps<'a'>)=><a {...props}>{children}</a>}))
-vi.mock('@/lib/api', () => ({api:{friendFields:{saveForFriend:vi.fn()}}}))
+vi.mock('@/lib/api', async original => ({...await original<typeof import('@/lib/api')>(),api:{friendFields:{saveForFriend:vi.fn()}}}))
 const fields = FIXED_FRIEND_FIELDS.map((spec,index) => ({
   id:spec.key, name:spec.label, fixedKey:spec.key, type:'text', isPersonal:true, value:spec.key==='birthday'?'2000-01-01':spec.key==='age'?'18':spec.key==='name'?'山田花子':null,
   valueSource:spec.key==='birthday'?{type:'form',id:'form',name:'登録'}:null,
@@ -74,7 +74,7 @@ test('基本の編集は取消で送らず、失敗では値を保ち、保存�
   fireEvent.change(screen.getByRole('textbox',{name:'名前'}),{target:{value:'新しい名前'}})
   vi.mocked(api.friendFields.saveForFriend).mockResolvedValueOnce({success:false,error:'保存失敗'} as never)
   fireEvent.click(screen.getByRole('button',{name:'保存する'}))
-  await waitFor(()=>expect(screen.getByRole('alert').textContent).toBe('保存失敗'))
+  await waitFor(()=>expect(screen.getByRole('alert').textContent).toBe('保存できませんでした'))
   expect((screen.getByRole('textbox',{name:'名前'}) as HTMLInputElement).value).toBe('新しい名前')
   vi.mocked(api.friendFields.saveForFriend).mockResolvedValueOnce({success:true} as never)
   fireEvent.click(screen.getByRole('button',{name:'保存する'}))

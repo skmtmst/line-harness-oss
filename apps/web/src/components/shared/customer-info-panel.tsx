@@ -1,4 +1,5 @@
 'use client'
+import {japaneseDetailOf} from '@/components/shared/api-error-message'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -58,6 +59,7 @@ export default function CustomerInfoPanel({
     } catch { /* 保存できなくてもその場の表示は使える */ }
   }, [hidden, order, loaded])
   useEffect(() => { setExpanded(false); setSettings(false); setEditing(false); setSaved({}); setSaveError(''); setSaving(false) }, [friendId, canEdit])
+  useEffect(() => { setSaved({}) }, [fields])
   const shownFields = fields.map(field => saved[field.id] === undefined ? field : { ...field, value: saved[field.id], valueSource: null })
   const sorted = [...sections].sort((a,b) => {
     const ai = order.indexOf(a.key), bi = order.indexOf(b.key)
@@ -90,7 +92,7 @@ export default function CustomerInfoPanel({
         setSaving(true); setSaveError('');
         const values = Object.fromEntries(shownFields.filter(field => FIXED_FRIEND_FIELDS.some(spec => spec.key === field.fixedKey) && draft[field.id] !== (field.value ?? '')).map(field => [field.id, draft[field.id]]))
         try { const result = await api.friendFields.saveForFriend(friendId, values); if (generation.current !== started) return; if (!result.success) throw new Error(result.error ?? '保存できませんでした'); setSaved(current => ({ ...current, ...values })); setEditing(false); notifyToast('保存しました'); onRetry?.() }
-        catch (error) { if (generation.current === started) setSaveError(error instanceof Error ? error.message : '保存できませんでした') }
+        catch (error) { if (generation.current === started) setSaveError(japaneseDetailOf(error) || '保存できませんでした') }
         finally { if (generation.current === started) setSaving(false) }
       }}>保存する</Button></div>{saveError ? <p className={styles.note} role="alert">{saveError}</p> : null}</> : null}
       {hiddenPersonalCount > 0 ? <p className={styles.note}>個人情報は閲覧権限が必要です。</p> : null}
