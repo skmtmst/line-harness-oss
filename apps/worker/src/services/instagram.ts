@@ -16,59 +16,22 @@ export class InstagramError extends Error {
   }
 }
 /**
- * `%XX` の並びだけを元の文字へ戻す。秘密値が URL エンコードされた形で混ざっていても
- * 見つけられるようにするための下ごしらえで、記録に出す本文そのものを作るためではない。
- * 壊れた並び（不完全な `%` 等）があっても例外にせず、その部分はそのまま残す。
- */
-function safeDecodeURIComponent(text: string): string {
-  return text.replace(/(?:%[0-9A-Fa-f]{2})+/g, (match) => {
-    try {
-      return decodeURIComponent(match);
-    } catch {
-      return match;
-    }
-  });
-}
-/**
- * 記録へ出す文字から、合鍵らしい並びを消す。Meta の説明文は Meta が書く自由な文章で、
- * 要求に渡した値がそのまま混ざって返ってくる可能性があるため、二重に守る。
- * 値が URL エンコードされた形で混ざっていても見つけられるよう、先に `%XX` を元へ戻してから見る。
+ * Meta のエラー本文から、原因調べに使う安全な項目だけを短く取り出す。
  *
- * 1. その要求で実際に使った秘密値（合鍵・アプリシークレット・認可コード）を丸ごと置き換える。
- *    取り違えで文章を壊さないよう、6文字以上のものだけを対象にする。
- * 2. 取りこぼし対策。記号を挟まず20文字以上続く並びは合鍵の形なので、中身を見ずに置き換える。
- *    長いIDが一緒に消えても、原因調べに使う `status` / `type` / `code` / `subcode` は残る。
+ * `error.message` は Meta が書く自由な文章で、要求に渡した値（合鍵・アプリシークレット・
+ * 認可コード）がそのまま、あるいは URL エンコード・二重エンコードなど様々な形で混ざって
+ * 返ってくる可能性がある。どの形で混ざるかを網羅して消す（伏せ字処理を重ねる）やり方は
+ * 新しい表現が見つかるたびに後追いになり守り切れないため、`message` 自体を記録に出さない。
+ * `status` / `type` / `code` / `subcode` は Meta の応答のうち種別・番号を表す項目で、
+ * 要求した値がそのまま入り込む自由な文章ではないため、これらだけで原因調べを行う。
  */
-export function redactInstagramSecrets(
-  text: string,
-  secrets: Array<string | null | undefined>,
-): string {
-  let out = safeDecodeURIComponent(text);
-  for (const secret of secrets)
-    if (secret && secret.length >= 6)
-      out = out.split(secret).join('[redacted]');
-  return out.replace(/[A-Za-z0-9_-]{20,}/g, '[redacted]');
-}
-/** 要求の中で秘密値が入る問い合わせ項目。これらの値は記録へ出す前に消す。 */
-const META_SECRET_QUERY_KEYS = [
-  'client_secret',
-  'code',
-  'fb_exchange_token',
-  'input_token',
-  'access_token',
-] as const;
-/** Meta のエラー本文から、秘密値を含まない部分だけを短く取り出す。 */
-async function metaErrorDetail(
-  response: Response,
-  secrets: Array<string | null | undefined>,
-): Promise<string | undefined> {
+async function metaErrorDetail(response: Response): Promise<string | undefined> {
   try {
     const body = (await response.json()) as {
       error?: {
         type?: string;
         code?: number;
         error_subcode?: number;
-        message?: string;
       };
     };
     const e = body?.error;
@@ -78,10 +41,6 @@ async function metaErrorDetail(
       e.type ? `type=${e.type}` : '',
       e.code != null ? `code=${e.code}` : '',
       e.error_subcode != null ? `subcode=${e.error_subcode}` : '',
-      // 説明文は Meta が書く自由な文章。秘密値を消してから短く切る。
-      e.message
-        ? `message=${redactInstagramSecrets(String(e.message), secrets).slice(0, 300)}`
-        : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -169,13 +128,7 @@ export async function instagramGraph<T>(
         ? 'meta_authorization_failed'
         : 'meta_request_failed',
       502,
-      // この要求で渡した秘密値を渡し、Meta の説明文から消してから記録へ出す。
-      `${method} ${config.version}/${path} ${await metaErrorDetail(response, [
-        token,
-        config.appSecret,
-        config.encryptionKey,
-        ...META_SECRET_QUERY_KEYS.map((k) => query[k]),
-      ])}`,
+      `${method} ${config.version}/${path} ${await metaErrorDetail(response)}`,
     );
   return response.json() as Promise<T>;
 }
