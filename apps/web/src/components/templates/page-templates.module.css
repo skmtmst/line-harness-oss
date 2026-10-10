@@ -375,6 +375,7 @@
 :global([data-theme='v8']) .listBody .pagination { padding-inline: var(--tpl-list-inset); }
 :global([data-theme='v8']) [data-list-skeleton] .paginationRow,
 :global([data-theme='v8']) [data-list-skeleton] .pagination { justify-content: space-between; }
+:global([data-theme='v8']) [data-list-skeleton] .pagination > :only-child { flex: 1; min-width: 0; }
 
 /* 旧画面が表の外に足していた枠も、共通の型で平らにする。 */
 :global([data-theme='v8']) [data-list-skeleton] .content :global(div:has(> [data-shared-part='list-table'])) { margin: 0; padding-inline: 0; border: 0; border-radius: var(--radius-flat); box-shadow: none; }

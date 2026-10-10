@@ -101,3 +101,21 @@ test('閲覧のみでは基本の編集と表示項目の変更を出さない',
  render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit={false} sections={[]}/>);
  expect(screen.queryByRole('button',{name:'編集'})).toBeNull();expect(screen.queryByRole('button',{name:'表示項目を編集'})).toBeNull();
 })
+
+test('生年月日が未登録なら回答年齢を表示して編集でき、年齢だけの表示設定も保存できる', async () => {
+  const withoutBirthday = fields.map(field => field.fixedKey === 'birthday' ? {...field, value:null} : field)
+  render(<CustomerInfoPanel friendId="f" fields={withoutBirthday} state="ready" canEdit sections={[]}/>)
+  expect(screen.getByText('年齢')).toBeTruthy()
+  expect(screen.getByText('18')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button',{name:'編集'}))
+  fireEvent.change(screen.getByRole('textbox',{name:'年齢'}),{target:{value:'19'}})
+  vi.mocked(api.friendFields.saveForFriend).mockResolvedValueOnce({success:true} as never)
+  fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+  await waitFor(()=>expect(screen.getByText('19')).toBeTruthy())
+  expect(api.friendFields.saveForFriend).toHaveBeenLastCalledWith('f',{age:'19'})
+  fireEvent.click(screen.getByRole('button',{name:'表示項目を編集'}))
+  fireEvent.click(screen.getByRole('checkbox',{name:'年齢'}))
+  fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+  expect(screen.queryByText('年齢')).toBeNull()
+  expect(JSON.parse(localStorage.getItem('chat.friendInfoSections.v4')!).hidden).toContain('fixed:age')
+})

@@ -64,6 +64,7 @@ export default function CustomerInfoPanel({
   useEffect(() => { setExpanded(false); setSettings(false); setEditing(false); setSaved({}); setSaveError(''); setSaving(false) }, [friendId, canEdit])
   useEffect(() => { setSaved({}) }, [fields])
   const shownFields = fields.map(field => saved[field.id] === undefined ? field : { ...field, value: saved[field.id], valueSource: null })
+  const birthdayVisible = Boolean(fixedFieldValue(shownFields, 'birthday').value) && !hidden.includes('fixed:birthday')
   const sorted = [...sections].sort((a,b) => {
     const ai = order.indexOf(a.key), bi = order.indexOf(b.key)
     return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
@@ -83,9 +84,9 @@ export default function CustomerInfoPanel({
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
         : <dl className={styles.rows}>
-          {[...FIXED_FRIEND_FIELDS].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => spec.key !== 'age' && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
+          {[...FIXED_FRIEND_FIELDS].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => (spec.key !== 'age' || !birthdayVisible) && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
             const { value, source, derived } = fixedFieldValue(shownFields, spec.key)
-            const age = spec.key === 'birthday' ? fixedFieldValue(shownFields, 'age').value : null
+            const age = spec.key === 'birthday' && !hidden.includes('fixed:age') ? fixedFieldValue(shownFields, 'age').value : null
             const display = value && age ? `${value}（${age}歳）` : value
             const field = shownFields.find(field => field.fixedKey === spec.key)!
             return <div className={styles.row} key={spec.key}>
@@ -125,10 +126,10 @@ export default function CustomerInfoPanel({
     {canEdit ? <Button variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</Button> : null}
     {settings && canEdit ? <DisplayItemsDialog title="表示項目" items={[
       ...choices.map(choice => ({...choice, group:'顧客情報の段'})),
-      ...FIXED_FRIEND_FIELDS.filter(spec => spec.key !== 'age').map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本'})),
-    ]} selected={[...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.filter(spec => spec.key !== 'age').map(spec => `fixed:${spec.key}`)].filter(key => !hidden.includes(key)).sort((a,b) => (order.indexOf(a)<0?999:order.indexOf(a))-(order.indexOf(b)<0?999:order.indexOf(b)))}
+      ...FIXED_FRIEND_FIELDS.map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本'})),
+    ]} selected={[...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.map(spec => `fixed:${spec.key}`)].filter(key => !hidden.includes(key)).sort((a,b) => (order.indexOf(a)<0?999:order.indexOf(a))-(order.indexOf(b)<0?999:order.indexOf(b)))}
       manageHref="/friend-fields" onCancel={() => setSettings(false)} onConfirm={keys => {
-        const all = [...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.filter(spec => spec.key !== 'age').map(spec => `fixed:${spec.key}`)]
+        const all = [...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.map(spec => `fixed:${spec.key}`)]
         setHidden(all.filter(key => !keys.includes(key))); setOrder(keys); setSettings(false)
       }} /> : null}
   </div>

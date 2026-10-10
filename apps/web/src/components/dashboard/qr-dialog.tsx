@@ -6,6 +6,7 @@ import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
+import { FieldError } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -554,7 +555,7 @@ export default function QrDialog({
                 </Button>
               )}
             </div>
-            {imageState === 'failed' ? <p role="alert" className="text-danger text-xs">QRを保存できませんでした。もう一度お試しください。</p> : null}
+            {imageState === 'failed' ? <FieldError id="qr-save-error">QRを保存できませんでした。もう一度お試しください。</FieldError> : null}
             {pdfState === 'failed' ? (
               <p className="text-danger mt-1 text-xs" role="alert">
                 印刷用PDFを作れませんでした。もう一度押してください。

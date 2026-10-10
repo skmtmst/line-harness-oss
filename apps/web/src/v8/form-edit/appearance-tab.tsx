@@ -28,7 +28,7 @@ import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import { ogImageUrlError } from './model'
 import styles from './edit.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
@@ -177,7 +177,7 @@ export function AppearanceTab(props: Props) {
             <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} title={props.portable?'色を決めて配る':'このフォームだけ変える'} note="型かカスタムを選ぶ" />
           </RadioCardGroup>
           {!props.portable ? <Link href="/settings/customer-look">店のデザインを変える ↗</Link> : mode === 'fixed' ? <p className={styles.cardNote}>このフォームは色を固定して配ります。配った先の店の設定より優先します。</p> : null}
-          {props.accountLookError && !props.portable ? <p role="alert" className={styles.fieldError}>{props.accountLookError}</p> : null}
+          {props.accountLookError && !props.portable ? <FieldError id="account-look-error">{props.accountLookError}</FieldError> : null}
           {mode === 'fixed' ? <><p className={styles.fieldLabelPlain}>デザインの型</p><CustomerDesignPicker value={preset} onChange={next => onChangeOptions({customerDesign:{mode:'fixed',preset:next}})} /></> : null}
           {mode === 'fixed' && preset === 'custom' ? <>
           <p className={styles.fieldLabelPlain}>色（5つの役割）</p>

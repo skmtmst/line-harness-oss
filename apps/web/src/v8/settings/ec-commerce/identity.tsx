@@ -243,7 +243,7 @@ export default function EcIdentityCandidatesScreen() {
                 <Td><span className={styles.ops}>
                   {hasCandidate ? (
                     <>
-                      <Button type="button" variant={selected ? 'primary' : 'secondary'} aria-pressed={selected} onClick={() => { setCandidateId(item.id); review.select(item.id) }}>候補を見る</Button>
+                      <Button type="button" variant={selected ? 'primary' : 'secondary'} aria-expanded={selected} onClick={() => { setCandidateId(item.id); review.select(item.id) }}>候補を見る</Button>
                       {canEdit ? <Button type="button" data-qa-open="ELayY" onClick={() => review.openDialog(item.id)}>決める</Button> : null}
                     </>
                   ) : (

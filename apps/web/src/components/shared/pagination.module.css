@@ -169,6 +169,8 @@ button.item:disabled {
 /* B-178：一覧の余白は型が持つ。件数と送り先を1つの右寄せの組にする。 */
 [data-theme='v8'] :global([data-list-skeleton]) .pagination { width: auto; justify-content: flex-end; padding: 0; }
 [data-theme='v8'] :global([data-list-skeleton]) .summary { flex: none; margin-right: var(--space-16); }
+[data-theme='v8'] :global([data-list-skeleton]) .pagination:has(> .summary) { flex: 1; min-width: 0; }
+[data-theme='v8'] :global([data-list-skeleton]) .pagination:has(> .summary) .summary { margin-right: auto; }
 
 /* B-203・B-207・B-211：10-10 に採用した共通の形。 */
 html[data-theme='v8'] .current { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }

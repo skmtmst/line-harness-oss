@@ -871,7 +871,7 @@ export default function FriendsListV8() {
                   <Td key={column.key} className={`${styles.td} ${styles.fixedContent}`}><span className={styles.cellText} title={monthDayTime(lastContact)}>{monthDay(lastContact)}</span></Td>
                   )
                   const value = friend.fieldValues?.[column.key]
-                  return <Td key={column.key} className={styles.td}><span className={styles.cellText} title={value ?? undefined}>{value ?? '未設定'}</span></Td>
+                  return <Td key={column.key}><span className={styles.cellText} title={value ?? undefined}>{value ?? '未設定'}</span></Td>
                 })}
                 <Td className={styles.tdMenu}>
                   <div className={styles.menuBox}>

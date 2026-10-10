@@ -14,7 +14,7 @@ import {SaveErrorScope,useSaveFormErrors} from '@/components/shared/save-form-er
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
-import {Field} from '@/components/shared/form-controls'
+import {Field,FieldError} from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import SectionHeader from '@/components/shared/section-header'
 import CustomerDesignPicker from '@/components/shared/customer-design-picker'
@@ -48,7 +48,7 @@ export default function CustomerLookScreen() {
  }
  return <SaveErrorScope errors={saveErrors}><SettingsPage title="お客さまの画面のデザイン" layout="customer-look" navigation={<SettingsNavV8/>}
   preview={status==='ready'?<CustomerLookPreview look={draft} accountName={selectedAccount?.name??'公式アカウント'}/>:undefined}
-  saveStatus={error?<p role="alert">{error}</p>:undefined}
+  saveStatus={error?<FieldError id="customer-look-save-error">{error}</FieldError>:undefined}
   saveActions={canEdit&&status==='ready'?<><Button disabled={saving||!dirty} onClick={()=>guard.guarded(()=>{if(saved)setDraft(saved);setError('')})}>キャンセル</Button><Button variant="primary" disabled={!dirty} busy={saving} onClick={()=>void save()}>保存する</Button></>:undefined}>
    {!selectedAccountId?<ListState kind="empty" title="店を選んでください"/>:status==='loading'?<ListState kind="loading" title="デザインを読み込んでいます"/>:status==='error'?<ListState kind="error" title={error} action={<Button onClick={()=>setRetry(current=>current+1)}>もう一度読み込む</Button>}/>:<>
     {!canEdit?<ReadOnlyNotice/>:null}
