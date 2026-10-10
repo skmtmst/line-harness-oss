@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React, { useState, type ReactNode } from 'react'
+import React from 'react'
 import { Blob as NodeBlob } from 'node:buffer'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -14,11 +14,11 @@ vi.mock('@/lib/api', async (original) => ({
   api: { mileage: { rewards: mocks.rewards } }, fetchApi: mocks.redemptions,
 }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn() }) }))
-import V8RewardsTab from './v8-rewards-tab'
+import { MileageShell } from '@/v8/mileage/frame'
+import V8RewardsTab from '@/v8/mileage/rewards'
 
 function Screen() {
-  const [actions, setActions] = useState<ReactNode>(null)
-  return <>{actions}<V8RewardsTab readonly registerHeaderActions={setActions} /></>
+  return <MileageShell.Provider value={{ tab: 'rewards', readonly: true, narrow: false, counts: {}, setCount: () => {} }}><V8RewardsTab /></MileageShell.Provider>
 }
 const reward = (name: string, status: 'published' | 'draft' = 'published'): MileageRewardSummary => ({
   id: name, lineAccountId: 'A', programId: 'p', name, description: null, imageUrl: null,

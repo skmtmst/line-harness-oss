@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import V8ScoreTab from './v8-score-tab'
+import V8ScoreTab from '@/v8/mileage/score'
 
 const calls = vi.hoisted(() => ({ friends: vi.fn(), rules: vi.fn() }))
 vi.mock('@/lib/api', () => ({
@@ -54,7 +54,7 @@ describe('V8 行動スコアのCSV書き出し', () => {
       if (tag === 'a') element.click = anchorClick
       return element
     }) as typeof document.createElement)
-    render(<V8ScoreTab readonly registerHeaderActions={() => {}} />)
+    render(<V8ScoreTab />)
     await waitFor(() => expect(screen.getByText('山田')).toBeTruthy())
     const button = screen.getByRole('button', { name: 'この頁の行動スコアをCSVで書き出す' })
     expect((button as HTMLButtonElement).disabled).toBe(false)

@@ -8,7 +8,8 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/contexts/account-context'
-import V8RewardsTab from './v8-rewards-tab'
+import { MileageShell } from '@/v8/mileage/frame'
+import V8RewardsTab from '@/v8/mileage/rewards'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
@@ -109,7 +110,6 @@ function stubFetch() {
 
 let container: HTMLDivElement
 let root: Root
-let headerNode: React.ReactNode
 const originalFetch = globalThis.fetch
 
 function installWebStorage(): void {
@@ -140,7 +140,6 @@ beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   createdRewards.length = 0
   testedRewards.length = 0
-  headerNode = null
   stubFetch()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -159,11 +158,7 @@ async function renderTab() {
   await act(async () => {
     root.render(
       <AccountProvider>
-        <V8RewardsTab
-          readonly={false}
-          registerHeaderActions={(node) => { headerNode = node }}
-          registerTabCount={() => {}}
-        />
+        <MileageShell.Provider value={{ tab: 'rewards', readonly: false, narrow: false, counts: {}, setCount: () => {} }}><V8RewardsTab /></MileageShell.Provider>
       </AccountProvider>,
     )
   })
@@ -179,7 +174,7 @@ async function waitForRows(): Promise<void> {
 
 function openRowMenu(name: string): void {
   const button = [...container.querySelectorAll('button')].find(
-    (element) => element.getAttribute('aria-label') === `${name}のその他操作`,
+    (element) => element.getAttribute('aria-label') === `${name}の操作`,
   )
   if (!(button instanceof HTMLButtonElement)) throw new Error('その他操作のボタンがありません')
   button.click()
@@ -202,12 +197,14 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     expect(body).not.toContain('残り制限なし')
   })
 
-  it('フォルダの注意書きと行の脚注が絵どおり', async () => {
+  it('現役のフォルダはすべてだけを出し、行の操作を説明する', async () => {
     await renderTab()
     await waitForRows()
     const body = container.textContent ?? ''
-    expect(body).toContain('フォルダを消しても、中の経路は未分類に残ります')
-    expect(body).toContain('行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。')
+    expect(body).toContain('すべて')
+    expect(container.querySelector('button[aria-label="フォルダを追加"]')).toBeNull()
+    await act(async () => { (container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement).click() })
+    expect(container.textContent ?? '').toContain('行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。')
   })
 
   it('行の「…」に4つの操作が並ぶ', async () => {
@@ -238,7 +235,6 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
   it('頭に CSVで書き出すが出て、表の中身が入る', async () => {
     await renderTab()
     await waitForRows()
-    expect(headerNode).not.toBeNull()
     const blobs: Blob[] = []
     const restoreObjectUrl = globalThis.URL.createObjectURL
     globalThis.URL.createObjectURL = ((blob: Blob) => {
@@ -247,11 +243,7 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     }) as typeof globalThis.URL.createObjectURL
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     try {
-      const host = document.createElement('div')
-      document.body.appendChild(host)
-      const headerRoot = createRoot(host)
-      await act(async () => { headerRoot.render(<>{headerNode}</>) })
-      const button = [...host.querySelectorAll('button')].find(
+      const button = [...container.querySelectorAll('button')].find(
         (element) => (element.textContent ?? '').includes('CSVで書き出す'),
       )
       if (!(button instanceof HTMLButtonElement)) throw new Error('CSV のボタンがありません')
@@ -262,8 +254,6 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
       expect(text).toContain('"使い道","必要なマイル"')
       expect(text).toContain('送料無料クーポン')
       expect(click).toHaveBeenCalled()
-      await act(async () => { headerRoot.unmount() })
-      host.remove()
     } finally {
       globalThis.URL.createObjectURL = restoreObjectUrl
       click.mockRestore()

@@ -8,7 +8,8 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/contexts/account-context'
-import V8HistoryTab from './v8-history-tab'
+import { MileageShell } from '@/v8/mileage/frame'
+import V8HistoryTab from '@/v8/mileage/history'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
@@ -71,7 +72,6 @@ function stubFetch() {
 
 let container: HTMLDivElement
 let root: Root
-let headerNode: React.ReactNode
 const originalFetch = globalThis.fetch
 
 function installWebStorage(): void {
@@ -100,7 +100,6 @@ beforeEach(() => {
   installWebStorage()
   globalThis.localStorage.setItem('lh_selected_account', 'account-1')
   document.documentElement.dataset.theme = 'v8'
-  headerNode = null
   stubFetch()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -119,10 +118,7 @@ async function waitForRows(): Promise<void> {
   await act(async () => {
     root.render(
       <AccountProvider>
-        <V8HistoryTab
-          readonly={false}
-          registerHeaderActions={(node) => { headerNode = node }}
-        />
+        <MileageShell.Provider value={{ tab: 'history', readonly: false, narrow: false, counts: {}, setCount: () => {} }}><V8HistoryTab /></MileageShell.Provider>
       </AccountProvider>,
     )
   })
@@ -134,10 +130,10 @@ async function waitForRows(): Promise<void> {
 }
 
 describe('履歴の絵合わせ（板 `oRbJi`）', () => {
-  it('日時は短く出す（9/30 14:12）', async () => {
+  it('記録の日と時刻を名前の全文表示で確認できる（日本時間）', async () => {
     await waitForRows()
     const body = container.textContent ?? ''
-    expect(body).toContain('9/30 14:12')
+    expect(container.querySelector('tbody span[title]')?.getAttribute('title')).toBe('Kenta Kawano・9月30日（水）14:12')
   })
 
   it('付けたの帯に補足は付けない', async () => {
@@ -149,15 +145,8 @@ describe('履歴の絵合わせ（板 `oRbJi`）', () => {
 
   it('頭に CSVで書き出すと増やす・減らすが出る', async () => {
     await waitForRows()
-    expect(headerNode).not.toBeNull()
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const headerRoot = createRoot(host)
-    await act(async () => { headerRoot.render(<>{headerNode}</>) })
-    const text = host.textContent ?? ''
+    const text = container.textContent ?? ''
     expect(text).toContain('CSVで書き出す')
     expect(text).toContain('増やす・減らす')
-    await act(async () => { headerRoot.unmount() })
-    host.remove()
   })
 })

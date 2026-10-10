@@ -1,14 +1,15 @@
 // @vitest-environment happy-dom
 /*
  * 友だちの残高（板 `CJlf4`）。絵の骨組み（`design/v8/html/CJlf4.html`）にそろえる。
- * 頭の CSV の空け・数の帯の空け（今月 増えた・今月 減った）・申請の行
- * （申請 佐藤 直人（10/2 15:20））・申請した人の言い方をここで留める。
+ * 頭の CSV の空け・数の帯の空け（直近30日 増えた・直近30日 減った）・申請の行
+ * （申請 佐藤 直人（10月2日（金）15:20））・申請した人の言い方をここで留める。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/contexts/account-context'
-import V8BalancesTab from './v8-balances-tab'
+import { MileageShell } from '@/v8/mileage/frame'
+import V8BalancesTab from '@/v8/mileage/balances'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
@@ -114,7 +115,6 @@ function stubFetch() {
 
 let container: HTMLDivElement
 let root: Root
-let headerNode: React.ReactNode
 const originalFetch = globalThis.fetch
 
 function installWebStorage(): void {
@@ -143,7 +143,6 @@ beforeEach(() => {
   installWebStorage()
   globalThis.localStorage.setItem('lh_selected_account', 'account-1')
   document.documentElement.dataset.theme = 'v8'
-  headerNode = null
   stubFetch()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -162,11 +161,7 @@ async function waitForRows(): Promise<void> {
   await act(async () => {
     root.render(
       <AccountProvider>
-        <V8BalancesTab
-          readonly={false}
-          registerHeaderActions={(node) => { headerNode = node }}
-          registerTabCount={() => {}}
-        />
+        <MileageShell.Provider value={{ tab: 'balances', readonly: false, narrow: false, counts: {}, setCount: () => {} }}><V8BalancesTab /></MileageShell.Provider>
       </AccountProvider>,
     )
   })
@@ -178,11 +173,11 @@ async function waitForRows(): Promise<void> {
 }
 
 describe('残高の絵合わせ（板 `CJlf4`）', () => {
-  it('数の帯は空けて書く（今月 増えた・今月 減った）', async () => {
+  it('数の帯は空けて書く（直近30日 増えた・直近30日 減った）', async () => {
     await waitForRows()
     const body = container.textContent ?? ''
-    expect(body).toContain('今月 増えた')
-    expect(body).toContain('今月 減った')
+    expect(body).toContain('直近30日 増えた')
+    expect(body).toContain('直近30日 減った')
     expect(body).not.toContain('今月増えた')
     expect(body).not.toContain('今月減った')
   })
@@ -190,21 +185,15 @@ describe('残高の絵合わせ（板 `CJlf4`）', () => {
   it('申請の行に頼んだ人と日時が出る', async () => {
     await waitForRows()
     const body = container.textContent ?? ''
-    expect(body).toContain('承認待ちのマイル変更 1件')
-    expect(body).toContain('申請 佐藤 直人（10/2 15:20）')
+    expect(body).toContain('承認待ちのマイル変更 1 件')
+    expect(body).toContain('申請 佐藤 直人（10月2日（金）15:20）')
     expect(body).toContain('申請した人とは別のオーナー')
   })
 
   it('頭の CSV と脚注は空けて書く', async () => {
     await waitForRows()
-    expect(headerNode).not.toBeNull()
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    const headerRoot = createRoot(host)
-    await act(async () => { headerRoot.render(<>{headerNode}</>) })
-    expect(host.textContent ?? '').toContain('この頁の残高を CSV')
-    await act(async () => { headerRoot.unmount() })
-    host.remove()
+    expect(container.textContent ?? '').toContain('この頁の残高を CSV')
+    await act(async () => { (container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement).click() })
     expect(container.textContent ?? '').toContain('CSV はこのページの残高を書き出します')
   })
 })

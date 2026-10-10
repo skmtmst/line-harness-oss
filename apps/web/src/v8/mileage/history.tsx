@@ -359,7 +359,7 @@ export default function HistoryTab() {
                 }} data-row-id={item.id}
               >
                 <Td className={styles.colName}><FolderDotName>
-                  <span className={styles.rowName} title={viewName(item)}>{viewName(item)}</span>
+                  <span className={styles.rowName} title={`${viewName(item)}・${formatMileageShortDateTime(item.occurredAt)}`}>{viewName(item)}</span>
 
                 </FolderDotName></Td>
                 <Td className={`${styles.colDelta} ${styles.num}`}><span className={styles.cellMain}>{formatMileageChange(item.amount)}</span></Td>
