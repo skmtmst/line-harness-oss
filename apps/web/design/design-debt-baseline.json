@@ -89,9 +89,6 @@
   "app/contents/vars/page.tsx": {
     "arbitrary-value": 3
   },
-  "app/conversions/conversion-points-v8.tsx": {
-    "unresolved-classname": 2
-  },
   "app/conversions/new/page.tsx": {
     "unresolved-classname": 5
   },
