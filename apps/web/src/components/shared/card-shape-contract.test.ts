@@ -99,7 +99,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["app/affiliates/tabs.tsx", "className=\"rounded-card border-hairline bg-canvas border p-4\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/affiliates/tabs.tsx", "className=\"bg-canvas rounded-card border-hairline mt-3 flex flex-wrap items-center gap-3 border p-3\"", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["app/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
-  ["app/events/change-review/change-review-v8.tsx", "className=\"text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/events/new/events-new-v8.tsx", "className=\"bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/nen-members/photo-review-detail.tsx", "className=\"mt-4 rounded-card border border-hairline bg-canvas p-4\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/nen/health/summary-drawer.tsx", "className=\"rounded-card border border-hairline bg-canvas p-3\"", "数の帯のマス。B-153に従い線で区切る。"],
@@ -151,7 +150,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/staff/login-audit.tsx", "className=\"overflow-hidden rounded-card border border-hairline bg-canvas\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["components/staff/login-audit.tsx", "className=\"flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4\"", "数の帯のマス。B-153に従い線で区切る。"],
   ["components/templates/message-template-editor.tsx", "className=\"border-hairline rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
-  ["components/webinars/webinar-form.tsx", "className=\"group rounded-card border border-hairline bg-canvas-sunken/60\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/affiliates/attribution-view.tsx", "className=\"bg-canvas border-hairline mt-2 overflow-x-auto rounded-card border\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["v8/automations/branch-editor.tsx", "className=\"border-hairline bg-canvas-sunken mt-3 rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/contents/media-detail-dialog.tsx", "className=\"bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
@@ -187,7 +185,8 @@ describe('B-168 カードの角丸・枠・影', () => {
     const keys = EXCEPTIONS.map(([file, selector]) => key({ file, selector }))
     expect(new Set(keys).size).toBe(keys.length)
     expect(EXCEPTIONS.every(([file, selector, reason]) => file && selector && reason.length > 10)).toBe(true)
-    expect(keys.filter(entry => !found.has(entry)), '影を付けた規則や消した規則の例外は外してください').toEqual([])
+    const stale = keys.filter(entry => !found.has(entry))
+    expect(stale, `影を付けた規則や消した規則の例外は外してください: ${JSON.stringify(stale)}`).toEqual([])
   })
 
   it('globalsの変数の連鎖・V8の上書き・フォールバックを解く（循環では止まる）', () => {
