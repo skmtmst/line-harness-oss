@@ -137,7 +137,8 @@
 
   /* Pencilの状態バッジ。既存画面の状態色は移行時にこの語彙へ寄せる。 */
   --color-status-info: var(--color-focus-ring);
-  --color-status-info-soft: #e9f1ff;
+  --color-status-info-deep: #1d4ed8; /* §6.5-4 案内の文字は濃い青 */
+  --color-status-info-soft: #2563eb1a;
   --color-status-warn: #f5c56b;
   --color-status-warn-soft: #f973161a;
   --color-status-warn-deep: #c2410c;

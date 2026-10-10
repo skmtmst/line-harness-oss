@@ -56,7 +56,7 @@ function block(css: string, selector: string): string {
 describe('#669 カード頭の緑を整理する', () => {
   it('操作リンクはリンク色（action）、補足はニュートラル', () => {
     const css = withoutComments(read('card.module.css'))
-    expect(block(css, '.action')).toMatch(/color:\s*var\(--color-link\)/)
+    expect(block(css, '.action')).toMatch(/color:\s*var\(--color-action\)/)
     expect(block(css, '.action')).not.toMatch(/accent/)
     expect(block(css, '.meta')).toMatch(/color:\s*var\(--color-ink-secondary\)/)
     expect(block(css, '.meta')).not.toMatch(/accent|success/)
@@ -123,7 +123,7 @@ describe('#669 変えた組み合わせは AA（4.5:1）を満たす', () => {
     ['ink-secondary（カード頭補足）', 'ink-secondary', 'canvas'],
     ['success（成功の札・通知）', 'success', 'success-bg'],
     ['success（成功文・白地）', 'success', 'canvas'],
-    ['status-info（更新告知）', 'status-info', 'status-info-soft'],
+    ['status-info-deep（更新告知）', 'status-info-deep', 'status-info-soft'],
   ])('%s', (_label, text, surface) => {
     expect(contrast(token(text), token(surface))).toBeGreaterThanOrEqual(4.5)
   })
