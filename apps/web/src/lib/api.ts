@@ -8914,6 +8914,7 @@ export const api = {
   },
 
   accountSettings: {
+    getCustomerLook: (accountId: string) => fetchApi<{success: boolean; data: {version: number; look: import('@line-crm/shared').CustomerLook}; error?: string}>(`/api/account-settings/customer-look?accountId=${encodeURIComponent(accountId)}`),
     getAllergyOptions: (accountId: string) => fetchApi<{ success: boolean; data: {version: number; options: string[]}; error?: string }>(`/api/account-settings/allergy-options?accountId=${encodeURIComponent(accountId)}`),
     saveAllergyOptions: (accountId: string, options: string[], expectedVersion: number) => fetchApi<{success: boolean; data?: {version: number}; error?: string}>('/api/account-settings/allergy-options', { method: 'PUT', body: JSON.stringify({accountId, options, expectedVersion}) }),
     getTestRecipients: (accountId: string) =>

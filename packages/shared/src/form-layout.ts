@@ -299,7 +299,11 @@ export interface FormOptions {
   researchGate?: ResearchGate;
   /** 回答者に見せるフォームの色・書体・角丸。任意のCSSは保存しない。 */
   theme?: FormTheme;
+  customerDesign?: {mode: 'account' | 'fixed'; preset: CustomerDesignPreset};
 }
+
+export const CUSTOMER_DESIGN_IDS = ['natural', 'modern', 'gentle', 'night', 'line', 'custom'] as const;
+export type CustomerDesignPreset = typeof CUSTOMER_DESIGN_IDS[number];
 
 export type FormFontFamily = "sans" | "serif";
 export type FormCornerRadius = "none" | "medium" | "round";
@@ -1272,6 +1276,8 @@ export function formBlockTypeError(input: unknown): string | null {
 }
 
 export function validateFormDefinition(layout: FormLayout): string | null {
+  const design = layout.options.customerDesign;
+  if (design !== undefined && (!design || !['account','fixed'].includes(design.mode) || !CUSTOMER_DESIGN_IDS.includes(design.preset))) return 'デザインの型を選び直してください';
   const typeError = formBlockTypeError(layout);
   if (typeError) return typeError;
   const seenNames = new Set<string>();
@@ -1596,7 +1602,7 @@ export function validateFormForPublish(layout: FormLayout): string | null {
     validateFormBranchGraph(layout) ??
     validateFormDefaultValues(layout) ??
     validateFormBookingReady(layout) ??
-    formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+    (layout.options.customerDesign && (layout.options.customerDesign.mode === 'account' || layout.options.customerDesign.preset !== 'custom') ? null : formThemeContrastError(normalizeFormTheme(layout.options?.theme)))
   );
 }
 

@@ -1,0 +1,8 @@
+@layer components {
+/* B236-4b/HQ-6b2 の3列、B237-5a の2列。色見本は採用板の16px。 */
+.two, .three { gap: var(--tpl-fe-chip-gap); }
+.two { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.three { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.swatches { --customer-swatch-size: 16px; display: flex; gap: var(--tpl-fdt-row-text-gap); }
+.swatches span { width: var(--customer-swatch-size); height: var(--customer-swatch-size); border-radius: var(--radius-pill); border: 1px solid var(--color-hairline); }
+}

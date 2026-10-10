@@ -11,10 +11,17 @@ import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { saveVersionedAccountSetting } from '@line-crm/db';
+import {accountCustomerLook} from '../services/customer-look.js';
 import { validateAllergyValues } from '@line-crm/shared';
 import { ALLERGY_OPTIONS_KEY, accountAllergyOptions } from '../services/allergy-options.js';
 
 const accountSettings = new Hono<Env>();
+accountSettings.get('/api/account-settings/customer-look',requireRole('owner','admin','staff'),async c=>{
+ const accountId=c.req.query('accountId');
+ if (!accountId) return c.json({success:false,error:'店を選んでください'},400);
+ if (!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[accountId])) return c.json({success:false,error:'権限がありません'},403);
+ return c.json({success:true,data:await accountCustomerLook(c.env.DB,accountId)});
+});
 const MAX_TEST_RECIPIENTS = 90;
 
 accountSettings.get('/api/account-settings/allergy-options', requireRole('owner','admin','staff'), async c => {

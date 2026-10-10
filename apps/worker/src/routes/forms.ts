@@ -4,6 +4,8 @@ import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import { formAvailability } from '../services/form-availability.js';
 import { applyAccountAllergyOptions } from '../services/allergy-options.js';
+import { accountCustomerLook } from '../services/customer-look.js';
+import { resolveCustomerFormTheme } from '@line-crm/shared';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -960,6 +962,10 @@ forms.get('/api/forms/:id', async (c) => {
       if (accounts.length === 1) publicAccountId = accounts[0];
     }
     if (publicAccountId) layout = await applyAccountAllergyOptions(c.env.DB, publicAccountId, layout);
+    if (!adminView) {
+      const look = publicAccountId ? (await accountCustomerLook(c.env.DB, publicAccountId)).look : undefined;
+      layout = {...layout, options: {...layout.options, theme: resolveCustomerFormTheme(layout.options, look)}};
+    }
     const data = adminView
       ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
       : { ...serializePublicForm(form, layout), availability: await formAvailability({
@@ -1123,9 +1129,9 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
     }
     // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは作れない。
     if (normalized && !('error' in normalized) && normalized.layout) {
-      const createdLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
+      const createdLayout = JSON.parse(normalized.layout) as FormLayout;
       const createContrastError = formThemeContrastError(
-        normalizeFormTheme(createdLayout.options?.theme),
+        resolveCustomerFormTheme(createdLayout.options),
       );
       if (createContrastError) {
         return inputError(c, { success: false, error: createContrastError }, 422, ["layout"]);
@@ -1354,9 +1360,9 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
         return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
       }
       // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
-      const savedLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
+      const savedLayout = JSON.parse(normalized.layout) as FormLayout;
       const contrastError = formThemeContrastError(
-        normalizeFormTheme(savedLayout.options?.theme),
+        resolveCustomerFormTheme(savedLayout.options),
       );
       if (contrastError) {
         return inputError(c, { success: false, error: contrastError }, 422, ["layout"]);
