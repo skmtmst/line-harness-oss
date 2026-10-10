@@ -48,6 +48,14 @@ function isCoveredRoute(method: string, path: string): boolean {
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
     '/api/restaurant-test/closures/:id/contact-status', '/api/restaurant-test/close-notification-settings',
     '/api/restaurant-test/opening-hours', '/api/restaurant-test/reservation-link',
+    '/api/restaurant-test/followups/:storeId',
+    '/api/restaurant-test/followups/:storeId/review-history',
+    '/api/restaurant-test/followups/:storeId/bindings/:stepId',
+    '/api/restaurant-test/followups/:storeId/request-start',
+    '/api/restaurant-test/followups/:storeId/stop',
+    '/api/restaurant-test/reservations/:id',
+    '/api/restaurant-test/reservations/:id/confirmations',
+
   ].includes(path)) return false;
   if (path.startsWith('/api/internal')) return false;
   if (path.startsWith('/admin/update')) return false;
@@ -138,6 +146,18 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/account-settings/customer-look',
   'PUT /api/account-settings/customer-look',
   'GET /api/liff/customer-look',
+  'PATCH /api/restaurant-test/reservations/{id}',
+  'GET /api/restaurant-test/followups/{storeId}',
+  'GET /api/restaurant-test/followups/{storeId}/review-history',
+  'POST /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
+  'PATCH /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
+  'DELETE /api/restaurant-test/followups/{storeId}/bindings/{stepId}',
+  'POST /api/restaurant-test/followups/{storeId}/request-start',
+  'POST /api/restaurant-test/followups/{storeId}/stop',
+  'GET /api/restaurant-test/reservations/{id}',
+  'GET /api/restaurant-test/reservations/{id}/confirmations',
+  'POST /api/liff/restaurant/confirmations/{requestId}/respond',
+
   'GET /api/traffic-pools/{id}',
   'PUT /api/traffic-pools/{id}',
   'DELETE /api/visit-stamps/staff-qr/{id}',

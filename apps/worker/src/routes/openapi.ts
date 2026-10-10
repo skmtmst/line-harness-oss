@@ -1,3 +1,4 @@
+import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
 import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
 import { formDocumentPaths } from './form-documents-openapi.js';
@@ -418,6 +419,7 @@ const spec = {
     '/api/liff/customer-look': {get:{tags:['LIFF'],summary:'保存済みのお客さまのデザイン（予約機能に依存しない）',security:[],parameters:[{name:'liffId',in:'query',required:true,schema:{type:'string'}}],responses:{'200':{description:'保存した版・型・公開用の色と書体'},'400':{description:'LIFF IDなし'},'404':{description:'不明なLIFF ID'}}}},
     ...pagesParityPaths,
     ...reservationBoardPaths,
+    ...restaurantFollowupPaths,
     ...folderUpgradePaths,
     ...archiveRestorePaths,
     ...formDocumentPaths,

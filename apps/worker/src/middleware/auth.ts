@@ -469,6 +469,9 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 ];
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  // 飲食3：担当者はフォロー・返事・登録情報を読む。開始・編集は管理者だけ。
+  ['GET', /^\/api\/restaurant-test\/followups\/[^/]+(?:\/review-history)?$/],
+  ['GET', /^\/api\/restaurant-test\/reservations\/[^/]+(?:\/confirmations)?$/],
   ['GET', /^\/api\/restaurant-test\/external-links\/[^/]+$/],
   ['PATCH', /^\/api\/restaurant-test\/external-links\/[^/]+$/],
   ['DELETE', /^\/api\/restaurant-test\/external-links\/[^/]+$/],

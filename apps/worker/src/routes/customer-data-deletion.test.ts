@@ -116,10 +116,25 @@ describe('B-215 private data deletion', () => {
     expect(response.status).toBe(200);
     expect(sqlite.raw.prepare('SELECT friend_id FROM rt_reservation_events').all()).toEqual([{ friend_id: 'v' }]);
     expect(sqlite.raw.prepare('SELECT event_id FROM rt_reservation_event_receipts').all()).toEqual([
-      { event_id: 'event-v' }, { event_id: 'event-v' },
+      { event_id: 'event-v' }, { event_id: 'event-v' }, { event_id: 'event-v' },
     ]);
     expect(sqlite.raw.prepare('SELECT id FROM visit_stamp_qr_codes ORDER BY id').all()).toEqual([{ id: 'qr-v' }, { id: 'storefront' }]);
     expect(count('visit_stamp_entries')).toBe(2);
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+  it('deletes restaurant confirmations and source jobs only for the target friend',async()=>{
+    sqlite.raw.exec(`INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES('org','a','Restaurant','t');
+      INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','Store','S','a');
+      INSERT INTO scenario_versions(id,scenario_id,version_number,published_at,created_at,updated_at) VALUES('version','restaurant-followup:store',1,'now','now','now');`);
+    for(const friend of ['u','v']){
+      sqlite.raw.prepare("INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status) VALUES(?,'store','phone','人',2,'2027-01-01T00:00:00Z','2027-01-01T01:00:00Z','pending')").run('r-'+friend);
+      sqlite.raw.prepare("INSERT INTO rt_reservation_confirmations(request_id,reservation_id,reservation_version,friend_id,requested_at,expires_at) VALUES(?,?,1,?,'now','later')").run('c-'+friend,'r-'+friend,friend);
+      sqlite.raw.prepare("INSERT INTO scenario_source_jobs(id,line_account_id,friend_id,scenario_version_id,step_id,source_kind,source_id,source_event_id,source_version,scheduled_at,idempotency_key) VALUES(?,'a',?,'version','step','restaurant_reservation',?,'event',1,'now',?)").run('j-'+friend,friend,'r-'+friend,'key-'+friend);
+    }
+    expect((await app().request(friendUrl,{method:'DELETE',headers:headers('delete-friend-data')},env())).status).toBe(200);
+    expect(sqlite.raw.prepare('SELECT friend_id FROM rt_reservation_confirmations').all()).toEqual([{friend_id:'v'}]);
+    expect(sqlite.raw.prepare('SELECT friend_id FROM scenario_source_jobs').all()).toEqual([{friend_id:'v'}]);
+    expect(count('rt_store_followup_templates')).toBe(1);expect(count('scenario_versions')).toBe(1);
     expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
   });
   it('keeps database parents and keys after partial R2 failure, denies content and retries', async () => {

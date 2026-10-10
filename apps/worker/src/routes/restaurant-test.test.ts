@@ -1,3 +1,5 @@
+import { publishScenarioVersion } from '@line-crm/db';
+import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -196,6 +198,13 @@ describe('電話予約のLINE確認通知', () => {
     testDb.raw.prepare('INSERT INTO friends (id, line_user_id, line_account_id, is_following) VALUES (?, ?, ?, ?)')
       .run('friend-fixture', body.lineUid, accountId, following);
   }
+  async function approveFollowup(){
+    testDb.raw.prepare("UPDATE scenario_steps SET message_content=? WHERE scenario_id='restaurant-followup:store-ginza' AND step_order=0").run('予約が確定しました。\n店舗: {{var.store_name}}\n日時: {{var.reservation_datetime}}〜{{var.reservation_end}}\n人数: {{var.guest_count}}名\nコース: {{var.course_name}}');
+    await publishScenarioVersion(testDb.db,'restaurant-followup:store-ginza',{staffId:'owner',idempotencyKey:crypto.randomUUID()});
+    const t=testDb.raw.prepare("SELECT template_version FROM rt_store_followup_templates WHERE store_id='store-ginza'").get() as {template_version:number};
+    const a=await requestRestaurantFollowupApproval(testDb.db,'store-ginza',t.template_version,'owner');expect(a).not.toBeNull();
+    testDb.raw.prepare("UPDATE rt_approval_requests SET status='approved',reviewed_by='owner' WHERE id=?").run(a!.id);
+  }
   async function notice(input: unknown = body) {
     const res = await request(path, input);
     expect(res.status).toBe(201);
@@ -204,10 +213,12 @@ describe('電話予約のLINE確認通知', () => {
     expect(testDb.raw.prepare('SELECT id FROM rt_reservations WHERE id = ?').get(result.data.id)).toBeDefined();
     return result.data;
   }
+  it('未承認は送信0で予約を保存する',async()=>{seedFriend();expect((await notice()).lineNotice).toEqual({sent:false,reason:'approval_required'});expect(fetch).not.toHaveBeenCalled();});
   it('確認LINEに店舗・日時・人数・コースを載せ、自動通知として履歴を残す', async () => {
     seedFriend();
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
+    await approveFollowup();
     const result = await notice({ ...body, courseId: 'menu-ginza' });
     expect(result.lineNotice).toEqual({ sent: true, reason: null });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -215,7 +226,8 @@ describe('電話予約のLINE確認通知', () => {
     expect(url).toBe('https://api.line.me/v2/bot/message/push');
     const headers = new Headers(init.headers);
     expect(headers.has('X-Line-Harness-Source')).toBe(false);
-    expect(headers.get('X-Line-Retry-Key')).toBe(result.id);
+    const job=testDb.raw.prepare("SELECT idempotency_key FROM scenario_source_jobs WHERE source_id=? AND status='sent'").get(result.id) as {idempotency_key:string};
+    expect(headers.get('X-Line-Retry-Key')).toBe(job.idempotency_key);
     expect(JSON.parse(init.body as string)).toMatchObject({ to: body.lineUid,
       messages: [{ type: 'text', text: expect.stringContaining('予約が確定しました。') }] });
     expect(JSON.parse(init.body as string).messages[0].text).toContain('テストコース');
@@ -230,6 +242,7 @@ describe('電話予約のLINE確認通知', () => {
     testDb.raw.prepare("UPDATE rt_stores SET timezone = 'Asia/Bangkok' WHERE id = 'store-ginza'").run();
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
+    await approveFollowup();
     expect((await notice({ ...body, guestCount: 3, startsAt: '2026-11-10T16:00:00.000Z', endsAt: '2026-11-10T18:00:00.000Z' })).lineNotice.sent).toBe(true);
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const text = JSON.parse(init.body as string).messages[0].text;
@@ -263,6 +276,7 @@ describe('電話予約のLINE確認通知', () => {
   it('送信失敗でも予約と在庫を保存し、例外の本文は返さない', async () => {
     seedFriend();
     vi.stubGlobal('fetch', vi.fn(async () => new Response('試験用の非公開本文', { status: 500 })));
+    await approveFollowup();
     const result = await notice();
     expect(result.lineNotice).toEqual({ sent: false, reason: 'send_failed' });
     expect(JSON.stringify(result)).not.toContain('非公開本文');
@@ -1737,5 +1751,44 @@ describe('飲食1 共通盤と予約の版',()=>{
   expect((await requestWithMethod(url,'PUT',body,'reader-key')).status).toBe(403);
   authMocks.getStaffByApiKey.mockResolvedValue(null);
   expect((await requestWithMethod(url,'PUT',{...body,storeId:'wrong'})).status).toBe(404);
+ });
+});
+
+describe('飲食3・共通フォローのHTTP境界',()=>{
+ const path='/api/restaurant-test/followups/store-ginza';
+ const scope='?account_id=account-1';
+ const version=()=> (testDb.raw.prepare("SELECT template_version FROM rt_store_followup_templates WHERE store_id='store-ginza'").get() as {template_version:number}).template_version;
+ it('公開前の開始と古い版を拒否し、共通の行の追加・解除は停止にする',async()=>{
+  seedRestaurantFixture();
+  expect((await request(path+'/request-start'+scope,{expectedVersion:version()})).status).toBe(409);
+  const step='custom-review';
+  testDb.raw.prepare("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content) VALUES(?,'restaurant-followup:store-ginza',6,'text','同じ口コミの案内')").run(step);
+  const before=version();
+  const binding={expectedVersion:before,trigger:'review_request',offsetMinutes:181,enabled:true};
+  expect((await requestWithMethod(path+'/bindings/'+step+scope,'POST',binding)).status).toBe(200);
+  expect((await requestWithMethod(path+'/bindings/'+step+scope,'PATCH',binding)).status).toBe(409);
+  expect((await requestWithMethod(path+'/bindings/'+step+scope,'DELETE',{expectedVersion:version(),trigger:'review_request'})).status).toBe(200);
+  expect(testDb.raw.prepare("SELECT sending_status FROM rt_store_followup_templates WHERE store_id='store-ginza'").get()).toEqual({sending_status:'stopped'});
+ });
+ it('別店の行を結ばず、所属店の外は読めず、閲覧のみは開始・停止・編集できない',async()=>{
+  seedRestaurantFixture();
+  const body={expectedVersion:version(),trigger:'post_visit',offsetMinutes:180,enabled:true};
+  expect((await requestWithMethod(path+'/bindings/restaurant-followup:store-yokohama:post_visit'+scope,'POST',body)).status).toBe(409);
+  testDb.raw.exec("INSERT INTO staff_members(id,name,role,api_key,account_scope) VALUES('viewer','閲覧','staff','viewer-test-key','accounts');INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('viewer','account-2',datetime('now'))");
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'viewer',name:'閲覧',role:'staff',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:'account-2',can_access_descendant_accounts:0});
+  expect((await requestAs(path+'?account_id=account-2','viewer-key')).status).toBe(200);
+  expect((await requestAs('/api/restaurant-test/followups/store-yokohama?account_id=account-2','viewer-key')).status).toBe(404);
+  for(const suffix of ['/request-start','/stop'])expect((await requestAs(path+suffix+'?account_id=account-2','viewer-key',{expectedVersion:version()})).status).toBe(403);
+  expect((await requestWithMethod(path+'/bindings/restaurant-followup:store-ginza:post_visit?account_id=account-2','PATCH',body,'viewer-key')).status).toBe(403);
+ });
+ it('共通編集で行を削除でき、登録されたアレルゲンと口コミ依頼の区別を返す',async()=>{
+  seedRestaurantFixture();
+  testDb.raw.prepare("DELETE FROM scenario_steps WHERE id='restaurant-followup:store-ginza:post_visit'").run();
+  expect(testDb.raw.prepare("SELECT COUNT(*) n FROM rt_store_followup_step_bindings WHERE store_id='store-ginza' AND trigger='post_visit'").get()).toEqual({n:0});
+  testDb.raw.prepare("UPDATE rt_reservations SET dining_snapshot_json=? WHERE id='reservation-ginza'").run(JSON.stringify({courseAllergens:['乳','小麦'],capturedAt:'2026-08-25T08:00:00Z'}));
+  const detail=await request('/api/restaurant-test/reservations/reservation-ginza'+scope);expect(detail.status).toBe(200);
+  expect((await detail.json() as {data:unknown}).data).toMatchObject({courseAllergens:['乳','小麦'],allergensSource:'registered_at_booking'});
+  const history=await request(path+'/review-history'+scope);expect(history.status).toBe(200);
+  expect((await history.json() as {data:unknown}).data).toMatchObject({reviewSelection:'all_customers',origin:'line_invitation',verifiedGoogleReviewAttributions:[]});
  });
 });

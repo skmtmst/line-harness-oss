@@ -1,3 +1,6 @@
+import { respondToRestaurantConfirmation, type RestaurantConfirmationResponse } from '../services/restaurant-confirmations.js';
+import { processRestaurantEvents } from '../services/restaurant-events.js';
+import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
@@ -110,6 +113,8 @@ async function finish(c: Context<Env>, store: CustomerStore) {
   try {
     await reconcileRestaurantInventory(c.env, store.id);
     await processBookingWaitlists(c.env, store.line_account_id);
+    await processRestaurantEvents(c.env, store.id);
+    await processScenarioSourceJobs(c.env);
     await processRestaurantCustomerNotices(c.env, store.id);
   } catch {
     console.error(
@@ -449,3 +454,16 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
     },
   );
 }
+
+restaurantCustomerBooking.post('/api/liff/restaurant/confirmations/:requestId/respond',inputJsonBoundary(),async c=>{
+ const self=await identity(c);if(self instanceof Response)return self;
+ const b=await c.req.json<{expectedVersion?:number;response?:RestaurantConfirmationResponse}>().catch(()=>null);
+ if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['going','change_requested','cancel'].includes(b.response??''))return inputError(c,{success:false,error:'invalid_confirmation_response'},400,['expectedVersion','response']);
+ const db=dbFor(c.env);const f=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_user_id=? AND is_following=1').bind(self.accountId,self.uid).first<{id:string}>();
+ if(!f)return c.json({success:false,error:'not_found'},404);
+ const result=await respondToRestaurantConfirmation(db,{requestId:c.req.param('requestId'),friendId:f.id,accountId:self.accountId,expectedVersion:b.expectedVersion!,response:b.response!});
+ if(!result.ok)return c.json({success:false,error:result.error},result.status);
+ const target=await db.prepare('SELECT r.store_id FROM rt_reservation_confirmations c JOIN rt_reservations r ON r.id=c.reservation_id WHERE c.request_id=?').bind(c.req.param('requestId')).first<{store_id:string}>();
+ if(target){const store=await storeFor(c,self.accountId,target.store_id);if(store)await finish(c,store);}
+ return c.json({success:true,data:result});
+});
