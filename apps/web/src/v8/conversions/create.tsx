@@ -55,6 +55,7 @@ import styles from './create.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /* 数えるきっかけ6種（今の作る画面と同じ中身）。 */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'
@@ -526,7 +527,7 @@ function ConversionCreate() {
       )}
     </>
   ) : (
-    <Button href="/conversions?tab=points">一覧へ戻る</Button>
+    <Button href="/conversions?tab=points">キャンセル</Button>
   )
 
   /* 帯は共通部品（save-conflict）に寄せた。名前の重なりと先の保存で題を言い分ける。 */
@@ -555,7 +556,7 @@ function ConversionCreate() {
       footerActions={footerActions} dirty={false}
     >
       {viewerOnly ? (
-        <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       {savedNotice ? <Notice tone="success">{savedNotice}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}

@@ -25,6 +25,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
@@ -301,7 +302,7 @@ export default function WebhooksInteractionsV8() {
 
   let listBody
   if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (loading && data.items.length === 0) {
     listBody = (
       <div aria-busy="true" aria-label="やり取りの記録を読み込んでいます">

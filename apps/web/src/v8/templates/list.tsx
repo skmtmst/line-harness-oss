@@ -15,31 +15,7 @@ import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/comp
 import { runOptimistic } from '@/lib/undoable'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Bookmark,
-  Braces,
-  ClipboardList,
-  Copy,
-  Eye,
-  FileText,
-  Folder as FolderIcon,
-  GalleryHorizontalEnd,
-  HelpCircle,
-  Image as ImageIcon,
-  Layers,
-  Link2,
-  List,
-  Mail,
-  MessageSquare,
-  Plus,
-  Send,
-  SquareArrowOutUpRight,
-  Ticket,
-  Trash2,
-  TriangleAlert,
-  Unlink,
-  Video,
-} from 'lucide-react'
+import { Bookmark, Braces, ClipboardList, Copy, FileText, Folder as FolderIcon, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Layers, Link2, List, Mail, MessageSquare, Plus, Send, SquareArrowOutUpRight, Ticket, Trash2, Unlink, Video } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import { clampSearchQuery } from '@/lib/search-query'
@@ -48,7 +24,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import { contentExcerpt } from '@/lib/broadcast-summary'
 import { ListPage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
@@ -98,6 +74,9 @@ import { formatDate as polishFormatDate, formatListDateTime as polishFormatListD
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | 'rich_video' | BroadcastAssetKind
@@ -1048,31 +1027,13 @@ export default function TemplatesListV8() {
       ))}
     </div>
   ) : !selectedAccountId ? (
-    <div className={styles.stateCard}>
-      <span className={styles.stateIcon}>
-        <FileText size={18} aria-hidden="true" />
-      </span>
-      <p className={styles.stateTitle}>
-        {accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}
-      </p>
-    </div>
+    <AccountRequiredState hasAccounts={accounts.length > 0}   icon={<FileText size={18} aria-hidden="true" />} />
   ) : view === 'forbidden' || view === 'error' ? (
-    <div className={styles.stateCard} data-design-node="susGP">
-      <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-        <TriangleAlert size={18} aria-hidden="true" />
-      </span>
-      <p className={styles.stateTitle}>
-        {view === 'forbidden' ? (failure?.title ?? '見る権限がありません') : 'テンプレートを読み込めませんでした'}
-      </p>
-      <p className={styles.stateDesc}>
-        {view === 'forbidden'
+    <ListState kind="error" title={view === 'forbidden' ? (failure?.title ?? '見る権限がありません') : 'テンプレートを読み込めませんでした'} description={view === 'forbidden'
           ? (failure?.description ?? '')
-          : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
-      </p>
-      {view === 'error' && (
+          : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'} data-design-node="susGP" action={<>{view === 'error' && (
         <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-      )}
-    </div>
+      )}</>} />
   ) : filteredTemplates.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -1278,10 +1239,7 @@ export default function TemplatesListV8() {
   const tabs = (
     <>
       {!canMutateTemplates ? (
-        <div className={styles.viewerBand} role="status" data-design-node="hEDTK">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="hEDTK"></ReadOnlyNotice></div>
       ) : null}
       <div className={styles.tabsBox}>
       <Tabs

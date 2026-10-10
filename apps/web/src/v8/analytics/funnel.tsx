@@ -1,6 +1,6 @@
 'use client'
 
-import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+import { FunnelChart } from '@/components/shared/charts'
 
 /*
  * ★V8 分析「ファネル」（Pencil `DkRDE`）。
@@ -30,6 +30,7 @@ import { useReportPeriod } from '@/components/shared/period-picker'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 type FunnelStatus = 'active' | 'stopped' | 'archived'
 type FunnelSummary = { id: string; name: string; windowDays: number; createdAt: string; status: FunnelStatus; currentVersion: { id: string; versionNumber: number; createdAt: string } | null; migrationState: 'ready' | 'needs_migration' }
@@ -316,7 +317,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
             {canManage ? <Button variant="secondary" onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />ファネルを作る</Button> : null}
             <Button variant="secondary" disabled={running} onClick={() => setRunReload((n) => n + 1)}><RefreshCw size={15} aria-hidden="true" />最新の結果をもう一度読む</Button>
           </div>
-          {runError ? <p className={styles.inlineError} role="alert">{runError}</p> : null}
+          {runError ? <Notice tone="danger" >{runError}</Notice> : null}
           {noRun && !run ? <p className={styles.caption}>{`まだ集計がありません。下の「定義の操作と集計の詳細」から「この${funnelDays}日を再集計」を押してください`}</p> : null}
           {usageNotice ? <p className={styles.warnText} role="status">{usageNotice}</p> : null}
           {run && !measurable ? <p className={styles.warnText} role="status">{`${STATE_LABELS[run.state]}のため、この結果は判定不能です。人数や割合は実測値ではありません。${run.stateReason ? ` ${run.stateReason}` : ''}`}</p> : null}

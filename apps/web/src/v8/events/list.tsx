@@ -12,7 +12,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bookmark, CalendarClock, CalendarX, Eye, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
+import { Bookmark, CalendarClock, CalendarX, Hourglass, Plus, TrendingDown, TriangleAlert, Users } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListSummary } from '@/lib/api'
 import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
@@ -48,14 +48,17 @@ import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention,
 import { jstDay, jstTime } from './shared'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類を表す印。裏側（events.ts）が `__ungrouped__` で受ける。 */
 const UNFILED = '__ungrouped__'
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 const VIEWER_NOTE = '閲覧のみで見ています。イベントを作る・直す・消す操作はオーナーか管理者に頼んでください。'
 
 /*
@@ -430,12 +433,7 @@ export default function EventsListV8() {
   )
 
   const stateCard = (icon: ReactNode, title: string, desc: string, action?: ReactNode, error = false) => (
-    <div className={styles.stateCard}>
-      <span className={styles.stateIcon} data-tone={error ? 'error' : undefined}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={error ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={<>{action}</>} />
   )
 
   let listBody: ReactNode
@@ -643,10 +641,7 @@ export default function EventsListV8() {
       title="イベント予約"
 
       tabs={!canEdit ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>{VIEWER_NOTE}</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
       ) : undefined}
       stats={(
         <KpiBand data-design="KPIs">

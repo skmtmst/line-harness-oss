@@ -20,17 +20,6 @@
   padding: var(--tpl-hb2-content-pad);
 }
 
-.roBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-hb2-op-chip-gap);
-  padding: var(--tpl-hb2-op-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-}
-
 .cardNote {
   margin: 0;
   color: var(--color-ink-faint);
@@ -315,3 +304,6 @@
   border-color: var(--color-danger);
   outline-color: var(--color-danger);
 }
+
+/* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
+.roBand { }

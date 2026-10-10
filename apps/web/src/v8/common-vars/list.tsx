@@ -20,25 +20,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Archive,
-  ArrowRight,
-  ArrowUpDown,
-  Braces,
-  CalendarClock,
-  CalendarX,
-  Check,
-  CircleDashed,
-  Copy,
-  Eye,
-  FolderCog,
-  Link2,
-  Lock,
-  Pause,
-  Plus,
-  TriangleAlert,
-  X,
-} from 'lucide-react'
+import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert, X } from 'lucide-react'
 import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
 import {
   api,
@@ -100,6 +82,9 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -1122,27 +1107,12 @@ function CommonVarsListInner() {
         ))}
     </div>
   ) : !selectedAccountId ? (
-    <div className={styles.stateCard}>
-      <span className={styles.stateIcon}><Braces size={18} aria-hidden="true" /></span>
-      <p className={styles.stateTitle}>LINEアカウントを選択してください</p>
-      <p className={styles.stateDesc}>共通情報はLINEアカウントごとに管理します。</p>
-    </div>
+    <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。"  icon={<Braces size={18} aria-hidden="true" />} />
   ) : listFailed ? (
     isForbidden(listFailure) ? (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><Lock size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>共通情報を見る権限がありません</p>
-        <p className={styles.stateDesc}>オーナーか管理者に、共通情報を見られるよう頼んでください。</p>
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-        <Button href="/staff" variant="secondary">できることを確かめる</Button>
-      </div>
+      <ListState kind="error" title="共通情報を見る権限がありません" description="オーナーか管理者に、共通情報を見られるよう頼んでください。"  action={<><Button type="button" onClick={() => void load()}>もう一度読み込む</Button><Button href="/staff" variant="secondary">できることを確かめる</Button></>} />
     ) : (
-      <div className={styles.stateCard} data-design-node="RqO7O">
-        <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>共通情報を読み込めませんでした</p>
-        <p className={styles.stateDesc}>{error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'}</p>
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="共通情報を読み込めませんでした" description={error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'} data-design-node="RqO7O" action={<><Button type="button" onClick={() => void load()}>もう一度読み込む</Button></>} />
     )
   ) : filtered.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
@@ -1516,9 +1486,7 @@ function CommonVarsListInner() {
             {deletePhase === 'loading' ? (
               <p className={styles.dialogLead}>使われている場所を確認しています…</p>
             ) : deletePhase === 'error' ? (
-              <p className={styles.dialogError} role="alert">
-                使用先を確認できませんでした。読み直してから、もう一度お試しください。
-              </p>
+              <Notice tone="danger" >使用先を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
             ) : deleteImpact ? (
               <>
                 {deleteImpact.canDelete ? (
@@ -1809,7 +1777,7 @@ function CommonVarsListInner() {
                       : (statusAction === 'stop' ? '止める' : '再開する')}
                   </Button>
                 </div>
-                {statusError ? <p className={styles.dialogError} role="alert">{statusError}</p> : null}
+                {statusError ? <Notice tone="danger" >{statusError}</Notice> : null}
               </>
             ) : null}
           </div>
@@ -1833,10 +1801,7 @@ function CommonVarsListInner() {
       }
       tabs={canWrite ? undefined : (
         /* 閲覧のみの帯（`OxSw8`）。数の帯の上。 */
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
       stats={
         <KpiBand data-design="KPIs" aria-label="共通情報の集計" className={styles.kpiStrip}>

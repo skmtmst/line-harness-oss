@@ -1,4 +1,6 @@
 'use client'
+
+import { RowMenu } from '@/components/shared/row-actions'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 
@@ -27,30 +29,7 @@ import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'reac
 import { useListScrollMemory, useListUrlParam, useListUrlValue } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Activity,
-  AlertCircle,
-  ArrowRight,
-  Bell,
-  Calendar,
-  CalendarClock,
-  FilePen,
-  CircleCheck,
-  Copy,
-  Eye,
-  Folder as FolderIcon,
-  FolderInput,
-  MoreHorizontal,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-  Send,
-  Square,
-  Trash2,
-  TriangleAlert,
-  Users,
-} from 'lucide-react'
+import { Activity, AlertCircle, ArrowRight, Bell, Calendar, CalendarClock, FilePen, CircleCheck, Copy, Folder as FolderIcon, FolderInput, Pause, Pencil, Play, Plus, Send, Square, Trash2, TriangleAlert, Users } from 'lucide-react'
 import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared'
 import { api, fetchApi, type ListStats } from '@/lib/api'
 import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list'
@@ -69,7 +48,7 @@ import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
@@ -80,7 +59,7 @@ import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shar
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { runUndoable, runOptimistic } from '@/lib/undoable'
 import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import { completeReorder } from '@/lib/complete-reorder'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import { formatTriggerOffset } from './reminder-timing'
@@ -88,6 +67,7 @@ import styles from './list-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -966,25 +946,14 @@ export default function RemindersListV8() {
                         label={`リマインダ「${row.name}」の操作`}
                         items={rowContextItems(row)}
                       >
-                        <button
-                          type="button"
-                          className={styles.menuButton}
-                          title={`リマインダ「${row.name}」の操作`}
-                          aria-label={`リマインダ「${row.name}」の操作`}
-                          aria-haspopup="menu"
-                          onClick={() =>
-                            setOpenMenuId((current) => (current === row.id ? null : row.id))
-                          }
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </button>
+                        <RowMenu
+                          label={`リマインダ「${row.name}」の操作`}
+                          items={rowMenuItems(row)}
+                          size="row"
+                          open={openMenuId === row.id}
+                          onOpenChange={(open) => setOpenMenuId(open ? row.id : null)}
+                        />
                       </ContextMenu>
-                      <ActionMenu
-                        open={openMenuId === row.id}
-                        onClose={() => setOpenMenuId(null)}
-                        ariaLabel={`リマインダ「${row.name}」の操作`}
-                        items={rowMenuItems(row)}
-                      />
                       </div>
                     </Td>
                   </Tr>
@@ -1149,10 +1118,7 @@ export default function RemindersListV8() {
 
       {/* 見るだけの人への帯（`a5C1p`）。押せない操作は置かずに隠す（2026-10-06 オーナー決定）。 */}
       {role !== null && !canEdit && (
-        <p className={styles.viewerBand} role="status" data-design-node="a5C1p">
-          <Eye size={16} aria-hidden="true" />
-          閲覧のみで見ています。{permissionDeniedMessage('store')}
-        </p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="a5C1p">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
       )}
 
       {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}

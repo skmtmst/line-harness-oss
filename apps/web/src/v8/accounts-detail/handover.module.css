@@ -141,11 +141,7 @@
   line-height: var(--tpl-acd-note-lh);
   white-space: pre-line;
 }
-.error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--tpl-acd-value-size);
-}
+
 
 /* 下の行：未判断の数・引き継ぎをやめる・本実行する。 */
 .bottomNote {

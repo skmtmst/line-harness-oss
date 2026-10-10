@@ -10,7 +10,7 @@
  * 絵に無い説明（種別の違い・作成後に変えられないもの）は板の頭の「？」へ入れた。
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+
 import { AlignLeft, Calendar, Check, CircleDot, Hash, ListChecks, Star, Type } from 'lucide-react'
 import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -255,7 +255,7 @@ export default function FieldEditor({
     setOptions(next)
   }
 
-  const back = <Link href={backHref} className={styles.backLink}>← 友だち情報欄へ</Link>
+  const back = null
   const help = (
     <>
       <AttributeKindGuide current="field" />

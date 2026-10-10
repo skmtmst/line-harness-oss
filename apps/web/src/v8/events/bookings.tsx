@@ -28,6 +28,7 @@ import { jstShort } from './shared'
 import styles from './bookings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 type ChipTone = 'warning' | 'success' | 'info' | 'neutral' | 'danger'
@@ -437,7 +438,7 @@ function Bookings({ eventId }: { eventId: string }) {
           action={<Button onClick={() => void refreshEvent()}>開き直す</Button>}
         />
       ) : null}
-      {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
+      {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
       {/* 数の帯。絵（Mu8qW）は4枚のカードなので、共通の KpiCard をカードの見せ方で並べる。 */}
       <div className={styles.kpis} data-design="KPIs">
@@ -637,7 +638,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 送る
               </Button>
             </div></Field></div>
-          {broadcastError ? <p className={styles.error} role="alert">{broadcastError}</p> : null}
+          {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}
         </section>
       ) : null}
       </div>

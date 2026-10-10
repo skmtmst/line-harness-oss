@@ -22,27 +22,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowDown,
-  ArrowUp,
-  BarChart3,
-  Check,
-  CircleAlert,
-  CircleCheck,
-  Copy,
-  Eye,
-  FilePlus2,
-  GitBranch,
-  GitCompareArrows,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-  RefreshCw,
-  Send,
-  ShieldCheck,
-  SlidersHorizontal,
-} from 'lucide-react'
+import { ArrowDown, ArrowUp, BarChart3, Check, CircleCheck, Copy, Eye, FilePlus2, GitBranch, GitCompareArrows, Pause, Pencil, Play, Plus, Send, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -58,7 +38,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TargetMissing from '@/components/shared/target-missing'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+
 import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -150,9 +130,10 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -2360,10 +2341,7 @@ export default function ScenarioDetailV8({
       <div className={styles.body} data-design="Body">
         <div className={styles.left}>
           {!canEdit ? (
-            <div className={styles.viewerBand} role="status">
-              <Eye aria-hidden />
-              <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-            </div>
+            <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
           ) : null}
 
           {/* 始めた直後の知らせ（nMSiE）。始めた記録への行き先を添える。 */}

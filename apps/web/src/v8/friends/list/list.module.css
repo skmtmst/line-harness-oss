@@ -4,20 +4,7 @@
  */
 
 /* 閲覧のみの帯（見出しの下・タブの上）。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-fm-band-gap);
-  margin-bottom: var(--tpl-fm-band-after);
-  padding: var(--tpl-fm-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-fm-band-lh);
-}
-
-.viewerBand > svg { flex-shrink: 0; color: var(--color-action); }
+.viewerBand { margin-bottom: var(--tpl-fm-band-after); }
 
 /* 閲覧のみで隠したボタンの場所（隣のボタンを動かさない）。 */
 .hiddenSlot {

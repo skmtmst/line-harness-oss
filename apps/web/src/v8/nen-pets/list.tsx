@@ -31,9 +31,10 @@ import PetEditorV8 from './editor'
 import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type PetsQuery } from './parts'
 import styles from './pets.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export default function PetsListV8({
   accountId,

@@ -20,7 +20,7 @@ import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -47,6 +47,7 @@ import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
 import StatusPill from '@/components/shared/status-pill'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 type View = 'cards' | 'table'
@@ -68,7 +69,7 @@ const SORT_OPTIONS = [
   { value: 'display', label: '並び：登録順' },
 ]
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 function isArchived(account: AccountWithStats) {
   return Boolean(account.archivedAt)
@@ -375,7 +376,7 @@ export default function HqHomeV8() {
         onAddFolder={canManage ? () => openFolderDialog(null) : undefined}
         addFolderLabel="フォルダを追加"
       >
-        <p className={styles.folderNote}>フォルダを消しても、アカウントは消えません</p>
+        <FolderPanelNote>フォルダを消しても、アカウントは消えません</FolderPanelNote>
       </FolderPanel>
     </div>
   )

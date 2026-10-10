@@ -11,7 +11,7 @@
  * 受け付ける URL：`/rich-menus/connections?id=<メニュー>`。
  */
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react'
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api'
@@ -194,7 +194,7 @@ function Connections() {
       boardId="wxIQ7"
       title={`切替のつながり：${group.name}`}
       help="タブで行き来できるメニューの関係"
-      identity={<Link href="/rich-menus" className={styles.backLink}>← リッチメニューへ</Link>}
+
       preview={aside}
       footerActions={<>
         <Button href="/rich-menus">メニュー一覧へ</Button>

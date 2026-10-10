@@ -12,7 +12,7 @@
  * 「あとで決める」ではじめて作成する（N-055）。
  */
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarClock, Check, Timer } from 'lucide-react'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
@@ -45,6 +45,7 @@ import { scenarioReferenceData } from '@/components/scenarios/scenario-reference
 import styles from './create.module.css'
 import DeliveryModeDiagram from './delivery-mode-diagram'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export default function ScenarioCreateV8() {
   usePageTitle('シナリオを作成')
@@ -363,7 +364,7 @@ export default function ScenarioCreateV8() {
       stepsSpacing="compact"
       boardId="dnzqC"
       title="シナリオを作る"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+
       steps={(
         <Steps
           label="シナリオ作成の進み方"
@@ -400,7 +401,7 @@ export default function ScenarioCreateV8() {
     >
       <div className={styles.notices} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
         {!canEdit ? (
-          <p className={styles.viewerBand} role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
         ) : null}
         {scenarioState === 'loading' ? <Notice tone="info">シナリオを読み込んでいます。</Notice> : null}
         {scenarioState === 'ready' && scenario ? (

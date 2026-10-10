@@ -301,7 +301,7 @@ function WebhooksCreateV8Inner() {
         boardId="hsD8e"
         title="送り先を作る"
         help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
+        footerActions={<Button href="/webhooks">キャンセル</Button>} dirty={false}
       >
         <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage>

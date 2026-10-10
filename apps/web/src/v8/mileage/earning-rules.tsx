@@ -14,7 +14,7 @@ import { jstDateOffset } from '@/lib/jst-datetime'
  * 見え方の切り替えとして持つ（保存はしない）。
  */
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from 'lucide-react'
@@ -62,6 +62,7 @@ import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -160,7 +161,7 @@ const PRESETS: Array<{ value: string; label: string; active: boolean; pending: b
   { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, stopped: false, sort: 'order' },
 ]
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 export default function EarningRulesTab() {
   const router = useRouter()

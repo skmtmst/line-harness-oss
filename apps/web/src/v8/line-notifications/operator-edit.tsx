@@ -16,7 +16,7 @@ import { notifySaved } from '@/components/shared/toast'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { Check, Eye, Send } from 'lucide-react'
+import { Check, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
@@ -62,6 +62,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 function OperatorEditInner() {
   const editId = useSearchParams().get('id')
@@ -457,10 +458,7 @@ function OperatorEditInner() {
         <SettingsInnerNav inline />
         <div className={styles.content}>
           {canWrite ? null : (
-            <div className={styles.roBand} role="status">
-              <Eye size={14} aria-hidden="true" />
-              <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-            </div>
+            <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
           )}
           <DetailColumns
             presentation="notification"

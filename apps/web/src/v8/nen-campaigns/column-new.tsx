@@ -16,7 +16,7 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Eye, Image as ImageIcon, Save, Type } from 'lucide-react'
+import { Image as ImageIcon, Save, Type } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
@@ -56,6 +56,7 @@ import {
 } from './column-form'
 import styles from './form.module.css'
 import { Field } from '@/components/shared/form-controls'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export default function ColumnNew() {
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -116,7 +117,7 @@ export default function ColumnNew() {
         help="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
         footerActions={<Button href="/nen-campaigns?tab=columns">一覧へ戻る</Button>} dirty={false}
       >
-        <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。コラムを書くのは管理者に頼んでください。" />
+        <ReadOnlyNotice role="status">閲覧のみで見ています。コラムを書くのは管理者に頼んでください。</ReadOnlyNotice>
       </CreatePage>
     )
   }

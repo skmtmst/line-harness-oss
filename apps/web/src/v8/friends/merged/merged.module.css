@@ -5,10 +5,10 @@
 .actions,
 .cards,
 .filters,
-.error { margin: 0 var(--tpl-head-pad-side); }
+
 
 .actions { display: flex; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
-.error { margin-top: var(--tpl-fr-stack-gap); color: var(--color-danger); font-size: var(--text-caption); }
+
 
 .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); margin-top: var(--tpl-fr-stack-gap); }
 

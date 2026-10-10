@@ -29,7 +29,7 @@
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-te-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 .hint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-te-hint-lh); }
-.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
 
 /* 名前とフォルダの並び：名前は伸びる・フォルダ 220・間12・下でそろえる。 */
 .pair { display: flex; align-items: flex-end; gap: var(--tpl-rule-row-gap); width: 100%; }
@@ -229,3 +229,5 @@
 .composerFooter::after { content: ''; flex: 1; }
 
 .composerTitleAccessories { display: flex; align-items: center; gap: var(--tpl-msg-composer-gap-s); }
+
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }

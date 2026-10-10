@@ -16,7 +16,7 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Copy, Eye, Info, Pause, Pencil, QrCode } from 'lucide-react'
+import { ArrowLeft, Info, Pause, Pencil, QrCode } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -45,10 +45,12 @@ import EditRouteModal from './edit-route-dialog'
 import QrDialog from './qr-dialog'
 import RefOrdersPanel, { type RefOrdersResult } from './ref-orders'
 import styles from './detail.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 interface MessageTemplate {
   id: string
@@ -77,7 +79,7 @@ const PERIOD_OPTIONS: Array<{ value: FriendPeriod; label: string }> = [
   { value: 'this', label: '今月' },
   { value: 'last', label: '先月' },
 ]
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 const DELETE_CHOICES: ReadonlyArray<readonly [DeleteChoice, string, string]> = [
   ['stop', '新しい人を受けるのをやめる（おすすめ）', 'URLは残し、「受付を終了しました」と表示します。'],
@@ -438,7 +440,7 @@ function InflowDetailContent() {
       ) : undefined}
     >
       {readonly ? (
-        <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       ) : null}
       {copyFailed && url ? (
         <div role="alert" className={styles.copyFallback}>

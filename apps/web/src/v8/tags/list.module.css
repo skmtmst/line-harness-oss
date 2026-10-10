@@ -9,18 +9,7 @@
   flex-shrink: 0;
 }
 
-.readonlyBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-tag-ro-gap);
-  margin: 0;
-  padding: var(--tpl-tag-ro-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  line-height: var(--tpl-tag-ro-lh);
-}
+.readonlyBand { margin: 0; }
 
 .readonlyIcon {
   width: var(--tpl-tag-ro-icon);
@@ -285,17 +274,7 @@
 }
 
 /* 操作の失敗の帯。 */
-.errorBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-tag-name-gap);
-  margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-gap);
-  padding: var(--tpl-tag-ro-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-danger-soft);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 .errorBand button {
   margin-left: auto;

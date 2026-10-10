@@ -49,6 +49,8 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
 const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
@@ -141,7 +143,7 @@ export function periodFrom(period: PeriodKey, now: Date): string | null {
   return null
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
 /** 届いた言葉は「」で囲んで1行。 */
 function quoted(text: string | null): string {
@@ -430,7 +432,7 @@ export default function AutoReplyRunsV8() {
       </div>}
     >
       {!canManage ? (
-        <p className={styles.viewerBand} role="status">{NO_MANAGE_NOTE}</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice></div>
       ) : null}
 
       <div className={styles.kpis}>

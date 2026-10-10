@@ -11,6 +11,7 @@ import { SettingsFormCard, SettingsFormRow } from '@/components/shared/settings-
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api } from '@/lib/api'
 import styles from './settings.module.css'
+import Notice from '@/components/shared/notice'
 
 const EMPTY: TenantCompanyContact = {
   legalCompanyName: null, postalCode: null, address: null, building: null,
@@ -148,7 +149,7 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     <SettingsFormRow>{field('phone')}{field('contactName')}</SettingsFormRow>
     <SettingsFormRow>{field('contactEmail')}{field('invoiceAddressee')}</SettingsFormRow>
     {loading ? <p role="status" className={styles.hint}>読み込んでいます…</p> : null}
-    {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+    {error ? <Notice tone="danger" >{error}</Notice> : null}
     {!loading && revision === null && canEdit ? <Button type="button" onClick={() => void load()}>もう一度読み込む</Button> : null}
     {null}
   </SettingsFormCard>

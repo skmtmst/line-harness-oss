@@ -9,7 +9,7 @@
  * 結びつける `PUT /api/ad-platforms/mappings/:pointId`（owner・admin）。BEHAVIOR.md の「広告とのつなぎ」。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Clock, Eye, History, RotateCw, Send, XCircle } from 'lucide-react'
+import { Clock, History, RotateCw, Send, XCircle } from 'lucide-react'
 import type { AdEventMapping } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -24,8 +24,9 @@ import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from 
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const STEPS = [
   { title: 'クリックの目印を持ち帰る', text: '広告から中継リンクを通った人の目印を残します。中継リンクを通らないと広告と結びつきません。' },
@@ -182,7 +183,7 @@ export default function AdConnectionsV8() {
         actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>} />
       <div className={adsStyles.body}>
         {readonly ? (
-          <p className={adsStyles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+          <div className={adsStyles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <h2 className={adsStyles.sectionTitle}>返すしくみ</h2>
         <ol className={styles.steps} aria-label="返すしくみ">

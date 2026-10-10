@@ -24,6 +24,7 @@ import CompanyContactCard from './company-contact'
 import styles from './settings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const TITLE = '統括の情報'
 const DESCRIPTION = '統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。'
@@ -40,7 +41,7 @@ export default function HqSettingsV8() {
   return (
     <ListPage boardId="K7HYu" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderNav={settingsNav}>
       <div className={styles.body}>
-        {role && !canEdit ? <Notice tone="info">閲覧のみで見ています。統括名の変更と会社・連絡先の登録は管理者だけができます。</Notice> : null}
+        {role && !canEdit ? <ReadOnlyNotice >閲覧のみで見ています。統括名の変更と会社・連絡先の登録は管理者だけができます。</ReadOnlyNotice> : null}
         <TenantNameCard canEdit={canEdit} />
         {canEdit ? <CompanyContactCard canEdit /> : null}
       </div>
@@ -112,7 +113,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
           <dt className={styles.label}>統括名</dt>
           <dd className={styles.value}>{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || emptyValue('unknown')}</dd>
         </dl>
-        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {error ? <Notice tone="danger" >{error}</Notice> : null}
         <p className={styles.hint}>統括名の変更は管理者だけができます。</p>
       </section>
     )
@@ -133,7 +134,7 @@ function TenantNameCard({ canEdit }: { canEdit: boolean }) {
         />
 {nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
       <p className={styles.hint}>会社名やブランド名など、メンバーが見てわかる名前にします</p>
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {error ? <Notice tone="danger" >{error}</Notice> : null}
       {null}
       <div className={styles.actions}>
         <Button variant="primary" type="submit" disabled={loading || saving} busy={saving}>統括名を保存する</Button>

@@ -16,18 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Bookmark,
-  CircleAlert,
-  Code,
-  Eye,
-  Inbox,
-  Link2,
-  Megaphone,
-  Plus,
-  UserPlus,
-  Users,
-} from 'lucide-react'
+import { Bookmark, CircleAlert, Code, Inbox, Link2, Megaphone, Plus, UserPlus, Users } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -51,8 +40,8 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -87,6 +76,7 @@ import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 interface MessageTemplate {
   id: string
@@ -870,10 +860,7 @@ export default function InflowListV8({
       </div>}
       stats={<>
         {readonly ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <KpiBand>
           <KpiCard
@@ -949,7 +936,7 @@ export default function InflowListV8({
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
-          <p className={styles.folderNote}>フォルダを消しても、中の経路は未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、中の経路は未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}

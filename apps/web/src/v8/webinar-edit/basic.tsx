@@ -15,8 +15,9 @@ import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import styles from './form.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const { webinar, editor, readOnly } = ctx
@@ -165,7 +166,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         action={readOnly ? null : <div className={styles.previewActions}><Button disabled={saving || testing} onClick={() => setTestConfirm(true)}>テストを送る</Button></div>}
       />}
     >
-      {readOnly ? <Notice tone="info">閲覧のみで見ています。変えるときはオーナーか管理者に頼んでください。</Notice> : null}
+      {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変えるときはオーナーか管理者に頼んでください。</ReadOnlyNotice> : null}
       <BasicForm
         idPrefix="webinar-basic"
         values={values}

@@ -3,7 +3,7 @@
 /* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
 import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Eye, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
+import { Check, Globe, HelpCircle, History, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import { TextArea } from '@/components/shared/text-field'
@@ -46,6 +46,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 type PhotoView = 'list' | 'detail' | 'publications'
@@ -561,7 +562,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         <>
           {!canEdit ? (
             <div className={styles.viewerRow}>
-              <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} data-design-node="photo-viewer-band" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+              <ReadOnlyNotice role="status" data-design-node="photo-viewer-band">閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
             </div>
           ) : null}
           <div className={styles.stats}>

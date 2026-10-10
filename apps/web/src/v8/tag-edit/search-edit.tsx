@@ -51,6 +51,7 @@ import { optionsWithCurrent, usageRowsOf, headUsageText } from './search-model'
 import styles from './search-edit.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -200,7 +201,7 @@ function DateRangeEditor({
           </>
         ) : null}
       </div>
-      {reversed ? <p role="alert" className={styles.errorText}>開始日が終了日より後になっています。入れ替えてください。</p> : null}
+      {reversed ? <Notice tone="danger" >開始日が終了日より後になっています。入れ替えてください。</Notice> : null}
     </div>
   )
 }
@@ -837,7 +838,7 @@ export default function SavedSearchEditV8() {
         {previewCount === null ? <span className={styles.countNum}>{emptyValue('unknown')}</span> : <span className={styles.countNum}>{polishFormatNumber(previewCount)}</span>}
         <span className={styles.countUnit}>人</span>
       </p>
-      {previewError ? <p role="alert" className={styles.errorText}>{previewError}</p> : null}
+      {previewError ? <Notice tone="danger" >{previewError}</Notice> : null}
       {previewStale ? (
         <div className={styles.staleBox} role="status">
           <p className={styles.staleTitle}>条件を変えました。上の人数は変える前の条件のもので、変えたあとの条件はまだ数えていません。</p>
@@ -868,7 +869,7 @@ export default function SavedSearchEditV8() {
     </div>
   )
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
 
   return (
     <div className={styles.page}>

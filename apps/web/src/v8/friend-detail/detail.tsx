@@ -45,6 +45,7 @@ import { PageHeading } from '@/components/templates/page-frame'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /** タブ10個（並びと URL の値は今の画面と同じ）。 */
 export const FRIEND_DETAIL_TABS = [
@@ -169,7 +170,7 @@ function FriendDetailV8Inner() {
 
       {perms.viewOnly ? (
         <div className={styles.band}>
-          <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+          <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
         </div>
       ) : null}
 

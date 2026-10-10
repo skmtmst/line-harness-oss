@@ -14,23 +14,10 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  AlignLeft,
-  ArrowLeft,
-  CalendarClock,
-  CalendarDays,
-  Copy,
-  Eye,
-  Hash,
-  Image as ImageIcon,
-  Link2,
-  ToggleLeft,
-  Type,
-  Upload,
-} from 'lucide-react'
+import { AlignLeft, ArrowLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
-import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED, isSecretLikeVarValue } from '@/lib/common-vars'
+import { commonVarValueError, isSecretLikeVarValue } from '@/lib/common-vars'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
@@ -47,9 +34,10 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './new.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／
@@ -450,10 +438,7 @@ export default function NewCommonVarV8() {
       )} dirty={false}
     >
       {canWrite ? null : (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
 
       {!accountLoading && !selectedAccountId && (

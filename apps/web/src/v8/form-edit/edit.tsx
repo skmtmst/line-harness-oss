@@ -12,9 +12,9 @@
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+
 import { useSearchParams } from 'next/navigation'
-import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
+import { FlaskConical, Smartphone, Upload } from 'lucide-react'
 import {
   emptyLayout,
   formThemeContrastError,
@@ -34,7 +34,7 @@ import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
-import { notifyToast } from '@/components/shared/toast'
+
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { validateFormLayoutForSave } from '@/components/forms/form-definition-validation'
 import { normalizeSectionName } from '@/components/forms/section-name'
@@ -74,6 +74,7 @@ import { FormPhone } from './phone'
 import styles from './edit.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TextLink from '@/components/shared/text-link'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const TAB_ITEMS: { key: EditTab; label: string }[] = [
   { key: 'content', label: '中身' },
@@ -891,25 +892,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     <CreatePage
       boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}
       title={name || 'フォーム名未設定'}
-      identity={(
-        /* 絵は矢印も文字の1つ（「← 回答フォームへ」）。 */
-        host ? (
-          <Link
-            href={host.backHref}
-            className={styles.backLink}
-            onClick={(event) => {
-              event.preventDefault()
-              requestUnsavedAction(host.onCancel)
-            }}
-          >
-            {'← 回答フォームへ'}
-          </Link>
-        ) : (
-          <Link href="/form-submissions" className={styles.backLink}>
-            {'← 回答フォームへ'}
-          </Link>
-        )
-      )}
+
       steps={(
         <div className={styles.tabs}>
           {/* 型は説明をタブの下へ置くので、絵どおり題の下・タブの上に出すためここに置く。 */}
@@ -917,7 +900,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, errorCount: tabErrors[t.key], onClick: () => changeTab(t.key) }))} />
         </div>
       )}
-      notice={readOnly ? <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /> : undefined}
+      notice={readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice> : undefined}
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}

@@ -14,7 +14,7 @@
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
-import { CalendarClock, ClipboardList, Coins, Eye, Package, Save, Send } from 'lucide-react'
+import { CalendarClock, ClipboardList, Coins, Package, Save, Send } from 'lucide-react'
 import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
 import { CreatePage } from '@/components/templates'
@@ -44,6 +44,7 @@ import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared
 import { tapActionLiffUrl } from '@/lib/tap-actions'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /** きっかけの短い言い方（配信フローの札・日数の選ぶ欄）。 */
 const TRIGGER_SHORT: Record<string, string> = {
@@ -411,7 +412,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       ) : <Button href="/nen-campaigns">一覧へ戻る</Button>} dirty={false}
     >
       {!canEdit ? (
-        <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。配信を直すのは管理者に頼んでください。" />
+        <ReadOnlyNotice role="status">閲覧のみで見ています。配信を直すのは管理者に頼んでください。</ReadOnlyNotice>
       ) : null}
       {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
       <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? Object.entries(withoutVersion(merged) ?? {}).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])).map(([key, value]) => ({ text: `${key === 'bodyText' ? '本文' : key === 'title' ? 'タイトル' : key === 'deliveryTime' ? '配信時刻' : '設定'}：入力 ${typeof value === 'string' ? value : JSON.stringify(value)} ／ 最新 ${JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])}`, kind: 'change' as const })) : null} />
@@ -553,7 +554,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
                 value={formAction?.formId ?? ''}
                 onChange={chooseForm}
               />
-              {formIssueMessage ? <p className={styles.error} role="alert">{formIssueMessage}</p> : null}
+              {formIssueMessage ? <Notice tone="danger" >{formIssueMessage}</Notice> : null}
             </>}
             {formIssueBanner && !formIssueMessage ? <p className={styles.muted}>{formIssueBanner}</p> : null}
           </div>

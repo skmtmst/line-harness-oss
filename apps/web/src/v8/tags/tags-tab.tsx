@@ -13,20 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  AlertCircle,
-  Bookmark,
-  Check,
-  CircleDashed,
-  Folder,
-  FolderOpen,
-  GripVertical,
-  Inbox,
-  Plus,
-  Sparkles,
-  Tag as TagIcon,
-  Users,
-} from 'lucide-react'
+import { Bookmark, Check, CircleDashed, Folder, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type ListStats } from '@/lib/api'
 import { useRowLeaving } from '@/lib/use-row-leaving'
@@ -34,7 +21,7 @@ import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPageBody } from '@/components/templates'
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import StatusBadge from '@/components/shared/status-badge'
 import FilterChip from '@/components/shared/filter-chip'
@@ -55,7 +42,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import TagPill from '@/components/shared/tag-pill'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
@@ -75,6 +62,9 @@ import {
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { emptyValue } from '@/components/shared/empty-value'
+import ListState from '@/components/shared/list-state'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import Notice from '@/components/shared/notice'
 
 /** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
@@ -89,7 +79,7 @@ const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
 /**
@@ -647,7 +637,7 @@ export default function TagsTab({
   const folderNote = (
     <>
       {canEdit ? null : <span className={styles.viewerFolderAddSpace} aria-hidden="true" />}
-      <p className={styles.folderNote}>フォルダを消しても、中のタグは未分類に残ります</p>
+      <FolderPanelNote>フォルダを消しても、中のタグは未分類に残ります</FolderPanelNote>
       {folderError ? (
         <p role="alert" className={styles.folderNote}>
           {folderError}
@@ -658,18 +648,9 @@ export default function TagsTab({
   )
 
   const table = status === 'forbidden' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>タグを見る権限がありません</p>
-      <p className={styles.stateDesc}>タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。</p>
-    </div>
+    <ListState kind="error" title="タグを見る権限がありません" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。"  />
   ) : status === 'error' ? (
-    <div className={styles.stateCard} data-design-node="U0aKD">
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>タグを読み込めませんでした</p>
-      <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-    </div>
+    <ListState kind="error" title="タグを読み込めませんでした" description="再読み込みしても直らない場合はエラー報告へ。" data-design-node="U0aKD" action={<><Button type="button" onClick={() => void load()}>もう一度読み込む</Button></>} />
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList
@@ -861,11 +842,7 @@ export default function TagsTab({
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-          </p>
+          <Notice tone="danger" >{actionError}<button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button></Notice>
         ) : null}
         {table}
       </ListPageBody>

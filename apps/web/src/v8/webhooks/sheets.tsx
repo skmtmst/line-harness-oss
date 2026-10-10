@@ -25,6 +25,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import {
@@ -416,7 +417,7 @@ export default function WebhooksSheetsV8() {
 
   let body
   if (!selectedAccountId) {
-    body = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    body = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (status === 'loading') {
     body = (
       <div aria-busy="true" aria-label="連携の状態を読み込んでいます">

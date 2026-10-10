@@ -145,7 +145,7 @@ export default function OpsTwoFactorV8() {
                   // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
                   <img src={qr} alt="認証アプリ登録用のQRコード" />
                 ) : qrFailed ? (
-                  <p role="alert" className={styles.error}>QRコードを表示できませんでした</p>
+                  <Notice tone="danger" >QRコードを表示できませんでした</Notice>
                 ) : (
                   <DelayedSkeleton loading skeleton={<Skeleton className="block h-full w-full" />} />
                 )}

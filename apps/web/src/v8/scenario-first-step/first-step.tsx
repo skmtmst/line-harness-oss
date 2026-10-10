@@ -13,10 +13,10 @@ import { jstDate } from '@/lib/jst-datetime'
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */
-import { formatDate as polishFormatDate } from '@/lib/format'
+
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Filter, PencilLine, Smartphone, Tag as TagIcon, Users } from 'lucide-react'
 import {
@@ -38,7 +38,7 @@ import MessageKindFields, {
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
 import QuestionEditor, { emptyQuestion, type ScenarioQuestion } from '@/components/scenarios/question-editor'
-import { ConditionDialog, describeCondition } from '@/components/scenarios/scenario-dialogs'
+import { ConditionDialog } from '@/components/scenarios/scenario-dialogs'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
@@ -57,7 +57,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
-import { notifyToast } from '@/components/shared/toast'
+
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -71,7 +71,8 @@ import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -569,7 +570,7 @@ export default function ScenarioFirstStepV8() {
     <CreatePage
       boardId={narrow ? 'U5rxyH' : 'V6xAo'}
       title="1通目を設定"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+
       steps={(
         <Steps
           label="シナリオ作成の進み方"
@@ -604,7 +605,7 @@ export default function ScenarioFirstStepV8() {
       )}
     >
       {!canEdit ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />

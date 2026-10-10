@@ -27,7 +27,7 @@ import HelpTip from '@/components/shared/help-tip'
 import { FieldError } from '@/components/shared/form-controls'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
+
 import Pagination from '@/components/shared/pagination'
 import Radio from '@/components/shared/radio'
 import { RowActions } from '@/components/shared/row-actions'
@@ -58,6 +58,7 @@ import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type PaperRow = { id: string; card_id?: string; friend_id: string; photo_url: string; stamps: number; status: string; created_at?: string }
 type FriendLite = { id: string; displayName?: string | null; metadata?: Record<string, unknown> | null }
@@ -433,7 +434,7 @@ function VisitStampsScreen() {
           onClick: () => selectTab(item.key),
         }))} />
       </div>
-      {role === 'viewer' ? <div className={tpl.notice}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></div> : null}
+      {role === 'viewer' ? <div className={tpl.notice}><ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></div> : null}
       <div className={tpl.split} data-template-region="body" role="tabpanel" id={`visit-stamp-panel-${tab}`} aria-labelledby={`visit-stamp-tab-${tab}`}>
         <div className={styles.body}>
           {tab === 'settings' ? (

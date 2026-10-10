@@ -30,8 +30,10 @@ import { audienceOf, progressStatusText, runAudienceText, runStamp, type Progres
 import styles from './detail.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 type Group = {
   id: string
@@ -302,7 +304,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               </div>
             ) : null}
             {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-            {actionError ? <p className={styles.errorText} role="alert">{actionError}</p> : null}
+            {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
             <section className={styles.card} aria-label="公開の進み">
               <h2 className={styles.cardTitle}>公開の進み</h2>
@@ -374,7 +376,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                 <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
               </div>
             )}
-            {canOperate || role === null ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・取り下げは管理者の操作です。</p>}
+            {canOperate || role === null ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・取り下げは管理者の操作です。</ReadOnlyNotice></div>}
             <section className={styles.aboutBox} aria-label="いまの状態">
               <h2 className={styles.aboutTitle}>いまの状態</h2>
               <dl className={styles.aboutList}>

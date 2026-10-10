@@ -179,8 +179,3 @@
   color: var(--color-warning);
   font-size: var(--text-caption);
 }
-.dialogError {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}

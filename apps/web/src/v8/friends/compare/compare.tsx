@@ -33,6 +33,7 @@ import styles from './compare.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 const STRENGTH_WORD = { strong: '決め手', medium: '手がかり', weak: '参考' } as const
 const ATTRIBUTE_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
@@ -228,7 +229,7 @@ function CompareInner() {
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
                     />
-{review.decideError ? <p className={styles.error} role="alert">{review.decideError}</p> : null}
+{review.decideError ? <Notice tone="danger" >{review.decideError}</Notice> : null}
 {!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
                       <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
                     ) : null}

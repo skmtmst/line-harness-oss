@@ -14,21 +14,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowRight,
-  Check,
-  ChevronLeft,
-  CircleAlert,
-  Copy,
-  Download,
-  Info,
-  Pause,
-  Pencil,
-  Play,
-  RotateCcw,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { ArrowRight, Check, CircleAlert, Copy, Download, Info, Pause, Pencil, Play, RotateCcw, Trash2, X } from 'lucide-react'
 import { describeReminderTiming, type Reminder, type ReminderStep } from '@line-crm/shared'
 import {
   api,
@@ -40,7 +26,7 @@ import {
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
@@ -59,7 +45,7 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'

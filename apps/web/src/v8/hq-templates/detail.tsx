@@ -24,9 +24,11 @@ import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
@@ -130,7 +132,7 @@ export default function HqTemplateDetail({
     )
   }
   const compareBox = compare ? (
-    compare.error ? <p className={styles.errorText} role="alert">{compare.error}</p>
+    compare.error ? <Notice tone="danger" >{compare.error}</Notice>
       : !compare.result ? <p className={styles.empty} role="status">比べています…</p>
       : (
         <ChangeBox
@@ -217,7 +219,7 @@ export default function HqTemplateDetail({
         description={[kindLabel, folderName, current?.creator_name ? `作った人 ${current.creator_name}` : null, `更新 ${stamp(detail.template.updated_at)}`].filter(Boolean).join('・')}
         preview={side}
       >
-        {canEdit ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</p>}
+        {canEdit ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・配る操作は統括の管理者に頼んでください。</ReadOnlyNotice></div>}
         {notices}
         {canEdit ? (
           <div className={styles.draftBand} role="status">

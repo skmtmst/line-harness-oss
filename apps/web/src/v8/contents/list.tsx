@@ -17,7 +17,7 @@ import type {
   MediaDeleteImpactReference,
   MediaItem,
 } from '@line-crm/shared'
-import { Archive, Eye, EyeOff, HardDrive, Images, LayoutGrid, List as ListIcon, Plus } from 'lucide-react'
+import { Archive, EyeOff, HardDrive, Images, LayoutGrid, List as ListIcon, Plus } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -47,7 +47,7 @@ import Notice from '@/components/shared/notice'
 import BulkBar from '@/components/shared/bulk-bar'
 import { classifyApiFailure } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
-import { RequiredBadge } from '@/components/shared/form-controls'
+
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 import { formatNumber } from '@/lib/format'
@@ -65,6 +65,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
 const UNGROUPED = '__ungrouped__'
@@ -1141,10 +1142,7 @@ export default function MediaLibraryListV8() {
       title="登録メディア一覧"
       help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
       tabs={!canManageMedia ? (
-        <p className={styles.roBand} role="note">
-          <Eye size={16} aria-hidden="true" />
-          <span>{`閲覧のみで見ています。${managementPermissionReason}。`}</span>
-        </p>
+        <div className={styles.roBand}><ReadOnlyNotice role="note">{`閲覧のみで見ています。${managementPermissionReason}。`}</ReadOnlyNotice></div>
       ) : undefined}
       stats={(
         <KpiBand aria-label="登録メディアの集計">

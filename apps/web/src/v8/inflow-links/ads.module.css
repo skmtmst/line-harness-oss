@@ -29,18 +29,7 @@
 .description { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-create-desc-size); line-height: var(--tpl-create-desc-lh); }
 
 .body { display: flex; flex-direction: column; gap: var(--tpl-cn-card-gap); padding-top: var(--tpl-detail-head-pad-bottom); }
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: 0;
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-info-bg);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-ro-band-lh);
-}
+.viewerBand { margin: 0; }
 .error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
 .faint { color: var(--color-ink-faint); }
 

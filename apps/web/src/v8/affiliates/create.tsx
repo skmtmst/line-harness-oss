@@ -496,7 +496,7 @@ export default function CreateAffiliateV8() {
         </div>
       </section>
 
-      {saveError ? <p className={styles.errorText} role="alert">{saveError}</p> : null}
+      {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}
       {saveNote ? <p className={styles.cardNote} role="status">{saveNote}</p> : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したアフィリエイター" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>

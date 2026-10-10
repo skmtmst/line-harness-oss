@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { CircleAlert, GitCompare, Link2, RotateCcw, Send } from 'lucide-react'
+import { GitCompare, Link2, Send } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -472,7 +472,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     >
       {messageType === 'flex' ? (
         flexError ? (
-          <p role="alert" className={styles.error}>{flexError}このままでは保存できません。</p>
+          <Notice tone="danger" >{flexError}このままでは保存できません。</Notice>
         ) : !messageContent.trim() ? (
           <p className={styles.hint}>カードの内容を入力すると、ここに表示されます。</p>
         ) : (
@@ -484,7 +484,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         </LinePreviewMessage>
       )}
       {preview.unresolved.length > 0 ? (
-        <p role="alert" className={styles.error}>値を確認できない差し込みがあります：{preview.unresolved.map((key) => `{{${key}}}`).join('、')}</p>
+        <Notice tone="danger" >値を確認できない差し込みがあります：{preview.unresolved.map((key) => `{{${key}}}`).join('、')}</Notice>
       ) : null}
     </LinePreview>
   )
@@ -548,7 +548,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
           <>
             {host?.notice}
             {messageType === 'flex' || messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
-            {error || loadFailed ? <p role="alert" className={styles.error}>{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p> : null}
+            {error || loadFailed ? <Notice tone="danger" >{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</Notice> : null}
             {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <Card padding="none" layout="vertical" className={styles.card}>
@@ -599,7 +599,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               </div>
               <FieldError id="te-content-error">{fields.error('content')}</FieldError>
               {messageType === 'flex' && flexError && messageContent.trim() && !fields.invalid('content') ? (
-                <p role="alert" className={styles.error}>{flexError}このままでは保存できません。</p>
+                <Notice tone="danger" >{flexError}このままでは保存できません。</Notice>
               ) : null}
               <p className={styles.hint}>
                 {messageType === 'flex'
@@ -607,7 +607,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   : '名前と友だち情報は受け取る人ごと、共通情報と配信日は送る時点の値に置き換わります。回答フォームの答えは、答えを保存した友だち情報から差し込みます。'}
                 {messageContent.length > 4500 ? ' 約4,500文字を超えると複数のメッセージに分かれて届きます。' : ''}
               </p>
-              {referenceState === 'failed' ? <p role="alert" className={styles.error}>差し込み項目を読み込めませんでした。画面を再読み込みしてください。</p> : null}
+              {referenceState === 'failed' ? <Notice tone="danger" >差し込み項目を読み込めませんでした。画面を再読み込みしてください。</Notice> : null}
               {host ? <p className={styles.hint}>統括のテンプレートで差し込めるのは、名前・配信日・その他です（友だち情報・共通情報はアカウントごとに違うため）。</p>
                 : !editorAccountId && !loading ? <p className={styles.hint}>LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p> : null}
               {accountMismatch ? (

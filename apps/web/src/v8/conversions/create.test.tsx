@@ -190,7 +190,7 @@ describe('V8 成果地点を作る', () => {
     expect(screen.getByText('閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /保存して/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /使う場所を足す/ })).toBeNull()
-    expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'キャンセル' }).getAttribute('href')).toBe('/conversions?tab=points')
     // 押せない入力の欄も置かない（作る画面なので帯だけ）
     expect(screen.queryByLabelText('成果地点の名前')).toBeNull()
   })

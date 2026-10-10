@@ -234,12 +234,7 @@ function PageState({ node, self, title, desc, icon, actions, head }: {
     <div className={layout.shell} data-design-node={node}>
       {head ?? <Head self={self} />}
       <div className={styles.stateBody}>
-        <div className={styles.stateCard} role={icon ? undefined : 'status'}>
-          {icon}
-          <p className={styles.stateTitle}>{title}</p>
-          <p className={styles.stateDesc}>{desc}</p>
-          {actions ? <div className={styles.stateActions}>{actions}</div> : null}
-        </div>
+        <ListState kind={title.includes('読み込み') ? 'loading' : icon ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={actions} />
       </div>
     </div>
   )

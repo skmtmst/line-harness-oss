@@ -5,7 +5,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, UserPlus, X } from 'lucide-react'
+import { UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import LoginAudit from '@/components/staff/login-audit'
@@ -55,10 +55,11 @@ import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissi
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { formatDateTime } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -1086,7 +1087,7 @@ function StaffPageHost() {
       />
       {viewer ? (
         <div className={styles.viewerBandRow}>
-          <Notice tone="info" icon={<Eye size={16} aria-hidden="true" />}>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Notice>
+          <ReadOnlyNotice ></ReadOnlyNotice>
         </div>
       ) : null}
       <div className={styles.body}>

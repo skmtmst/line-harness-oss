@@ -35,7 +35,7 @@ import Select from '@/components/shared/select'
 import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { notifyToast } from '@/components/shared/toast'
+
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
@@ -474,7 +474,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         )}
       >
         {host?.notice}
-        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
         {nameCard}
 

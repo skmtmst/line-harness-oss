@@ -30,7 +30,8 @@ import { RICH_VIDEO_BUTTON_LABELS, richVideoContent, richVideoDraftIssue, videoP
 import styles from './edit.module.css'
 import videoStyles from './rich-video.module.css'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+import Notice from '@/components/shared/notice'
 
 const emptyDraft: RichVideoDraft = {name:'',folderId:'',originalContentUrl:'',previewImageUrl:'',height:1040,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'',altText:''}
 
@@ -217,7 +218,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
       band={!canMutate && role ? <p className={styles.readonly} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>:undefined}
       footerActions={canMutate?<>{hqHost && host ? <Button disabled={busy} onClick={()=>guarded(host.onCancel)}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}{hqHost?<Button onClick={()=>void save(false,false)} disabled={busy||loading||loadFailed}>下書きを保存</Button>:null}<Button variant="primary" onClick={()=>void save()} disabled={busy||loading||loadFailed||mismatch||(!hqHost&&!selectedAccountId)} busy={busy} busyLabel="保存中…">{hqHost?host?.primaryLabel??'保存して配る':'保存する'}</Button></>:undefined}>
       {host?.notice}
-      {error?<p className={styles.error} role="alert">{error}</p>:null}
+      {error?<Notice tone="danger" >{error}</Notice>:null}
       {mismatch?<p className={styles.readonly} role="status">このテンプレートのLINEアカウントに切り替えてから保存してください。</p>:null}
       {loading?<p role="status">読み込み中…</p>:null}
       <Card padding="none" layout="vertical" className={styles.card}><h2 className={styles.cardTitle}>名前とフォルダ</h2><div className={styles.pair}><div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="rv-name"><TextField id="rv-name" invalid={issue?.field==='name'} aria-describedby={issue?.field==='name'?'rv-name-error':undefined} value={draft.name} onChange={e=>patch({name:e.target.value})} disabled={!canMutate||busy||loading||loadFailed}/>{fieldError('name')}</Field></div><div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="rv-folder">{canMutate?<FolderSelect size="full" id="rv-folder" aria-label="フォルダ" value={hqHost?host!.folder:draft.folderId} onChange={hqHost?host!.onFolderChange:value=>patch({folderId:value})} folders={hqHost?host!.folders:folders.map(folderById)} onCreate={hqHost?hostFolderCreate(host!):undefined} disabled={busy||loading||loadFailed}/>:<span>{hqHost?host!.folders.find(f=>f.value===host!.folder)?.label??'未分類':folders.find(f=>f.id===draft.folderId)?.name??'未分類'}</span>}</Field></div></div></Card>

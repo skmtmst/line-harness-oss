@@ -17,20 +17,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Archive,
-  Bookmark,
-  CalendarClock,
-  Download,
-  Eye,
-  FilePen,
-  Inbox,
-  MousePointerClick,
-  Plus,
-  Radio,
-  Users,
-  Video,
-} from 'lucide-react'
+import { Archive, Bookmark, CalendarClock, Download, FilePen, Inbox, MousePointerClick, Plus, Radio, Users, Video } from 'lucide-react'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -43,10 +30,10 @@ import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -55,6 +42,7 @@ import DetailPanel from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { withViewTransition } from '@/components/shared/view-transition'
@@ -88,9 +76,10 @@ import {
 import styles from './list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft' | 'archived'
@@ -850,7 +839,7 @@ function WebinarList() {
   if (accountLoading || loading) {
     listBody = <ListSkeleton />
   } else if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (loadFailure && visibleItems.length === 0) {
     listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined} />
   } else if (visibleItems.length === 0) {
@@ -870,10 +859,7 @@ function WebinarList() {
     listBody = (
       <>
         {loadFailure ? (
-          <div role="alert" className={styles.errorBand}>
-            <span>{loadFailure.title}</span>
-            {loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : null}
-          </div>
+          <Notice tone="danger" ><span>{loadFailure.title}</span>{loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : null}</Notice>
         ) : null}
         {refreshing ? <p role="status" className="sr-only">検索中…</p> : null}
         <div className={styles.tableWrap}>
@@ -980,10 +966,7 @@ function WebinarList() {
       stats={<>
         {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 64px 跳ねていた（動きの点検 8 番）。 */}
         {role !== null && !canEdit ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         {csvError ? <div className={styles.statsNotice}><Notice tone="info">{csvError}</Notice></div> : null}
         {overviewFailure && !loadFailure ? (
@@ -1017,7 +1000,7 @@ function WebinarList() {
           addFolderDisabled={!selectedAccountId}
           rows={folderRows}
         >
-          <p className={styles.folderNote}>フォルダを消しても、中のウェビナーは未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、中のウェビナーは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}

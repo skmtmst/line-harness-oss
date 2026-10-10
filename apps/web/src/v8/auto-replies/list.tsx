@@ -25,28 +25,7 @@ import { useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/componen
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Activity,
-  Ban,
-  ChevronDown,
-  CircleCheck,
-  CircleHelp,
-  Clock,
-  Copy,
-  Folder as FolderIcon,
-  Layers,
-  MessageSquare,
-  Pause,
-  Pencil,
-  Square,
-  Play,
-  Trash2,
-  TriangleAlert,
-  Zap,
-  Bookmark,
-  Eye,
-  Plus,
-} from 'lucide-react'
+import { Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Clock, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Plus } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { clampSearchQuery } from '@/lib/search-query'
@@ -105,6 +84,8 @@ import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -1071,24 +1052,13 @@ export default function AutoRepliesListV8() {
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : visibleLoadState === 'error' || visibleLoadState === 'forbidden' ? (
-    <div className={styles.stateCard} style={{ padding: '28px 24px' }} data-design-node="G8i4xP">
-      <span className={`${styles.stateIcon} ${styles.stateIconError}`} style={{ width: 32, height: 32 }}>
-        <TriangleAlert size={16} aria-hidden="true" />
-      </span>
-      <p className={styles.stateTitle}>
-        {visibleLoadState === 'forbidden' ? LOAD_STATE_WORDS.forbidden.label : '自動応答を読み込めませんでした'}
-      </p>
-      <p className={styles.stateDesc}>
-        {visibleLoadState === 'forbidden'
+    <ListState kind="error" title={visibleLoadState === 'forbidden' ? LOAD_STATE_WORDS.forbidden.label : '自動応答を読み込めませんでした'} description={visibleLoadState === 'forbidden'
           ? LOAD_STATE_WORDS.forbidden.note
           : isForbiddenOrRateLimited(loadError)
             ? LOAD_STATE_WORDS.error.note
-            : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
-      </p>
-      {visibleLoadState === 'error' && (
+            : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'} data-design-node="G8i4xP" action={<>{visibleLoadState === 'error' && (
         <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-      )}
-    </div>
+      )}</>} />
   ) : sortedItems.length === 0 ? (
     /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */
     <EmptyList
@@ -1576,10 +1546,7 @@ export default function AutoRepliesListV8() {
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {!canEdit && (
-          <div className={styles.viewerBand} role="status" data-design-node="Q5lOCc">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="Q5lOCc"></ReadOnlyNotice></div>
         )}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
@@ -1826,10 +1793,7 @@ export default function AutoRepliesListV8() {
           pagination={listPager}
       >
         {actionError ? (
-          <p className={styles.errorBand} style={{ padding: '10px 14px' }} role="alert">
-            {actionError}
-            <button type="button" onClick={() => void load()}>もう一度読み込む</button>
-          </p>
+          <Notice tone="danger" >{actionError}<button type="button" onClick={() => void load()}>もう一度読み込む</button></Notice>
         ) : null}
         {listBody}
       </ListPage>

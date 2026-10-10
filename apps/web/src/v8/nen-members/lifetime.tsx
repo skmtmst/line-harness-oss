@@ -29,6 +29,7 @@ import styles from './members.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import Notice from '@/components/shared/notice'
 
 type MilestoneDraft = { id: string | null; threshold: number; title: string; benefit: string | null; notify: boolean; reachedCount: number }
 
@@ -138,7 +139,7 @@ export default function LifetimeV8({
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-          {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
         </div>
       ) : null}
 

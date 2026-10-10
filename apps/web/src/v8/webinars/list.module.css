@@ -173,15 +173,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-pad-block);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 /* 道具の段の右：並び・よく使う絞り込み（左に印）。 */
 .sortBox { width: var(--tpl-wb-sort-w); }
@@ -234,22 +226,7 @@
 }
 
 /* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: var(--tpl-wb-ro-gap) var(--tpl-head-pad-side);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin: var(--tpl-wb-ro-gap) var(--tpl-head-pad-side); }
 .statsNotice {
   padding: 0 var(--tpl-head-pad-side) var(--tpl-wb-ro-gap);
 }

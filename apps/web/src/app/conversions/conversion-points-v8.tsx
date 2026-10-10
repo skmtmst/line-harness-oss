@@ -51,6 +51,7 @@ import styles from './conversion-points-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /** V8 の絞り込み。`all` を含む以外は v7 の `StatusFilter` と同じ。 */
 export type ConversionPointsV8Status = 'all' | ConversionDefinitionFilter
@@ -259,7 +260,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
       {model.exportError ? <p className={styles.panelError} role="alert">{model.exportError}</p> : null}
 
       {!canEdit ? (
-        <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+        <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
       ) : null}
       <Notice tone="info" message="成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。" />
       {notice ? <Notice tone="success" message={notice} /> : null}

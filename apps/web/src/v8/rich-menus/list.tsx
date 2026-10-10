@@ -14,22 +14,7 @@ import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'reac
 import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  ArrowDownUp,
-  CalendarClock,
-  CircleCheck,
-  CloudDownload,
-  CloudOff,
-  Eye,
-  FilePen,
-  Hand,
-  Image as ImageIcon,
-  ListOrdered,
-  Plus,
-  Split,
-  TriangleAlert,
-  Trophy,
-} from 'lucide-react'
+import { ArrowDownUp, CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api'
 import { clampSearchQuery } from '@/lib/search-query'
@@ -83,8 +68,10 @@ import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -980,12 +967,7 @@ export default function RichMenusListV8() {
   )
 
   const stateCard = (icon: React.ReactNode, title: string, desc: string, action: React.ReactNode, tone?: 'error') => (
-    <div className={styles.stateCard}>
-      <span className={tone === 'error' ? `${styles.stateIcon} ${styles.stateIconError}` : styles.stateIcon}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={tone === 'error' ? 'error' : 'empty'} title={title} description={desc} icon={icon} action={<>{action}</>} />
   )
 
   const listBody = !selectedAccount ? (
@@ -1314,10 +1296,7 @@ export default function RichMenusListV8() {
       stats={<>
         {/* 見るだけの人への帯（ZoKow）。数の帯の上。 */}
         {!canEdit ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         <KpiBand data-design="KPIs" className={styles.kpis}>
           <KpiCard
@@ -1446,10 +1425,7 @@ export default function RichMenusListV8() {
     </>}
     >
       {actionError ? (
-        <p className={styles.errorBand} role="alert">
-          {actionError}
-          <button type="button" onClick={() => void reload()}>もう一度読み込む</button>
-        </p>
+        <Notice tone="danger" >{actionError}<button type="button" onClick={() => void reload()}>もう一度読み込む</button></Notice>
       ) : null}
       {listBody}
     </ListPage>

@@ -23,7 +23,7 @@ import Button from '@/components/shared/button'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
-import { GitCompare, Pencil, RefreshCw, Smartphone, TriangleAlert, Upload } from 'lucide-react'
+import { Pencil, Smartphone, Upload } from 'lucide-react'
 import StatusBadge from '@/components/shared/status-badge'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
@@ -58,6 +58,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import Notice from '@/components/shared/notice'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1173,7 +1174,7 @@ export default function MenuFormV8() {
           </section>
 
           {saveError && (
-            <p className={styles.saveError} role="alert">{saveError}</p>
+            <Notice tone="danger" >{saveError}</Notice>
           )}
           {createdMenuNeedingFollowUp && !saveError && (
             <p className={styles.saveNote}>

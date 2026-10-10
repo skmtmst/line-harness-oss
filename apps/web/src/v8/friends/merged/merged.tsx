@@ -38,6 +38,7 @@ import MergedPersonV8 from './person'
 import { useMergedUsers, USERS_PAGE_SIZES } from './use-merged-users'
 import styles from './merged.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /** 所属アカウントの選びの「複数アカウントのみ」（絞り込みの口は今と同じ onlyDups）。 */
 const MULTI_ACCOUNTS = '__multi'
@@ -138,7 +139,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             </Button>
           ) : null}
         </div>
-        {u.exportError ? <p className={styles.error} role="alert">{u.exportError}</p> : null}
+        {u.exportError ? <Notice tone="danger" >{u.exportError}</Notice> : null}
 
         <div className={styles.cards}>
           {kpis.map((kpi) => (

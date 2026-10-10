@@ -39,6 +39,7 @@ import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import Notice from '@/components/shared/notice'
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -258,7 +259,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   </Button>
                 </div>
 {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-{error ? <p className={styles.error} role="alert">{error}</p> : null}</Field></div>
+{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div>
             </>
           )}
         </div>

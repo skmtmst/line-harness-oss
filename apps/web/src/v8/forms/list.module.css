@@ -28,23 +28,7 @@
 }
 
 /* 閲覧のみの帯（JV2oR）。見出しの下。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-fm-band-gap);
-  padding: var(--tpl-fm-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-fm-band-lh);
-  margin-bottom: var(--tpl-fm-band-after);
-}
-
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin-bottom: var(--tpl-fm-band-after); }
 
 /* 道具の段（広い板）：探す・札3つ … 並び・件数を1本に。 */
 .wideTools {
@@ -128,15 +112,7 @@
   line-height: var(--tpl-fm-band-lh);
 }
 
-.errorBand {
-  flex-basis: 100%;
-  margin: 0;
-  padding: var(--tpl-fm-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 
 /* 数の帯の説明：狭い板（GrnO4）では行き先の左で2行に折る（絵どおり）。 */
 .kpiDetailWrap {

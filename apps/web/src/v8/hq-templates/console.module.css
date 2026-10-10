@@ -3,11 +3,7 @@
 
 .body { display: flex; flex-direction: column; gap: var(--tpl-htn-gap); padding: var(--tpl-htn-body-pad); min-width: 0; color: var(--color-ink); }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.readonlyBand {
-  margin: 0; padding: var(--tpl-htn-info-pad); border-radius: var(--tpl-htn-radius-m);
-  background: var(--color-info-bg); color: var(--color-ink-secondary);
-  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18);
-}
+.readonlyBand { margin: 0; }
 .empty { margin: 0; padding: var(--tpl-htn-empty-pad); text-align: center; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
 .note { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .noteStrong { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }

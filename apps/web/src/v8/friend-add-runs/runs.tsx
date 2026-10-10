@@ -47,6 +47,8 @@ import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routin
 import styles from './runs.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -61,7 +63,7 @@ const RUN_STATUSES_PARAM = new Set<FriendAddEventRoutingStatus>([
 /** CSV 書き出しの安全弁（今までと同じ：100件×50頁＝5,000件で止める）。 */
 const CSV_EXPORT_MAX_PAGES = 50
 const CSV_EXPORT_PAGE_SIZE = 100
-const PAGE_SIZE_OPTIONS = [10, 20, 50].map((n) => ({ value: String(n), label: `${n} 件表示` }))
+const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 const NO_MANAGE_NOTE = '閲覧のみで見ています。一時停止・もう一度実行はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
 
 function routeNameOf(item: RunItem): string {
@@ -456,7 +458,7 @@ function FriendAddRunsInner() {
         </Button>
       </div>}
     >
-      {!canManage ? <p className={styles.viewerBand} role="status">{NO_MANAGE_NOTE}</p> : null}
+      {!canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice></div> : null}
       {ruleIdFilter ? (
         <p className={styles.hint}>
           この設定の実行結果だけを表示しています。

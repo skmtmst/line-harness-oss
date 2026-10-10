@@ -36,6 +36,7 @@ import styles from './create.module.css'
 import { tagNameProblem } from './tag-name'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { Field } from '@/components/shared/form-controls'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 export { tagNameProblem } from './tag-name'
 
 export default function TagCreateV8() {
@@ -190,9 +191,9 @@ function TagCreate() {
 
   if (loading) return <ListState kind="loading" title="複製元を読み込んでいます…" />
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (staffRole !== null && !canManageRole(staffRole)) return <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
 
-  const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
+  const back = null
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
   // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口・同じ権限。
   const createGroup = async (name: string, color: string | null) => {

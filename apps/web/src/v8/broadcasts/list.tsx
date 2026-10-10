@@ -1,6 +1,6 @@
 'use client'
 
-import SharedStatusBadge from '@/components/shared/status-badge'
+
 
 
 /*
@@ -18,26 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  AlertCircle,
-  ArrowUpDown,
-  Bookmark,
-  CalendarClock,
-  CalendarDays,
-  ChevronDown,
-  Copy,
-  Eye,
-  FilePen,
-  FileText,
-  Gauge,
-  List as ListIcon,
-  Lock,
-  MailOpen,
-  Plus,
-  Send,
-  SendHorizontal,
-  UserCheck,
-} from 'lucide-react'
+import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
 import { loadFailureNotice } from '@/components/shared/api-error-message'
@@ -47,7 +28,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -75,6 +56,8 @@ import styles from './list.module.css'
 import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -988,12 +971,7 @@ export default function BroadcastListV8() {
   )
 
   const stateCard = (icon: React.ReactNode, title: string, desc: string | null, action: React.ReactNode, danger = false) => (
-    <div className={styles.stateCard}>
-      {icon ? <span className={danger ? `${styles.stateIcon} ${styles.stateIconError}` : styles.stateIcon}>{icon}</span> : null}
-      <p className={styles.stateTitle}>{title}</p>
-      {desc ? <p className={styles.stateDesc}>{desc}</p> : null}
-      {action}
-    </div>
+    <ListState kind={danger ? 'error' : 'empty'} title={title} description={desc ?? undefined} icon={icon} action={action} />
   )
 
   const listBody = loading ? (
@@ -1147,10 +1125,7 @@ export default function BroadcastListV8() {
       help="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={<>
         {canEdit ? null : (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
         )}
         <KpiBand>
           {kpis.map((kpi) => (
@@ -1179,7 +1154,7 @@ export default function BroadcastListV8() {
         >
           {/* 閲覧のみ：「フォルダを追加」は置かず、場所だけ空ける */}
           {canEdit ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
-          <p className={styles.note}>フォルダを消しても、入っていたものは未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
           {folderError ? (
             <p role="alert" className={styles.note}>
               {folderError}

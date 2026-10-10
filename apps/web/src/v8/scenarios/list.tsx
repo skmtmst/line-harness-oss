@@ -1,6 +1,6 @@
 'use client'
 
-import StatusBadge from '@/components/shared/status-badge'
+
 
 
 /*
@@ -23,25 +23,7 @@ import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam 
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Bookmark,
-  CalendarPlus,
-  Copy,
-  Eye,
-  Folder as FolderIcon,
-  Lightbulb,
-  ListVideo,
-  Pause,
-  Play,
-  Plus,
-  Send,
-  ShieldCheck,
-  Square,
-  TriangleAlert,
-  UserCheck,
-  Users,
-  Workflow,
-} from 'lucide-react'
+import { Bookmark, CalendarPlus, Copy, Folder as FolderIcon, Lightbulb, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, UserCheck, Users, Workflow } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import { api, type ListStats } from '@/lib/api'
 import { useOffsetServerList } from '@/lib/use-server-list'
@@ -68,7 +50,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -91,12 +73,15 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
 
 /** 1ページに出す件数の選択肢（表示は PageSizeSelect が「N件表示」にする）。 */
-const PAGE_SIZE_OPTIONS = [20, 50, 100]
+const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES
 
 /** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「有効のみ」。 */
 const SAVED_FILTER_OPTIONS = [
@@ -847,14 +832,7 @@ export default function ScenariosListV8() {
       </div>
     ) : scenarioList.error ? (
       /* 板 `BxGhV`「読み込めなかった」。数の帯は「—」のまま。 */
-      <div className={styles.stateCard} role="alert" data-design-node="BxGhV">
-        <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-          <TriangleAlert size={16} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>シナリオを読み込めませんでした</p>
-        <p className={styles.stateDesc}>作ったシナリオは消えていません。通信を確かめて、もう一度試してください。</p>
-        <Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="シナリオを読み込めませんでした" description="作ったシナリオは消えていません。通信を確かめて、もう一度試してください。" data-design-node="BxGhV" action={<><Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button></>} />
     ) : scenarios.length === 0 ? (
       /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */
       <EmptyList
@@ -1197,10 +1175,7 @@ export default function ScenariosListV8() {
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
         {!canEdit && (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
         )}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
@@ -1396,10 +1371,7 @@ export default function ScenariosListV8() {
       pagination={listPager}
     >
       {actionError ? (
-        <p className={styles.errorBand} role="alert">
-          {actionError}
-          <button type="button" onClick={() => setActionError('')}>閉じる</button>
-        </p>
+        <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
       ) : null}
       {listBody}
     </ListPage>

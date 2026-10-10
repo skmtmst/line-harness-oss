@@ -18,22 +18,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  CircleCheck,
-  Download,
-  Eye,
-  GitCompare,
-  Pause,
-  Play,
-  Plus,
-  Smartphone,
-  X,
-} from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, X } from 'lucide-react'
 import type {
   CommonVar,
   CommonVarChangeImpact,
@@ -86,9 +71,10 @@ import { focusFieldById } from '@/lib/use-form-errors'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /** 予定の日時（`YYYY-MM-DDTHH:mm`・日本時間）を「10/1 0:00」の形にする。 */
 export function scheduleStamp(value: string): string {
@@ -1115,10 +1101,7 @@ function EditCommonVarV8Inner() {
       )} dirty={false}
     >
       {canWrite ? null : (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
 
       {error && item ? (

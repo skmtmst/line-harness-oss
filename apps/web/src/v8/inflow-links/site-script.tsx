@@ -16,7 +16,7 @@
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
+import { CircleHelp, Pause, Play, Plus, RefreshCw } from 'lucide-react'
 import { ApiError, api, type MeasurementSite } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
@@ -27,7 +27,7 @@ import HelpTip from '@/components/shared/help-tip'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import IconButton from '@/components/shared/icon-button'
+import { MoreAction } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -36,8 +36,9 @@ import { focusField } from './focus-field'
 import styles from './site-script.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -308,15 +309,13 @@ export default function SiteScriptV8() {
             <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? emptyValue('unknown')}</span></span>
             <span className={styles.colMenu} role="cell">
               {manage ? (
-                <IconButton
+                <MoreAction
                   title={`「${site.label}」の操作`}
                   aria-label={`「${site.label}」の操作`}
                   aria-expanded={selectedSiteId === site.id}
                   aria-controls="site-script-row-actions"
                   onClick={() => setSelectedSiteId((current) => (current === site.id ? null : site.id))}
-                >
-                  <MoreHorizontal size={16} aria-hidden="true" />
-                </IconButton>
+                 />
               ) : null}
             </span>
           </div>
@@ -349,7 +348,7 @@ export default function SiteScriptV8() {
       actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>}>
       <div className={styles.body}>
         {readonly ? (
-          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
 
         {loading && summary == null && !failed ? (

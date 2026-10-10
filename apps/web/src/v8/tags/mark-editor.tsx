@@ -14,7 +14,7 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+
 import { useRouter } from 'next/navigation'
 import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react'
 import {
@@ -31,7 +31,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import { TextField } from '@/components/shared/text-field'
+
 import { Field } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -408,7 +408,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   if (loadState === 'loading') return <ListState kind="loading" />
 
-  const back = <Link href="/tags?tab=marks" className={styles.backLink}>← 対応マークへ</Link>
+  const back = null
   const description = editing && selected
     ? `${selected.friendCount} 人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
     : '対応の状態を、色つきの印で管理します。'

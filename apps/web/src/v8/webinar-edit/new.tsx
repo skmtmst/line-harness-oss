@@ -23,6 +23,7 @@ import { BackLink, WizardSteps } from './chrome'
 import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const FOLDERS_BLOCKED = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
 const TITLE_EMPTY = 'ウェビナー名を入力してください'
@@ -146,7 +147,7 @@ function NewInner() {
         </>}
         preview={<BasicPreview title={values.title} description={values.description} accountName={accountName} />} dirty={false}
       >
-        {readOnly ? <Notice tone="info">閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</Notice> : null}
+        {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</ReadOnlyNotice> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {/* 閲覧のみと分かったら、押せない入力の欄は置かず閲覧のみの帯だけを出す（作る画面なので見せる中身は無い。2026-10-06 オーナー決定）。 */}
         {readOnly ? null : <BasicForm

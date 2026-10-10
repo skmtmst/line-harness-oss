@@ -13,23 +13,7 @@
 }
 
 /* 閲覧のみの帯（hEDTK）。タブの上。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-tl-band-gap);
-  margin-bottom: var(--tpl-tl-band-after);
-  padding: var(--tpl-tl-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-tl-band-lh);
-}
-
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin-bottom: var(--tpl-tl-band-after); }
 
 /* 数の帯の説明：狭い板（L7zA7C）では2行に折る（絵どおり）。 */
 .kpiDetailWrap {

@@ -221,7 +221,7 @@ function EventsCreateV8Inner() {
         boardId="d4adD4"
         title="イベントを作る"
         help="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
-        footerActions={<Button href="/events">一覧へ戻る</Button>} dirty={false}
+        footerActions={<Button href="/events">キャンセル</Button>} dirty={false}
       >
         <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage>

@@ -32,8 +32,9 @@ describe('友だちV8の画面契約', () => {
     expect(PAGE).not.toContain('友だち管理のマニュアルは準備中です')
   })
 
-  it('表示件数10〜50件と省略ページングを持つ', () => {
-    expect(PAGE).toContain('const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50]')
+  it('共通の表示件数と省略ページングを持つ', () => {
+    expect(PAGE).toContain("from '@/components/shared/page-size-select'")
+    expect(PAGE).toContain('const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES')
     expect(TABLE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(PAGINATION).toContain('paginationItems')
     expect(PAGINATION).toContain("return [1, 'ellipsis', current, 'ellipsis', total]")

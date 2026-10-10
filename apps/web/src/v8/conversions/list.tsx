@@ -15,23 +15,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Banknote,
-  Bookmark,
-  CircleOff,
-  CirclePause,
-  Download,
-  Eye,
-  FilePen,
-  KeyRound,
-  Pause,
-  Play,
-  Plus,
-  Target,
-  TriangleAlert,
-  Trophy,
-  Unplug,
-} from 'lucide-react'
+import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug } from 'lucide-react'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -43,7 +27,7 @@ import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel'
 import { useListUrlParam } from '@/components/shared/list-url-state'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -94,10 +78,11 @@ import { notifyToast } from '@/components/shared/toast'
 import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */
@@ -926,7 +911,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       {issuedSecret && panelPoint.measureMethod === 'webhook' ? (
         <p className={styles.secretBox} role="status">{`発行した鍵（この表示でだけ見られます。連携先へ渡してください）：${issuedSecret}`}</p>
       ) : null}
-      {ingestError ? <p className={styles.errorText} role="alert">{ingestError}</p> : null}
+      {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
       <div className={styles.panelButtons}>
         {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
           <Button onClick={() => void issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
@@ -1007,7 +992,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           onChange={(event) => setStopReason(event.target.value)}
         />
       </Field>
-      {stopError ? <p className={styles.errorText} role="alert">{stopError}</p> : null}
+      {stopError ? <Notice tone="danger" >{stopError}</Notice> : null}
       <div className={styles.panelActions}>
         <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
         <Button
@@ -1162,10 +1147,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       }
       stats={<>
         {!canEdit && role !== null ? (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         {exportError ? <div className={styles.statsNotice}><Notice tone="warn">{exportError}</Notice></div> : null}
         {actionError ? <div className={styles.statsNotice}><Notice tone="warn">{actionError}</Notice></div> : null}

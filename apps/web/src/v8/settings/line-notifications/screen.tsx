@@ -53,13 +53,10 @@ import {
 } from './customer-kpis'
 import KpiCard from '@/components/shared/kpi-card'
 import FilterChip from '@/components/shared/filter-chip'
-import {
-  isForbidden,
-  isForbiddenOrRateLimited,
-  loadFailureNotice,
-} from '@/components/shared/api-error-message'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 const customerFilters = [
   ['all', 'すべて'],
   ['enabled', '出している'],
@@ -1221,7 +1218,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
         <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button>
       </p>
     ) : null}
-    {!canManage && expandedSetting === null ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</p> : null}
+    {!canManage && expandedSetting === null ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
     {tab === 'failures' ? <RunsTab lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <RunsTab lineAccountId={selectedAccountId} mode="history" /> : null}
     {tab === 'operator' ? (renderOperatorRules

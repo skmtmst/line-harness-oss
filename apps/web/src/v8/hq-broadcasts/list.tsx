@@ -14,13 +14,13 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, ArrowUpDown, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react'
+import { AlertCircle, CalendarClock, FilePen, Inbox, List, MailOpen, Plus, Send } from 'lucide-react'
 import type { HqBroadcastRun } from '@line-crm/shared'
 import { ListPage, ListPagePagination } from '@/components/templates/list-page'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -380,7 +380,7 @@ export default function HqBroadcastList() {
           rows={folderRows}
         >
           {canManage ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
-          <p className={styles.note}>フォルダを消しても、入っていたものは未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       )}
       overlays={(

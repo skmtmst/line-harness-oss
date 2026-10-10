@@ -12,7 +12,7 @@
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Eye, Play, RotateCcw } from 'lucide-react'
+import { Play, RotateCcw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type AccountHandover, type AccountHandoverDecision } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -26,7 +26,7 @@ import Card from '@/components/shared/card'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Th, Tr, Td, TableStateRow } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ListState from '@/components/shared/list-state'
+
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
@@ -42,6 +42,7 @@ import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type HandoverDecisionView = AccountHandoverDecision & {
   sourceName?: string
@@ -368,7 +369,7 @@ export default function AccountHandoverV8() {
   }
 
   const viewerBand = !canManage ? (
-    <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>{NO_MANAGE_NOTE}</Notice>
+    <ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice>
   ) : null
 
   // 段1・段2の入口。出す側と受け取る側の両方の口を出す。
@@ -395,7 +396,7 @@ export default function AccountHandoverV8() {
                 <Button type="button" variant="primary" disabled={linking || !linkCode.trim()} busy={linking} busyLabel="確認中…" onClick={() => void submitLinkCode()}>コードを読む</Button>
               </div>
             ) : null}
-            {linkError ? <p role="alert" className={styles.error}>{linkError}</p> : null}
+            {linkError ? <Notice tone="danger" >{linkError}</Notice> : null}
           </Card>
         </div>
       </>

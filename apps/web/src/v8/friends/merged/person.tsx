@@ -18,7 +18,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Toggle from '@/components/shared/toggle'
 import { TextArea } from '@/components/shared/text-field'
-import { RequiredBadge } from '@/components/shared/form-controls'
+
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dialog'
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
@@ -28,6 +28,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
@@ -76,10 +77,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
       <div className={styles.split}>
         <div className={styles.main}>
           {m.saveError ? (
-            <p className={styles.error} role="alert">
-              {m.saveError}
-              <button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button>
-            </p>
+            <Notice tone="danger" >{m.saveError}<button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button></Notice>
           ) : null}
 
           <section className={styles.card} aria-labelledby="mp-delivery">

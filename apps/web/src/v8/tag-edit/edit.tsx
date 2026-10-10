@@ -29,7 +29,7 @@ import Notice from '@/components/shared/notice'
 import { folderCreateResult } from '@/components/shared/folder-select'
 import TargetMissing from '@/components/shared/target-missing'
 
-import { notifyToast } from '@/components/shared/toast'
+
 
 import { ArchivedTagEditor, DeleteDialog } from '@/components/friend-fields/edit-tag-page-v4'
 import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
@@ -39,6 +39,7 @@ import styles from './edit.module.css'
 
 import { TagEditForm } from './edit-form'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export default function TagEditV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
@@ -230,7 +231,7 @@ export default function TagEditV8() {
   }
   // アーカイブのタグは通常の編集を出さない（#710）。
   if (tag.status === 'archived') {
-    if (!canEdit) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+    if (!canEdit) return <ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice>
     return <ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => { if (targetRef.current === targetKey && targetGenerationRef.current === targetGeneration) setTag((current) => (current ? { ...current, ...updated } : current)) }} />
   }
 

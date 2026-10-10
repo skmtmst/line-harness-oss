@@ -30,7 +30,7 @@ import LinePreview from '@/components/shared/line-preview'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
 import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import { notifyToast } from '@/components/shared/toast'
+
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import TapActionField from '@/components/shared/tap-action-field'
 import { FieldError } from '@/components/shared/form-controls'
@@ -45,6 +45,7 @@ import type { TemplateEditHost } from './host'
 import styles from './edit.module.css'
 import rich from './rich.module.css'
 import { Field } from '@/components/shared/form-controls'
+import Notice from '@/components/shared/notice'
 
 /* ── 形と面（template-asset-editor.tsx と同じ値） ── */
 export interface RichArea { label: string; x: number; y: number; width: number; height: number }
@@ -463,7 +464,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         )}
       >
         {host?.notice}
-        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
 
         {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>

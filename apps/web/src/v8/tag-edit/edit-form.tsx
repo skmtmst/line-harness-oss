@@ -30,15 +30,16 @@ import { tagNameProblem } from '@/v8/tags/tag-name'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
-import Toggle from '@/components/shared/toggle'
+
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model'
 import styles from './edit.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export interface TagEditHost {
   initialValues: TagEditorValues
@@ -242,7 +243,7 @@ export function TagEditForm({
         busy={saving}
         boardId={host ? 'MFgPZ' : 'Qat9s'}
         footerOutlined={Boolean(host)}
-        notice={<>{host?.notice}{readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</p> : null}{conflictBand}</>}
+        notice={<>{host?.notice}{readOnly ? <div className={styles.roBand}><ReadOnlyNotice role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</ReadOnlyNotice></div> : null}{conflictBand}</>}
         title={host?.title ?? (tag.name || 'タグを編集')}
         identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
         help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}

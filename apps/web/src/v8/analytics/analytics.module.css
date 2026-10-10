@@ -63,22 +63,7 @@
 }
 
 /* 閲覧のみの帯（タブの下・数の帯の上）。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  margin: var(--tpl-an-ro-margin);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin: var(--tpl-an-ro-margin); }
 
 /* 説明は絵どおり字の途中で折る（全体の言葉のまとまりの折り返しを外す）。 */
 .description {
@@ -913,14 +898,7 @@
   gap: var(--tpl-an-wide-gap);
   min-width: 0;
 }
-.inlineError {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--tpl-an-wide-gap);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
 .resultList {
   display: flex;
   flex-direction: column;

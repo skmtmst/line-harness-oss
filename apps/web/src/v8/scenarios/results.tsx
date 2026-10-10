@@ -9,7 +9,7 @@
  * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
+
 import { useSearchParams } from 'next/navigation'
 import { Download, Eye, PencilLine } from 'lucide-react'
 import type { Scenario, ScenarioStats, ScenarioStep } from '@line-crm/shared'
@@ -429,7 +429,7 @@ export default function ScenarioResultsV8() {
   return (
     <DetailPage
       boardId="X4STXS"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+
       title={scenario ? `配信結果：${scenario.name}` : '配信結果'}
       help="始まった・読み終えた・どの通まで届いたかを見ます。"
       actions={(

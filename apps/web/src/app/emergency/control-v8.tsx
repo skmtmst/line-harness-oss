@@ -12,7 +12,7 @@
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
  */
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Eye, PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
+import { PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import {
   api,
@@ -44,6 +44,7 @@ import type { UpdateRelease } from './update-history'
 import styles from './control-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -505,10 +506,7 @@ const EmergencyControlV8 = (
     <div data-design-node="OHwbU" className={styles.board}>
       {/* 権限が無い人には閲覧のみの帯。操作は出さず、記録は読める。 */}
       {previewSettled && !canControl ? (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status">閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</ReadOnlyNotice></div>
       ) : null}
 
       {needsReload ? (

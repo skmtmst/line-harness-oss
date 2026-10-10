@@ -9,7 +9,7 @@
  * v7 の画面（app/automations/page.tsx の v7 の枝）は触らない。データの口は同じ。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Eye } from 'lucide-react'
+
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole } from '@/lib/staff-role'
@@ -22,7 +22,8 @@ import { Tabs } from '@/components/shared/tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './shell.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export type AutomationTabKey = 'rules' | 'common-actions' | 'runs' | 'templates'
 
@@ -98,10 +99,7 @@ export function AutomationTabs({ active, counts }: { active: AutomationTabKey; c
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>
-      <div className={styles.viewerBand} role="status">
-        <Eye size={16} aria-hidden="true" />
-        <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-      </div>
+      <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
     </div>
   )
 }

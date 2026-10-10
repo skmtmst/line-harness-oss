@@ -13,10 +13,7 @@ import {
   api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail,
   type AutomationDraftDetail,
 } from '@/lib/api'
-import {
-  ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play,
-  RefreshCw, Tag as TagIcon, Trash2, TriangleAlert, UserPlus, UserRound, Zap,
-} from 'lucide-react'
+import { ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play, Tag as TagIcon, Trash2, UserPlus, UserRound, Zap } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -64,6 +61,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -2531,7 +2529,7 @@ export function NewAutomationV8({
       )} dirty={false}
     >
       {canManage === false ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。ルールを作る操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。ルールを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {resumeTarget && resumeStatus === 'failed' ? (

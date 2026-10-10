@@ -12,7 +12,7 @@
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Copy, LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
+import { LayoutTemplate, Plus, RefreshCw, Trash2, FlaskConical, Inbox } from 'lucide-react'
 import type { IncomingWebhook } from '@line-crm/shared'
 import {
   api,
@@ -36,6 +36,7 @@ import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -615,7 +616,7 @@ export default function WebhooksIncomingV8() {
   /* ===== 右の設定 ===== */
   let rightColumn
   if (!selectedAccountId) {
-    rightColumn = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    rightColumn = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (incomingStatus === 'ready' && !selected) {
     /* 修正案 D-2：空の一覧。 */
     rightColumn = (

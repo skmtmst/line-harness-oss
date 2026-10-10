@@ -11,7 +11,7 @@
  */
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useState } from 'react'
-import { Copy, Download, FileText } from 'lucide-react'
+import { Download, FileText } from 'lucide-react'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -20,6 +20,7 @@ import { Field } from '@/components/shared/form-controls'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './qr-dialog.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import Notice from '@/components/shared/notice'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
@@ -132,9 +133,9 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
           <p className={styles.note}>
             印刷するときは「印刷用 PDF」がきれいです。チラシ・POP では 3cm 以上の大きさにしてください。
           </p>
-          {imageState === 'failed' ? <p role="alert" className={styles.error}>QRを保存できませんでした。時間をおいて、もう一度お試しください。</p> : null}
+          {imageState === 'failed' ? <Notice tone="danger" >QRを保存できませんでした。時間をおいて、もう一度お試しください。</Notice> : null}
           {pdfState === 'failed' ? (
-            <p role="alert" className={styles.error}>印刷用 PDF を作れませんでした。時間をおいて、もう一度お試しください。</p>
+            <Notice tone="danger" >印刷用 PDF を作れませんでした。時間をおいて、もう一度お試しください。</Notice>
           ) : null}
         </div>
     </Dialog>

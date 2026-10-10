@@ -10,7 +10,7 @@
  */
 import { useRouter } from 'next/navigation'
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { ArrowRight, BookOpen, CircleCheck, ExternalLink } from 'lucide-react'
+import { ArrowRight, BookOpen, CircleCheck } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { MANUAL_LINKS } from '@/lib/manual-links'
@@ -27,6 +27,7 @@ import { TextField } from '@/components/shared/text-field'
 import TermsBody from './terms-body'
 import { canSubmitTerms, formatAgreedAt, hasReadTerms, initialWizardStep, STEP } from './terms-state'
 import styles from './store-new.module.css'
+import Notice from '@/components/shared/notice'
 
 const STEPS = [
   ['利用規約への同意', 'musubo の利用規約と、個人情報の取扱いをご確認ください。'],
@@ -270,7 +271,7 @@ export default function StoreNewV8() {
                   <Button external href="/restaurant-test/terms">利用規約を別画面で読む</Button>
                 </div>
                 <Checkbox checked={termsChecked} disabled={!readToEnd || agreeing} onCheckedChange={setTermsChecked}>上記の利用規約および個人情報の取扱いに同意します</Checkbox>
-                {agreeError ? <p role="alert" className={styles.error}>{agreeError}</p> : null}
+                {agreeError ? <Notice tone="danger" >{agreeError}</Notice> : null}
               </>
             ) : null}
 

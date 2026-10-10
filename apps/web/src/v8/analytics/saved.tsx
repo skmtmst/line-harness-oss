@@ -26,6 +26,7 @@ import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import Notice from '@/components/shared/notice'
 
 const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = { available: '利用可能', partial: '一部集計', unavailable: '未取得', failed: '失敗' }
 const REPORT_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = { active: '有効', paused: '停止中', archived: 'アーカイブ' }
@@ -300,9 +301,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
         {schedulesLoading ? <span className={styles.caption}>確認中</span> : null}
         {canManage ? <Button href="/analytics/reports/new" variant="secondary"><Plus size={15} aria-hidden="true" />定期レポートを作る</Button> : null}
       </div>
-      {schedulesError ? <div className={styles.inlineError} role="alert"><span>{schedulesError}</span>
-        {/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}
-        <Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></div> : null}
+      {schedulesError ? <Notice tone="danger" ><span>{schedulesError}</span>{/* 版ずれの通知は reloadSchedules で消さない。消すのは手でやり直したこの入口だけ。 */}<Button variant="secondary" disabled={schedulesLoading} onClick={() => { setSchedulesError(''); reloadSchedules() }}>もう一度確認</Button></Notice> : null}
       {schedulesLoading ? null : schedules.length === 0 ? (schedulesError ? null : <ListState kind="empty" title="定期レポートはまだありません" description="決まった曜日や日に、集計結果をメールやLINEへ届けられます。" />)
         : <div className={styles.table} role="table" aria-label="定期レポート">
           <div className={styles.thead} role="row">

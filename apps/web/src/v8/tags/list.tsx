@@ -13,7 +13,7 @@
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Eye, Plus, Upload } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -29,7 +29,8 @@ import MarksTab from './marks-tab'
 import SearchesTab from './searches-tab'
 import FieldsTab from './fields-tab'
 import styles from './list.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -114,9 +115,7 @@ export default function TagsList({
 
       {readOnly ? (
         <div className={styles.readonlyRow}>
-          <p className={styles.readonlyBand}>
-            <Eye className={styles.readonlyIcon} aria-hidden="true" />
-            閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.readonlyBand}><ReadOnlyNotice ></ReadOnlyNotice></div>
         </div>
       ) : null}
 

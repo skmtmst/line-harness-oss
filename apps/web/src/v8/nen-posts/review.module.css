@@ -642,11 +642,7 @@
   gap: var(--tpl-nm-action-gap);
   font-size: var(--text-label);
 }
-.errorText {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--tpl-nm-row-size);
-}
+
 
 /* 公式サイト掲載（SyQA1）：写真の表＋右に幅190の決めごと。 */
 .publicationsGrid {

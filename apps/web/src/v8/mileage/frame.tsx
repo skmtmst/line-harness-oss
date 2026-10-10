@@ -9,12 +9,13 @@
  * 数の帯・フォルダの列・道具の段・表は各タブが一覧の型（ListPage）の枠へ渡す。
  */
 import { createContext, useContext, type ReactNode } from 'react'
-import { Eye } from 'lucide-react'
+
 import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './mileage.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export const MILEAGE_TABS = [
   { key: 'earning-rules', label: 'たまる決めごと', board: 'OC0gy' },
@@ -57,10 +58,7 @@ export function useMileageShell(): MileageShellContext {
 /** 閲覧のみの帯（E2Any）。数の帯の上。 */
 export function ViewerBand() {
   return (
-    <p className={styles.viewerBand} role="note">
-      <Eye size={16} aria-hidden="true" />
-      <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-    </p>
+    <div className={styles.viewerBand}><ReadOnlyNotice role="note"></ReadOnlyNotice></div>
   )
 }
 

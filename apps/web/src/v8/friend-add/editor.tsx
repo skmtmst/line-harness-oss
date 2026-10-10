@@ -84,9 +84,10 @@ import styles from './editor.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -734,7 +735,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       )} dirty={false}
     >
       {!canEdit ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}

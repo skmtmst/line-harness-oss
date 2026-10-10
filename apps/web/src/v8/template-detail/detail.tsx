@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, CircleAlert, Copy, ExternalLink, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
+import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
 import { validateFlexContent } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -46,10 +46,12 @@ import {
 import styles from './detail.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /** 表にまず見せる行数。残りは「ほか N か所を見る」で開く。 */
 const USAGE_VISIBLE = 4
@@ -349,7 +351,7 @@ export default function TemplateDetailV8() {
           <RowMenu className={styles.moreButton} label="そのほかの操作" menuLabel={`テンプレート「${template.name}」の操作`} items={menuItems} />
         </div>
       ) : null}
-      {duplicateError ? <p className={styles.errorText} role="alert">{duplicateError}</p> : null}
+      {duplicateError ? <Notice tone="danger" >{duplicateError}</Notice> : null}
       <section className={styles.aboutBox} aria-label="このテンプレートについて">
         <h2 className={styles.aboutTitle}>このテンプレートについて</h2>
         <dl className={styles.aboutList}>
@@ -394,7 +396,7 @@ export default function TemplateDetailV8() {
         description={[messageTypeText(template.messageType), folderLabel, `更新 ${shortStamp(template.updatedAt)}`].join('・')}
         preview={side}
       >
-        {canMutate ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</p>}
+        {canMutate ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>}
         {template.hasDraft ? (
           <div className={styles.draftBand} role="status">
             <CircleAlert size={18} aria-hidden="true" className={styles.draftIcon} />

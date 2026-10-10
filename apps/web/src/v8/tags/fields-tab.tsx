@@ -13,13 +13,13 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from 'lucide-react'
+import { ClipboardList, FileText, GripVertical, Info, PenLine, Plus, Send, Users } from 'lucide-react'
 import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { useRowLeaving } from '@/lib/use-row-leaving'
 import { ListPageBody } from '@/components/templates'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -40,7 +40,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { notifyToast } from '@/components/shared/toast'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
@@ -50,12 +50,14 @@ import styles from './list.module.css'
 import type { AttributeListHost } from './attribute-host'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import Notice from '@/components/shared/notice'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類の印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 /** 種類の言葉（絵：選ぶ種類は「1つ選ぶ」「いくつも選ぶ」）。ほかは今の言葉。 */
 export function fieldTypeWord(type: FriendFieldType): string {
@@ -509,7 +511,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
             addFolderLabel="フォルダを追加"
             rows={folderRows}
           >
-            <p className={styles.folderNote}>フォルダを消しても、中の項目は未分類に残ります</p>
+            <FolderPanelNote>フォルダを消しても、中の項目は未分類に残ります</FolderPanelNote>
             {folderError ? (
               <p role="alert" className={styles.folderNote}>
                 {folderError}
@@ -546,15 +548,11 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            {retryOrder ? (
+          <Notice tone="danger" >{actionError}{retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
               <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-            )}
-          </p>
+            )}</Notice>
         ) : null}
         {table}
       </ListPageBody>

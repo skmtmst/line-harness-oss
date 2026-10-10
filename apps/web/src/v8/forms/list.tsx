@@ -16,19 +16,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as R
 import { useListScrollMemory } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Archive,
-  CircleCheck,
-  ClipboardList,
-  Eye,
-  FileText,
-  IdCard,
-  Inbox,
-  Link2,
-  Percent,
-  Plus,
-  TriangleAlert,
-} from 'lucide-react'
+import { Archive, CircleCheck, ClipboardList, FileText, IdCard, Inbox, Percent, Plus, TriangleAlert } from 'lucide-react'
 import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared'
 import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -49,7 +37,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -89,8 +77,11 @@ import {
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
@@ -918,7 +909,7 @@ export default function FormsListV8() {
       addFolderLabel="フォルダを追加"
       rows={folderRows}
     >
-      <p className={styles.folderNote}>フォルダを消しても、中のフォームは未分類に残ります。</p>
+      <FolderPanelNote>フォルダを消しても、中のフォームは未分類に残ります。</FolderPanelNote>
       {folderError ? (
         <p role="alert" className={styles.folderNote}>
           {folderError}
@@ -1032,12 +1023,7 @@ export default function FormsListV8() {
 
   /* ===== 一覧の中身（読込中・失敗・空・0件・表を分ける） ===== */
   const stateCard = (icon: ReactNode, title: string, desc: string, action?: ReactNode, error = false, node?: string) => (
-    <div className={styles.stateCard} data-design-node={node}>
-      <span className={styles.stateIcon} data-tone={error ? 'error' : undefined}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={error ? 'error' : 'empty'} title={title} description={desc} data-design-node={node} icon={icon} action={action} />
   )
 
   const tableHead = (
@@ -1295,10 +1281,7 @@ export default function FormsListV8() {
 
   /* 閲覧のみの帯（`JV2oR`）。見出しの下・数の帯の上。 */
   const viewerBand = !canEditForms ? (
-    <div className={styles.viewerBand} role="status" data-design-node="JV2oR">
-      <Eye size={16} aria-hidden="true" />
-      <span>{VIEWER_NOTE}</span>
-    </div>
+    <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
   const overlays = (
@@ -1669,10 +1652,7 @@ export default function FormsListV8() {
               </div>
             ) : null}
             {createError ? (
-              <p className={styles.errorBand} role="alert">
-                {createError}
-                <button type="button" className={styles.textButton} onClick={() => setCreateError('')}>閉じる</button>
-              </p>
+              <Notice tone="danger" >{createError}<button type="button" className={styles.textButton} onClick={() => setCreateError('')}>閉じる</button></Notice>
             ) : null}
           </>
         )}

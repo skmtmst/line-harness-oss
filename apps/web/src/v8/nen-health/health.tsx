@@ -43,11 +43,12 @@ import SummaryDrawerV8, { SummarySheet } from './summary'
 import { EMPTY_FILTERS, Pill, RowMenu, WeightBars, changeBadges, md, rangeText, type HealthFilters, type HealthTabKey } from './parts'
 import styles from './health.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 export type { HealthTabKey } from './parts'
 
 const BOARD: Record<HealthTabKey, string> = { logs: 'mIwA4', concern: 'mIwA4', items: 'z2tvtX' }
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 type SummaryState = { accountId: string; petId: string; data: NenHealthSummaryData }
 

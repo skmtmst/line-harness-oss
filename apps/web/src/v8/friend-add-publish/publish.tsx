@@ -39,6 +39,7 @@ import FriendAddDoneV8 from './done'
 import styles from './publish.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden' | 'missing'
 type RuleDetail = {
@@ -387,7 +388,7 @@ function FriendAddPublish() {
         <Button href="/friend-add-settings">一覧へ戻る</Button>
       )}
     >
-      {!canEdit ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</p> : null}
+      {!canEdit ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。有効にする操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
 

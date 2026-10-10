@@ -25,9 +25,11 @@ import { canResendInvite, lastLoginShort, memberKpis, memberStatus, sortMembersB
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+
+
 import { emptyValue } from '@/components/shared/empty-value'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -212,9 +214,9 @@ function MembersInner() {
       folders={<HqSettingsNavV8 active="members" />} folderNav={settingsNav}
     >
       <div className={styles.body}>
-        {ready && !canManage ? <p className={styles.viewerBand} role="status">{VIEWER_NOTE}</p> : null}
+        {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}
         {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-        {actionError ? <p className={styles.error} role="alert">{actionError}</p> : null}
+        {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
         {status === 'loading' ? (
           <ListState permissionScope="hq" kind="loading" title="権限者を読み込んでいます" />
