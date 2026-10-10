@@ -268,7 +268,10 @@ describe('R587 フォルダだけの失敗は一覧と容量を隠さない', ()
     await waitForText('表示できませんでした')
     // 容量の取得自体は生きているので「—（未取得）」にしない。
     expect(host.textContent).toContain('使っている容量')
-    expect(host.textContent).not.toContain('—（未取得）')
+    const capacity = [...host.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.startsWith('使っている容量'))!
+    expect(capacity).toBeTruthy()
+    expect(capacity.textContent).toContain('12%')
+    expect(capacity.textContent).not.toContain('未取得')
   })
 
   it('一覧が失敗を返しても全体の失敗と再試行になる', async () => {
@@ -373,7 +376,10 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
     expect(host.textContent).not.toContain('件中')
     // 容量の取得は生きているので残る。
     expect(host.textContent).toContain('使っている容量')
-    expect(host.textContent).not.toContain('—（未取得）')
+    const capacity = [...host.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.startsWith('使っている容量'))!
+    expect(capacity).toBeTruthy()
+    expect(capacity.textContent).toContain('12%')
+    expect(capacity.textContent).not.toContain('未取得')
   })
 
   it('一覧503後の読み直しで正しい件数が戻る', async () => {
@@ -410,7 +416,7 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
     expect(folderRowButton('すべて').textContent).toBe('すべて2')
 
     const imageChips = [...host.querySelectorAll<HTMLButtonElement>('button')]
-      .filter((button) => button.textContent === '画像')
+      .filter((button) => /^画像(?:\s+\d+)?$/.test(button.textContent ?? ''))
     expect(imageChips).toHaveLength(1)
     await act(async () => { imageChips[0].click(); await settle() })
     await waitForText('1件中 1〜1件を表示')

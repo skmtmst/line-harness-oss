@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 /*
@@ -10,21 +10,24 @@ import { describe, expect, it } from 'vitest'
 
 const MEDIA = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const VARS = readFileSync(new URL('./vars/page.tsx', import.meta.url), 'utf8')
+const FOLDERS = readFileSync(new URL('../../components/shared/managed-folder-panel.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../../components/shared/folder-row-actions.tsx', import.meta.url), 'utf8')
 
 describe('R37 フォルダの名前変更・削除の接続', () => {
   it('メディア一覧は FolderPanel の行に名前変更・削除を渡す', () => {
-    expect(MEDIA).toContain('onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined')
-    expect(MEDIA).toContain('onDelete: canManageMedia')
-    expect(MEDIA).toContain("deleteNote: '削除しても、中のメディアは未分類に残ります。'")
+    expect(MEDIA).toContain('<ManagedFolderPanel')
+    expect(MEDIA).toContain('canManage={canManageMedia && Boolean(selectedAccountId)}')
+    expect(FOLDERS).toContain('enabled: editable')
+    expect(FOLDERS).toContain('actions.rowActions(folder, index).onEdit?.()')
+    expect(FOLDERS).toContain('actions.rowActions(folder, index).onDelete?.()')
   })
 
   it('メディア一覧は名前を直す窓と消す前の確認の窓を出す', () => {
-    expect(MEDIA).toContain('<FolderAddDialog')
+    expect(FOLDERS).toContain('<FolderAddDialog')
     expect(MEDIA).toContain('kind="media"')
-    expect(MEDIA).toContain('folder={editingFolder}')
-    expect(MEDIA).toContain('フォルダ「${deletingFolder?.name ??')
-    expect(MEDIA).toContain('削除しても、中のメディアは未分類に残ります。')
-    expect(MEDIA).toContain('api.folders.delete(deletingFolder.id')
+    expect(FOLDERS).toContain('folder={editing}')
+    expect(FOLDERS).toContain('中の${itemLabel}は未分類に残ります。')
+    expect(FOLDERS).toContain('api.folders.delete(')
+    expect(FOLDERS).toContain('<ConfirmDialog')
   })
 
   it('共通情報一覧は FolderPanel の行に名前変更・削除を渡す', () => {

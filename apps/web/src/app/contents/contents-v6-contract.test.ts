@@ -1,7 +1,8 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const UPLOAD = readFileSync(new URL('./media-upload-dialog.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('./media-detail-dialog.tsx', import.meta.url), 'utf8')
 const REPLACEMENT = readFileSync(new URL('./media-replacement-dialog.tsx', import.meta.url), 'utf8')
@@ -9,20 +10,21 @@ const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts', import.meta.url), 'utf8')
 const DB = readFileSync(new URL('../../../../../packages/db/src/media.ts', import.meta.url), 'utf8')
 const GUIDANCE = readFileSync(new URL('./media-quota-guidance.tsx', import.meta.url), 'utf8')
+const FOLDERS = readUiSource(new URL('../../components/shared/managed-folder-panel.tsx', import.meta.url), 'utf8')
 
-describe('V6 登録メディア一覧の契約', () => {
-  it('V6の実Nodeと共通状態部品を使う', () => {
-    expect(PAGE).toContain('data-design-node="g89Tc"')
+describe('V8 登録メディア一覧の契約', () => {
+  it('V8の板と共通状態部品を使う', () => {
+    expect(PAGE).toContain('boardId="O7hUt7"')
     expect(PAGE).toContain('<ListState kind="loading"')
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('kind="empty"')
   })
 
   it('未取得の使用数を0件に見せない', () => {
-    expect(PAGE).toContain("? '使用先を確認できません'")
+    expect(PAGE).toContain("? '使用先：確かめられません'")
     expect(PAGE).toContain("item.usageCount === 0")
-    expect(PAGE).toContain("? 'どこでも使っていない'")
-    expect(PAGE).toContain('`${item.usageCount}か所で使用中`')
+    expect(PAGE).toContain("? '使用先：どこでも使っていない'")
+    expect(PAGE).toContain('`使用先：${item.usageCount} か所`')
   })
 
   it('使っていないメディアだけを一覧で絞り込める', () => {
@@ -40,11 +42,11 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('並び順と表示件数を選べる', () => {
-    expect(PAGE).toContain("const [sort, setSort] = useState<MediaSort>('newest')")
+    expect(PAGE).toContain("const [sort, setSort] = useListUrlValue<MediaSort>('sort', 'newest')")
     expect(PAGE).toContain('入れた日が新しい順')
     expect(PAGE).toContain('使われている順')
     expect(PAGE).toContain('sort,')
-    expect(PAGE).toContain('const [pageSize, setPageSize] = useState(20)')
+    expect(PAGE).toContain("const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)")
     expect(PAGE).toContain('PAGE_SIZE_OPTIONS')
     expect(PAGE).toContain('offset: (page - 1) * pageSize')
     expect(PAGE).toContain('setTotal(res.data.total)')
@@ -57,7 +59,8 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('quota.limitBytes')
     expect(PAGE).toContain('<MediaQuotaGuidance')
     expect(PAGE).toContain('quota={quota}')
-    expect(PAGE).toContain('selected={showNearLimitOnly}')
+    expect(PAGE).toContain("{ value: 'near-limit', label: '上限に近いものだけ' }")
+    expect(PAGE).toContain('setShowNearLimitOnly(true)')
     expect(PAGE).toContain('nearLimitOnly: showNearLimitOnly')
     // 棒と残量とstate別の案内は案内側に寄せている。
     expect(GUIDANCE).toContain('quota.remainingBytes')
@@ -67,7 +70,7 @@ describe('V6 登録メディア一覧の契約', () => {
   })
 
   it('格子と一覧の切り替えを持つ', () => {
-    expect(PAGE).toContain("const [view, setView] = useState<MediaView>('grid')")
+    expect(PAGE).toContain("useListUrlValue<MediaView>('view', 'grid')")
     expect(PAGE).toContain('aria-label="並べ方"')
     expect(PAGE).toContain('格子で並べる')
     expect(PAGE).toContain('一覧で並べる')
@@ -77,9 +80,10 @@ describe('V6 登録メディア一覧の契約', () => {
   it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {
     // #730: 選択中の1件に閉じた母集団で数えるよう、選択中IDを渡す。
     expect(PAGE).toContain("api.folders.list('media', accountAtRequest)")
-    expect(PAGE).toContain("api.folders.create({ kind: 'media', name })")
+    expect(FOLDERS).toContain('api.folders.create(')
     expect(PAGE).toContain('folderId: folderFilter || undefined')
-    expect(PAGE).toContain('<FolderPanel')
+    expect(PAGE).toContain('<ManagedFolderPanel')
+    expect(PAGE).toContain('kind="media"')
   })
 
   it('詳細では取得済みメタデータと使用先を表示し、安全確認後に新版を追加する', () => {
@@ -161,7 +165,9 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('disabled={!isKnownUnused(item) || !!item.archivedAt}')
     expect(PAGE).toContain('使用先を確認できないため選べません')
     expect(PAGE).toContain('removableSelected.length !== selected.size')
-    expect(PAGE).not.toContain('item.usageCount === undefined || item.usageCount === 0')
+    const unusedCheck = PAGE.match(/function isKnownUnused\(item: MediaItem\)(?:\s*:\s*boolean)?\s*\{([^}]+)\}/)?.[1]
+    expect(unusedCheck).toBeDefined()
+    expect(unusedCheck).not.toContain('undefined')
   })
 
   it('選択中のLINEアカウントを一覧・登録・変更・使用先・削除へ渡す', () => {
@@ -211,7 +217,7 @@ describe('V6 登録メディア一覧の契約', () => {
     // 画面側は必ず理由付きで呼ぶ。staff には押し口を出さない。
     expect(API).toContain('body: JSON.stringify({ accountId, reason })')
     // #976 U086: 必須の印は共通の「必須」札。見た目の文は「理由 必須（あとから…）」
-    expect(PAGE).toContain('理由<RequiredBadge />')
+    expect(PAGE).toContain('<Field label="理由（あとから履歴で確認できます）" required>')
     expect(PAGE).toContain('（あとから履歴で確認できます）')
     expect(PAGE).toContain('{canManageMedia ? (')
     // worker は owner/admin だけを通し、理由なしは 400、二重実行は 409。
