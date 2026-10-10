@@ -1,3 +1,4 @@
+import { peopleBoardEntry } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { BOOKING_PERSON_LIMIT_GUARD_SQL, bookingPersonLimitBindings, bookingPersonLimitError } from '../services/booking-person-limit.js';
 import { reorderBookingMenus } from '@line-crm/db';
@@ -157,7 +158,7 @@ booking.use('*', async (c, next) => {
   const path = c.req.path;
   const mutation = (c.req.method === 'PUT' && path === '/api/booking/admin/sync-rules') || (c.req.method === 'POST' || c.req.method === 'PATCH') && (
     path === '/api/liff/booking/requests' || path === '/api/booking/admin/bookings'
-    || /^\/api\/booking\/admin\/(bookings|requests)\/[^/]+(\/reassign)?$/.test(path));
+    || /^\/api\/booking\/admin\/(bookings|requests|board)\/[^/]+(\/reassign)?$/.test(path));
   if (!mutation || c.res.status < 200 || c.res.status >= 300) return;
   try {
     const accountId = path.startsWith('/api/liff/') ? await resolveAccountIdFromLiff(c) : await resolveAccountIdAdmin(c);
@@ -4124,6 +4125,10 @@ async function seatTableLabels(
 }
 
 interface TodaySeatRow {
+  customer_version: number;
+  table_id: string | null;
+  table_ids_json: string;
+  source: string;
   kind: 'seat';
   id: string;
   store_id: string;
@@ -4160,7 +4165,8 @@ async function getTodaySeatReservations(
     const reservations = await db
       .prepare(
         `SELECT r.id, r.starts_at, r.ends_at, r.status, r.customer_name,
-                r.guest_count, r.table_id, m.name AS course_name
+                r.guest_count, r.table_id, r.customer_version, r.source,
+                (SELECT json_group_array(table_id) FROM rt_reservation_table_links WHERE reservation_id=r.id) AS table_ids_json, m.name AS course_name
            FROM rt_reservations r
            LEFT JOIN rt_menu_items m ON m.id = r.course_id
           WHERE r.store_id = ? AND r.starts_at >= ? AND r.starts_at < ?
@@ -4175,6 +4181,9 @@ async function getTodaySeatReservations(
         status: string;
         customer_name: string;
         guest_count: number;
+        customer_version: number;
+        source: string;
+        table_ids_json: string;
         table_id: string | null;
         course_name: string | null;
       }>();
@@ -4210,6 +4219,7 @@ async function getTodaySeatReservations(
     for (const reservation of list) {
       rows.push({
         kind: 'seat',
+        customer_version: reservation.customer_version, table_id: reservation.table_id, table_ids_json: reservation.table_ids_json, source: reservation.source,
         id: reservation.id,
         store_id: store.id,
         store_name: store.name,
@@ -4267,7 +4277,7 @@ booking.get('/api/booking/admin/today', async (c) => {
   if (staffId) { conditions.push('b.staff_id = ?'); values.push(staffId); }
   const rows = mode === 'seat' ? { results: [] } : await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.ends_at, b.status, b.price_at_booking,
+      `SELECT b.id, b.line_account_id, b.lock_version, b.starts_at, b.ends_at, b.status, b.price_at_booking,
               b.friend_id, b.booking_customer_id,
               m.id AS menu_id, m.name AS menu_name,
               s.id AS staff_id, s.display_name AS staff_name,
@@ -7926,3 +7936,19 @@ booking.get('/api/liff/booking/seat-availability',async c=>{
 });
 
 export default booking;
+
+booking.get('/api/booking/admin/board',async c=>{
+ const accountId=await resolveAccountIdAdmin(c);if(!accountId)return inputError(c,{error:'missing_account_id'},400,['account_id']);
+ const from=c.req.query('from'),to=c.req.query('to'),offset=Number(c.req.query('offset')??0),limit=Number(c.req.query('limit')??100);
+ if(!from||!to||!Number.isFinite(Date.parse(from))||!Number.isFinite(Date.parse(to))||Date.parse(to)<=Date.parse(from)||!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>500)return inputError(c,{error:'invalid_range'},400,['from','to','limit','offset']);
+ const rows=await c.env.DB.prepare(`SELECT b.*,COALESCE(f.real_name,f.display_name,bc.display_name,'—') customer_name,s.display_name staff_name,m.name menu_name
+ FROM bookings b LEFT JOIN friends f ON f.id=b.friend_id LEFT JOIN booking_customers bc ON bc.id=b.booking_customer_id LEFT JOIN staff s ON s.id=b.staff_id LEFT JOIN menus m ON m.id=b.menu_id
+ WHERE b.line_account_id=? AND julianday(b.starts_at)<julianday(?) AND julianday(b.ends_at)>julianday(?) ORDER BY b.starts_at,b.id LIMIT ? OFFSET ?`).bind(accountId,to,from,limit,offset).all<Record<string,unknown>>();
+ const total=await c.env.DB.prepare('SELECT COUNT(*) total FROM bookings WHERE line_account_id=? AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?)').bind(accountId,to,from).first<{total:number}>();
+ return c.json({success:true,data:{entries:rows.results.map(peopleBoardEntry),total:total!.total,limit,offset}});
+});
+booking.patch('/api/booking/admin/board/:id',requireRole('owner','admin','staff'),inputJsonBoundary(),async c=>{
+ const b=await c.req.json();
+ if(b.kind!=='people'||!Number.isInteger(b.expectedVersion)||b.expectedVersion<0||typeof b.startsAt!=='string')return inputError(c,{error:'invalid_move'},400,['expectedVersion','startsAt']);
+ return updateAdminBooking(c,{lock_version:b.expectedVersion,starts_at:b.startsAt,staff_id:b.staffId});
+});

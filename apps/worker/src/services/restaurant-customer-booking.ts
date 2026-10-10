@@ -131,7 +131,7 @@ export async function customerAvailability(
           const occupied = (
             await db
               .prepare(
-                `SELECT table_id FROM rt_reservations WHERE store_id=? AND id<>? AND status NOT IN ('cancelled','no_show') AND (status<>'pending' OR hold_expires_at IS NULL OR julianday(hold_expires_at)>julianday('now')) AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?) UNION SELECT table_id FROM rt_seat_waitlist WHERE store_id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?)`,
+                `SELECT l.table_id FROM rt_reservations JOIN rt_reservation_table_links l ON l.reservation_id=rt_reservations.id WHERE store_id=? AND id<>? AND status NOT IN ('cancelled','no_show') AND (status<>'pending' OR hold_expires_at IS NULL OR julianday(hold_expires_at)>julianday('now')) AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?) UNION SELECT l.table_id FROM rt_seat_waitlist JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=rt_seat_waitlist.id WHERE store_id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND julianday(starts_at)<julianday(?) AND julianday(ends_at)>julianday(?)`,
               )
               .bind(
                 store.id,
@@ -145,7 +145,7 @@ export async function customerAvailability(
               .all<{ table_id: string | null }>()
           ).results;
           tables = tables.filter(
-            (t) => !occupied.some((r) => r.table_id === t.id),
+            (t) => !(t.tableIds??[t.id]).some(id=>occupied.some((r)=>r.table_id===id)),
           );
         }
         const inventories = (
@@ -194,7 +194,7 @@ export async function processRestaurantCustomerNotices(
   const rows = (
     await db
       .prepare(
-        `SELECT o.*,s.line_account_id FROM rt_customer_notice_outbox o JOIN rt_stores s ON s.id=o.store_id JOIN rt_reservations r ON r.id=o.reservation_id WHERE o.sent_at IS NULL AND o.customer_version=r.customer_version AND s.status='active' AND (? IS NULL OR s.id=?) AND (o.lease_until IS NULL OR julianday(o.lease_until)<=julianday('now')) LIMIT 50`,
+        `SELECT o.*,s.line_account_id FROM rt_customer_notice_outbox o JOIN rt_stores s ON s.id=o.store_id JOIN rt_reservations r ON r.id=o.reservation_id WHERE o.sent_at IS NULL AND o.valid=1 AND s.status='active' AND (? IS NULL OR s.id=?) AND (o.lease_until IS NULL OR julianday(o.lease_until)<=julianday('now')) LIMIT 50`,
       )
       .bind(storeId ?? null, storeId ?? null)
       .all<{
@@ -209,7 +209,7 @@ export async function processRestaurantCustomerNotices(
     const lease = crypto.randomUUID();
     const claim = await db
       .prepare(
-        "UPDATE rt_customer_notice_outbox SET lease_token=?,lease_until=datetime('now','+5 minutes') WHERE id=? AND sent_at IS NULL AND (lease_until IS NULL OR julianday(lease_until)<=julianday('now'))",
+        "UPDATE rt_customer_notice_outbox SET lease_token=?,lease_until=datetime('now','+5 minutes') WHERE id=? AND sent_at IS NULL AND valid=1 AND (lease_until IS NULL OR julianday(lease_until)<=julianday('now'))",
       )
       .bind(lease, r.id)
       .run();

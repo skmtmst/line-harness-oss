@@ -1,3 +1,4 @@
+import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
 import { formDocumentPaths } from './form-documents-openapi.js';
 import { folderUpgradePaths } from './folder-upgrade-openapi.js';
@@ -404,6 +405,7 @@ const spec = {
     },
   },
   paths: {
+    ...reservationBoardPaths,
     ...folderUpgradePaths,
     ...archiveRestorePaths,
     ...formDocumentPaths,

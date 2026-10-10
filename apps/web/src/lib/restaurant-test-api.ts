@@ -30,12 +30,12 @@ export type RestaurantReservation = {
   customer_name: string; customer_phone: string | null; line_uid: string | null; guest_count: number;
   starts_at: string; ends_at: string; table_id: string | null; table_label: string | null;
   course_id: string | null; course_name: string | null; status: string; allergy_note: string | null; note: string | null;
-  hold_expires_at?: string | null;
+  hold_expires_at?: string | null; customer_version?: number; dining_snapshot_json?: string | null; table_ids_json?: string;
   sync_direction: 'inbound_only'
 }
 export type RestaurantTable = {
   id: string; store_id: string; code: string; label: string; seat_type: string; min_capacity: number;
-  max_capacity: number; floor_x: number; floor_y: number; join_group: string | null; is_active: number
+  max_capacity: number; floor_id?:string; floor_version?:number; floor_x: number; floor_y: number; join_group: string | null; is_active: number
 }
 export type SeatVisitMark = {
   id?: string; kind: 'visited' | 'late' | 'no_show'; late_minutes: number | null;
