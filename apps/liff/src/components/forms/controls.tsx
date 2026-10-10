@@ -1,6 +1,6 @@
 /** LIFF と管理画面の見本で共有する入力の形。通信・送信は呼ぶ側が持つ。 */
 import { useEffect, useState, useRef, forwardRef, type InputHTMLAttributes, type ReactNode, type LabelHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes, type Ref } from 'react'
-import { PREFECTURES, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
+import { PREFECTURES, FORM_DOCUMENT_SCAN_NOTE, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
 import styles from './controls.module.css'
 
 /** 欄名と必要度の表示。札を読み上げ名へ混ぜず、欄との結び付きを保つ。 */
@@ -87,7 +87,6 @@ export function RatingStars({ name, current, onChange }: { name: string; current
 
 // 写真の許可形式。PDF は質問の設定に応じて加える。
 export const FORM_FILE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif'
-export const FORM_FILE_NOTE = 'JPG・PNG・GIF・WebP・HEIC・HEIF、10MBまで（画像のみ）'
 export function FormFileControl({ label, uploading = false, onUpload, kind = 'image', kinds, bothSides = false, maxCount = 1, files = [], onRemove }: {
   label: string; uploading?: boolean; onUpload?: (file: File, side: 'single' | 'front' | 'back') => void;
   kind?: FormInputBlock['fileKind']; kinds?: FormInputBlock['fileKinds']; bothSides?: boolean; maxCount?: number;
@@ -133,6 +132,7 @@ export function FormFileControl({ label, uploading = false, onUpload, kind = 'im
       <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => pick(false)}><FieldIcon mark="clip" />ファイルを選ぶ</button>
     </div> : null}
     <p className={styles.note}>{kind === 'pdf' ? 'PDF・1ファイル10MBまで' : `JPG・PNG・GIF・WebP・HEIC・HEIF${allowedKinds.includes('pdf') ? '・PDF' : ''}・1ファイル10MBまで`}{`・${sides.length === 2 ? 2 : Math.min(10, Math.max(1, maxCount))}枚まで`}</p>
+    <p className={styles.note}>{FORM_DOCUMENT_SCAN_NOTE}</p>
     {uploading ? <p className={styles.note}>送っています...</p> : null}
     {error ? <p role="alert" className={styles.note}>{error}</p> : null}
   </div>

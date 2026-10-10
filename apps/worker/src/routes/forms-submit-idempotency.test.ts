@@ -708,6 +708,16 @@ describe('フォーム回答の冪等予約', () => {
     expect(body.data.id).toBe(claimOf().submission_id);
   });
 
+  test.each(['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'])('書類の保存失敗%sは選び直す案内を返す', async code => {
+    mocks.insertFormSubmissionRecord.mockRejectedValueOnce(new Error(code));
+    const response = await app().fetch(submitRequest({ full_name: '山田' }), env());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' });
+    expect(answerStore.size).toBe(0);
+    expect(claimOf().status).toBe('failed');
+    expect(mocks.pushViaHarnessProxy).not.toHaveBeenCalled();
+  });
+
   test('INSERT後の件数更新に失敗したら500にし、同じキーで再開して補完する', async () => {
     failures.resyncCountOnce = true;
 

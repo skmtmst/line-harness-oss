@@ -3212,6 +3212,9 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     throw err;
   }
   } catch (err) {
+    if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
+      return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
+    }
     console.error('POST /api/forms/:id/submit error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

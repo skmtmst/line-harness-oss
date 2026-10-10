@@ -62,6 +62,7 @@ export const FILE_SCAN_REASON_LABELS: Record<string, string> = {
   office_macro: 'マクロが見つかりました',
   executable_signature: '実行ファイルの印があります',
   external_flagged: '外部の検査で問題が見つかりました',
+  scan_attempts_exhausted: '検査が終わらなかったため、使えません',
   scan_unavailable: '検査が止まっています',
 };
 
@@ -300,6 +301,10 @@ export interface ThreatScanner {
   ): Promise<'clean' | 'quarantined'>;
 }
 
+export const FORM_FILE_SCAN_MAX_ATTEMPTS = 5;
+export function isPrivateFormDocumentScan(scan: Pick<FileScanRow, 'subject_kind' | 'subject_id'>): boolean {
+  return scan.subject_kind === 'form_file' && scan.subject_id.startsWith('private/form-documents/');
+}
 export class ScanRetryableError extends Error {}
 
 export function nextFileScanRetryAt(attempts: number, nowMs: number): string {
@@ -399,13 +404,19 @@ export async function markFileScanQuarantined(
   ).bind(reasonCode, detail, now, now, now, id).run();
 }
 
-export async function markFileScanPendingRetry(db: ScanDb, id: string, attempts: number): Promise<void> {
+export async function markFileScanPendingRetry(db: ScanDb, id: string, attempts: number, maxAttempts?: number): Promise<FileScanStatus> {
   const now = jstNow();
+  if (maxAttempts !== undefined && attempts + 1 >= maxAttempts) {
+    await db.prepare(`UPDATE media_file_scans SET attempts = ? WHERE id = ?`).bind(attempts + 1, id).run();
+    await markFileScanRejected(db, id, 'scan_attempts_exhausted', `検査を${maxAttempts}回試しても終わりませんでした`);
+    return 'rejected';
+  }
   await db.prepare(
     `UPDATE media_file_scans
         SET status = 'pending', attempts = ?, next_retry_at = ?, updated_at = ?
       WHERE id = ?`,
   ).bind(attempts + 1, nextFileScanRetryAt(attempts, Date.now()), now, id).run();
+  return 'pending';
 }
 
 /** 内蔵検査を回して行を進める。外の検査は呼び出し側が ThreatScanner で足す。 */
@@ -465,8 +476,8 @@ export async function runScanForStoredObject(
 ): Promise<FileScanRow> {
   const head = await readSlice(store, r2Key, { offset: 0, length: FILE_SCAN_HEAD_BYTES });
   if (!head || head.length === 0) {
-    await markFileScanPendingRetry(db, scan.id, scan.attempts);
-    return { ...scan, status: 'pending', attempts: scan.attempts + 1 };
+    const status = await markFileScanPendingRetry(db, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined);
+    return { ...scan, status, attempts: scan.attempts + 1 };
   }
   const tail = scan.size_bytes > head.length
     ? await readSlice(store, r2Key, { suffix: FILE_SCAN_TAIL_BYTES })

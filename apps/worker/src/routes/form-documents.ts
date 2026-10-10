@@ -1,18 +1,18 @@
 import { Hono, type Context } from 'hono';
 import { setAccountSetting } from '@line-crm/db';
-import { formFileKind, formFileKinds, type FormInputBlock } from '@line-crm/shared';
+import { formFileKinds, type FormInputBlock } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { builtinFileScan, getFileScanConfig, resolveExternalScanner, markFileScanClean, markFileScanQuarantined, markFileScanPendingRetry } from '../services/file-scan.js';
+import { builtinFileScan, getFileScanConfig, resolveExternalScanner, markFileScanClean, markFileScanQuarantined, markFileScanPendingRetry, FORM_FILE_SCAN_MAX_ATTEMPTS } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';
 import { imageDimensions } from '../services/media-metadata.js';
-import { documentAnswer, documentExpired, identityRetentionDays, IDENTITY_RETENTION_KEY, type FormDocumentRow } from '../services/form-documents.js';
+import { documentAnswer, documentExpired, uploadedDocumentKind, purgeUnsafeFormDocuments, identityRetentionDays, IDENTITY_RETENTION_KEY, type FormDocumentRow } from '../services/form-documents.js';
 
 const TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' };
 export async function uploadFormDocument(c: Context<Env>, block: FormInputBlock, scope: { accountId: string; formId: string; friendId: string; versionId: string | null }) {
   const mime = (c.req.header('Content-Type') ?? '').split(';')[0].trim().toLowerCase();
-  const kind = formFileKind(block);
+  const kind = uploadedDocumentKind(block, mime);
   const kinds = formFileKinds(block);
   const extension = TYPES[mime];
   if (!extension || (mime === 'application/pdf' ? !kinds.includes('pdf') : !kinds.some(k => k === 'image' || k === 'identity'))) return c.json({ success: false, error: 'この質問で受け取れる形式を選んでください' }, 400);
@@ -57,9 +57,10 @@ export async function uploadFormDocument(c: Context<Env>, block: FormInputBlock,
       if (await external.scan(bytes, { filename, mimeType: mime, sizeBytes: size }) !== 'clean') {
         await markFileScanQuarantined(c.env.DB, scan.id, 'external_flagged', '外部の検査で問題が見つかりました'); status = 'quarantined';
       }
-    } catch { await markFileScanPendingRetry(c.env.DB, scan.id, scan.attempts); status = 'pending'; }
+    } catch { await markFileScanPendingRetry(c.env.DB, scan.id, scan.attempts, FORM_FILE_SCAN_MAX_ATTEMPTS); status = 'pending'; }
   }
   if (status === 'clean') await markFileScanClean(c.env.DB, scan.id);
+  if (status === 'quarantined') await purgeUnsafeFormDocuments(c.env.DB, c.env.IMAGES, scan.id);
   if (status === 'quarantined') return c.json({ success: false, code: 'file_scan_blocked', error: '安全を確認できませんでした。別のファイルを選んでください' }, 422);
   const row = await c.env.DB.prepare('SELECT * FROM form_submission_files WHERE id = ?').bind(id).first<FormDocumentRow>();
   if (!row) throw new Error('document_record_missing');
@@ -71,8 +72,10 @@ formDocuments.get('/api/form-files/:id/content', requireRole('owner', 'admin', '
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   if (!row || !scope.ids.includes(row.line_account_id)) return c.json({ success: false, error: '書類が見つかりません' }, 404);
   if (row.file_kind === 'identity' && !['owner', 'admin'].includes(c.get('staff')?.role ?? '')) return c.json({ success: false, error: '見る権限がありません' }, 403);
+  if (row.scan_status === 'quarantined') return c.json({ success: false, error: '危ないファイルのため開けません' }, 409);
+  if (row.scan_status === 'rejected') return c.json({ success: false, error: '安全を確認できませんでした。別のファイルを選んでください' }, 409);
   if (documentExpired(row)) return c.json({ success: false, error: '期限で消しました' }, 410);
-  if (row.scan_status !== 'clean') return c.json({ success: false, error: '検査が終わるまで開けません' }, 409);
+  if (row.scan_status !== 'clean') return c.json({ success: false, error: '検査中です' }, 409);
   const object = await c.env.IMAGES.get(row.r2_key);
   if (!object) return c.json({ success: false, error: '書類が見つかりません' }, 404);
   return new Response(object.body, { headers: { 'Content-Type': row.mime_type, 'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(row.filename)}`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'", 'Referrer-Policy': 'no-referrer' } });
