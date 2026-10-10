@@ -18,21 +18,26 @@ import ReservationsPage from '../restaurant/reservations/reservations'
 import { at, reservation, snapshotOf } from '../restaurant/booking-kit/test-data'
 
 /* 鈴木（Hot Pepper・T4・秋の鹿肉コース・電話あり）と、押さえ（T1）。 */
-const today = [
+const reservationsToday = () => [
   reservation('r1', { customer_name: '鈴木 真理', source: 'hotpepper', guest_count: 4, customer_phone: '090-1234-5678', starts_at: at(0, 19), ends_at: at(0, 21), table_id: 't4', course_id: 'm1', course_name: '秋の鹿肉コース' }),
   reservation('r2', { customer_name: '押さえ', source: 'phone', status: 'pending', hold_expires_at: at(0, 23), note: '電話のお客さま用', guest_count: 2, starts_at: at(0, 20), ends_at: at(0, 21, 30), table_id: 't1' }),
 ]
+let today: ReturnType<typeof reservationsToday>
 
 beforeEach(() => {
+  // 台帳の「今日」と「次の予約」、来店日の年比較を固定する。待ち合わせのタイマーは実時間のまま。
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 10, 12) })
+  today = reservationsToday()
   role.value = 'owner'
   fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 2 }) })
   fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: today } })
   fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: null, version: 1, updatedBy: null, updatedAt: null } })
   fixture.updateReservation.mockResolvedValue({ success: true })
   fixture.customerSearch.mockResolvedValue({ data: [] })
-  fixture.customerHistory.mockResolvedValue({ data: { visitCount: 3, visits: [{ id: 'v1', starts_at: new Date(2026, 7, 14, 19).toISOString(), guest_count: 4, allergy_note: null, table_label: null, course_name: null }] } })
+  // 日付表示は日本時間。端末がUTCでも8/14となるよう、見本にも時差を明示する。
+  fixture.customerHistory.mockResolvedValue({ data: { visitCount: 3, visits: [{ id: 'v1', starts_at: '2026-08-14T19:00:00+09:00', guest_count: 4, allergy_note: null, table_label: null, course_name: null }] } })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 const openDetail = async () => {
   render(<ReservationsPage />)
@@ -53,18 +58,10 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
   })
 
   it('「次の予約」の「詳細を見る」でも開く', async () => {
-    // 「次の予約」は今より後の予約だけ出る。19:00 の予約が「次」になるよう、今日の 12:00 に時計を止める
-    // （止めないと、夜に回したときだけ落ちる）。時計だけを止め、待ち合わせの時間は止めない。
-    const noon = new Date(); noon.setHours(12, 0, 0, 0)
-    vi.useFakeTimers({ toFake: ['Date'], now: noon })
-    try {
-      render(<ReservationsPage />)
-      await screen.findByRole('button', { name: /^鈴木 真理 4名/ })
-      fireEvent.click(screen.getByRole('button', { name: '詳細を見る' }))
-      expect(await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })).not.toBeNull()
-    } finally {
-      vi.useRealTimers()
-    }
+    render(<ReservationsPage />)
+    await screen.findByRole('button', { name: /^鈴木 真理 4名/ })
+    fireEvent.click(screen.getByRole('button', { name: '詳細を見る' }))
+    expect(await screen.findByRole('dialog', { name: '鈴木 真理さん・4名' })).not.toBeNull()
   })
 
   it('取り消すは確かめの窓を通してから今の口へ取消を送る', async () => {

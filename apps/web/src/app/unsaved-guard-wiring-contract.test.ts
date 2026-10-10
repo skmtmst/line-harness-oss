@@ -182,6 +182,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'v8/restaurant/google/settings.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/tag-edit/edit-form.tsx': 'components/templates/create-page.tsx',
   'v8/template-edit/frame.tsx': 'v8/template-edit/message.tsx',
+  // リンクの見え方も含め、入力は親のスナップショットへ即時反映する。窓を閉じても残り、離脱は親の番兵が守る。
+  'v8/form-edit/appearance-tab.tsx': 'v8/form-edit/edit.tsx',
   'app/webinars/edit/basic-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/templates/edit-v8.tsx': 'app/templates/editor-v8.tsx',
   'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
