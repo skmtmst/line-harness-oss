@@ -36,7 +36,7 @@ describe('リマインダのフォルダ', () => {
   it('フォルダが1つも無いときは未分類で作れ、読み込み失敗は選び直せる', () => {
     expect(BASICS).toContain('未分類')
     expect(BASICS).toContain('フォルダを読み込めませんでした')
-    expect(BASICS).toContain('再読み込み')
+    expect(BASICS).toContain('もう一度読み込む')
   })
 
   it('一覧と受け口は前から folderId を通していた（画面だけが遅れていた）', () => {

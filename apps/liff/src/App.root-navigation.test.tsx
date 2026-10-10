@@ -8,6 +8,8 @@ vi.mock('./pages/Booking.js', () => ({ default: function BookingProbe() {
   const location = useLocation();
   return <p data-testid="booking-url">{location.pathname + location.search}</p>;
 } }));
+vi.mock('./pages/Webinar.js', () => ({ default: function WebinarProbe() { const location = useLocation(); return <p data-testid="webinar-url">{location.pathname + location.search}</p>; } }));
+vi.mock('./pages/Research.js', () => ({ default: function ResearchProbe() { const location = useLocation(); return <p data-testid="research-url">{location.pathname + location.search}</p>; } }));
 vi.mock('./pages/EventWaitlistOffer.js', () => ({ default: ({ token }: { token: string }) => <p>案内:{token}</p> }));
 vi.mock('@line/liff', () => ({ default: {
   init: vi.fn(), isLoggedIn: () => true, getProfile: async () => ({ userId: 'test-user' }), getIDToken: () => 'test-token',
@@ -58,3 +60,9 @@ describe('L13：入口の移動と再読込で liffId を保つ', () => {
     expect(new URL(next, 'https://example.com').searchParams.get('menu_id')).toBe('menu-1');
   });
 });
+
+ it.each([['webinar', 'slug', 'webinar-1', '/webinar/webinar-1'], ['research', 'researchId', 'research-1', '/research/research-1']])('B-173: 公開された%sの旧入口でもアカウント指定を保つ', async (page, key, id, path) => {
+   const search = `?liffId=account-B&page=${page}&${key}=${id}&ref=link-1`;
+   render(<MemoryRouter initialEntries={[`/${search}`]}><App /></MemoryRouter>);
+   expect((await screen.findByTestId(`${page}-url`)).textContent).toBe(`${path}${search}`);
+ });

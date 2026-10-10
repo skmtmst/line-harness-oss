@@ -213,6 +213,15 @@ async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTe
 
     if (await serveSharedStubs(route, url.pathname)) return
 
+    // V8の共通タグ選択は、窓を開いたときに店のタグとフォルダを読み直す。
+    if (url.pathname === '/api/tags') {
+      await json(route, { success: true, data: [{ id: 'tag-vip', name: 'VIP', lineAccountId: url.searchParams.get('accountId') ?? ACCOUNT_A, groupId: null }] })
+      return
+    }
+    if (url.pathname === '/api/tag-groups') {
+      await json(route, { success: true, data: [] })
+      return
+    }
     if (url.pathname === '/api/automation-draft-resources') {
       await json(route, { success: true, data: { tags: [{ id: 'tag-vip', name: 'VIP' }], scenarios: [] } })
       return
@@ -561,8 +570,8 @@ async function closeActionEditor(page: Page) {
 async function pickTag(page: Page, label: string) {
   await page.getByRole('button', { name: new RegExp(`^${label}：(選ぶ|変える)$`) }).click()
   const picker = page.getByRole('dialog', { name: 'タグを選ぶ', exact: true })
-  await picker.getByRole('radio', { name: 'VIP', exact: true }).check()
-  await picker.getByRole('button', { name: '選ぶ', exact: true }).click()
+  await picker.getByRole('checkbox', { name: 'VIP', exact: true }).check()
+  await picker.getByRole('button', { name: '選ぶ（1件）', exact: true }).click()
   await picker.waitFor({ state: 'hidden' })
 }
 
@@ -627,7 +636,8 @@ describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => 
       button.click()
     })
     await waitUntil(() => api.createCalls.length === 1, '新規下書きAPIが呼ばれませんでした')
-    expect(await save.isDisabled()).toBe(true)
+    // 保存中は共通Buttonが処理中の文言へ切り替わる。連打防止はそのボタンで確かめる。
+    expect(await page.getByRole('button', { name: '処理中…', exact: true }).isDisabled()).toBe(true)
     api.releaseCreate()
     await page.getByText('下書きに保存しました。見込み人数を確認して、1人で試せます。').last().waitFor()
     expect(api.createCalls).toHaveLength(1)
@@ -718,7 +728,7 @@ describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => 
     // V8は保存中の店舗切替を止める。Bの応答をAへ混ぜない。
     await requestAccountSwitch(page, ACCOUNT_A)
     expect(await page.evaluate(() => localStorage.getItem('lh_selected_account'))).toBe(ACCOUNT_B)
-    expect(await page.getByRole('button', { name: '下書きを保存', exact: true }).isDisabled()).toBe(true)
+    expect(await page.getByRole('button', { name: '処理中…', exact: true }).isDisabled()).toBe(true)
     api.releaseCreate()
     await waitUntil(() => api.updateCalls.some((call) => call.pathname === '/api/automation-drafts/draft-account-b-1'), '店舗Bの保存が終わりませんでした')
     await waitUntil(() => page.getByRole('button', { name: '下書きを保存', exact: true }).isEnabled({ timeout: 200 }).catch(() => false), '保存中の状態が終わりませんでした')

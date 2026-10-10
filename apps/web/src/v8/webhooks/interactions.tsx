@@ -10,6 +10,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
  * （一覧・送り直し・まとめて送り直し）。URL・鍵・本文は一覧にも中身にも出さない。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（CSV の書き出し口が無い など）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDownLeft, ArrowUpRight, CircleAlert, FileCode, History, Inbox, LayoutList, RefreshCw, RotateCw, TriangleAlert } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
@@ -36,6 +37,7 @@ import { withViewTransition } from '@/components/shared/view-transition'
 import { ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, useWebhookOverview, type BandCell } from './shell'
 import { eventWord, shortDateTime } from './words'
 import styles from './interactions.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Direction = 'all' | 'outgoing' | 'incoming'
 type Status = 'all' | 'failed'
@@ -68,7 +70,7 @@ function bodyLines(item: WebhookInteraction): { main: string; sub: string } {
   const retried = item.retryOfId
     ? '前の失敗をやり直した記録'
     : item.status === 'failed' && item.attemptCount > 1 ? `${item.attemptCount}回やり直して失敗` : ''
-  return { main: head || '—', sub: [tail, retried].filter(Boolean).join('・') }
+  return { main: head || emptyValue('unknown'), sub: [tail, retried].filter(Boolean).join('・') }
 }
 
 function replyLabel(item: WebhookInteraction): { text: string; failed: boolean } {
@@ -78,7 +80,7 @@ function replyLabel(item: WebhookInteraction): { text: string; failed: boolean }
 }
 
 function seconds(ms: number | null): string {
-  return ms == null ? '—' : `${(Math.round(ms / 100) / 10).toFixed(1)} 秒`
+  return ms == null ? emptyValue('unknown') : `${(Math.round(ms / 100) / 10).toFixed(1)} 秒`
 }
 
 /* その記録をここからやり直せるかを業務の言葉で説明する（v7 と同じ定義）。 */
@@ -120,11 +122,11 @@ export default function WebhooksInteractionsV8() {
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useListUrlValue('q', '')
   const [direction, setDirection] = useState<Direction>('all')
   const [status, setStatus] = useState<Status>('all')
   const [periodDays, setPeriodDays] = useState(30)
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [limit, setLimit] = useState(20)
   const [selected, setSelected] = useState<WebhookInteraction | null>(null)
   const [techOpen, setTechOpen] = useState(false)
@@ -216,10 +218,10 @@ export default function WebhooksInteractionsV8() {
       if (accountRef.current !== accountId) return
       if (!response.success) throw new Error(response.error)
       const d = response.data
-      const remainingNote = d.remaining > 0 ? `まだ失敗のまま残っているものが${d.remaining}件あります。もう一度押すと続きをやり直します。` : ''
-      const reviewNote = d.needsReview > 0 ? `届いたか分からないものが${d.needsReview}件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。` : ''
-      const excludedNote = d.excluded > 0 ? `送り先が消えた・止まっている・自動の送り直し中などで、対象外のものが${d.excluded}件あります。` : ''
-      const message = `${d.requested}件を確認し、${d.succeeded}件が届きました。届かなかったもの ${d.failed}件、対象外 ${d.skipped}件です。${remainingNote}${reviewNote}${excludedNote}`
+      const remainingNote = d.remaining > 0 ? `まだ失敗のまま残っているものが${d.remaining} 件あります。もう一度押すと続きをやり直します。` : ''
+      const reviewNote = d.needsReview > 0 ? `届いたか分からないものが${d.needsReview} 件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。` : ''
+      const excludedNote = d.excluded > 0 ? `送り先が消えた・止まっている・自動の送り直し中などで、対象外のものが${d.excluded} 件あります。` : ''
+      const message = `${d.requested} 件を確認し、${d.succeeded} 件が届きました。届かなかったもの ${d.failed} 件、対象外 ${d.skipped} 件です。${remainingNote}${reviewNote}${excludedNote}`
       if (d.failed > 0 || d.skipped > 0 || d.remaining > 0 || d.needsReview > 0 || d.excluded > 0) setNotice(message)
       else notifyToast(message)
       await load()
@@ -328,7 +330,7 @@ export default function WebhooksInteractionsV8() {
         kind="error"
         title="やり取りの記録を表示できませんでした"
         description="記録は消えていません。通信の状態を確認して、もう一度お試しください。"
-        action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+        onRetry={() => void load()}
       />
     )
   } else if (data.items.length === 0) {
@@ -384,7 +386,7 @@ export default function WebhooksInteractionsV8() {
   const pager = loaded && data.total > 0 ? (
     <div className={styles.pagerRow}>
       <span className={styles.pagerLead}>
-        <span className={styles.pagerCount}>{`${formatNumber(data.total)}件中 ${rangeFirst}〜${rangeLast}件`}</span>
+        <span className={styles.pagerCount}>{`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`}</span>
         <span className={styles.smallSelect}>
           <Select
             aria-label="1ページに出す件数"
@@ -400,11 +402,11 @@ export default function WebhooksInteractionsV8() {
 
   return (
     <ListPage
-      help="行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
       boardId="Uv9AA"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       tabs={<WebhookTabs active="interactions" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
         {!isOwner && !canRetry ? <ViewerBand /> : null}
@@ -553,12 +555,12 @@ function InteractionDialog({ item, accountId, techOpen, setTechOpen, canRetry, r
           <div className={styles.dialogRow}><dt>返事</dt><dd>{item.responseLabel}{item.responseStatus !== null ? `（相手の応答番号 ${item.responseStatus}）` : ''}</dd></div>
           {item.failureReason ? <div className={styles.dialogRow}><dt>失敗した理由</dt><dd className={styles.danger}>{item.failureReason}</dd></div> : null}
           <div className={styles.dialogRow}><dt>試した回数</dt><dd>{`${item.attemptCount} 回（1分・5分・30分あけて）`}</dd></div>
-          <div className={styles.dialogRow}><dt>かかった時間</dt><dd>{item.durationMs == null ? '—' : `返事まで ${seconds(item.durationMs)}`}</dd></div>
+          <div className={styles.dialogRow}><dt>かかった時間</dt><dd>{item.durationMs == null ? emptyValue('unknown') : `返事まで ${seconds(item.durationMs)}`}</dd></div>
           <div className={styles.dialogRow}><dt>記録の番号</dt><dd>{item.id}</dd></div>
           {techOpen ? (
             <>
               <div className={styles.dialogRow}><dt>状態の記号</dt><dd>{item.status}</dd></div>
-              <div className={styles.dialogRow}><dt>やり直し元の記録</dt><dd>{item.retryOfId ?? '—'}</dd></div>
+              <div className={styles.dialogRow}><dt>やり直し元の記録</dt><dd>{item.retryOfId ?? emptyValue('unknown')}</dd></div>
             </>
           ) : null}
           <div className={`${styles.dialogRow} ${styles.dialogRowPill}`}>

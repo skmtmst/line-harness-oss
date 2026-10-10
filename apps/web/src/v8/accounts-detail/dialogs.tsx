@@ -26,6 +26,8 @@ import StepUpPrompt, { isStepUpRequired, stepUpFailureMessage, type StepUpReques
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { ARCHIVE_BLOCKER_MESSAGES, parseCount, type AccountDetailView } from './view'
 import styles from './dialogs.module.css'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import NumberInput from '@/components/shared/number-field'
 
 /** 窓の枠。題・右上の×・中身・下の操作（右寄せ）。 */
 function Frame({ open, node, width, top, title, busy, onCancel, actions, children }: {
@@ -131,7 +133,7 @@ export function StopDialog({ account, onClose, onDone }: {
         return
       }
       // 接続が通らなくて再開できない等の理由は、API の言葉をそのまま見せる。
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setBusy(false)
     }
@@ -163,7 +165,7 @@ export function StopDialog({ account, onClose, onDone }: {
           <TextField
             id={inputId}
             maxLength={500}
-            placeholder={stopping ? '例: 乗り換えの準備のため' : '例: 接続を直したので再開する'}
+            placeholder={stopping ? '例：乗り換えの準備のため' : '例：接続を直したので再開する'}
             value={reason}
             onChange={(event) => { setReason(event.target.value); setFieldErrors({}) }}
             disabled={busy}
@@ -189,7 +191,7 @@ function archiveFailureMessage(caught: unknown): string {
     if (messages.length > 0) return messages.join(' / ')
     return 'このアカウントはいまアーカイブできません。止まっているか、既定でないかを確かめてください。'
   }
-  return describeSaveFailure(caught)
+  return withPermissionFailure(caught, describeSaveFailure(caught), 'store')
 }
 
 export function ArchiveDialog({ account, onClose, onDone }: {
@@ -269,7 +271,7 @@ export function ArchiveDialog({ account, onClose, onDone }: {
         <TextField
           id={reasonId}
           maxLength={500}
-          placeholder="例: 使わなくなったため"
+          placeholder="例：使わなくなったため"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           disabled={busy}
@@ -322,7 +324,7 @@ export function RestoreDialog({ account, onClose, onDone }: {
         setStepUp({ purpose: 'line_account.credentials', action: `「${account.name}」をアーカイブから戻す`, retry: run })
         return
       }
-      setError(describeSaveFailure(caught))
+      setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
     } finally {
       setBusy(false)
     }
@@ -608,12 +610,12 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         </div>
         <div className={styles.field}>
           <div className={styles.labelRow}>
-            <label className={styles.label} htmlFor={ids.og}>ブランド設定（OGP）</label>
+
             <Button type="button" variant="text" presentation="account-inline" aria-expanded={showOgMore} onClick={() => setShowOgMore((value) => !value)}>
               {showOgMore ? '説明と画像を閉じる' : '説明と画像も変える'}
             </Button>
           </div>
-          <TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} />
+          <Field label="ブランド設定（OGP）" htmlFor={ids.og}><TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} /></Field>
         </div>
         {showOgMore ? (
           <>
@@ -633,10 +635,10 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         ) : null}
         <div className={styles.pair}>
           <Field label="友だちの上限" htmlFor={ids.cap} error={fields.error('cap')}>
-            <TextField {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
+            <NumberInput numericText {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} />
           </Field>
           <Field label="警告を出す人数" htmlFor={ids.warn} error={fields.error('warn')}>
-            <TextField {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
+            <NumberInput numericText {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} />
           </Field>
         </div>
         <ImageUploader

@@ -7,6 +7,7 @@
  * 差し替えるのは API（サーバーとの境界）・shell のタイトル・next/link だけ。
  * 編集部品と保存の流れは本物を使う。
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -35,6 +36,7 @@ vi.mock('next/link', () => ({
 
 let created = 0
 beforeEach(() => {
+  clearToastsForTest()
   vi.resetAllMocks()
   created = 0
   window.sessionStorage.clear()
@@ -53,15 +55,15 @@ beforeEach(() => {
 afterEach(cleanup)
 
 it('下書きの保存後に新しく作ると、保存済みを残して空の入力へ戻る', async () => {
-  render(<TemplateConsole type="tag" />)
+  render(<><TemplateConsole type="tag" /><ToastHost /></>)
   fireEvent.click((await screen.findAllByRole('button', { name: 'タグを作る', exact: true }))[0])
-  fireEvent.change(screen.getByPlaceholderText('例: 定期購入者'), { target: { value: '一つ目' } })
+  fireEvent.change(screen.getByPlaceholderText("例：定期購入者"), { target: { value: '一つ目' } })
   fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
   await screen.findByText('ひな形を保存しました。')
   expect(calls.create).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getAllByRole('button', { name: 'タグを作る', exact: true })[0])
-  expect((screen.getByPlaceholderText('例: 定期購入者') as HTMLInputElement).value).toBe('')
-  fireEvent.change(screen.getByPlaceholderText('例: 定期購入者'), { target: { value: '二つ目' } })
+  expect((screen.getByPlaceholderText("例：定期購入者") as HTMLInputElement).value).toBe('')
+  fireEvent.change(screen.getByPlaceholderText("例：定期購入者"), { target: { value: '二つ目' } })
   fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
   await waitFor(() => expect(calls.create).toHaveBeenCalledTimes(2))
   await screen.findByText('一つ目')

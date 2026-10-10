@@ -102,7 +102,7 @@ describe('GB-9 パフォーマンス', () => {
   it('期間の切り替えでAPIへ days を渡す', async () => {
     await render()
     expect(perf.calls).toEqual([28])
-    const button = [...container.querySelectorAll('button')].find((node) => node.textContent === '直近7日')
+    const button = [...container.querySelectorAll('button')].find((node) => node.textContent === '過去7日')
     expect(button).toBeTruthy()
     await act(async () => { button!.click() })
     expect(perf.calls).toEqual([28, 7])

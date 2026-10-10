@@ -15,6 +15,9 @@ import ListRange from '@/components/ui/list-range'
 import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import { SettingsShellV8 } from '../settings-nav-v8'
 import styles from '../settings-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 /* 板 `PfA4o` の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -92,17 +95,15 @@ export function FileScanV8() {
           onCancel={() => { setReleaseTarget(null); setReleaseReason(''); setReleaseError('') }}
           onConfirm={() => void release()}
         >
-          <div>
-            <label htmlFor="file-scan-release-reason" className={styles.reasonHint}>
-              理由（必須）
-            </label>
-            <TextArea
+          <div><Field label={<>
+
+              理由
+            </>} htmlFor="file-scan-release-reason" required><TextArea
               id="file-scan-release-reason"
               value={releaseReason}
               onChange={(event) => { setReleaseReason(event.target.value); setReleaseError('') }}
               placeholder="例：社内の画像と確認できたため"
-            />
-          </div>
+            /></Field></div>
         </ConfirmDialog>
       ) : null}
 
@@ -254,9 +255,9 @@ export function FileScanV8() {
             <tbody>
               {items.map((item) => (
                 <Tr key={item.id}>
-                  <Td><span className={styles.urlCell} title={item.filename}>{item.filename}</span>{item.releasedAt && <StatusBadge tone="neutral" size="compact">戻した</StatusBadge>}</Td>
-                  <Td><span className={styles.urlCell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</span></Td>
-                  <Td><span className={styles.urlCell} title={item.reasonLabel ?? '確認が必要です'}>{item.reasonLabel ?? '確認が必要です'}</span></Td>
+                  <Td><span className={styles.urlCell} ><TruncatedText value={String(item.filename ?? '')} url /></span>{item.releasedAt && <StatusBadge tone="neutral" size="compact">戻した</StatusBadge>}</Td>
+                  <Td><span className={styles.urlCell} ><TruncatedText value={String(item.uploaderLabel ?? '—')} url /></span></Td>
+                  <Td><span className={styles.urlCell} ><TruncatedText value={String(item.reasonLabel ?? '確認が必要です')} url /></span></Td>
                   <Td className={styles.tdRight}>
                     {item.status === 'quarantined' ? (
                       <RowActions
@@ -270,7 +271,7 @@ export function FileScanV8() {
                         destructiveItem={{ id: 'delete', label: '削除する', onSelect: () => { setDeleteTarget(item); setDeleteError('') } }}
                       />
                     ) : (
-                      <span className={styles.cardMeta}>—</span>
+                      <span className={styles.cardMeta}>{emptyValue('unknown')}</span>
                     )}
                   </Td>
                 </Tr>
@@ -317,33 +318,24 @@ export function FileScanV8() {
           </div>
           {configOpen ? (
             <div className={styles.formNarrow}>
-              <div>
-                <label htmlFor="file-scan-provider" className={styles.reasonHint}>提供元</label>
-                <TextField
+              <div><Field label={<>提供元</>} htmlFor="file-scan-provider"><TextField
                   id="file-scan-provider"
                   value={provider}
                   onChange={(event) => setProvider(event.target.value)}
                   placeholder="例：example-scan"
-                />
-              </div>
-              <div className={styles.fieldGap}>
-                <label htmlFor="file-scan-endpoint" className={styles.reasonHint}>送り先（https）</label>
-                <TextField
+                /></Field></div>
+              <div className={styles.fieldGap}><Field label={<>送り先（https）</>} htmlFor="file-scan-endpoint"><TextField
                   id="file-scan-endpoint"
                   value={endpoint}
                   onChange={(event) => setEndpoint(event.target.value)}
                   placeholder="https://example.com/scan"
-                />
-              </div>
-              <div className={styles.fieldGap}>
-                <label htmlFor="file-scan-secret-ref" className={styles.reasonHint}>鍵の名前</label>
-                <TextField
+                /></Field></div>
+              <div className={styles.fieldGap}><Field label={<>鍵の名前</>} htmlFor="file-scan-secret-ref"><TextField
                   id="file-scan-secret-ref"
                   value={secretRef}
                   onChange={(event) => setSecretRef(event.target.value)}
                   placeholder="例：FILE_SCAN_API_KEY"
-                />
-              </div>
+                /></Field></div>
               <div className={styles.formSubmit}>
                 <Button type="button" variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">
                   外の検査の設定を保存する

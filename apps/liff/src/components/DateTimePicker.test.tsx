@@ -874,3 +874,15 @@ it('L3：月だけでも日から時刻へ進み、月へ戻って別の日を�
   expect(await screen.findByText('2026年10月')).toBeTruthy();
   expect(screen.queryByRole('radiogroup', { name: '表示の切り替え' })).toBeNull();
 });
+
+it.each(['list', 'calendar'] as const)('BUG-03：%sで読めない日は満席と区別し、再試行で回復する', async (view) => {
+  mockSettings(view);
+  availability.mockRejectedValueOnce(new Error('network failed'));
+  const { onSelect } = renderPicker();
+  expect(await screen.findByText('読み込めませんでした')).toBeTruthy();
+  expect(screen.queryAllByRole('button', { name: /満席/ })).toHaveLength(0);
+  expect(onSelect).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }));
+  expect(await screen.findByRole('button', { name: '10月16日 空きあり' })).toBeTruthy();
+  expect(screen.queryByText('読み込めませんでした')).toBeNull();
+});

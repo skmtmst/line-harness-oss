@@ -150,7 +150,7 @@ async function render() {
       await Promise.resolve()
     })
   }
-  await screen.findByRole('heading', { level: 1, name: '新規登録7日間フォロー' })
+  await screen.findByRole('heading', { level: 2, name: '新規登録7日間フォロー' })
 }
 
 beforeEach(() => {
@@ -178,7 +178,7 @@ describe('V8 シナリオ配信の編集', () => {
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
       expect(screen.getAllByRole(name === '配信結果を見る' ? 'link' : 'button', { name }).length, name).toBeGreaterThan(0)
     }
-    expect(screen.getByText('保存済み 10月1日 14:02')).toBeTruthy()
+    expect(screen.getByText('保存済み 10月1日（木）14:02')).toBeTruthy()
     expect(screen.getByText('友だち追加のとき')).toBeTruthy()
     expect(screen.getByText('送っています')).toBeTruthy()
     expect(screen.getByText('何もしない（一時停止）')).toBeTruthy()
@@ -206,7 +206,7 @@ describe('V8 シナリオ配信の編集', () => {
   it('閲覧のみ：帯が出て、変える操作のボタンを置かない（押せないボタンも残さない）', async () => {
     role.value = 'staff'
     await render()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     for (const name of ['まとめてテストを送る', '設定を変える', '一時停止する', '変える', 'このシナリオを削除する', '複製する', '保存する', 'メッセージを追加する', 'テンプレートを追加する', '＋ ここに挿入', '名前・説明・置き場を変える', 'このシナリオのその他操作', '1通目を上へ']) {
       expect(screen.queryByRole('button', { name }), name).toBeNull()
     }

@@ -3,6 +3,7 @@
  * 今までの画面（app/form-submissions/edit）の処理を写したもの。src/v8 からは
  * 古い画面ファイルを import できないので、同じ中身をここに持つ（動きは同じ）。
  */
+import { FIXED_FRIEND_FIELDS, fixedFieldForBlock } from '@line-crm/shared'
 import type { FormAction, FormBlock, FormInputBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { makeFormBlock } from '@/components/forms/form-definition-operations'
 import type { FormRefs } from '@/components/forms/form-refs'
@@ -158,6 +159,8 @@ export const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
 
 /** 1行で書く欄のうち、形を決めたもの（時刻・メール・電話）は名前を分ける。 */
 export function inputTypeLabel(block: FormInputBlock): string {
+  const fixed = FIXED_FRIEND_FIELDS.find(f => f.key === fixedFieldForBlock(block))
+  if (fixed) return fixed.label
   if (block.type === 'text') {
     const format = block.limit?.format
     if (format === 'time') return '時刻'
@@ -208,12 +211,16 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
     { key: 'rating', label: '5段階の評価', hint: '★で答える', make: input('rating') },
   ] },
   { title: '書いてもらう', cards: [
+    ...FIXED_FRIEND_FIELDS.filter(f => ['name', 'kana', 'birthday', 'age'].includes(f.key)).map(f => ({
+      key: f.key, label: f.label, hint: '友だちの決まった欄に入る',
+      make: input(f.type, { label: f.label, fixedField: f.key, limit: { format: f.format } }),
+    })),
     { key: 'text', label: '1行で書く', hint: '名前・会員番号など', make: input('text') },
     { key: 'textarea', label: '自由に書く', hint: '複数行のフリーテキスト', make: input('textarea') },
     // メールと電話は分ける（オーナー 2026-10-08：「メールアドレスと電話番号を分けよう」）。
-    { key: 'contact', label: 'メール', hint: 'メールの形をチェック', make: input('text', { label: 'メールアドレス', placeholder: '例：sample@example.com', limit: { format: 'email' } }) },
-    { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', placeholder: '例：090-1234-5678', limit: { format: 'tel' } }) },
-    { key: 'address', label: '住所', hint: '郵便番号から自動で', make: input('address', { label: '住所' }) },
+    { key: 'contact', label: 'メール', hint: 'メールの形をチェック', make: input('text', { label: 'メールアドレス', fixedField: 'email', placeholder: '例：sample@example.com', limit: { format: 'email' } }) },
+    { key: 'tel', label: '電話', hint: '番号の形をチェック', make: input('text', { label: '電話番号', fixedField: 'tel', placeholder: '例：090-1234-5678', limit: { format: 'tel' } }) },
+    { key: 'address', label: '住所', hint: '郵便番号から自動で', make: input('address', { label: '住所', fixedField: 'address' }) },
   ] },
   { title: '日にち・予約', cards: [
     { key: 'date', label: '日付', hint: 'カレンダーで選ぶ', make: input('date', { label: '日付' }) },
@@ -234,7 +241,7 @@ export const isChoiceType = (type: FormInputType) => type === 'radio' || type ==
 
 /* ---------------- 答え終わったら行うこと ---------------- */
 
-export function emptyAction(kind: FormAction['kind']): FormAction {
+export function emptyAction(kind: Exclude<FormAction['kind'], 'research_action'>): FormAction {
   switch (kind) {
     case 'send_text': return { kind: 'send_text', text: '' }
     case 'send_template': return { kind: 'send_template', templateId: '' }
@@ -246,7 +253,7 @@ export function emptyAction(kind: FormAction['kind']): FormAction {
 }
 
 /** 足すボタン（XXFT4 の下の列）。 */
-export const ACTION_ADDERS: { kind: FormAction['kind']; label: string }[] = [
+export const ACTION_ADDERS: { kind: Exclude<FormAction['kind'], 'research_action'>; label: string }[] = [
   { kind: 'send_text', label: 'テキスト' },
   { kind: 'send_template', label: 'テンプレート' },
   { kind: 'tag', label: 'タグ' },
@@ -259,6 +266,7 @@ export const ACTION_ADDERS: { kind: FormAction['kind']; label: string }[] = [
 export function describeAfterAction(action: FormAction, refs: FormRefs): string {
   const nameOf = (list: { id: string; name: string }[], id: string, missing: string) => list.find((x) => x.id === id)?.name ?? missing
   switch (action.kind) {
+    case 'research_action': return 'リサーチで設定した回答後の動作'
     case 'send_text': return action.text.trim() ? `テキストを送る「${action.text.trim()}」` : 'テキストを送る（本文が未設定）'
     case 'send_template': return action.templateId ? `テンプレート「${nameOf(refs.templates, action.templateId, '消えたテンプレート')}」を送る` : 'テンプレートを送る（未選択）'
     case 'tag': {

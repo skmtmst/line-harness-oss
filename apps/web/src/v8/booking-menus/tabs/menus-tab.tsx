@@ -1,5 +1,7 @@
 'use client'
 
+import SharedStatusPill from '@/components/shared/status-pill'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import TagPill from '@/components/shared/tag-pill'
 
 /* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
@@ -43,8 +45,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   onReload: () => void
 }) {
   const router = useRouter()
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [page, setPage] = useListUrlValue('page', 1)
   const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
@@ -210,7 +212,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         icon={<AccountIcon />}
         title="予約設定を読み込めませんでした"
         description={error ?? '通信状態を確認して、もう一度お試しください。'}
-        action={<Button onClick={onReload}>もう一度試す</Button>}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
       />
     )
   }
@@ -259,7 +261,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>メニュー</h2>
             <span className={styles.sectionDesc}>
-              {menuCount ?? menus.length}件・出しているもの {activeCount}
+              {menuCount ?? menus.length} 件・出しているもの {activeCount}
             </span>
           </div>
           <div className={styles.tableHead} role="row" aria-hidden="true">
@@ -329,13 +331,10 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   )}
                 </span>
                 <span className={styles.colCount}>
-                  <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0}件</span>
+                  <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0} 件</span>
                 </span>
                 <span className={styles.colStatus}>
-                  <span className={`${styles.statePill} ${(visOverride[menu.id] ?? menu.is_active) ? styles.statePillOn : styles.statePillOff}`}>
-                    <span className={styles.stateDot} aria-hidden="true" />
-                    {(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '止めている'}
-                  </span>
+                  <SharedStatusPill tone={(visOverride[menu.id] ?? menu.is_active) ? 'success' : 'neutral'}>{(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '停止中'}</SharedStatusPill>
                 </span>
                 <span className={styles.colMenu}>
                   <RowMenu

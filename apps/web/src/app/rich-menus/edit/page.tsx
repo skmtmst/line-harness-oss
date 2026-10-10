@@ -1948,7 +1948,7 @@ function TargetingStep({
             <h2 className="text-ink text-sm font-bold">利用できる条件軸</h2>
             <p className="text-ink-faint mt-1 text-xs">友だち一覧の詳細検索と同じ条件を使います</p>
             <p className="text-ink-secondary mt-4 text-xs font-medium">標準互換（15軸）</p>
-            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['名前','個別メモ','ステータスメッセージ','友だち登録日','タグ','友だち情報','シナリオ','イベント予約','カレンダー予約','共通情報','リマインダ','回答フォーム','最終反応日','その他','対応マーク'].map((label) => <span key={label} className="bg-canvas-sunken rounded-mini px-2 py-1">{label}</span>)}</div>
+            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['名前','メモ','ステータスメッセージ','友だち登録日','タグ','友だち情報','シナリオ','イベント予約','カレンダー予約','共通情報','リマインダ','回答フォーム','最終反応日','その他','対応マーク'].map((label) => <span key={label} className="bg-canvas-sunken rounded-mini px-2 py-1">{label}</span>)}</div>
             <p className="text-ink-secondary mt-4 text-xs font-medium">この画面だけの軸（6軸）</p>
             <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded-mini px-2 py-1">{label}</span>)}</div>
           </section>

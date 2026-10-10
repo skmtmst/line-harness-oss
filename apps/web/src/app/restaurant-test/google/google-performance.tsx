@@ -177,7 +177,7 @@ export function PerformanceTab({ accountId }: { accountId: string }) {
         ))}
       </div>
 
-      <section className="border-hairline rounded-card border p-4 sm:p-5">
+      <section className="content-card rounded-card border p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <h3 className="font-semibold">プロフィール表示の推移</h3>
           <div className="flex-1" />

@@ -170,7 +170,7 @@ describe('FRIEND-03/20 条件を人が読める形で出す', () => {
     expect(describeSavedCondition({ kind: 'last_activity', op: 'after', value: '2026-03-01' }))
       .toBe('最終反応日が 2026-03-01以降')
     expect(describeSavedCondition({ kind: 'event_booking', op: 'exists' })).toBe('イベント予約がある')
-    expect(describeSavedCondition({ kind: 'memo', op: 'exists' })).toBe('個別メモがある')
+    expect(describeSavedCondition({ kind: 'memo', op: 'exists' })).toBe('メモがある')
     expect(describeSavedCondition({ kind: 'common_event', op: 'exists', value: 'conversion' }))
       .toBe('その他のイベント「conversion」がある')
   })

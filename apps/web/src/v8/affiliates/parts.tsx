@@ -1,10 +1,14 @@
 'use client'
 
+import { statusLabel } from '@/lib/status-labels'
+
+
 /*
  * 成果とアフィリエイトの各タブで同じ形の部品（道具の段・よく使う絞り込み・件数・
  * 状態の札・空と失敗の1枚・行の「…」）。形は一覧の型と共通部品に任せ、
  * ここは並べ方だけを持つ。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
 import { type ReactNode } from 'react'
 import { Bookmark } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -17,7 +21,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import styles from './affiliates.module.css'
 
-export const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))
+export const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
 
 /** 道具の段の右：「よく使う絞り込み」（左に印）。 */
 export function SavedSelect({
@@ -72,7 +76,7 @@ export function ToolbarNotices({
       {warn ? <div className={styles.fullRow}><Notice tone="warn">{warn}</Notice></div> : null}
       {error ? <div className={styles.fullRow}><Notice tone="danger" message={error} /></div> : null}
       {success ? <div className={styles.fullRow}><Notice tone="success" message={success} /></div> : null}
-      {children}
+      {typeof children === 'string' ? statusLabel(children) : children}
     </>
   )
 }
@@ -133,10 +137,7 @@ export function AffiliateToolbar({ narrow, notices, search, chips, trailing, nar
 /** 状態の札（点つき）。tone は色の種類。 */
 export function StatusPill({ tone, children }: { tone: 'active' | 'warn' | 'danger' | 'neutral'; children: ReactNode }) {
   return (
-    <span className={styles.pill} data-tone={tone}>
-      <span className={styles.pillDot} aria-hidden="true" />
-      {children}
-    </span>
+    <SharedStatusPill tone={tone === 'active' ? 'success' : tone === 'warn' ? 'warning' : tone}>{typeof children === 'string' ? statusLabel(children) : children}</SharedStatusPill>
   )
 }
 
@@ -159,7 +160,7 @@ export function StateCard({
 
 /** 失敗の1枚の「もう一度試す」。 */
 export function RetryButton({ onRetry }: { onRetry: () => void }) {
-  return <Button type="button" onClick={onRetry}>もう一度試す</Button>
+  return <Button type="button" onClick={onRetry}>もう一度読み込む</Button>
 }
 
 /** 行の右端の「…」。メニューの目印が行を1段増やさないよう箱で包む。 */

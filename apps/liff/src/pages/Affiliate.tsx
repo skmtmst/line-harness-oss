@@ -1,3 +1,4 @@
+import { TextInput, FieldLabel } from '../components/forms/controls.js';
 import liff from '@line/liff';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
@@ -9,6 +10,7 @@ import Card from '../components/ui/Card.js';
 import Badge from '../components/ui/Badge.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import Icon from '../components/ui/Icon.js';
+import { LiffInput } from '../components/forms/controls.js'
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -266,30 +268,25 @@ function CopyButton({
 
   return (
     <>
-      <button
+      <Button variant="secondary" className="w-auto shrink-0"
         type="button"
         onClick={handleCopy}
-        className={
-          compact
-            ? 'liff-hit shrink-0 rounded-lg border border-hairline bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-ink'
-            : 'inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-hairline bg-canvas px-3 text-xs font-bold text-ink'
-        }
       >
         {!compact && <Icon name="copy" className="h-3.5 w-3.5" />}
-        {copied ? 'コピー済み' : 'コピー'}
-      </button>
+        {copied ? 'コピーしました' : 'コピーする'}
+      </Button>
       {manualCopy && (
         <div className="w-full space-y-1">
           <p className="text-xs text-ink-secondary">
             自動コピーできませんでした。下のURLを選択してコピーしてください。
           </p>
-          <input
+          <TextInput
             ref={urlRef}
             type="text"
+            aria-label="紹介のURL"
             readOnly
             value={url}
             onFocus={(e) => e.currentTarget.select()}
-            className="w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs text-ink"
           />
         </div>
       )}
@@ -591,14 +588,13 @@ function CompactOfferRow({
       <p className="min-w-0 flex-1 truncate text-xs text-ink" title={offer.name}>
         {offer.name}・リンクを発行する
       </p>
-      <button
+      <Button variant="secondary" className="w-auto shrink-0"
         type="button"
         onClick={() => void handleEnroll()}
         disabled={busy || offer.halted}
-        className="liff-hit shrink-0 rounded-lg border border-hairline bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-ink disabled:opacity-50"
       >
         {busy ? '発行中…' : '発行する'}
-      </button>
+      </Button>
       {error && <p className="w-full text-xs font-bold text-danger">{error}</p>}
     </div>
   );
@@ -741,39 +737,39 @@ function AddOfferLinkForm({
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        ＋ SNSごとのリンクを発行
+        ＋ SNSごとのリンクを発行する
       </Button>
     );
   }
 
   return (
     <div className="space-y-2">
-      <input
+      <FieldLabel htmlFor="affiliate-link-label">リンクの名前</FieldLabel>
+      <TextInput
+        id="affiliate-link-label"
         type="text"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
-        placeholder="例: X用、Instagram用"
-        className="w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-ink"
+        placeholder="例：X用、Instagram用"
         disabled={busy}
       />
       {error && <p className="text-xs font-bold text-danger">{error}</p>}
       <div className="flex gap-2">
         <div className="flex-1">
           <Button variant="primary" onClick={handleAdd} disabled={busy}>
-            {busy ? '発行中…' : 'リンクを発行'}
+            {busy ? '発行中…' : 'リンクを発行する'}
           </Button>
         </div>
-        <button
+        <Button variant="text"
           type="button"
           onClick={() => {
             setOpen(false);
             setError(null);
           }}
           disabled={busy}
-          className="shrink-0 px-4 text-sm text-ink-faint disabled:opacity-50"
         >
-          やめる
-        </button>
+          キャンセル
+        </Button>
       </div>
     </div>
   );

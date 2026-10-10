@@ -30,7 +30,7 @@ vi.mock('next/link', async () => {
 vi.mock('@/lib/api', () => ({
   api: { notifications: { center: { list: fixture.list, markRead: fixture.markRead, markAllRead: fixture.markAllRead } } },
 }))
-vi.mock('@/components/shared/toast', async (original) => ({ ...(await original<object>()), notifyToast: fixture.toast }))
+vi.mock('@/components/shared/toast', async (original) => ({ ...(await original<object>()), notifyToast: fixture.toast, notifySaved: fixture.toast }))
 
 import TopBar from '@/components/shared/top-bar'
 import BellNotifications from './bell-notifications'

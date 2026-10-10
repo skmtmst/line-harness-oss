@@ -251,7 +251,7 @@ export default function ApiTokensPanel() {
       </Notice>
 
       {actionError ? (
-        <Notice tone="error">{actionError}</Notice>
+        <Notice tone="danger">{actionError}</Notice>
       ) : null}
 
       {issued ? (

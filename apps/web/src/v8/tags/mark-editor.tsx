@@ -10,6 +10,9 @@
  * 絵に無い「新しい友だちに最初から付ける」は右の列の下の空きに置く。並び順は一覧で並べ替える（ここでは今の値を保つ）。
  * きまりの中身を変える・作るは、今の自動変更ルールの部品（SupportMarkRulesPanel）を窓で開く。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -45,6 +48,8 @@ import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fiel
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
 import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 const COLORS = [
   { value: '#EF4B55', name: '赤' },
@@ -297,14 +302,17 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           automationRules: createRule ? [{ name: `${name.trim()}：${eventLabel(ruleEvent)}`, event: ruleEvent, condition: null, priority: 0, manualProtectionMinutes: ruleProtectionMinutes, isActive: ruleActive } satisfies SaveSupportMarkAutomationRule] : [],
         }, attemptKey())
       if (!result.success) throw new Error(result.error)
-      disarm()
-      router.push('/tags?tab=marks')
+      notifySaved()
+      if (editing && markId) {
+        setItems((rows) => rows.map((row) => row.id === markId ? { ...row, ...result.data } : row))
+        setBaseline({ name, color, displayOrder, isDefault })
+      } else { disarm(); router.push(createPageReturnHref('/tags?tab=marks', result.data.id)) }
     } catch (reason) {
       const status = (reason as { status?: number } | null)?.status
       const code = (reason as { code?: string } | null)?.code
       if (status === 403) {
         setSaveForbidden(true)
-        setError(describeSaveFailure(reason))
+        setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
         return
       }
       if (status === 409 && code === 'SUPPORT_MARK_VERSION_CONFLICT') {
@@ -317,15 +325,12 @@ function MarkEditorBody({ markId }: { markId?: string }) {
             version: typeof latest.version === 'number' ? latest.version : (selected?.version ?? 1),
           }
           setConflict(next)
-          setItems((prev) => prev.map((mark) => mark.id === markId
-            ? { ...mark, name: next.name, color: next.color, displayOrder: next.displayOrder, version: next.version }
-            : mark))
-          setBaseline({ name: next.name, color: next.color, displayOrder: next.displayOrder, isDefault: selected?.isDefault ?? isDefault })
+          collision.mark()
         }
         setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
         return
       }
-      setError(describeSaveFailure(reason))
+      setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
     } finally {
       setSaving(false)
     }
@@ -377,7 +382,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const blockedReason =
     loadState === 'error' ? '一覧を読み込めませんでした。再読み込みしてください'
-      : loadState === 'forbidden' ? '対応マークを見る権限がありません'
+      : loadState === 'forbidden' ? permissionDeniedMessage('store')
         : roleBlocked ? '対応マークを作る権限がありません'
           : saveForbidden ? '対応マークを保存する権限がありません'
             : loadState === 'ready' && loadedAccountRef.current !== selectedAccountId ? 'アカウントを切り替えています。一覧を読み込むまでお待ちください'
@@ -388,17 +393,24 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const applyLatest = () => {
     if (!conflict) return
+    setItems((rows) => rows.map(mark => mark.id === markId ? { ...mark, ...conflict } : mark))
+    setBaseline({ name: conflict.name, color: conflict.color, displayOrder: conflict.displayOrder, isDefault })
     setName(conflict.name)
     setColor(conflict.color)
     setDisplayOrder(conflict.displayOrder)
     setConflict(null)
+    setError('')
+    collision.clear()
   }
+
+  const collision = useSaveConflict<NonNullable<typeof conflict>>({ fetchLatest: async () => conflict, reload: applyLatest })
+  const comparison = collision.latest ? [['名前', name, collision.latest.name], ['色', color, collision.latest.color], ['並び順', displayOrder, collision.latest.displayOrder]].flatMap(([label, current, latest]) => current === latest ? [] : [{ text: `${label}：編集中 ${current} → 最新 ${latest}` }]) : null
 
   if (loadState === 'loading') return <ListState kind="loading" />
 
   const back = <Link href="/tags?tab=marks" className={styles.backLink}>← 対応マークへ</Link>
   const description = editing && selected
-    ? `${selected.friendCount}人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
+    ? `${selected.friendCount} 人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
     : '対応の状態を、色つきの印で管理します。'
 
   const aside = hideForm ? null : (
@@ -428,8 +440,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       <CreatePage
         boardId="ulq9Y"
         title={editing ? (selected?.name ?? '対応マークを編集') : '対応マークを作る'}
-        description={description}
-        help={<AttributeKindGuide current="mark" />}
+
+        help={<>{description}{<AttributeKindGuide current="mark" />}</>}
         identity={back}
         preview={aside}
         destructive={editing && selected && !hideForm ? (
@@ -439,15 +451,15 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         ) : undefined}
         footerActions={hideForm ? <Button href="/tags?tab=marks">一覧へ戻る</Button> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>
-          <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
+          <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined}  onClick={() => void save()} busy={saving}>
             <Check size={15} aria-hidden="true" />{editing ? '保存する' : '対応マークを作る'}
           </Button>
-        </>}
+        </>} dirty={false}
       >
         {hideForm ? (
           <ListState
             kind="forbidden"
-            description={editing ? '対応マークを編集する権限がありません。オーナーか管理者に確認してください。' : '対応マークを作る権限がありません。オーナーか管理者に確認してください。'}
+            description={editing ? permissionDeniedMessage('store') : permissionDeniedMessage('store')}
           />
         ) : null}
         {!hideForm && loadState === 'error' ? (
@@ -455,9 +467,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         ) : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {conflict ? (
-          <Notice tone="warn" action={<Button type="button" onClick={applyLatest}>最新の内容を取り込む</Button>}>
-            {`最新の保存内容は名前「${conflict.name}」・並び順${conflict.displayOrder}です。入力内容はそのまま残しています。入力のまま保存し直すか、最新の内容を取り込んでください。`}
-          </Notice>
+          <SaveConflictBand title={`ほかの人が先に対応マーク「${conflict.name}」を保存しました`} compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} />
         ) : null}
 
         {hideForm ? null : (
@@ -472,11 +482,11 @@ function MarkEditorBody({ markId }: { markId?: string }) {
               {editing ? (
                 <>
                   {rulesState === 'not-connected' ? <p className={styles.fieldNote}>自動で変えるきまりは、まだこの環境で使えません。</p> : null}
-                  {rulesState === 'forbidden' ? <p className={styles.fieldNote}>きまりを見る権限がありません。オーナーか管理者に確認してください。</p> : null}
+                  {rulesState === 'forbidden' ? <p className={styles.fieldNote}>{permissionDeniedMessage('store')}</p> : null}
                   {rulesState === 'error' ? (
                     <div className={styles.inlineRetry}>
                       <p className={styles.fieldError} role="alert">きまりを読み込めませんでした。</p>
-                      <Button type="button" variant="text" onClick={() => void loadRules()}>読み直す</Button>
+                      <Button type="button" variant="text" onClick={() => void loadRules()}>もう一度読み込む</Button>
                     </div>
                   ) : null}
                   {rulesState === 'ready' && rules.length === 0 ? <p className={styles.fieldNote}>今は自動で変えません。必要なときだけきまりを作ってください。</p> : null}
@@ -502,14 +512,9 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                 </>
               ) : createRule ? (
                 <div className={styles.ruleForm}>
-                  <label className={styles.field}>
-                    <span className={styles.label}>きっかけ</span>
-                    <Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" />
-                  </label>
-                  <p className={styles.fieldNote}>{`→ 「${name || 'このマーク'}」に変える`}</p>
-                  <label className={styles.field}>
-                    <span className={styles.label}>手動で変更した直後の保護</span>
-                    <Select
+                  <Field note={<>{`→ 「${name || 'このマーク'}」に変える`}</>} label="きっかけ"><Select aria-label="きっかけ" value={ruleEvent} onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)} options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))} size="full" /></Field>
+
+                  <Field label="手動で変更した直後の保護"><Select
                       aria-label="手動変更の保護時間"
                       value={String(ruleProtectionMinutes)}
                       onChange={(value) => setRuleProtectionMinutes(Number(value))}
@@ -520,8 +525,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                         { value: '1440', label: '1日は手動の変更を守る' },
                       ]}
                       size="full"
-                    />
-                  </label>
+                    /></Field>
                   <Checkbox checked={ruleActive} onCheckedChange={setRuleActive}>このきまりを有効にして登録する</Checkbox>
                   <span><Button type="button" onClick={() => setCreateRule(false)}>きまりを外す</Button></span>
                 </div>
@@ -534,6 +538,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           </>
         )}
       </CreatePage>
+      <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} lines={comparison} onReload={collision.reloadLatest} onCancel={collision.closeCompare} />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       {archiveOpen && selected ? (
@@ -546,7 +551,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
           error={archiveError}
           onReplacement={setReplacementMarkId}
           onCancel={() => { if (!archiving) { setArchiveOpen(false); setArchiveImpact(null) } }}
-          onConfirm={() => void confirmArchive(selected)}
+          onConfirm={() => confirmArchive(selected)}
         />
       ) : null}
       {/* きまりを作る・直すは今の自動変更ルールの部品を窓で開く。閉じたら読み直す。 */}
@@ -562,7 +567,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         busy={ruleBusy}
         error={ruleError || undefined}
         onCancel={() => { if (!ruleBusy) setStoppingRule(null) }}
-        onConfirm={() => void stopRule()}
+        onConfirm={() => stopRule()}
       />
     </>
   )

@@ -15,6 +15,8 @@ import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { BasicForm, BasicPreview, SLUG_PATTERN, type BasicValues } from './basic-form'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import styles from './form.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
   const { webinar, editor, readOnly } = ctx
@@ -115,7 +117,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       }
       return true
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       return false
     } finally {
       lock.current = false
@@ -137,10 +139,10 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
     try {
       if (dirty && !(await save())) return
       const response = await webinarApi.testNotifications(webinar.id)
-      setTestResult(`通知テスト：成功 ${response.data.sent}件・失敗 ${response.data.failed}件`)
+      setTestResult(`通知テスト：成功 ${response.data.sent} 件・失敗 ${response.data.failed} 件`)
       setTestConfirm(false)
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
     } finally {
       setTesting(false)
     }
@@ -153,7 +155,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description="管理名と公開ページの基本、開催形式を決めます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。"
+      help="管理名と公開ページの基本、開催形式を決めます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。"
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<BasicPreview
@@ -189,7 +191,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         busy={saving || testing}
         error={error || undefined}
         onCancel={() => { if (!saving && !testing) setTestConfirm(false) }}
-        onConfirm={() => void runTest()}
+        onConfirm={() => runTest()}
       >
         {dirty ? <p className={styles.cardNote}>変えた基本設定を保存してから送ります。</p> : null}
       </ConfirmDialog>

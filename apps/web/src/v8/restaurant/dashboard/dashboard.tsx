@@ -8,6 +8,7 @@
  * → 今日の予約の表（来店の印）｜右：予約サイト・グルメ媒体・Google の口コミ・Instagram の新着。
  * 全店の一覧（前の店舗ダッシュボード `CHz31`）は `?view=stores` で残す。動きは BEHAVIOR.md。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
 import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
@@ -32,6 +33,7 @@ import { TodayTable } from './today-table'
 import { canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle, summarizeToday } from './summarize'
 import { useStoreToday } from './use-store-today'
 import styles from './dashboard.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function daysAgo(iso: string, now: number): string {
   const days = Math.max(0, Math.floor((now - Date.parse(iso)) / 86_400_000))
@@ -44,9 +46,9 @@ function headDescription(hours: ReturnType<typeof useStoreToday>['hours'], updat
   const periods = hours?.find((day) => day.weekday === now.getDay())?.periods ?? null
   const open = hours === null ? null : periods && periods.length > 0 ? periods.map((p) => `${p.opensAt}〜${p.closesAt}`).join('・') : '休み'
   return [
-    `${now.getMonth() + 1}月${now.getDate()}日（${week}）`,
+    polishFormatDate(now, { style: 'day' }),
     open ? `営業 ${open}` : null,
-    updatedAt ? `更新 ${pad2(updatedAt.getHours())}:${pad2(updatedAt.getMinutes())}` : null,
+    updatedAt ? `更新 ${polishFormatDate(updatedAt, { style: 'time' })}` : null,
   ].filter(Boolean).join(' ・ ')
 }
 
@@ -143,16 +145,16 @@ function TodayStore() {
             <div className={styles.closeBand} role="status" data-close-band="">
               <Bell size={18} aria-hidden="true" className={styles.closeIcon} />
               <div className={styles.closeText}>
-                <p className={styles.closeTitle}>{`他の予約サイトの枠を閉じてください（未対応 ${pending.length}件）`}</p>
+                <p className={styles.closeTitle}>{`他の予約サイトの枠を閉じてください（未対応 ${pending.length} 件）`}</p>
                 <p className={styles.closeDetail}>
                   {`${slotTitle(first.startsAt)} の枠が${reasonText(first)} → ${openItems(first).map((item) => item.name).join('・')} の枠を閉じてください`}
                 </p>
               </div>
               {firstMedium?.adminUrl ? (
-                <Button href={firstMedium.adminUrl} target="_blank" rel="noopener noreferrer">{`${firstMedium.name}の管理画面を開く ↗`}</Button>
+                <Button external href={firstMedium.adminUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
               ) : null}
               {canWrite && firstItem ? (
-                <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`}>
+                <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`} busy={Boolean(busyId === firstItem.id)} busyLabel="処理中…">
                   <Check size={15} aria-hidden="true" />閉じた
                 </Button>
               ) : null}
@@ -179,7 +181,7 @@ function TodayStore() {
               value={summary?.guests ?? null}
               unit="人"
               loading={!summary}
-              detail={summary ? (summary.peak ? `いちばん多いのは ${summary.peak.label}（${summary.peak.guests}人）` : '今日の予約はまだありません') : '読み込んでいます'}
+              detail={summary ? (summary.peak ? `いちばん多いのは ${summary.peak.label}（${summary.peak.guests} 人）` : '今日の予約はまだありません') : '読み込んでいます'}
               action={{ label: '時間ごとに見る', href: '/restaurant-test/reservations' }}
             />
             <KpiCard
@@ -201,7 +203,7 @@ function TodayStore() {
               unit="件"
               delta={googleConnected && d.oldestReview ? <Chip tone="warn">{`最長 ${daysAgo(d.oldestReview.createTime, now)}`}</Chip> : null}
               detail={googleConnected
-                ? `Google ★${google.connection.averageRating ?? '—'}（${google.connection.totalReviewCount ?? 0}件）`
+                ? `Google ★${google.connection.averageRating ?? emptyValue('unknown')}（${google.connection.totalReviewCount ?? 0}件）`
                 : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
               action={googleConnected ? { label: '返信する', href: '/restaurant-test/google' } : { label: 'つなぐ', href: '/settings/sns' }}
             />
@@ -228,7 +230,7 @@ function TodayStore() {
       boardId="hKRRF"
       headingSize="compact"
       title="今日のお店"
-      description={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
+      help={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
       actions={actions}
       tabs={<StoreTabs current="dashboard" flush />}
     >

@@ -1,7 +1,37 @@
 /** LIFF と管理画面の見本で共有する入力の形。通信・送信は呼ぶ側が持つ。 */
-import { useEffect, useState, useRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
-import { PREFECTURES, type FormInputBlock } from '@line-crm/shared'
+import { useEffect, useState, useRef, forwardRef, type InputHTMLAttributes, type ReactNode, type LabelHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes, type Ref } from 'react'
+import { PREFECTURES, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
 import styles from './controls.module.css'
+
+/** 欄名と必要度の表示。札を読み上げ名へ混ぜず、欄との結び付きを保つ。 */
+export function FieldMark({ required = false }: { required?: boolean }) {
+  return <span aria-hidden="true" className={required ? styles.required : styles.optional}>{required ? '必須' : '任意'}</span>
+}
+
+export function FieldLabel({ required = false, children, ...props }: LabelHTMLAttributes<HTMLLabelElement> & { required?: boolean }) {
+  return <div className={styles.label}><label {...props}>{children}</label><FieldMark required={required} /></div>
+}
+
+export function FieldCount({ value, max, night = false }: { value: string; max: number; night?: boolean }) {
+  return <p className={`${styles.count} ${night ? styles.nightCount : ''}`}>{value.length}/{max}文字</p>
+}
+
+function examplePlaceholder(value?: string) {
+  return value?.replace(/^例\s*[:：]\s*/, '例：')
+}
+
+export function TextInput({ appearance = 'default', className = '', placeholder, ref, ...props }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement>; appearance?: 'default' | 'night' | 'hidden' | 'pin' }) {
+  const look = appearance === 'hidden' ? 'sr-only' : appearance === 'pin' ? styles.pin : appearance === 'night' ? styles.nightInput : styles.input
+  return <input {...props} ref={ref} placeholder={examplePlaceholder(placeholder)} className={`${look} ${className}`} />
+}
+
+export function TextArea({ className = '', placeholder, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} placeholder={examplePlaceholder(placeholder)} className={`${styles.input} ${styles.textarea} ${className}`} />
+}
+
+export function ChoiceInput(props: InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={styles.choiceInput} />
+}
 
 type Mark = 'calendar' | 'clock' | 'chevron' | 'clip'
 export function FieldIcon({ mark }: { mark: Mark }) {
@@ -22,14 +52,14 @@ export function FormTextControl({ block, value, onChange, ...props }: {
   const temporal = block.type === 'date' ? 'date' : format === 'time' ? 'time' : null
   const hint = block.placeholder || (temporal === 'date' ? '年/月/日' : temporal === 'time' ? '--:--' : '')
   const field = block.type === 'textarea' ? (
-    <textarea id={props.id} aria-describedby={props['aria-describedby']} aria-invalid={props['aria-invalid']} style={props.style} readOnly={props.readOnly}
+    <TextArea id={props.id} aria-describedby={props['aria-describedby']} aria-invalid={props['aria-invalid']} aria-required={props['aria-required']} style={props.style} readOnly={props.readOnly}
       rows={3} value={value} placeholder={block.placeholder || undefined} maxLength={block.limit?.max}
-      onChange={(e) => onChange(e.target.value)} className={`${styles.input} ${styles.textarea}`} />
+      onChange={(e) => onChange(e.target.value)} />
   ) : (
     <div className={styles.wrap}>
-      <input {...props} type={temporal ?? (format === 'email' ? 'email' : format === 'tel' ? 'tel' : 'text')}
+      <TextInput {...props} type={temporal ?? (format === 'email' ? 'email' : format === 'tel' ? 'tel' : 'text')}
         value={value} placeholder={block.placeholder || undefined} maxLength={block.limit?.max}
-        onChange={(e) => onChange(e.target.value)} className={styles.input} data-temporal={temporal || undefined} data-empty={temporal && !value || undefined} />
+        onChange={(e) => onChange(e.target.value)} data-temporal={temporal || undefined} data-empty={temporal && !value || undefined} />
       {temporal && !value ? <span className={styles.temporalHint} aria-hidden="true">{hint}</span> : null}
       {temporal ? <span className={styles.endIcon}><FieldIcon mark={temporal === 'date' ? 'calendar' : 'clock'} /></span> : null}
     </div>
@@ -55,16 +85,56 @@ export function RatingStars({ name, current, onChange }: { name: string; current
   </div>
 }
 
-// Worker の forms/upload が受け付ける画像形式。PDF は受け付けない。
+// 写真の許可形式。PDF は質問の設定に応じて加える。
 export const FORM_FILE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif'
 export const FORM_FILE_NOTE = 'JPG・PNG・GIF・WebP・HEIC・HEIF、10MBまで（画像のみ）'
-export function FormFileControl({ label, uploading = false, onUpload }: { label: string; uploading?: boolean; onUpload?: (file: File) => void }) {
+export function FormFileControl({ label, uploading = false, onUpload, kind = 'image', kinds, bothSides = false, maxCount = 1, files = [], onRemove }: {
+  label: string; uploading?: boolean; onUpload?: (file: File, side: 'single' | 'front' | 'back') => void;
+  kind?: FormInputBlock['fileKind']; kinds?: FormInputBlock['fileKinds']; bothSides?: boolean; maxCount?: number;
+  files?: (FormFileAnswer & { previewUrl?: string })[]; onRemove?: (fileId: string) => void;
+}) {
+  const allowedKinds = kinds ?? [kind];
+  kind = allowedKinds.includes('identity') ? 'identity' : allowedKinds.includes('image') ? 'image' : 'pdf';
   const ref = useRef<HTMLInputElement>(null)
+  const camera = useRef<HTMLInputElement>(null)
+  const sideRef = useRef<'single' | 'front' | 'back'>('single')
+  const [error, setError] = useState('')
+  const [selectedSide, setSelectedSide] = useState<'front' | 'back'>('front')
+  const accept = [allowedKinds.some(k => k === 'image' || k === 'identity') ? FORM_FILE_ACCEPT : '', allowedKinds.includes('pdf') ? 'application/pdf' : ''].filter(Boolean).join(',')
+  const choose = (file?: File) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024 || !file.size) { setError('1ファイル10MBまでです'); return }
+    if (!accept.split(',').includes(file.type)) { setError('受け取れる形式のファイルを選んでください'); return }
+    setError(''); onUpload?.(file, sideRef.current)
+  }
+  const sides: ('single' | 'front' | 'back')[] = kind === 'identity' && bothSides ? ['front', 'back'] : ['single']
+  const pick = (take: boolean) => {
+    sideRef.current = sides.length === 2 ? files.some(f => f.side === selectedSide) ? (selectedSide === 'front' ? 'back' : 'front') : selectedSide : 'single';
+    (take ? camera : ref).current?.click();
+  }
   return <div className={styles.stack}>
-    <input ref={ref} type="file" aria-label={label} accept={FORM_FILE_ACCEPT} disabled={uploading} hidden onChange={(e) => { const file = e.target.files?.[0]; if (file) onUpload?.(file); e.target.value = '' }} />
-    <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => ref.current?.click()}><FieldIcon mark="clip" />写真・書類を選ぶ</button>
-    <p className={styles.note}>{FORM_FILE_NOTE}</p>
+    <input ref={ref} type="file" aria-label={label} accept={accept} disabled={uploading} hidden onChange={e => { choose(e.target.files?.[0]); e.target.value = '' }} />
+    <input ref={camera} type="file" aria-label={`${label}を撮る`} accept={FORM_FILE_ACCEPT} capture="environment" disabled={uploading} hidden onChange={e => { choose(e.target.files?.[0]); e.target.value = '' }} />
+    <div className={styles.fileSlots} data-both-sides={sides.length === 2 || undefined}>
+      {sides.map(side => {
+        const entries = files.filter(file => (file.side ?? 'single') === side)
+        return <div key={side} className={styles.stack} role="group" aria-label={side === 'single' ? label : side === 'front' ? '表' : '裏'}>
+          {side !== 'single' ? <button type="button" className={styles.fileSlot} aria-pressed={selectedSide === side} disabled={uploading} onClick={() => setSelectedSide(side)}>{side === 'front' ? '表' : '裏'}{!entries.length ? '（写真を入れる）' : ''}</button> : null}
+          {entries.map(file => <div key={file.fileId} className={styles.fileItem}>
+            {file.previewUrl && file.mimeType?.startsWith('image/') ? <img className={styles.filePreview} src={file.previewUrl} alt="送った写真" /> : <span className={styles.fileName} title={file.filename}>{file.filename || '書類'}{file.state === 'pending' ? '（検査中）' : ''}</span>}
+            <button type="button" className={styles.fileRemove} disabled={uploading} aria-label={`${file.filename || '書類'}を外す`} onClick={() => onRemove?.(file.fileId)}>×</button>
+          </div>)}
+        </div>
+      })}
+    </div>
+    {files.length < (sides.length === 2 ? 2 : Math.min(10, Math.max(1, maxCount))) ? <div className={styles.stack}>
+      {kind !== 'pdf' ? <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => pick(true)}>写真を撮る</button> : null}
+      {kind !== 'pdf' ? <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => pick(false)}>写真を選ぶ</button> : null}
+      <button type="button" className={styles.fileButton} disabled={uploading} onClick={() => pick(false)}><FieldIcon mark="clip" />ファイルを選ぶ</button>
+    </div> : null}
+    <p className={styles.note}>{kind === 'pdf' ? 'PDF・1ファイル10MBまで' : `JPG・PNG・GIF・WebP・HEIC・HEIF${allowedKinds.includes('pdf') ? '・PDF' : ''}・1ファイル10MBまで`}{`・${sides.length === 2 ? 2 : Math.min(10, Math.max(1, maxCount))}枚まで`}</p>
     {uploading ? <p className={styles.note}>送っています...</p> : null}
+    {error ? <p role="alert" className={styles.note}>{error}</p> : null}
   </div>
 }
 
@@ -84,7 +154,7 @@ export function AddressControls({ draft, placeholder, onChange, onLookup, lookin
       {/* 候補は入力部品の呼ぶ側からではなく共通の正本を使う。 */}
       {PREFECTURES.map((p) => <option key={p} value={p}>{p}</option>)}
     </FormSelectControl>
-    {(['city', 'addressLine1', 'addressLine2'] as const).map((key, i) => <label key={key} className={styles.stack}><span className={styles.note}>{['市区町村', '番地', '建物名・部屋番号（任意）'][i]}</span><input type="text" aria-label={['市区町村', '番地', '建物名'][i]} value={draft[key]} placeholder={key === 'addressLine1' ? placeholder || undefined : undefined} onChange={(e) => onChange({ ...draft, [key]: e.target.value })} className={styles.input} /></label>)}
+    {(['city', 'addressLine1', 'addressLine2'] as const).map((key, i) => <label key={key} className={styles.stack}><span className={styles.note}>{['市区町村', '番地', '建物名・部屋番号'][i]}{key === 'addressLine2' && <FieldMark />}</span><TextInput type="text" aria-label={['市区町村', '番地', '建物名'][i]} value={draft[key]} placeholder={key === 'addressLine1' ? placeholder || undefined : undefined} onChange={(e) => onChange({ ...draft, [key]: e.target.value })} /></label>)}
   </div>
 }
 
@@ -180,4 +250,18 @@ export function DateYmdField({
       ))}
     </div>
   );
+}
+
+/** LIFF の全画面が使う素の欄。識別子・電話・選択・添付の意味は変えない。 */
+export const LiffInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & {appearance?:'night'|'concealed'|'pin'}>(function LiffInput({className, appearance, type='text',...props},ref) {
+ const choice=type==='radio'||type==='checkbox'
+ return <input {...props} ref={ref} type={type} className={[appearance==='concealed'?styles.concealedInput:appearance==='pin'?styles.pinInput:choice?styles.choiceInput:appearance==='night'?styles.nightInput:styles.input,className].filter(Boolean).join(' ')} />
+})
+export const LiffTextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function LiffTextArea({className,rows=3,...props},ref){return <textarea {...props} ref={ref} rows={rows} className={[styles.input,styles.textarea,className].filter(Boolean).join(' ')} />})
+export function RequiredMark() { return <span aria-hidden="true" className={styles.required}>必須</span> }
+export function OptionalMark() { return <span aria-hidden="true" className={styles.optional}>任意</span> }
+export function LiffFieldLabel({label,children,required=false,optional=!required,as:Tag='label',className,...props}: LabelHTMLAttributes<HTMLLabelElement> & {label?:string;required?:boolean;optional?:boolean;as?:'label'|'span'}) {
+ const text=label ?? children
+ const shown=typeof text==='string'?text.replace(/\s*[（(](任意|必須)[）)]/g,'').replace(/\s*[*＊]$/,''):text
+ return <span className={styles.labelRow}><Tag {...props} className={[styles.label,className].filter(Boolean).join(' ')}>{shown}</Tag>{required?<RequiredMark/>:optional?<OptionalMark/>:null}</span>
 }

@@ -7,18 +7,19 @@
  */
 import { ClipboardList } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListRange from '@/components/ui/list-range'
 import { formatDateTime } from '@/lib/format'
 import type { FriendDetailState } from './use-friend-detail'
 import styles from './detail.module.css'
+import { DetailLoading } from '@/components/templates/detail-page'
 
-const renderValue = (v: unknown) => (Array.isArray(v) ? v.join(', ') : String(v ?? ''))
 
 export default function FormsTab({ data }: { data: FriendDetailState }) {
   const { submissions, submissionsStatus, submissionsTotal, submissionsNextCursor, submissionsLoadingMore, submissionsMoreError } = data
 
   if (submissionsStatus === 'loading' || submissionsStatus === 'idle') {
-    return <div className={styles.pane}><p className={styles.paneNote}>回答を読み込んでいます…</p></div>
+    return <div className={styles.pane}><DetailLoading /></div>
   }
   if (submissionsStatus === 'error') {
     return (
@@ -51,12 +52,12 @@ export default function FormsTab({ data }: { data: FriendDetailState }) {
             </div>
             <dl className={styles.answers}>
               {keys.map((k) => (
-                <div key={k} className={styles.answer}><dt>{labelByName.get(k)}</dt><dd>{renderValue(s.data[k])}</dd></div>
+                <div key={k} className={styles.answer}><dt>{labelByName.get(k)}</dt><dd><FormFileAttachments value={s.data[k]} /></dd></div>
               ))}
               {orphans.map((k) => (
                 <div key={k} className={styles.answer}>
                   <dt title={`項目キー: ${k}`}>{k}<span className={styles.orphan}>（現在は使われていない項目）</span></dt>
-                  <dd>{renderValue(s.data[k])}</dd>
+                  <dd><FormFileAttachments value={s.data[k]} /></dd>
                 </div>
               ))}
             </dl>

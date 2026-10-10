@@ -36,6 +36,8 @@ import {
   WebhooksV8Band, WebhooksV8Head, outgoingKpiCells, useV8BandData,
 } from './outgoing-v8'
 import styles from './apitokens-v8.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -182,7 +184,7 @@ function ApiTokensV8Inner() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setActionError(describeApiFailure(caught, '発行', {
-        forbidden: '鍵の発行は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
@@ -223,7 +225,7 @@ function ApiTokensV8Inner() {
         return
       }
       setDialogError(describeApiFailure(caught, '入れ替え', {
-        forbidden: '鍵の入れ替えは統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
@@ -256,7 +258,7 @@ function ApiTokensV8Inner() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setDialogError(describeApiFailure(caught, '停止', {
-        forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
@@ -282,7 +284,7 @@ function ApiTokensV8Inner() {
       />
       <WebhooksV8Band cells={outgoingKpiCells({ items: band.outgoingItems, incomingCount: band.incomingCount, summary: band.summary })} />
 
-      {actionError ? <Notice tone="error">{actionError}</Notice> : null}
+      {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
 
       {issued ? (
         <section className={styles.issuedBox} aria-label="発行した鍵">
@@ -313,9 +315,7 @@ function ApiTokensV8Inner() {
         {showCreate ? (
           <section className={styles.createBox} aria-label="鍵の発行">
             <h2 className={styles.createTitle}>新しい鍵</h2>
-            <div>
-              <label className={styles.label} htmlFor="webhook-v8-token-name">名前</label>
-              <input
+            <div><Field label={<>名前</>} htmlFor="webhook-v8-token-name"><input
                 id="webhook-v8-token-name"
                 value={name}
                 maxLength={120}
@@ -323,8 +323,7 @@ function ApiTokensV8Inner() {
                 placeholder="例：予約システム連携"
                 className={styles.input}
               />
-              {nameError ? <p className={styles.fieldError} role="alert">{nameError}</p> : null}
-            </div>
+{nameError ? <p className={styles.fieldError} role="alert">{nameError}</p> : null}</Field></div>
             <fieldset>
               <legend className={styles.label}>できること</legend>
               <div className={styles.checkRow}>
@@ -387,7 +386,7 @@ function ApiTokensV8Inner() {
             kind="error"
             title="鍵を読み込めませんでした"
             description={loadError}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : null}
         {status === 'forbidden' ? (
@@ -439,7 +438,7 @@ function ApiTokensV8Inner() {
                     {tokens.map((token) => (
                       <tr key={token.id} data-ctx-row={token.id}>
                         <td className={styles.nameCell} title={token.name}>{token.name}</td>
-                        <td><span className={styles.nameCell} title={token.scopes.map(scopeLabel).join('・')}>{token.scopes.map(scopeLabel).join('・')}</span></td>
+                        <td><span className={styles.nameCell} ><TruncatedText value={String(token.scopes.map(scopeLabel).join('・') ?? '')} /></span></td>
                         <td className={styles.dimCell}>{formatDateTime(token.createdAt)}</td>
                         <td className={styles.dimCell}>{formatDateTime(token.lastUsedAt)}</td>
                         <td><span className={`${styles.pill} ${styles.pillActive}`}>● 使っている</span></td>

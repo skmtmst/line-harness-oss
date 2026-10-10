@@ -24,7 +24,7 @@
 
 ## 呼ぶ口（今と同じ）
 - ルール：`api.automations.list`（数の帯の今月動いた・失敗は `summary`）、条件に外れたは `/api/automation-runs?limit=1` の `summary.skipped`。
-  編集＝`createDraftFromAutomation`→`/automations/drafts?id=`、複製＝`duplicate`、止める・動かす・削除＝`setStatus`（確認の窓）、1人で試す＝`test`（窓で友だちIDを入れる）。
+  編集＝`createDraftFromAutomation`→`/automations/drafts?id=`、複製＝`duplicate`、止める・動かす・保管＝`setStatus`（確認の窓）、1人で試す＝`test`（窓で友だちIDを入れる）。
 - タブの件数：ルール＝一覧の件数、共通アクション＝`api.commonActions.list` の件数、見本＝`api.automations.templates` の件数。読めないときは数を出さない。
 - 動いた記録：`/api/automation-runs`（`limit`・`offset`・`search`・`status`・`include_test`）、中身＝`getRun`、もう一度やる＝`POST /retry`、取りやめ＝`cancelRun`、CSV＝`runsCsvUrl`＋`downloadApiFile`。
 - 共通アクション：`api.commonActions.list`（`status`・`query`・`limit`・`offset`、数の帯は `summary`）、複製＝`duplicate`→編集、保管・戻す＝`archive`/`unarchive`、CSV＝`csvUrl`。
@@ -66,3 +66,7 @@
 - きっかけの言い方は口の「〇〇とき」から「とき」を落として出す（絵：「友だちになった」）。
 - きっかけの札は、かっこの補足を外した同じきっかけを1つにまとめ（「注文が確定した（初回）」→「注文が確定した」）、**先に出てきた順に6つまで**（絵は「すべて」＋6つ）。7つ目以降のきっかけの見本は「すべて」から見る。
 - 数の帯はルールの一覧と同じ4つ（今月動いた＝この30日に動いた回数。「先月より」は口が無いので出さない）。
+
+## B-173 保管から戻す
+- `?archived=1` の保管の札で保管したルールだけを見る（一覧APIに `includeArchived=1`）。
+- 行の「…」→「保管から戻す」→確認の窓→`POST /api/automations/:id/restore`。公開版ありは停止中、公開前は下書きへ。同じID・版・実行記録を残し、稼働は再開しない。閲覧のみでは戻す操作を隠す。

@@ -113,7 +113,7 @@ export default function GenerationPanel({
   return (
     <aside
       data-design-node="GcJHv"
-      className="flex w-full shrink-0 flex-col self-start rounded-card border border-hairline bg-canvas xl:sticky xl:top-4"
+      className="flex w-full shrink-0 flex-col self-start rounded-card border content-card bg-canvas xl:sticky xl:top-4"
       style={{ maxWidth: 390 }}
       aria-label="画像を生成"
     >

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React, { useState } from 'react'
+import React, { act, useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EntityMultiPickerDialog, EntityPickerField, type EntityPickerItem } from './entity-picker'
@@ -52,6 +52,7 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     const dialog = await screen.findByRole('dialog')
     expect((within(dialog).getByRole('radio', { name: '初回カウンセリング' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: '施術' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(within(dialog).getAllByRole('radio').map((row) => row.getAttribute('aria-label'))).toEqual(['施術後アンケート'])
     fireEvent.click(within(dialog).getByRole('radio', { name: '施術後アンケート' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))

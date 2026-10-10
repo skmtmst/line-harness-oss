@@ -1,3 +1,4 @@
+import type { HqMediaRuntime } from './hq-media.js';
 import { resolveHqBroadcastAudience, countHqAudience } from './hq-broadcast-audience.js';
 import { hqBroadcastApprovalState } from './hq-broadcast-approval.js';
 import { getLineAccountById, getStaffById, getBroadcastById, getRetryableRecipientIds,
@@ -99,7 +100,7 @@ export async function prepareHqBroadcast(db:D1Database,tenantId:string,actorId:s
   try {const result=await db.batch(statements);if(update&&!result[0].meta.changes)throw new StampError('下書きが更新されました。読み直してください',409);}catch(e){if(update)throw e;const winner=await db.prepare('SELECT id,input_json FROM hq_broadcast_runs WHERE tenant_id=? AND request_id=?').bind(tenantId,b.requestId).first<{id:string;input_json:string}>();if(!winner)throw e;if(winner.input_json!==canonical)throw new StampError('同じ実行の依頼で内容が変わっています',409);return getHqBroadcastRun(db,tenantId,winner.id);}
   return getHqBroadcastRun(db,tenantId,id);
 }
-export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true):Promise<HqBroadcastPreflight[]> {
+export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true,runtime?:HqMediaRuntime):Promise<HqBroadcastPreflight[]> {
   const input=JSON.parse(run.input_json) as HqBroadcastInput,targets=(await db.prepare('SELECT * FROM hq_broadcast_targets WHERE run_id=? ORDER BY line_account_id').bind(run.id).all<Target>()).results;
   const result:HqBroadcastPreflight[]=[];
   for(const t of targets) {
@@ -121,7 +122,7 @@ export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true
     // APIエラーも接続不明として人に返す。別の店舗の枠では補えない。
     if(remaining===null)reasons.push('今月の送信枠・LINE接続を確認できません');
     else if(audienceCount!==null&&audienceCount>remaining)reasons.push('今月の送信枠が足りません');
-    try {const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,t.line_account_id,input),content=mappedHqContent(materials,account?.name??t.account_name,account?.liff_id),parts=parseBroadcastMessageParts({...materials,...content});for(const p of parts)await resolveSendCommonVars(db,t.line_account_id,p.messageContent,{kind:'broadcast',id:run.id});}
+    try {const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,t.line_account_id,input,runtime ? {...runtime,copy:false} : undefined),content=mappedHqContent(materials,account?.name??t.account_name,account?.liff_id),parts=parseBroadcastMessageParts({...materials,...content});for(const p of parts)await resolveSendCommonVars(db,t.line_account_id,p.messageContent,{kind:'broadcast',id:run.id});}
     catch(e) {reasons.push(e instanceof StampError?e.message:'店舗の共通情報を確認してください');}
     const p={accountId:t.line_account_id,accountName:account?.name??t.account_name,audienceCount,remaining,connected:connected&&remaining!==null,paused,blockedReasons:reasons,excluded:!!t.excluded,broadcastId:t.broadcast_id};
     result.push(p);
@@ -138,9 +139,9 @@ export async function excludeHqBroadcastTargets(db:D1Database,run:RunRow,actorId
     ops.push(db.prepare(`INSERT INTO hq_broadcast_audit(id,run_id,line_account_id,actor_id,action) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM hq_broadcast_runs WHERE id=? AND dispatch_token=?)`).bind(crypto.randomUUID(),run.id,t.line_account_id,actorId,ids.includes(t.line_account_id)?'excluded':'included',run.id,token));}
   const r=await db.batch(ops);if(!r[0].meta.changes)throw new StampError('対象店が更新されました。読み直してください', 409, ["accountIds","accountTagIds"]);
 }
-export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:string,version:number, confirmedRecipientCount?:number) {
+export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:string,version:number, confirmedRecipientCount?:number, runtime?:HqMediaRuntime) {
   if(run.status!=='prepared')return readHqBroadcastResult(db,run);
-  const preflight=await preflightHqBroadcast(db,run),selected=preflight.filter(p=>!p.excluded);
+  const preflight=await preflightHqBroadcast(db,run,true,runtime),selected=preflight.filter(p=>!p.excluded);
   if(!selected.length||selected.some(p=>p.blockedReasons.length))throw new StampError('送れない店舗を外して再確認してください',409);
   const approval=await hqBroadcastApprovalState(db,run,actorId,preflight);
   if(approval.gate.required) {
@@ -153,7 +154,7 @@ export async function dispatchHqBroadcast(db:D1Database,run:RunRow,actorId:strin
     const resolved=await resolveHqBroadcastAudience(db,run.tenant_id,p.accountId,input);
     const account=await getLineAccountById(db,p.accountId);
     if(!account||account.tenant_id!==run.tenant_id)throw new StampError('店舗を確認してください',409);
-    const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,p.accountId,input);
+    const materials=await resolveHqBroadcastMaterials(db,run.tenant_id,p.accountId,input,runtime ? {...runtime,copy:true} : undefined);
     const content=mappedHqContent(materials,account.name,account.liff_id);
     ops.push(db.prepare(`INSERT INTO broadcasts(id,title,message_type,message_content,message_bubbles_json,target_type,status,scheduled_at,line_account_id,alt_text,segment_conditions,hq_run_id,
       internal_memo,track_links,measure_opens,stealth_spread_minutes,message_options_json,approval_status,approval_requested_by_staff_id,approval_decided_by_staff_id,approval_confirmed_count)

@@ -165,7 +165,7 @@ describe('R530 実行結果の出し分け契約', () => {
 
   it('再実行・一時停止が canManage で守られ、403 は権限の説明になる', () => {
     expect(PAGE).toContain('if (canManage && item.canRetry)')
-    expect(PAGE).toContain('再実行する権限がありません')
+    expect(PAGE).toContain("permissionDeniedMessage('store')")
     expect(PAGE).toContain('再実行・一時停止はオーナーと管理者だけができます')
   })
 })

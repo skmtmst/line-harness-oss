@@ -9,6 +9,7 @@
  * データの口は v7 と同じ（作成・本人確認・未保存の番兵）。`?event=` で見本の出来事を選んでおく。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（競合の口が無い・それでも送れないときの口が無い など）。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -32,6 +33,7 @@ import Select from '@/components/shared/select'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import styles from './create.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /*
  * 送る出来事。正本は packages/db/src/webhooks.ts の KNOWN_OUTGOING_EVENT_TYPES。
@@ -193,7 +195,7 @@ function WebhooksCreateV8Inner() {
 
   async function save(next: 'draft' | 'active') {
     if (staffRole !== null && staffRole !== 'owner') {
-      setError('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+      setError(permissionDeniedMessage('store'))
       return
     }
     const accountId = selectedAccountId
@@ -222,7 +224,7 @@ function WebhooksCreateV8Inner() {
     if (next === 'active' && pendingStop && pendingStop.accountId === accountId) {
       // もう作れていて動いている。同じ送り先をもう1つ作らない。
       createdActiveRef.current = null
-      router.push('/webhooks')
+      router.push(createPageReturnHref('/webhooks', pendingStop.id))
       return
     }
     if (next === 'draft' && pendingStop && pendingStop.accountId === accountId) {
@@ -230,7 +232,7 @@ function WebhooksCreateV8Inner() {
         const stop = await api.webhooks.outgoing.update(pendingStop.id, accountId, { isActive: false })
         if (!stop.success) throw new Error(stop.error)
         createdActiveRef.current = null
-        router.push('/webhooks')
+        router.push(createPageReturnHref('/webhooks', pendingStop.id))
       } catch {
         setError('送り先は作れましたが、まだ止められていません（いまは動いています）。もう一度「下書きを保存」を押すと、止めるところだけやり直します。')
         setSaving(false)
@@ -257,7 +259,7 @@ function WebhooksCreateV8Inner() {
         res = await create()
       } catch (caught) {
         if (!isStepUpRequired(caught)) {
-          if (caught instanceof ApiError && caught.status === 403) throw new Error('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+          if (caught instanceof ApiError && caught.status === 403) throw new Error(permissionDeniedMessage('store'))
           throw caught
         }
         const token = await gate('webhook.secret', 'Webhookを登録する')
@@ -282,7 +284,7 @@ function WebhooksCreateV8Inner() {
         }
         createdActiveRef.current = null
       }
-      router.push('/webhooks')
+      router.push(createPageReturnHref('/webhooks', res.data.id))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。')
       setSaving(false)
@@ -298,10 +300,10 @@ function WebhooksCreateV8Inner() {
       <CreatePage
         boardId="hsD8e"
         title="送り先を作る"
-        description="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        footerActions={<Button href="/webhooks">一覧へ戻る</Button>}
+        help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
+        footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
       >
-        <Notice tone="info">送り先の作成は統括だけができます。必要なときは統括に頼んでください。</Notice>
+        <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage>
     )
   }
@@ -337,7 +339,7 @@ function WebhooksCreateV8Inner() {
     <CreatePage
       boardId="hsD8e"
       title="送り先を作る"
-      description="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
+      help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
       preview={preview}
       status="下書き（まだ動いていません）"
       footerActions={(
@@ -346,7 +348,7 @@ function WebhooksCreateV8Inner() {
           <Button disabled={saving} onClick={() => void save('draft')} busy={saving}>下書きを保存</Button>
           <Button variant="primary" disabled={saving} onClick={() => void save('active')} busy={saving}>つくって動かす</Button>
         </>
-      )}
+      )} dirty={false}
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
@@ -476,15 +478,12 @@ function WebhooksCreateV8Inner() {
               </div>
             ) : null}
             {detailsOpen ? (
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="wh-new-incoming">受け取った知らせも送る（受け取り口の種類。カンマで区切る）</label>
-                <TextField
+              <div className={styles.field}><Field label="受け取った知らせも送る（受け取り口の種類。カンマで区切る）" htmlFor="wh-new-incoming"><TextField
                   id="wh-new-incoming"
                   value={incomingSources}
                   onChange={(event) => setIncomingSources(event.target.value)}
-                  placeholder="例: form, booking"
-                />
-              </div>
+                  placeholder="例：form, booking"
+                /></Field></div>
             ) : null}
           </>
         ) : null}

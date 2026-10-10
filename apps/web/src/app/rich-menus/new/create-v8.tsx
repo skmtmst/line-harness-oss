@@ -54,7 +54,7 @@ import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import SegmentedControl from '@/components/shared/segmented'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import DateTimeField from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -114,6 +114,8 @@ import {
 import styles from './create-v8.module.css'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 /* ---------- 手順 ---------- */
 
@@ -257,8 +259,8 @@ function describeMenuSummary(input: {
 }): string {
   const areaCount = input.pages.reduce((total, page) => total + page.areas.length, 0)
   return [
-    `名前：${input.name || '（未入力）'}`,
-    `言葉：${input.chatBarText || '（未入力）'}`,
+    `名前：${input.name || emptyValue('unconfigured')}`,
+    `言葉：${input.chatBarText || emptyValue('unconfigured')}`,
     `出す相手：${input.audienceAll ? 'みんな' : '条件あり'}`,
     `面の数：${input.pages.length}`,
     `ボタンの数：${areaCount}`,
@@ -1045,7 +1047,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         /targetingPriority/.test(raw)
           ? '出す順番は1以上の整数で入力してください。小数は使えません。'
           : describeApiFailure(e, '下書きの保存', {
-              forbidden: 'リッチメニューを保存できるのは、権限を持つ人だけです。必要なときは統括に頼んでください。',
+              scope: 'store',
             }),
       )
       return false
@@ -1662,7 +1664,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const headNote =
     step === 'shape'
       ? host ? 'いまは下書きとして作ります。最後の「配る」で選んだアカウントへ届けます。' : 'いまは下書きとして作ります。最後の「公開」で LINE に出します。'
-      : `名前：${name || '（未入力）'}・いまは下書きです`
+      : `名前：${name || emptyValue('unconfigured')}・いまは下書きです`
 
   /* ---------- 描画 ---------- */
 
@@ -1716,7 +1718,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     <CreatePage boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
-      } headingSize="large" title={<>リッチメニューを作る</>} description={<>{headNote}{conflict ? (
+      } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conflict ? (
           /* 板 `r8dGXT`：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
           <div className={styles.conflictSlot}>
             <SaveConflictBand
@@ -1864,7 +1866,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         return (
           <ConfirmDialog
             open={next !== null}
-            title={blockers.length > 0 ? 'タブの数をいま減らせません' : `タブの数を${next === 0 ? 'なし' : `${(next ?? 0) + 1}つ`}にしますか？`}
+            title={blockers.length > 0 ? 'タブの数をいま減らせません' : `タブの数を${next === 0 ? emptyValue('none') : `${(next ?? 0) + 1}つ`}にしますか？`}
             description={
               blockers.length > 0
                 ? '消えるタブを行き先にしている切替ボタンがあります。理由を直してから、もう一度お試しください。'
@@ -2098,7 +2100,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               previewAlt={image ? `選択中の画像: ${image.name}` : undefined}
               value={image?.src ?? null}
               accept="image/png,image/jpeg"
-              limitText="PNG・JPEG・1MB まで"
+              maxBytes={1 * 1024 * 1024}
               aspectRatio={`${dims.width} / ${dims.height}`}
               disabled={!canPick || busy}
               removable={Boolean(image?.removable)}
@@ -2149,7 +2151,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           previewAlt={image ? `タブ${index + 1}の画像: ${image.name}` : undefined}
           value={image?.src ?? null}
           accept="image/png,image/jpeg"
-          limitText="1MB まで"
+          maxBytes={1 * 1024 * 1024}
           aspectRatio={`${dims.width} / ${dims.height}`}
           disabled={!canPick}
           removable={Boolean(image?.removable)}
@@ -2348,7 +2350,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               </li>
             </ol>
             <Field label="順番（1 がいちばん先）" htmlFor="rm-hq-order">
-              <TextInput id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
+              <NumberInput numericText id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
                 const next = Number(e.target.value.replace(/[^0-9]/g, ''))
                 setTargetingPriority(Number.isFinite(next) && next > 0 ? Math.min(next, 999) - 1 : 0)
               }} />
@@ -2474,7 +2476,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <div className={styles.endBox}>
             <div className={styles.endHead}>
               <span className={styles.endTitle}>終わりを決める（任意）</span>
-              <Toggle
+              <SettingCheckbox
                 label="終わりを決める"
                 checked={endEnabled}
                 onChange={(on) => {
@@ -2649,7 +2651,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               {
                 key: 'tabs',
                 label: '切替タブ',
-                value: (group ? pages.length : tabCount + 1) > 1 ? `${group ? pages.length : tabCount + 1}ページ` : 'なし',
+                value: (group ? pages.length : tabCount + 1) > 1 ? `${group ? pages.length : tabCount + 1}ページ` : emptyValue('none'),
               },
             ]}
           />

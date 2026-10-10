@@ -10,6 +10,8 @@
  * 件数と金額はEC運用の集計の口（アカウントの切り替えで古い応答を捨てる・集計だけの失敗は数の帯だけ）、
  * 「候補を見る」で表の下に根拠・影響・両方の中身・これまでの判断、「決める」で判定の窓。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowUpRight, Link2, Plug, Search, Unlink, UserSearch } from 'lucide-react'
 import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
@@ -33,6 +35,8 @@ import shared from './screen.module.css'
 import styles from './identity.module.css'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type View = 'all' | 'candidate' | 'none' | 'conflict'
 type Sort = 'newest' | 'confidence'
@@ -76,8 +80,8 @@ export default function EcIdentityCandidatesScreen() {
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
-  const [view, setView] = useState<View>('all')
-  const [sort, setSort] = useState<Sort>('confidence')
+  const [view, setView] = useListUrlValue<View>('view', 'all')
+  const [sort, setSort] = useListUrlValue<Sort>('sort', 'confidence')
 
   /* アカウントを切り替えたら、前のアカウントの遅れた応答は採らない（R600）。 */
   const operationsReqRef = useRef(0)
@@ -182,7 +186,7 @@ export default function EcIdentityCandidatesScreen() {
 
         <div className={styles.toolbar}>
           <span className={styles.sortBox}>
-            <Select aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} />
+            <ListToolbarSort aria-label="候補の並び順" value={sort} onChange={(value) => setSort(value as Sort)} options={[{ value: 'confidence', label: '確からしさが高い順' }, { value: 'newest', label: '注文が新しい順' }]} />
           </span>
           {/* 絵に無い絞り込み（候補あり・候補なし・同じ人が2人いる疑い）は、並びの横に小さく残す。 */}
           <span className={styles.sortBox}>
@@ -213,9 +217,9 @@ export default function EcIdentityCandidatesScreen() {
             const hasCandidate = Boolean(item.right.label)
             const selected = review.selectedId === item.id
             return (
-              <Tr key={item.id} selected={selected}>
+              <Tr key={item.id} selected={selected} data-row-id={item.id}>
                 <Td><span className={shared.stack}>
-                  <span className={styles.name} title={item.left.label}>{item.left.label}</span>
+                  <span className={styles.name} ><TruncatedText value={String(item.left.label ?? '')} /></span>
                   <span className={shared.sub} title={leftSub}>{leftSub}</span>
                 </span></Td>
                 <Td><span className={shared.stack}>
@@ -228,7 +232,7 @@ export default function EcIdentityCandidatesScreen() {
                 <Td>
                   {hasCandidate ? (
                     <StatusBadge tone={confidenceTone(item.confidence.label)} size="compact">{confidenceText(item.confidence.label)}</StatusBadge>
-                  ) : '—'}
+                  ) : emptyValue('unknown')}
                 </Td>
                 <Td><span className={styles.ops}>
                   {hasCandidate ? (
@@ -287,7 +291,7 @@ export default function EcIdentityCandidatesScreen() {
       boardId="w1W8h"
       layout="narrow-nav"
       title="EC連携"
-      description="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
+      help="ネットショップから注文・発送・定期便の出来事を取り込み、LINE の友だちと結びつけます。"
       actions={<Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={shared.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>}
     >
       <EcTabsV8 accountId={selectedAccountId} active="identity" />

@@ -15,7 +15,7 @@ afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.c
 it('初回失敗→再試行で本当に読み直し、一覧から選べる', async () => {
   list.mockRejectedValueOnce(new Error('network'))
   render(<HqTemplatePicker open {...props} />)
-  fireEvent.click(await screen.findByRole('button', { name: 'もう一度試す' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }))
   fireEvent.click(await screen.findByRole('radio', { name: '店からの案内' }))
   fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
   expect(list).toHaveBeenCalledTimes(2)
@@ -26,9 +26,9 @@ it('初回失敗→再試行で本当に読み直し、一覧から選べる', a
 it('再試行も失敗したら再び理由と再試行を出す', async () => {
   list.mockRejectedValueOnce(new Error('network')).mockRejectedValueOnce(new Error('network'))
   render(<HqTemplatePicker open {...props} />)
-  fireEvent.click(await screen.findByRole('button', { name: 'もう一度試す' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }))
   await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
-  expect(await screen.findByRole('button', { name: 'もう一度試す' })).toBeTruthy()
+  expect(await screen.findByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   expect(screen.queryByText('統括のテンプレートがまだありません。「テンプレート」で作ってください。')).toBeNull()
 })
 

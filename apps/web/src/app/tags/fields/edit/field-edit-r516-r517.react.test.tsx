@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React from 'react'
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -79,6 +80,7 @@ function nameBox(): HTMLInputElement {
 }
 
 beforeEach(() => {
+  clearToastsForTest()
   fixture.fieldsList.mockResolvedValue({ success: true, data: [FIELD] })
   fixture.foldersList.mockResolvedValue({
     success: true,
@@ -95,7 +97,7 @@ afterEach(() => {
 describe('R516 フォルダ取得失敗を隠さず、未分類と誤表示しない', () => {
   it('失敗中は選択欄を出さず、その場で読み直せる', async () => {
     fixture.foldersList.mockRejectedValueOnce(new Error('network down'))
-    render(<EditFriendFieldPage />)
+    render(<><EditFriendFieldPage /><ToastHost /></>)
     await screen.findByText('所属を読み込めませんでした。今の所属は変わらず保存されます。')
     // 未分類だけの選択欄は出さない（所属IDは入力に残る）。
     expect(screen.queryByLabelText('友だち情報欄のフォルダ')).toBeNull()
@@ -107,7 +109,7 @@ describe('R516 フォルダ取得失敗を隠さず、未分類と誤表示し�
 
   it('失敗中も保存は元の所属のまま送る', async () => {
     fixture.foldersList.mockRejectedValueOnce(new Error('network down'))
-    render(<EditFriendFieldPage />)
+    render(<><EditFriendFieldPage /><ToastHost /></>)
     await screen.findByText('所属を読み込めませんでした。今の所属は変わらず保存されます。')
     fireEvent.change(nameBox(), { target: { value: 'メモB' } })
     fireEvent.click(saveButton())
@@ -120,7 +122,7 @@ describe('R516 フォルダ取得失敗を隠さず、未分類と誤表示し�
 
 describe('R517 応答消失後の再試行で保存済みか別人かを分ける', () => {
   it('送った内容が保存済みなら保存済みと案内する', async () => {
-    render(<EditFriendFieldPage />)
+    render(<><EditFriendFieldPage /><ToastHost /></>)
     await waitFor(() => expect(nameBox().value).toBe('メモ'))
     fireEvent.change(nameBox(), { target: { value: 'メモA' } })
 
@@ -144,7 +146,7 @@ describe('R517 応答消失後の再試行で保存済みか別人かを分け�
   })
 
   it('別人の変更なら差分を見せて取り込める', async () => {
-    render(<EditFriendFieldPage />)
+    render(<><EditFriendFieldPage /><ToastHost /></>)
     await waitFor(() => expect(nameBox().value).toBe('メモ'))
     fireEvent.change(nameBox(), { target: { value: 'メモA' } })
 
@@ -162,7 +164,10 @@ describe('R517 応答消失後の再試行で保存済みか別人かを分け�
     expect(nameBox().value).toBe('メモA')
     expect(screen.getAllByText(/Bの名前/).length).toBeGreaterThan(0)
 
-    fireEvent.click(screen.getByRole('button', { name: '最新の内容を取り込む' }))
+    fireEvent.click(screen.getByRole('button', { name: '違いを比べる' }))
+    await screen.findByRole('dialog', { name: '最新の保存と比べる' })
+    expect(nameBox().value).toBe('メモA')
+    fireEvent.click(within(screen.getByRole('dialog', { name: '最新の保存と比べる' })).getByRole('button', { name: '最新を読み込んで続ける' }))
     expect(nameBox().value).toBe('Bの名前')
 
     fixture.fieldsUpdate.mockResolvedValueOnce({ success: true, data: { id: 'f-1' } })

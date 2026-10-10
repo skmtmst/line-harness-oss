@@ -18,7 +18,7 @@ const FOCUSABLE = [
 ].join(',')
 
 /** モーダル系のフォーカス移動・Escape・背景スクロール停止を1か所にまとめる。 */
-export function useOverlayFocus(
+export function useOverlayFocus<T extends HTMLElement = HTMLDivElement>(
   open: boolean,
   onClose: () => void,
   closeDisabled = false,
@@ -27,10 +27,10 @@ export function useOverlayFocus(
    * 未保存の離脱確認のように「残る方」を主にする窓で、主のボタンへ寄せる。
    */
   initialFocus?: () => HTMLElement | null,
-): RefObject<HTMLDivElement | null> {
+): RefObject<T | null> {
   const depth = useContext(OverlayDepthContext)
   const identity = useRef<object>({})
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<T>(null)
   const onCloseRef = useRef(onClose)
   const initialFocusRef = useRef(initialFocus)
   const closeDisabledRef = useRef(closeDisabled)

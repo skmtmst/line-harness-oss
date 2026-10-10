@@ -1,3 +1,5 @@
+
+import { jstDate } from '@/lib/jst-datetime'
 /*
  * 友だちの履歴（GET /api/friends/:id/timeline）の言葉と行き先。
  * 今の画面（app/friends/detail/page.tsx）の決まりを写した（import は不可）。
@@ -133,7 +135,7 @@ export function dayHeading(value: string, now: Date = new Date()) {
 export function dayKey(value: string) {
   const time = new Date(value).getTime()
   if (Number.isNaN(time)) return ''
-  return new Date(time + 9 * 3_600_000).toISOString().slice(0, 10)
+  return jstDate(new Date(time))
 }
 
 /** 同じ元の行を二重に足さないための鍵（IDEA-03「重複なし」）。 */

@@ -75,7 +75,7 @@ async function render(tab: PetTab) {
   await settle()
 }
 const buttons = () => Array.from(document.querySelectorAll('button'))
-const byText = (text: string) => buttons().find((b) => b.textContent?.trim() === text)
+const byText = (text: string) => [...document.querySelectorAll<HTMLButtonElement>('button,a')].find((b) => b.textContent?.trim() === text)
 const byLabel = (label: string) => buttons().find((b) => b.getAttribute('aria-label') === label)
 async function click(target: Element | undefined) {
   expect(target).toBeTruthy()
@@ -86,6 +86,7 @@ const listCalls = () => fetchApi.mock.calls.filter(([path]) => String(path).star
 
 describe('V8 マイペット（src/v8/nen-pets）', () => {
   beforeEach(() => {
+    window.history.replaceState(null, "", "/")
     document.documentElement.dataset.theme = 'v8'
     role.value = 'owner'
     fetchApi.mockReset()
@@ -189,7 +190,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     await click(byLabel('「こむぎ」の操作'))
     expect(byText('ペットの情報を直す')).toBeFalsy()
     expect(byText('飼い主を開く')).toBeTruthy()
-    expect(buttons().some((b) => b.textContent?.includes('CSV で書き出す'))).toBe(true)
+    expect(buttons().some((b) => b.textContent?.includes('CSVで書き出す'))).toBe(true)
     await act(async () => { root.render(<PetsV8 accountId="acc-1" tab="feeding" onChangeTab={() => {}} />) })
     await settle()
     for (const text of ['既定にする', 'これを使う', '＋ 主食を追加する', '＋ 然の商品を追加する', '保存する', 'キャンセル']) {

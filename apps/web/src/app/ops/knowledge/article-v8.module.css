@@ -1,7 +1,11 @@
 @layer properties, theme, base, components, utilities;
 .page { display: flex; flex-direction: column; gap: 14px; min-width: 0; container-type: inline-size; }
 .columns { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr); align-items: start; gap: 14px; min-width: 0; }
-.fields { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 18px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
+.fields { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 18px;  border-radius: var(--radius-card);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
+}
 .fields label { font-size: 12px; }
 .fields label input, .fields label button { height: 36px; }
 .fields label:nth-child(1) { order: 0; }

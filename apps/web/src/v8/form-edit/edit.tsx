@@ -9,6 +9,8 @@
  * 競合・試しのURLは今までの画面（app/form-submissions/edit/page.tsx）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -70,6 +72,8 @@ import { FormEditAttemptContext } from './field-issues'
 import { focusFieldById } from '@/lib/use-form-errors'
 import { FormPhone } from './phone'
 import styles from './edit.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import TextLink from '@/components/shared/text-link'
 
 const TAB_ITEMS: { key: EditTab; label: string }[] = [
   { key: 'content', label: '中身' },
@@ -667,13 +671,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         setPublishedContentRevision(published.data.contentRevision)
         setIsActive(true)
         const message = published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました'
-        setNotice(message)
-        notifyToast(message)
+        notifySaved(message)
         savedSnapshot.current = JSON.stringify({ ...current, isActive: true })
       } else {
         if (!silent) {
-          setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
-          notifyToast('下書きを保存しました')
+          notifySaved('下書きを保存しました')
         }
         savedSnapshot.current = reconciledOwnSave
           ? JSON.stringify({
@@ -700,7 +702,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       }
       if (silent) return false
       setError(describeApiFailure(e, '保存', {
-        forbidden: 'このLINEアカウントや権限では保存できません。選んでいるアカウントと権限を確認してください。',
+        scope: 'store',
       }))
       return false
     } finally {
@@ -740,13 +742,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   }
   const testUrl = answerUrl && testToken ? `${answerUrl}${answerUrl.includes('?') ? '&' : '?'}test_token=${encodeURIComponent(testToken)}` : null
 
-  const copyAnswerUrl = () => {
-    if (!answerUrl) return
-    void navigator.clipboard
-      .writeText(answerUrl)
-      .then(() => notifyToast('URLをコピーしました'))
-      .catch(() => setNotice(`コピーできませんでした。URL：${answerUrl}`))
-  }
 
   /* ---------------- 対象が無いとき ---------------- */
 
@@ -815,10 +810,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             <div className={styles.urlRow}>
               {/* 見せるのは短い形（絵どおり）。全文は title とコピーで渡す。 */}
               <span className={styles.urlValue} title={answerUrl}>{`https://liff.line.me/…/forms/${id}`}</span>
-              <Button onClick={copyAnswerUrl}>
-                <Copy size={15} aria-hidden="true" />
-                コピー
-              </Button>
+              <CopyTextButton value={answerUrl} label="コピー" aria-label="回答用URLをコピー" />
             </div>
             <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
             {canEdit ? (
@@ -832,7 +824,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             ) : null}
             {testError ? <p role="alert" className={styles.urlError}>{testError}</p> : null}
             {testUrl ? (
-              <a href={testUrl} target="_blank" rel="noreferrer" className={styles.urlLink}>試しのURLを開く</a>
+              <TextLink external href={testUrl}   className={styles.urlLink}>試しのURLを開く</TextLink>
             ) : null}
           </>
         ) : (
@@ -853,7 +845,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <Button onClick={() => void save(false)} disabled={hostBusy} busy={hostBusy} busyLabel="保存中…" title="ひな形を保存（配った先は変わりません）">
             下書きを保存
           </Button>
-          <Button variant="primary" onClick={() => void save(true)} disabled={hostBusy} title="保存したあとに、配るアカウントを選べます">
+          <Button variant="primary" onClick={() => void save(true)} disabled={hostBusy} title="保存したあとに、配るアカウントを選べます" busy={Boolean(hostBusy)} busyLabel="処理中…">
             保存する
           </Button>
         </>
@@ -931,7 +923,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       footerActions={footerActions}
       status={host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
         ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
-        : dirty ? '保存していない変更があります' : undefined}
+        : dirty ? '保存していない変更があります' : undefined} dirty={false}
     >
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
@@ -1026,7 +1018,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             )}
           </div>
           <ul className={styles.publishNotes}>
-            <li>・すでに集まった回答（{submitCount.toLocaleString('ja-JP')}件）は消えません。消した質問の答えも残ります。</li>
+            <li>・すでに集まった回答（{polishFormatNumber(submitCount)} 件）は消えません。消した質問の答えも残ります。</li>
             <li>{publishedContentRevision !== null ? `・公開するまで、いまの版${publishedContentRevision}がそのまま使われます。` : '・公開するまで、いまの版がそのまま使われます。'}</li>
           </ul>
           {/* 絵の操作は真ん中（下の帯と同じ）。窓の既定の右寄せの帯は使わない。 */}

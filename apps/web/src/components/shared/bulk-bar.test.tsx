@@ -48,3 +48,13 @@ describe('一括バー（★V7 z97zZN §2）', () => {
     expect(container.firstChild).toBeNull()
   })
 })
+
+it('このページを選んだ後に、条件に合う全件を選べる', async () => {
+  const selectAll = vi.fn()
+  const view = render(<BulkBar count={20} total={78} onSelectAll={selectAll} />)
+  const button = view.getByRole('button', { name: '78件すべてを選ぶ' })
+  await act(async () => { button.click() })
+  expect(selectAll).toHaveBeenCalledTimes(1)
+  view.rerender(<BulkBar count={78} total={78} onSelectAll={selectAll} />)
+  expect(view.queryByRole('button', { name: '78件すべてを選ぶ' })).toBeNull()
+})

@@ -75,7 +75,7 @@ describe('R527 編集URLの出し分け（役割×操作）', () => {
     await flush()
     expect(host.querySelector('[data-design="Steps"]')).toBeNull()
     expect(host.textContent).toContain(
-      '作成と変更はオーナーと管理者だけができます',
+      'オーナーか管理者に頼んでください',
     )
   })
 
@@ -85,7 +85,7 @@ describe('R527 編集URLの出し分け（役割×操作）', () => {
     await flush()
     expect(host.querySelector('[data-design="Steps"]')).not.toBeNull()
     expect(host.textContent).not.toContain(
-      '作成と変更はオーナーと管理者だけができます',
+      'オーナーか管理者に頼んでください',
     )
   })
 })
@@ -107,6 +107,6 @@ describe('R527 編集URLの出し分け契約', () => {
   it('手順と編集窓が canManage で守られている', () => {
     expect(PAGE).toContain('if (!canManage)')
     expect(PAGE).toContain('kind="forbidden"')
-    expect(PAGE).toContain('作成と変更はオーナーと管理者だけができます')
+    expect(PAGE).toContain('オーナーか管理者に頼んでください')
   })
 })

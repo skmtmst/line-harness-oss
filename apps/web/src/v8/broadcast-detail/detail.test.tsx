@@ -99,7 +99,7 @@ function reservedProps(overrides: Partial<ReservedProps> = {}): ReservedProps {
   return {
     broadcast: broadcast({
       id: 'broadcast-0', title: '8月キャンペーンのお知らせ', status: 'scheduled', messageType: 'image',
-      scheduledAt: '2026-08-24T01:00:00.000Z', displayStatus: 'scheduled', displayStatusLabel: '予約済み', draftStep: null,
+      scheduledAt: '2026-08-24T01:00:00.000Z', displayStatus: 'scheduled', displayStatusLabel: '予約中', draftStep: null,
     }),
     estimate: { audienceCount: 1213, hiddenExcluded: 12, warnings: [] },
     audienceLabel: 'このアカウントの友だち全員',
@@ -182,7 +182,7 @@ describe('V8 一斉配信の詳細', () => {
     const alert = document.querySelector('[role="alert"]')
     expect(alert?.textContent).toContain('ほかの人が配信「未購入者フォロー」を更新しました')
     expect(alert?.textContent).toContain('この画面では書き換えません')
-    await act(async () => { buttonText('読み直す')!.click() })
+    await act(async () => { buttonText('最新を読み込んで続ける')!.click() })
     expect(onConflictReload).toHaveBeenCalledTimes(1)
   })
 
@@ -237,7 +237,7 @@ describe('V8 一斉配信を予約したあと', () => {
     await render(<Reserved {...props} cancelOpen />)
     const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
     expect(dialog.textContent).toContain('「8月キャンペーンのお知らせ」の予約を取り消しますか？')
-    expect(dialog.textContent).toContain('1,213人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。')
+    expect(dialog.textContent).toContain('1,213 人 に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。')
     const order = [...dialog.querySelectorAll('button')].map((button) => button.textContent?.trim()).filter((text) => text && text !== '')
     expect(order.slice(-3)).toEqual(['予約を取り消す', 'やめる', '予約のまま残す'])
     await act(async () => { buttonText('予約を取り消す')!.click() })

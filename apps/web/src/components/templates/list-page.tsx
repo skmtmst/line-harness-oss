@@ -86,10 +86,9 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'ã
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, standalone, tabs, title, description, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
-  const pageHelp = body.skeleton && description ? <>{help}{description}</> : help
+export function ListPage({ boardId, standalone, tabs, title, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
   return <PageFrame kind="list" boardId={boardId} standalone={standalone} skeleton={body.skeleton}>
-    <PageHeading {...{ title, identity, actions, crumbs, steps, headingSize }} description={body.skeleton ? undefined : description} help={pageHelp} />
+    <PageHeading {...{ title, help, identity, actions, crumbs, steps, headingSize }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...body} />
   </PageFrame>

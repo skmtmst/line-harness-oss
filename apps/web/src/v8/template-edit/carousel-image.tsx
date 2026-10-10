@@ -6,6 +6,7 @@ import { validateCarouselImage } from './carousel-image-upload'
 import styles from './carousel-image.module.css'
 import ImageFrame from '@/components/shared/image-frame'
 
+import TruncatedText from '@/components/shared/truncated-text'
 
 /** 受け取りの失敗理由。日本語の理由だけを出し、「API error: 500」などの英語は案内文に置き換える。 */
 function uploadReasonOf(caught: unknown): string {
@@ -59,7 +60,7 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
         previewAlt="カードの画像"
         value={url || null}
         accept="image/jpeg,image/png"
-        limitText={`${maxMB}MB 以内`}
+        maxBytes={maxMB * 1024 * 1024}
         busy={busy}
         error={error}
         disabled={disabled}
@@ -68,8 +69,8 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
         onMediaPick={onMediaPick}
         onUrl={onUrl}
       />
-      {file && <span className={styles.filename} title={file.name}>{file.name}</span>}
-      {error && file && !validateCarouselImage(file, maxMB) && <Button disabled={disabled || busy} onClick={() => void send(file)}>もう一度受け取る</Button>}
+      {file && <span className={styles.filename} ><TruncatedText value={String(file.name ?? '')} /></span>}
+      {error && file && !validateCarouselImage(file, maxMB) && <Button disabled={disabled || busy} onClick={() => void send(file)} busy={Boolean(busy)} busyLabel="処理中…">もう一度受け取る</Button>}
     </div>
   )
 }

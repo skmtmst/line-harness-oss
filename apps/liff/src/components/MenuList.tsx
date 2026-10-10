@@ -1,3 +1,5 @@
+import { bookingPriceText } from '../lib/booking-price.js';
+import Button from './ui/Button.js';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type MenuItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
@@ -71,17 +73,14 @@ export default function MenuList({
           {[ALL_CATEGORY, ...categories].map((c) => {
             const active = c === category;
             return (
-              <button
+              <Button variant="chip" selected={active}
                 key={c}
                 type="button"
                 onClick={() => setCategory(c)}
                 aria-pressed={active}
-                className={`liff-hit shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${
-                  active ? 'bg-ink text-canvas' : 'bg-liff-chip text-liff-sub'
-                }`}
               >
                 {c}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -91,15 +90,10 @@ export default function MenuList({
           const selected = m.id === selectedId;
           return (
             <li key={m.id}>
-              <button
+              <Button variant="option" selected={selected}
                 type="button"
                 onClick={() => onSelect(m)}
                 aria-pressed={selected}
-                className={`liff-press flex w-full items-center gap-3 rounded-(--liff-radius-lg) p-3.5 text-left outline focus-visible:outline-2 focus-visible:outline-ink ${
-                  selected
-                    ? 'bg-liff-soft outline-2 -outline-offset-1 outline-liff-primary'
-                    : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line'
-                }`}
               >
                 <span
                   className="h-14 w-14 shrink-0 rounded-[10px] bg-liff-photo"
@@ -120,7 +114,7 @@ export default function MenuList({
                   <span className="mt-[3px] block text-xs">
                     <span className="font-semibold text-ink">{m.duration_minutes}分</span>
                     <span className="ml-2 font-bold text-liff-primary">
-                      {m.base_price === 0 ? '無料' : `¥${m.base_price.toLocaleString()}`}
+                      {bookingPriceText(m.base_price, m.price_mode)}
                     </span>
                   </span>
                 </span>
@@ -129,7 +123,7 @@ export default function MenuList({
                 ) : (
                   <Icon name="chevron-right" className="h-[18px] w-[18px] shrink-0 text-liff-idle" />
                 )}
-              </button>
+              </Button>
             </li>
           );
         })}

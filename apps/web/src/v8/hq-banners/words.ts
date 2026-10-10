@@ -3,6 +3,8 @@
  */
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { parseJstDateTime, type BannerImage, type BannerPreset } from '@/lib/hq-banners'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 /** 権限が無いときの案内（v7 と同じ文）。 */
 export const BANNER_FORBIDDEN = 'この操作はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。'
@@ -14,22 +16,12 @@ export function bannerFailureMessage(caught: unknown, action: string): string {
 
 /** 「9/30」。カードの「更新」に使う（絵 B9ZAr の「8 枚 ・ 9/30 更新」）。 */
 export function monthDay(iso: string): string {
-  const date = parseJstDateTime(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', month: 'numeric', day: '2-digit' }).formatToParts(date)
-  const month = parts.find((p) => p.type === 'month')?.value ?? ''
-  const day = parts.find((p) => p.type === 'day')?.value ?? ''
-  return `${month}/${day}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 /** 「9/30 10:12」。画像の詳細の「作成」に使う。 */
 export function monthDayTime(iso: string): string {
-  const date = parseJstDateTime(iso)
-  if (Number.isNaN(date.getTime())) return '—'
-  const f = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-  const parts = f.formatToParts(date)
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(iso, { style: 'detail' })
 }
 
 /**

@@ -1,9 +1,14 @@
+'use client'
+
 import React from 'react'
 import type { ReactNode } from 'react'
 import { Inbox, Loader, Lock } from 'lucide-react'
+import Button from './button'
 import TargetMissing from './target-missing'
-import { loadFailureCopy } from './api-error-message'
+import { loadFailureCopy, permissionDeniedMessage, type PermissionScope } from './api-error-message'
 import styles from './list-state.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { DelayedSkeleton, ListSkeleton } from './skeleton'
 
 /**
  * 一覧に中身を出せないときの1枚。
@@ -56,7 +61,7 @@ export const PRESETS: Record<ListStateKind, { title: string; description: string
   loading: { title: '読み込んでいます', description: 'このまま少しお待ちください。' },
   empty: { title: 'データがありません', description: '条件を変えるか、新しく作成してください。' },
   error: { title: '表示できませんでした', description: '再読み込みしても直らない場合はエラー報告へ。' },
-  forbidden: { title: '表示する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' },
+  forbidden: { title: '表示する権限がありません', description: permissionDeniedMessage() },
 }
 
 export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description: string }> = {
@@ -69,8 +74,10 @@ export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description
 
 export default function ListState({
   kind,
+  permissionScope = 'store',
   title,
   description,
+  permissionReason,
   action,
   onRetry,
   retrying = false,
@@ -79,16 +86,21 @@ export default function ListState({
   'data-design': dataDesign,
   error,
   icon,
+  loadingShape = 'list',
 }: {
+  loadingShape?: 'list' | 'cards'
+  permissionScope?: PermissionScope
   kind: ListStateKind
   /** 空の表示で、その機能の印を渡す。 */
   icon?: ReactNode
   /** 設計どおりの文言で足りないとき（「まだタグがありません」など）だけ渡す。 */
   title?: string
   description?: string
+  /** 権限以外にも分かっている制約。頼む先の文は部品が出す。 */
+  permissionReason?: string
   /** 作成導線つきの空状態（設計 `fRgeK`）。押せる操作が画面の他所にあるなら渡さない。 */
   action?: ReactNode
-  /** もう一度読み込む。`error` のときだけ押し口を出す。 */
+  /** もう一度読み込む。`error`・`forbidden` で押し口を出す。 */
   onRetry?: () => void
   /** 読み直している間。二度押しを止める。 */
   retrying?: boolean
@@ -99,26 +111,29 @@ export default function ListState({
   'data-design'?: string
   /**
    * 捕まえた読み込み失敗（m23m）。`error` のときだけ見る。
-   * 403 は権限の案内にし、押しても直らない再試行の口は出さない。
+   * 403 は権限の案内を残し、権限変更後にも読み直せるようにする。
    * 429 は待ち秒数（`Retry-After` があれば使う）を添える。
    * 画面は `title`・`description` で上書きできる。
    */
   error?: unknown
 }) {
+  const v8 = useAdminTheme() === 'v8'
+  if (kind === 'loading' && v8) return <div data-list-state="loading" data-design={dataDesign} className={className} aria-busy="true" aria-label={title ?? PRESETS.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton shape={loadingShape} />} /></div>
+
   const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
 
   // 失敗の1枚は TargetMissing の error と同じ中身を使う（★V7 `x63W5x`）。
   // 見た目が2か所でずれないように、ここで組み立て直さない。
   // className は付けない（見た目は TargetMissing が持つ。余白は親で付ける）。
   if (kind === 'error') {
-    const failure = error === undefined ? null : loadFailureCopy(error, 'この画面')
+    const failure = error === undefined ? null : loadFailureCopy(error, 'この画面', permissionScope)
     return (
       <div data-list-state="error" role="alert" data-design={dataDesign}>
         <TargetMissing
           kind="error"
           title={title ?? failure?.title ?? preset.title}
-          description={description ?? failure?.description ?? preset.description}
-          onRetry={failure && !failure.retryable ? undefined : onRetry}
+          description={failure && !failure.retryable ? failure.description : description ?? failure?.description ?? preset.description}
+          onRetry={onRetry ?? (() => window.location.reload())}
           retrying={retrying}
         />
         {action}
@@ -146,8 +161,8 @@ export default function ListState({
     >
       <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={24} className={iconClass} />}</span>
       <p className={styles.title}>{title ?? preset.title}</p>
-      <p className={styles.description}>{description ?? preset.description}</p>
-      {action ? <div className={styles.action}>{action}</div> : null}
+      <p className={styles.description}>{kind === 'forbidden' ? `${permissionReason ? `${permissionReason} ` : ''}${permissionDeniedMessage(permissionScope)}` : description ?? preset.description}</p>
+      {kind === 'forbidden' ? <div className={styles.action}><Button busy={retrying} onClick={onRetry ?? (() => window.location.reload())}>{retrying ? '読み込んでいます' : 'もう一度読み込む'}</Button>{action}</div> : action ? <div className={styles.action}>{action}</div> : null}
     </div>
   )
 }

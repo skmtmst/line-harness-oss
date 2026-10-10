@@ -54,7 +54,7 @@ describe('素の Tailwind 色・16進数・絵文字が無い', () => {
 describe('進む操作は下の操作の帯に1つだけ', () => {
   it('詳細は選んでから進む (枠タップで直接進まない)', () => {
     expect(event).toContain('<BottomBar>');
-    expect(event.match(/<Button/g)?.length ?? 0).toBe(1);
+    expect(event.match(/<Button\s+variant="primary"/g)?.length ?? 0).toBe(1);
     expect(event).toContain('variant="primary"');
     expect(event).toContain('selectedSlot');
     expect(event).toContain('時間を選んでください');
@@ -78,23 +78,23 @@ describe('進む操作は下の操作の帯に1つだけ', () => {
   it('確認は申し込む1つ (戻るボタンは見出しの ← だけ)', () => {
     expect(confirm).toContain('<BottomBar>');
     expect(confirm).toMatch(/<Button[\s\S]*variant="primary"/);
-    expect(confirm.match(/<Button/g)?.length ?? 0).toBe(2);
+    expect(confirm.slice(confirm.indexOf("<BottomBar>")).match(/<Button\s+variant="primary"/g)?.length ?? 0).toBe(1);
     expect(confirm).toContain('申し込む');
     expect(confirm).not.toContain('予約をリクエスト');
     expect(confirm).not.toContain('>戻る<');
   });
 
-  it('確定・待ちは下の帯に「LINEに戻る」と、待ちなら「キャンセル待ちをやめる」・それ以外は「自分のイベントを見る」(★V8 qVdiX)', () => {
+  it('確定・待ちは下の帯に「LINEに戻る」と、待ちなら「キャンセル待ちを取り消す」・それ以外は「自分のイベントを見る」(★V8 qVdiX)', () => {
     expect(done).toContain('<BottomBar>');
     expect(done).toContain('LINEに戻る');
     expect(done).toContain('自分のイベントを見る');
-    expect(done).toContain('キャンセル待ちをやめる');
+    expect(done).toContain('キャンセル待ちを取り消す');
     // 2つ目のボタンはどちらか一方だけ (自分の待ちが見つかったときだけ「やめる」)。
-    expect(done).toMatch(/\{waitEntry \? \([\s\S]*キャンセル待ちをやめる[\s\S]*\) : \([\s\S]*自分のイベントを見る[\s\S]*\)\}/);
+    expect(done).toMatch(/\{waitEntry \? \([\s\S]*キャンセル待ちを取り消す[\s\S]*\) : \([\s\S]*自分のイベントを見る[\s\S]*\)\}/);
     expect(done.match(/<Button/g)?.length ?? 0).toBe(3);
   });
 
-  it('キャンセル待ちをやめるは確認窓を通してから取り下げの口を呼ぶ・順番は自分の待ちから出す', () => {
+  it('キャンセル待ちを取り消すは確認窓を通してから取り下げの口を呼ぶ・順番は自分の待ちから出す', () => {
     expect(done).toMatch(/api\s*\.myEventWaitlist\(\)/);
     expect(done).toContain("w.status === 'waiting'");
     expect(done).toContain('<ConfirmDialog');
@@ -202,8 +202,10 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
     expect(event).toContain('aria-label={full ?');
     expect(event).toContain('満席');
     // 押せない時の地は1つだけ (bg-shell-gray)。白と重ねると白く見える。
-    const disabledTone = event.match(/disabled\s*\?\s*'[^']*'/)?.[0] ?? '';
-    expect(disabledTone).toContain('bg-shell-gray');
+    expect(event).toContain('unavailable={disabled}');
+    const button = readFileSync(join(ROOT, 'components', 'ui', 'Button.tsx'), 'utf8');
+    const disabledTone = button.match(/unavailable\s*\?\s*'[^']*'/g)?.find((tone) => tone.includes('border-hairline')) ?? '';
+    expect(disabledTone).toContain('bg-liff-off-bg');
     expect(disabledTone).not.toContain('bg-canvas');
     expect(disabledTone).toContain('border-hairline');
     // 押せない時の文字は薄い色。
@@ -211,7 +213,8 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
   });
 
   it('選んだ時間は濃い緑の地＋白文字 (gVjiC・予約の日時選びと同じ形)', () => {
-    expect(event).toContain('bg-liff-primary');
+    expect(event).toContain('variant="optionRow" selected={selected}');
+    expect(readFileSync(join(ROOT, 'components', 'ui', 'Button.tsx'), 'utf8')).toContain('border-liff-primary bg-liff-primary');
     expect(event).toContain('setSelectedId(s.id)');
   });
 

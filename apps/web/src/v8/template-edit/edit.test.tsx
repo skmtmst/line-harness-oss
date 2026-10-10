@@ -163,7 +163,7 @@ describe('V8 メッセージを作る・編集', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
     expect(templatesApi.create).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'account-a', name: '予約前日のご案内', messageContent: 'こんにちは', folderId: null }))
-    expect(push).toHaveBeenCalledWith('/templates')
+    expect(push).toHaveBeenCalledWith('/templates?highlight=template-new')
   })
 
   it('1152 の幅では板 a1k3d の印を付け、見え方は「LINEでの見え方を見る」の窓で開く', async () => {
@@ -336,7 +336,7 @@ describe('V8 クーポン・リサーチを作る', () => {
       name: '夏の20%オフ',
       payload: expect.objectContaining({ title: '夏の20%オフ', startsAt: '2026-08-01T00:00', endsAt: '2026-08-31T23:59', oncePerFriend: true, folder: '03_販促・クーポン' }),
     }))
-    expect(push).toHaveBeenCalledWith('/templates')
+    expect(push).toHaveBeenCalledWith('/templates?highlight=asset-1')
   })
 
   it('リサーチ：質問を足す・消すと問の数が変わり、選択肢の無い質問は保存を断る', async () => {
@@ -392,4 +392,14 @@ describe('V8 クーポン・リサーチを作る', () => {
     }
     expect(results).toEqual([['二問目', '一問目'], ['二問目', '一問目'], ['二問目', '一問目']])
   })
+})
+
+it('リサーチの回答後の処理は未動作と知らせ、設定は保存する', async () => {
+  assetsCreate.mockResolvedValue({success:true,data:{id:'research'}})
+  await mount('kind=research&visual=1')
+  expect(host.textContent).toContain('まだ動きません')
+  expect(host.textContent).toContain('設定は保存できます')
+  fireEvent.click(screen.getByRole('button',{name:'保存して公開'}))
+  await flush()
+  expect(assetsCreate).toHaveBeenCalledWith(expect.objectContaining({kind:'research',payload:expect.objectContaining({answerActions:[]})}))
 })

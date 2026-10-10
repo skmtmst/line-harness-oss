@@ -51,8 +51,9 @@ describe('フォルダの色の丸', () => {
 
   it('B-194: dot={false} の古い指定でも丸と名前の1行を出す', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }} dot={false}>NEN会員</FolderDotName>)
-    expect(html).toContain('data-folder-dot')
-    expect(html).toContain('title="NEN会員"')
+    expect(html).toContain('NEN会員')
+    expect(html).toContain('data-truncated-text')
+    expect(html).not.toContain('data-folder-dot')
   })
 
   it('大きさ 8・名前との間 8・説明の行の字下げ 16 は変数で持つ', () => {

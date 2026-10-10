@@ -84,6 +84,11 @@ beforeEach(() => {
       return json({ success: true, data: { ...saved, id: 'er-new' } })
     }
     if (url.pathname === '/api/entry-routes') return json({ success: true, data: [saved] })
+    if (url.pathname === '/api/broadcast-message-assets') return json({ success: true, data: [
+      { id: 'coupon-1', kind: 'coupon', lineAccountId: 'account-a', name: '店頭10%オフ', publishedVersion: 1, payload: { description: '10%オフ', startsAt: '2026-01-01', endsAt: '2099-01-01' } },
+      { id: 'coupon-draft', kind: 'coupon', lineAccountId: 'account-a', name: '未公開のクーポン', publishedVersion: 0, payload: { startsAt: '2026-01-01', endsAt: '2099-01-01' } },
+      { id: 'coupon-other', kind: 'coupon', lineAccountId: 'other', name: '別のお店', publishedVersion: 1, payload: { startsAt: '2026-01-01', endsAt: '2099-01-01' } },
+    ] })
     if (url.pathname === '/api/tags') return json({ success: true, data: [{ id: 'tag-vip', name: 'VIP', color: '#000', groupId: null }] })
     if (url.pathname === '/api/scenarios') return json({ success: true, data: { items: [], total: 0, limit: 200, sort: [] } })
     if (url.pathname === '/api/entry-route-genres') return json({ success: true, data: [{ name: 'SNS' }] })
@@ -135,7 +140,7 @@ describe('V8 流入リンクを作る', () => {
     fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
     await flush()
     expect(posted[0]).toMatchObject({ name: '秋の店頭POP', refCode: 'autumn-pop', lineAccountId: 'account-a', isActive: true, tagId: null })
-    expect(push).toHaveBeenCalledWith('/inflow-links/detail?id=er-new')
+    expect(push).toHaveBeenCalledWith('/inflow-links?highlight=er-new')
   })
 
   it('409 で返ると競合の帯を出し、違いを比べる窓は違う項目だけを並べ、最新を取り込んで直すで入力へ写す', async () => {
@@ -145,7 +150,7 @@ describe('V8 流入リンクを作る', () => {
     fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
     await flush()
     expect(push).not.toHaveBeenCalled()
-    const band = screen.getByRole('alert', { name: '文字が重複しています' })
+    const band = screen.getByRole('alert')
     expect(band.textContent).toContain('「summer-ig」は')
     expect(screen.getByRole('button', { name: /比べてから保存/ })).toBeTruthy()
     fireEvent.click(within(band).getByRole('button', { name: /違いを比べる/ }))
@@ -160,4 +165,40 @@ describe('V8 流入リンクを作る', () => {
     expect(screen.queryByRole('dialog', { name: '違いを比べる' })).toBeNull()
     expect(screen.getByText('VIP')).toBeTruthy()
   })
+  it('未選択では発行せず、窓で公開中のクーポンを選び相手も保存する', async () => {
+    query.value = 'name=店頭POP&ref=summer-ig'
+    await mount()
+    fireEvent.click(screen.getByRole('switch', { name: 'クーポンを渡す' }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
+    await flush()
+    expect(posted).toHaveLength(0)
+    expect(screen.getByText('渡すクーポンを選んでください')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'クーポンを選ぶ' }))
+    await flush()
+    const dialog = screen.getByRole('dialog', { name: 'クーポンを選ぶ' })
+    expect(dialog.textContent).not.toContain('未公開のクーポン')
+    expect(dialog.textContent).not.toContain('別のお店')
+    fireEvent.click(within(dialog).getByText('店頭10%オフ'))
+    await flush()
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ', exact: true }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '渡す相手' }))
+    await flush()
+    fireEvent.click(within(screen.getByRole('option', { name: 'すでに友だちの人にも' })).getByRole('button'))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
+    await flush()
+    expect(posted[0]).toMatchObject({ couponEnabled: true, couponAssetId: 'coupon-1', couponAudience: 'all_friends' })
+    createStatus = 409
+    fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
+    await flush()
+    fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: /違いを比べる/ }))
+    await flush()
+    const comparison = screen.getByRole('dialog', { name: '違いを比べる' })
+    expect(comparison.textContent).toContain('店頭10%オフ / すでに友だちの人にも')
+    expect(comparison.textContent).not.toContain('coupon-1')
+    expect(comparison.textContent).not.toContain('all_friends')
+  })
+
 })

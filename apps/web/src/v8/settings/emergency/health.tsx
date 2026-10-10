@@ -30,6 +30,9 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 // 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
 import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
+import { formatTime as polishFormatTime, formatDate as polishFormatDate } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ReleaseSummary = { version: string; released: string | null }
 
@@ -118,19 +121,14 @@ function formatCheckedAt(iso: string | null | undefined, now = Date.now()): stri
   if (!iso) return '—'
   const time = Date.parse(iso)
   if (Number.isNaN(time)) return '—'
-  const clock = new Date(time).toLocaleTimeString('ja-JP', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Tokyo' })
+  const clock = polishFormatTime(new Date(time))
   const minutes = Math.round((now - time) / 60000)
   if (minutes < 10) return clock
   return `${clock}（${minutes >= 60 ? `${Math.round(minutes / 60)}時間前` : `${minutes}分前`}）`
 }
 
 function formatMonthDayTime(iso: string | null | undefined): string {
-  if (!iso) return ''
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return ''
-  const date = new Date(time).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
-  const clock = new Date(time).toLocaleTimeString('ja-JP', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Tokyo' })
-  return `${date} ${clock}`
+  return polishFormatDate(iso, { style: 'detail', fallback: '' })
 }
 
 function formatDetectedSince(iso: string | null | undefined): string {
@@ -189,20 +187,20 @@ function OpenAlerts({
   if (alerts.length === 0) return <p className={styles.alertsNote}>異常の記録はありません。健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</p>
   return (
     <section className={styles.alerts} aria-label="開いている異常">
-      <h2 className={styles.alertsTitle}>{`開いている異常 ${alerts.length}件`}</h2>
+      <h2 className={styles.alertsTitle}>{`開いている異常 ${alerts.length} 件`}</h2>
       <div className={styles.alertRows}>
         {alerts.map((alert) => {
           const busy = busyId === alert.id
           const lastEvent = alert.events[0]
           const notification = alert.notification.unconfigured > 0
-            ? `${alert.notification.unconfigured}件の通知先が未設定です。担当者または連絡先を設定して再確認できます。`
+            ? `${alert.notification.unconfigured} 件の通知先が未設定です。担当者または連絡先を設定して再確認できます。`
             : alert.notification.failed > 0
-              ? `${alert.notification.failed}件の通知が送れませんでした。再送できます。`
+              ? `${alert.notification.failed} 件の通知が送れませんでした。再送できます。`
               : alert.notification.total === 0
                 ? '通知の準備を確認しています。'
                 : alert.notification.queued + alert.notification.sending > 0
                   ? '通知を送っています。'
-                  : `${alert.notification.sent}件の通知を送信しました。`
+                  : `${alert.notification.sent} 件の通知を送信しました。`
           const response = ALERT_RESPONSE_FIRST[alert.checkKey]
           const checkTitle = CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.sub ?? alert.checkKey
           const detail = [
@@ -229,22 +227,19 @@ function OpenAlerts({
                   </Button>
                 ) : null}
                 {canManage ? (
-                  <Button variant="secondary" disabled={busy || !canRetry} title={canRetry ? undefined : 'やり直せる通知はありません'} onClick={() => void onRetry(alert)}>
+                  <Button variant="secondary" disabled={busy || !canRetry} title={canRetry ? undefined : 'やり直せる通知はありません'}  onClick={() => void onRetry(alert)}>
                     {alert.notification.unconfigured > 0 ? '通知先を再確認する' : '通知をやり直す'}
                   </Button>
                 ) : null}
               </div>
               {openNoteId === alert.id && alert.status === 'open' ? (
-                <label className={styles.noteField} htmlFor={`operation-alert-note-${alert.id}`}>
-                  受領メモ（任意）。「受領を記録する」で記録します。
-                  <input
+                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><input
                     id={`operation-alert-note-${alert.id}`}
                     value={notes[alert.id] ?? ''}
                     maxLength={500}
                     onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))}
                     disabled={busy}
-                  />
-                </label>
+                  /></Field>
               ) : null}
             </div>
           )
@@ -334,8 +329,8 @@ export function HealthPanelV8({
       const releases = (releaseLog as { releases?: ReleaseSummary[] }).releases ?? []
       const version = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
         ?? releases.find((item) => item.released)?.version
-        ?? '—'
-      setStats({ stops: recent.length, longest: longest > 0 ? formatMinutesRough(longest) : '—', version })
+        ?? emptyValue('unknown')
+      setStats({ stops: recent.length, longest: longest > 0 ? formatMinutesRough(longest) : emptyValue('unknown'), version })
       setStatsNote('この30日')
     } catch {
       setStats(null)
@@ -460,7 +455,7 @@ export function HealthPanelV8({
       const response = await api.operations.retryAlertNotifications(alert.id, accountId)
       if (!response.success) throw new Error(response.error)
       if (requestedAccountId !== currentAccountIdRef.current) return
-      setAlertNotice({ tone: 'success', text: response.data.retried > 0 ? `${response.data.retried}件の通知または通知先を再確認しました。` : '再確認できる通知はありません。' })
+      setAlertNotice({ tone: 'success', text: response.data.retried > 0 ? `${response.data.retried} 件の通知または通知先を再確認しました。` : '再確認できる通知はありません。' })
       await load(false)
     } catch (error) {
       if (requestedAccountId !== currentAccountIdRef.current) return

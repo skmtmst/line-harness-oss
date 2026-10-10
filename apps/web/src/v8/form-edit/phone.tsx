@@ -1,13 +1,15 @@
 'use client'
 
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * 「お客さまに見える形」のスマホ（m1cWEy・ijxur・XXFT4・tpRRT の右）。
  * 外枠 330×690・黒い島・LINE の上の帯・メニューの帯。中は回答画面の形。
  * 選んでいるページを出す。押せない見本（role="img" ではなく読める文で出す）。
  * 予約を入れる欄の日にち・時刻は形を見せるための見本で、実際の空きではない。
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 import { PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
 import { DateYmdField, AddressControls, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../../../../liff/src/components/forms/controls'
 import styles from './edit.module.css'
@@ -37,39 +39,13 @@ export function FormPhone({ layout, pageIndex, accountName, bookingMenus }: Prop
   const firstInput = blocks.findIndex((b) => b.kind === 'input')
   const progressAt = pageIndex === 0 && firstInput > 0 ? firstInput : 0
   // 色を決めたフォームは、その主の色で見せる（決めていなければ LINE の緑）。
-  const phoneRef = useRef<HTMLDivElement>(null)
   const main = layout.options.theme?.main ?? null
-  useEffect(() => {
-    const el = phoneRef.current
-    if (!el) return
-    if (main) el.style.setProperty('--fe-phone-main', main)
-    else el.style.removeProperty('--fe-phone-main')
-  }, [main])
   const nextLabel = last
     ? (options.submitLabel || '送信する')
     : `${options.nextLabel || '次へ'}（${pageIndex + 1} / ${sections.length}）`
 
   return (
-    <section className={styles.phoneWrap} aria-label="お客さまに見える形">
-      <p className={styles.phoneTitle}>お客さまに見える形</p>
-      <div className={styles.phone} ref={phoneRef}>
-        <div className={styles.phoneScreen}>
-          <div className={styles.phoneStatus}>
-            <span className={styles.phoneClock}>9:41</span>
-            <span className={styles.phoneIsland} aria-hidden="true" />
-            <span className={styles.phoneIcons} aria-hidden="true">
-              <Signal size={15} strokeWidth={1.8} />
-              <Wifi size={15} strokeWidth={1.8} />
-              <BatteryFull size={20} strokeWidth={1.8} />
-            </span>
-          </div>
-          <div className={styles.phoneHead}>
-            <ChevronLeft size={20} aria-hidden="true" />
-            <span className={styles.phoneName}>{accountName}</span>
-            <Search size={17} aria-hidden="true" />
-            <Phone size={17} aria-hidden="true" />
-            <Menu size={17} aria-hidden="true" />
-          </div>
+    <LiffPhoneFrame title="回答フォーム" accountName={accountName} caption="お客さまに見える形" label="お客さまに見える形" accent={main}>
           <div className={styles.phoneForm}>
             {blocks.length === 0 ? <p className={styles.phoneEmpty}>このページにはまだブロックがありません</p> : null}
             {blocks.map((block, index) => (
@@ -79,14 +55,7 @@ export function FormPhone({ layout, pageIndex, accountName, bookingMenus }: Prop
             <span className={styles.phoneSpacer} />
             <span className={styles.phoneNext}>{nextLabel}</span>
           </div>
-          <div className={styles.phoneMenu}>
-            <span>メニュー</span>
-            <ChevronDown size={12} aria-hidden="true" />
-          </div>
-          <div className={styles.phoneHome}><span aria-hidden="true" /></div>
-        </div>
-      </div>
-    </section>
+    </LiffPhoneFrame>
   )
 }
 
@@ -102,7 +71,7 @@ function PhoneBlockWithProgress({ block, showProgress, progress, bookingMenus }:
 function PhoneBlock({ block, bookingMenus }: { block: FormBlock; bookingMenus: Props['bookingMenus'] }) {
   switch (block.kind) {
     case 'image':
-      return <PhoneImage url={block.mediaUrl} />
+      return <PhoneImage url={block.mediaUrl} alt={block.alt} />
     case 'heading':
       return <p className={styles.phoneHeading} data-level={block.level ?? 2}>{block.text}</p>
     case 'text':
@@ -115,10 +84,10 @@ function PhoneBlock({ block, bookingMenus }: { block: FormBlock; bookingMenus: P
 }
 
 /** 読めない画像は壊れた印を出さず、地の色の箱にする。 */
-function PhoneImage({ url }: { url: string }) {
+function PhoneImage({ url, alt }: { url: string; alt?: string }) {
   const [failed, setFailed] = useState(false)
   if (!url || failed) return <span className={styles.phoneImage} role="img" aria-label={url ? '画像（読み込めません）' : '画像（未設定）'} />
-  return <img className={styles.phoneImage} src={url} alt="" onError={() => setFailed(true)} />
+  return <img className={styles.phoneImage} src={url} alt={alt ?? ""} onError={() => setFailed(true)} />
 }
 
 function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; bookingMenus: Props['bookingMenus'] }) {
@@ -145,7 +114,7 @@ function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; booking
         })}
       </div> : null}
       {block.type === 'rating' ? <RatingStars name={block.name} current={normalizeRatingValue(text)} onChange={() => {}} /> : null}
-      {block.type === 'file' ? <FormFileControl label={block.label} /> : null}
+      {block.type === 'file' ? <FormFileControl label={block.label} kind={block.fileKind} kinds={block.fileKinds} bothSides={block.fileBothSides} maxCount={block.fileMaxCount} /> : null}
       {block.type === 'address' ? <AddressControls draft={{ postalCode: '', prefecture: '', city: '', addressLine1: '', addressLine2: '' }} placeholder={block.placeholder} onChange={() => {}} /> : null}
       {block.type === 'booking' ? <BookingPreview block={block} bookingMenus={bookingMenus} /> : null}
     </div>
@@ -155,9 +124,9 @@ function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; booking
 function BookingPreview({ block, bookingMenus }: { block: FormInputBlock; bookingMenus: Props['bookingMenus'] }) {
   const menu = bookingMenus.find((m) => m.id === block.booking?.menuId)
   const days = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() + i + 1)
-    return { date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, weekday: WEEKDAY[d.getDay()], day: d.getDate(), open: true }
+    const date = jstDateOffset(i + 1)
+    const d = new Date(`${date}T00:00:00Z`)
+    return { date, weekday: WEEKDAY[d.getUTCDay()], day: d.getUTCDate(), open: true }
   })
   return <><p className={styles.phoneText}>空き枠の見本（実際の空きではありません）</p><BookingControls preview menuLabel={menu ? `${menu.name}・${menu.durationMinutes}分` : 'メニューを選んでください'} days={days} selectedDate={days[2].date} onDate={() => {}} times={SAMPLE_TIMES.map((start, i) => ({ start, open: i !== 0 && i !== 4, selected: false }))} onTime={() => {}} /></>
 }

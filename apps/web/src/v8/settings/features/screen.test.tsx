@@ -79,7 +79,7 @@ describe('★V8 機能設定の閲覧のみ', () => {
     try {
       await act(async () => { root.render(<FeatureSettingsScreen />) })
       await flush()
-      await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
+      await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
       const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('機能設定を保存'))!
       await act(async () => { fireEvent.click(save) })
       const reason = host.querySelector<HTMLInputElement>('#feature-settings-reason')!
@@ -97,7 +97,7 @@ describe('★V8 機能設定の閲覧のみ', () => {
     fixture.role = 'owner'
     await act(async () => { root.render(<FeatureSettingsScreen />) })
     await flush()
-    expect(host.querySelectorAll('[role="switch"]').length).toBeGreaterThan(0)
+    expect(host.querySelectorAll('input[type="checkbox"]').length).toBeGreaterThan(0)
     expect(buttonNames()).toContain('並びを変える')
     expect(buttonNames()).toContain('まとめて')
     expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(true)
@@ -109,7 +109,7 @@ describe('★V8 機能設定の閲覧のみ', () => {
     await act(async () => { root.render(<FeatureSettingsScreen />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(host.querySelectorAll('[role="switch"]')).toHaveLength(0)
+    expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0)
     expect(buttonNames()).not.toContain('並びを変える')
     expect(buttonNames()).not.toContain('まとめて')
     expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(false)

@@ -1,5 +1,9 @@
 'use client'
 
+
+import SharedStatusPill from '@/components/shared/status-pill'
+import BulkBar from '@/components/shared/bulk-bar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarOptional, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
@@ -53,7 +57,6 @@ import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
@@ -65,7 +68,7 @@ import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import SortSelect from '@/components/ui/sort-select'
+import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import TagOverflow from '@/components/shared/tag-overflow'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
@@ -97,6 +100,9 @@ import {
 } from './words'
 import QuickCreateV8 from './quick-create'
 import styles from './list.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
@@ -259,14 +265,14 @@ export default function AutoRepliesListV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
-  const [sortKey, setSortKey] = useState<SortKey>('priority')
+  const [sortKey, setSortKey] = useListUrlValue<SortKey>('sortKey', 'priority')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
   const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
   const [timedOnly, setTimedOnly] = useListUrlFlag('timed')
   const [zeroThisMonthOnly, setZeroThisMonthOnly] = useListUrlFlag('zero')
   /** 「重なりあり」の絞り込み。要確認の帯・行の札から入る。 */
   const [conflictOnly, setConflictOnly] = useListUrlFlag('conflict')
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [pageParam, setPageParam] = useListUrlParam('page', '1')
   const page = Math.max(1, Number.parseInt(pageParam, 10) || 1)
   const setPage = useCallback((next: number) => setPageParam(String(next)), [setPageParam])
@@ -384,33 +390,8 @@ export default function AutoRepliesListV8() {
     page,
   })
   const rules = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : items
-  /*
-   * 止まっている自動応答の削除は、どこにも影響しない（もう返信していない）。確かめの窓を出さずに
-   * 一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。動いているものは今までどおり窓。
-   */
-  const deferredDelete = useDeferredDelete()
-  const requestDelete = (r: AutoReply) => {
-    setDeleteError('')
-    if (r.isActive) {
-      setPendingDelete({ item: r, accountId: selectedAccountId })
-      return
-    }
-    const requestAccountId = selectedAccountId
-    if (panelId === r.id) setPanelId(null)
-    setSelectedIds((current) => {
-      if (!current.has(r.id)) return current
-      const next = new Set(current)
-      next.delete(r.id)
-      return next
-    })
-    deferredDelete.schedule({
-      ids: [r.id],
-      message: `自動応答「${displayName(r)}」を削除しました`,
-      commit: () => api.autoReplies.delete(r.id),
-      onCommitted: () => (selectedAccountIdRef.current === requestAccountId ? load() : undefined),
-      failureMessage: '自動応答を削除できませんでした。状態を読み直してからお試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (r: AutoReply) => { setDeleteError(''); setPendingDelete({ item: r, accountId: selectedAccountId }) }
 
   /* ===== 数の帯 ===== */
   const hitsAllKnown = rules.length > 0 && rules.every((r) => r.hits !== undefined)
@@ -429,7 +410,7 @@ export default function AutoRepliesListV8() {
   const ready = visibleLoadState === 'ready'
 
   /* ===== 絞り込み ===== */
-  const afterQuery = rules.filter((r) => !deferredDelete.isHidden(r.id) && autoReplyMatchesQuery(r, query))
+  const afterQuery = rules.filter((r) => autoReplyMatchesQuery(r, query))
   const inFolder = afterQuery.filter((r) => {
     if (folderFilter === UNFILED) return !r.folderId
     if (folderFilter) return r.folderId === folderFilter
@@ -523,15 +504,15 @@ export default function AutoRepliesListV8() {
    * 再開したなら止める。止め直すときは変える前の理由を使う）。
    * 送れなかったら戻して「もう一度」の知らせを出す。
    */
-  const runToggle = () => {
-    if (!pendingToggle) return
-    if (pendingToggle.accountId !== selectedAccountId) {
+  const runToggle = (target = pendingToggle) => {
+    if (!target) return
+    if (target.accountId !== selectedAccountId) {
       setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
       return
     }
-    const requestAccountId = pendingToggle.accountId
-    const ids = pendingToggle.ids
-    const kind = pendingToggle.kind
+    const requestAccountId = target.accountId
+    const ids = target.ids
+    const kind = target.kind
     const reason = toggleReason.trim() === '' ? null : toggleReason.trim()
     const key = listContextKey
     // 逆操作のために、変える前の止めた理由を覚えておく。
@@ -554,11 +535,11 @@ export default function AutoRepliesListV8() {
           ? '自動応答を再開しました'
           : '自動応答を停止しました'
         : targetKind === 'resume'
-          ? `${ids.length}件の自動応答を再開しました`
-          : `${ids.length}件の自動応答を停止しました`
+          ? `${ids.length} 件の自動応答を再開しました`
+          : `${ids.length} 件の自動応答を停止しました`
     const failedMessage = (targetKind: 'stop' | 'resume', forbidden: boolean) =>
       forbidden
-        ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
+        ? permissionDeniedMessage('store')
         : targetKind === 'stop'
           ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
           : '自動応答を再開できませんでした。状態を読み直してからお試しください。'
@@ -595,14 +576,7 @@ export default function AutoRepliesListV8() {
         setOptimisticRows(null)
         setSelectedIds(new Set())
         reloadIfSameAccount()
-        const reverseKind = targetKind === 'stop' ? 'resume' : 'stop'
-        notifyToast(doneMessage(targetKind), {
-          actionLabel: '元に戻す',
-          onAction: () =>
-            sendToggle(reverseKind, (id) =>
-              reverseKind === 'stop' ? (beforeStopReason.get(id) ?? null) : null,
-            ),
-        })
+        notifyToast(doneMessage(targetKind))
       })()
     }
     setPendingToggle(null)
@@ -688,7 +662,7 @@ export default function AutoRepliesListV8() {
             failed += 1
           }
         }
-        if (failed > 0) throw new Error(`${failed}件のフォルダ移動に失敗しました`)
+        if (failed > 0) throw new Error(`${failed} 件のフォルダ移動に失敗しました`)
       },
       undo: () => setOptimisticRows(null),
       failureMessage: 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
@@ -898,7 +872,7 @@ export default function AutoRepliesListV8() {
               dividerBefore: true,
               onSelect: () => {
                 setToggleError('')
-                setPendingToggle({ ids: [r.id], names: [name], kind: 'resume', accountId: selectedAccountId })
+                runToggle({ ids: [r.id], names: [name], kind: 'resume', accountId: selectedAccountId })
               },
             },
       )
@@ -948,12 +922,9 @@ export default function AutoRepliesListV8() {
     const name = displayName(r)
     setToggleError('')
     setToggleReason('')
-    setPendingToggle({
-      ids: [r.id],
-      names: [name],
-      kind: r.isActive ? 'stop' : 'resume',
-      accountId: selectedAccountId,
-    })
+    const target: PendingToggle = { ids: [r.id], names: [name], kind: r.isActive ? 'stop' : 'resume', accountId: selectedAccountId }
+    if (r.isActive) setPendingToggle(target)
+    else runToggle(target)
     setPanelId(null)
   }
 
@@ -986,7 +957,7 @@ export default function AutoRepliesListV8() {
       unfiledId={UNFILED}
       allCount={rules.length}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_営業時間外"
+      placeholder="例：01_営業時間外"
     />
   )
 
@@ -1008,7 +979,7 @@ export default function AutoRepliesListV8() {
       value: ready ? rules.filter((r) => r.isActive).length : null,
       unit: '件',
       detail: ready
-        ? `動いていない ${rules.filter((r) => !r.isActive).length}件`
+        ? `動いていない ${rules.filter((r) => !r.isActive).length} 件`
         : LOAD_STATE_WORDS[visibleLoadState].label,
     },
     {
@@ -1020,7 +991,7 @@ export default function AutoRepliesListV8() {
       detail: ready
         ? monthlyHits === null
           ? '実行結果を読み込めませんでした'
-          : `累計 ${totalHits === null ? '—' : formatNumber(totalHits)}回`
+          : `累計 ${totalHits === null ? emptyValue('unknown') : formatNumber(totalHits)}回`
         : LOAD_STATE_WORDS[visibleLoadState].label,
     },
     {
@@ -1112,7 +1083,7 @@ export default function AutoRepliesListV8() {
             : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
       </p>
       {visibleLoadState === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
       )}
     </div>
   ) : sortedItems.length === 0 ? (
@@ -1185,7 +1156,7 @@ export default function AutoRepliesListV8() {
                       event.preventDefault()
                       setPanelId(r.id)
                     }
-                  }}
+                  }} data-row-id={r.id}
                 >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                       {canEdit && <Checkbox
@@ -1213,7 +1184,7 @@ export default function AutoRepliesListV8() {
                       <>
                         {canEdit ? <Link
                           href={`/auto-replies/edit?id=${r.id}`}
-                          title={name}
+
                           className={styles.cellTitle}
                           onClick={(event) => {
                             event.stopPropagation()
@@ -1222,7 +1193,7 @@ export default function AutoRepliesListV8() {
                             goEdit(r.id)
                           }}
                         >
-                          {name}
+                          <TruncatedText value={String(name ?? '')} />
                         </Link> : <button type="button" className={styles.cellTitle} title={name} onClick={(event) => { event.stopPropagation(); setPanelId(r.id) }}>{name}</button>}
                       </>
 
@@ -1237,28 +1208,22 @@ export default function AutoRepliesListV8() {
                           ? `テンプレート「${tpl.label}」`
                           : `${responseTypeWord(r.responseType).label}で返す`}
                     </span>
-                    <span className={styles.cellSub} title={actions.join('・') || 'なし'}>
-                      {actions.length > 0 ? `＋${actions.join('・')}` : 'なし'}
+                    <span className={styles.cellSub} title={actions.join('・') || emptyValue('none')}>
+                      {actions.length > 0 ? `＋${actions.join('・')}` : emptyValue('none')}
                     </span>
                   </Td>
                   {!narrow && (
                     <Td
                       className={styles.countCell}
-                      title={`今月 ${r.hits?.period ?? '—'}回 ／ 累計 ${r.hits?.total ?? '—'}回`}
+                      title={`今月 ${r.hits?.period ?? emptyValue('unknown')}回 ／ 累計 ${r.hits?.total ?? emptyValue('unknown')}回`}
                     >
                       {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
-                      <div className={styles.countMain}>{r.hits?.period ?? '—'}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>累計 {r.hits?.total == null ? '—' : formatNumber(r.hits.total)}回</div>
+                      <div className={styles.countMain}>{r.hits?.period ?? emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></div>
+                      <div className={styles.countSub}>累計 {r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回</div>
                     </Td>
                   )}
                   <Td>
-                    <span
-                      className={`${styles.statePill} ${r.isActive ? styles.statePillActive : styles.statePillStopped}`}
-                      title={stopNote(r) ?? undefined}
-                    >
-                      <span style={{ width: 6, height: 6, borderRadius: 'var(--radius-pill)', background: 'currentColor' }} aria-hidden="true" />
-                      {r.isActive ? '有効' : '停止中'}
-                    </span>
+                    <SharedStatusPill tone={r.isActive ? 'success' : 'neutral'} title={stopNote(r) ?? undefined}>{r.isActive ? '有効' : '停止中'}</SharedStatusPill>
                       {conflicts > 0 && (
                         <button
                           type="button"
@@ -1368,8 +1333,8 @@ export default function AutoRepliesListV8() {
               <p title={trigger.title}>{trigger.text}</p>
               <TagOverflow label="すべての応答条件">{conditionChips(panelRow).map((label) => <span key={label} className={styles.condChip} title={label}>{label}</span>)}</TagOverflow>
               <p>
-                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? '—'}回 ／
-                累計 {panelRow.hits?.total ?? '—'}回
+                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? emptyValue('unknown')}回 ／
+                累計 {panelRow.hits?.total ?? emptyValue('unknown')}回
               </p>
             </DetailPanel>
           )
@@ -1377,9 +1342,7 @@ export default function AutoRepliesListV8() {
 
       {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
       {canEdit && selectedCount > 0 ? (
-        <div className={styles.bulkRow} style={{ padding: '10px 14px' }} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
-          <Button
+        <BulkBar count={selectedCount} total={sortedItems.length} onSelectAll={() => setSelectedIds(new Set(sortedItems.map(item => item.id)))} onClear={clearSelection}><Button
             type="button"
             variant="secondary"
             disabled={stoppableIds.length === 0}
@@ -1392,32 +1355,28 @@ export default function AutoRepliesListV8() {
           >
             <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             まとめて止める
-          </Button>
-          <Button
+          </Button><Button
             type="button"
             variant="secondary"
             disabled={resumableIds.length === 0}
             title={resumableIds.length === 0 ? '停止中のルールが選ばれていません' : undefined}
             onClick={() => {
               setToggleError('')
-              setPendingToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
+              runToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
             }}
           >
             <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             まとめて再開
-          </Button>
-          <Button
+          </Button><Button
             type="button"
             variant="secondary"
             onClick={() => openMove([...selectedIds])}
           >
             <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             フォルダへ移す
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
+          </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
             選択を外す
-          </Button>
-        </div>
+          </Button></BulkBar>
       ) : null}
     </>
   )
@@ -1426,7 +1385,7 @@ export default function AutoRepliesListV8() {
   const listPager = pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {(safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, sortedItems.length)} / {formatNumber(sortedItems.length)}件
+        {(safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, sortedItems.length)} / {formatNumber(sortedItems.length)} 件
       </span>
       <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
     </ListPagePagination>
@@ -1584,15 +1543,15 @@ export default function AutoRepliesListV8() {
   return (
     <ListPage skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
-      </>} help="□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。" description={<>
+      </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
-      </>}
+      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}</>}
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {!canEdit && (
           <div className={styles.viewerBand} role="status" data-design-node="Q5lOCc">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         )}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
@@ -1619,10 +1578,10 @@ export default function AutoRepliesListV8() {
             : pendingToggle.kind === 'resume'
               ? pendingToggle.ids.length === 1
                 ? `自動応答「${pendingToggle.names[0]}」を再開しますか？`
-                : `${pendingToggle.ids.length}件の自動応答を再開しますか？`
+                : `${pendingToggle.ids.length} 件の自動応答を再開しますか？`
               : pendingToggle.ids.length === 1
                 ? `「${pendingToggle.names[0]}」を止める`
-                : `${pendingToggle.ids.length}件の自動応答を止めますか？`
+                : `${pendingToggle.ids.length} 件の自動応答を止めますか？`
         }
         description={
           pendingToggle?.kind === 'resume'
@@ -1741,7 +1700,7 @@ export default function AutoRepliesListV8() {
         title={
           moveIds && moveIds.length === 1
             ? `「${displayName(rules.find((r) => r.id === moveIds[0]) ?? ({} as AutoReply))}」のフォルダを移す`
-            : `${moveIds?.length ?? 0}件の自動応答をフォルダへ移す`
+            : `${moveIds?.length ?? 0} 件の自動応答をフォルダへ移す`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
         confirmLabel="移動する"
@@ -1773,7 +1732,7 @@ export default function AutoRepliesListV8() {
         confirmLabel={duplicating ? '複製中…' : '複製する'}
         busy={duplicating}
         error={duplicateError}
-        onConfirm={() => void runDuplicate()}
+        onConfirm={() => runDuplicate()}
         onCancel={() => {
           if (duplicating) return
           setDuplicateTarget(null)
@@ -1842,7 +1801,7 @@ export default function AutoRepliesListV8() {
         {actionError ? (
           <p className={styles.errorBand} style={{ padding: '10px 14px' }} role="alert">
             {actionError}
-            <button type="button" onClick={() => void load()}>読み直す</button>
+            <button type="button" onClick={() => void load()}>もう一度読み込む</button>
           </p>
         ) : null}
         {listBody}

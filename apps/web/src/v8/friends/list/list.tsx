@@ -13,6 +13,10 @@ import { FolderDotName } from '@/components/shared/folder-dot'
  * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
+import { collectListRows } from '@/components/shared/collect-list-rows'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -79,6 +83,9 @@ import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags
 import styles from './list.module.css'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
@@ -97,7 +104,7 @@ const COLUMNS: Array<{ key: Column; label: string }> = [
   { key: 'last', label: '最終接触' },
 ]
 
-const VIEWER_NOTE = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
+const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
 function scoreBoundary(raw: string | null) {
   if (raw === null || !/^-?\d+$/.test(raw)) return undefined
@@ -111,6 +118,14 @@ function prefixed(label: string, options: Array<{ value: string; label: string }
 
 function isPageSize(value: number): value is PageSize {
   return (PAGE_SIZE_OPTIONS as readonly number[]).includes(value)
+}
+
+function validAdvancedSearch(value: unknown): value is AdvancedSearchResult | null {
+  if (value === null) return true
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const result = value as Partial<AdvancedSearchResult>
+  return !!result.params && typeof result.params === 'object' && !Array.isArray(result.params)
+    && Array.isArray(result.summary) && result.summary.every(item => typeof item === 'string')
 }
 
 export default function FriendsListV8() {
@@ -144,27 +159,29 @@ export default function FriendsListV8() {
   const directQuery = (searchParams.get('q') ?? '').trim()
 
   const [friends, setFriends] = useState<FriendListItem[]>([])
+  const [fieldNames, setFieldNames] = useState<string[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [marks, setMarks] = useState<SupportMarkListItem[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [savedOpen, setSavedOpen] = useState(false)
-  const [advanced, setAdvanced] = useState<AdvancedSearchResult | null>(null)
+  const [advanced, setAdvanced] = useListUrlJsonValue<AdvancedSearchResult | null>('advanced', null, validAdvancedSearch)
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<PageSize>(20)
-  const [selectedTagId, setSelectedTagId] = useState(directTagId)
-  const [searchInput, setSearchInput] = useState(directQuery)
-  const [searchSubmitted, setSearchSubmitted] = useState(directQuery)
-  const [sortMode, setSortMode] = useState<SortMode>('recent')
-  const [responseFilter, setResponseFilter] = useState<ResponseFilter>('all')
-  const [operatorId, setOperatorId] = useState('')
-  const [scenarioId, setScenarioId] = useState('')
-  const [attentionOnly, setAttentionOnly] = useState(false)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue<PageSize>('pageSize', 20)
+  const [selectedTagId, setSelectedTagId] = useListUrlValue('tag', '')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [searchSubmitted, setSearchSubmitted] = useListUrlValue('q', '')
+  const [sortMode, setSortMode] = useListUrlValue<SortMode>('sortMode', 'recent')
+  const [responseFilter, setResponseFilter] = useListUrlValue<ResponseFilter>('responseFilter', 'all')
+  const [operatorId, setOperatorId] = useListUrlValue('operatorId', '')
+  const [scenarioId, setScenarioId] = useListUrlValue('scenarioId', '')
+  const [attentionOnly, setAttentionOnly] = useListUrlValue('attentionOnly', false)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [refreshing, setRefreshing] = useState(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
+  const [selectionFriends, setSelectionFriends] = useState<FriendListItem[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -225,7 +242,7 @@ export default function FriendsListV8() {
   const restoredRef = useRef<string | null>(null)
   const [restoredAccount, setRestoredAccount] = useState<string | null>(null)
   const restored = !accountLoading && Boolean(selectedAccountId) && restoredAccount === selectedAccountId
-  const hasExplicitUrlFilters = hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
+  const hasExplicitUrlFilters = ['advanced', 'q', 'tag', 'sortMode', 'responseFilter', 'operatorId', 'scenarioId', 'attentionOnly', 'page', 'pageSize'].some((key) => searchParams.has(key)) || hasScoreRange || audienceId !== '' || Boolean(directSavedSearchId) || directTagId !== '' || directQuery !== ''
   useEffect(() => {
     if (accountLoading || !selectedAccountId || restoredRef.current === selectedAccountId) return
     restoredRef.current = selectedAccountId
@@ -266,8 +283,7 @@ export default function FriendsListV8() {
     if (!restored) return
     const next = searchInput.trim()
     if (next === searchSubmitted) return
-    const timer = window.setTimeout(() => { setSearchSubmitted(next); setPage(1) }, 300)
-    return () => window.clearTimeout(timer)
+     setSearchSubmitted(next); setPage(1)
   }, [restored, searchInput, searchSubmitted])
 
   /* 絞り込みは上の控えが戻す。スクロール位置も、戻ったときだけ同じ所へ戻す（動きの点検 5 番）。 */
@@ -297,6 +313,17 @@ export default function FriendsListV8() {
       return next
     })
   }, [])
+
+  const fieldsEnabled = featureVisibility.enabled('friend_fields')
+  useEffect(() => {
+    let cancelled = false
+    setFieldNames([])
+    if (!selectedAccountId || !fieldsEnabled) return
+    void api.friendFields.list(selectedAccountId).then(response => {
+      if (!cancelled && response.success) setFieldNames(response.data.map(field => field.name))
+    }).catch(() => { if (!cancelled) setOptionsFailed(true) })
+    return () => { cancelled = true }
+  }, [selectedAccountId, fieldsEnabled])
 
   const loadOptions = useCallback(async () => {
     const requestedAccountId = selectedAccountId
@@ -330,6 +357,35 @@ export default function FriendsListV8() {
       setOptionsFailed(true)
     }
   }, [selectedAccountId, marksEnabled])
+
+  const selectAllFriends = async () => {
+    const request = loadRequestRef.current
+    const all = await collectListRows(total, async (offset, limit) => {
+      const response = await api.friends.list({
+        ...(advanced?.params ?? {}),
+        offset: String(offset),
+        limit,
+        tagId: selectedTagId || undefined,
+        accountId: selectedAccountId || undefined,
+        audienceId: audienceId || undefined,
+        search: searchSubmitted || undefined,
+        includeChatStatus: true,
+        sort: sortMode,
+        handled: responseFilter === 'unhandled' ? 'unhandled' : undefined,
+        operatorId: operatorId || undefined,
+        scenarioId: scenarioId || undefined,
+        metadata: attentionOnly ? { __attention: '1' } : undefined,
+        scoreMin,
+        scoreMax,
+        scoredOnly: scoredOnly || undefined,
+      })
+      if (!response.success) throw new Error('読み込めませんでした')
+      return response.data
+    })
+    if (request !== loadRequestRef.current) return
+    setSelectionFriends(all)
+    setSelectedIds(new Set(all.map(friend => friend.id)))
+  }
 
   const loadFriends = useCallback(async () => {
     const requestId = ++loadRequestRef.current
@@ -453,7 +509,7 @@ export default function FriendsListV8() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `friends-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("友だち")
     anchor.click()
     URL.revokeObjectURL(url)
   }, [friends])
@@ -504,25 +560,25 @@ export default function FriendsListV8() {
   const kpis = [
     {
       key: 'active', title: '有効な友だち', icon: Users, value: stats?.active ?? null,
-      detail: stats ? `総友だち ${formatNumber(stats.total)}` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `総友だち ${formatNumber(stats.total)}` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
       delta: activeDelta != null ? { text: `${activeDelta >= 0 ? '+' : ''}${formatNumber(activeDelta)}`, tone: activeDelta < 0 ? 'neutral' : 'up' } : null,
       href: '/chats',
     },
     {
       key: 'blocked', title: 'ブロック・非表示', icon: UserRoundX, value: stats ? stats.blockedByThem + stats.hiddenByUs : null,
-      detail: stats ? `相手から ${stats.blockedByThem}・自分から ${stats.hiddenByUs}` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `相手から ${stats.blockedByThem}・自分から ${stats.hiddenByUs}` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
       delta: null,
       href: '/chats',
     },
     {
       key: 'unanswered', title: '未対応', icon: MessageSquare, value: stats?.unanswered ?? null,
-      detail: stats ? `対応済み ${formatNumber(stats.resolved)}` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `対応済み ${formatNumber(stats.resolved)}` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
       delta: stats && stats.unanswered > 0 ? { text: '要確認', tone: 'warn' } : null,
       href: '/chats?status=unread',
     },
     {
       key: 'added', title: '今月の追加', icon: UserPlus, value: stats?.addedThisMonth ?? null,
-      detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)}人` : statsFailed ? '読み込めませんでした' : '—',
+      detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)}人` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
       delta: stats ? { text: `${addedDiff >= 0 ? '+' : ''}${addedDiff}`, tone: addedDiff < 0 ? 'neutral' : 'up' } : null,
       href: '/chats',
     },
@@ -638,7 +694,7 @@ export default function FriendsListV8() {
             注目のみ
           </FilterChip>
         </div>
-        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : '—'}</span>
+        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
         {broadcastHandoffHref ? (
           <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
             <Megaphone size={14} aria-hidden="true" />
@@ -646,7 +702,7 @@ export default function FriendsListV8() {
           </Link>
         ) : null}
         <span className={styles.spacer} />
-        {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount}件選択中</span> : null}
+        {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         <span className={styles.columnsBox}>
           <button ref={columnsButtonRef} type="button" aria-expanded={columnsOpen} onClick={() => setColumnsOpen((current) => !current)} className={styles.textButton}>
             <Columns3 size={16} aria-hidden="true" />
@@ -677,9 +733,9 @@ export default function FriendsListV8() {
           width={98}
           value={String(pageSize)}
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
-          options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+          options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
         />
-        <Select
+        <ListToolbarSort
           aria-label="並び順"
           treatment="text"
           width={171}
@@ -698,9 +754,9 @@ export default function FriendsListV8() {
       {hasScoreRange ? (
         <div className={styles.applied}>
           <span>
-            行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
+            行動スコア：{scoreMin !== undefined ? `${scoreMin} 点以上` : ''}
             {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
-            {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
+            {scoreMax !== undefined ? `${scoreMax} 点以下` : ''}
             {scoredOnly ? '（点数がついている人のみ）' : ''}
           </span>
           <Link href="/friends" className={styles.linkButton}>この条件を外す</Link>
@@ -709,7 +765,7 @@ export default function FriendsListV8() {
       {optionsFailed ? (
         <p className={styles.optionsFailed}>
           絞り込みの選択肢を読み込めませんでした。タグが空なのは、取れなかっただけかもしれません。
-          <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className={styles.linkButton}>再読み込み</button>
+          <button type="button" onClick={() => { void loadOptions(); void loadMarks() }} className={styles.linkButton}>もう一度読み込む</button>
         </p>
       ) : null}
     </ListToolbarFrame>
@@ -791,7 +847,7 @@ export default function FriendsListV8() {
             const attention = String(friend.metadata?.__attention ?? '') === '1'
             const tags = splitTags(friend.tags)
             return (
-              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row>
+              <Tr key={friend.id} interactive selected={selectedIds.has(friend.id) || undefined} className={styles.row} data-friend-row data-row-id={friend.id}>
                 <Td className={styles.tdCheck} onClick={(event) => event.stopPropagation()}>
                   <Checkbox checked={selectedIds.has(friend.id)} onCheckedChange={() => toggleSelect(friend.id)} aria-label={`${friend.displayName}を選ぶ`} />
                 </Td>
@@ -828,7 +884,7 @@ export default function FriendsListV8() {
                   </Td>
                 ) : null}
                 {visible.has('scenario') ? (
-                  <Td className={styles.td}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? 'なし'}</span></Td>
+                  <Td className={styles.td}><span className={styles.cellText} title={friend.activeScenario?.name}>{friend.activeScenario?.name ?? emptyValue('none')}</span></Td>
                 ) : null}
                 {visible.has('latest') ? (
                   <Td className={styles.td}>
@@ -845,7 +901,7 @@ export default function FriendsListV8() {
                     <div className={styles.tags} title={friend.tags.map((tag) => tag.name).join('・') || undefined}>
                       <TagOverflow>{friend.tags.map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="sm" />)}</TagOverflow>
 
-                      {friend.tags.length === 0 ? <span className={styles.faint}>—</span> : null}
+                      {friend.tags.length === 0 ? <span className={styles.faint}>{emptyValue('unknown')}</span> : null}
                     </div>
                   </Td>
                 ) : null}
@@ -879,7 +935,7 @@ export default function FriendsListV8() {
   const pager = (
     <ListPager>
       <span className={styles.pagerCount}>
-        {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : '—'}
+        {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : emptyValue('unknown')}
       </span>
       <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ" />
     </ListPager>
@@ -891,7 +947,7 @@ export default function FriendsListV8() {
       boardId="x6QsVz"
       headingSize="compact"
       title="友だち"
-      description="LINE でつながっている人の一覧です。タグと対応の状態で絞り込めます。"
+      help="LINE でつながっている人の一覧です。タグと対応の状態で絞り込めます。"
       actions={headActions}
       tabs={(
         <>
@@ -909,7 +965,7 @@ export default function FriendsListV8() {
       overlays={(
         <>
           <span className={styles.bulkWrap} data-design="V8BulkBar">
-            <BulkBar count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
+            <BulkBar total={total} onSelectAll={selectAllFriends} count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
               {selectedIds.size > 1 && canRunBulk(staffRole) ? (
                 <Button variant="secondary" data-qa-open="IAf7j" onClick={() => setBulkOpen(true)}>操作を選ぶ</Button>
               ) : null}
@@ -921,7 +977,7 @@ export default function FriendsListV8() {
           <BulkRunDialog
             open={bulkOpen}
             friendIds={[...selectedIds]}
-            selectedFriends={friends.filter((friend) => selectedIds.has(friend.id))}
+            selectedFriends={[...new Map([...selectionFriends, ...friends].map(friend => [friend.id, friend])).values()].filter(friend => selectedIds.has(friend.id))}
             tags={allTags}
             accountId={selectedAccountId}
             supportMarksEnabled={marksEnabled}
@@ -948,7 +1004,7 @@ export default function FriendsListV8() {
               open={advancedOpen}
               accountId={selectedAccountId}
               tags={allTags}
-              fieldNames={[]}
+              fieldNames={fieldNames}
               marks={marks}
               scenarios={scenarios}
               onClose={() => setAdvancedOpen(false)}

@@ -15,6 +15,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Progress from '@/components/shared/progress'
 import { formatNumber } from '@/lib/format'
+import { formatYen as polishFormatYen } from '@/lib/format'
 
 function formatReception(from: string | null, to: string | null): string {
   const date = (iso: string) => iso.slice(0, 10).replaceAll('-', '/')
@@ -30,11 +31,11 @@ function formatSavedAt(iso: string): string {
 
 function versionSummary(version: OfferVersion): string {
   const parts = [
-    `1件 ${formatNumber(version.rewardAmount)}円`,
+    `1件 ${polishFormatYen(version.rewardAmount)}`,
     version.rewardMiles > 0 ? `＋${formatNumber(version.rewardMiles)}マイル` : null,
     `期間${version.windowDays}日`,
-    version.capTotal != null ? `全体${version.capTotal}件` : null,
-    version.capMonthlyPerAffiliate != null ? `月${version.capMonthlyPerAffiliate}件` : null,
+    version.capTotal != null ? `全体${version.capTotal} 件` : null,
+    version.capMonthlyPerAffiliate != null ? `月${version.capMonthlyPerAffiliate} 件` : null,
   ].filter((part): part is string => part !== null)
   return parts.join('・')
 }
@@ -134,9 +135,9 @@ export function OfferTermsFields({ values, onChange, disabled = false, errors = 
 }) {
   const fieldId = useId()
   const fields = [
-    { key: 'windowDays', label: '数える期間（日）', type: 'number', min: 1, max: 365, placeholder: '例: 30（空は今のまま）', help: 'リンクを開いてから数える期間です。既定は30日です。' },
-    { key: 'capTotal', label: '全体の上限（件）', type: 'number', min: 1, placeholder: '例: 200（空は上限なし）', help: 'この案件で付ける成果の数の上限です。上限に達したら受付を自動で止めます。' },
-    { key: 'capMonthly', label: '1人あたり月の上限（件）', type: 'number', min: 1, placeholder: '例: 10（空は上限なし）', help: '1人の紹介者に1か月で付ける数の上限です。上限に達したらその人の受付を止めます。' },
+    { key: 'windowDays', label: '数える期間（日）', type: 'number', min: 1, max: 365, placeholder: '例：30（空は今のまま）', help: 'リンクを開いてから数える期間です。既定は30日です。' },
+    { key: 'capTotal', label: '全体の上限（件）', type: 'number', min: 1, placeholder: '例：200（空は上限なし）', help: 'この案件で付ける成果の数の上限です。上限に達したら受付を自動で止めます。' },
+    { key: 'capMonthly', label: '1人あたり月の上限（件）', type: 'number', min: 1, placeholder: '例：10（空は上限なし）', help: '1人の紹介者に1か月で付ける数の上限です。上限に達したらその人の受付を止めます。' },
     { key: 'receptionFrom', label: '受付の始め', type: 'date' },
     { key: 'receptionTo', label: '受付の終わり', type: 'date' },
   ] as const
@@ -209,7 +210,7 @@ export default function OfferTermsDialog({
             <div className="flex gap-2">
               <dt className="text-ink-faint w-24 shrink-0">報酬</dt>
               <dd className="text-ink font-semibold tabular-nums">
-                1件 {formatNumber(rewardAmount)}円
+                1 件 {polishFormatYen(rewardAmount)}
                 {rewardMiles > 0 ? `＋${formatNumber(rewardMiles)}マイル` : null}
               </dd>
             </div>
@@ -232,9 +233,9 @@ export default function OfferTermsDialog({
               <dd className="text-ink">
                 {status.capTotal != null || status.capMonthlyPerAffiliate != null ? (
                   <>
-                    {status.capTotal != null ? `この案件で${status.capTotal}件` : null}
+                    {status.capTotal != null ? `この案件で${status.capTotal} 件` : null}
                     {status.capTotal != null && status.capMonthlyPerAffiliate != null ? '／' : null}
-                    {status.capMonthlyPerAffiliate != null ? `1人月${status.capMonthlyPerAffiliate}件` : null}
+                    {status.capMonthlyPerAffiliate != null ? `1人月${status.capMonthlyPerAffiliate} 件` : null}
                   </>
                 ) : (
                   '上限なし'
@@ -250,14 +251,14 @@ export default function OfferTermsDialog({
             <Progress
               state="active"
               title={status.totalRemaining != null && status.totalRemaining > 0
-                ? `上限まであと${status.totalRemaining}件`
+                ? `上限まであと${status.totalRemaining} 件`
                 : '上限に達しました'}
               percent={Math.min(100, Math.round((status.totalUsed / status.capTotal) * 100))}
-              countText={`${formatNumber(status.totalUsed)} / ${formatNumber(status.capTotal)}件`}
+              countText={`${formatNumber(status.totalUsed)} / ${formatNumber(status.capTotal)} 件`}
             />
           ) : status.capMonthlyPerAffiliate != null ? (
             <p className="text-ink-secondary text-sm tabular-nums">
-              1人あたり月{status.capMonthlyPerAffiliate}件まで
+              1人あたり月{status.capMonthlyPerAffiliate} 件まで
             </p>
           ) : null}
           <section aria-label="決まりの履歴">

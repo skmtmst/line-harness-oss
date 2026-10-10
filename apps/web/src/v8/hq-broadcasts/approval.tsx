@@ -21,6 +21,7 @@ import { ApprovalRequestFields, ApproverSection, formatApprovalDateTime } from '
 import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export type HqApproval = {
   state: BroadcastApprovalState | null
@@ -133,17 +134,17 @@ export function HqApprovalBlock({
   return (
     <>
       {gate === 'single' ? (
-        <Notice tone="info">{`送る人数が ${formatNumber(state.gate.threshold)}通以上です。統括の担当者が1人なので、送るときに人数を入れて確かめます。`}</Notice>
+        <Notice tone="info">{`送る人数が ${formatNumber(state.gate.threshold)} 通以上です。統括の担当者が1人なので、送るときに人数を入れて確かめます。`}</Notice>
       ) : gate === 'needsRequest' ? (
         <Notice tone="warn">
           {state.approval.status === 'rejected'
-            ? `差し戻されました（理由：${state.approval.rejectReason || '—'}）。内容を直して、もう一度承認を依頼してください。`
+            ? `差し戻されました（理由：${state.approval.rejectReason || emptyValue('unknown')}）。内容を直して、もう一度承認を依頼してください。`
             : `送る人数が ${formatNumber(state.gate.threshold)}通以上なので、もう1人の承認が要ります。承認されるまで送られません。`}
         </Notice>
       ) : gate === 'pending' ? (
         <Notice
           tone="info"
-          action={state.viewer.isRequester ? <Button size="compact" disabled={busy} onClick={() => void run1(() => hqBroadcastsApi.cancelApproval(run.id, run.version), '承認の依頼を取り消しました')}>依頼を取り消す</Button> : undefined}
+          action={state.viewer.isRequester ? <Button size="compact" disabled={busy} onClick={() => void run1(() => hqBroadcastsApi.cancelApproval(run.id, run.version), '承認の依頼を取り消しました')} busy={Boolean(busy)} busyLabel="処理中…">依頼を取り消す</Button> : undefined}
         >
           {`${nameOf(state.approval.approverStaffId) ? `${nameOf(state.approval.approverStaffId)}さんの` : ''}承認を待っています（依頼 ${formatApprovalDateTime(state.approval.requestedAt)}）。${state.approval.note ? `ひとこと：${state.approval.note}` : ''}`}
         </Notice>
@@ -167,12 +168,12 @@ export function HqApprovalBlock({
       <ConfirmDialog
         open={requestOpen}
         title="承認を依頼する"
-        description={`送る相手 ${formatNumber(state.gate.recipientCount)}人。承認されるまで送られません。`}
+        description={`送る相手 ${formatNumber(state.gate.recipientCount)} 人。承認されるまで送られません。`}
         confirmLabel="承認を依頼する"
         busy={busy}
         error={message || undefined}
         onCancel={() => { if (!busy) { setMessage(''); onRequestClose() } }}
-        onConfirm={approverId ? () => void run1(() => hqBroadcastsApi.requestApproval(run.id, run.version, approverId, note.trim() || undefined), '承認を依頼しました').then((ok) => { if (ok) onRequestClose() }) : undefined}
+        onConfirm={approverId ? () => run1(() => hqBroadcastsApi.requestApproval(run.id, run.version, approverId, note.trim() || undefined), '承認を依頼しました').then((ok) => { if (ok) onRequestClose() }) : undefined}
       >
         <ApprovalRequestFields
           recipientCount={state.gate.recipientCount}
@@ -220,7 +221,7 @@ export function HqTestSendDialog({
       const id = await prepare()
       if (!id) { setError('先に入れていない所を直してください。'); return }
       const result = (await hqBroadcastsApi.testSend(id, chosen)).data
-      notifyToast(result.failed ? `テストを ${result.sent}人に送りました（${result.failed}人は送れませんでした）` : `テストを ${result.sent}人に送りました`)
+      notifyToast(result.failed ? `テストを ${result.sent} 人に送りました（${result.failed} 人は送れませんでした）` : `テストを ${result.sent} 人に送りました`)
       onClose()
     } catch (caught) {
       setError(errorText(caught, 'テストを送れませんでした。アカウントのテスト送信の宛先を確かめてください。'))
@@ -237,7 +238,7 @@ export function HqTestSendDialog({
       busy={busy}
       error={error || undefined}
       onCancel={() => { if (!busy) { setError(''); onClose() } }}
-      onConfirm={chosen ? () => void send() : undefined}
+      onConfirm={chosen ? () => send() : undefined}
     >
       {accounts.length === 0 ? <p className="text-ink-faint text-xs">先に送るアカウントを選んでください。</p> : (
         <HqAccountSelectField label="テストを送るアカウント" accounts={accounts} value={chosen} onChange={setAccountId} disabled={busy} />

@@ -1,5 +1,6 @@
 import { Children, isValidElement, type ReactNode } from 'react'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
+import TruncatedText from './truncated-text'
 import styles from './folder-dot.module.css'
 
 /**
@@ -52,11 +53,12 @@ function nameText(node: ReactNode): string {
  * 丸＋名前の1行。名前は1行のまま省略する（全文は呼ぶ側の title で見せる）。
  * B-194: どの幅でも丸を出す。旧い dot 指定は受け取るだけ。
  */
-export function FolderDotName({ folder, children }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode }) {
+export function FolderDotName({ folder, dot = true, children }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode }) {
+  if (!dot) return <>{typeof children === 'string' ? <TruncatedText value={children} /> : children}</>
   return (
     <span className={styles.line} data-list-name="" title={nameText(children)}>
       <FolderDot folder={folder} />
-      <span className={styles.name}>{children}</span>
+      {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{children}</span>}
     </span>
   )
 }

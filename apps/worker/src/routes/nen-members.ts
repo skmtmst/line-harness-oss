@@ -14,7 +14,6 @@ import {
   savePhotoPublicationOrder,
   nextVersionToken,
   resolveLineCredential,
-  findOrCreateGlobalTag,
   toJstString,
 } from '@line-crm/db';
 import * as dbPackage from '@line-crm/db';
@@ -51,7 +50,6 @@ import {
   planForPetRow,
   refreshStoredFeeding,
 } from '../services/nen-feeding.js';
-import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { APPETITE_LABELS, STOOL_LABELS, isCareStoolStatus, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
 import {
   attemptPhotoRewardForPhoto,
@@ -118,29 +116,6 @@ function detectedImageMime(bytes: Uint8Array): keyof typeof IMAGE_TYPES | null {
       && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') return 'image/webp';
   return null;
 }
-
-const CONSULTATION_TAG_RULES = [
-  { key: '食事', pattern: /ご飯|ごはん|フード|食欲|食いつき|食べ|偏食|おやつ|栄養|サプリ|水分|飲み水/ },
-  { key: '排泄', pattern: /便|うんち|ウンチ|下痢|軟便|便秘|血便|おしっこ|オシッコ|尿|トイレ|排泄/ },
-  { key: '皮膚・被毛', pattern: /皮膚|毛並み|被毛|脱毛|毛玉|ブラッシング|シャンプー|かゆ|痒|アレルギー|舐め続け/ },
-  { key: '目・涙', pattern: /目|涙|目やに|まつげ|充血/ },
-  { key: '耳', pattern: /耳|イヤー/ },
-  { key: '口・歯', pattern: /口臭|口内|歯|デンタル|歯周|ひげ|ヒゲ/ },
-  { key: '呼吸', pattern: /咳|呼吸|息|しゃっくり|くしゃみ|いびき|ゼーゼー/ },
-  { key: '行動・しつけ', pattern: /しつけ|噛|吠|鳴|威嚇|遊|留守番|ストレス|散歩|興奮|嫉妬|多頭|怖が|震え/ },
-  { key: '生活環境', pattern: /ケージ|クレート|サークル|旅行|電車|タクシー|ホテル|寝床|ベッド|室内/ },
-  { key: '予防・通院', pattern: /ワクチン|感染症|薬|病院|疾患|発情|ヒート|手術/ },
-  { key: '消化器', pattern: /嘔吐|吐く|吐いた|胃|腸|膵|腹痛|お腹/ },
-  { key: '泌尿器', pattern: /腎|膀胱|尿|結石|頻尿/ },
-  { key: '運動器', pattern: /関節|歩き|歩行|足|脚|骨|びっこ|立てない/ },
-  { key: '神経', pattern: /けいれん|痙攣|発作|神経|麻痺|ふらつき/ },
-  { key: '心臓', pattern: /心臓|心拍|脈|循環/ },
-  { key: '腫瘍', pattern: /腫瘍|がん|癌|しこり/ },
-  { key: '中毒', pattern: /中毒|毒|誤食|誤飲|チョコ|玉ねぎ|ネギ|キシリトール/ },
-  { key: '高齢', pattern: /高齢|シニア|老犬|老猫|認知/ },
-] as const;
-const URGENT_PATTERN = /呼吸.{0,4}(苦し|でき)|意識|けいれん|痙攣|大量.{0,3}(出血|吐血)|誤飲|毒|ぐったり.{0,8}(反応|動か)|何度も.{0,3}(吐|嘔吐)|血便|尿が出ない/;
-const CAUTION_PATTERN = /食べない|下痢|嘔吐|咳|発熱|元気がない|痛が|出血|腫れ|急に|続いて|繰り返/;
 
 type FriendRow = {
   id: string; line_user_id: string; display_name: string | null; user_id: string | null;
@@ -1238,116 +1213,6 @@ nenMembers.put('/api/liff/nen/photos/:id/publication-consent', inputJsonBoundary
     success: true,
     data: { publicationConsent: body.consent, publicPetName: body.consent && body.showPetName === true },
   });
-});
-
-type KnowledgeMeta = { id: string; title: string; animal_type: string; tags_json: string; source_name: string; authority_rank: number };
-type KnowledgeArticle = KnowledgeMeta & { source_url: string; body: string; source_kind: string; language: string };
-
-function questionKeywords(question: string, detected: string[]) {
-  const direct = ['食欲','食いつき','ご飯','フード','下痢','軟便','便秘','嘔吐','咳','呼吸','涙','目やに','耳','皮膚','毛','アレルギー','口臭','歯','留守番','吠える','噛む','トイレ','散歩','震える','水','体重']
-    .filter((keyword) => question.includes(keyword));
-  return [...new Set([...direct, ...detected.flatMap((value) => value.split(/[・]/))])].slice(0, 10);
-}
-
-function knowledgeScore(row: KnowledgeMeta, keywords: string[], detected: string[]) {
-  const tags = JSON.parse(row.tags_json || '[]') as string[];
-  let score = detected.filter((tag) => tags.some((sourceTag) => sourceTag.includes(tag) || tag.includes(sourceTag))).length * 8;
-  for (const keyword of keywords) if (row.title.includes(keyword)) score += 6;
-  return score + Math.floor(Number(row.authority_rank || 40) / 10);
-}
-
-function knowledgeExcerpt(body: string, keywords: string[]) {
-  const normalized = body.replace(/\s+/g, ' ').trim();
-  const found = keywords.map((keyword) => normalized.toLowerCase().indexOf(keyword.toLowerCase())).filter((index) => index >= 0).sort((a, b) => a - b)[0];
-  if (found === undefined) return normalized.slice(0, 2200);
-  const start = Math.max(0, found - 550);
-  return normalized.slice(start, start + 2400);
-}
-
-function diverseKnowledge(rows: Array<{ article: KnowledgeArticle; score: number }>, limit = 5) {
-  const selected: KnowledgeArticle[] = [];
-  const sourceCounts = new Map<string, number>();
-  for (const { article } of rows) {
-    if ((sourceCounts.get(article.source_name) || 0) >= 2) continue;
-    selected.push(article);
-    sourceCounts.set(article.source_name, (sourceCounts.get(article.source_name) || 0) + 1);
-    if (selected.length >= limit) break;
-  }
-  return selected;
-}
-
-function aiText(result: unknown): string {
-  if (!result || typeof result !== 'object') return '';
-  const value = result as { response?: unknown; choices?: Array<{ message?: { content?: unknown } }> };
-  if (typeof value.response === 'string') return value.response.trim();
-  const content = value.choices?.[0]?.message?.content;
-  return typeof content === 'string' ? content.trim() : '';
-}
-
-async function assignConsultationTags(c: Context<Env>, friendId: string, animalType: 'dog' | 'cat', detected: string[]) {
-  const names = [`AI相談：${animalType === 'dog' ? 'わんちゃん' : 'ねこちゃん'}`, ...detected.map((tag) => `AI相談：${tag}`)];
-  for (const name of names) {
-    const tag = await findOrCreateGlobalTag(c.env.DB, { name, color: '#16815B' });
-    if (tag) await attachTagAndFireSideEffects(c.env.DB, friendId, tag.id);
-  }
-  return names;
-}
-
-nenMembers.post('/api/liff/nen/consultations', inputJsonBoundary({"animalType":["string"],"petId":["string"],"question":["string"]}), async (c) => {
-  const friend = await currentFriend(c);
-  if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
-  const body = await c.req.json<{ animalType?: string; petId?: string; question?: string }>().catch(() => null);
-  const question = String(body?.question || '').replace(/\s+/g, ' ').trim();
-  const animalType = body?.animalType === 'cat' ? 'cat' : body?.animalType === 'dog' ? 'dog' : null;
-  if (!animalType || question.length < 8 || question.length > 1000) return inputError(c, { success: false, error: '8〜1000文字で相談内容を入力してください' }, 400, ["animalType","question"]);
-  if (body?.petId) {
-    const owned = await c.env.DB.prepare(`SELECT id, animal_type FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(body.petId, friend.id).first<{ id: string; animal_type: string }>();
-    if (!owned) return c.json({ success: false, error: 'Pet not found' }, 404);
-    if (owned.animal_type !== animalType) return inputError(c, { success: false, error: '選択したペットの種別をご確認ください' }, 400, ["petId","animalType"]);
-  }
-
-  const detected: string[] = CONSULTATION_TAG_RULES.filter((rule) => rule.pattern.test(question)).map((rule) => rule.key);
-  if (!detected.length) detected.push('その他');
-  const safetyLevel = URGENT_PATTERN.test(question) ? 'urgent' : CAUTION_PATTERN.test(question) ? 'caution' : 'general';
-  const keywords = questionKeywords(question, detected);
-  const metadata = await c.env.DB.prepare(`SELECT id, title, animal_type, tags_json, source_name, authority_rank FROM nen_knowledge_articles WHERE is_active=1 AND animal_type IN (?, 'all')`).bind(animalType).all<KnowledgeMeta>();
-  const candidateIds = metadata.results
-    .map((row) => ({ row, score: knowledgeScore(row, keywords, detected) }))
-    .sort((a, b) => b.score - a.score || b.row.id.localeCompare(a.row.id, 'ja', { numeric: true }))
-    .slice(0, 24).map(({ row }) => row.id);
-  const placeholders = candidateIds.map(() => '?').join(',');
-  const candidates = candidateIds.length
-    ? (await c.env.DB.prepare(`SELECT id, title, animal_type, tags_json, source_name, source_url, source_kind, authority_rank, language, body FROM nen_knowledge_articles WHERE id IN (${placeholders})`).bind(...candidateIds).all<KnowledgeArticle>()).results
-    : [];
-  const rankedSources = candidates
-    .map((article) => ({ article, score: knowledgeScore(article, keywords, detected) + keywords.filter((keyword) => article.body.includes(keyword)).length * 2 }))
-    .sort((a, b) => b.score - a.score || b.article.authority_rank - a.article.authority_rank);
-  const sources = diverseKnowledge(rankedSources);
-
-  let advice = '';
-  if (safetyLevel === 'urgent') {
-    advice = '心配な状態です。今すぐ、かかりつけまたは夜間対応の動物病院へ電話し、受診してください。移動までの間は無理に食べ物や水、薬を与えず、呼吸や意識の状態、症状が始まった時刻を記録してください。AI相談の回答を待って様子を見る状況ではありません。';
-  } else if (c.env.AI && sources.length) {
-    const context = sources.map((source, index) => `参考${index + 1}: ${source.title}\n発行主体: ${source.source_name}\n信頼度: ${source.authority_rank}/100\n${knowledgeExcerpt(source.body, keywords)}\n出典: ${source.source_url}`).join('\n\n');
-    try {
-      const result = await (c.env.AI.run as (model: string, input: unknown) => Promise<unknown>)('@cf/zai-org/glm-4.7-flash', { messages: [
-        { role: 'system', content: 'あなたは然-NEN-の犬猫の暮らし相談AIです。獣医師ではなく診断・治療・投薬指示をしません。与えられたNENナレッジだけを根拠に、やさしく具体的な日本語で回答してください。最初に相談への共感、次に考えられる見方、家庭で安全に確認できること、最後に受診の目安を示します。断定せず、参考資料にない内容を作らないでください。緊急性が疑われる場合は受診を最優先にしてください。500文字以内。' },
-        { role: 'user', content: `対象: ${animalType === 'dog' ? 'わんちゃん' : 'ねこちゃん'}\n相談: ${question}\n\nNENナレッジ:\n${context}` },
-      ], temperature: 0.2, max_completion_tokens: 700 });
-      advice = aiText(result);
-    } catch (error) {
-      console.error('NEN consultation AI failed', error);
-    }
-  }
-  if (!advice) advice = `ご相談ありがとうございます。まず、いつから・どのくらいの頻度か、食欲・元気・排泄など普段との違いを記録してみてください。${safetyLevel === 'caution' ? '症状が続く、悪化する、別の症状も出る場合は、早めに動物病院へご相談ください。' : '気になる状態が続く場合は、無理に自己判断せず動物病院へご相談ください。'}`;
-
-  const tags = await assignConsultationTags(c, friend.id, animalType, detected);
-  const id = crypto.randomUUID();
-  await c.env.DB.prepare(`INSERT INTO nen_consultation_logs_v2
-    (id, friend_id, pet_id, animal_type, topic, question_text, answers_json, result_key, result_text, tag_name, tags_json, source_ids_json, safety_level, created_at)
-    VALUES (?, ?, ?, ?, 'free_text', ?, '[]', 'nen_ai', ?, ?, ?, ?, ?, ?)`)
-    .bind(id, friend.id, body?.petId || null, animalType, question, advice, tags[0], JSON.stringify(tags), JSON.stringify(sources.map((source) => source.id)), safetyLevel, jstNow()).run();
-  return c.json({ success: true, data: { id, advice, tags, safetyLevel, sources: sources.map((source) => ({ title: source.title, url: source.source_url, source: source.source_name })) } }, 201);
 });
 
 // Admin APIs
@@ -2474,12 +2339,6 @@ nenMembers.get('/api/nen-members/friends/:friendId', requireRole('owner', 'admin
 nenMembers.get('/api/nen-members/ranks', async (c) => {
   const { scope, where } = await adminAccountScope(c);
   const rows = await c.env.DB.prepare(`SELECT s.*, f.display_name, f.line_user_id FROM nen_ec_member_snapshots s JOIN friends f ON f.id=s.friend_id WHERE 1 = 1 ${where} ORDER BY s.purchase_amount DESC LIMIT 300`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
-  return c.json({ success: true, data: rows.results });
-});
-
-nenMembers.get('/api/nen-members/consultations', async (c) => {
-  const { scope, where } = await adminAccountScope(c);
-  const rows = await c.env.DB.prepare(`SELECT cl.*, p.name pet_name, f.display_name owner_name FROM nen_consultation_logs_v2 cl LEFT JOIN nen_pet_profiles p ON p.id=cl.pet_id JOIN friends f ON f.id=cl.friend_id WHERE 1 = 1 ${where} ORDER BY cl.created_at DESC LIMIT 300`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 

@@ -14,10 +14,10 @@
 [data-theme='v8'] .select:focus-visible,
 [data-theme='v8'] .add:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 [data-theme='v8'] .select {
-  padding: 7px 10px; gap: 8px; border-radius: 8px;
+  padding: 7px 10px; gap: 8px; border-radius: var(--polish-radius-control);
   font-size: 13px; font-weight: 500; line-height: normal; color: var(--color-ink-secondary);
 }
-[data-theme='v8'] .row[data-active] { border-radius: 8px; background: var(--color-shell); }
+[data-theme='v8'] .row[data-active] { border-radius: var(--polish-radius-control); background: var(--color-shell); }
 [data-theme='v8'] .row[data-active] .select { background: var(--color-shell); color: var(--color-ink); font-weight: 600; }
 [data-theme='v8'] .folderIcon { display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-folder-dot-indent); flex-shrink: 0; }
 [data-theme='v8'] .count { font-family: var(--font-inter), Inter, sans-serif; font-size: 12px; font-weight: 400; line-height: normal; }
@@ -36,7 +36,7 @@
 [data-theme='v8'] .row[data-active] .label { font-weight: 600; }
 
 [data-theme='v8'] .panel { max-width: 100%; min-width: 0; }
-[data-theme='v8'] .row { padding: 7px 10px; gap: 8px; border-radius: 8px; }
+[data-theme='v8'] .row { padding: 7px 10px; gap: 8px; border-radius: var(--polish-radius-control); }
 [data-theme='v8'] .row .select { padding: 0; }
 [data-theme='v8'] .menu { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
 /*

@@ -96,7 +96,7 @@ export default function BroadcastStatusRail({
   const finished = FINISHED.has(displayStatus)
 
   return (
-    <section aria-label="配信の状態" className="bg-canvas rounded-card border-hairline border p-5">
+    <section aria-label="配信の状態" className="bg-canvas rounded-card content-card border p-5">
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-2">
         {steps.map((step, index) => {
           const done = finished ? index <= currentIndex : index < currentIndex

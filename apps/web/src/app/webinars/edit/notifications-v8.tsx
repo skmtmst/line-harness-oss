@@ -10,6 +10,7 @@ import LinePreview from '@/components/shared/line-preview'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { webinarApi, type WebinarAction, type WebinarEditor, type WebinarNotificationOverview, type WebinarNotificationSettings } from '@/lib/api'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { Field } from '@/components/shared/form-controls'
 
 const TRIGGER_LABEL: Record<WebinarAction['trigger'], string> = { completed: '視聴完了', cta_clicked: 'CTAクリック', unviewed: '未視聴' }
 const ACTION_LABEL: Record<WebinarAction['actionType'], string> = { add_tag: 'タグを付ける', remove_tag: 'タグを外す', start_scenario: 'シナリオを始める', stop_scenario: 'シナリオを止める', resume_scenario: 'シナリオを再開する', send_message: 'メッセージを送る', send_webhook: 'Webhookを送る', switch_rich_menu: 'リッチメニューを変える', remove_rich_menu: 'リッチメニューを外す' }
@@ -99,23 +100,23 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   }
   const testDone = !dirty && editor.notificationTest?.status === 'passed'
   const preview = editor.notificationMessages?.registration || editor.notificationMessages?.start || ''
-  const testButton = (label: string) => <Button onClick={() => setTestConfirmOpen(true)} disabled={testing || saving || testDone || !settingsReady} title={testDone ? 'テスト済みです' : !settingsReady ? '通知の設定を読み込んでから実行できます' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : label}</Button>
+  const testButton = (label: string) => <Button onClick={() => setTestConfirmOpen(true)} disabled={testing || saving || testDone || !settingsReady} title={testDone ? 'テスト済みです' : !settingsReady ? '通知の設定を読み込んでから実行できます' : undefined}  busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : label}</Button>
 
   return (
     <div data-design-node="E7iAYs" data-webinar-pane="notifications">
       <div className="min-w-0 space-y-4">
-        <section className="border-hairline bg-canvas rounded-card border p-5">
+        <section className="content-card bg-canvas rounded-card border p-5">
           <WebinarNotifications webinarId={webinarId} onLoaded={handleLoaded} onDirtyChange={setNotificationDirty} registerSave={registerNotificationSave} />
           <div className="mt-3">{testButton('テストを送る（全部）')}</div>
         </section>
-        <fieldset disabled={saving} className="border-hairline bg-canvas min-w-0 rounded-card border p-5">
+        <fieldset disabled={saving} className="content-card bg-canvas min-w-0 rounded-card border p-5">
           <h2 className="text-ink text-base font-semibold">視聴後にすること <HelpTip label="視聴後にすることの説明">見たかどうかで、タグを付けたりシナリオを始めたりします。</HelpTip></h2>
           {actionError ? <Notice tone="info" action={<Button onClick={() => setActionAttempt((value) => value + 1)}>もう一度読み込む</Button>}>視聴後の設定を読み込めませんでした。</Notice> : <ul className="divide-hairline my-3 divide-y">
             {(['completed', 'cta_clicked', 'unviewed'] as const).map((trigger) => <li key={trigger} className="flex items-center gap-4 py-3"><span className="text-ink w-24 shrink-0 text-sm font-semibold">{TRIGGER_LABEL[trigger]}</span><span className="text-ink-secondary min-w-0 flex-1 truncate text-sm" title={actions?.filter((a) => a.trigger === trigger).map((a) => ACTION_LABEL[a.actionType]).join('・')}>{actions === null ? '読み込んでいます' : actions.filter((a) => a.trigger === trigger).map((a) => ACTION_LABEL[a.actionType]).join('・') || 'まだ何もしない'}</span><Button size="compact" onClick={onOpenActions} aria-label={`${TRIGGER_LABEL[trigger]}の動きを変える`}>…</Button></li>)}
           </ul>}
           <label className="text-ink block text-xs font-semibold" htmlFor="webinar-action-message">視聴完了のメッセージ</label>
           <textarea id="webinar-action-message" aria-label="視聴完了メッセージ本文" value={templateBody} onChange={(event) => setTemplateBody(event.target.value)} rows={2} className="border-hairline bg-canvas text-ink mt-2 w-full rounded-control border px-3 py-2 text-sm" />
-          <div className="mt-3"><label className="text-ink mb-2 block text-xs font-semibold">結果が取れないとき</label><Select aria-label="視聴結果を取得できない場合" value={policy} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></div>
+          <div className="mt-3"><Field label={<>結果が取れないとき</>}><Select aria-label="視聴結果を取得できない場合" value={policy} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></Field></div>
           <div className="mt-3"><Button onClick={onOpenActions}>条件を足す</Button></div>
           {!registerSave ? <Button onClick={() => void save()} disabled={saving}>下書きを保存</Button> : null}
         </fieldset>
@@ -125,7 +126,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
       <aside aria-label="LINEでの見え方">
         <h2 className="text-ink mb-3 text-base font-semibold">LINEでの見え方</h2>
         <LinePreview><div className="bg-canvas text-ink rounded-control p-3 text-sm">{preview || '通知の本文を入れると、ここに出ます。'}</div></LinePreview>
-        <div className="mt-3 flex flex-wrap justify-center gap-2">{testButton('テストを送る')}{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : publicPageReason ? <Button disabled title={publicPageReason}>公開ページを見る</Button> : null}</div>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">{testButton('テストを送る')}{canOpenPublicPage && publicUrl ? <Button external href={publicUrl}  >公開ページを見る</Button> : publicPageReason ? <Button disabled title={publicPageReason}>公開ページを見る</Button> : null}</div>
         {publicPageReason && !canOpenPublicPage ? <p className="text-ink-faint mt-2 text-xs">{publicPageReason}</p> : null}
       </aside>
       <ConfirmDialog open={testConfirmOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestConfirmOpen(false) }} onConfirm={() => void runTest()}><p className="text-ink-secondary text-xs">{dirty ? '未保存の設定を保存してから送ります。' : ''}対象：「{webinarTitle}」の有効な通知。本文は設定済みのものを送ります。</p></ConfirmDialog>

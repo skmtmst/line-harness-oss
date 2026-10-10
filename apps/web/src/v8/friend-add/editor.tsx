@@ -12,6 +12,7 @@
  * （口・版・下書き・冪等の鍵の扱いを変えない）。違うのは見せ方と、先に保存された
  * ときの帯（違いを比べる・最新を読み込んで続ける）。BEHAVIOR.md に書き出した。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -59,7 +60,7 @@ import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } fr
 import SegmentedControl from '@/components/shared/segmented'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import Toggle from '@/components/shared/toggle'
+import { SettingCheckbox } from '@/components/shared/checkbox'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
@@ -81,6 +82,11 @@ import { addTimeWindow, MESSAGE_TYPE_LABEL, removeTimeWindow, updateTimeWindow }
 import { resendSuppressionText } from './text'
 import styles from './editor.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Step = 'basic' | 'routes' | 'message' | 'actions' | 'preview'
 type EditorRule = {
@@ -418,7 +424,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       }
       savedSnapshot.current = editorSnapshot(rule, definition)
       setConflict(false)
-      setNotice('下書きを保存しました。')
+      notifySaved('下書きを保存しました。')
       if (!ruleId || nextStep) samePageUrl.replace(`/friend-add-settings?view=edit&id=${encodeURIComponent(savedId)}&step=${nextStep ?? step}`)
       return savedId
     } catch (caught) {
@@ -426,7 +432,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(true)
       } else {
-        setError(describeSaveFailure(caught))
+        setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
       }
       return null
     } finally {
@@ -611,7 +617,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         : `テキスト ${definition.messageText.length}字`
       : step === 'basic' || step === 'routes'
         ? '手順3で作る'
-        : MESSAGE_TYPE_LABEL[definition.messageType] ?? '未設定'
+        : MESSAGE_TYPE_LABEL[definition.messageType] ?? emptyValue('unconfigured')
   const statusLabel = rule.status === 'published' ? '有効' : rule.status === 'stopped' ? '停止中' : '下書き'
   const routeSummary = step === 'basic'
     ? '手順2で選ぶ'
@@ -681,10 +687,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       boardId={step === 'routes' && narrow ? 'xHpkS' : conflict ? 'h5rm8t' : STEPS[currentIndex].node}
       title="初回案内を作る"
       steps={<Steps label="初回案内の作る手順" steps={stepperSteps} currentKey={step} />}
-      description={<>
+      help={<>
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
-          : `名前：${rule.name || '（未入力）'}・いまは${statusLabel}です`}
+          : `名前：${rule.name || emptyValue('unconfigured')}・いまは${statusLabel}です`}
       </>}
       /* 先に保存されたとき（h5rm8t）：板の頭の下に、入力欄と右の列にまたがる帯（型の notice の置き場）。
          帯は共通部品（save-conflict）。比べる窓は項目を左右に並べるこの画面のものを使う。 */
@@ -716,7 +722,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
               <Power size={14} aria-hidden="true" />有効にする
             </Button>
           ) : (
-            <Button type="button" variant="primary" disabled={saving || enabling} onClick={() => moveToStep(nextStep.key)}>
+            <Button type="button" variant="primary" disabled={saving || enabling} onClick={() => moveToStep(nextStep.key)} busy={Boolean(saving)} busyLabel="処理中…">
               次へ：{nextStep.label}
               <ArrowRight size={15} aria-hidden="true" />
             </Button>
@@ -725,10 +731,10 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       ) : (
         /* 閲覧のみ：変える操作（保存・次へ・有効にする）は置かない。 */
         <Button href="/friend-add-settings">一覧へ戻る</Button>
-      )}
+      )} dirty={false}
     >
       {!canEdit ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作は管理者に頼んでください。</p>
+        <p className={styles.viewerBand} role="status">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
@@ -802,7 +808,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         title="最新の保存とあなたの直しの違い"
         description={compare && compare.length === 0 ? '項目の違いはありません。最新を読み込んで続けてください。' : '左があなたの直し、右が先に保存された内容です。'}
         confirmLabel="最新を読み込んで続ける"
-        onConfirm={() => void reloadAfterConflict()}
+        onConfirm={() => reloadAfterConflict()}
         onCancel={() => setCompare(null)}
       >
         {compare && compare.length > 0 ? (
@@ -859,9 +865,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
           <p className={styles.cardDesc}>一覧に出る名前です。友だちには見えません。</p>
         </div>
         <div className={styles.fieldPair}>
-          <div className={styles.field}>
-            <label htmlFor="fa-name" className={styles.label}>設定名（60文字まで）</label>
-            <TextField
+          <div className={styles.field}><Field label="設定名（60文字まで）" htmlFor="fa-name"><TextField
               id="fa-name"
               value={rule.name}
               maxLength={60}
@@ -871,11 +875,8 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
               placeholder="例：秋フェアの初回案内"
               onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))}
             />
-            {nameError ? <span id="fa-name-error" className={styles.fieldError} role="alert">{nameError}</span> : null}
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="fa-folder" className={styles.label}>フォルダ</label>
-            {canEdit ? (
+{nameError ? <span id="fa-name-error" className={styles.fieldError} role="alert">{nameError}</span> : null}</Field></div>
+          <div className={styles.field}><Field label="フォルダ" htmlFor="fa-folder">{canEdit ? (
               <FolderSelect
                 id="fa-folder"
                 aria-label="フォルダ"
@@ -888,8 +889,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError, onC
               />
             ) : (
               <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
-            )}
-          </div>
+            )}</Field></div>
         </div>
       </Card>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="だれに送るか">
@@ -965,24 +965,18 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
   const conditions = (<>
       <p className={styles.subDesc}>空のままなら、選んだリンクから来た全員に送ります。</p>
       <div className={styles.datePair}>
-        <div className={styles.field}>
-          <label htmlFor="fa-from" className={styles.label}>有効期間 はじめ</label>
-          <DateTimeField
+        <div className={styles.field}><Field label="有効期間 はじめ" htmlFor="fa-from"><DateTimeField
             id="fa-from"
             value={localInputValue(definition.activeFrom)}
             readOnly={!canEdit}
             onChange={(next) => setDefinition((current) => ({ ...current, activeFrom: next || null }))}
-          />
-        </div>
-        <div className={styles.field}>
-          <label htmlFor="fa-until" className={styles.label}>有効期間 おわり</label>
-          <DateTimeField
+          /></Field></div>
+        <div className={styles.field}><Field label="有効期間 おわり" htmlFor="fa-until"><DateTimeField
             id="fa-until"
             value={localInputValue(definition.activeUntil)}
             readOnly={!canEdit}
             onChange={(next) => setDefinition((current) => ({ ...current, activeUntil: next || null }))}
-          />
-        </div>
+          /></Field></div>
       </div>
       {legacy ? (
         <p className={styles.fieldError} role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</p>
@@ -1025,16 +1019,13 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           <h2 className={styles.cardTitle}>どの流入リンクから来た人に送るか</h2>
           <p className={styles.cardDesc}>選んだリンクの URL・QR（どちらも同じ入口）から追加された人に動きます</p>
         </div>
-        <label className={styles.routeSearch}>
-          <Search size={14} aria-hidden="true" />
-          <input
+        <Field label={<><Search size={14} aria-hidden="true" /></>}><input
             className={styles.routeSearchInput}
             value={query}
             placeholder="流入リンクの名前で探す"
             aria-label="流入リンクの名前で探す"
             onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+          /></Field>
         {/* 閲覧のみ：選ぶチェックは置かず、選んでいるリンクの名前だけを並べる。 */}
         {(canEdit ? visibleRoutes : visibleRoutes.filter((route) => definition.routeIds.includes(route.id))).map((route) => {
           const checked = definition.routeIds.includes(route.id)
@@ -1042,7 +1033,7 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
           if (!canEdit) {
             return (
               <p key={route.id} className={styles.readOnlyRoute}>
-                <span className={styles.readOnlyRouteName} title={route.name}>{route.name}</span>
+                <span className={styles.readOnlyRouteName} ><TruncatedText value={String(route.name ?? '')} /></span>
                 <span className={styles.routeSub}>{route.kind ? `QR・URL｜${route.kind}` : 'QR・URL'}</span>
               </p>
             )
@@ -1143,7 +1134,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           <h2 className={styles.cardTitle}>最初に送るもの</h2>
         </div>
         {!canEdit ? (
-          <ReadOnlyText label="最初に送るものの種類" value={MESSAGE_TABS.find((tab) => tab.key === definition.messageType)?.label ?? MESSAGE_TYPE_LABEL[definition.messageType] ?? '未設定'} />
+          <ReadOnlyText label="最初に送るものの種類" value={MESSAGE_TABS.find((tab) => tab.key === definition.messageType)?.label ?? MESSAGE_TYPE_LABEL[definition.messageType] ?? emptyValue('unconfigured')} />
         ) : (
         <div className={styles.chipRow} role="group" aria-label="最初に送るものの種類">
           {MESSAGE_TABS.map((tab) => {
@@ -1293,7 +1284,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           <span className={styles.spacer} aria-hidden="true" />
           {/* 閲覧のみ：つまみは置かない（左の文で今の設定が読める）。 */}
           {canEdit ? (
-            <Toggle
+            <SettingCheckbox
               checked={suppressOn}
               label="同じ人に何度も送らない"
               onChange={(next) => setDefinition((current) => ({ ...current, resendSuppressionHours: next ? 24 : 0 }))}
@@ -1508,13 +1499,13 @@ function PreviewStep({ rule, definition, routeNames, runTest, testing, testOk, o
     ? '配信なし'
     : definition.messageType === 'text' && definition.messageText
       ? `テキスト ${definition.messageText.length}字`
-      : MESSAGE_TYPE_LABEL[definition.messageType] ?? '未設定'
+      : MESSAGE_TYPE_LABEL[definition.messageType] ?? emptyValue('unconfigured')
   const actionSummary = definition.actions.length === 0
-    ? 'なし'
+    ? emptyValue('none')
     : `${definition.actions.slice(0, 2).map((action) => action.label.replace(/「.*」/, '')).join('・')}の${definition.actions.length}つ`
   const overlapOk = overlapNotes.length === 0
   const rows: Array<{ label: string; value: string; href: string }> = [
-    { label: '名前・フォルダ', value: `${rule.name || '（未入力）'}${rule.folderName ? `・${rule.folderName}` : ''}`, href: hrefFor('basic') },
+    { label: '名前・フォルダ', value: `${rule.name || emptyValue('unconfigured')}${rule.folderName ? `・${rule.folderName}` : ''}`, href: hrefFor('basic') },
     { label: 'だれに', value: rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除した人' : 'はじめて友だち追加した人', href: hrefFor('basic') },
     { label: '流入リンク', value: routeNames.length > 0 ? routeNames.join('・') : '未選択', href: hrefFor('routes') },
     { label: '最初に送るもの', value: `${firstSend}${definition.timing === 'immediate' ? '・追加してすぐ' : ''}`, href: hrefFor('message') },
@@ -1570,7 +1561,7 @@ function PreviewStep({ rule, definition, routeNames, runTest, testing, testOk, o
               {canEdit ? (
                 check.href
                   ? <Link className={styles.textLink} href={check.href}>見直す</Link>
-                  : <Button type="button" variant="text" disabled={testing} onClick={runTest}>直す</Button>
+                  : <Button type="button" variant="text" disabled={testing} onClick={runTest} busy={testing} busyLabel="処理中…">直す</Button>
               ) : null}
             </li>
           ))}

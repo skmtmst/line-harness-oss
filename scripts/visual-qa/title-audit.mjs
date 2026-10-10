@@ -40,11 +40,22 @@ export function readTitle(inject20 = false) {
     text: title.textContent.trim().replace(/\s+/g, ' '), size: css.fontSize, weight: css.fontWeight, lh: css.lineHeight,
     tag: title.tagName, className: title.className, title: title.getAttribute('title'),
     whiteSpace: css.whiteSpace, textOverflow: css.textOverflow,
+    clientWidth: title.clientWidth, scrollWidth: title.scrollWidth,
+    clientHeight: title.clientHeight, scrollHeight: title.scrollHeight,
   }
 }
 
 export function titlePasses(title) {
   return !!title && title.size === '22px' && title.weight === '700' && title.lh === '32px'
+}
+
+/** B-152⑩：題は折り返せる。省略する題は全文の手掛かりを必須にする。 */
+export function titleFullyReadable(title) {
+  if (!title?.text) return false
+  if (title.whiteSpace === 'nowrap' && title.textOverflow === 'ellipsis') return title.title === title.text
+  if (!['normal', 'pre-wrap', 'break-spaces'].includes(title.whiteSpace)) return false
+  return title.clientWidth > 0 && title.clientHeight > 0
+    && title.scrollWidth <= title.clientWidth + 1 && title.scrollHeight <= title.clientHeight + 1
 }
 
 async function openAuditPage(browser, baseUrl, route, errors) {
@@ -87,8 +98,8 @@ async function main() {
           const actual = new URL(page.url()).pathname.replace(/\/$/, '') || '/'
           // 入口だけの転送は宛先を固定して記録する。その他の転送を成功にしない。
           const expected = SAMPLES.aliases?.[path] || path
-          const longNameSafe = !/(?:detail|reserved)$/.test(path) || (title?.title === title?.text && title?.whiteSpace === 'nowrap' && title?.textOverflow === 'ellipsis')
-          const problem = actual !== expected ? `redirect:${actual}` : errors.length ? errors.join('; ') : !title ? '題なし' : title.text === '画面を表示できませんでした' ? '画面が落ちた' : !longNameSafe ? '詳細の題の省略表示・全文表示が不足' : ''
+          const longNameSafe = !/(?:detail|reserved)$/.test(path) || titleFullyReadable(title)
+          const problem = actual !== expected ? `redirect:${actual}` : errors.length ? errors.join('; ') : !title ? '題なし' : title.text === '画面を表示できませんでした' ? '画面が落ちた' : !longNameSafe ? '詳細の題が切れているか、省略した全文を確認できない' : ''
           const body = problem ? await page.locator('body').innerText() : undefined
           if (flags.includes('--screenshots')) {
             const shotDir = join(dirname(output), 'title-audit-shots')

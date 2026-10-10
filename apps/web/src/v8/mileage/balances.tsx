@@ -1,6 +1,7 @@
 'use client'
 
 import { FolderDotName } from '@/components/shared/folder-dot'
+import { jstDateOffset } from '@/lib/jst-datetime'
 
 /*
  * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
@@ -12,6 +13,8 @@ import { FolderDotName } from '@/components/shared/folder-dot'
  * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
  * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, CircleDot, Clock3, Download, RefreshCw, TrendingDown, TrendingUp, Undo2, Users, Wallet } from 'lucide-react'
@@ -44,11 +47,13 @@ import {
 import { MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './mileage.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 function dateOnlyDaysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 function expiringText(member: MileageFriendV6): string {
@@ -84,12 +89,12 @@ export default function BalancesTab() {
   const [decreasedMiles, setDecreasedMiles] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [offset, setOffset] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
-  const [withBalanceOnly, setWithBalanceOnly] = useState(false)
-  const [pendingOnly, setPendingOnly] = useState(false)
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [offset, setOffset] = useListUrlValue('offset', 0)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [withBalanceOnly, setWithBalanceOnly] = useListUrlValue('withBalanceOnly', false)
+  const [pendingOnly, setPendingOnly] = useListUrlValue('pendingOnly', false)
   const [approvalRequests, setApprovalRequests] = useState<MileageAdjustmentApprovalRequest[] | null>(null)
   const [approvalFailed, setApprovalFailed] = useState(false)
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null)
@@ -174,7 +179,7 @@ export default function BalancesTab() {
     const timer = window.setTimeout(() => {
       setOffset(0)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
@@ -260,7 +265,7 @@ export default function BalancesTab() {
       const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `mileage-balances-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.download = csvFileName("マイル残高")
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -299,7 +304,7 @@ export default function BalancesTab() {
         icon={<Users size={14} aria-hidden="true" />}
         value={ready ? summary.totalMembers : null}
         unit="人"
-        detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人` : '—'}
+        detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人` : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -309,7 +314,7 @@ export default function BalancesTab() {
         unit=""
         detail={ready
           ? `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)}`
-          : '—'}
+          : emptyValue('unknown')}
       />
       <KpiCard
         presentation="band"
@@ -333,7 +338,7 @@ export default function BalancesTab() {
   /* 承認待ちの板（黄の地）。案内の帯のすぐ下・道具の段の上。 */
   const approval = approvalRequests && approvalRequests.length > 0 ? (
     <section className={styles.approval} aria-label="承認待ちのマイル変更">
-      <p className={styles.approvalTitle}>{`承認待ちのマイル変更 ${approvalRequests.length}件`}</p>
+      <p className={styles.approvalTitle}>{`承認待ちのマイル変更 ${approvalRequests.length} 件`}</p>
       {approvalError ? <Notice tone="danger" message={approvalError} /> : null}
       {approvalRequests.map((request) => (
         <div key={request.id} className={styles.approvalRow}>
@@ -386,7 +391,7 @@ export default function BalancesTab() {
         icon={<CircleDot size={13} aria-hidden="true" />}
         onChange={(selected) => { setOffset(0); setWithBalanceOnly(selected) }}
       >
-        {`残高あり ${summary === null ? '—' : formatMileageNumber(summary.withBalanceCount)}`}
+        {`残高あり ${summary === null ? emptyValue('unknown') : formatMileageNumber(summary.withBalanceCount)}`}
       </FilterChip>
       <FilterChip
         selected={pendingOnly}
@@ -464,13 +469,13 @@ export default function BalancesTab() {
                   /* 行の中のボタン・リンクを押したときは、そちらに任せる。 */
                   if ((event.target as HTMLElement).closest('a, button')) return
                   router.push(href)
-                }}
+                }} data-row-id={member.friendId}
               >
                 <Td className={styles.colName}><FolderDotName>
                   <span className={styles.rowName} title={member.displayName}>{member.displayName}</span>
 
                 </FolderDotName></Td>
-                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? '—'}</span></Td>
+                <Td className={styles.colRank}><span className={styles.cellMain} title={member.rankReason}>{rankLabel(member.rank) ?? emptyValue('unknown')}</span></Td>
                 <Td className={`${styles.colBalance} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(member.available)}</span>
                   {member.pending > 0 ? <span className={styles.cellSub}>{`保留 ${formatMileageNumber(member.pending)}`}</span> : null}
@@ -515,7 +520,7 @@ export default function BalancesTab() {
   const pager = !loading && !loadError && members.length > 0 && pageCount > 1 ? (
     <div className={styles.pagerRow}>
       <span className={styles.pagerCount}>
-        {`${formatMileageNumber(filteredTotal)}人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, filteredTotal))}人`}
+        {`${formatMileageNumber(filteredTotal)} 人中 ${formatMileageNumber(offset + 1)}〜${formatMileageNumber(Math.min(offset + members.length, filteredTotal))} 人`}
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
     </div>
@@ -554,16 +559,13 @@ export default function BalancesTab() {
           onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
           onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
         >
-          <label className={styles.fieldLabel}>
-            差し戻す理由
-            <textarea
+          <Field label="差し戻す理由"><textarea
               className={styles.textarea}
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
               placeholder="例：調整の根拠となる資料を確認できませんでした"
               rows={3}
-            />
-          </label>
+            /></Field>
         </Dialog>
       }
     >

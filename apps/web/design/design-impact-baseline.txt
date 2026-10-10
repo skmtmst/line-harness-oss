@@ -422,7 +422,8 @@ shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/shared/save-conflict.tsx
 shared-button-importer components/shared/entity-picker.tsx
 shared-button-importer components/shared/source-picker-dialog.tsx
-shared-button-importer components/shared/tap-action-field.tsx
+shared-button-importer components/shared/tag-picker-field.tsx
+shared-button-importer components/shared/tap-extras-field.tsx
 shared-button-importer components/shared/target-missing.tsx
 shared-button-importer components/shared/version-history.tsx
 shared-button-importer components/staff/login-audit.tsx
@@ -441,7 +442,6 @@ shared-button-importer app/inflow-links/ad-event-mappings.tsx
 shared-button-importer components/events/event-application-preview.tsx
 shared-button-importer v8/hq/company-contact.tsx
 shared-button-importer v8/tags/create.tsx
-shared-button-importer v8/tags/field-edit.tsx
 shared-button-importer v8/tags/field-editor.tsx
 shared-button-importer v8/tags/field-migrate.tsx
 shared-button-importer v8/tags/fields-tab.tsx
@@ -469,6 +469,7 @@ shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/common-vars/export-panel.tsx
 shared-button-importer v8/common-vars/list.tsx
+shared-button-importer v8/inflow-links/coupon-settings.tsx
 shared-button-importer v8/inflow-links/bulk-dialog.tsx
 shared-button-importer v8/inflow-links/edit-route-dialog.tsx
 shared-button-importer v8/inflow-links/list.tsx
@@ -708,6 +709,7 @@ shared-button-importer v8/no-permission/no-permission.tsx
 shared-button-importer v8/not-found/not-found.tsx
 shared-button-importer components/friends/schedule-dialog.tsx
 # ★V8 予約スタッフの登録（CcA4k）・勤務とシフト（d5fmnM・E3YDK・wvGke）を src/v8/booking-staff に一から書いた。
+shared-button-importer v8/booking-staff/phone.tsx
 shared-button-importer v8/booking-staff/shifts.tsx
 shared-button-importer v8/booking-staff/staff-new.tsx
 shared-button-importer v8/scenario-first-step/first-step.tsx
@@ -748,3 +750,10 @@ shared-button-importer v8/settings/ec-commerce/subscriptions.tsx
 shared-button-importer components/shared/message-composer.tsx
 shared-button-importer components/shared/message-composer-media.tsx
 shared-button-importer v8/template-edit/frame.tsx
+shared-button-importer components/shared/bulk-bar.tsx
+
+shared-button-importer components/shared/list-state.tsx
+
+shared-button-importer components/shared/form-file-attachments.tsx
+shared-button-importer components/shared/form-document-retention.tsx
+shared-button-importer components/shared/customer-info-panel.tsx

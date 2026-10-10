@@ -28,7 +28,7 @@ function TemplatePreview({ id }: { id: string | null }) {
   useEffect(() => {
     if (!id) { setNode(null); return }
     let current = true
-    setNode(<ListState kind="loading" />)
+    setNode(<ListState permissionScope="hq" kind="loading" />)
     void Promise.resolve().then(() => hqTemplatesApi.get(id)).then((detail) => {
       if (!current) return
       const read = bubbleFromTemplate(id, detail.definition as MessageTemplateDefinition)
@@ -76,10 +76,10 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
   return <EntityPickerDialog title="テンプレートから選ぶ" description="統括のテンプレートを選ぶと、開いているメッセージをその内容に置き換えます。" confirmLabel="このテンプレートを使う"
     items={(list ?? []).filter((t) => !kind || t.kind === kind).map(templatePickerItem)} folders={folders} categories={KINDS} busy={busy} error={error || undefined}
     createHref="/hq/templates" createLabel="テンプレートを作る"
-    state={loadError && !list ? <ListState kind="error" error={loadError} onRetry={() => { setLoadError(null); setReload((value) => value + 1) }} />
-      : !list ? <ListState kind="loading" />
-      : list.length === 0 ? <ListState kind="empty" title="統括のテンプレートがまだありません。「テンプレート」で作ってください。" /> : undefined}
+    state={loadError && !list ? <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => { setLoadError(null); setReload((value) => value + 1) }} />
+      : !list ? <ListState permissionScope="hq" kind="loading" />
+      : list.length === 0 ? <ListState permissionScope="hq" kind="empty" title="統括のテンプレートがまだありません。「テンプレート」で作ってください。" /> : undefined}
     preview={(item) => <TemplatePreview id={item?.id ?? null} />}
     onSelect={() => setError('')}
-    onConfirm={(id) => void pick(id)} onCancel={() => { setError(''); onClose() }} />
+    onConfirm={(id) => pick(id)} onCancel={() => { setError(''); onClose() }} />
 }

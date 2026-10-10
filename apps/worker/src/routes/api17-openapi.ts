@@ -1,4 +1,4 @@
-const kind={type:'string',enum:['message','carousel','rich_message','question','coupon','research']};
+const kind={type:'string',enum:['message','carousel','rich_message','rich_video','question','coupon','research']};
 const id={name:'id',in:'path',required:true,schema:{type:'string'}};
 const color={type:['string','null'],pattern:'^#[0-9a-fA-F]{6}$'};
 const folder={type:'object',required:['id','kind','name','parentId','color','displayOrder'],properties:{id:{type:'string'},kind:{const:'line_account'},name:{type:'string'},parentId:{type:'null'},color,displayOrder:{type:'integer',minimum:0},itemCount:{type:'integer',minimum:0},createdAt:{type:'string'},updatedAt:{type:'string'}}};
@@ -19,7 +19,7 @@ export const api17Paths={
     put:{tags:['LINE Accounts'],summary:'アカウントを1つのフォルダへ移動（nullは未分類）',parameters:[id],requestBody:body({type:'object',required:['folderId'],properties:{folderId:{type:['string','null']}}}),responses:{'200':response('移動後の所属',{type:'object',properties:{id:{type:'string'},folderId:{type:['string','null']},folder:{anyOf:[folder,{type:'null'}]}}}),'404':{description:'アカウントがない・担当範囲外'},...writeErrors}},
   },
   '/api/hq/templates/kind-counts':{
-    get:{tags:['HQ Templates'],summary:'統括テンプレートの6種類ごとの件数',responses:{'200':response('全6種類の件数',{type:'object',properties:Object.fromEntries(kind.enum.map(k=>[k,{type:'integer',minimum:0}]))}),'403':{description:'統括権限が必要'}}},
+    get:{tags:['HQ Templates'],summary:'統括テンプレートの7種類ごとの件数',responses:{'200':response('全7種類の件数',{type:'object',properties:Object.fromEntries(kind.enum.map(k=>[k,{type:'integer',minimum:0}]))}),'403':{description:'統括権限が必要'}}},
   },
 };
 export const api17TemplateKind=kind;

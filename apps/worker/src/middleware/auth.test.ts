@@ -1069,6 +1069,9 @@ describe('N-423 staff deny-by-default (#670)', () => {
     expect(isPublicApiBoundary('POST', '/api/forms/f1/submit')).toBe(true);
     expect(isPublicApiBoundary('POST', '/api/forms/f1/opened')).toBe(true);
     expect(isPublicApiBoundary('POST', '/api/forms/f1/partial')).toBe(true);
+    expect(isPublicApiBoundary('POST', '/api/forms/f1/files')).toBe(true);
+    expect(isPublicApiBoundary('GET', '/api/form-files/id/content')).toBe(false);
+    expect(isPublicApiBoundary('PUT', '/api/forms/document-settings/account')).toBe(false);
     expect(isPublicApiBoundary('DELETE', '/api/forms/f1/submit')).toBe(false);
     expect(isPublicApiBoundary('POST', '/api/integrations/slack/events')).toBe(true);
     expect(isPublicApiBoundary('GET', '/api/webhooks/incoming/abc/receive')).toBe(true);

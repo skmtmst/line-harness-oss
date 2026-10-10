@@ -69,7 +69,7 @@ export function useDelayedSkeleton(loading: boolean): boolean {
         timer = setTimeout(() => {
           shownAtRef.current = Date.now()
           setVisible(true)
-        }, SHOW_DELAY_MS)
+        }, Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--polish-loading-delay')) || SHOW_DELAY_MS)
       }
     } else if (shownAtRef.current !== null) {
       const remaining = MIN_VISIBLE_MS - (Date.now() - shownAtRef.current)
@@ -139,13 +139,13 @@ export function DelayedSkeleton({
 
 /**
  * 表の骨組み。見出しは画面の表に残し、tbody の場所へ置く。
- * 行の高さは出来上がりと同じ（V8 52・v7 は 58 を渡す）。
+ * 行の高さは出来上がりと同じ（V8 56・v7 は 58 を渡す）。
  * 列の骨の幅は出来上がりの列幅と同じ値を渡す。
  */
 export function TableSkeleton({
   columns,
   rows = 5,
-  rowHeight = 52,
+  rowHeight = 56,
 }: {
   /** 列ごとの骨の幅（px 数か CSS の長さ。出来上がりの列幅と同じ）。 */
   columns: Array<number | string>
@@ -189,7 +189,7 @@ export function StatTilesSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div aria-hidden="true" className="flex flex-col gap-4 sm:flex-row">
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="flex-1 rounded-card border border-hairline bg-canvas px-4 py-3">
+        <div key={index} className="flex-1 rounded-card border content-card bg-canvas px-4 py-3">
           <Skeleton height={12} width={64} />
           <div className="mt-2">
             <Skeleton height={28} width={96} />
@@ -228,4 +228,15 @@ export function SkeletonRow({ className }: { className?: string }) {
       <Skeleton width={50} height={10} className={styles.bone} />
     </div>
   )
+}
+
+/** 一覧の列に沿う3〜6行の骨格。カード一覧も同じ待ち時間の部品で包む。 */
+export function ListSkeleton({ rows = 4, columns = 3, shape = 'list' }: { rows?: number; columns?: number; shape?: 'list' | 'cards' }) {
+  const count = Math.min(6, Math.max(3, rows))
+  if (shape === 'cards') return <CardsSkeleton count={count} />
+  return <div className={styles.list} aria-hidden="true">
+    {Array.from({ length: count }, (_, index) => <div key={index} className={styles.listRow}>
+      {Array.from({ length: Math.max(1, columns) }, (_, column) => <Skeleton key={column} className={column === 0 ? styles.nameBone : column === columns - 1 ? styles.dateBone : styles.numberBone} />)}
+    </div>)}
+  </div>
 }

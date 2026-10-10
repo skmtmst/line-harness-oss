@@ -125,7 +125,7 @@ export function matchesQuery(row: ManualLinkRow, query: string): boolean {
 export function brokenNotice(rows: ReadonlyArray<ManualLinkRow>): string | null {
   const broken = rows.filter((r) => r.status === 'broken').length
   if (broken === 0) return null
-  return `開けないリンクが ${broken}件あります。直すまで、その画面の「マニュアル」は押しても何も出ません。`
+  return `開けないリンクが ${broken} 件あります。直すまで、その画面の「マニュアル」は押しても何も出ません。`
 }
 
 /**

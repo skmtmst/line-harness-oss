@@ -27,6 +27,8 @@ import {
   routingLabel,
 } from '../run-status'
 import styles from './detail-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 const ACTION_LABELS: Record<string, string> = {
   tag: 'タグ操作',
@@ -71,7 +73,7 @@ function titleDate(value: string): string {
 
 export default function FriendAddRunDetailV8() {
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<DetailLoading />}>
       <FriendAddRunDetailV8Inner />
     </Suspense>
   )
@@ -164,7 +166,7 @@ function FriendAddRunDetailV8Inner() {
     }
   }
 
-  if (accountLoading || loading) return <ListState kind="loading" title="実行詳細を読み込んでいます" />
+  if (accountLoading || loading) return <DetailLoading label="実行詳細を読み込んでいます" />
   if (!runId) {
     return (
       <TargetMissing
@@ -221,7 +223,7 @@ function FriendAddRunDetailV8Inner() {
     ? detail.attribution.routeName || detail.attribution.reason || '選択した経路'
     : '経路が分からなかった人'
   const ruleName = detail.rule?.name ?? '名前は未取得'
-  const ruleVersion = detail.rule?.versionNumber ?? '—'
+  const ruleVersion = detail.rule?.versionNumber ?? emptyValue('unknown')
   const messageType = detail.rule?.definition?.messageType
   const messageLabel = messageType ? MESSAGE_TYPE_LABEL[messageType] ?? '案内' : '案内'
   const friendKindLabel = detail.friendKind === 'first_time' ? 'はじめて' : '再追加・ブロック解除'

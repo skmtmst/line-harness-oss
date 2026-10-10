@@ -82,7 +82,7 @@ export default function ImageUploader({
         title={title}
         value={previewUrl || null}
         accept={lineImage ? 'image/jpeg,image/png' : 'image/*'}
-        limitText={lineImage ? '1ファイル1メガバイト以内・JPEG・PNG' : `1ファイル${maxMB}メガバイト以内・画像`}
+        maxBytes={(lineImage ? 1 : maxMB) * 1024 * 1024}
         validate={validate}
         upload={uploadImageFile}
         onChange={(next) => onChangeRef.current(next ? toValue(next) : null)}

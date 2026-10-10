@@ -9,7 +9,7 @@ import './readonly-v8.css'
 export default function ReadonlyHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
   const theme = useAdminTheme()
   if (theme !== 'v8') return <OpsPageHeader title={title} actions={actions} />
-  return <PageHeader breadcrumb={[]} title={title} description={description ?? ""} actions={actions} className="v8-ro-ops-header" />
+  return <PageHeader breadcrumb={[]} title={title} help={description ?? ""} actions={actions} className="v8-ro-ops-header" />
 }
 
 /** V7の要素はそのまま残し、V8だけ板の印を外側に付ける。 */

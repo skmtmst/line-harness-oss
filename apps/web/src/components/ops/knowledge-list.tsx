@@ -89,7 +89,7 @@ export default function KnowledgeList() {
   }
   if (editing) return <KnowledgeEditor key={editing.id} article={editing} fullPage onClose={() => setEditing(null)} onSaved={() => void load()} />
   return <div className={`${styles.page} ${v8.page}`} data-design-node="h114s">
-    <PageHeader breadcrumb={[]} title="ナレッジ" description="解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。" />
+    <PageHeader breadcrumb={[]} title="ナレッジ" help="解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。" />
     <KpiBand gridClassName={v8.metrics} aria-label="このページの記事の状況">
       <KpiCard variant="v6" title="承認済み" value={loaded && !error ? rows.filter(row => knowledgeState(row).label === '承認済み').length : null} unit="件" detail="AI の返信に使う" help="このページの件数です。全件の集計ではありません。" loading={!loaded} />
       <KpiCard variant="v6" title="承認待ち" value={loaded && !error ? rows.filter(row => row.reviewState === 'pending').length : null} unit="件" detail="根拠が揃った下書き" help="このページの件数です。全件の集計ではありません。" loading={!loaded} />

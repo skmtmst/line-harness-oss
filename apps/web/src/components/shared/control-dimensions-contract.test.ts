@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-describe('Pencil V6 の入力・選択・押し口規定', () => {
+describe('V8 の入力・選択・押し口規定', () => {
   it('役割ごとの高さと白背景を共通部品で維持する', () => {
     const button = read('./button.module.css')
     // 入力欄の正本は text-field.module.css（form-controls の TextInput・TextArea はその包み）。
@@ -17,11 +17,11 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
      * 以前はボタン36px・選択/検索42pxでずれていた。タッチ端末は44px。
      * （`@media (pointer: coarse)` の 44px は design-unification の試験が見る）
      */
-    expect(button).toMatch(/\.standard\s*{[^}]*height:\s*40px/s)
-    expect(button).toMatch(/\.field\s*{[^}]*height:\s*40px/s)
+    expect(button).toMatch(/\.standard\s*{[^}]*height:\s*36px/s)
+    expect(button).toMatch(/\.field\s*{[^}]*height:\s*36px/s)
     expect(textField).toMatch(/\.field\s*{[^}]*background:\s*var\(--color-canvas\)/s)
-    expect(textField).toMatch(/\.single\s*{[^}]*height:\s*40px/s)
-    expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*40px/s)
+    expect(textField).toMatch(/\.single\s*{[^}]*height:\s*36px/s)
+    expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*36px/s)
     expect(select).toMatch(/background:\s*var\(--color-canvas\)/)
     // 開いた候補は DOM に描き、矢印はアイコンで出す（ブラウザ任せにしない）。
     expect(selectTsx).toContain('ChevronDown')
@@ -32,7 +32,7 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
      * プルダウンがはみ出す（予約設定の空き確認で発生）。
      */
     expect(select).toMatch(/@layer components/)
-    expect(search).toMatch(/\.search\s*{[^}]*height:\s*40px/s)
+    expect(search).toMatch(/\.search\s*{[^}]*height:\s*36px/s)
     expect(search).toMatch(/background:\s*var\(--color-canvas\)/)
   })
 
@@ -41,7 +41,7 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     const rule = globals.match(/select:not\(\[multiple\]\):not\(\.appearance-none\)\s*{([^}]*)}/s)?.[1]
 
     expect(rule).toBeDefined()
-    expect(rule).toMatch(/min-height:\s*40px/)
+    expect(rule).toMatch(/min-height:\s*36px/)
     expect(rule).toMatch(/padding-right:\s*36px/)
     expect(rule).toMatch(/background-color:\s*var\(--color-canvas\)/)
     expect(rule).toMatch(/background-position:\s*right 12px center/)

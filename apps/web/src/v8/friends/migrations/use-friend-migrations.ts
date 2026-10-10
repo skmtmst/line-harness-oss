@@ -147,7 +147,7 @@ export function useFriendMigrations() {
     setBusy(true)
     try {
       const response = await api.friendMigrations.executeImport(importId)
-      setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error)
+      setMessage(response.success ? `${response.data.applied ?? 0} 件を反映しました。` : response.error)
     } catch (error) {
       setMessage(operationFailureMessage(error, '反映'))
     } finally {

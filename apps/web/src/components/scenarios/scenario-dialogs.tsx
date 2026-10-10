@@ -88,7 +88,7 @@ function Shell({
  */
 const RULE_TYPE_LABEL: Record<string, string> = {
   name: '名前',
-  private_memo: '個別メモ',
+  private_memo: 'メモ',
   status_message: 'ステータスメッセージ',
   registered_at: '友だち登録日',
   support_mark: '対応マーク',
@@ -194,10 +194,10 @@ export function ConditionDialog({
         <Notice tone="danger" className="mb-4" message={error} />
       )}
       {rangeError && (
-        <Notice tone="validation" className="mb-4" message={rangeError} />
+        <Notice tone="warn" className="mb-4" message={rangeError} />
       )}
       {draftError && (
-        <Notice tone="validation" className="mb-4" message={draftError} />
+        <Notice tone="warn" className="mb-4" message={draftError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
@@ -285,7 +285,7 @@ export function ConditionDialog({
         <h3 className="text-ink text-sm font-bold">足せる条件</h3>
         <p className="text-ink-secondary mt-2 text-xs font-medium">下の「詳しい条件を編集」を開くと出る追加ボタンと同じ並び</p>
         <div className="mt-2 space-y-3">{[
-          ['名前','個別メモ','ステータスメッセージ','友だち登録日'],
+          ['名前','メモ','ステータスメッセージ','友だち登録日'],
           ['対応マーク','タグ','友だち情報','シナリオ購読','シナリオ'],
           ['回答フォーム','最終反応日','反応状態','行動スコア'],
           ['ブロック状態','表示状態'],

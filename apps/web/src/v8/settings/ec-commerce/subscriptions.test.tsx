@@ -132,7 +132,7 @@ describe('#731 定期便のページ送りとタブの件数', () => {
     render(<SubscriptionsPanel accountId="account-a" />)
     const footer = await screen.findByText(/数えていません/)
     console.log('AUDIT-WEB 弾いた件数の知らせ =', footer.textContent)
-    expect(footer.textContent).toContain('2件は数えていません')
+    expect(footer.textContent).toContain('2 件は数えていません')
   })
 })
 

@@ -1118,10 +1118,8 @@ function LineNotificationsPage() {
           // M031: 403・429は共通の言い方（権限の案内・待ち案内）へ切り替える。
           ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
           : '運用者へのお知らせの件数を読み込めませんでした。'}
-        {/* M031: 403は押しても直らないので再試行の口は出さない。 */}
-        {isForbidden(operatorCountError) ? null : (
-          <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void load()}>もう一度</button>
-        )}
+        {/* M031: 403は権限変更後に読み直せるようにする。 */}
+        <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void load()}>もう一度読み込む</button>
       </p>
     ) : null}
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
@@ -1261,7 +1259,7 @@ function LineNotificationsPage() {
           />
         </div>
       )
-        : loadState === 'forbidden' ? <ListState kind="forbidden" />
+        : loadState === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />

@@ -5,6 +5,7 @@
  * 担当スタッフタブ（menus/settings-v8.tsx）の両方から使う。
  * 見た目・入力検査（parseBookingStaffInput）・紐づけ候補の取り方は変えない。
  */
+import { Field } from '@/components/shared/form-controls'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
@@ -12,20 +13,9 @@ import ImageUploader from '@/components/shared/image-uploader'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
 import { api, type BookingStaff } from '@/lib/api'
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-xs font-medium text-ink-secondary mb-1">
-        {label}
-        {required && <span className="text-status-danger ml-0.5">*</span>}
-      </span>
-      {children}
-    </label>
-  )
-}
+import NumberInput from '@/components/shared/number-field'
 
 export function StaffEditModal({
   staff,
@@ -42,7 +32,6 @@ export function StaffEditModal({
   const busySave = saving
   const [err, setErr] = useState<string | null>(null)
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
-  const panelRef = useOverlayFocus(true, onClose, saving)
   // N-411 本人勤務: 予約スタッフをログインユーザーへ紐づけるための一覧。
   const [members, setMembers] = useState<StaffMember[]>([])
 
@@ -78,14 +67,7 @@ export function StaffEditModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="booking-staff-modal-title" className="bg-canvas rounded-card shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
-          <h2 id="booking-staff-modal-title" className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
+    <Dialog open title={form.id ? 'スタッフ編集' : '新規スタッフ'} onCancel={onClose} onConfirm={() => void submit()} confirmLabel="保存する" busy={saving} designWidth={560}>
         <div className="px-6 py-4 space-y-4">
           <Field label="内部名（管理用）" required>
             <input
@@ -94,7 +76,7 @@ export function StaffEditModal({
               onChange={(e) => set('name', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.name}
               className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="例: yamada-taro"
+              placeholder="例：yamada-taro"
             />
           </Field>
           <Field label="表示名" required>
@@ -114,7 +96,7 @@ export function StaffEditModal({
               onChange={(e) => set('role', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.role}
               className="w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="例: トップスタイリスト"
+              placeholder="例：トップスタイリスト"
             />
           </Field>
           <ImageUploader
@@ -137,7 +119,7 @@ export function StaffEditModal({
             />
           </Field>
           <Field label="並び順">
-            <input
+            <NumberInput
               type="number"
               value={form.sort_order ?? 0}
               onChange={(e) => set('sort_order', Number(e.target.value))}
@@ -155,7 +137,9 @@ export function StaffEditModal({
             checked={Boolean(form.is_active)}
             onCheckedChange={(checked) => set('is_active', checked ? 1 : 0)}
           >有効（顧客に表示する）</Checkbox>
-          <Field label="ログインユーザー（本人の勤務）">
+          <Field note={<>
+              紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。
+            </>} label="ログインユーザー（本人の勤務）">
             <Select
               aria-label="ログインユーザーとの紐づけ"
               size="full"
@@ -166,26 +150,11 @@ export function StaffEditModal({
                 ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
               ]}
             />
-            <span className="text-ink-faint mt-1 block text-xs">
-              紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。
-            </span>
+
           </Field>
           {err && <p className="text-xs text-danger">{err}</p>}
         </div>
-        <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-shell-gray rounded-control"
-          >
-            キャンセル
-          </button>
-          <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={submit} disabled={saving} busy={busySave}>
-            {busySave === undefined && saving ? '保存中…' : '保存する'}
-          </Button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }
 

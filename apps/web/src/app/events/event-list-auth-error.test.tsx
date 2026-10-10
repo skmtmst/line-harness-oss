@@ -4,7 +4,7 @@
  *
  * 以前はどちらも同じ「通信失敗・再読み込み」の1枚だった。権限が無い人が
  * 通信環境を調べたり何度も読み直したりしてしまう。見る筋書き:
- *   1. 403 は権限不足の1枚（管理者への依頼、再読み込み口なし）
+ *   1. 403 は権限不足の1枚（管理者への依頼、権限を確認後に読み直せる）
  *   2. 503 は通信失敗の1枚（再読み込み口あり）
  *   3. 404 も通信失敗側（再読み込み口あり）
  *   4. 正常・空は今までどおり
@@ -159,16 +159,16 @@ function bodyText(): string {
 
 function retryButton(): HTMLElement | null {
   return [...document.querySelectorAll<HTMLElement>('button')]
-    .find((b) => b.textContent?.includes('再読み込み')) ?? null
+    .find((b) => b.textContent?.includes('もう一度読み込む')) ?? null
 }
 
 describe('R601 イベント一覧の権限不足と通信失敗の言い分け', () => {
-  it('403 は権限不足の1枚で、管理者への依頼を出し、再読み込み口は出さない', async () => {
+  it('403 は権限不足の1枚で、管理者への依頼を出し、権限を確認後に読み直せる', async () => {
     listEvents.mockRejectedValue(new ApiError(403, 'forbidden'))
     await renderPage()
     expect(bodyText()).toContain('イベントを見る権限がありません')
     expect(bodyText()).toContain('管理者')
-    expect(retryButton(), '押しても直らない再読み込みは出さない').toBeNull()
+    expect(retryButton(), '権限を確認した後に読み直せる').toBeTruthy()
   })
 
   it('503 は通信失敗の1枚で、再読み込み口を出す', async () => {

@@ -22,6 +22,7 @@ import { Tabs } from '@/components/shared/tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import styles from './shell.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 export type AutomationTabKey = 'rules' | 'common-actions' | 'runs' | 'templates'
 
@@ -99,7 +100,7 @@ export function ViewerBand() {
     <div className={styles.viewerRow}>
       <div className={styles.viewerBand} role="status">
         <Eye size={16} aria-hidden="true" />
-        <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+        <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
       </div>
     </div>
   )

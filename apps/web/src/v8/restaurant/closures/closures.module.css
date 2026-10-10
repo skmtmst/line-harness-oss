@@ -311,7 +311,9 @@
   min-width: 0;
   padding: var(--tpl-e10-card-pad);
   border-radius: var(--tpl-e1-radius-l);
-  box-shadow: var(--tpl-e10-ring);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+  background: var(--color-canvas);
 }
 
 .cardHead {

@@ -37,6 +37,9 @@ import {
   type TagEditorValues,
 } from '@/components/friend-fields/tag-editor-v4'
 import styles from './tag-editor-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
+import { Field } from '@/components/shared/form-controls'
 
 /** 連動 OFF のときに出す「ON にすると何ができるか」（v7 と同じ内容）。 */
 const LINKED_PREVIEW = [
@@ -282,22 +285,16 @@ export default function TagEditorV8({
             <SectionTitle title="基本" />
             <div className={styles.sectionBody}>
               <div className={styles.fieldGrid}>
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>所属フォルダ</span>
-                  <Select
+                <Field note={<>フォルダの色がタグの印になります。未選択なら「未分類」です。</>} label={<><span className={styles.fieldLabel}>所属フォルダ</span></>}><Select
                     aria-label="所属フォルダ"
                     value={groupId}
                     onChange={setGroupId}
                     options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]}
                     size="full"
                   />
-                  <span className={styles.fieldHint}>フォルダの色がタグの印になります。未選択なら「未分類」です。</span>
-                </label>
-                <label className={styles.field}>
-                  <span className={styles.fieldLabel}>タグ名 <RequiredBadge /></span>
-                  <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={styles.input} />
-                  <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" />
-                </label>
+</Field>
+                <Field label={<><span className={styles.fieldLabel}>タグ名 </span></>} required><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期購入者" className={styles.input} />
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></Field>
               </div>
               {foldersFailed ? (
                 <div className={styles.noteBand} role="alert">
@@ -419,26 +416,14 @@ export default function TagEditorV8({
               <SectionTitle title="マイル" note="タグが付いたときのマイル付与と、今後の獲得倍率を決めます。" />
               <div className={styles.sectionBody}>
                 <div className={styles.fieldGrid2}>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>本人へのマイル付与</span>
-                    <span className={styles.numberRow}><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
-                    <span className={styles.fieldHint}>このタグが付いた本人へ、一度だけ積みます。</span>
-                  </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>紹介者へのマイル付与</span>
-                    <span className={styles.numberRow}><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
-                    <span className={styles.fieldHint}>紹介経由の友だちなら、その紹介者にも積みます。</span>
-                  </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>今後のマイル倍率</span>
-                    <Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" />
-                    <span className={styles.fieldHint}>このタグが付いている間、次回以降の付与倍率に使います。</span>
-                  </label>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>倍率の優先度</span>
-                    <Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" />
-                    <span className={styles.fieldHint}>倍率タグが複数ある場合、数字が大きい設定を優先します。</span>
-                  </label>
+                  <Field note={<>このタグが付いた本人へ、一度だけ積みます。</>} label={<><span className={styles.fieldLabel}>本人へのマイル付与</span></>}><span className={styles.numberRow}><NumberInput unit="マイル" type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /></span>
+</Field>
+                  <Field note={<>紹介経由の友だちなら、その紹介者にも積みます。</>} label={<><span className={styles.fieldLabel}>紹介者へのマイル付与</span></>}><span className={styles.numberRow}><NumberInput unit="マイル" type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /></span>
+</Field>
+                  <Field note={<>このタグが付いている間、次回以降の付与倍率に使います。</>} label={<><span className={styles.fieldLabel}>今後のマイル倍率</span></>}><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" />
+</Field>
+                  <Field note={<>倍率タグが複数ある場合、数字が大きい設定を優先します。</>} label={<><span className={styles.fieldLabel}>倍率の優先度</span></>}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" />
+</Field>
                 </div>
                 <RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
                   <RadioCard name="reapplyMode" value="once" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} title="最初の1回だけ積む" note="誤操作や付け直しで、同じマイルが重複しません。" />
@@ -456,8 +441,8 @@ export default function TagEditorV8({
                 {mode === 'edit' && applyToExisting && (
                   <div className={styles.statGrid}>
                     <div className={styles.statBox}><p className={styles.statLabel}>現在の対象者</p><p className={styles.statValue}>{tag?.friendCount ?? 0}<span className={styles.statUnit}>人</span></p></div>
-                    <div className={styles.statBox}><p className={styles.statLabel}>本人マイル対象</p><p className={styles.statValue}>{retroPreview ? retroPreview.selfTargets : referenceRetroactiveState ? (tag?.friendCount ?? 0) : '—'}<span className={styles.statUnit}>人</span></p></div>
-                    <div className={styles.statBox}><p className={styles.statLabel}>紹介者対象</p><p className={styles.statValue}>{retroPreview ? retroPreview.referralTargets : referenceRetroactiveState ? Math.min(tag?.friendCount ?? 0, 34) : '—'}<span className={styles.statUnit}>人</span></p></div>
+                    <div className={styles.statBox}><p className={styles.statLabel}>本人マイル対象</p><p className={styles.statValue}>{retroPreview ? retroPreview.selfTargets : referenceRetroactiveState ? (tag?.friendCount ?? 0) : emptyValue('unknown')}<span className={styles.statUnit}>人</span></p></div>
+                    <div className={styles.statBox}><p className={styles.statLabel}>紹介者対象</p><p className={styles.statValue}>{retroPreview ? retroPreview.referralTargets : referenceRetroactiveState ? Math.min(tag?.friendCount ?? 0, 34) : emptyValue('unknown')}<span className={styles.statUnit}>人</span></p></div>
                     <div className={styles.statBox}><p className={styles.statLabel}>倍率</p><p className={styles.statValue} style={{ fontSize: 14 }}>次回付与から</p></div>
                   </div>
                 )}
@@ -493,7 +478,7 @@ export default function TagEditorV8({
                   {usageRows.map((row) => (
                     <div key={row.name} className={styles.useRow}>
                       <dt className={styles.useName}>{row.name}</dt>
-                      <dd className={styles.useCount}>{row.count === undefined || row.count === null ? '—' : `${row.count}件`}</dd>
+                      <dd className={styles.useCount}>{row.count === undefined || row.count === null ? emptyValue('unknown') : `${row.count}件`}</dd>
                     </div>
                   ))}
                 </dl>

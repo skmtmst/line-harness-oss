@@ -55,7 +55,7 @@ test('止められなかったら知らせて残り、もう一度押すと止�
   await waitFor(() => expect(screen.getByText(/まだ止められていません/)).toBeTruthy())
   expect(nav.push).not.toHaveBeenCalled()
   await act(async () => { screen.getByRole('button', { name: '下書きを保存' }).click() })
-  await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/webhooks'))
+  await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/webhooks?highlight=wh-1'))
   expect(calls.filter((call) => call.startsWith('POST /api/webhooks/outgoing'))).toHaveLength(1)
   expect(puts).toBe(2)
 })

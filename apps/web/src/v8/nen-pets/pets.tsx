@@ -8,6 +8,8 @@
  * データの口（pets・feeding・saveFeeding・updatePet・CSV）は今の画面と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { useListUrlJsonValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useEffect, useState } from 'react'
 import { Calculator, Download, Eye, History, PawPrint, Sparkles } from 'lucide-react'
 import { ListPage } from '@/components/templates'
@@ -24,6 +26,7 @@ import PetsListV8 from './list'
 import FeedingV8 from './feeding'
 import { EMPTY_QUERY, downloadCsv, petsToCsv, type PetTab, type PetsQuery } from './parts'
 import styles from './pets.module.css'
+import { csvFileName } from '@/lib/csv-file-name'
 
 export type { PetTab } from './parts'
 
@@ -47,7 +50,7 @@ export default function PetsV8({
   const [kpis, setKpis] = useState<NenPetKpis | null>(null)
   const [kpisFailed, setKpisFailed] = useState(false)
   /** 一覧の絞り込み。CSV も同じ条件で書き出す（今の画面と同じ）。 */
-  const [query, setQuery] = useState<PetsQuery>(EMPTY_QUERY)
+  const [query, setQuery] = useListUrlJsonValue<PetsQuery>('query', EMPTY_QUERY)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState(false)
 
@@ -79,7 +82,7 @@ export default function PetsV8({
     try {
       const res = await nenPetsApi.pets(accountId, { ...query, pageSize: 'all' })
       if (!res.success) throw new Error(res.error)
-      downloadCsv(petsToCsv(res.data.items), `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`)
+      downloadCsv(petsToCsv(res.data.items), csvFileName("ペット"))
     } catch {
       setExportError(true)
     } finally {
@@ -121,10 +124,10 @@ export default function PetsV8({
       boardId={BOARD[tab]}
       headingSize="regular"
       title="マイペット"
-      description="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
+      help="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
       actions={accountId ? (
         <Button type="button" onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSV で書き出す
+          <Download size={15} aria-hidden="true" />CSVで書き出す
         </Button>
       ) : null}
       tabs={tabs}

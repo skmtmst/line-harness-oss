@@ -138,7 +138,7 @@ function buttons(): string[] {
 }
 
 describe('M012 読み込み失敗の3つの面', () => {
-  it('403 は権限の面に出し、見つからない案内・再試行口は出さない', async () => {
+  it('403 は権限の面に出し、見つからない案内・再読み込みを出す', async () => {
     const { ApiError } = await import('@/lib/api')
     state.friendGet = () => Promise.reject(new ApiError(403, 'API error: 403'))
     await render()
@@ -148,7 +148,7 @@ describe('M012 読み込み失敗の3つの面', () => {
     // 228-003 の再発防止：削除・別アカウントの案内へ落ちない。
     expect(host.textContent).not.toContain('この友だちは見つかりません')
     expect(host.textContent).not.toContain('友だちを読み込めませんでした')
-    expect(buttons()).not.toContain('もう一度読み込む')
+    expect(buttons()).toContain('もう一度読み込む')
   })
 
   it('404 は見つからない案内に出し、一覧へ戻る', async () => {

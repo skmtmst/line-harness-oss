@@ -40,6 +40,20 @@ describe('broadcast template conversion', () => {
     expect(bubble.content).toMatchObject({ assetId: 'asset-1', assetName: '夏クーポン' })
   })
 
+  it('pins research choices and tap extras to the published version, including when a draft exists', () => {
+    const published = [{ format: 'single', required: true, text: '質問', choices: ['公開済み'], choiceTapExtras: [{ scoreChange: 10 }] }]
+    const bubble = contentTemplateToBubble({
+      id: 'survey', lineAccountId: 'store', kind: 'research', name: 'アンケート', publishedVersion: 2,
+      publishedPayload: { questions: published },
+      payload: { questions: [{ format: 'single', required: true, text: '下書き', choices: ['未公開'], choiceTapExtras: [{ scoreChange: 100 }] }] },
+      createdAt: '', updatedAt: '',
+    })
+    expect(bubble.content).toMatchObject({ assetId: 'survey', assetVersion: 2, questions: published })
+    const card = JSON.parse(bubbleLegacyMessage(bubble).messageContent)
+    expect(card.footer.contents[0].action).toEqual({ type: 'uri', label: '回答する', uri: 'https://liff.line.me/{{liff_id}}/?page=research&researchId=survey' })
+    expect(JSON.stringify(card)).not.toContain('research:survey:2:0:0')
+  })
+
   it('uses raw Flex JSON as the legacy message content', () => {
     expect(bubbleLegacyMessage({
       id: 'bubble-id',
@@ -186,14 +200,14 @@ describe('素材の引用を LINE の種別に直す', () => {
     expect(out.messageContent).toContain('coupon_use:a')
   })
 
-  it('リサーチは読める文に直す', () => {
+  it('リサーチはLIFFで回答するボタンに直す', () => {
     const out = bubbleLegacyMessage({
       id: 'b', type: 'research',
-      content: { assetId: 'a', assetName: '調査', description: '答えてください', actionUrl: 'https://example.com/f' },
+      content: { assetId: 'a', assetName: '調査', description: '答えてください', questions: [{ text: '質問', format: 'free', required: true }] },
     })
-    expect(out.messageType).toBe('text')
+    expect(out.messageType).toBe('flex')
     expect(out.messageContent).toContain('答えてください')
-    expect(out.messageContent).not.toContain('assetId')
+    expect(out.messageContent).toContain('page=research&researchId=a')
   })
 
   it('選んでいない素材は選び直しを求める', () => {

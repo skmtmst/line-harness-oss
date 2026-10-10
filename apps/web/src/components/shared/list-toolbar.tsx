@@ -2,6 +2,7 @@
 import type React from 'react'
 
 import { useLayoutEffect, useRef, useState, type ReactNode, type HTMLAttributes } from 'react'
+import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
 import styles from './list-toolbar.module.css'
 
@@ -20,8 +21,6 @@ export type ListToolbarSearch = {
   width?: number
   /** 検索中。渡すと虫眼鏡の代わりに回る印が出る。 */
   loading?: boolean
-  /** 箱の右端の近道の印（例 '⌘K'）。渡すと探す欄へ飛べる。v8 だけ。 */
-  shortcut?: string
 }
 
 /**
@@ -46,8 +45,10 @@ export default function ListToolbar({
   filters,
   trailing,
   secondary,
+  sort,
   layout = 'band',
 }: {
+  sort?: ListToolbarSortProps
   search?: ListToolbarSearch
   /** 既存の検索フォームの動きを保って共通の段へ移す口。 */
   searchSlot?: ReactNode
@@ -77,14 +78,13 @@ export default function ListToolbar({
           onClear={() => search.onChange('')}
           maxLength={search.maxLength}
           loading={search.loading}
-          shortcut={search.shortcut}
         /></div> : searchSlot ? <div className={styles.search} data-toolbar-search>{searchSlot}</div> : null}
         {actions}
       </div>
-      {filters || trailing ? (
+      {filters || trailing || sort ? (
         <div className={styles.row2}>
           {filters ? <div className={styles.filters} data-toolbar-tools>{filters}</div> : null}
-          {trailing ? <div className={styles.trailing} data-toolbar-tools>{trailing}</div> : null}
+          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools>{sort ? <ListToolbarSort {...sort} /> : null}{trailing}</div> : null}
         </div>
       ) : null}
       {secondary ? <div className={styles.secondary} data-toolbar-secondary>{secondary}</div> : null}
@@ -138,4 +138,10 @@ export function ListToolbarOptional({ children, label = 'ほかの絞り込み',
     <summary aria-label={label} title={label}>…</summary>
     <div data-toolbar-optional-content>{children}</div>
   </details>
+}
+
+export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & { label?: string; 'aria-label'?: string }
+/** 並びの名前と選ぶ操作はこの欄にそろえる。 */
+export function ListToolbarSort(props: ListToolbarSortProps) {
+  return <span data-list-sort><Select {...props} label="並び" aria-label="並び" /></span>
 }

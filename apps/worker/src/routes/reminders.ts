@@ -574,7 +574,7 @@ function readTargetCondition(
   };
 }
 
-function readDraftSettings(
+export function readDraftSettings(
   raw: unknown,
 ): { ok: true; value: ReminderDraftSettings } | { ok: false; error: string; status?: number } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -714,7 +714,7 @@ function readDraftSettings(
   };
 }
 
-async function validateReminderDraftReferences(
+export async function validateReminderDraftReferences(
   db: D1Database,
   settings: ReminderDraftSettings,
 ): Promise<string | null> {

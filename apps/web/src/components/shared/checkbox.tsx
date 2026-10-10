@@ -87,3 +87,10 @@ export default function Checkbox({
     </span>
   )
 }
+
+/** 保存や送信で反映する二択。即時反映のスイッチと同じデータ契約で移行できる。 */
+export function SettingCheckbox({ checked, label, onChange, disabled, locked }: {
+ checked: boolean; label: string; onChange?: (checked:boolean)=>void; disabled?:boolean; locked?:boolean
+}) {
+ return <span data-setting-checkbox><Checkbox checked={Boolean(locked || checked)} aria-label={label} disabled={locked || disabled} onCheckedChange={onChange ?? (()=>{})} /></span>
+}

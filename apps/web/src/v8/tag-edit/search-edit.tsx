@@ -49,6 +49,8 @@ import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/com
 import { formatDateTime } from '@/lib/format'
 import { optionsWithCurrent, usageRowsOf, headUsageText } from './search-model'
 import styles from './search-edit.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -70,7 +72,7 @@ const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> 
   { value: 'purchase', label: '購入履歴' },
   { value: 'last_activity', label: '最終反応日' },
   { value: 'reminder', label: 'リマインダ' },
-  { value: 'memo', label: '個別メモ' },
+  { value: 'memo', label: 'メモ' },
   { value: 'common_event', label: 'その他のイベント' },
   { value: 'chat_status', label: '対応状況' },
   { value: 'following', label: '友だち状態' },
@@ -190,17 +192,11 @@ function DateRangeEditor({
     <div className={styles.grow}>
       <div className={styles.dateRow}>
         <Select aria-label="日付の比べ方" value={op} onChange={setOp} options={[{ value: 'between', label: '期間' }, { value: 'after', label: '以降' }, { value: 'before', label: '以前' }]} width={120} />
-        <label className={styles.dateLabel}>
-          {op === 'before' ? '終了日' : '開始日'}
-          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} />
-        </label>
+        <Field label={<>{op === 'before' ? '終了日' : '開始日'}</>}><DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} /></Field>
         {op === 'between' ? (
           <>
             <span className={styles.dateDash} aria-hidden="true">〜</span>
-            <label className={styles.dateLabel}>
-              終了日
-              <DateField aria-label="終了日" value={to} onChange={setTo} />
-            </label>
+            <Field label="終了日"><DateField aria-label="終了日" value={to} onChange={setTo} /></Field>
           </>
         ) : null}
       </div>
@@ -401,7 +397,7 @@ function ConditionControls({
       ) : condition.kind === 'memo' ? (
         <>
           <Select
-            aria-label="個別メモの比較"
+            aria-label="メモの比較"
             value={['exists', 'has', 'not_exists', 'not_has', 'eq', 'contains'].includes(condition.op) ? condition.op : 'exists'}
             onChange={(op) => onChange({ ...condition, op, value: isSavedSearchValueOptionalOp(op) ? '' : condition.value })}
             options={[
@@ -830,15 +826,15 @@ export default function SavedSearchEditV8() {
   const countNote = previewError || preview?.error
     ? '人数をまだ数えていません。数え直してください。'
     : preview?.calculatedAt
-      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人）。数え直している間は古い数を出しません`
+      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? emptyValue('unknown')}人・MAIL ${preview.byChannel.mail ?? emptyValue('unknown')}人）。数え直している間は古い数を出しません`
       : '保存した条件でまだ数えていません。数え直すと出ます'
-  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length}件）` : '削除できるか確かめられません'
+  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length} 件）` : '削除できるか確かめられません'
 
   const side = (
     <div className={styles.side}>
       <div className={styles.sideHead}><h2 className={styles.sideTitle}>当てはまる人</h2></div>
       <p className={styles.count}>
-        {previewCount === null ? <span className={styles.countNum}>—</span> : <span className={styles.countNum}>{previewCount.toLocaleString('ja-JP')}</span>}
+        {previewCount === null ? <span className={styles.countNum}>{emptyValue('unknown')}</span> : <span className={styles.countNum}>{polishFormatNumber(previewCount)}</span>}
         <span className={styles.countUnit}>人</span>
       </p>
       {previewError ? <p role="alert" className={styles.errorText}>{previewError}</p> : null}
@@ -879,8 +875,8 @@ export default function SavedSearchEditV8() {
       <CreatePage
         title={original.name}
         identity={<Link href="/tags?tab=searches" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />保存した検索へ</Link>}
-        description={[
-          previewCount === null ? '人数はまだ数えていません' : `${previewCount.toLocaleString('ja-JP')}人が当てはまる`,
+        help={[
+          previewCount === null ? '人数はまだ数えていません' : `${polishFormatNumber(previewCount)} 人が当てはまる`,
           original.isShared ? '全員に共有' : '自分だけ',
           headUsageText(original.usedIn),
         ].join('・')}
@@ -892,29 +888,22 @@ export default function SavedSearchEditV8() {
         footerActions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
-            <Button type="button" disabled={saving} onClick={() => void duplicate()}><Copy size={14} aria-hidden="true" />複製して保存する</Button>
+            <Button type="button" disabled={saving} onClick={() => void duplicate()} busy={Boolean(saving)} busyLabel="処理中…"><Copy size={14} aria-hidden="true" />複製して保存する</Button>
             <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}><Check size={14} aria-hidden="true" />保存する</Button>
           </>
-        )}
+        )} dirty={false}
       >
         {error ? <Notice tone="danger" message={error} /> : null}
         <section className={styles.card} aria-label="名前と共有">
           <h2 className={styles.cardTitle}>名前と共有</h2>
-          <label className={styles.field}>
-            <span className={styles.labelStrong}>条件名</span>
-            <Field error={nameError}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></Field>
-            {/* IDEA-04：同名の検索がすでにあるとき、保存する前に知らせる。 */}
-            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.labelStrong}>説明</span>
-            <TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} />
-          </label>
+          <Field label="条件名"><Field error={nameError}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></Field>
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" /></Field>
+          <Field label="説明"><TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} /></Field>
           <div className={styles.field}>
             <span className={styles.labelRow}>
               <span className={styles.label}>共有</span>
               {/* 設計 XBkiQ：共有を選ぶ場所で、上限と共有すると何が起きるかを先に言う。 */}
-              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount}件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
+              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount} 件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
             </span>
             <div className={styles.seg} role="radiogroup" aria-label="共有">
               <button type="button" role="radio" aria-checked={isShared} className={isShared ? styles.segOn : styles.segBtn} onClick={() => setIsShared(true)}>全員</button>
@@ -979,7 +968,7 @@ export default function SavedSearchEditV8() {
             </div>
             <div className={styles.field}>
               <span className={styles.label}>表示件数</span>
-              <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} width={120} />
+              <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size} 件` }))} width={120} />
             </div>
           </div>
           <p className={styles.hint}>{`表示列：${conditions.list?.columns?.join('・') || '名前・タグ・担当者'}`}</p>
@@ -987,7 +976,7 @@ export default function SavedSearchEditV8() {
         {/* IDEA-04：印ならタグ・値なら情報欄・条件の保存は保存した検索、という違いを編集の場所でも確かめられる。 */}
         <AttributeKindGuide current="search" />
       </CreatePage>
-      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
+      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); return remove() }} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="検索条件への変更" busy={saving} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )

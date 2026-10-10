@@ -330,7 +330,12 @@ export default function SeatReserve() {
     setView('pick');
   }
 
-  if (loadState === 'loading') return <LoadingView />;
+  if (loadState === 'loading') return (
+    <LiffLookScope className="min-h-screen bg-canvas">
+      <LiffHeader title="ご予約" />
+      <div className="mx-auto w-full max-w-md px-4 pt-3"><LoadingView /></div>
+    </LiffLookScope>
+  );
   if (loadState === 'missing')
     return (
       <LiffLookScope className="min-h-screen bg-canvas">
@@ -434,13 +439,12 @@ export default function SeatReserve() {
             {busy ? 'お取りしています…' : 'この時刻で進む'}
           </Button>
           {target && (
-            <button
+            <Button variant="text"
               type="button"
               onClick={() => void openMine()}
-              className="self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
             >
-              ← 変更をやめる
-            </button>
+              キャンセル
+            </Button>
           )}
         </BottomBar>
       )}
@@ -484,7 +488,7 @@ export default function SeatReserve() {
             : ''
         }
         confirmLabel="取り消す"
-        cancelLabel="やめる"
+        cancelLabel="閉じる"
         destructive
         busy={busy}
         error={cancelling ? (error ?? undefined) : undefined}

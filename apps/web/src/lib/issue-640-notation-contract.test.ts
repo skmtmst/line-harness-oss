@@ -31,7 +31,7 @@ describe('#640 省略表示の全文確認（title）', () => {
   })
 
   it('/friend-add-settings V8: 設定名・経路・送るものに全文確認を残す', () => {
-    expect(FRIEND_ADD).toContain('title={rule.name}')
+    expect(FRIEND_ADD).toContain('value={String(rule.name')
     expect(FRIEND_ADD).not.toContain('styles.nameSub}') // B-194: 経路は詳細で見る
     expect(FRIEND_ADD).toContain('title={line}')
   })

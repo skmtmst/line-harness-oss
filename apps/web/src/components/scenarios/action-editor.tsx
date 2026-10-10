@@ -29,6 +29,8 @@
  *     既にある設定を黙って上書きすることになる
  */
 
+import TagPickerField from '@/components/shared/tag-picker-field'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
@@ -172,7 +174,7 @@ function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
       return [{ ...common, id: action.id, type: 'start_reminder', params: { reminderId: config.reminderId }, sortOrder: actionIndex * 10 }]
     }
     if (action.actionType === 'event_booking' && typeof config.eventId === 'string' && config.eventId) {
-      return [{ ...common, id: action.id, type: 'common_action', params: { eventId: config.eventId }, sortOrder: actionIndex * 10 }]
+      return [{ ...common, id: action.id, type: 'event_booking', params: config, sortOrder: actionIndex * 10 }]
     }
     return []
   })
@@ -816,7 +818,7 @@ export default function ActionEditor({
               ここで決めた条件に合う友だちにだけ、この動作を実行します。条件なしなら全員に実行します。
             </p>
             {conditionError && (
-              <Notice tone="validation" className="mb-4">
+              <Notice tone="warn" className="mb-4">
                 {conditionError}
               </Notice>
             )}
@@ -1048,6 +1050,7 @@ export function ActionConfigEditor({
   targetsLoading?: boolean
   onChange: (config: unknown) => void
 }) {
+  const theme = useAdminTheme()
   const c = (action.config ?? {}) as Record<string, unknown>
 
   switch (action.actionType) {
@@ -1067,7 +1070,7 @@ export function ActionConfigEditor({
               />
             ))}
           </RadioCardGroup>
-          <div className="flex flex-wrap gap-1.5">
+          {theme === 'v8' ? <TagPickerField label="タグの操作対象" options={tags} value={selected} onChange={tagIds => onChange({ ...c, tagIds })} /> : <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => {
               const on = selected.includes(tag.id)
               return (
@@ -1083,7 +1086,7 @@ export function ActionConfigEditor({
                 </Button>
               )
             })}
-          </div>
+          </div>}
         </>
       )
     }
@@ -1269,6 +1272,12 @@ export function ActionConfigEditor({
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-semibold">イベント予約</span>
+          <Select
+            aria-label="イベント予約の操作"
+            value={c.op === 'cancel' ? 'cancel' : 'register'}
+            options={[{ value: 'register', label: 'イベントに申し込む' }, { value: 'cancel', label: '申し込みを取り消す' }]}
+            onChange={(op) => onChange({ ...c, op })}
+          />
           <TargetSelector
             label="イベント予約"
             kind="event"

@@ -10,6 +10,8 @@
  * 行内のラジオ、担当するアカウントは枠の中に縦1列のチェック、下の帯は線の下で真ん中寄せ。
  * 窓の枠・×・題は共通の Dialog、頭の寸法は dialog-head.module.css。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
@@ -50,13 +52,7 @@ export type MemberDialogValue = {
  * 絵 `yLKwV` の「10/9（金）18:40」の形で出す。
  */
 export function inviteExpiryLabel(now: Date = new Date()): string {
-  const at = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric',
-    weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(at)
-  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${pick('month')}/${pick('day')}（${pick('weekday')}）${pick('hour')}:${pick('minute')}`
+  return polishFormatDate(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), { style: 'detail', now })
 }
 
 /** 担当範囲で選べるアカウント。アーカイブしたものは選ばせない（今の担当範囲に入っているものは残す）。 */
@@ -203,10 +199,10 @@ export default function MemberDialogV8({
         {!member ? (
           <div className={styles.pair}>
             <FormField label="名前" htmlFor={`${uid}-name`} error={fieldErrors.name}>
-              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例: 山田 太郎" />
+              <TextField id={`${uid}-name`} value={value.name} maxLength={100} disabled={busy} autoFocus invalid={Boolean(fieldErrors.name)} onChange={(e) => set('name', e.target.value)} className={styles.full} placeholder="例：山田 太郎" />
             </FormField>
             <FormField label="メールアドレス" htmlFor={`${uid}-email`} error={fieldErrors.email}>
-              <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例: staff@example.com" />
+              <TextField id={`${uid}-email`} type="email" value={value.email} disabled={busy} invalid={Boolean(fieldErrors.email)} onChange={(e) => set('email', e.target.value)} className={styles.full} placeholder="例：staff@example.com" />
             </FormField>
           </div>
         ) : null}
@@ -271,18 +267,6 @@ export default function MemberDialogV8({
         {note ? <p className={styles.callout}>{note}</p> : null}
       </form>
     </Dialog>
-  )
-}
-
-function Field({ label, note, htmlFor, children }: { label: string; note?: string; htmlFor: string; children: ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <div className={styles.labelRow}>
-        <label htmlFor={htmlFor} className={styles.label}>{label}</label>
-        {note ? <span className={styles.note}>{note}</span> : null}
-      </div>
-      {children}
-    </div>
   )
 }
 

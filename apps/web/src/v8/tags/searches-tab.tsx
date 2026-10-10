@@ -11,6 +11,8 @@
  * 絵の下の段のとおり、行の「…」に「複製して保存」を足した（同じ条件で新しく保存する）。
  */
 import { FolderDotName } from '@/components/shared/folder-dot'
+import { notifySaved } from '@/components/shared/toast'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -44,6 +46,9 @@ import { formatDay, formatNumber } from '@/lib/format'
 import styles from './list.module.css'
 import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 const PAGE_SIZES = [10, 20, 50]
 const MAX_SAVED = 50
@@ -60,7 +65,7 @@ const USAGE_WORDS: Record<string, string> = {
 export function conditionSummary(split: { all: string[]; any: string[]; note: string | null }): string {
   const all = split.all.join(' かつ ')
   const any = split.any.join(' または ')
-  const main = all && any ? `${all} かつ （${any}）` : all || any || '指定なし'
+  const main = all && any ? `${all} かつ （${any}）` : all || any || emptyValue('unconfigured')
   return split.note ? `${main}・${split.note}` : main
 }
 
@@ -79,7 +84,7 @@ export function usageSummary(usedIn: SavedSearch['usedIn']): string {
 
 /** 更新（「Kenta・8月20日」）。 */
 function updatedText(search: SavedSearch): string {
-  const who = search.updatedBy ?? search.createdBy ?? '—'
+  const who = search.updatedBy ?? search.createdBy ?? emptyValue('unknown')
   const day = formatDay(search.updatedAt ?? search.createdAt).replace(/（.）$/, '')
   return `${who}・${day}`
 }
@@ -97,11 +102,11 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
   const [tags, setTags] = useState<Tag[]>([])
   const [conditionLabels, setConditionLabels] = useState<SavedSearchConditionLabels>({})
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
-  const [query, setQuery] = useState('')
-  const [usageFilter, setUsageFilter] = useState<SavedSearchUsageFilter>('all')
-  const [matchFilter, setMatchFilter] = useState<'all' | 'matched' | 'zero' | 'unknown'>('all')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [usageFilter, setUsageFilter] = useListUrlValue<SavedSearchUsageFilter>('usageFilter', 'all')
+  const [matchFilter, setMatchFilter] = useListUrlValue<'all' | 'matched' | 'zero' | 'unknown'>('matchFilter', 'all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?search=<id> を残す。 */
   const [activeSearchId, setActiveSearchId] = useDetailPanelUrl('search')
@@ -192,7 +197,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         isShared: search.isShared,
       })
       if (!res.success) throw new Error(res.error)
-      notifyToast(`「${search.name}のコピー」を保存しました`)
+      notifySaved(`「${search.name}のコピー」を保存しました`)
       void load()
     } catch (reason) {
       setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした')
@@ -254,9 +259,9 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
     const list: ActionMenuItem[] = []
     const index = filteredList.findIndex((item) => item.id === search.id)
     if (search.lineAccountId) {
-      list.push({ id: 'open', label: '友だち一覧へ', external: true, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
+      list.push({ id: 'open', label: '友だち一覧へ', external: true, href: `/friends?savedSearch=${search.id}`, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
       if (canEdit) {
-        list.push({ id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
+        list.push({ id: 'edit', label: '編集', external: true, href: `/tags/searches/edit?id=${encodeURIComponent(search.id)}`, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
         list.push({
           id: 'duplicate',
           label: '複製して保存',
@@ -275,7 +280,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         : search.usedIn === undefined
           ? '使用先を確認できないため削除できません'
           : (search.usedIn?.length ?? 0) > 0
-            ? `使用中のため削除できません（${search.usedIn?.length ?? 0}件）`
+            ? `使用中のため削除できません（${search.usedIn?.length ?? 0} 件）`
             : '削除できるか確認できません'
       list.push({
         id: 'delete',
@@ -300,7 +305,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
 
   const sharedCount = items.filter((item) => item.isShared).length
   const kpiCards = [
-    { title: '保存した条件', icon: Bookmark, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : '—' },
+    { title: '保存した条件', icon: Bookmark, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : emptyValue('unknown') },
     { title: '配信で使っている', icon: Send, value: kpis.usedInBroadcasts, unit: '件', detail: '一斉配信・自動処理' },
     { title: '該当なし', icon: CircleDashed, value: kpis.zeroMatches, unit: '件', detail: '条件が古いかも' },
     { title: '今月の利用', icon: MousePointerClick, value: kpis.callsThisMonth, unit: '回', detail: kpis.callsThisMonth === null ? '利用の記録は未接続' : '友だち一覧で開いた回数' },
@@ -316,14 +321,14 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
     <div className={styles.stateCard}>
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>保存した検索を見る権限がありません</p>
-      <p className={styles.stateDesc}>オーナーか管理者に確認してください。</p>
+      <p className={styles.stateDesc}>{permissionDeniedMessage('store')}</p>
     </div>
   ) : loadError ? (
     <div className={styles.stateCard}>
       <AlertCircle className={styles.stateIconError} aria-hidden="true" />
       <p className={styles.stateTitle}>保存した検索を読み込めませんでした</p>
       <p className={styles.stateDesc}>{loadError}</p>
-      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
     </div>
   ) : ready && items.length === 0 ? (
     <div className={styles.stateCard}>
@@ -370,17 +375,17 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                     event.preventDefault()
                     openSearchDetail(search.id)
                   }
-                }}
+                }} data-row-id={search.id}
               >
                 <Td className={styles.searchColName}><FolderDotName>
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                     <div className={styles.nameRow}>
                       {editHref ? (
-                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`} title={search.name} onClick={(event) => event.stopPropagation()}>
-                          {search.name}
+                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`}  onClick={(event) => event.stopPropagation()}>
+                          <TruncatedText value={String(search.name ?? '')} />
                         </Link>
                       ) : (
-                        <span className={styles.name} title={search.name}>{search.name}</span>
+                        <span className={styles.name} ><TruncatedText value={String(search.name ?? '')} /></span>
                       )}
                     </div>
 
@@ -391,7 +396,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                       ) : null}</Td>
                 <Td className={styles.searchColCount} onClick={(event) => event.stopPropagation()}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
-                    {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : '—'}
+                    {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : emptyValue('unknown')}
                   </span>
                 </Td>
                 <Td className={styles.searchColShare}><span className={styles.cellText}>{search.isShared ? '全員' : '自分だけ'}</span></Td>
@@ -424,7 +429,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       {pages > 1 ? (
         <div className={styles.pager}>
           <span className={styles.pagerCount}>
-            {`${filteredList.length}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filteredList.length)}件`}
+            {`${filteredList.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filteredList.length)} 件`}
           </span>
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り" />
         </div>
@@ -497,7 +502,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
             {retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
-              <button type="button" onClick={() => { setError(''); void load() }}>読み直す</button>
+              <button type="button" onClick={() => { setError(''); void load() }}>もう一度読み込む</button>
             )}
           </p>
         ) : null}
@@ -549,7 +554,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
               <dd>
                 {activeSearch.lineAccountId && activeSearch.matchCount !== null && activeSearch.matchCount !== undefined ? (
                   <Link href={`/friends?savedSearch=${activeSearch.id}`} className={styles.countLink}>{`${formatNumber(activeSearch.matchCount)}人`}</Link>
-                ) : '—'}
+                ) : emptyValue('unknown')}
               </dd>
             </div>
             <div><dt>使っている所</dt><dd>{usageSummary(activeSearch.usedIn)}</dd></div>

@@ -7,9 +7,10 @@
  * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
  * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。
  * 「タグ連動」「マイル」は畳んで1行の要約を出し、「開く」で中身を出す（絵どおり）。
- * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・保管済み）は今の画面（app/tags/edit-tag-page-v8）と同じ。
+ * 動き（読み込み・保存・さかのぼり反映の確認・競合・削除・アーカイブ）は今の画面（app/tags/edit-tag-page-v8）と同じ。
  */
 
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -37,6 +38,7 @@ import { describeTagDiff } from './conflict-diff'
 import styles from './edit.module.css'
 
 import { TagEditForm } from './edit-form'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
 
 export default function TagEditV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'タグ', href: '/tags' }])
@@ -156,13 +158,13 @@ export default function TagEditV8() {
       if (!stillHere()) return
       if (!update.success) throw new Error(update.error)
       saveKeysRef.current.clear(sig)
-      notifyToast(update.data.replayed ? '保存済みでした。' : update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
+      notifySaved(update.data.replayed ? '保存済みでした。' : update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
       setConflictValues(null)
       await load(true)
     } catch (reason) {
       if (!stillHere()) return
       if (reason instanceof ApiError && reason.status === 409) setConflictValues(values)
-      else setError(describeSaveFailure(reason))
+      else setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
     } finally {
       if (targetRef.current === savingTarget && targetGenerationRef.current === targetGeneration) setSaving(false)
     }
@@ -226,7 +228,7 @@ export default function TagEditV8() {
   if (!tag || !definition) {
     return <TargetMissing kind="error" title="タグを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
   }
-  // 保管済みのタグは通常の編集を出さない（#710）。
+  // アーカイブのタグは通常の編集を出さない（#710）。
   if (tag.status === 'archived') {
     if (!canEdit) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
     return <ArchivedTagEditor tag={tag} accountId={selectedAccountId} onCancel={() => router.push('/tags')} onSaved={(updated) => { if (targetRef.current === targetKey && targetGenerationRef.current === targetGeneration) setTag((current) => (current ? { ...current, ...updated } : current)) }} />
@@ -262,7 +264,7 @@ export default function TagEditV8() {
         confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
+        onConfirm={() => reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')

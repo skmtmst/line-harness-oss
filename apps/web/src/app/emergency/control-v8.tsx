@@ -42,6 +42,8 @@ import { SendPathCoveragePanel } from './send-path-coverage-panel'
 import releaseLog from '@/generated/release-log-summary.json'
 import type { UpdateRelease } from './update-history'
 import styles from './control-v8.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
 
@@ -286,8 +288,8 @@ const EmergencyControlV8 = (
 
   const targetLabels: Record<StopTarget, { label: string; note: string }> = {
     broadcasts: { label: '予約中の一斉配信', note: '予約を下書きに戻します' },
-    scenarios: { label: 'シナリオ', note: '稼働中のシナリオ配信を止めます' },
-    reminders: { label: 'リマインダ', note: '稼働中のものを止めます' },
+    scenarios: { label: 'シナリオ', note: '有効のシナリオ配信を止めます' },
+    reminders: { label: 'リマインダ', note: '有効のものを止めます' },
     automations: { label: '自動処理', note: 'オートメーションと自動応答を止めます' },
   }
 
@@ -552,7 +554,7 @@ const EmergencyControlV8 = (
           </div>
           <p className={`${styles.kpiValue} ${isStopped ? styles.kpiValueDanger : ''}`}>
             {/* WEB312：状態が読めていないときは「動いている」と言わない。 */}
-            {previewSettled && control ? (isStopped ? '止めている' : '動いている') : '—'}
+            {previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
           </p>
           <p className={styles.kpiDetail}>
             {impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'}
@@ -564,7 +566,7 @@ const EmergencyControlV8 = (
             <span className={styles.kpiLabel}>止めた回数</span>
           </div>
           <p className={styles.kpiValue}>
-            {historyState === 'ready' ? formatNumber(recent90.length) : '—'}<span className={styles.kpiUnit}>回</span>
+            {historyState === 'ready' ? formatNumber(recent90.length) : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
           </p>
           <p className={styles.kpiDetail}>この90日</p>
         </div>
@@ -574,7 +576,7 @@ const EmergencyControlV8 = (
             <span className={styles.kpiLabel}>いちばん長かった停止</span>
           </div>
           <p className={styles.kpiValue}>
-            {historyState === 'ready' ? (longest.entry ? formatMinutesRough(longest.minutes) : '—') : '—'}
+            {historyState === 'ready' ? (longest.entry ? formatMinutesRough(longest.minutes) : emptyValue('unknown')) : emptyValue('unknown')}
           </p>
           <p className={styles.kpiDetail}>
             {longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'}
@@ -585,7 +587,7 @@ const EmergencyControlV8 = (
             <span className={styles.kpiTile} aria-hidden="true"><Tag size={14} /></span>
             <span className={styles.kpiLabel}>いまの版</span>
           </div>
-          <p className={styles.kpiValue}>{historyState === 'ready' ? (currentVersion ?? '—') : '—'}</p>
+          <p className={styles.kpiValue}>{historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}</p>
           <p className={styles.kpiDetail}>
             {latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'}
           </p>
@@ -610,9 +612,7 @@ const EmergencyControlV8 = (
           ))}
         </div>
         <div className={styles.accountRow}>
-          <div className={styles.accountField}>
-            <label htmlFor="emergency-account-v8" className={styles.fieldLabel}>止めるアカウント</label>
-            <span className={styles.accountSelect}>
+          <div className={styles.accountField}><Field label="止めるアカウント" htmlFor="emergency-account-v8"><span className={styles.accountSelect}>
             <Select
               size="full"
               id="emergency-account-v8"
@@ -634,8 +634,7 @@ const EmergencyControlV8 = (
                 ...accounts.map((account) => ({ value: account.id, label: `${account.name}（いまのアカウント）` })),
               ]}
             />
-            </span>
-          </div>
+            </span></Field></div>
           {canControl ? <Button
             type="button"
             variant="danger"
@@ -781,8 +780,8 @@ const EmergencyControlV8 = (
                       <td title={entry.detail ? `${entry.reason}（${entry.detail}）` : entry.reason} className={styles.cellTruncate}>
                         {entry.reason}
                       </td>
-                      <td>{minutes === null ? '—' : formatMinutesRough(minutes)}</td>
-                      <td>—</td>
+                      <td>{minutes === null ? emptyValue('unknown') : formatMinutesRough(minutes)}</td>
+                      <td>{emptyValue('unknown')}</td>
                     </tr>
                   )
                 })}
@@ -851,9 +850,7 @@ const EmergencyControlV8 = (
                 ))}
               </div>
               <p className={styles.dialogHint}>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p>
-              <div className={styles.confirmReason}>
-                <label htmlFor="emergency-reason-v8" className={styles.dialogLabel}>止める理由（必須）</label>
-                <input
+              <div className={styles.confirmReason}><Field label="止める理由" htmlFor="emergency-reason-v8" required><input
                   id="emergency-reason-v8"
                   aria-label="止める理由"
                   value={reason}
@@ -863,8 +860,7 @@ const EmergencyControlV8 = (
                   placeholder="例：宛先の絞り込みを間違えた"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
-                />
-              </div>
+                /></Field></div>
               <div className={styles.detailBlock}>
                 <div className={styles.detailHead}>
                   <label htmlFor="emergency-detail-v8" className={styles.dialogLabel}>補足（任意）</label>
@@ -897,19 +893,14 @@ const EmergencyControlV8 = (
               ) : null}
             </>
           )}
-          <label className={styles.dialogField}>
-            <span className={styles.dialogLabel}>
-              確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力
-            </span>
-            <input
+          <Field label={`確認のため「${confirmMode === 'stop' ? '停止' : '復旧'}」と入力`} required><input
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
               autoFocus
               disabled={mutationLocked || running}
               aria-label="確認の言葉"
               className={styles.dialogInput}
-            />
-          </label>
+            /></Field>
           {confirmMode === 'stop' && stepUpMethod !== 'none' ? (
             <div className={styles.dialogField}>
               <span className={styles.dialogLabel} id="emergency-stepup-label">

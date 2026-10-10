@@ -53,7 +53,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 vi.mock('@/components/shared/toast', async (importOriginal: () => Promise<Record<string, unknown>>) => ({
   ...(await importOriginal()),
-  notifyToast: (message: string, options?: { actionLabel?: string }) => { toasts.push({ message, actionLabel: options?.actionLabel }) },
+  notifyToast: (message: string, options?: { actionLabel?: string }) => { toasts.push({ message, actionLabel: options?.actionLabel }) }, notifySaved: (message: string, options?: { actionLabel?: string }) => { toasts.push({ message, actionLabel: options?.actionLabel }) }
 }))
 
 import { FRIEND_ATTRIBUTES_QA_GROUPS, FRIEND_ATTRIBUTES_QA_TAGS } from '@/components/friend-fields/tags-page-v4'
@@ -95,7 +95,7 @@ describe('V8 タグの並び替えの保存の失敗', () => {
     const before = await moveFirstDown()
     expect(reorder).toHaveBeenCalledTimes(1)
     expect(order()).toEqual(before)
-    expect(toasts.at(-1)).toEqual({ message: '並び順を保存できませんでした。通信を確かめて、もう一度お試しください。', actionLabel: 'もう一度' })
+    expect(toasts.at(-1)).toEqual({ message: '並び順を保存できませんでした。 通信を確かめて、もう一度お試しください。', actionLabel: 'もう一度' })
   })
 
   it('失敗の返事でも同じく元へ戻す', async () => {

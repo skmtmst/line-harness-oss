@@ -4,8 +4,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 13px;
+  gap: 8px;
+  padding: 0 16px;
   border: 1px solid;
   border-radius: var(--radius-control);
   /*
@@ -39,11 +39,11 @@
  * 「主要ボタン・入力・検索・選択はPC 40px」と決め直した。
  */
 .standard {
-  height: 40px;
+  height: 36px;
 }
 
 .field {
-  height: 40px;
+  height: 36px;
 }
 
 /*
@@ -88,9 +88,11 @@
  * （文字が乗らない用途）。
  */
 .primary {
-  border-color: var(--color-accent-deep);
+  border-color: var(--color-accent-edge);
   background: var(--color-accent-deep);
   color: var(--color-on-accent);
+  border-radius: var(--radius-button-primary);
+  box-shadow: var(--card-shadow);
 }
 
 /*
@@ -104,9 +106,10 @@
 }
 
 .secondary {
-  border-color: var(--color-hairline);
+  border-color: var(--color-field-border);
   background: var(--color-canvas);
   color: var(--color-ink);
+  box-shadow: var(--shadow-field);
 }
 
 .secondary:hover:not(:disabled) {
@@ -123,8 +126,8 @@
  * と同じ考え方。
  */
 .danger {
-  border-color: var(--color-danger);
-  background: var(--color-danger);
+  border-color: var(--color-danger-action);
+  background: var(--color-danger-action);
   color: var(--color-on-accent);
 }
 
@@ -230,7 +233,7 @@
 [data-theme='v8'] .button[data-presentation='account-inline'] { color: var(--color-accent-deep); font-size: var(--tpl-acd-label-size); }
 [data-theme='v8'] .button[data-presentation='registration-inline'] { color: var(--color-action); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
 [data-theme='v8'] .button[data-presentation]:hover:not(:disabled) { text-decoration: underline; }
-[data-theme='v8'] .button > svg { width: 15px; height: 15px; flex: none; }
+[data-theme='v8'] .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); background: var(--color-canvas); color: var(--color-danger); }
 [data-theme='v8'] .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
@@ -266,3 +269,10 @@
 [data-theme='v8'] .button.composer { height: var(--tpl-btn-compact-h, 32px); min-height: var(--tpl-btn-compact-h, 32px); padding: 0 14px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
 [data-theme='v8'] .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
+
+/* B-152・仕上げ2 */
+[data-theme='v8'] .button, .button.inline.text { font-weight: var(--polish-weight-body); }
+
+/* B-152・仕上げ7 */
+[data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }
+[data-theme='v8'] .button:is(:hover, :active):not(:disabled) { filter: none; }

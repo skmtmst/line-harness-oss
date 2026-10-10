@@ -1,5 +1,8 @@
 'use client'
 
+import { statusLabel } from '@/lib/status-labels'
+
+
 /*
  * ★V8 マイペットの小さな部品（CSV・言葉・誕生日の形・行の「…」・件数の文）。
  * 今の画面（app/nen/pets の page.tsx・pet-editor.tsx）から写した。
@@ -13,6 +16,8 @@ import { formatNumber } from '@/lib/format'
 import { petAnimalTypeLabel, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './pets.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 export type PetTab = 'pets' | 'feeding'
 export type PetsQuery = { q: string; species: string; product: string; weight: NenPetWeightFilter; sort: NenPetSort }
@@ -55,14 +60,13 @@ export function normalizeBirthdayInput(value: string): string | null | 'invalid'
 
 /** 「09/28」（体重の更新日）。日付が無ければ「—」。 */
 export function monthDay(value: string | null | undefined): string {
-  if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) return '—'
-  return value.slice(5, 10).replace('-', '/')
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 /** 件数の文（「8件中 1〜8件」）。 */
 export function rangeText(total: number, page: number, size: number): string {
   if (total === 0) return '0件'
-  return `${formatNumber(total)}件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)}件`
+  return `${formatNumber(total)} 件中 ${(page - 1) * size + 1}〜${Math.min(total, page * size)} 件`
 }
 
 /**

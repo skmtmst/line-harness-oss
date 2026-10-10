@@ -53,7 +53,7 @@ describe('V6 7-1-H リマインダ実行結果', () => {
   })
 
   it('読込・失敗・空を区別し、失敗した1通だけ再試行できる', () => {
-    expect(PAGE).toContain('<ListState kind="loading"')
+    expect(PAGE).toContain('<DetailLoading')
     // 対象の取得失敗は ★V7 TargetMissing の error（取り直し口つき）。
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('onRetry={() => void load()}')

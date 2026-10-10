@@ -1,10 +1,13 @@
 'use client'
 
+import TruncatedText from '@/components/shared/truncated-text'
+
 /*
  * ★V8 分析「URLクリック」（Pencil `iK4cQ`）。
  * 数の帯 → 道具の段（探す・状態・期間・CSV）→ URLごとの表 → 数え方の注。
  * 呼ぶ口（検索語は API へ・200件まで）・状態の絞り込み・ページ送り・CSV は今の画面（UrlClicksOverviewTab）と同じ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Link2, MousePointerClick, Unlink, Users } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
@@ -19,6 +22,9 @@ import { RangePickerV8, StatePill } from './common'
 import { MetricText } from './reactions'
 import { downloadCsv, formatAnalyticsDateTime, periodCaption, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
+import { useReportPeriod } from '@/components/shared/period-picker'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Link = AnalyticsUrlClicksOverview['data']['links'][number]
 
@@ -33,24 +39,21 @@ function sourceOf(item: Link): { kind: string; name: string; all: string } {
   const first = item.usageLocations[0]
   if (!first) return { kind: '—', name: '', all }
   const match = /^(.+?)「(.+)」$/.exec(first)
-  const more = item.usageLocations.length > 1 ? ` ほか${item.usageLocations.length - 1}件` : ''
+  const more = item.usageLocations.length > 1 ? ` ほか${item.usageLocations.length - 1} 件` : ''
   return match ? { kind: match[1], name: `${match[2]}${more}`, all } : { kind: first, name: more.trim(), all }
 }
 
-const shortUrl = (url: string) => url.replace(/^https?:\/\//, '')
 
 export default function UrlClicksV8({ accountId }: { accountId: string }) {
-  const [pageSize, setPageSize] = useState(10)
-  const [page, setPage] = useState(0)
-  const [days, setDays] = useState(30)
-  const range = useMemo(() => rangeFor(days - 1), [days])
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('all')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
+  const [page, setPage] = useListUrlValue('page', 0)
+  const { days, setDays, range, customRange, setRange } = useReportPeriod()
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [status, setStatus] = useListUrlValue('status', 'all')
   // 検索語は API へ渡し、200件を超えた URL にも届くようにする。
   const [debouncedQuery, setDebouncedQuery] = useState('')
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
-    return () => window.clearTimeout(timer)
+    setDebouncedQuery(query.trim())
   }, [query])
   const state = useOverview<AnalyticsUrlClicksOverview>(
     () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200, query: debouncedQuery || undefined }),
@@ -60,7 +63,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const lastPage = Math.max(0, Math.ceil(links.length / pageSize) - 1)
   const currentPage = Math.min(page, lastPage)
   const visibleLinks = links.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
-  const exportRows = () => downloadCsv('analytics-url-clicks.csv', [
+  const exportRows = () => downloadCsv(csvFileName("URLクリック"), [
     ['リンク名', 'URL', '押された回数', '押した人', '使われた場所'],
     ...links.map((item) => [item.name, item.originalUrl, shownValue(item.clicks), shownValue(item.knownClickPeople), item.usageLocations.join('、')]),
   ])
@@ -70,9 +73,9 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const toolbar = <div className={styles.toolbar}>
     <div className={styles.searchBox}><SearchField id="url-click-search" aria-label="URL・配信名・リンク名で探す" value={query} onChange={(value) => { setQuery(value); setPage(0) }} onClear={() => { setQuery(''); setPage(0) }} placeholder="URL・配信名・リンク名で探す" loading={state.loading} /></div>
     <div className={styles.selectBox}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></div>
-    <RangePickerV8 days={days} onChange={setDays} />
+    <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
     <span className={styles.spacer} />
-    <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
   </div>
 
   if (!state.data) {
@@ -112,21 +115,21 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
           : visibleLinks.map((item) => {
             const source = sourceOf(item)
             const actions = [item.actions?.tagName, item.actions?.scenarioName].filter(Boolean).join('・')
-            const when = `最初 ${item.firstClickedAt ? formatAnalyticsDateTime(item.firstClickedAt.value) : '—'} ／ 最後 ${item.lastClickedAt ? formatAnalyticsDateTime(item.lastClickedAt.value) : '—'}`
+            const when = `最初 ${item.firstClickedAt ? formatAnalyticsDateTime(item.firstClickedAt.value) : emptyValue('unknown')} ／ 最後 ${item.lastClickedAt ? formatAnalyticsDateTime(item.lastClickedAt.value) : emptyValue('unknown')}`
             return <div key={item.trackedLinkId} className={styles.trow} role="row" data-h="two">
-              <span role="cell" className={styles.colMain} title={when}><strong className={styles.cellStrong}>{item.name}</strong><span className={styles.cellSub} title={item.originalUrl}>{shortUrl(item.originalUrl)}</span></span>
+              <span role="cell" className={styles.colMain} title={when}><strong className={styles.cellStrong}>{item.name}</strong><TruncatedText className={styles.cellSub} value={item.originalUrl} url /></span>
               <span role="cell" className={styles.colType} data-w="170" title={source.all || undefined}><strong className={styles.cellStrong}>{source.kind}</strong>{source.name ? <span className={styles.cellSub}>{source.name}</span> : null}</span>
               <span role="cell" className={styles.num} data-w="100"><MetricText metric={item.clicks} /></span>
-              <span role="cell" className={styles.num} data-w="90" title={`届いた人数 ${shownValue(item.deliveredPeople) ?? '—'}`}><MetricText metric={item.knownClickPeople} /></span>
-              <span role="cell" className={styles.num} data-w="80">{shownValue(item.clickRate) === null ? <span className={styles.faint} title={item.clickRate.reason ?? undefined}>—</span> : <span>{shownValue(item.clickRate)}%</span>}</span>
+              <span role="cell" className={styles.num} data-w="90" title={`届いた人数 ${shownValue(item.deliveredPeople) ?? emptyValue('unknown')}`}><MetricText metric={item.knownClickPeople} /></span>
+              <span role="cell" className={styles.num} data-w="80">{shownValue(item.clickRate) === null ? <span className={styles.faint} title={item.clickRate.reason ?? undefined}>{emptyValue('unknown')}</span> : <span>{shownValue(item.clickRate)}%</span>}</span>
               <span role="cell" className={styles.colState} title={actions ? `押した人へ：${actions}` : undefined}><StatePill tone={item.isActive ? 'ok' : 'neutral'}>{item.isActive ? '計測中' : '停止中'}</StatePill></span>
             </div>
           })}
       </div>
       {links.length > 10 ? <div className={styles.pager}>
-        <span>{`${links.length}件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)}件（取得した範囲）`}</span>
+        <span>{`${links.length} 件中 ${links.length ? currentPage * pageSize + 1 : 0}〜${Math.min((currentPage + 1) * pageSize, links.length)} 件（取得した範囲）`}</span>
         <span className={styles.spacer} />
-        <Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} />
+        <Select aria-label="表示件数" value={String(pageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value} 件` }))} onChange={(value) => { setPageSize(Number(value)); setPage(0) }} />
         <Button variant="secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>前へ</Button>
         <Button variant="secondary" disabled={currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>次へ</Button>
       </div> : null}

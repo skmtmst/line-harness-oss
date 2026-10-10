@@ -13,6 +13,8 @@ import { FolderDotName } from '@/components/shared/folder-dot'
  * 開け閉めの段で残す（絵の表の下の案内どおり、操作を落とさない）。
  * 決めごとの編集の器（試す・保存・公開の手順）は /mileage/score-rules の画面。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, Minus, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
@@ -55,6 +57,13 @@ import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
@@ -76,9 +85,9 @@ const BAND_TONE: Record<ActionScoreBand, 'active' | 'neutral' | 'warn'> = {
 }
 
 function bandName(band: ActionScoreBand, highMin: number, normalMin: number) {
-  if (band === 'high') return `点が高い（${formatMileageNumber(highMin)}点〜）`
-  if (band === 'normal') return `中くらい（${formatMileageNumber(normalMin)}〜${formatMileageNumber(highMin - 1)}点）`
-  return `低い（〜${formatMileageNumber(normalMin - 1)}点）`
+  if (band === 'high') return `点が高い（${formatMileageNumber(highMin)} 点〜）`
+  if (band === 'normal') return `中くらい（${formatMileageNumber(normalMin)}〜${formatMileageNumber(highMin - 1)} 点）`
+  return `低い（〜${formatMileageNumber(normalMin - 1)} 点）`
 }
 
 function bandOf(score: number, highMin: number, normalMin: number): ActionScoreBand {
@@ -92,7 +101,7 @@ function frequencyText(rule: ActionScoreRule): string {
   const limit = rule.frequency.limit
   switch (rule.frequency.kind) {
     case 'unlimited': return '何回でも'
-    case 'per_day': return `1日${limit}回まで`
+    case 'per_day': return `1日${limit} 回まで`
     case 'per_subject': return '同じ対象は1回'
     case 'per_subject_per_day': return '同じ対象は1日1回'
     case 'once_per_period': return '期間中1回'
@@ -101,7 +110,7 @@ function frequencyText(rule: ActionScoreRule): string {
 }
 
 function ruleValueText(rule: ActionScoreRule): string {
-  if (rule.operation === 'set') return `${formatMileageNumber(rule.value)}点にする`
+  if (rule.operation === 'set') return `${formatMileageNumber(rule.value)} 点にする`
   return `${rule.value > 0 ? '+' : ''}${formatMileageNumber(rule.value)}`
 }
 
@@ -123,7 +132,7 @@ type FriendsItem = ActionScoreOverview['items'][number]
 function actionScoreAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 400) return error.message
-    if (error.status === 403) return '点数を変更する権限がありません。'
+    if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '対象の友だちまたはLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境では点数を変更できません。'
     if (error.status === 409) return '同じ操作がすでに記録されています。画面を読み直してからやり直してください。'
@@ -144,12 +153,12 @@ export default function ScoreTab() {
     latestAccountRef.current = accountId
   }, [accountId])
   const [overview, setOverview] = useState<ActionScoreOverview | null>(null)
-  const [filter, setFilter] = useState<ActionScoreFilter>('all')
-  const [sort, setSort] = useState<ActionScoreSort>('score_desc')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [filter, setFilter] = useListUrlValue<ActionScoreFilter>('filter', 'all')
+  const [sort, setSort] = useListUrlValue<ActionScoreSort>('sort', 'score_desc')
+  const [searchInput, setSearchInput] = useListUrlValue('q', '')
+  const [search, setSearch] = useListUrlValue('q', '')
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -159,10 +168,10 @@ export default function ScoreTab() {
   const [config, setConfig] = useState<ActionScoreRuleConfiguration | null>(null)
   const [rulesLoading, setRulesLoading] = useState(true)
   const [rulesError, setRulesError] = useState(false)
-  const [ruleSearchInput, setRuleSearchInput] = useState('')
-  const [ruleSearch, setRuleSearch] = useState('')
-  const [gainOnly, setGainOnly] = useState(false)
-  const [loseOnly, setLoseOnly] = useState(false)
+  const [ruleSearchInput, setRuleSearchInput] = useListUrlValue('ruleSearch', '')
+  const [ruleSearch, setRuleSearch] = useListUrlValue('ruleSearch', '')
+  const [gainOnly, setGainOnly] = useListUrlValue('gainOnly', false)
+  const [loseOnly, setLoseOnly] = useListUrlValue('loseOnly', false)
   const [ruleMenuId, setRuleMenuId] = useState<string | null>(null)
   const [rulesActionError, setRulesActionError] = useState('')
   const [rulesBusy, setRulesBusy] = useState(false)
@@ -222,7 +231,7 @@ export default function ScoreTab() {
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `action-scores-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = csvFileName("行動の点数")
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -260,12 +269,12 @@ export default function ScoreTab() {
     const timer = window.setTimeout(() => {
       setPage(1)
       setSearch(searchInput.trim())
-    }, 300)
+    }, 0)
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setRuleSearch(ruleSearchInput.trim()), 300)
+    const timer = window.setTimeout(() => setRuleSearch(ruleSearchInput.trim()), 0)
     return () => window.clearTimeout(timer)
   }, [ruleSearchInput])
 
@@ -428,9 +437,9 @@ export default function ScoreTab() {
         title="公開中のルール"
         icon={<Settings2 size={14} aria-hidden="true" />}
         value={rulesLoading || rulesError ? null : 0}
-        valueText={rulesLoading || rulesError ? undefined : publishedVersionNo === null ? 'なし' : `版 ${formatMileageNumber(publishedVersionNo)}`}
+        valueText={rulesLoading || rulesError ? undefined : publishedVersionNo === null ? emptyValue('none') : `版 ${formatMileageNumber(publishedVersionNo)}`}
         unit=""
-        detail={rulesLoading ? '—' : hasDraftChanges ? '下書きの変更あり' : '下書きとの差はありません'}
+        detail={rulesLoading ? emptyValue('unknown') : hasDraftChanges ? '下書きの変更あり' : '下書きとの差はありません'}
       />
     </KpiBand>
   )
@@ -476,7 +485,7 @@ export default function ScoreTab() {
       }}
       chips={chips}
       trailing={<>
-        <Button onClick={() => void openPreview()} disabled={!editable}>
+        <Button onClick={() => void openPreview()} disabled={!editable} busy={Boolean(previewBusy)} busyLabel="処理中…">
           <Bookmark size={15} aria-hidden="true" /> この分けかただと何人入るか
         </Button>
         <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
@@ -511,7 +520,7 @@ export default function ScoreTab() {
             const day = formatMileageMonthDay(item.lastChangedAt)
             const reason = actionScoreReasonLabel(item.lastReason)
             return (
-              <Tr key={item.friendId} className={styles.row} data-table-layout="columns">
+              <Tr key={item.friendId} className={styles.row} data-table-layout="columns" data-row-id={item.friendId}>
                 <Td className={styles.colName}><FolderDotName><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
                 <Td className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
@@ -522,7 +531,7 @@ export default function ScoreTab() {
                 </Td>
                 <Td className={styles.colTrend}>
                   <span className={styles.scoreNum} data-score-delta={change === null || change === 0 ? 'zero' : change > 0 ? 'positive' : 'negative'}>
-                    {change === null ? '—' : formatMileageChange(change)}
+                    {change === null ? emptyValue('unknown') : formatMileageChange(change)}
                   </span>
                 </Td>
                 <Td className={styles.colReact}>
@@ -543,7 +552,7 @@ export default function ScoreTab() {
                             id: 'friend',
                             label: 'この人を見る',
                             external: true,
-                            onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(item.friendId)}`),
+                            href: `/friends/detail?id=${encodeURIComponent(item.friendId)}`, onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(item.friendId)}`),
                           },
                         ]}
                       />
@@ -576,7 +585,7 @@ export default function ScoreTab() {
         aria-controls="ml-score-rules"
         onClick={() => setRulesOpen((open) => !open)}
       >
-        <span className={styles.rulesToggleTitle}>{`できごとの決めごと${editable ? ` ${formatMileageNumber(editable.rules.length)}件` : ''}`}</span>
+        <span className={styles.rulesToggleTitle}>{`できごとの決めごと${editable ? ` ${formatMileageNumber(editable.rules.length)} 件` : ''}`}</span>
         <span className={styles.rulesToggleHint}>{publishedVersionNo === null ? '公開中のルールはありません' : `公開中 版 ${formatMileageNumber(publishedVersionNo)}`}</span>
         {rulesOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
       </button>
@@ -614,7 +623,7 @@ export default function ScoreTab() {
                 open={ruleMenuId === '__head'}
                 onOpenChange={(next) => setRuleMenuId(next ? '__head' : null)}
                 items={[
-                  { id: 'edit', label: '決めごとの編集画面を開く', external: true, onSelect: () => router.push('/mileage/score-rules') },
+                  { id: 'edit', label: '決めごとの編集画面を開く', external: true, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
                   {
                     id: 'stop',
                     label: '公開中のルールを止める',
@@ -650,7 +659,7 @@ export default function ScoreTab() {
                 const changed = ruleChanged(rule, publishedRules.get(rule.id))
                 const stopped = !rule.enabled
                 return (
-                  <Tr key={rule.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
                     <Td className={styles.colName}><FolderDotName>
                       <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
 
@@ -659,7 +668,7 @@ export default function ScoreTab() {
                     <Td className={styles.colStateWide}>
                       <span className={styles.pill} data-tone={stopped ? 'neutral' : changed ? 'warn' : 'active'}>
                         <span className={styles.pillDot} aria-hidden="true" />
-                        {stopped ? '止めている' : changed ? '下書きで変更' : '公開中'}
+                        {stopped ? '停止中' : changed ? '下書きで変更' : '公開中'}
                       </span>
                     </Td>
                     <Td className={styles.colOpsMenu}>
@@ -670,7 +679,7 @@ export default function ScoreTab() {
                             open={ruleMenuId === rule.id}
                             onOpenChange={(next) => setRuleMenuId(next ? rule.id : null)}
                             items={[
-                              { id: 'edit', label: '編集', external: true, onSelect: () => router.push('/mileage/score-rules') },
+                              { id: 'edit', label: '編集', external: true, href: '/mileage/score-rules', onSelect: () => router.push('/mileage/score-rules') },
                               {
                                 id: 'remove',
                                 label: '外す',
@@ -704,7 +713,7 @@ export default function ScoreTab() {
     <>
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
-          {`${formatMileageNumber(total)}件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)}件`}
+          {`${formatMileageNumber(total)} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, total)} 件`}
         </span>
         <span className={styles.chipGroup}>
           <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
@@ -771,7 +780,7 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setPublishConfirm(false) }}
-          onConfirm={() => void publishDraft()}
+          onConfirm={() => publishDraft()}
         />
         <ConfirmDialog
           open={stopConfirm}
@@ -782,7 +791,7 @@ export default function ScoreTab() {
           busy={rulesBusy}
           error={rulesActionError || undefined}
           onCancel={() => { if (!rulesBusy) setStopConfirm(false) }}
-          onConfirm={() => void stopPublished()}
+          onConfirm={() => stopPublished()}
         />
         <ConfirmDialog
           open={removeTarget !== null}
@@ -911,7 +920,7 @@ export function ScoreAdjustDialog({
       cancelLabel="キャンセル"
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void submit()}
+      onConfirm={() => submit()}
       onCancel={() => { if (!busy) onCancel() }}
     >
       {/* 絵 Nv7An：縦に間 14 の1列。ラベルと入れ物の間は 6。 */}
@@ -942,9 +951,7 @@ export function ScoreAdjustDialog({
           </div>
         </div>
 
-        <div className={styles.dlgGroup}>
-          <label className={styles.dlgFieldLabel} htmlFor="ml-score-amount">点数</label>
-          <input
+        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount"><NumberInput numericText
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -954,12 +961,9 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('amount') || undefined}
             aria-describedby={fields.invalid('amount') ? 'ml-score-amount-error' : undefined}
           />
-          <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError>
-        </div>
+<FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></div>
 
-        <div className={styles.dlgGroup}>
-          <label className={styles.dlgCaption} htmlFor="ml-score-reason">理由</label>
-          <textarea
+        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason"><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}
@@ -969,8 +973,7 @@ export function ScoreAdjustDialog({
             aria-invalid={fields.invalid('reason') || undefined}
             aria-describedby={fields.invalid('reason') ? 'ml-score-reason-error' : undefined}
           />
-          <FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError>
-        </div>
+<FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></div>
 
         <p className={styles.dlgCaption}>この変更で起きること</p>
         <div className={styles.delta3}>
@@ -980,11 +983,11 @@ export function ScoreAdjustDialog({
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更量</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : '—'}</p>
+            <p className={styles.deltaValue}>{validAmount ? `${formatMileageChange(delta)} 点` : emptyValue('unknown')}</p>
           </div>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更後</p>
-            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : '—'}</p>
+            <p className={styles.deltaValue}>{validAmount ? `${formatMileageNumber(scoreAfter)} 点` : emptyValue('unknown')}</p>
           </div>
         </div>
 
@@ -1001,11 +1004,7 @@ export function ScoreAdjustDialog({
 
 /* 明細の日時（絵は「9/02 19:20」。日・時を2桁にそろえ、行の幅をそろえる）。日本時間で出す。 */
 function formatScoreHistoryTime(value: string): string {
-  const time = new Date(value).getTime()
-  if (Number.isNaN(time)) return '—'
-  const jst = new Date(time + 9 * 60 * 60 * 1000)
-  const two = (n: number) => String(n).padStart(2, '0')
-  return `${jst.getUTCMonth() + 1}/${two(jst.getUTCDate())} ${two(jst.getUTCHours())}:${two(jst.getUTCMinutes())}`
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 /*
@@ -1079,7 +1078,7 @@ function ScoreHistoryDialog({
         <span className={styles.dlgAvatar} aria-hidden="true">{friendName.slice(0, 1)}</span>
         <div className={styles.dlgPersonText}>
           <span className={styles.dlgPersonName}>{friendName}</span>
-          <span className={styles.dlgPersonSub}>{`いま ${score != null ? formatMileageNumber(score) : '—'} 点・${bandName(band, highMin, normalMin)}`}</span>
+          <span className={styles.dlgPersonSub}>{`いま ${score != null ? formatMileageNumber(score) : emptyValue('unknown')} 点・${bandName(band, highMin, normalMin)}`}</span>
         </div>
       </div>
 
@@ -1115,7 +1114,7 @@ function ScoreHistoryDialog({
                     {formatMileageChange(item.scoreChange)}
                   </span>
                 </td>
-                <td className={styles.miniNum}>{item.scoreAfter === null ? '—' : formatMileageNumber(item.scoreAfter)}</td>
+                <td className={styles.miniNum}>{item.scoreAfter === null ? emptyValue('unknown') : formatMileageNumber(item.scoreAfter)}</td>
               </tr>
             ))}
           </tbody>

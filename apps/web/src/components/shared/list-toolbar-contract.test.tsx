@@ -1,17 +1,18 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from './list-toolbar'
 
 afterEach(cleanup)
 
 describe('B-178 共通の道具の段の操作', () => {
-  it('検索の変更と消す操作を元の受け口へ返す', () => {
+  it('検索の変更と消す操作を元の受け口へ返す', async () => {
     const onChange = vi.fn()
     render(<ListToolbar search={{ placeholder: '名前を探す', label: '一覧を検索', value: '来店', onChange }} />)
     fireEvent.change(screen.getByRole('searchbox', { name: '一覧を検索' }), { target: { value: '予約' } })
-    expect(onChange).toHaveBeenCalledWith('予約')
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('予約'))
     fireEvent.click(screen.getByRole('button', { name: /消/ }))
     expect(onChange).toHaveBeenCalledWith('')
   })
@@ -51,4 +52,10 @@ describe('B-178 共通の道具の段の操作', () => {
     fireEvent.click(screen.getByRole('button', { name: '注目のみ' }))
     expect(onClick).toHaveBeenCalledOnce()
   })
+})
+
+it('並びは道具の段の共通欄だけで選ぶ', () => {
+  const html = renderToStaticMarkup(<ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} sort={{ value: 'recent', onChange: vi.fn(), options: [{ value: 'recent', label: '新しい順' }] }} />)
+  expect(html).toContain('data-list-sort')
+  expect(html).toContain('aria-label="並び"')
 })

@@ -112,9 +112,11 @@
 
 .fieldCard {
   padding: 20px;
-  border: 1px solid var(--color-hairline);
+
   border-radius: var(--radius-card);
   background: var(--color-canvas);
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
 }
 
 .fieldCardTarget {

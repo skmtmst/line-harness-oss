@@ -538,7 +538,7 @@ function AutomationRunsPageV7() {
       {status === 'loading' ? (
         <ListState kind="loading" title="動いた記録を読み込んでいます" />
       ) : status === 'error' ? (
-        <ListState kind="error" title="動いた記録を読み込めませんでした" description="記録は消えていません。再読み込みしてください。" action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
+        <ListState kind="error" title="動いた記録を読み込めませんでした" description="記録は消えていません。再読み込みしてください。" onRetry={() => void load()} />
       ) : !data || data.items.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border">
           <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />

@@ -1,3 +1,5 @@
+import { archiveRestorePaths } from './archive-restore-openapi.js';
+import { formDocumentPaths } from './form-documents-openapi.js';
 import { folderUpgradePaths } from './folder-upgrade-openapi.js';
 import {auditstepsPaths} from './auditsteps-openapi.js';
 import { tabCountPaths } from './tab-counts-openapi.js';
@@ -403,6 +405,8 @@ const spec = {
   },
   paths: {
     ...folderUpgradePaths,
+    ...archiveRestorePaths,
+    ...formDocumentPaths,
     ...tabCountPaths,
     ...tenantCompanyContactPaths,
     ...chatAttachmentPaths,
@@ -2071,17 +2075,39 @@ const spec = {
       get: { tags: ['HQ Support'], summary: '契約先から見える運営の操作履歴（書き込みを伴ったものだけ）', responses: { '200': { description: 'Visible operator actions for the caller tenant' } } },
     },
     // ── HQ Templates ───────────────────────────────────────────────────────
+    '/api/hq/templates/media/upload-sessions': {
+      post: {
+        tags: ['HQ Templates'], summary: '店を選ばず、統括の動画・音声の直接アップロードを準備する',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['filename', 'mimeType', 'sizeBytes'], properties: { filename: { type: 'string', maxLength: 200 }, mimeType: { enum: ['video/mp4', 'audio/mp4'] }, sizeBytes: { type: 'integer', minimum: 1, maximum: 209715200 } } } } } },
+        responses: { '201': { description: '15分有効の署名付きPUT URL、必須ヘッダー、セッションIDと期限' }, '403': { description: '統括全体の編集権限がない' }, '422': { description: '形式・容量が不正' }, '500': { description: '直接アップロード未設定' } },
+      },
+    },
+    '/api/hq/templates/media/upload-sessions/{id}/complete': {
+      post: {
+        tags: ['HQ Templates'], summary: '統括の動画・音声を容量・形式・ETag・長さで検査し、受取記録を返す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['etag'], properties: { etag: { type: 'string' } } } } } },
+        responses: { '201': { description: 'メディアの受取記録。再要求も同じ記録を返す。安全性の確認が終わるまで公開・配布しない' }, '403': { description: '統括全体の編集権限がない' }, '404': { description: '利用者・統括に属するセッションがない' }, '409': { description: '期限切れ・内容不一致・取り込み未確定' }, '422': { description: 'ファイル形式・長さが不正' } },
+      },
+    },
+    '/api/hq/templates/media/upload-sessions/{id}': {
+      delete: {
+        tags: ['HQ Templates'], summary: '未完了の統括アップロードを取り消す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'セッションを失効し、未完了のファイルを削除' }, '403': { description: '統括全体の編集権限がない' }, '404': { description: '利用者・統括に属するセッションがない' }, '409': { description: '完了済みのファイルは取り消せない' } },
+      },
+    },
     '/api/hq/templates/media': {
       post: {
         tags: ['HQ Templates'], summary: '統括ひな形のPNG/JPEG画像を登録',
         parameters: [
-          { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu', 'rich_message'] } },
+          { name: 'purpose', in: 'query', required: true, schema: { type: 'string', enum: ['message', 'rich_menu', 'rich_message', 'rich_video_preview'] } },
           { name: 'filename', in: 'query', required: true, schema: { type: 'string', minLength: 1, maxLength: 200 } },
           { name: 'width', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる幅。画像が違う寸法なら登録せず422' },
           { name: 'height', in: 'query', required: false, schema: { type: 'integer' }, description: '採用できる高さ。画像が違う寸法なら登録せず422' },
         ],
         requestBody: { required: true, content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } } } },
-        responses: { '201': { description: '統括の画像。rich_messageは5サイズのmediaとbaseUrl/baseSizeを返す。message/rich_menuの同一再送は既存画像を再利用する' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
+        responses: { '201': { description: '統括の画像。rich_message・rich_video_previewは原本と5サイズのmediaとbaseUrl/baseSizeを返す。message/rich_menuの同一再送は既存画像を再利用する' }, '403': { description: 'Tenant-wide owner/admin write permission required' }, '422': { description: 'Invalid image, dimensions, size or unconfirmed upload' } },
       },
       delete: {
         tags: ['HQ Templates'], summary: '採用されなかった統括ひな形の画像を回収（所有確認つき）',
@@ -2359,7 +2385,41 @@ const spec = {
       post: {
         tags: ['Dashboard'], summary: '印刷用PDFをサーバーで作る（止めた経路は出さない）',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'A4 PDF' }, '404': { description: 'Not found' }, '409': { description: '経路は停止中' } },
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { paper: { type: 'string', enum: ['A4', 'A5'], default: 'A4' } } } } } },
+        responses: { '200': { description: 'A4 または A5 の店頭用PDF', content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } } }, '400': { description: '用紙の指定が正しくない' }, '404': { description: '経路が見つからない、または閲覧範囲外' }, '409': { description: '経路またはクーポンが利用できない' } },
+      },
+    },
+    '/api/entry-routes/{id}/qr-image': {
+      post: {
+        tags: ['Dashboard'], summary: '流入経路のQR画像を保存する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: {
+          format: { type: 'string', enum: ['png', 'svg'], default: 'png' },
+          size: { type: 'string', enum: ['small', 'medium', 'large'], default: 'medium', description: '256・512・1024ピクセル' },
+        } } } } },
+        responses: { '200': { description: 'QR画像', content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/svg+xml': { schema: { type: 'string', format: 'binary' } } } }, '400': { description: '形式または大きさが正しくない' }, '404': { description: '経路が見つからない、または閲覧範囲外' }, '409': { description: '経路は停止中' } },
+      },
+    },
+    '/api/liff/entry-route-coupon': {
+      post: {
+        tags: ['LIFF'], summary: '流入経路のクーポンを本人として受け取る（同じ経路では1人1回）',
+        security: [],
+        description: '管理APIキーは使わず、店舗のLINE Login IDトークンで個別に本人確認する。',
+        parameters: [{ name: 'Authorization', in: 'header', required: true, schema: { type: 'string' }, description: 'Bearer <LINE Login IDトークン>' }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } } } },
+        responses: { '200': { description: '受け取ったクーポンと使用回数（再読込では同じ受取記録）' }, '400': { description: '経路の指定が正しくない' }, '401': { description: 'LINEの本人確認が必要' }, '404': { description: '経路または友だちが見つからない' }, '409': { description: 'クーポンが利用できない、または対象外' } },
+      },
+    },
+    '/api/liff/entry-route-coupon/use': {
+      post: {
+        tags: ['LIFF'], summary: '本人が受け取ったクーポンの使用を記録する（再試行は同じ結果）',
+        security: [],
+        description: '管理APIキーは使わず、店舗のLINE Login IDトークンで個別に本人確認する。',
+        parameters: [{ name: 'Authorization', in: 'header', required: true, schema: { type: 'string' }, description: 'Bearer <LINE Login IDトークン>' }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['receiptId', 'requestId'], properties: {
+          receiptId: { type: 'string' }, requestId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$' },
+        } } } } },
+        responses: { '200': { description: '使用を記録した結果（同じrequestIdは重複記録しない）' }, '400': { description: '受取記録または再試行の識別子が正しくない' }, '401': { description: 'LINEの本人確認が必要' }, '404': { description: '本人の受取記録が見つからない' }, '409': { description: '使用済み、期限切れ、またはクーポンが利用できない' } },
       },
     },
     // ── 広告費 (#818) ────────────────────────────────────────────────────

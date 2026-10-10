@@ -2,54 +2,35 @@
  * 予約枠・在庫（Y8SjT2 ほか）の表示の形。今の画面（app/restaurant-test/v8/inventory.tsx）から写し、
  * 絵の書き方（「19:00 の卓」「10/2・金」「T1〜T4」）に合わせた。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
 import type { RestaurantTable } from '@/lib/restaurant-test-api'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
-function dateParts(date: Date, timezone?: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
-  return Object.fromEntries(parts.map(({ type, value }) => [type, value]))
-}
+
 
 export function slotTimeLabel(startsAt: string, timezone?: string): string {
-  const date = new Date(startsAt)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = dateParts(date, timezone)
-  return `${Number(parts.hour)}:${parts.minute}`
+  return polishFormatDate(startsAt, { style: 'time', timeZone: timezone || 'Asia/Tokyo' })
 }
 
 /** 「10/2・金」 */
 export function dayLabel(ymd: string): string {
-  const [y, m, d] = ymd.split('-').map(Number)
-  if (!y || !m || !d) return ''
-  const date = new Date(y, m - 1, d)
-  return `${m}/${d}・${WEEKDAY[date.getDay()]}`
+  return polishFormatDate(ymd, { style: 'list-day-weekday', fallback: '' })
 }
 
 /** 「10/2（金）」 */
 export function dayLabelParen(ymd: string): string {
-  const [y, m, d] = ymd.split('-').map(Number)
-  if (!y || !m || !d) return ''
-  const date = new Date(y, m - 1, d)
-  return `${m}/${d}（${WEEKDAY[date.getDay()]}）`
+  return polishFormatDate(ymd, { style: 'list-day-weekday', fallback: '' })
 }
 
 /** 「10/2 18:42」 */
 export function formatAt(value: string | null, timezone?: string): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = dateParts(date, timezone)
-  return `${Number(parts.month)}/${Number(parts.day)} ${parts.hour.padStart(2, '0')}:${parts.minute}`
+  return polishFormatDate(value, { style: 'list', timeZone: timezone || 'Asia/Tokyo' })
 }
 
 /** 「14:02」 */
 export function formatTime(value: string | null | undefined, timezone?: string): string {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const parts = dateParts(date, timezone)
-  return `${Number(parts.hour)}:${parts.minute}`
+  return polishFormatDate(value, { style: 'time', fallback: '', timeZone: timezone || 'Asia/Tokyo' })
 }
 
 /** 「中川 由美」→「中川さん」 */

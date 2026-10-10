@@ -1,11 +1,14 @@
 'use client'
 
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+
 /*
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
  * 動画（差し替える・準備の段）→ 公開期間（オンデマンド）／開催回（日時指定）→ 配信枠 → 視聴の数え方。
  * 右は公開ページでの見え方。
  * 口・保存の決まりは app/webinars/edit/video-v8.tsx・video-stages.tsx・scheduled-session-row.tsx と同じ（BEHAVIOR.md）。
  */
+import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
@@ -35,16 +38,17 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { Field } from '@/components/shared/form-controls'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import NumberInput from '@/components/shared/number-field'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 
 /** JST の「10/8（木）20:00」。 */
 function shortJst(iso: string): string {
-  const time = Date.parse(iso)
-  if (Number.isNaN(time)) return iso
-  const d = new Date(time + 9 * 60 * 60 * 1000)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEKDAY[d.getUTCDay()]}）${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
+  return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 /** datetime-local の字面を JST で（`2026-10-01T10:00`）。 */
 function localJst(value: string | null | undefined): string {
@@ -53,7 +57,7 @@ function localJst(value: string | null | undefined): string {
   return Number.isNaN(time) ? '' : new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
 }
 function toJstIso(local: string): string {
-  return `${local}:00+09:00`
+  return datetimeLocalJstToUtcIso(local)
 }
 
 function ruleView(rule: WebinarScheduleRule): { kind: string; tone: 'success' | 'neutral' | 'warn'; detail: string } {
@@ -70,7 +74,7 @@ function sessionText(session: WebinarSessionCapacity | null | undefined, failed:
   if (session === null) return '定員なし'
   if (session.state === 'closed') return '受付終了'
   if (session.state === 'full') return '満員'
-  return session.remaining === null ? '受付中' : `残り ${formatNumber(session.remaining)}人`
+  return session.remaining === null ? '受付中' : `残り ${formatNumber(session.remaining)} 人`
 }
 
 /** 開催回1つぶんの定員・申込（口 webinarApi.webinarSession）。 */
@@ -156,7 +160,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       ctx.onWebinarSaved(res.data)
       return true
     } catch (cause) {
-      setPeriodError(describeSaveFailure(cause))
+      setPeriodError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       return false
     } finally {
       periodLock.current = false
@@ -179,7 +183,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       ctx.onWebinarSaved(res.data)
       return true
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
       return false
     } finally {
       setBusy(false)
@@ -258,7 +262,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       actions={chrome.actions}
       identity={chrome.identity}
       steps={chrome.steps}
-      description={scheduled
+      help={scheduled
         ? '日時指定配信：開催回ごとに日時と定員を決めます。動画は準備（変換など）が済んでから公開できます。'
         : '動画と、見られる期間を決めます。見終わったかどうかの決め方もここで決めます。'}
       footerActions={chrome.footerActions}
@@ -276,8 +280,8 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         </div>
         {ctx.canOpenPublicPage && ctx.publicUrl ? (
           <div className={form.previewActions}>
-            <Button href={ctx.publicUrl} target="_blank" rel="noreferrer"><Monitor size={15} aria-hidden="true" />PC で見る</Button>
-            <Button href={ctx.publicUrl} target="_blank" rel="noreferrer"><Smartphone size={15} aria-hidden="true" />スマホで見る</Button>
+            <Button external href={ctx.publicUrl}  ><Monitor size={15} aria-hidden="true" />PC で見る</Button>
+            <Button external href={ctx.publicUrl}  ><Smartphone size={15} aria-hidden="true" />スマホで見る</Button>
           </div>
         ) : ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}
@@ -318,17 +322,11 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         <section className={form.card} aria-labelledby="webinar-period-title">
           <div className={form.cardHead}><h2 id="webinar-period-title" className={form.cardTitle}>公開期間</h2></div>
           <div className={form.pair}>
-            <div className={form.field}>
-              <label className={form.label} htmlFor="webinar-period-start">公開の開始</label>
-              <DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} />
-            </div>
-            <div className={form.field}>
-              <label className={form.label} htmlFor="webinar-period-end">公開の終了<span className={form.optional}>任意</span></label>
-              {noEnd
+            <div className={form.field}><Field label="公開の開始" htmlFor="webinar-period-start"><DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} /></Field></div>
+            <div className={form.field}><Field label="公開の終了" htmlFor="webinar-period-end">{noEnd
                 ? <TextField id="webinar-period-end" value="なし（いつでも）" readOnly onFocus={() => { if (!readOnly) setNoEnd(false) }} />
                 : <DateTimeField id="webinar-period-end" value={endsAt} readOnly={readOnly} onChange={setEndsAt} />}
-              {!readOnly && !noEnd ? <Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox> : null}
-            </div>
+{!readOnly && !noEnd ? <Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox> : null}</Field></div>
           </div>
           {periodError ? <Notice tone="danger">{periodError}</Notice> : null}
         </section>
@@ -359,7 +357,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         </section>
       ) : (
         <section className={form.card} data-gap="tight" aria-labelledby="webinar-rules-title">
-          <div className={form.cardHeadRow}><h2 id="webinar-rules-title" className={form.cardTitle}>{`配信枠 ${webinar.schedule.length}件`}</h2></div>
+          <div className={form.cardHeadRow}><h2 id="webinar-rules-title" className={form.cardTitle}>{`配信枠 ${webinar.schedule.length} 件`}</h2></div>
           <p className={styles.desc}>視聴できる時間の枠です。枠が0件だと公開できません。</p>
           {webinar.schedule.map((rule, index) => <RuleRow key={index} rule={rule} webinarId={webinar.id} menu={ruleMenu(index, `枠${index + 1}`)} />)}
           {webinar.schedule.length === 0 ? <p className={form.cardNote}>まだ枠がありません。下の「枠を足す」から足してください。</p> : null}
@@ -376,17 +374,11 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       <section className={form.card} aria-labelledby="webinar-count-title">
         <div className={form.cardHead}><h2 id="webinar-count-title" className={form.cardTitle}>視聴の数え方</h2></div>
         <div className={form.pair}>
-          <div className={form.field}>
-            <label className={form.labelSmall} htmlFor="webinar-completion">視聴完了とみなす</label>
-            <TextField id="webinar-completion" readOnly value="90%以上見たら視聴完了（変えられません）" title="視聴完了の決め方はサーバーが決めています（動画の9割以上）" />
-          </div>
-          <div className={form.field}>
-            <label className={form.labelSmall} htmlFor="webinar-policy">結果が取れないとき</label>
-            {readOnly
+          <div className={form.field}><Field label="視聴完了とみなす" htmlFor="webinar-completion"><TextField id="webinar-completion" readOnly value="90%以上見たら視聴完了（変えられません）" title="視聴完了の決め方はサーバーが決めています（動画の9割以上）" /></Field></div>
+          <div className={form.field}><Field label="結果が取れないとき" htmlFor="webinar-policy">{readOnly
               ? <ReadValue label="結果が取れないとき">{policy === 'escalate' ? '担当へ上げる' : '翌日に取り直す'}</ReadValue>
               : <Select id="webinar-policy" aria-label="結果が取れないとき" size="full" value={policy} disabled={policyBusy} onChange={(value) => void savePolicy(value as 'escalate' | 'retry_next_day')} options={[{ value: 'retry_next_day', label: '翌日に取り直す' }, { value: 'escalate', label: '担当へ上げる' }]} />}
-            {policyError ? <p className={form.fieldError} role="alert">{policyError}</p> : null}
-          </div>
+{policyError ? <p className={form.fieldError} role="alert">{policyError}</p> : null}</Field></div>
         </div>
       </section>
 
@@ -455,12 +447,12 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
       <span className={styles.colCap}>
         {editing ? (
           <span className={styles.capEdit}>
-            <TextField id={capId} aria-label={`${when}の定員（人）`} inputMode="numeric" value={input} disabled={saving} placeholder="無制限" invalid={Boolean(capError)} aria-describedby={capError ? `${capId}-error` : undefined} onChange={(event) => { setInput(event.target.value); setCapError('') }} />
+            <NumberInput numericText id={capId} aria-label={`${when}の定員（人）`} inputMode="numeric" value={input} disabled={saving} placeholder="無制限" invalid={Boolean(capError)} aria-describedby={capError ? `${capId}-error` : undefined} onChange={(event) => { setInput(event.target.value); setCapError('') }} />
             <IconButton aria-label="定員を保存" title="定員を保存" disabled={saving} onClick={() => void save()}><Check size={15} aria-hidden="true" /></IconButton>
           </span>
-        ) : <span className={styles.cell}>{session === undefined ? '—' : session?.capacity == null ? '無制限' : `${formatNumber(session.capacity)} 人`}</span>}
+        ) : <span className={styles.cell}>{session === undefined ? emptyValue('unknown') : session?.capacity == null ? '無制限' : `${formatNumber(session.capacity)} 人`}</span>}
       </span>
-      <span className={styles.colCount}><span className={styles.cell}>{session ? `${formatNumber(session.reservedCount)} 人` : '—'}</span></span>
+      <span className={styles.colCount}><span className={styles.cell}>{session ? `${formatNumber(session.reservedCount)} 人` : emptyValue('unknown')}</span></span>
       <span className={styles.colState}>
         <span className={form.pill} data-tone={session?.state === 'full' ? 'warn' : session?.state === 'open' ? 'info' : undefined}><span className={form.pillDot} aria-hidden="true" />{sessionText(session, failed)}</span>
       </span>
@@ -524,11 +516,11 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
             ))}
           </div>
         ) : null}
-        {mode === 'one' && kind === 'once' ? <div className={form.field}><label htmlFor="wd-rule-date" className={form.labelSmall}>日付</label><input id="wd-rule-date" type="date" className={styles.dateInput} value={date} aria-invalid={dateErrors.date ? true : undefined} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(event) => { setDate(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></div> : null}
+        {mode === 'one' && kind === 'once' ? <div className={form.field}><Field label="日付" htmlFor="wd-rule-date"><DateField id="wd-rule-date" value={date} invalid={Boolean(dateErrors.date)} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(value) => { setDate(value); setDateErrors({}) }} /><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></Field></div> : null}
         {mode === 'bulk' ? (
           <div className={form.pair}>
-            <div className={form.field}><label htmlFor="wd-rule-from" className={form.labelSmall}>始まり</label><input id="wd-rule-from" type="date" className={styles.dateInput} value={from} aria-invalid={dateErrors.from ? true : undefined} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(event) => { setFrom(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></div>
-            <div className={form.field}><label htmlFor="wd-rule-to" className={form.labelSmall}>終わり</label><input id="wd-rule-to" type="date" className={styles.dateInput} value={to} aria-invalid={dateErrors.to ? true : undefined} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(event) => { setTo(event.target.value); setDateErrors({}) }} /><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></div>
+            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from"><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
+            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to"><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
           </div>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></div>
@@ -572,7 +564,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
       ctx.onWebinarSaved(res.data)
       onClose()
     } catch (cause) {
-      setError(describeSaveFailure(cause))
+      setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
     } finally {
       setBusy(false)
     }
@@ -591,7 +583,7 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
   }
   const nexts = asset === null ? (['uploaded'] as WebinarVideoAsset['stage'][]) : asset ? NEXT_STAGE[asset.stage] ?? [] : []
   return (
-    <Dialog open title="動画を差し替える" description="登録メディアの動画から選びます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。" confirmLabel="保存する" busy={busy} error={error || undefined} onConfirm={() => void save()} onCancel={() => { if (!busy) onClose() }}>
+    <Dialog open title="動画を差し替える" description="登録メディアの動画から選びます。保存しても、公開中の内容は「確認」で公開し直すまで変わりません。" confirmLabel="保存する" busy={busy} error={error || undefined} onConfirm={() => save()} onCancel={() => { if (!busy) onClose() }}>
       <div className={styles.dialogBody}>
         {mediaError ? <Notice tone="info">登録メディアの動画を読み込めませんでした。</Notice> : null}
         <Select label="動画" aria-label="動画" size="full" value={choice} disabled={media === null && !mediaError} onChange={setChoice} options={[
@@ -600,11 +592,12 @@ function ReplaceVideoDialog({ ctx, asset, onAsset, onClose }: { ctx: EditContext
           ...(media ?? []).map((item) => ({ value: item.id, label: item.filename })),
           ...(choice && choice !== EXTERNAL && media && !media.some((item) => item.id === choice) ? [{ value: choice, label: '今の動画' }] : []),
         ]} />
-        <div className={form.field}><label htmlFor="wd-minutes" className={form.labelSmall}>動画の長さ（分）</label><TextField id="wd-minutes" inputMode="numeric" value={minutes} invalid={Boolean(minutesError)} aria-describedby={minutesError ? 'wd-minutes-error' : undefined} onChange={(event) => { setMinutes(event.target.value); setMinutesError('') }} /><FieldError id="wd-minutes-error">{minutesError}</FieldError></div>
+        <div className={form.field}><Field label="動画の長さ（分）" htmlFor="wd-minutes"><NumberInput numericText unit="分" id="wd-minutes" inputMode="numeric" value={minutes} invalid={Boolean(minutesError)} aria-describedby={minutesError ? 'wd-minutes-error' : undefined} onChange={(event) => { setMinutes(event.target.value); setMinutesError('') }} />
+<FieldError id="wd-minutes-error">{minutesError}</FieldError></Field></div>
         {nexts.length > 0 ? (
           <div className={form.field}>
             <span className={form.labelSmall}>動画の準備（検査・変換・配信の形・表紙を通した動画だけ公開できます）</span>
-            <div className={form.buttons}>{nexts.map((next) => <Button key={next} disabled={busy} onClick={() => void advance(next)}>{NEXT_LABEL[next] ?? next}</Button>)}</div>
+            <div className={form.buttons}>{nexts.map((next) => <Button key={next} disabled={busy} onClick={() => void advance(next)} busy={Boolean(busy)} busyLabel="処理中…">{NEXT_LABEL[next] ?? next}</Button>)}</div>
           </div>
         ) : null}
       </div>

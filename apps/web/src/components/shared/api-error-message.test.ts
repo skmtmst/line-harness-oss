@@ -3,17 +3,17 @@ import { ApiError } from '@/lib/api'
 import { classifyApiFailure, describeApiFailure, isForbiddenOrRateLimited, japaneseDetailOf, loadFailureCopy, loadFailureNotice, retryAfterSecondsOf } from './api-error-message'
 
 describe('APIの失敗を原因どおりに言い分ける（R32）', () => {
-  it('403は権限不足に分け、統括への依頼を案内する', () => {
+  it('403は権限不足に分け、店舗のオーナーか管理者への依頼を案内する', () => {
     const err = new ApiError(403, 'API error: 403')
     expect(classifyApiFailure(err)).toBe('forbidden')
-    expect(describeApiFailure(err, '作成')).toContain('統括')
+    expect(describeApiFailure(err, '作成')).toContain('オーナーか管理者に頼んでください')
     expect(describeApiFailure(err, '作成')).not.toContain('通信')
   })
 
-  it('呼び出し側の指定で403の案内を変えられる', () => {
+  it('統括では統括の管理者へ頼み、自由な上書きは受け付けない', () => {
     const err = new ApiError(403, 'API error: 403')
-    expect(describeApiFailure(err, '作成', { forbidden: '受け取り口の作成は統括だけができます。' }))
-      .toBe('受け取り口の作成は統括だけができます。')
+    expect(describeApiFailure(err, '作成', { scope: 'hq', forbidden: '受け取り口の作成は統括だけができます。' }))
+      .toBe('この操作の権限がありません。統括の管理者に頼んでください。')
   })
 
   it('400/422は入力の直しに分け、欄の下と組み合わせられる', () => {
@@ -112,4 +112,11 @@ describe('読み込み失敗の1枚（403・429の出し分け）', () => {
     expect(loadFailureNotice(new ApiError(500, 'API error: 500'), 'この画面'))
       .not.toContain('API error')
   })
+})
+
+it('B-158 決まり6：日本語の403でも画面独自の頼む先へ戻さず、統括の読み込みも同じ文を出す', () => {
+  const error = new ApiError(403, '運営へ連絡してください')
+  expect(japaneseDetailOf(error)).toBe('')
+  expect(describeApiFailure(error, '表示')).toBe('この操作の権限がありません。オーナーか管理者に頼んでください。')
+  expect(loadFailureCopy(error, '会員', 'hq')).toMatchObject({ description: 'この操作の権限がありません。統括の管理者に頼んでください。', retryable: false })
 })

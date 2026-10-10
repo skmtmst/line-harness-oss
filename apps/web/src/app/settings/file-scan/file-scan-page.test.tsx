@@ -270,14 +270,14 @@ describe('ファイルの検査の設定画面', () => {
     fireEvent.click(screen.getByRole('button', { name: 'invoice.pdfのその他操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
     await waitFor(() => {
-      expect(screen.getByText('ファイルを削除する')).toBeTruthy()
+      expect(screen.getByText('「invoice.pdf」を削除しますか？')).toBeTruthy()
     })
     confirmInDialog('削除する')
     const message = 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
     await waitFor(() => {
       expect(screen.getByText(message)).toBeTruthy()
     })
-    expect(screen.getByText('ファイルを削除する')).toBeTruthy()
+    expect(screen.getByText('「invoice.pdf」を削除しますか？')).toBeTruthy()
     expect(container.querySelector('p[role="alert"]')).toBeNull()
   })
 

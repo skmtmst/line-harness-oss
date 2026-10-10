@@ -256,7 +256,7 @@ export function ApprovalStatusSection({
   }
   if (approval.status === 'rejected') {
     return (
-      <section aria-label="差し戻し" className="bg-canvas rounded-card border-hairline border p-5">
+      <section aria-label="差し戻し" className="bg-canvas rounded-card content-card border p-5">
         <p className="text-ink text-sm font-semibold">差し戻されました</p>
         <p className="text-ink-secondary mt-1 text-xs leading-5">
           理由：{approval.rejectReason || '—'}
@@ -269,7 +269,7 @@ export function ApprovalStatusSection({
   }
   if (approval.status === 'expired') {
     return (
-      <section aria-label="期限切れ" className="bg-canvas rounded-card border-hairline border p-5">
+      <section aria-label="期限切れ" className="bg-canvas rounded-card content-card border p-5">
         <p className="text-ink text-sm font-semibold">期限切れです</p>
         <p className="text-ink-secondary mt-1 text-xs leading-5">
           承認されないまま予約の時刻を過ぎたため、送っていません。送るには作り直してください。
@@ -279,7 +279,7 @@ export function ApprovalStatusSection({
   }
   if (approval.status === 'approved') {
     return (
-      <section aria-label="承認済み" className="bg-canvas rounded-card border-hairline border p-5">
+      <section aria-label="承認済み" className="bg-canvas rounded-card content-card border p-5">
         <p className="text-ink text-sm font-semibold">承認されています</p>
         <p className="text-ink-faint mt-1 text-xs leading-5">
           {scheduledLabel ? `${scheduledLabel}に送ります。` : '送る操作へ進めます。'}
@@ -326,7 +326,7 @@ export function ApproverSection({
   const [rejectReason, setRejectReason] = useState('')
   if (approval.status !== 'pending' || !viewer.isApprover) return null
   return (
-    <section aria-label="承認の依頼" className="bg-canvas rounded-card border-hairline border p-5">
+    <section aria-label="承認の依頼" className="bg-canvas rounded-card content-card border p-5">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-ink flex items-center gap-1 text-sm font-semibold">
           承認の依頼

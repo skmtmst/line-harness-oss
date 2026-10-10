@@ -159,7 +159,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
   it('上のタブで種類を替える（店と同じ6種類）', async () => {
     const h = await render()
     const tabs = [...document.querySelectorAll('[role="tab"], a, button')].map((el) => el.textContent ?? '')
-    for (const label of ['メッセージ', 'カルーセル', 'リッチメッセージ', '質問', 'クーポン', 'リサーチ']) expect(tabs.some((text) => text.startsWith(label))).toBe(true)
+    for (const label of ['メッセージ', 'カルーセル', 'リッチメッセージ', 'リッチビデオ', '質問', 'クーポン', 'リサーチ']) expect(tabs.some((text) => text.startsWith(label))).toBe(true)
     const carousel = [...document.querySelectorAll('button, a')].find((el) => el.textContent?.startsWith('カルーセル'))
     await act(async () => { (carousel as HTMLElement).click() })
     expect(h.onKindChange).toHaveBeenCalledWith('carousel')

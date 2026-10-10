@@ -16,6 +16,8 @@ import type { RestaurantSnapshot } from '@/lib/restaurant-test-api'
 import RestaurantFrame from '../common-a/frame'
 import { HalfGrid, Panel, PanelAside, StatRow, Status } from '../common-a/parts'
 import styles from './stores.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
   /* 集計は今日以降の有効予約だけを見る（今の画面と同じ R104）。 */
@@ -43,7 +45,7 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
       <Panel
         title="店舗一覧"
         description="本部から全店の予約と接続状態を確認します。"
-        aside={<PanelAside tone={issues ? 'warning' : 'success'}>{issues ? `${issues}件の要確認` : 'すべて正常'}</PanelAside>}
+        aside={<PanelAside tone={issues ? 'warning' : 'success'}>{issues ? `${issues} 件の要確認` : 'すべて正常'}</PanelAside>}
         flush
       >
         <div role="table" aria-label="店舗一覧" className={styles.table}>
@@ -64,10 +66,10 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
             return (
               <div key={item.id} role="row" className={styles.row}>
                 <span role="cell" className={`${styles.cell} ${styles.colStore}`}>
-                  <span className={styles.storeName} title={item.name}>{item.name}</span>
+                  <span className={styles.storeName} ><TruncatedText value={String(item.name ?? '')} /></span>
                   <span className={styles.storeCode}>{item.code}</span>
                 </span>
-                <span role="cell" className={`${styles.cell} ${styles.colArea}`}>{item.area || '—'}</span>
+                <span role="cell" className={`${styles.cell} ${styles.colArea}`}>{item.area || emptyValue('unknown')}</span>
                 <span role="cell" className={`${styles.cell} ${styles.colCount} ${styles.num}`}>{`${reservations.length}件`}</span>
                 <span role="cell" className={`${styles.cell} ${styles.colGuests} ${styles.num}`}>{`${reservations.reduce((s, r) => s + r.guest_count, 0)}名`}</span>
                 <span role="cell" className={`${styles.cell} ${styles.colCapacity} ${styles.num}`}>{`${item.capacity}席`}</span>

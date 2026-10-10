@@ -7,6 +7,7 @@
  * 口は今の画面と同じ（GET/PUT /api/nen/feeding-products）。
  * 行は文字で見せ、商品名を押すとその行だけ入力欄になる（足した行は最初から入力欄）。
  */
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
 import Card from '@/components/shared/card'
@@ -26,6 +27,9 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen-ranks-api'
 import { Pill } from './parts'
 import styles from './pets.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import NumberInput from '@/components/shared/number-field'
 
 /** 係数の説明（Worker `services/nen-feeding.ts` の ENERGY_FACTORS と同じ値）。 */
 const FACTOR_ROWS: Array<{ label: string; dog: string; cat: string }> = [
@@ -150,12 +154,12 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
       setDrafts(fromData(res.data))
       setTreatLimit(String(res.data.treatLimitPercent ?? 10))
       setDirty(false)
-      setNotice(res.data.refreshedPets
+      notifySaved(res.data.refreshedPets
         ? `主食を保存し、登録済みのペット ${formatNumber(res.data.refreshedPets)}頭の目安を計算し直しました。`
         : '主食を保存しました。')
     } catch (caught) {
       setError(describeApiFailure(caught, '主食の保存', {
-        forbidden: '主食を保存する権限がありません。権限を確認してください。',
+        scope: 'store',
       }))
     } finally {
       setBusy(false)
@@ -187,19 +191,16 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
               <p className={styles.cardDesc}>然の商品名と 100g あたりのカロリーを登録すると、マイページに「然の鹿肉の目安」が出ます</p>
             </div>
             <ProductTable {...tableProps} kind="nen" defaultHead="目安に使う商品" defaultChip="目安に使う中" makeDefault="これを使う" addLabel="然の商品を追加する" onAdd={() => add('nen')} />
-            <div className={styles.treat}>
-              <label className={styles.treatLabel} htmlFor="nen-treat-limit">おやつの上限（%）</label>
-              <span className={styles.treatRow}>
+            <div className={styles.treat}><Field label="おやつの上限（%）" htmlFor="nen-treat-limit"><span className={styles.treatRow}>
                 <span className={styles.treatInput}>
                   {canEdit ? (
-                    <TextField disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} />
+                    <NumberInput numericText unit="%" disabled={busy} id="nen-treat-limit" inputMode="numeric" value={treatLimit} onChange={(event) => { setTreatLimit(event.target.value); touch() }} />
                   ) : (
                     <TextField id="nen-treat-limit" value={treatLimit} readOnly />
                   )}
                 </span>
                 <span className={styles.treatNote}>1日の必要カロリーのうち、おやつに回す割合</span>
-              </span>
-            </div>
+              </span></Field></div>
           </Card>
         </div>
 
@@ -285,9 +286,9 @@ function ProductTable({
               {row.editing && canEdit ? (
                 <><TextField {...fields.bind(`feeding-name-${row.key}`)} disabled={busy} aria-label="商品名" value={row.name} maxLength={40} placeholder={kind === 'nen' ? '例：然 鹿肉ジャーキー' : '例：ドライフード'} onChange={(event) => onUpdate(row.key, { name: event.target.value })} /><FieldError id={`feeding-name-${row.key}-error`}>{fields.error(`feeding-name-${row.key}`)}</FieldError></>
               ) : canEdit ? (
-                <button type="button" disabled={busy} className={styles.productNameButton} title={`${row.name}を直す`} onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
+                <button type="button" disabled={busy} className={styles.productNameButton} title={`${row.name}を直す`}  onClick={() => onUpdate(row.key, { editing: true })}>{row.name}</button>
               ) : (
-                <span className={styles.cell} title={row.name}>{row.name}</span>
+                <span className={styles.cell} ><TruncatedText value={String(row.name ?? '')} /></span>
               )}
             </span>
             <span className={styles.productKcal} role="cell">

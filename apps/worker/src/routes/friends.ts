@@ -1,4 +1,5 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { hydrateDocumentAnswers } from '../services/form-documents.js';
 import { getFriendSummary } from '@line-crm/db';
 import { getFriendUpcomingItems } from '../services/friend-upcoming-items.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
@@ -48,7 +49,7 @@ import {
   isValidIdempotencyKey,
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
-import { compileSavedSearch } from '../services/saved-search-filter.js';
+import { compileSavedSearch, friendFieldValueSql } from '../services/saved-search-filter.js';
 import { getSavedSearchMatchPreview } from '../services/saved-search-insights.js';
 import { listLimit, listOffset } from './list-pagination.js';
 
@@ -529,12 +530,12 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     for (const [key, value] of url.searchParams.entries()) {
       if (key.startsWith('metadata.')) {
         const metaKey = key.slice('metadata.'.length);
-        conditions.push(`json_extract(f.metadata, '$.' || ?) = ?`);
+        conditions.push(`${friendFieldValueSql()} = ?`);
         binds.push(metaKey, value);
       } else if (key.startsWith('metadataNot.')) {
         const metaKey = key.slice('metadataNot.'.length);
         conditions.push(
-          `(json_extract(f.metadata, '$.' || ?) IS NULL OR json_extract(f.metadata, '$.' || ?) != ?)`,
+          `(${friendFieldValueSql()} IS NULL OR ${friendFieldValueSql()} != ?)`,
         );
         binds.push(metaKey, metaKey, value);
       }
@@ -1224,7 +1225,7 @@ friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
       includeSubmissions ? getFormSubmissionsByFriend(db, id, 10) : Promise.resolve([]),
       countFriendFormSubmissions(db, id).catch(() => null),
       /*
-       * 対応の状況（対応マーク・担当者・個別メモ）。
+       * 対応の状況（対応マーク・担当者・メモ）。
        *
        * 詳細画面はこれを出す設計だが、これまで返していなかったので
        * 「受信箱で扱っています」という案内文しか置けなかった。同じ人の
@@ -1292,7 +1293,7 @@ friends.get('/api/friends/:id/form-submissions', requireVisibleFriend, async (c)
     return c.json({
       success: true,
       data: {
-        items: page.items.map(serializeFriendFormSubmission),
+        items: await Promise.all(page.items.map(async row => { const item = serializeFriendFormSubmission(row); return { ...item, data: await hydrateDocumentAnswers(c.env.DB, item.data, c.get('staff')?.role, row.id) }; })),
         total,
         nextCursor: page.nextCursor,
       },

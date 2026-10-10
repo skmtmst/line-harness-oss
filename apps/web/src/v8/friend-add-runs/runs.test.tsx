@@ -144,7 +144,7 @@ describe('実行結果の画面（REIxB）', () => {
   it('数の帯・失敗の帯・表・下の2枚が出る', async () => {
     await render()
     expect(host.querySelector('[data-design-node="REIxB"]')).toBeTruthy()
-    expect(host.textContent).toContain('失敗した処理が 2件あります')
+    expect(host.textContent).toContain('失敗した処理が 2 件あります')
     expect(host.textContent).toContain('山田 太郎')
     expect(host.textContent).toContain('経路ごとの内訳')
     expect(host.textContent).toContain('二重送信を防ぐ・知らせ')
@@ -167,7 +167,7 @@ describe('実行結果の画面（REIxB）', () => {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
     }
     expect(retried).toEqual(['run-f1', 'run-f2'])
-    expect(host.textContent).toContain('失敗した処理を2件もう一度実行しました。')
+    expect(host.textContent).toContain('失敗した処理を2 件もう一度実行しました。')
   })
 
   it('閲覧のみには一時停止・もう一度実行を出さず、帯を出す', async () => {

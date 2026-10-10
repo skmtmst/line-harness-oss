@@ -9,6 +9,8 @@
  * データの口・入力検査・秘密値の守り・下書き保存は `app/contents/vars/new/new-v8.tsx`
  * から写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -44,6 +46,10 @@ import FolderSelect, { folderById, folderCreator } from '@/components/shared/fol
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './new.module.css'
 import { focusFieldById } from '@/lib/use-form-errors'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /*
  * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／
@@ -357,13 +363,13 @@ export default function NewCommonVarV8() {
         }
         return
       }
-      router.push('/contents/vars')
+      router.push(createPageReturnHref('/contents/vars', res.data.id))
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         setError('その差し込み名は既に使われています')
         focusField('cv-key')
       } else {
-        setError(describeSaveFailure(e))
+        setError(withPermissionFailure(e, describeSaveFailure(e), 'store'))
         if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
           const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
           if (target) focusField(target)
@@ -384,17 +390,7 @@ export default function NewCommonVarV8() {
   const saveDisabled = saving || !canWrite
   const previewName = name.trim() || '共通情報'
 
-  const copyKey = async () => {
-    const key = varKey.trim()
-    if (!key) return
-    try {
-      await navigator.clipboard.writeText(`{{var.${key}}}`)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    } catch {
-      setError('コピーできませんでした。差し込み名の欄の文字を選んでコピーしてください。')
-    }
-  }
+
 
   const preview = (
     <>
@@ -411,7 +407,7 @@ export default function NewCommonVarV8() {
             <span className={styles.talkName}>然 - NEN -</span>
             <div className={styles.talkBubbleRow}>
               <p className={styles.talkBubble}>
-                {`いつもありがとうございます。\n${previewName}は ${value || '（未入力）'} です。`}
+                {`いつもありがとうございます。\n${previewName}は ${value || emptyValue('unconfigured')} です。`}
               </p>
               <span className={styles.talkTime}>10:00</span>
             </div>
@@ -425,7 +421,7 @@ export default function NewCommonVarV8() {
     <CreatePage
       boardId="p82v9"
       title="共通情報を作る"
-      description="保存しただけでは差し込まれません。公開すると使えるようになります"
+      help="保存しただけでは差し込まれません。公開すると使えるようになります"
       identity={<Link href="/contents/vars" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />共通情報へ</Link>}
       preview={preview}
       footerActions={(
@@ -434,7 +430,7 @@ export default function NewCommonVarV8() {
           {/* 閲覧のみには押せない保存を置かない（隠す）。 */}
           {canWrite ? (
             <>
-              <Button type="button" disabled={saveDisabled} onClick={() => void save(false, true)}>
+              <Button type="button" disabled={saveDisabled} onClick={() => void save(false, true)} busy={Boolean(saving)} busyLabel="処理中…">
                 下書きを保存
               </Button>
               <Button
@@ -451,12 +447,12 @@ export default function NewCommonVarV8() {
             </>
           ) : null}
         </>
-      )}
+      )} dirty={false}
     >
       {canWrite ? null : (
         <div className={styles.roBand} role="status">
           <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
         </div>
       )}
 
@@ -469,11 +465,7 @@ export default function NewCommonVarV8() {
           <h2 id="cv-new-name-heading" className={styles.cardTitle}>名前と差し込み名</h2>
         </div>
         <div className={styles.nameRow}>
-          <div className={styles.field}>
-            <label htmlFor="cv-name" className={styles.fieldLabelStrong}>
-              共通情報名（友だちには見えません）
-            </label>
-            <input
+          <div className={styles.field}><Field label="共通情報名（友だちには見えません）" htmlFor="cv-name"><input
               id="cv-name"
               type="text"
               maxLength={NAME_MAX}
@@ -490,11 +482,8 @@ export default function NewCommonVarV8() {
               aria-invalid={nameFieldError ? true : undefined}
               title={`${name.length}/${NAME_MAX}文字`}
             />
-            <VarFieldError message={nameFieldError} />
-          </div>
-          <div className={`${styles.field} ${styles.folderField}`}>
-            <label htmlFor="cv-folder" className={styles.fieldLabel}>フォルダ</label>
-            <div className={styles.selectBox}>
+<VarFieldError message={nameFieldError} /></Field></div>
+          <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="cv-folder"><div className={styles.selectBox}>
               <FolderSelect
                 aria-label="フォルダ"
                 id="cv-folder"
@@ -506,21 +495,18 @@ export default function NewCommonVarV8() {
                 : undefined}
               />
             </div>
-            {foldersError ? (
+{foldersError ? (
               <div className={styles.folderError} data-folders-state="error">
                 <p className={styles.fieldHint}>フォルダの一覧を読み込めませんでした。未分類のまま登録できます。</p>
                 <Button type="button" onClick={() => void loadFolders()}>
                   再読み込み
                 </Button>
               </div>
-            ) : null}
-          </div>
+            ) : null}</Field></div>
         </div>
-        <div className={styles.field}>
-          <label htmlFor="cv-key" className={styles.fieldLabel}>
-            差し込み名（あとから変えられません）
-          </label>
-          <div className={styles.keyRow}>
+        <div className={styles.field}><Field note={<>
+            半角の英小文字で始め、英小文字・数字・下線だけ・32文字まで。変えるとテンプレートの差し込みが空になるため、あとから変えられません。
+          </>} label="差し込み名（あとから変えられません）" htmlFor="cv-key"><div className={styles.keyRow}>
             <span className={styles.keyBox}>
               <span className={styles.keyMark} aria-hidden="true">{'{{var.'}</span>
               <input
@@ -540,16 +526,10 @@ export default function NewCommonVarV8() {
               />
               <span className={styles.keyMark} aria-hidden="true">{'}}'}</span>
             </span>
-            <Button variant="text" type="button" onClick={() => void copyKey()} disabled={!varKey.trim()} aria-label="差し込み名をコピー">
-              <Copy size={14} aria-hidden="true" />
-              {copied ? 'コピー済み' : 'コピー'}
-            </Button>
+            <CopyTextButton value={`{{var.${varKey.trim()}}}`} aria-label="差し込み名をコピー" disabled={!varKey.trim()} />
           </div>
-          <VarFieldError message={keyFieldError} />
-          <p className={styles.fieldHint}>
-            半角の英小文字で始め、英小文字・数字・下線だけ・32文字まで。変えるとテンプレートの差し込みが空になるため、あとから変えられません。
-          </p>
-        </div>
+<VarFieldError message={keyFieldError} />
+</Field></div>
       </section>
 
       <section className={styles.card} aria-labelledby="cv-new-type-heading">
@@ -582,11 +562,7 @@ export default function NewCommonVarV8() {
             )
           })}
         </div>
-        <div className={styles.field}>
-          <label htmlFor="cv-value" className={styles.fieldLabelStrong}>
-            中身 {COMMON_VAR_VALUE_REQUIRED.has(type) && <span className={styles.required}>*</span>}
-          </label>
-          {type === 'boolean' ? (
+        <div className={styles.field}><Field label="中身" htmlFor="cv-value">{type === 'boolean' ? (
             <Select size="full" aria-label="中身" id="cv-value" error={valueFieldError || undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
           ) : type === 'long_text' ? (
             <textarea
@@ -631,8 +607,7 @@ export default function NewCommonVarV8() {
               title={type === 'number' ? undefined : `${value.length}/${VALUE_MAX}文字`}
             />
           )}
-          <VarFieldError message={valueFieldError} />
-        </div>
+<VarFieldError message={valueFieldError} /></Field></div>
       </section>
 
       <section className={styles.card} aria-labelledby="cv-new-period-heading">
@@ -641,20 +616,18 @@ export default function NewCommonVarV8() {
           <p className={styles.cardNote}>空なら期間を決めません。予約した配信は、送り始める時刻で判断します</p>
         </div>
         <div className={styles.periodGrid}>
-          <label htmlFor="cv-valid-from" className={styles.fieldLabel}>始まり</label>
-          <label htmlFor="cv-valid-until" className={styles.fieldLabel}>終わり</label>
-          <label htmlFor="cv-expiry-behavior" className={styles.fieldLabel}>期間の外では</label>
-          <DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} />
-          <DateTimeField id="cv-valid-until" value={validUntil} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} />
+
+
+
+          <Field label="始まり" htmlFor="cv-valid-from"><DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></Field>
+          <Field label="終わり" htmlFor="cv-valid-until"><DateTimeField id="cv-valid-until" value={validUntil} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></Field>
           <div className={styles.selectBox}>
-            <Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
+            <Field label="期間の外では" htmlFor="cv-expiry-behavior"><Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} /></Field>
           </div>
         </div>
         <VarFieldError message={periodFieldError} />
         {expiryBehavior === 'fallback' && (
-          <div className={styles.field}>
-            <label htmlFor="cv-fallback-value" className={styles.fieldLabel}>代替値</label>
-            {type === 'boolean' ? (
+          <div className={styles.field}><Field label="代替値" htmlFor="cv-fallback-value">{type === 'boolean' ? (
               <Select size="full" aria-label="代替値" id="cv-fallback-value" error={fallbackFieldError || undefined} value={fallbackValue} onChange={(next) => setFallbackValue(next)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
             ) : type === 'date' ? (
               <DateField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} />
@@ -670,16 +643,11 @@ export default function NewCommonVarV8() {
                 aria-invalid={fallbackFieldError ? true : undefined}
               />
             )}
-            <VarFieldError message={fallbackFieldError} />
-          </div>
+<VarFieldError message={fallbackFieldError} /></Field></div>
         )}
       </section>
 
-      <div className={styles.field}>
-        <label htmlFor="cv-memo" className={styles.fieldLabelStrong}>
-          社内メモ <span className={styles.optional}>任意</span>
-        </label>
-        <input
+      <div className={styles.field}><Field label="社内メモ" htmlFor="cv-memo"><input
           id="cv-memo"
           type="text"
           maxLength={MEMO_MAX}
@@ -690,8 +658,7 @@ export default function NewCommonVarV8() {
           }}
           placeholder="臨時休業のときは「臨時のお知らせ」も直す"
           className={styles.fieldInput}
-        />
-      </div>
+        /></Field></div>
 
       {secretWarningFields && (
         <div
@@ -721,7 +688,7 @@ export default function NewCommonVarV8() {
             >
               入力に戻って修正する
             </Button>
-            <Button type="button" disabled={saving} onClick={() => void save(true)}>
+            <Button type="button" disabled={saving} onClick={() => void save(true)} busy={Boolean(saving)} busyLabel="処理中…">
               内容を確認して登録する
             </Button>
           </div>

@@ -959,12 +959,13 @@ function VarsPageInner() {
               // 消えたように読めるため、空の案内と作成ボタンは出さない。
               <div className="text-ink-faint px-4 py-8 text-center text-sm">
                 {/*
-                  R590: 403は権限案内にする。押しても直らない再試行は
-                  出さない。503などは通信障害と再試行のまま残す。
+                  R590: 403は権限案内と権限変更後の読み直しを出す。
+                  503などは通信障害と再試行のまま残す。
                 */}
                 {isForbidden(listFailure) ? (
                   <ListState
                     kind="forbidden"
+                    onRetry={() => void load()}
                     title="共通情報を見る権限がありません"
                     description={error}
                   />

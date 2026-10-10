@@ -254,7 +254,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
       </section>
 
       <div className="gb-profile-grid grid min-w-0 grid-cols-1 gap-4">
-        <section className="border-hairline bg-canvas flex flex-col gap-4 rounded-card border p-5" aria-labelledby="gb-store-info-title">
+        <section className="content-card bg-canvas flex flex-col gap-4 rounded-card border p-5" aria-labelledby="gb-store-info-title">
           <div className="flex flex-wrap items-center gap-3">
             <h3 id="gb-store-info-title" className="text-base font-bold">店舗情報</h3>
             <span className="grow" />
@@ -278,7 +278,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
           </dl>
         </section>
 
-        <section className="border-hairline bg-canvas flex flex-col gap-3 self-start rounded-card border p-5" aria-labelledby="gb-google-updates-title">
+        <section className="content-card bg-canvas flex flex-col gap-3 self-start rounded-card border p-5" aria-labelledby="gb-google-updates-title">
           <h3 id="gb-google-updates-title" className="text-lead font-bold">Google側の変更を確認</h3>
           {data.googleUpdates && data.googleUpdates.fields.length > 0 ? (
             <>
@@ -380,7 +380,7 @@ function periodDiff(before: GoogleHoursPeriod[], after: GoogleHoursPeriod[]): [s
 
 function ChangeTargetCard({ storeName, today, timeZone, title, current, note, hint }: { storeName: string; today: string; timeZone: string; title: string; current: ReactNode; note: string; hint: string }) {
   return (
-    <section className="border-hairline bg-canvas flex flex-col gap-4 self-start rounded-card border p-5" aria-label="変更対象の確認">
+    <section className="content-card bg-canvas flex flex-col gap-4 self-start rounded-card border p-5" aria-label="変更対象の確認">
       <h3 className="text-lead font-bold">{storeName}</h3>
       <p className="text-ink-faint text-label leading-relaxed">基準日：{formatYmdJa(today, true)}<br />タイムゾーン：{timeZone}</p>
       <div className="border-hairline border-t pt-4">
@@ -638,7 +638,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
         </div>
 
         {editedDates.length > 0 ? (
-          <section className="border-hairline bg-canvas flex flex-col gap-2 rounded-card border p-4" aria-label="変更する日の一覧">
+          <section className="content-card bg-canvas flex flex-col gap-2 rounded-card border p-4" aria-label="変更する日の一覧">
             <h4 className="text-sm font-bold">変更する日（{editedDates.length}日）</h4>
             {editedDates.map((date) => (
               <div key={date} className="flex flex-wrap items-center gap-3 text-sm">
@@ -701,7 +701,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
             )
           })}
         </div>
-        <section className="border-hairline bg-canvas flex flex-col gap-2 rounded-card border p-4" aria-label="変更した曜日">
+        <section className="content-card bg-canvas flex flex-col gap-2 rounded-card border p-4" aria-label="変更した曜日">
           <h4 className="text-sm font-bold">変更した曜日（{weeklyChanged.length}）</h4>
           {weeklyChanged.length === 0 ? <p className="text-ink-faint text-sm">まだ変更はありません。</p> : weeklyChanged.map((d) => { const [b, a] = periodDiff(profile.regularHours[d] ?? [], weekly[d] ?? []); return <p key={d} className="flex flex-wrap items-center gap-3 text-sm"><span className="font-semibold">{WEEKDAY_JA[d]}曜</span><span className="text-ink-faint">{b}</span><span className="text-ink-faint">→</span><span className="text-accent-deep font-bold">{a}</span></p> })}
           <p className="text-ink-faint text-caption">変えていない曜日はそのままです。特定の日だけ変えたい場合は「カレンダーで指定」から設定してください。</p>
@@ -888,7 +888,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
       {writeEnabled && !canSend ? <NoteBar tone="warn">Googleへの送信は店舗管理者以上が行います。この変更案は保存されているので、管理者が「変更履歴」から確認して送信できます。</NoteBar> : null}
       {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
 
-      <section className="border-hairline bg-canvas flex flex-col gap-5 rounded-card border p-5">
+      <section className="content-card bg-canvas flex flex-col gap-5 rounded-card border p-5">
         <h3 className="text-metric font-bold">{title}</h3>
         <div className="gb-compare-grid grid min-w-0 grid-cols-1 items-center gap-6">
           <div className="border-hairline bg-canvas flex flex-col gap-3 rounded-card border p-5">
@@ -911,7 +911,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
       <InfoNote>反映直前にGoogleの最新情報を再確認します。他の担当者が{isHours ? '' : '同じ項目を'}変更していた場合は、差分を表示して止めます。</InfoNote>
 
       {!done && change.status !== 'cancelled' ? (
-        <section className="border-hairline bg-canvas flex flex-col gap-3 rounded-card border p-5">
+        <section className="content-card bg-canvas flex flex-col gap-3 rounded-card border p-5">
           <Checkbox checked={checked} onCheckedChange={setChecked} description={null}>
             <span className="text-sm font-semibold">{isHours ? '店舗・日付・時間を確認しました' : '店舗・項目・内容を確認しました'}</span>
           </Checkbox>

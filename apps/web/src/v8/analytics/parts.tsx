@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
+
 /*
  * ★V8 分析の画面で共通に使う処理（app/analytics/page.tsx から写した）。
  * src/v8 からは @/app を読めないので、読み込み・数の出し方・期間・CSV を
@@ -9,6 +11,9 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { AnalyticsMetric, AnalyticsMetricState } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatYen as polishFormatYen } from '@/lib/format'
+
 
 export function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
   const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
@@ -20,7 +25,7 @@ export function downloadCsv(filename: string, rows: Array<Array<string | number 
   URL.revokeObjectURL(url)
 }
 
-/** 板の頭の「CSV で書き出す」へ、いま開いている見かたの書き出しを登録する。 */
+/** 板の頭の「CSVで書き出す」へ、いま開いている見かたの書き出しを登録する。 */
 export type ExportAction = { onClick: () => void; disabled: boolean }
 export const AnalyticsExportContextV8 = createContext<((action: ExportAction | null) => void) | null>(null)
 
@@ -38,11 +43,7 @@ export const RANGES = [7, 30, 90]
 
 /** 今の画面と同じ日本時間の暦日の範囲。 */
 export function rangeFor(days: number, now = new Date()): { from: string; to: string } {
-  const jstNow = new Date(now.getTime() + 9 * 3600_000)
-  return {
-    from: new Date(jstNow.getTime() - days * 24 * 3600_000).toISOString().slice(0, 10),
-    to: jstNow.toISOString().slice(0, 10),
-  }
+  return { from: jstDateOffset(-days, now), to: jstDate(now) }
 }
 
 export type OverviewResult<T> =
@@ -85,7 +86,7 @@ export function metricText(
   if (value.value === null) return '—'
   if (typeof value.value === 'string') return value.value
   if (options?.percent) return `${Math.round(value.value * 1000) / 10}%`
-  if (options?.currency) return `${formatNumber(value.value)}円`
+  if (options?.currency) return `${polishFormatYen(value.value)}`
   return formatNumber(value.value)
 }
 
@@ -118,17 +119,11 @@ export function metricCardState(
 }
 
 export function formatAnalyticsDateTime(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return formatDateTime(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 export function formatAnalyticsDate(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return formatDay(date)
+  return polishFormatDate(value, { style: 'detail', fallback: '—' })
 }
 
 const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土'] as const
@@ -138,7 +133,7 @@ export function analyticsWeekday(date: string): string {
 
 /** YYYY-MM-DD を「9/15」に。 */
 export function shortDate(date: string): string {
-  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
+  return polishFormatDate(date, { style: 'list-day', fallback: '—' })
 }
 
 export function periodCaption(from: string, to: string, cutoffAt: string): string {

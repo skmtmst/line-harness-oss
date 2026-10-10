@@ -83,7 +83,7 @@ beforeEach(() => {
   hq.send.mockResolvedValue({ data: {} })
   hq.cancel.mockResolvedValue({ data: {} })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
 async function selectAccounts(...names: string[]) {
   fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選ぶ|変える)$/ }))
@@ -98,7 +98,7 @@ async function fillToConfirm(body = '{店名}より：1月の限定メニュー'
   fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '1月の限定メニュー' } })
   fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
   await selectAccounts('銀座店', '新宿店')
-  expect(screen.getByText('12,000人')).toBeTruthy()
+  expect(screen.getByText('12,000 人')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'メッセージ設定へ' }))
   fireEvent.change(screen.getByLabelText('本文'), { target: { value: body } })
   fireEvent.click(screen.getByRole('button', { name: '送信設定へ' }))
@@ -106,6 +106,15 @@ async function fillToConfirm(body = '{店名}より：1月の限定メニュー'
 }
 
 describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送るアカウント）', () => {
+  it('日本で日付が変わった直後でも、予約の初期日は日本の明日になる', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-09T15:00:00Z'))
+    params.value = new URLSearchParams('step=schedule')
+    render(<HqBroadcastCreate />)
+    const date = await screen.findByRole('button', { name: '送る日' })
+    expect(date.textContent).toContain('2026年10月11日')
+  })
+
   it('B-139：本文の無い吹き出しは帯にせず、吹き出しの下に理由と頭に赤い丸を出し、そこへ移る', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()
@@ -145,7 +154,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
   it('送るアカウントを選び、最終確認で確かめると問題のある店を外し、送ると版を付けて送る', async () => {
     render(<HqBroadcastCreate />)
     await fillToConfirm()
-    await screen.findByText('送る：1アカウント・6,120人')
+    await screen.findByText('送る：1アカウント・6,120 人')
     const input = hq.create.mock.calls[0][0]
     expect(input.accountIds).toEqual(['a1', 'a2'])
     expect(input.accountTagIds).toEqual([])
@@ -218,7 +227,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     hq.approvalCandidates.mockResolvedValue({ success: true, data: [{ id: 's-2', name: '佐々木', role: 'admin', canApprove: true }] })
     render(<HqBroadcastCreate />)
     await fillToConfirm()
-    await screen.findByText('送る：1アカウント・6,120人')
+    await screen.findByText('送る：1アカウント・6,120 人')
     fireEvent.click(await screen.findByRole('button', { name: '承認を依頼する' }))
     expect(await screen.findByText(/もう1人の承認が要ります/)).toBeTruthy()
     expect(await screen.findByText('承認をお願いする人')).toBeTruthy()
@@ -241,7 +250,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
   it('本文を変えたら、もう一度確かめるまで送らない（同じ下書きを版つきで直す。取り消して作り直さない）', async () => {
     render(<HqBroadcastCreate />)
     await fillToConfirm('はじめの本文')
-    await screen.findByText('送る：1アカウント・6,120人')
+    await screen.findByText('送る：1アカウント・6,120 人')
     fireEvent.click(screen.getByRole('button', { name: 'メッセージへ戻る' }))
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: '直した本文' } })
     fireEvent.click(screen.getByRole('button', { name: '送信設定へ' }))
@@ -262,7 +271,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     const again = await screen.findByRole('button', { name: '送る前に確かめる' })
     expect(new URL(window.location.href).searchParams.get('id')).toBe('run-1')
     fireEvent.click(again)
-    await screen.findByText('送る：1アカウント・6,120人')
+    await screen.findByText('送る：1アカウント・6,120 人')
     expect(hq.create).toHaveBeenCalledTimes(1)
     expect(hq.update).not.toHaveBeenCalled()
   })
@@ -274,7 +283,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     const again = await screen.findByRole('button', { name: '送る前に確かめる' })
     expect(new URL(window.location.href).searchParams.get('id')).toBe('run-1')
     fireEvent.click(again)
-    await screen.findByText('送る：1アカウント・6,120人')
+    await screen.findByText('送る：1アカウント・6,120 人')
     expect(hq.create).toHaveBeenCalledTimes(1)
     expect(hq.update).not.toHaveBeenCalled()
     expect(hq.exclude.mock.calls.map((call) => call[2])).toEqual([1, 1])
@@ -412,11 +421,11 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(hq.create).not.toHaveBeenCalled()
   })
 
-  it('まだ送れない質問・紹介は理由を示し、書いた本文を残す', async () => {
+  it('まだ送れない紹介・リッチビデオは理由を示し、書いた本文を残す', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.change(screen.getByLabelText('本文'), {target:{value:'残す本文'}})
-    for (const name of ['質問','紹介','リッチビデオ']) {
+    for (const name of ['紹介','リッチビデオ']) {
       const tab = screen.getByRole('tab', {name})
       expect(tab.getAttribute('aria-disabled')).toBe('true')
       expect(tab.getAttribute('title')).toBeTruthy()
@@ -606,10 +615,23 @@ describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
     render(<HqBroadcastDetail />)
     const reasons = await waitFor(() => { const el = document.querySelector('[data-failure-reasons]'); if (!el) throw new Error('まだ'); return el as HTMLElement })
     expect(reasons.textContent).toContain('名古屋店')
-    expect(reasons.textContent).toContain('LINEが混雑しています（460人）・やり直せます')
+    expect(reasons.textContent).toContain('LINEが混雑しています（460 人）・やり直せます')
     cleanup()
     hq.get.mockResolvedValue({ data: { id: 'run-9', title: '下書き', status: 'prepared', version: 1, scheduledAt: null, targets: [], input: { messageContent: '' } } })
     render(<HqBroadcastDetail />)
     expect((await screen.findByRole('link', { name: /下書きを直す/ })).getAttribute('href')).toBe('/hq/broadcasts/new?id=run-9')
   })
 })
+
+it('B-173: 統括でリサーチの質問と公開版を読み込み下書きへ保存する', async () => {
+ tpl.listByKind.mockResolvedValue([{id:'research1',name:'健康調査',kind:'research',content_summary:'リサーチ'}]);
+ tpl.get.mockResolvedValue({template:{id:'research1',name:'健康調査',template_type:'template',current_version_id:'v1'},definition:{schemaVersion:1,media:[],template:{id:'source1',name:'健康調査',messageType:'text',messageContent:''},asset:{kind:'research',payload:{questions:[{text:'体調',format:'free',required:true}],answerActions:[]}}}});
+ render(<HqBroadcastCreate />);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'健康調査'}});fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店');fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}));
+ expect(screen.getByRole('tab',{name:'質問'}).getAttribute('aria-disabled')).not.toBe('true');
+ fireEvent.click(screen.getByRole('button',{name:'テンプレートから選ぶ'}));
+ fireEvent.click(await screen.findByRole('radio',{name:'健康調査'}));fireEvent.click(screen.getByRole('button',{name:'このテンプレートを使う'}));
+ await waitFor(()=>expect(screen.queryByRole('radio',{name:'健康調査'})).toBeNull());
+ fireEvent.click(screen.getByRole('button',{name:'下書きを保存する'}));
+ await waitFor(()=>expect(hq.create).toHaveBeenCalled());
+ expect(JSON.parse(hq.create.mock.calls[0][0].messageBubblesJson)[0]).toMatchObject({type:'research',content:{hqTemplateId:'research1',hqTemplateVersionId:'v1'}});
+});

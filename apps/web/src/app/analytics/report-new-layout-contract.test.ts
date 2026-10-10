@@ -11,7 +11,8 @@ const PAGE = readFileSync(new URL('./reports/new/page.tsx', import.meta.url), 'u
 describe('定期レポート「いつ送りますか」の幅 (R229)', () => {
   it('間隔・曜日/日・集計期間は列の幅に合わせる（固定176pxへ戻さない）', () => {
     expect(PAGE).not.toContain('size="standard"')
-    for (const label of ['間かく', '送る曜日', '送る日', '集計する期間']) {
+    expect(PAGE).toMatch(/<Field label="集計する期間" required><PeriodPicker days=/)
+    for (const label of ['間かく', '送る曜日', '送る日']) {
       const line = PAGE.split('\n').find((l) => l.includes(`aria-label="${label}"`))
       expect(line, label).toBeTruthy()
       expect(line).toContain('size="full"')

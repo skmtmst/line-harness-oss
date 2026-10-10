@@ -1,9 +1,12 @@
+import { AutoFormLeaveGuard, FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import type { ReactNode } from 'react'
 import StickyBar from '@/components/shared/sticky-bar'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
 
 export interface CreatePageProps extends PageHeadingProps {
+  dirty?: boolean
+  busy?: boolean
   boardId?: string
   standalone?: boolean
   children: ReactNode
@@ -37,8 +40,9 @@ export interface CreatePageProps extends PageHeadingProps {
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ boardId, standalone, children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+export function CreatePage({ dirty, busy, boardId, standalone, children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
   return <PageFrame kind="create" boardId={boardId} standalone={standalone} hasFooter>
+    {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}

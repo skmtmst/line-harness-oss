@@ -3763,12 +3763,29 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
   if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
   if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
-  if (pathname === '/api/friends/friend-1/fields') {
+  const basicFieldsFriend = pathname.match(/^\/api\/friends\/(friend-[01])\/fields$/)
+  if (basicFieldsFriend) {
+    const friend = FRIEND_DETAILS[basicFieldsFriend[1]]
+    const specs = [
+      ['name', '名前', 'text', friend.realName],
+      ['kana', 'ふりがな', 'text', 'やまだ たろう'],
+      ['birthday', '生年月日', 'date', '1988-04-12'],
+      ['age', '年齢', 'number', '38'],
+      ['email', 'メール', 'email', 'sample@example.test'],
+      ['tel', '電話', 'tel', '09012345678'],
+      ['address', '住所', 'textarea', '東京都新宿区1-2'],
+    ]
+    const basics = specs.map(([fixedKey, name, type, value], index) => ({
+      id: `fixed-${fixedKey}`, fixedKey, name, fieldKey: `fixed_${fixedKey}`, type, value,
+      folderId: null, isPersonal: true, isStarred: false, ecIsMaster: false, source: 'form',
+      displayOrder: index - 7, valueSource: { type: 'form', id: 'form-1', name: '来店アンケート' },
+      valueUpdatedAt: '2026-10-08T10:12:00+09:00',
+    }))
     const values = ['1988-04-12', '2026-12-31', '2026-09-15', 'プレミアム']
     return {
       success: true,
       data: {
-        items: FRIEND_FIELDS.map((field, index) => ({ ...field, value: values[index] })),
+        items: [...basics, ...FRIEND_FIELDS.map((field, index) => ({ ...field, value: values[index] }))],
         hiddenPersonalCount: 0,
       },
     }

@@ -1,3 +1,6 @@
+import { handleResearchTap } from '../services/research-tap.js';
+import { handleExtraPostback } from '../services/tap-extras.js';
+import { sendEntryRouteCoupon } from '../services/entry-route-coupon.js';
 import {stableWebhookStepId} from '../services/incoming-webhook-receipts.js';
 import { workflowLineClient } from '../services/workflow-line-client.js';
 import type { WorkflowExecution } from '../services/workflow-execution.js';
@@ -41,7 +44,7 @@ import {
   getActiveStopSuppressionSafe,
 } from '../services/entry-route-stop.js';
 import { applyFriendAddRouting } from '../services/friend-add-routing.js';
-import { fireEvent } from '../services/event-bus.js';
+import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { matchAndReply } from '../services/auto-reply.js';
 import { buildMessage } from '../services/step-delivery.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
@@ -840,6 +843,27 @@ async function handleEvent(
     let scenarioEnrollmentId = routing?.enrollments[0]?.enrollment.id ?? null;
     let friendAddDeliveryCount = 0;
 
+    if (routing?.messageText && !routing.suppressed && sendRight) {
+      try {
+        const { expandSendCommonVars } = await import('../services/interpolation-context.js');
+        const content = await expandSendCommonVars(db, routing.messageText,
+          { kind: 'notification', id: routing.ruleId ?? friend.id },
+          { lineAccountId, friendId: friend.id, messageType: 'text' });
+        if (await holdSendRight({ external: true })) {
+          try {
+            await lineClient.pushMessage(userId, [buildMessage('text', content)], sendRetryKey(`rule-text:${routing.ruleVersionId}`));
+          } catch (error) {
+            noteSendOutcome(classifyFollowSendFailure(error));
+            throw error;
+          }
+          noteSendOutcome('delivered');
+          friendAddDeliveryCount += 1;
+          await logOutgoingMessage(db, { friendId: friend.id, messageType: 'text', content,
+            deliveryType: 'push', source: 'friend_add', lineAccountId });
+        }
+      } catch (error) { logWebhookStepFailure('friend_add_rule_text', error, lineAccountId, event); }
+    }
+
     if (routing?.routed) {
       // 送信権を取れなかった実行は送らずに引く（予約を取った側が送る）。
       for (const { scenarioId, enrollment, resumed } of (sendRight ? routing.enrollments : [])) {
@@ -1011,6 +1035,27 @@ async function handleEvent(
         } catch (err) {
           logWebhookStepFailure('referral_scenario_enrollment', err, lineAccountId, event);
         }
+      }
+    }
+
+    // QRのクーポン: 初めての追加だけ。既存友だちは本人確認済みLIFFで受け取る。
+    if (friendKind === 'first_time' && !stoppedRefDiscarded && referralRoute?.coupon_enabled === 1
+      && lineAccountId && await holdSendRight({ external: true })) {
+      try {
+        await sendEntryRouteCoupon(db, referralRoute, friend, async (message, retryKey) => {
+          if (!await holdSendRight({ external: true })) {
+            throw Object.assign(new Error('entry_coupon_fenced_out'), { friendAddSendAborted: true });
+          }
+          try {
+            await lineClient.pushMessage(userId, [message], retryKey);
+          } catch (error) {
+            noteSendOutcome(classifyFollowSendFailure(error));
+            throw error;
+          }
+          noteSendOutcome('delivered');
+        });
+      } catch (error) {
+        logWebhookStepFailure('entry_route_coupon', error, lineAccountId, event);
       }
     }
 
@@ -1197,10 +1242,20 @@ async function handleEvent(
     const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
     if (!friend) return;
 
-    const rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
+    let rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
+    if (rawPostbackData.startsWith('tx=')) {
+      const inner = await replay('tap_extra', () => handleExtraPostback(execution?.mutationDb('tap_extra') ?? db, friend.id, lineAccountId ?? null, rawPostbackData, event.webhookEventId));
+      if (inner === null) return;
+      rawPostbackData = inner;
+    }
+    if (rawPostbackData.startsWith('research:')) {
+      const text = await replay('research_tap', () => handleResearchTap(db, friend.id, lineAccountId ?? null, rawPostbackData));
+      if (event.replyToken) await lineClient.replyMessage(event.replyToken, [{ type: 'text', text }]);
+      return;
+    }
     if (rawPostbackData.startsWith('coupon_use:')) {
-      const assetId = rawPostbackData.slice('coupon_use:'.length);
-      const result = await redeemCoupon(db, friend, lineAccountId ?? null, assetId, event.webhookEventId);
+      const [assetId, receiptId] = rawPostbackData.slice('coupon_use:'.length).split(':');
+      const result = await redeemCoupon(db, friend, lineAccountId ?? null, assetId, event.webhookEventId, new Date(event.timestamp), receiptId, {executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}});
       if (!result.replayed && event.replyToken) await lineClient.replyMessage(event.replyToken, [{ type: 'text', text: result.message }]);
       return;
     }
@@ -1236,6 +1291,7 @@ async function handleEvent(
         const result = await handleCarouselTap(db, lineClient, friend, carouselTap, {
           lineAccountId,
           replyToken: event.replyToken,
+          sourceEventId: event.webhookEventId,
         });
         // 制限にかかったときは、ここで終わる。自動応答まで回すと、
         // 「もう押せません」と自動応答の両方が届く。

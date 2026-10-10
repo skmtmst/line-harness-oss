@@ -134,11 +134,11 @@ describe("壊れた入力を受け止める", () => {
     expect(layout?.sections).toHaveLength(1);
   });
 
-  test("知らない種類のブロックは落とす", () => {
+  test("知らない種類のブロックは正規化前に拒否する", () => {
     const layout = normalizeLayout({
       sections: [{ id: "s1", name: "1", blocks: [{ id: "x", kind: "iframe", src: "..." }] }],
     });
-    expect(layout?.sections[0].blocks).toHaveLength(0);
+    expect(layout).toBeNull();
   });
 });
 

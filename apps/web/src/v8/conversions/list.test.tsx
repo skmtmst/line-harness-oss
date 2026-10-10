@@ -133,7 +133,7 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByText('成果地点を読み込めませんでした')).toBeTruthy()
     expect(screen.queryByText('まだ成果地点がありません')).toBeNull()
     failed = false
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await flush()
     expect(screen.getByText('商品を買った')).toBeTruthy()
     expect(screen.queryByText('成果地点を読み込めませんでした')).toBeNull()
@@ -155,18 +155,18 @@ describe('V8 コンバージョンの一覧', () => {
     expect(scroll).toHaveBeenCalledWith({ block: 'center' })
     const error = screen.getByRole('alert')
     expect(error.textContent).toBe('名前を入れてください')
-    expect(input.getAttribute('aria-describedby')).toBe(error.id)
+    expect(input.getAttribute('aria-describedby')?.split(/\s+/)).toContain(error.id)
     expect(screen.getAllByText('名前を入れてください')).toHaveLength(1)
     expect(calls.some((call) => call.startsWith('POST '))).toBe(false)
   })
 
   it('状態の札に口の件数を出し、行に数え方と使われている場所を出す', async () => {
     await mount()
-    expect(screen.getByRole('button', { name: /動いている 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /有効 1/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /どこからも使われていない 1/ })).toBeTruthy()
     expect(screen.getByText('注文が確定したとき')).toBeTruthy()
     expect(screen.getByText('1回ごと・取り消しは引く')).toBeTruthy()
-    expect(screen.getByText('1人1回・止めた日 9/20')).toBeTruthy()
+    expect(screen.getByText('1人1回・止めた日 09/20')).toBeTruthy()
     expect(screen.getByText('ファネル 1')).toBeTruthy()
     expect(screen.getByText('アフィリエイト 1')).toBeTruthy()
   })
@@ -193,7 +193,7 @@ describe('V8 コンバージョンの一覧', () => {
   it('閲覧のみ：帯を出し、作る・使う場所を足す・変える操作は置かない（見る操作は残す）', async () => {
     role.value = 'staff'
     await mount()
-    expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('link', { name: /成果地点を作る/ })).toBeNull()
     expect(screen.queryByRole('link', { name: '使う場所を足す' })).toBeNull()
     expect(Array.from(document.querySelectorAll('button')).filter((button) => button.disabled)).toEqual([])
@@ -209,8 +209,8 @@ describe('V8 コンバージョンの一覧', () => {
   it('1152 の板：札は「動いている」「止めている」の2つだけ（ほかはよく使う絞り込みから）', async () => {
     narrow.value = true
     await mount()
-    expect(screen.getByRole('button', { name: /動いている 1/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /止めている 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /有効 1/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /停止中 1/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /下書き 0/ })).toBeNull()
     expect(screen.getByText('使われていない')).toBeTruthy()
   })
@@ -245,7 +245,7 @@ describe('V8 コンバージョンの一覧', () => {
 
   it('札で絞ると、その状態の行だけになる', async () => {
     await mount()
-    fireEvent.click(screen.getByRole('button', { name: /止めている 1/ }))
+    fireEvent.click(screen.getByRole('button', { name: /停止中 1/ }))
     await flush()
     expect(screen.queryByText('商品を買った')).toBeNull()
     expect(screen.getByText('資料をダウンロードした')).toBeTruthy()

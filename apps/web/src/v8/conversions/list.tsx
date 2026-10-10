@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -41,7 +42,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
-import SortSelect from '@/components/ui/sort-select'
+import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel'
 import { useListUrlParam } from '@/components/shared/list-url-state'
@@ -94,6 +95,11 @@ import { focusConversionField, type ConversionFieldIssue } from './field-issue'
 import styles from './list.module.css'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { csvFileName } from '@/lib/csv-file-name'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type StatusFilter = 'all' | ConversionDefinitionFilter
 /** フォルダの列の「未分類」（`?folder=unfiled`）。 */
@@ -117,8 +123,8 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
 
 /* 状態の札（絵 r6dJFy の並び）。件数は口の stateCounts。 */
 const CHIPS: Array<{ value: ConversionDefinitionFilter; label: string; icon: ReactNode }> = [
-  { value: 'active', label: '動いている', icon: <Play size={13} aria-hidden="true" /> },
-  { value: 'stopped', label: '止めている', icon: <Pause size={13} aria-hidden="true" /> },
+  { value: 'active', label: '有効', icon: <Play size={13} aria-hidden="true" /> },
+  { value: 'stopped', label: '停止中', icon: <Pause size={13} aria-hidden="true" /> },
   { value: 'draft', label: '下書き', icon: <FilePen size={13} aria-hidden="true" /> },
   { value: 'invalid', label: '入力不良', icon: <TriangleAlert size={13} aria-hidden="true" /> },
   { value: 'sourceStopped', label: '起点停止', icon: <CirclePause size={13} aria-hidden="true" /> },
@@ -178,7 +184,7 @@ function shortTrigger(point: ConversionDefinitionListItem): string {
 }
 
 function shortDate(iso: string): string {
-  return `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 /* 「何が起きたら数えるか」の2行目（数え方・金額または止めた日）。 */
@@ -274,12 +280,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [summaryReport, setSummaryReport] = useState<ConversionDefinitionReport | null>(null)
   const [listTruncated, setListTruncated] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useListUrlValue('q', '')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [sort, setSort] = useState<PointSort>('cv-desc')
+  const [sort, setSort] = useListUrlValue<PointSort>('sort', 'cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   /* 左のフォルダの列（共通の /api/folders・種類 conversion）。'' はすべて。`?folder=` で共有できる。 */
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const folderState = useManagedFolders('conversion', accountId)
@@ -334,8 +340,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const [actionNotice, setActionNotice] = useState('')
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
-    return () => window.clearTimeout(timer)
+    setDebouncedQuery(query.trim())
   }, [query])
 
   /* 一覧は検索・並びを口へ渡し、続く頁をすべて読む（50頁・5000件で止め、切れたら断る）。 */
@@ -509,7 +514,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       const message = error instanceof Error ? error.message : ''
       setEditError(message.includes('更新されています')
         ? 'ほかの人がこの成果地点を先に直しました。上書きしていません。画面を閉じて読み直してから、もう一度お試しください。'
-        : describeSaveFailure(error))
+        : withPermissionFailure(error, describeSaveFailure(error), 'store'))
     } finally {
       setEditSaving(false)
     }
@@ -724,7 +729,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     setExportError('')
     try {
       const blob = await api.conversions.exportDefinitions({ ...definitionRange(30), lineAccountId: accountId ?? undefined })
-      downloadCsvBlob(blob, `conversion-definitions-${definitionRange(1).to}.csv`)
+      downloadCsvBlob(blob, csvFileName("成果地点"))
     } catch {
       setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
     } finally {
@@ -785,7 +790,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
     { id: 'usage', label: '使う場所を見る', onSelect: () => setPanelId(point.id) },
     ...(canEdit ? [
-      { id: 'add-usage', label: '使う場所を足す', external: true, onSelect: () => router.push(addUsageHref(point)) },
+      { id: 'add-usage', label: '使う場所を足す', external: true, href: addUsageHref(point), onSelect: () => router.push(addUsageHref(point)) },
       ...(point.status !== 'stopped' ? [{ id: 'edit', label: '編集する', onSelect: () => openEdit(point) }] : []),
       ...(point.state === 'draft'
         ? [{ id: 'publish', label: '公開する', disabled: publishing, onSelect: () => void publishDraft(point) }]
@@ -1101,9 +1106,9 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
                       <span className={styles.cellSub} title={rowSub(point)}>{rowSub(point)}</span>
                     </Td>
-                    <Td className={styles.colCount}><span className={styles.num}>{`${formatNumber(point.metrics.netCount)}件`}</span></Td>
+                    <Td className={styles.colCount}><span className={styles.num}>{`${formatNumber(point.metrics.netCount)} 件`}</span></Td>
                     <Td className={styles.colValue}>
-                      <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : '—'}</span>
+                      <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUsage}>
                       <span className={styles.usageMain} title={usageLabel(point)}>{usage.main}</span>
@@ -1136,7 +1141,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const pager = !loading && !loadFailed && pageCount > 1 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
-        {`${(currentPage - 1) * pageSize + 1}〜${(currentPage - 1) * pageSize + current.length} / ${formatNumber(shown.length)}件`}
+        {`${(currentPage - 1) * pageSize + 1}〜${(currentPage - 1) * pageSize + current.length} / ${formatNumber(shown.length)} 件`}
       </span>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="成果地点の一覧のページ送り" />
     </ListPagePagination>
@@ -1149,23 +1154,23 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   return (
     <ListPage
       skeleton
-      help={canEdit
+      help={<>{"成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"}{canEdit
             ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
-            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
+            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}</>}
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"
-      description="成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。"
+
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
-          <Download size={15} aria-hidden="true" />CSV で書き出す
+          <Download size={15} aria-hidden="true" />CSVで書き出す
         </Button>
       }
       stats={<>
         {!canEdit && role !== null ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
           </div>
         ) : null}
         {exportError ? <div className={styles.statsNotice}><Notice tone="warn">{exportError}</Notice></div> : null}
@@ -1185,7 +1190,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
             help="登録している成果地点の数です。"
             value={listUnavailable ? null : total}
             unit="件"
-            detail={stateCounts ? `動いている ${formatNumber(stateCounts.active)}・止めている ${formatNumber(stateCounts.stopped)}` : '—'}
+            detail={stateCounts ? `動いている ${formatNumber(stateCounts.active)}・止めている ${formatNumber(stateCounts.stopped)}` : emptyValue('unknown')}
           />
           <KpiCard
             presentation="band"
@@ -1194,7 +1199,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
             help="この30日に数えた成果の件数です（取り消しを引いた数）。"
             value={reportUnavailable ? null : kpi.currentCount}
             unit="件"
-            detail={delta === null || reportUnavailable ? '—' : `その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}
+            detail={delta === null || reportUnavailable ? emptyValue('unknown') : `その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}
           />
           <KpiCard
             presentation="band"

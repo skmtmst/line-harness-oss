@@ -220,7 +220,7 @@ type CreateBroadcastBody = {
 
 const BROADCAST_DRAFT_STEPS = new Set(['basic', 'audience', 'message', 'schedule', 'confirm']);
 const STANDARD_CONDITION_AXES = [
-  ['name', '名前'], ['private_memo', '個別メモ'], ['status_message', 'ステータスメッセージ'],
+  ['name', '名前'], ['private_memo', 'メモ'], ['status_message', 'ステータスメッセージ'],
   ['registered_at', '友だち登録日'], ['tag', 'タグ'], ['friend_field', '友だち情報'],
   ['scenario', 'シナリオ'], ['event_booking', 'イベント予約'], ['calendar_booking', 'カレンダー予約'],
   ['common_var', '共通情報'], ['reminder', 'リマインダ'], ['form_answered', '回答フォーム'],

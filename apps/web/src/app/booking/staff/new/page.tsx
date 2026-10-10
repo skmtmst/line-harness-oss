@@ -189,7 +189,7 @@ function NewBookingStaffV7() {
     <>
     <CreatePage
       title="予約スタッフを追加する"
-      description="お客様が予約するときに指名できるスタッフを追加します。"
+      help="お客様が予約するときに指名できるスタッフを追加します。"
       showHeader={false}
       parent={['予約設定', '/booking/menus?tab=staff']}
       saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを追加する'}

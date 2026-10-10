@@ -85,13 +85,13 @@ it('対象を変えたあとに遅れて届いた前の人数を捨てる', asyn
   // 偽の時計なので findBy・waitFor は使わず、選ぶ窓をその場で操作する。
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'タグ：選ぶ' })) })
   const picker = screen.getAllByRole('dialog').at(-1)!
-  await act(async () => { fireEvent.click(within(picker).getByRole('radio', { name: '購入者' })) })
-  await act(async () => { fireEvent.click(within(picker).getByRole('button', { name: '選ぶ' })) })
+  await act(async () => { fireEvent.click(within(picker).getByRole('checkbox', { name: '購入者' })) })
+  await act(async () => { fireEvent.click(within(picker).getByRole('button', { name: '選ぶ（1件）' })) })
   await estimate()
-  expect(screen.getByText(/10人に届く見込み/)).toBeTruthy()
+  expect(screen.getByText(/10 人に届く見込み/)).toBeTruthy()
   await act(async () => { resolveOld({ success: true, data: { audienceCount: 2000, hiddenExcluded: 0 } }) })
   expect(screen.queryByText(/2,000人に届く見込み/)).toBeNull()
-  expect(screen.getByText(/10人に届く見込み/)).toBeTruthy()
+  expect(screen.getByText(/10 人に届く見込み/)).toBeTruthy()
 })
 
 it('書きかけでアカウントを切り替えると確認まで止まる', async () => {

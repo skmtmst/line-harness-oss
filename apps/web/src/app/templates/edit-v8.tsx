@@ -25,7 +25,7 @@ import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { Field } from '@/components/shared/form-controls'
-import FlexPreviewComponent from '@/components/flex-preview'
+import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import { useAccount } from '@/contexts/account-context'
 import {
   EMPTY_TEMPLATE_REFERENCES,
@@ -59,6 +59,7 @@ import {
   type TemplateSaveInput,
 } from './edit/edit-core'
 import TemplateAssetEditorV8 from './asset-editor-v8'
+import TruncatedText from '@/components/shared/truncated-text'
 
 const EMPTY_REFERENCES = EMPTY_TEMPLATE_REFERENCES
 
@@ -555,7 +556,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
                 messageUrls.map((url) => (
                   <div key={url} className={styles.urlRow}>
                     <Link2 size={14} aria-hidden="true" className="shrink-0 text-ink-faint" />
-                    <span className={styles.urlText} title={url}>{url}</span>
+                    <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
                     <span className={styles.urlBadge}>短縮して、押された数を数える</span>
                   </div>
                 ))

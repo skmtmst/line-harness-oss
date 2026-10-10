@@ -91,7 +91,10 @@ async function renderPanel(notes: string | null = '前のメモ', friendId = 'fr
       </>,
     )
   })
-  await eventually(() => { expect(host.textContent).toContain('次の対応') })
+  await eventually(() => {
+    if (document.documentElement.dataset.theme === 'v8') expect(host.querySelector('[data-customer-info-panel] section[aria-label="対応"]')).toBeTruthy()
+    else expect(host.textContent).toContain('次の対応')
+  })
 }
 
 beforeEach(() => {

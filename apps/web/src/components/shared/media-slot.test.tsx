@@ -23,7 +23,7 @@ it('空の形：題・説明・制限・文字リンク。［ファイルを選�
   )
   expect(frameOf().dataset.state).toBe('empty')
   expect(frameOf().dataset.designNode).toBe('Z7vd2')
-  expect(screen.getByText('（1ファイル10メガバイト以内・JPEG・PNG）')).toBeTruthy()
+  expect(screen.getByText('（PNG・JPEG・10MB まで）')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'URL で入れる' })).toBeTruthy()
   expect(screen.getByRole('button', { name: '登録メディアから選ぶ' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'ファイルを選ぶ' })).toBeNull()
@@ -73,7 +73,7 @@ it('形式が違うものは送らない', async () => {
   const { container } = render(<MediaSlot title="メイン画像を追加" accept="image/jpeg,image/png" upload={upload} />)
   await act(async () => { choose(container, new File(['x'], 'a.gif', { type: 'image/gif' })) })
   expect(upload).not.toHaveBeenCalled()
-  expect(screen.getByRole('alert').textContent).toContain('JPEG・PNG')
+  expect(screen.getByRole('alert').textContent).toContain('PNG・JPEG')
 })
 
 it('入った形：画像を出し、［差し替える］［消す］。消すと null', () => {
@@ -131,13 +131,13 @@ it('読み取りのみ：押せる口を出さない', () => {
 })
 
 it('小さい所は文字を減らす', () => {
-  render(<MediaSlot title="画像を追加" size="compact" maxBytes={10 * 1024 * 1024} />)
-  expect(screen.getByText('10MB 以内')).toBeTruthy()
+  render(<MediaSlot title="画像を追加" size="compact" accept="image/png,image/jpeg" maxBytes={10 * 1024 * 1024} />)
+  expect(screen.getByText('PNG・JPEG・10MB まで')).toBeTruthy()
   expect(screen.queryByText(/ファイルをアップロード/)).toBeNull()
 })
 
 it('形式の名前', () => {
-  expect(formatNamesOf('image/jpeg,image/png')).toBe('JPEG・PNG')
+  expect(formatNamesOf('image/jpeg,image/png')).toBe('PNG・JPEG')
   expect(formatNamesOf('video/mp4')).toBe('MP4')
 })
 

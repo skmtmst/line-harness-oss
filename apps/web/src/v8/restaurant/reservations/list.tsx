@@ -21,6 +21,7 @@ import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-te
 import { Panel, StatRow, Status } from '../booking-kit/shell'
 import { INACTIVE_STATUSES, type LedgerView, isHold, maskPhone, mdhm, sourceKind, sourceName } from './format'
 import styles from './reservations.module.css'
+import { emptyValue } from '@/components/shared/empty-value'
 
 export const PAGE_SIZE = 20
 
@@ -118,21 +119,21 @@ export default function ListView({ view, rows, total, tables, page, period, stat
                 const kind = sourceKind(item.source)
                 const table = item.table_id ? tableById.get(item.table_id) : null
                 return (
-                  <Tr key={item.id}>
+                  <Tr key={item.id} data-row-id={item.id}>
                     <Td>{mdhm(item.starts_at)}</Td>
                     <Td>
                       <StatusBadge dot={false} size="compact" tone={kind === 'line' ? 'success' : kind === 'phone' ? 'neutral' : item.source === 'tabelog' || item.source === 'gurunavi' ? 'warning' : item.source === 'ikyu' || item.source === 'retty' || item.source === 'reszaiko' ? 'info' : 'danger'}>{sourceName(item.source)}</StatusBadge>
                     </Td>
                     <Td>
                       <p className={styles.customerName} title={item.customer_name}>{hold ? '押さえ' : item.customer_name}</p>
-                      <p className={styles.customerSub}>{hold ? (item.note || '仮押さえ') : item.line_uid ? 'LINE UID' : maskPhone(item.customer_phone) || '電話未登録'}</p>
+                      <p className={styles.customerSub}>{hold ? (item.note || '仮押さえ') : item.line_uid ? 'LINE UID' : maskPhone(item.customer_phone) || emptyValue('unconfigured')}</p>
                     </Td>
                     <Td align="right">{`${item.guest_count}名`}</Td>
                     <Td>
                       {table ? <span className={styles.clip} title={`${table.code}・${table.label}`}>{`${table.code}・${table.label}`}</span> : item.table_label ? item.table_label : <span className={styles.warnText}>未配席</span>}
                     </Td>
                     <Td><span className={styles.clip} title={item.course_name ?? undefined}>{item.course_name || '席のみ'}</span></Td>
-                    <Td><span className={item.allergy_note && !hold ? styles.noteCell : undefined}>{item.allergy_note && !hold ? <span className={styles.alertText}>{item.allergy_note}</span> : <span className={styles.mutedText}>—</span>}</span></Td>
+                    <Td><span className={item.allergy_note && !hold ? styles.noteCell : undefined}>{item.allergy_note && !hold ? <span className={styles.alertText}>{item.allergy_note}</span> : <span className={styles.mutedText}>{emptyValue('unknown')}</span>}</span></Td>
                     <Td><Status value={hold ? 'scheduled' : item.status} label={hold ? '押さえ' : undefined} /></Td>
                     <Td>
                       {canWrite ? (
@@ -153,7 +154,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
           </DataTable>
         )}
         {view === 'list' && pageCount > 1 ? (
-          <Pagination spacing="roomy" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min((page - 1) * PAGE_SIZE + rows.length, total)}件`} />
+          <Pagination spacing="roomy" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min((page - 1) * PAGE_SIZE + rows.length, total)} 件`} />
         ) : null}
       </Panel>
       <Panel title="顧客カルテ" description="電話番号または LINE UID で名寄せする設計です。">
@@ -161,7 +162,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
           {live.slice(0, 3).map((item) => (
             <Card key={item.id} frame="inset" corner="segment" padding="compact" layout="vertical" className={styles.karteCard}>
               <p className={styles.karteName}>{item.customer_name}</p>
-              <p className={styles.karteContact}>{item.line_uid ? 'LINE UID' : maskPhone(item.customer_phone) || '電話未登録'}</p>
+              <p className={styles.karteContact}>{item.line_uid ? 'LINE UID' : maskPhone(item.customer_phone) || emptyValue('unconfigured')}</p>
               <p className={styles.karteRecent}>{`直近：${mdhm(item.starts_at)} / ${item.guest_count}名`}</p>
             </Card>
           ))}

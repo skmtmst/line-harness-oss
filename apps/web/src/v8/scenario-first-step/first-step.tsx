@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
 /*
  * ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`・1152 `U5rxyH`）。
  *
@@ -11,6 +13,8 @@
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -67,6 +71,7 @@ import { browserDraftKey } from '@/v8/autosave/use-browser-draft'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const modeLabel: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
@@ -429,7 +434,7 @@ export default function ScenarioFirstStepV8() {
       }
       scenarioReferenceData.invalidateScenario(id)
       browserDraft.clear()
-      notifyToast('1通目を保存しました')
+      notifySaved('1通目を保存しました')
       goDetail()
     } catch (submitError) {
       // 例外でも「保存中」のままにしない（SCENARIO-05）。入力は残し、同じ場所からやり直せる。
@@ -482,17 +487,17 @@ export default function ScenarioFirstStepV8() {
    * 「始めた日＋N日後のその時刻。過ぎていたらすぐ」、経過時間は「始めた時刻＋日・時間・分」。
    * 例の始めた時刻は今日の 14:00 に固定する（開いた時刻で文が変わり、行の高さが揺れないように）。
    */
-  const exampleStart = new Date()
-  exampleStart.setHours(14, 0, 0, 0)
-  const dayLabel = (d: Date) => `${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）`
-  const hm = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  // 日本の暦をUTCの欄で計算し、端末の時間帯による日付のずれを避ける。
+  const exampleStart = new Date(`${jstDate()}T14:00:00Z`)
+  const dayLabel = (d: Date) => `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEKDAYS[d.getUTCDay()]}）`
+  const hm = (d: Date) => `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`
   const arrivalText = (() => {
     if (mode === 'absolute_time') {
       if (!TIME_RE.test(deliveryTime)) return null
       const [h, m] = deliveryTime.split(':').map(Number)
       const target = new Date(exampleStart)
-      target.setDate(target.getDate() + offsetDays)
-      target.setHours(h, m, 0, 0)
+      target.setUTCDate(target.getUTCDate() + offsetDays)
+      target.setUTCHours(h, m, 0, 0)
       if (target.getTime() <= exampleStart.getTime()) return `すぐ（${deliveryTime} を過ぎているため）`
       return `${offsetDays === 0 ? '同じ日の' : dayLabel(target)} ${deliveryTime}`
     }
@@ -576,7 +581,7 @@ export default function ScenarioFirstStepV8() {
           ]}
         />
       )}
-      description={`配信方式：${modeLabel[mode]}・シナリオ：${scenario?.name ?? '読み込み中'}`}
+      help={`配信方式：${modeLabel[mode]}・シナリオ：${scenario?.name ?? '読み込み中'}`}
       preview={preview}
       status={saving ? '保存しています' : browserDraft.label ?? undefined}
       footerActions={(
@@ -599,7 +604,7 @@ export default function ScenarioFirstStepV8() {
       )}
     >
       {!canEdit ? (
-        <p className={styles.viewerBand} role="status">閲覧のみで見ています。1通目を作る操作は管理者に頼んでください。</p>
+        <p className={styles.viewerBand} role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</p>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />

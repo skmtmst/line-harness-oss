@@ -173,6 +173,7 @@ async function renderPage() {
 }
 
 async function settle(ticks = 6) {
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
   for (let i = 0; i < ticks; i += 1) {
     await act(async () => { await Promise.resolve() })
   }
@@ -202,14 +203,13 @@ function pressEnter(input: HTMLInputElement) {
 }
 
 describe('友だちの残高タブの検索(本物のReact)', () => {
-  it('検索欄でEnterを押すと条件が即時確定して一覧を取り直す', async () => {
+  it('検索語を入れて300ms待つと自動で一覧を取り直す', async () => {
     const net = stubFetch()
     await renderPage()
     const input = await waitForSearchInput()
 
     typeInto(input, '田中')
-    // デバウンスの300msを待たず、Enterだけで確定・取り直しが走る。
-    pressEnter(input)
+    // Enterなしでも検索を確定する。
     await settle()
 
     const searched = net.friendsCalls().filter((call) => net.searchOf(call) === '田中')

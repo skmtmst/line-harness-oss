@@ -99,7 +99,7 @@ test('v8 では ralAc の鍵の表（札・入れ替える）が出る', async (
   const board = host.querySelector('[data-design-node="ralAc"]')
   expect(board).not.toBeNull()
   expect(board?.textContent).toContain('予約システム連携')
-  expect(board?.textContent).toContain('使っている')
+  expect(board?.textContent).toContain('有効')
   expect(board?.textContent).toContain('入れ替える')
   // 板 `ralAc` の作るボタンの文言（本人確認の用途名ではなく表のボタンの文言で見る）。
   expect(board?.textContent).toContain('鍵を発行する')

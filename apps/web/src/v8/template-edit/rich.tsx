@@ -9,10 +9,12 @@
  * 形・面の座標・動きの組み立ては template-asset-editor.tsx から写した（src/v8 は @/app を読めない）。
  * 外枠・名前とフォルダの箱・右の列はクーポン・リサーチ（asset.tsx）と同じ。動きは BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CircleSlash, Send } from 'lucide-react'
-import type { Folder, MediaItem, TemplateImagemapUpload } from '@line-crm/shared'
+import { type TapExtras, type Folder, type MediaItem, type TemplateImagemapUpload } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -34,7 +36,7 @@ import TapActionField from '@/components/shared/tap-action-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
-import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, type TapActionKind } from '@/lib/tap-actions'
+import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, tapExtraSaveError, type TapActionKind } from '@/lib/tap-actions'
 import { TemplateEditFrame } from './frame'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
@@ -42,6 +44,7 @@ import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import type { TemplateEditHost } from './host'
 import styles from './edit.module.css'
 import rich from './rich.module.css'
+import { Field } from '@/components/shared/form-controls'
 
 /* ── 形と面（template-asset-editor.tsx と同じ値） ── */
 export interface RichArea { label: string; x: number; y: number; width: number; height: number }
@@ -88,7 +91,7 @@ export function areaPlace(area: RichArea, all: RichArea[]): string {
  * 予約・回答フォーム・予約履歴・来店スタンプはアカウントの LIFF の URL（uri）で保存する。
  */
 export type AreaActionKind = 'none' | TapActionKind
-export interface AreaDraft { kind: AreaActionKind; uri: string; text: string; refId: string }
+export interface AreaDraft { tapExtras?: TapExtras; kind: AreaActionKind; uri: string; text: string; refId: string }
 export const emptyAreaDraft = (): AreaDraft => ({ kind: 'none', uri: '', text: '', refId: '' })
 export const areaDraftConfigured = (draft: AreaDraft | undefined): boolean => Boolean(draft && draft.kind !== 'none')
 
@@ -107,6 +110,10 @@ function visualAreas(): Record<string, AreaDraft> {
 }
 
 /** 保存値（payload）を組み立てる。足りないときは理由を返す（今の画面と同じ決まり）。 */
+function richAreaProblem(draft: AreaDraft, where: string, hasLiff: boolean): string | null {
+  return tapActionProblem(draft, { where, hasLiff, textMax: RICH_MESSAGE_TEXT_MAX })
+}
+
 export function buildRichPayload(input: {
   imageUrl: string
   pickedMedia: MediaItem | null
@@ -120,7 +127,7 @@ export function buildRichPayload(input: {
     const draft = input.areas[area.label]
     if (!draft || draft.kind === 'none') continue
     if (draft.kind === 'uri' && !draft.uri.trim()) return { error: `面 ${area.label} のURLを入力してください。` }
-    const problem = tapActionProblem(draft, { where: `面 ${area.label} `, hasLiff: Boolean(input.liffId), textMax: RICH_MESSAGE_TEXT_MAX })
+    const problem = richAreaProblem(draft, `面 ${area.label} `, Boolean(input.liffId))
     if (problem) return { error: `${problem}。` }
   }
   return {
@@ -132,6 +139,7 @@ export function buildRichPayload(input: {
       tapAreas: input.shape.areas.map((area) => {
         const draft = input.areas[area.label] ?? emptyAreaDraft()
         return {
+          ...(draft.tapExtras ? { tapExtras: draft.tapExtras } : {}),
           label: area.label,
           x: area.x,
           y: area.y,
@@ -161,9 +169,9 @@ function richInitial(host: TemplateEditHost | undefined) {
     const tap = taps.find((item) => item.label === area.label) ?? taps[index]
     if (tap?.actionType === 'uri' && typeof tap.uri === 'string') {
       const back = tapActionFromSavedUri(tap.uri)
-      areas[area.label] = { kind: back.kind as AreaActionKind, uri: back.uri, text: '', refId: back.refId }
+      areas[area.label] = { kind: back.kind as AreaActionKind, uri: back.uri, text: '', refId: back.refId, tapExtras: tap.tapExtras as TapExtras | undefined }
     }
-    if (tap?.actionType === 'message' && typeof tap.text === 'string') areas[area.label] = { kind: 'message', uri: '', text: tap.text, refId: '' }
+    if (tap?.actionType === 'message' && typeof tap.text === 'string') areas[area.label] = { kind: 'message', uri: '', text: tap.text, refId: '', tapExtras: tap.tapExtras as TapExtras | undefined }
   })
   const imageUrl = typeof payload.imageUrl === 'string' ? payload.imageUrl : typeof payload.baseUrl === 'string' ? `${payload.baseUrl}/1040` : ''
   return { name: content.name, shape: shape.value, areas, imageUrl, uploaded: { media: content.media, payload } as TemplateImagemapUpload }
@@ -277,11 +285,11 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     fields.define(`area-${area.label}`, `面 ${area.label} の押したら`, () => {
       const draft = areas[area.label]
       if (!draft || draft.kind === 'none') return null
-      return tapActionProblem(draft, { where: 'この面', hasLiff: Boolean(liffId), textMax: RICH_MESSAGE_TEXT_MAX })
+      return richAreaProblem(draft, 'この面', Boolean(liffId))
     }, { reveal: () => setSelectedLabel(area.label), group: `area-${area.label}` })
   })
 
-  const save = async (): Promise<boolean> => {
+  const save = async (): Promise<string | false> => {
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (fields.submit().length > 0) { setError(''); return false }
     const built = buildRichPayload({ imageUrl, pickedMedia, shape: shapeDef, areas, liffId })
@@ -301,8 +309,13 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       }
       setSaved(true)
       setClean(snapshot)
-      return true
-    } catch {
+      return result.data.id
+    } catch (caught) {
+      const extraError = tapExtraSaveError(caught)
+      if (extraError) {
+        fields.setServerErrors(Object.fromEntries(shapeDef.areas.filter(area => areas[area.label]?.tapExtras).map(area => [`area-${area.label}`, extraError])))
+        return false
+      }
       setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
       return false
     } finally {
@@ -338,15 +351,17 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   }
   const onSaveDraft = async () => {
     if (host) { hostSave(false); return }
-    if (await save()) notifyToast('下書きを保存しました')
+    const savedId = await save()
+    if (savedId) { notifySaved('下書きを保存しました'); disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
   const onPublish = async () => {
     if (host) { hostSave(true); return }
     setPublishing(true)
     try {
-      if (await save()) {
+      const savedId = await save()
+      if (savedId) {
         disarm()
-        router.push('/templates')
+        router.push(createPageReturnHref('/templates', savedId))
       }
     } finally {
       setPublishing(false)
@@ -440,7 +455,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
               下書きを保存
             </Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
               {host ? null : <Send size={15} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
@@ -449,21 +464,16 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
       >
         {host?.notice}
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-        {saved ? <p role="status" className={styles.readonly}>保存しました。一覧へ戻ると、リッチメッセージの一覧に出ています。</p> : null}
+        {null}
 
         {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>名前とフォルダ</h2>
           </div>
           <div className={styles.pair}>
-            <div className={`${styles.field} ${styles.grow}`}>
-              <label htmlFor="te-rich-name" className={styles.label}>テンプレート名</label>
-              <TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} />
-              <FieldError id="te-rich-name-error">{fields.error('name')}</FieldError>
-            </div>
-            <div className={`${styles.field} ${styles.folderField}`}>
-              <label htmlFor="te-rich-folder" className={styles.labelSmall}>フォルダ</label>
-              <FolderSelect
+            <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="te-rich-name"><TextField {...fields.bind('name')} id="te-rich-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：夏のキャンペーン告知" aria-required="true" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'te-rich-name-error' : undefined} />
+<FieldError id="te-rich-name-error">{fields.error('name')}</FieldError></Field></div>
+            <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="te-rich-folder"><FolderSelect
                 id="te-rich-folder"
                 aria-label="フォルダ"
                 value={host ? host.folder : folder}
@@ -475,8 +485,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                   : canMutate && selectedAccountId
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                     : undefined}
-              />
-            </div>
+              /></Field></div>
           </div>
         </Card>}
 
@@ -506,7 +515,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 previewAlt="リッチメッセージの画像"
                 value={imageSet ? imageUrl.trim() : null}
                 accept="image/png,image/jpeg"
-                limitText={hqHost ? '8MB 以内' : '10MB 以内'}
+                maxBytes={(hqHost ? 8 : 10) * 1024 * 1024}
                 busy={hqHost ? uploading : undefined}
                 onBusyChange={hqHost ? undefined : setUploading}
                 disabled={busy && !uploading}
@@ -572,6 +581,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                     <span className={rich.areaChip} data-unset={draft.kind === 'none' || undefined}>{`${area.label} ${areaPlace(area, shapeDef.areas)}`}</span>
                     <div className={rich.areaTap} {...fields.bind(`area-${area.label}`)} aria-describedby={fields.invalid(`area-${area.label}`) ? 'te-rich-area-error' : undefined}>
                       <TapActionField
+                        allowExtras={draft.kind !== "none"} accountId={tapAccountId} extrasError={fields.error(`area-${area.label}`)}
                         name={`面 ${area.label} `}
                         kindLabel={`面 ${area.label} を押したら`}
                         value={draft}

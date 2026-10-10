@@ -29,6 +29,7 @@ import MarksTab from './marks-tab'
 import SearchesTab from './searches-tab'
 import FieldsTab from './fields-tab'
 import styles from './list.module.css'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -115,8 +116,7 @@ export default function TagsList({
         <div className={styles.readonlyRow}>
           <p className={styles.readonlyBand}>
             <Eye className={styles.readonlyIcon} aria-hidden="true" />
-            閲覧のみで見ています。変える操作は管理者に頼んでください。
-          </p>
+            閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
         </div>
       ) : null}
 

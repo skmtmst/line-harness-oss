@@ -6,6 +6,8 @@
  * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
  * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。
  */
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
@@ -30,6 +32,7 @@ import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type 
 import styles from './pets.module.css'
 import { ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
 
+import { emptyValue } from '@/components/shared/empty-value'
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 const PAGE_SIZES = [10, 20, 50]
@@ -51,8 +54,8 @@ export default function PetsListV8({
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenPetListData | null>(null)
   const [draft, setDraft] = useState(query.q)
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [editing, setEditing] = useState<NenPetRow | null>(null)
   const requestRef = useRef(0)
 
@@ -77,11 +80,6 @@ export default function PetsListV8({
   }, [load])
 
   // 探す欄は打ち終わってから（0.3秒）取り直す。
-  useEffect(() => {
-    if (draft.trim() === query.q) return
-    const timer = window.setTimeout(() => { onQueryChange({ ...query, q: draft.trim() }); setPage(1) }, 300)
-    return () => window.clearTimeout(timer)
-  }, [draft, query, onQueryChange])
 
   const change = (patch: Partial<PetsQuery>) => { onQueryChange({ ...query, ...patch }); setPage(1) }
   const filtering = query.q !== '' || query.species !== '' || query.product !== '' || query.weight !== ''
@@ -95,7 +93,7 @@ export default function PetsListV8({
 
       <ListToolbarRow data-design="ListControls">
         <ListToolbarSearchSlot>
-          <SearchField aria-label="ペット名・飼い主で探す" placeholder="ペット名・飼い主で探す" value={draft} onChange={setDraft} onClear={() => setDraft('')} />
+          <SearchField aria-label="ペット名・飼い主で探す" placeholder="ペット名・飼い主で探す" value={draft} onChange={(value: string) => { setDraft(value); onQueryChange({ ...query, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onQueryChange({ ...query, q: '' }); setPage(1) }} />
         </ListToolbarSearchSlot>
         <Select
           aria-label="種別で絞り込む"
@@ -122,7 +120,7 @@ export default function PetsListV8({
           onChange={(value) => change({ weight: value === 'stale' || value === 'fresh' ? value : '' })}
           options={[{ value: '', label: '体重更新：すべて' }, { value: 'fresh', label: '体重更新：90日以内' }, { value: 'stale', label: '体重更新：90日以上前' }]}
         />
-        <Select
+        <ListToolbarSort
           aria-label="並び順"
           width={170}
           value={query.sort}
@@ -201,11 +199,11 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
   const friendHref = `/friends/detail?id=${encodeURIComponent(pet.owner.friendId)}`
   const items: ActionMenuItem[] = [
     ...(canEdit ? [{ id: 'edit', label: 'ペットの情報を直す', onSelect: onEdit }] : []),
-    { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { router.push(friendHref) } },
+    { id: 'owner', label: '飼い主を開く', external: true, href: friendHref, onSelect: () => { router.push(friendHref) } },
     /* マイページの更新を頼む送信の口は無いので、受信箱でこの飼い主とのトークを開いて頼む。 */
-    { id: 'nudge', label: 'マイページで更新を促す', external: true, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(pet.owner.friendId)}`) } },
+    { id: 'nudge', label: 'マイページで更新を促す', external: true, href: `/chats?friend=${encodeURIComponent(pet.owner.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(pet.owner.friendId)}`) } },
   ]
-  const updated = pet.weightKg == null ? '—' : monthDay(pet.weightUpdatedAt)
+  const updated = pet.weightKg == null ? emptyValue('unknown') : monthDay(pet.weightUpdatedAt)
   return (
     <Tr className={styles.row} data-table-layout="columns">
       <Td className={styles.colPet}>
@@ -232,7 +230,7 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
         </span>
       </Td>
       <Td className={styles.colAge}><span className={styles.cell}>{pet.ageLabel}</span></Td>
-      <Td className={styles.colWeight}><span className={styles.num}>{pet.weightKg == null ? '—' : `${pet.weightKg}kg`}</span></Td>
+      <Td className={styles.colWeight}><span className={styles.num}>{pet.weightKg == null ? emptyValue('unknown') : `${pet.weightKg}kg`}</span></Td>
       <Td className={styles.colFeed}>
         <span className={styles.stack}>
           <span className={feed.main === '—' ? styles.cell : styles.cellStrong}>{feed.main}</span>

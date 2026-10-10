@@ -11,6 +11,8 @@
  * データの口・下書き保存・公開・テスト送信・版の守り・未保存の番兵は、今の画面
  * （app/line-notifications/operator/new/operator-new-v8.tsx）から写した。動きは BEHAVIOR.md。
  */
+import { createPageReturnHref } from '@/components/shared/create-page'
+import { notifySaved } from '@/components/shared/toast'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -58,6 +60,8 @@ import {
 import styles from './operator-edit.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError } from '@/components/shared/form-controls'
+import TruncatedText from '@/components/shared/truncated-text'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 function OperatorEditInner() {
   const editId = useSearchParams().get('id')
@@ -214,7 +218,7 @@ function OperatorEditInner() {
         if (!active) return
         setRuleLoading(false)
         if (caught instanceof ApiError && caught.status === 403) {
-          setError('このLINEアカウントのお知らせを表示する権限がありません。')
+          setError(permissionDeniedMessage('store'))
         } else if (caught instanceof ApiError && caught.status === 404) {
           setError('お知らせが見つかりません。アカウントが違うか、削除された可能性があります。')
         } else {
@@ -295,7 +299,7 @@ function OperatorEditInner() {
   fields.define('name', 'お知らせの名前', () => (name.trim() ? null : 'お知らせの名前を入力してください。'))
   /* 受け取るスタッフは、宛先のチームの欄（operator-recipient-team）が赤くなって理由を出す（列車9 の形のまま）。 */
 
-  const saveDraft = async (): Promise<string | null> => {
+  const saveDraft = async (quiet = false): Promise<string | null> => {
     // 読み込み中に保存すると、未復元の項目が初期値で上書きされる。
     if (saving || ruleLoading) return null
     if (!selectedAccountId) {
@@ -335,7 +339,7 @@ function OperatorEditInner() {
           recipientType: teamId ? 'team' : 'staff',
           ...(teamId ? { teamId } : {}),
           recipientIds,
-          recipientLabel: `${recipientIds.length}人`,
+          recipientLabel: `${recipientIds.length} 人`,
           message: null,
           schedule,
           scheduleLabel,
@@ -357,12 +361,14 @@ function OperatorEditInner() {
         : await api.lineNotifications.operatorRules.create({ lineAccountId: selectedAccountId, ...payload })
       if (!result.success) throw new Error('save failed')
       setSavedRuleId(result.data.id)
-      if (typeof result.data.version === 'number') setRuleVersion(result.data.version)
+      if (typeof result.data.version === 'number') setRuleVersion(result.data.version ?? null)
       setError('')
+      setBaseline(signature)
+      if (!quiet) { notifySaved('下書きを保存しました'); if (!editId) router.push(createPageReturnHref('/line-notifications?tab=operator', result.data.id)) }
       return result.data.id
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 403) {
-        setError('このLINEアカウントのお知らせを変更する権限がありません。')
+        setError(permissionDeniedMessage('store'))
       } else if (caught instanceof ApiError && caught.status === 404) {
         setError('お知らせが見つかりません。一覧へ戻って開き直してください。')
       } else if (caught instanceof ApiError && (caught.status === 409 || caught.status === 400)) {
@@ -382,7 +388,7 @@ function OperatorEditInner() {
     /* 押した「公開」のボタンに手応え（押せない形＋輪）を出す。先に下書きを保存している間も。 */
     setPreparingPublish(true)
     try {
-      const ruleId = await saveDraft()
+      const ruleId = await saveDraft(true)
       if (!ruleId) return
       setConfirmOpen(true)
     } finally {
@@ -397,11 +403,16 @@ function OperatorEditInner() {
     setPublishing(true)
     setError('')
     try {
-      await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
-      router.push(`/line-notifications?tab=operator&highlight=${encodeURIComponent(ruleId)}`)
+      const result = await api.lineNotifications.operatorRules.publish(ruleId, selectedAccountId)
+      if (!result.success) throw new Error('公開できませんでした')
+      setRuleVersion(result.data.version ?? null)
+      setBaseline(signature)
+      setConfirmOpen(false)
+      notifySaved('公開しました')
+      if (!editId) router.push(createPageReturnHref('/line-notifications?tab=operator', ruleId))
     } catch (caught) {
       setError(describeApiFailure(caught, '公開', {
-        forbidden: 'このLINEアカウントのお知らせを公開する権限がありません。',
+        scope: 'store',
       }))
     } finally {
       setPublishing(false)
@@ -410,7 +421,7 @@ function OperatorEditInner() {
 
   const testSend = async () => {
     if (!selectedAccountId || saving || ruleLoading) return
-    const ruleId = await saveDraft()
+    const ruleId = await saveDraft(true)
     if (!ruleId) return
     setSaving(true); setError(''); setNotice('')
     try {
@@ -419,7 +430,7 @@ function OperatorEditInner() {
       setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
     } catch (caught) {
       setError(describeApiFailure(caught, 'テスト送信', {
-        forbidden: 'このLINEアカウントのお知らせをテスト送信する権限がありません。',
+        scope: 'store',
       }))
     } finally { setSaving(false) }
   }
@@ -436,11 +447,11 @@ function OperatorEditInner() {
   const description = editId
     ? '宛先はお店のスタッフ（運用者）です。どんなときに知らせるか・だれが受け取るか・いつ送るかを決めます。閉じるときに保存していなければ確認が出ます。'
     : '宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは「顧客へのお知らせ」で作ります。'
-  const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]
+  const teamOptions = [{ value: '', label: 'スタッフを選ぶ' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length} 人）` }))]
 
   return (
     <PageFrame kind="settings" boardId={editId ? 'hiBO8' : 'gjUz3'}>
-      <PageHeading title={title} description={description} />
+      <PageHeading title={title} help={description} />
 
       <div className={styles.body}>
         <SettingsInnerNav inline />
@@ -448,7 +459,7 @@ function OperatorEditInner() {
           {canWrite ? null : (
             <div className={styles.roBand} role="status">
               <Eye size={14} aria-hidden="true" />
-              <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+              <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
             </div>
           )}
           <DetailColumns
@@ -468,7 +479,7 @@ function OperatorEditInner() {
                   </div>
                 </div>
                 {canWrite ? (
-                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled}>
+                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled} busy={Boolean(saving)} busyLabel="処理中…">
                     <Send size={15} aria-hidden="true" />自分にテストを送る
                   </Button>
                 ) : null}
@@ -607,7 +618,7 @@ function OperatorEditInner() {
                   {items.length > 0 ? (
                     <>
                       <p className={styles.staffSummary}>
-                        {`選択 ${recipientIds.length}人／LINEで受け取れる ${lineReachable.length}人／管理画面で受け取れる ${recipientIds.length}人`}
+                        {`選択 ${recipientIds.length} 人／LINEで受け取れる ${lineReachable.length} 人／管理画面で受け取れる ${recipientIds.length} 人`}
                       </p>
                       <p className={styles.staffNote}>0人のときは「受け取る人を1人以上選んでください」と出て、公開できません。</p>
                     </>
@@ -615,7 +626,7 @@ function OperatorEditInner() {
                   {canWrite && teamFormOpen ? (
                     <div className={styles.teamForm}>
                       <TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} />
-                      <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
+                      <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()} busy={Boolean(teamBusy)} busyLabel="処理中…">{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
                     </div>
                   ) : null}
                   {teamError ? (
@@ -704,7 +715,7 @@ function OperatorEditInner() {
           <ul className={styles.confirmList} aria-label="受け取る人">
             {selectedRecipients.map((recipient) => (
               <li key={recipient.id} className={styles.confirmRow}>
-                <span className={styles.confirmName} title={recipient.name}>{recipient.name}</span>
+                <span className={styles.confirmName} ><TruncatedText value={String(recipient.name ?? '')} /></span>
                 <span className={styles.confirmRole}>{recipientRole(recipient, staffRoles)}</span>
                 <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>
                   {recipient.channels.line ? 'LINE' : '画面だけ'}

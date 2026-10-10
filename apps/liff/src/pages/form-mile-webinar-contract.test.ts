@@ -19,7 +19,7 @@ function page(name: string): string {
 
 const form = () => page('Form.tsx');
 const affiliate = () => page('Affiliate.tsx');
-const webinar = () => page('Webinar.tsx');
+const webinar = () => readFileSync(join(ROOT, '../../../worker/src/client/webinar/main.tsx'), 'utf8');
 
 /**
  * 直しを戻したときの赤化確認用。ふだんは作業ツリーの Form.tsx を読むが、
@@ -160,11 +160,13 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
   it('必須は欄名の横の小さな赤い札。入力の失敗の赤とは分ける', () => {
     const src = formSrc();
     // 必須の印は ★V8 (B8rCt・g9osGN) の赤い札 (地 #fdecec・文字 liff-sun)
-    expect(src).toMatch(/function RequiredMark[\s\S]*?bg-liff-required-bg/);
-    expect(src).toMatch(/function RequiredMark[\s\S]*?text-liff-sun/);
-    expect(src).toContain('<RequiredMark />');
-    // 必須に失敗の赤を渡さない
-    expect(src).not.toMatch(/<RequiredMark[^/]*color/);
+    const controls = readFileSync(join(ROOT, '..', 'components', 'forms', 'controls.tsx'), 'utf8');
+    const styles = readFileSync(join(ROOT, '..', 'components', 'forms', 'controls.module.css'), 'utf8');
+    expect(src).toContain('<FieldLabel');
+    expect(src).toContain('required={block.required}');
+    expect(controls).toContain('styles.required');
+    expect(styles).toContain('var(--color-liff-required-bg)');
+    expect(styles).toContain('var(--color-liff-sun)');
     // 入力の失敗 (欄の下の直し方・枠) はお店のテーマの error のまま
     expect(src).toContain('errorColor={theme.error}');
   });
@@ -197,15 +199,16 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
   });
 });
 
-describe('ウェビナーの配信中は ★V8 RpW2h の暗い地、時刻の同期はそのまま', () => {
-  it('同期・補正・ハートビート・計測が残る', () => {
-    const src = webinar();
-    expect(src).toContain('expectedPosition');
-    expect(src).toContain('DRIFT_TOLERANCE');
-    expect(src).toContain('HEARTBEAT_MS');
-    expect(src).toContain('webinarHeartbeat');
-    expect(src).toContain('webinarCtaClick');
-    expect(src).toContain('webinarComment');
+describe('ウェビナーは申込もできる本体を共用する', () => {
+  it('旧URLの入口からWorkerと同じ画面へ認証情報とslugを渡す', () => {
+    const src = page('Webinar.tsx');
+    expect(src).toContain("worker/src/client/webinar/main");
+    expect(src).toContain('<WebinarApp ctx={ctx} slug={slug} />');
+    const shared = webinar();
+    expect(shared).toContain('expectedPosition');
+    expect(shared).toContain('DRIFT_TOLERANCE');
+    expect(shared).toContain('HEARTBEAT_MS');
+    expect(src).toContain('getIdToken()');
   });
 
   it('配信中は暗い地・16:9 の動画・途中のボタンは LINE の緑・送信は主の緑', () => {
@@ -213,8 +216,8 @@ describe('ウェビナーの配信中は ★V8 RpW2h の暗い地、時刻の同
     const live = src.slice(src.indexOf('ライブ中 (★V8 RpW2h)'));
     expect(live).toContain('bg-night-deep');
     expect(live).toContain('aspect-video');
-    expect(live).toContain('bg-night-cta');
-    expect(live).toContain('bg-liff-primary');
+    expect(live).toContain('variant="nightAction"');
+    expect(live).toContain('variant="nightSend"');
     // 待機・終了などは白い殻のまま
     expect(src).toContain('bg-canvas');
   });
@@ -233,7 +236,8 @@ describe('ウェビナーの配信中は ★V8 RpW2h の暗い地、時刻の同
     expect(src).toContain('ご視聴ありがとうございました');
     expect(src).toContain('友だち追加すると見られます');
     expect(src).toContain('この端末では再生できません');
-    expect(src).toContain('読み込めませんでした');
+    expect(src).toContain('<LoadErrorView');
+    expect(readFileSync(join(ROOT, '..', 'components', 'LoadErrorView.tsx'), 'utf8')).toContain('読み込めませんでした');
   });
 
   it('会話は「名前　本文」の1行。自分の名前だけ色を変える', () => {

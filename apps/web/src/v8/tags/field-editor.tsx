@@ -100,6 +100,7 @@ export default function FieldEditor({
   backHref,
   onCancel,
   onSubmit,
+  onDraftChange,
 }: {
   host?: { title: string; notice?: ReactNode; footer: (submit: () => void, cancel: () => void) => ReactNode }
   mode: 'create' | 'edit'
@@ -122,6 +123,7 @@ export default function FieldEditor({
   backHref: string
   onCancel: () => void
   /** 作成は第2引数に冪等キーが入る（R515）。編集では使わない。 */
+  onDraftChange?: (values: FieldEditorValues) => void
   onSubmit: (values: FieldEditorValues, requestKey: string) => void
 }) {
   usePageTitle(host?.title ?? (mode === 'create' ? '項目を作る' : '項目を編集'))
@@ -188,6 +190,26 @@ export default function FieldEditor({
   }, [name, fieldKey, type, folderId, options, defaultValue, defaultOptions, isPersonal, isStarred, ecIsMaster, ecFieldPath])
 
   const effectiveType = mode === 'edit' && field ? field.type : type
+  const draftValues = useMemo<FieldEditorValues>(() => ({
+      name: name.trim(),
+      fieldKey: fieldKey.trim(),
+      type: effectiveType,
+      folderId,
+      options: NEEDS_OPTIONS.has(effectiveType) ? optionList : null,
+      ...(host && NEEDS_OPTIONS.has(effectiveType) ? { optionIds: options.flatMap((value, index) => value.trim() ? [field?.optionDefinitions?.filter((option) => !('status' in option) || option.status !== 'archived')[index]?.id] : []) } : {}),
+      defaultValue: FILE_TYPES.has(effectiveType)
+        ? null
+        : effectiveType === 'multi_select'
+          ? (defaultOptions.length > 0 ? defaultOptions : null)
+          : effectiveType === 'select'
+            ? (defaultValue || null)
+            : defaultValue.trim() || null,
+      isPersonal,
+      isStarred,
+      ecIsMaster,
+      ecFieldPath: ecIsMaster ? ecFieldPath.trim() : '',
+    }), [name, fieldKey, effectiveType, folderId, optionList, host, options, field?.optionDefinitions, defaultOptions, defaultValue, isPersonal, isStarred, ecIsMaster, ecFieldPath])
+  useEffect(() => { onDraftChange?.(draftValues) }, [draftValues, onDraftChange])
   const typeLocked = mode === 'edit' || locked
   const optionsActive = NEEDS_OPTIONS.has(effectiveType) && !locked
   const destination = folders.find((folder) => folder.id === folderId)?.name ?? '未分類'
@@ -223,25 +245,7 @@ export default function FieldEditor({
     if (mode === 'create' && !/^[a-z][a-z0-9_]{0,31}$/.test(fieldKey.trim())) return failField('key', '差し込みの名前は英小文字で始まる英数字と _ の32文字以内にしてください')
     if (keyOwners.length) return failField('key', 'この差し込みの名前はすでに使われています')
     setValidationTarget(''); setValidationError('')
-    onSubmit({
-      name: name.trim(),
-      fieldKey: fieldKey.trim(),
-      type: effectiveType,
-      folderId,
-      options: NEEDS_OPTIONS.has(effectiveType) ? optionList : null,
-      ...(host && NEEDS_OPTIONS.has(effectiveType) ? { optionIds: options.flatMap((value, index) => value.trim() ? [field?.optionDefinitions?.filter((option) => !('status' in option) || option.status !== 'archived')[index]?.id] : []) } : {}),
-      defaultValue: FILE_TYPES.has(effectiveType)
-        ? null
-        : effectiveType === 'multi_select'
-          ? (defaultOptions.length > 0 ? defaultOptions : null)
-          : effectiveType === 'select'
-            ? (defaultValue || null)
-            : defaultValue.trim() || null,
-      isPersonal,
-      isStarred,
-      ecIsMaster,
-      ecFieldPath: ecIsMaster ? ecFieldPath.trim() : '',
-    }, idempotencyKeyRef.current)
+    onSubmit(draftValues, idempotencyKeyRef.current)
   }
 
   const optionRows = options.length >= MIN_OPTION_ROWS ? options : [...options, ...Array(MIN_OPTION_ROWS - options.length).fill('')]
@@ -287,9 +291,7 @@ export default function FieldEditor({
           <p className={styles.sideNote}>{`「${FIELD_TYPE_WORDS.select}」「${FIELD_TYPE_WORDS.multi_select}」のときは選択肢を並べます。`}</p>
           <div className={styles.optionStack}>
             {optionRows.map((value, index) => (
-              <label key={index} className={styles.field}>
-                <span className={styles.label}>選択肢</span>
-                <TextField
+              <Field key={index} label="選択肢"><TextField
                   ref={index === 0 ? (element) => { validationRefs.current.options = element } : undefined}
                   invalid={index === 0 && validationTarget === 'options' && Boolean(validationError)}
                   aria-describedby={index === 0 && validationTarget === 'options' && validationError ? 'ff-error-options' : undefined}
@@ -298,8 +300,7 @@ export default function FieldEditor({
                   aria-label={`選択肢 ${index + 1}`}
                   placeholder={OPTION_EXAMPLES[index] ?? undefined}
                   onChange={(event) => setOption(index, event.target.value)}
-                />
-              </label>
+                /></Field>
             ))}
             {fieldError('options')}
             <span>
@@ -331,11 +332,8 @@ export default function FieldEditor({
           <Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked || saving}>友だち一覧の列に出す</Checkbox>
           <Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked || saving}>EC側の値を正とする（EC連携で上書き）</Checkbox>
           {ecIsMaster ? (
-            <label className={styles.field} data-field="ec">
-              <span className={styles.label}>EC側の項目名</span>
-              <TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" />
-              {fieldError('ec')}
-            </label>
+            <Field label="EC側の項目名"><TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" />
+{fieldError('ec')}</Field>
           ) : null}
         </section>
       </div>
@@ -354,7 +352,7 @@ export default function FieldEditor({
         <>
           <h2 className={styles.asideTitle}>いまの使用状況</h2>
           <dl className={styles.placeList}>
-            <div className={styles.placeRow}><dt>値が入っている友だち</dt><dd>{typeof field?.usageCount === 'number' ? `${field.usageCount}人` : '未集計'}</dd></div>
+            <div className={styles.placeRow}><dt>値が入っている友だち</dt><dd>{typeof field?.usageCount === 'number' ? `${field.usageCount} 人` : '未集計'}</dd></div>
             {field?.displayTargets?.length ? <div className={styles.placeRow}><dt>使用先</dt><dd>{field.displayTargets.join('・')}</dd></div> : null}
           </dl>
           <p className={styles.asideText}>{field?.isPersonal ? '個人情報として保護されています。見られる・変えられるのは権限のある担当者だけです。' : '個人情報の保護は未設定です。'}</p>
@@ -368,8 +366,8 @@ export default function FieldEditor({
       <CreatePage
         boardId="w9zY5"
         title={host ? host.title : mode === 'create' ? '項目を作る' : (field?.name ?? '項目を編集')}
-        description={host ? '各アカウントへ配る情報欄のひな形を作ります。種類と差し込みの名前は作ったあと変えられません。' : mode === 'create' ? '友だち1人ひとりに持たせる情報欄を作ります。種類は作ったあと「移行」でだけ変えられます' : '名前・フォルダ・値の扱いを変えられます。種類は「移行」でだけ変えられます'}
-        help={help}
+
+        help={<>{host ? '各アカウントへ配る情報欄のひな形を作ります。種類と差し込みの名前は作ったあと変えられません。' : mode === 'create' ? '友だち1人ひとりに持たせる情報欄を作ります。種類は作ったあと「移行」でだけ変えられます' : '名前・フォルダ・値の扱いを変えられます。種類は「移行」でだけ変えられます'}{help}</>}
         identity={host ? undefined : back}
         notice={host?.notice}
         preview={aside}
@@ -386,7 +384,7 @@ export default function FieldEditor({
             <Check size={15} aria-hidden="true" />
             {mode === 'create' ? '項目を作る' : '保存する'}
           </Button>
-        </>}
+        </>} dirty={false}
       >
         {notices}
         {error ? <Notice tone="danger" message={error} /> : null}
@@ -394,9 +392,7 @@ export default function FieldEditor({
 
         <section className={styles.card} aria-labelledby="ff-basic">
           <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ff-basic">基本</h2></div>
-          <label className={styles.field} data-field="name">
-            <span className={styles.label}>項目名</span>
-            <TextField
+          <Field label="項目名"><TextField
               ref={(element) => { validationRefs.current.name = element }}
               invalid={validationTarget === 'name' && Boolean(validationError)}
               aria-describedby={validationTarget === 'name' && validationError ? 'ff-error-name' : undefined}
@@ -406,9 +402,8 @@ export default function FieldEditor({
               placeholder="例：愛犬のお名前"
               onChange={(event) => { setName(event.target.value); if (mode === 'create' && !keyTouched) setFieldKey(suggestKey(event.target.value)) }}
             />
-            {fieldError('name')}
-            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" />
-          </label>
+{fieldError('name')}
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" /></Field>
           <div className={styles.field} data-field="key">
             <span className={styles.labelStrong} id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>
             <span className={styles.keyRow}>

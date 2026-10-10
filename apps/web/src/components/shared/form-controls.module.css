@@ -142,3 +142,19 @@
 [data-theme='v8'] .field[data-spacing='section'] { gap: var(--tpl-section-gap); }
 [data-theme='v8'] .field[data-field-size='compact'] .label { font-size: var(--tpl-rest3-ec-small); line-height: var(--tpl-rest3-ec-label-lh); }
 [data-theme='v8'] .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
+
+/* B-152・仕上げ1：ラベルと欄 */
+[data-theme='v8'] .labelRow { margin-bottom: var(--polish-space-row); }
+
+/* B-152・仕上げ2 */
+[data-theme='v8'] .field .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+[data-theme='v8'] .field:is([data-field-size], [data-label-size], [data-density]) .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+/* B-158：任意も札で示す。 */
+[data-theme='v8'] .optional {
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.4;
+}

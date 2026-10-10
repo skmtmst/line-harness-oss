@@ -12,6 +12,10 @@
  * 空のまま使われているときの黄色の帯は表の列の上、行の右端は「…」
  * （編集・止める／再開する・削除する）。右クリックでも同じものが出る。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -93,6 +97,11 @@ import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
+import { formatDate as polishFormatDate } from '@/lib/format'
+import TruncatedText from '@/components/shared/truncated-text'
+import { Field } from '@/components/shared/form-controls'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -148,9 +157,7 @@ function formatListDate(value: string): string {
 
 /** 「10/7まで」の札の日付。年月は要らず、月日だけ出す。 */
 function formatMonthDay(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return `${date.getMonth() + 1}/${date.getDate()}まで`
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 /*
@@ -178,36 +185,7 @@ function stateBadge(item: CommonVar): { label: string; tone: 'success' | 'info' 
 
 /** 差し込み名の右のコピーの印（絵：キーの横の小さな印）。押すと印が「✓」に変わる。 */
 function CopyKeyButton({ value, label }: { value: string; label: string }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const timerRef = useRef<number | null>(null)
-  useEffect(() => () => {
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-  }, [])
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setState('copied')
-    } catch {
-      setState('failed')
-    }
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-    timerRef.current = window.setTimeout(() => setState('idle'), 1500)
-  }
-  return (
-    <button
-      type="button"
-      className={styles.copyKey}
-      data-state={state}
-      aria-label={label}
-      title={state === 'copied' ? 'コピーしました' : state === 'failed' ? 'コピーできませんでした。文字を選んでコピーしてください' : 'コピー'}
-      onClick={(event) => {
-        event.stopPropagation()
-        void copy()
-      }}
-    >
-      {state === 'copied' ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
-    </button>
-  )
+  return <CopyTextButton value={value} aria-label={label} />
 }
 
 function CommonVarsListInner() {
@@ -244,11 +222,11 @@ function CommonVarsListInner() {
   const [folderReloading, setFolderReloading] = useState(false)
   const [listLimited, setListLimited] = useState(false)
 
-  const [query, setQuery] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [query, setQuery] = useListUrlValue('q', '')
+  const [page, setPage] = useListUrlValue('page', 1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [chip, setChip] = useState<VarsChip>('all')
-  const [order, setOrder] = useState<CommonVarOrder>('usage_desc')
+  const [order, setOrder] = useListUrlValue<CommonVarOrder>('order', 'usage_desc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [orderMenuOpen, setOrderMenuOpen] = useState(false)
@@ -315,7 +293,7 @@ function CommonVarsListInner() {
       if (accountAtRequest === latestAccountRef.current) {
         setListFailure(e)
         setError(e instanceof ApiError && e.status === 403
-          ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
+          ? permissionDeniedMessage('store')
           : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
       }
     } finally {
@@ -803,7 +781,7 @@ function CommonVarsListInner() {
   const prepareRemoveSelected = async () => {
     if (selected.size === 0 || !selectedAccountId) return
     if (selected.size > MAX_BATCH_DELETE_COUNT) {
-      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT}件までです。フォルダや検索で絞り込んで分けて削除してください。`)
+      setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT} 件までです。フォルダや検索で絞り込んで分けて削除してください。`)
       return
     }
     const request = {
@@ -828,7 +806,7 @@ function CommonVarsListInner() {
       const blocked = impacts.filter(({ impact }) => !impact.canDelete)
       if (blocked.length > 0) {
         const references = blocked.reduce((sum, { impact }) => sum + impact.total, 0)
-        setError(`${blocked.length}件は、合計${references}か所で使用中のため削除できません。`)
+        setError(`${blocked.length} 件は、合計${references}か所で使用中のため削除できません。`)
         return
       }
     } catch {
@@ -883,7 +861,7 @@ function CommonVarsListInner() {
         setDeleteBatchError(
           failed.length === targets.length
             ? '選択した共通情報を削除できませんでした。状態を読み直してから、もう一度お試しください。'
-            : `${failed.length}件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
+            : `${failed.length} 件の共通情報を削除できませんでした。削除できなかったものだけを残しています。`,
         )
         await load()
         return
@@ -915,7 +893,7 @@ function CommonVarsListInner() {
     <div role="alert" className={styles.folderAlert}>
       <p className={styles.folderNote}>
         {folderForbidden
-          ? 'フォルダを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+          ? permissionDeniedMessage('store')
           : 'フォルダを読み込めませんでした。登録した共通情報は消えていません。'}
       </p>
       {folderForbidden ? null : (
@@ -963,7 +941,7 @@ function CommonVarsListInner() {
       unfiledId={UNGROUPED}
       allCount={listFailed ? null : items.length}
       unfiledCount={unfiledCount}
-      placeholder="例: 01_店舗案内"
+      placeholder="例：01_店舗案内"
       controlRef={folderControlRef}
     >
       {folderFailureNote}
@@ -999,37 +977,7 @@ function CommonVarsListInner() {
   )
   /* 並び替え：絵に無いが今の機能。場所を取らないよう印だけのボタン＋メニュー。 */
   const orderLabel = ORDER_OPTIONS.find((option) => option.value === order)?.label ?? ''
-  const orderBox = (
-    <>
-      <IconButton
-        title={`並び替え：${orderLabel}`}
-        aria-label={`並び替え：${orderLabel}`}
-        aria-haspopup="menu"
-        aria-expanded={orderMenuOpen}
-        onClick={(event) => {
-          orderAnchorRef.current = event.currentTarget
-          setOrderMenuOpen((open) => !open)
-        }}
-      >
-        <ArrowUpDown size={15} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu
-        open={orderMenuOpen}
-        onClose={() => setOrderMenuOpen(false)}
-        anchorRef={orderAnchorRef}
-        ariaLabel="並び替え"
-        items={ORDER_OPTIONS.map((option) => ({
-          id: option.value,
-          label: option.value === order ? `${option.label}（いまの並び）` : option.label,
-          onSelect: () => {
-            setOrderMenuOpen(false)
-            setOrder(option.value)
-            setPage(1)
-          },
-        }))}
-      />
-    </>
-  )
+  const orderBox = <ListToolbarSort value={order} onChange={(value) => { setOrder(value as typeof order); setPage(1) }} options={ORDER_OPTIONS} />
   const perPageBox = (
     <div className={styles.perPageBox}>
       <Select
@@ -1185,6 +1133,7 @@ function CommonVarsListInner() {
         <span className={styles.stateIcon}><Lock size={18} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>共通情報を見る権限がありません</p>
         <p className={styles.stateDesc}>オーナーか管理者に、共通情報を見られるよう頼んでください。</p>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
         <Button href="/staff" variant="secondary">できることを確かめる</Button>
       </div>
     ) : (
@@ -1192,7 +1141,7 @@ function CommonVarsListInner() {
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={18} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>共通情報を読み込めませんでした</p>
         <p className={styles.stateDesc}>{error || '読み込みに失敗しました。接続を確かめて、もう一度お試しください。'}</p>
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
       </div>
     )
   ) : filtered.length === 0 ? (
@@ -1257,7 +1206,7 @@ function CommonVarsListInner() {
                 const badge = stateBadge(item)
                 const valueText = formatVarValue(item.type, item.value)
                 const pending = item.nextSchedule ?? null
-                const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`
+                const updateTitle = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1} 件` : ''}`}`
                 return (
                   <Tr
                     interactive
@@ -1290,11 +1239,11 @@ function CommonVarsListInner() {
                           <>
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
-                              title={item.name}
+
                               className={styles.nameLink}
                               onClick={(event) => event.stopPropagation()}
                             >
-                              {item.name}
+                              <TruncatedText value={String(item.name ?? '')} />
                             </Link>
                           </>
                         </div>
@@ -1304,17 +1253,14 @@ function CommonVarsListInner() {
                       {valueText || <span className={styles.valueEmpty}>（空）</span>}
                     </Td>
                     <Td>
-                      <span className={styles.statePill} data-tone={badge.tone}>
-                        <span className={styles.stateDot} aria-hidden="true" />
-                        {badge.label}
-                      </span>
+                      <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
                     </Td>
                     {!narrow && (
                       <Td onClick={(event) => event.stopPropagation()}>
                         {item.usageCount === undefined ? (
                           <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
                         ) : item.usageCount === 0 ? (
-                          <span className={styles.usageNone}>なし</span>
+                          <span className={styles.usageNone}>{emptyValue('none')}</span>
                         ) : (
                           <Link
                             href={`/contents/vars/edit?id=${item.id}`}
@@ -1348,7 +1294,7 @@ function CommonVarsListInner() {
       </ContextMenu>
 
       {/* まとめての帯（選ぶと表の下に出る）。 */}
-      {canWrite ? <BulkBar count={selected.size} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
+      {canWrite ? <BulkBar count={selected.size} total={filtered.length} onSelectAll={() => setSelected(new Set(filtered.map(item => item.id)))} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
         <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>選択を外す</Button>
         <Button type="button" variant="danger" onClick={() => void prepareRemoveSelected()}>選択した共通情報を削除</Button>
       </BulkBar> : null}
@@ -1358,8 +1304,8 @@ function CommonVarsListInner() {
   const pagerSummary = filtered.length === 0
     ? '0件'
     : pageCount > 1
-      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)}件`
-      : `${formatNumber(filtered.length)}件`
+      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)} 件`
+      : `${formatNumber(filtered.length)} 件`
   const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : pageCount > 1 ? (
     <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
   ) : (
@@ -1374,7 +1320,7 @@ function CommonVarsListInner() {
       icon: Braces,
       value: listFailed ? null : stats.total,
       unit: '件',
-      detail: `下書き ${listFailed ? '—' : stats.draftCount}・止めた ${listFailed ? '—' : stats.stoppedCount}`,
+      detail: `下書き ${listFailed ? emptyValue('unknown') : stats.draftCount}・止めた ${listFailed ? emptyValue('unknown') : stats.stoppedCount}`,
     },
     {
       key: 'usage',
@@ -1453,23 +1399,20 @@ function CommonVarsListInner() {
                 </span>
               </p>
             ) : null}
-            <label className={styles.dialogField}>
-              <span className={styles.dialogLabel}>
+            <Field label={<><span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
-              </span>
-              <input
+              </span></>}><input
                 value={statusReason}
                 onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                 placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
                 className={styles.dialogInput}
-              />
-            </label>
+              /></Field>
             {statusAction === 'stop' && statusScheduled.length > 0 ? (
               <p className={styles.dialogWarn} role="note">
                 <TriangleAlert size={14} aria-hidden="true" />
                 <span>
                   予約中の{statusScheduled[0].kindLabel}「{statusScheduled[0].name}」が送られなくなります。
-                  {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)}件` : ''}
+                  {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)} 件` : ''}
                 </span>
               </p>
             ) : null}
@@ -1693,29 +1636,21 @@ function CommonVarsListInner() {
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                <label className={styles.dialogField}>
-                  <span className={styles.dialogLabel}>消した理由（記録に残ります）</span>
-                  <input
+                <Field label="消した理由（記録に残ります）"><input
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"
                     className={styles.dialogInput}
-                  />
-                </label>
+                  /></Field>
                 ) : null}
 
                 {deleteImpact.canDelete ? (
-                  <label className={styles.dialogField}>
-                    <span className={styles.dialogLabel}>
-                      削除する場合は、差し込みキーを入力してください
-                    </span>
-                    <input
+                  <Field label="削除する場合は、差し込みキーを入力してください"><input
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
                       className={styles.dialogInput}
-                    />
-                  </label>
+                    /></Field>
                 ) : null}
 
                 {deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
@@ -1735,13 +1670,13 @@ function CommonVarsListInner() {
         open={deleteTargets.length > 0}
         title={deleteTargets.length === 1
           ? `「${deleteTargets[0]?.name ?? ''}」を削除しますか？`
-          : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1}件を削除しますか？`}
-        description={`選択した${deleteTargets.length}件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
+          : `「${deleteTargets[0]?.name ?? ''}」ほか${deleteTargets.length - 1} 件を削除しますか？`}
+        description={`選択した${deleteTargets.length} 件の共通情報と、登録値・次回予約を削除します。テンプレート、配信、フォルダ、友だちは削除しません。この操作は元に戻せません。`}
         confirmLabel="削除する"
         destructive
         busy={deleting}
         error={deleteBatchError || undefined}
-        onConfirm={() => void removeSelected()}
+        onConfirm={() => removeSelected()}
         onCancel={() => {
           if (deleting) return
           batchRequestRef.current = {
@@ -1753,17 +1688,12 @@ function CommonVarsListInner() {
           setDeleteTargets([])
         }}
       >
-        <label className={styles.dialogField}>
-          <span className={styles.dialogLabel}>
-            消した理由 <span className={styles.required}>必須</span>
-          </span>
-          <input
+        <Field label="消した理由" required><input
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="店舗情報の変更のため"
             className={styles.dialogInput}
-          />
-        </label>
+          /></Field>
       </ConfirmDialog>
 
       {activeItem ? (
@@ -1828,14 +1758,14 @@ function CommonVarsListInner() {
             </p>
             <p className={styles.panelLabel}>状態</p>
             <p className={styles.panelText}>
-              {activeStopped ? '止めている' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}
+              {activeStopped ? '停止中' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}
             </p>
             <p className={styles.panelLabel}>使っている所</p>
             <p className={styles.panelText}>
               {activeItem.usageCount === undefined
                 ? '—（未取得）'
                 : activeItem.usageCount === 0
-                  ? 'なし'
+                  ? emptyValue('none')
                   : `${formatNumber(activeItem.usageCount)}か所`}
             </p>
             <p className={styles.panelLabel}>更新・次回</p>
@@ -1885,7 +1815,7 @@ function CommonVarsListInner() {
       boardId={narrow ? 'XIzkJ' : canWrite ? 'FM94M' : 'OxSw8'}
       headingSize="regular"
       title="共通情報"
-      description="会社名・営業時間・電話番号など、何度も使う文字をここで持ち、テンプレートや配信に差し込みます。ここを変えると、差し込んだ所がまとめて変わります。"
+      help="会社名・営業時間・電話番号など、何度も使う文字をここで持ち、テンプレートや配信に差し込みます。ここを変えると、差し込んだ所がまとめて変わります。"
       actions={
         <VarsExportPanel
           accountId={selectedAccountId}
@@ -1897,7 +1827,7 @@ function CommonVarsListInner() {
         /* 閲覧のみの帯（`OxSw8`）。数の帯の上。 */
         <div className={styles.viewerBand} role="status">
           <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
         </div>
       )}
       stats={

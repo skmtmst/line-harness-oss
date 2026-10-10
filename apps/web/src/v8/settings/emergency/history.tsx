@@ -21,6 +21,8 @@ import { MANUAL_UPDATE_GUIDE_URL } from '@/components/update/use-update-status'
 import releaseLog from '@/generated/release-log-summary.json'
 import { api, type OperationHistoryEntry } from '@/lib/api'
 import styles from './history.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Release = { version: string; released: string | null; entries: Array<{ text: string }> }
 type Deployment = NonNullable<OperationHistoryEntry['deployment']>
@@ -30,13 +32,7 @@ const DAY = 24 * 60 * 60 * 1000
 
 /** 「10/1 23:58」。release-log の「2026-08-19 15:00」（日本時間・オフセット無し）もそのまま読む。 */
 function shortWhen(value: string | null | undefined): string {
-  if (!value) return '—'
-  const plain = value.match(/^\d{4}-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
-  if (plain && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) return `${Number(plain[1])}/${Number(plain[2])} ${plain[3]}:${plain[4]}`
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map((p) => [p.type, p.value]))
-  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
+  return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
 function toTime(value: string | null | undefined): number {
@@ -79,7 +75,7 @@ export function historyRows(releases: Release[], deployments: Deployment[]) {
   const latest = latestDeploymentPhases(deployments)
   const used = new Set<string>()
   const rows = latest.map((deployment) => {
-    const version = deployment.version?.replace(/^v/, '') ?? '—'
+    const version = deployment.version?.replace(/^v/, '') ?? emptyValue('unknown')
     used.add(version)
     const release = releases.find((item) => item.version.replace(/^v/, '') === version)
       ?? { version, released: deployment.occurredAt, entries: [] }
@@ -159,7 +155,7 @@ export default function UpdateHistoryV8() {
                 <GridRow key={deployment?.deploymentId || `${release.version}|${deployment?.occurredAt ?? release.released}`}>
                   <GridCell role="cell" className={styles.cell}>{shortWhen(deployment?.occurredAt ?? release.released)}</GridCell>
                   <GridCell role="cell" className={`${styles.cell} ${styles.strong}`} title={title}>{title}</GridCell>
-                  <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : '—'}</GridCell>
+                  <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : emptyValue('unknown')}</GridCell>
                   <GridCell role="cell" className={`${styles.cell} ${styles.num}`}>—</GridCell>
                   <GridCell role="cell" className={styles.judge}><StatusBadge tone={({ good: 'success', warn: 'warning', danger: 'danger', muted: 'neutral' } as Record<string, StatusBadgeTone>)[result.tone]}>{result.label}</StatusBadge></GridCell>
                 </GridRow>
@@ -171,7 +167,7 @@ export default function UpdateHistoryV8() {
 
       <div className={styles.foot}>
         <p className={styles.footText}>自前でデプロイしている環境では、手動アップデートガイドの手順で更新します。</p>
-        <Button href={MANUAL_UPDATE_GUIDE_URL} target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />手動アップデートガイドを開く</Button>
+        <Button external href={MANUAL_UPDATE_GUIDE_URL}  >手動アップデートガイドを開く</Button>
       </div>
     </div>
   )

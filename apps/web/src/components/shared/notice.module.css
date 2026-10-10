@@ -16,10 +16,10 @@
 .notice {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 12px 16px;
   border-radius: var(--radius-control);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 400;
   line-height: 1.6;
 }
@@ -58,21 +58,21 @@
  * 地は同値（#e8f8ee）の success-bg に名前をそろえる。
  */
 .success {
-  background: var(--color-success-bg);
+  background: var(--color-notice-success-bg);
   color: var(--color-success);
 }
 
 /* 注意（黄）。文字は必ず warn-deep（地に warn は読めないため）。 */
 .warn {
   border: 1px solid var(--color-status-warn);
-  background: var(--color-status-warn-soft);
+  background: var(--color-notice-warning-bg);
   color: var(--color-status-warn-deep);
 }
 
 /* 危険（赤）。止まっている・失敗していることだけに使う。 */
 .danger {
   border: 1px solid var(--color-status-danger);
-  background: var(--color-status-danger-soft);
+  background: var(--color-notice-danger-bg);
   color: var(--color-status-danger);
 }
 
@@ -111,12 +111,12 @@
 
 /* 正本 ThDed。案内の印だけ青、本文は副文字色。 */
 [data-theme='v8'] .notice {
-  gap: 10px; padding: 10px 14px; border-radius: 10px;
+  gap: 10px; padding: 10px 14px; border-radius: var(--polish-radius-control);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
   line-height: 20px;
 }
 [data-theme='v8'] .info { background: var(--color-status-info-soft); }
-[data-theme='v8'] .info .icon { color: var(--color-status-info); }
+[data-theme='v8'] .info .icon { color: var(--color-status-info-icon); }
 .infoIconV8 { display: none; }
 [data-theme='v8'] .infoIconV8 { display: block; }
 [data-theme='v8'] .infoIconV7 { display: none; }

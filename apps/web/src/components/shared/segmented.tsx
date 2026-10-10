@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import styles from './segmented.module.css'
 
@@ -22,7 +23,7 @@ export default function SegmentedControl<T extends string>({
   appearance = 'track',
   equalWidth = false,
 }: {
-  options: { value: T; label: string }[]
+  options: { value: T; label: ReactNode; ariaLabel?: string }[]
   value: T
   onChange: (value: T) => void
   'aria-label': string
@@ -99,6 +100,7 @@ export default function SegmentedControl<T extends string>({
           className={[styles.item, option.value === value ? styles.selected : null]
             .filter(Boolean)
             .join(' ')}
+          aria-label={option.ariaLabel}
           aria-pressed={option.value === value}
           onClick={() => onChange(option.value)}
         >

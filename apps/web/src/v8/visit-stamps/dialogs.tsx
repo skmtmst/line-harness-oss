@@ -5,6 +5,8 @@
  * 特典・倍率・初回ボーナス・ランク倍率は「下書き」を変えるだけ（保存は下の帯の［保存する］）。
  * 理由・暗証番号・写真は、その場で口を呼ぶ（呼び出しは画面側）。
  */
+import { Field as SharedField } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
 import { useEffect, useState } from 'react'
 import type { VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
@@ -15,9 +17,10 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors, type FormErrors } from '@/lib/use-form-errors'
 import { WEEKDAYS, minuteLabel } from './display'
 import styles from './visit-stamps.module.css'
+import NumberInput from '@/components/shared/number-field'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className={styles.field}><span className={styles.label}>{label}</span>{children}</label>
+  return <SharedField label={label}>{children}</SharedField>
 }
 
 /*
@@ -25,13 +28,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * 打っている途中には出さない（窓の下の帯にも出さない）。
  */
 function CheckedField({ id, label, fields, name, children }: { id: string; label: string; fields: FormErrors; name: string; children: React.ReactNode }) {
-  return (
-    <div className={styles.field}>
-      <label htmlFor={id} className={styles.label}>{label}</label>
-      {children}
-      <FieldError id={`${id}-error`}>{fields.error(name)}</FieldError>
-    </div>
-  )
+  return <SharedField label={label} htmlFor={id}>{children}<FieldError id={`${id}-error`}>{fields.error(name)}</FieldError></SharedField>
 }
 const checkedProps = (fields: FormErrors, name: string, id: string) => ({ ...fields.bind(name), id, invalid: fields.invalid(name), 'aria-describedby': fields.invalid(name) ? `${id}-error` : undefined })
 
@@ -53,7 +50,7 @@ export function RewardDialog({ open, reward, onClose, onSave }: {
       onConfirm={() => { if (fields.submit().length === 0) onSave({ id: reward?.id ?? `reward-${Date.now().toString(36)}`, name: name.trim(), stamps: n }) }}>
       <div className={styles.dialogBody}>
         <CheckedField id="vs-reward-name" label="特典の名前" fields={fields} name="name"><TextField {...checkedProps(fields, 'name', 'vs-reward-name')} value={name} onChange={(e) => setName(e.target.value)} placeholder="例：ドリンク 1杯" maxLength={100} /></CheckedField>
-        <CheckedField id="vs-reward-stamps" label="何個で使えるか" fields={fields} name="stamps"><TextField {...checkedProps(fields, 'stamps', 'vs-reward-stamps')} value={stamps} onChange={(e) => setStamps(e.target.value)} inputMode="numeric" placeholder="例：5" /></CheckedField>
+        <CheckedField id="vs-reward-stamps" label="何個で使えるか" fields={fields} name="stamps"><NumberInput numericText {...checkedProps(fields, 'stamps', 'vs-reward-stamps')} value={stamps} onChange={(e) => setStamps(e.target.value)} inputMode="numeric" placeholder="例：5" /></CheckedField>
       </div>
     </Dialog>
   )
@@ -133,8 +130,8 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
           <CheckedField id="vs-mul-end" label="時間の終わり" fields={fields} name="end"><div {...fields.bind('end')}><Select id="vs-mul-end" aria-label="時間の終わり" size="full" value={end} error={fields.error('end') ?? undefined} onChange={(v) => { fields.clear('end'); setEnd(v) }} options={endOptions} /></div></CheckedField>
         </div>
         <div className={styles.row2}>
-          <Field label="期間の始まり（任意）"><TextField type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-          <CheckedField id="vs-mul-to" label="期間の終わり（任意）" fields={fields} name="to"><TextField {...checkedProps(fields, 'to', 'vs-mul-to')} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></CheckedField>
+          <Field label="期間の始まり（任意）"><DateField value={from} onChange={setFrom} /></Field>
+          <CheckedField id="vs-mul-to" label="期間の終わり（任意）" fields={fields} name="to"><DateField {...checkedProps(fields, 'to', 'vs-mul-to')} value={to} onChange={setTo} /></CheckedField>
         </div>
       </div>
     </Dialog>
@@ -150,7 +147,7 @@ export function BonusDialog({ open, value, onClose, onSave }: { open: boolean; v
   fields.define('count', 'はじめての来店で足す個数', () => (Number.isInteger(n) && n >= 1 ? null : '1 以上の数で入れてください。'))
   return (
     <Dialog open={open} title="初回来店ボーナス" confirmLabel="変える" onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(n) }}>
-      <CheckedField id="vs-bonus-count" label="はじめての来店で足す個数" fields={fields} name="count"><TextField {...checkedProps(fields, 'count', 'vs-bonus-count')} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></CheckedField>
+      <CheckedField id="vs-bonus-count" label="はじめての来店で足す個数" fields={fields} name="count"><NumberInput numericText {...checkedProps(fields, 'count', 'vs-bonus-count')} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></CheckedField>
     </Dialog>
   )
 }

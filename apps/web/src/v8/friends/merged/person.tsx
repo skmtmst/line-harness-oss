@@ -24,14 +24,14 @@ import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dia
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import styles from './person.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+import { PageHeading } from '@/components/templates/page-frame'
+import { Field } from '@/components/shared/form-controls'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 9/30（日本時間）。 */
 function shortDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')}`
+  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 const FIELD_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
@@ -43,10 +43,8 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
   const canManage = staffRole === null || canManageRole(staffRole)
 
   const head = (title: string, description: string) => (
-    <header className={styles.head}>
-      <h2 className={styles.title}>{title}</h2>
-      <p className={styles.description}>{description}</p>
-    </header>
+    <PageHeading title={title}
+        help={<>{description}</>} />
   )
 
   if (m.phase !== 'ready' || !m.person) {
@@ -80,7 +78,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
           {m.saveError ? (
             <p className={styles.error} role="alert">
               {m.saveError}
-              <button type="button" className={styles.link} onClick={m.reload}>読み直す</button>
+              <button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button>
             </p>
           ) : null}
 
@@ -111,7 +109,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
               </thead>
               <tbody>
                 {deliveryRows.map(({ friend, active }) => (
-                  <Tr key={friend.friendId} className={styles.row}>
+                  <Tr key={friend.friendId} className={styles.row} data-row-id={friend.friendId}>
                     <Td className={styles.td}>{friend.lineAccountName}</Td>
                     <Td className={styles.td}>{friend.displayName}</Td>
                     <Td className={styles.td}><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
@@ -148,7 +146,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
               </thead>
               <tbody>
                 {person.linkedFriends.map((friend) => (
-                  <Tr key={friend.friendId} className={`${styles.row} ${styles.rowTall}`}>
+                  <Tr key={friend.friendId} className={`${styles.row} ${styles.rowTall}`} data-row-id={friend.friendId}>
                     <Td className={styles.td}>{friend.lineAccountName}</Td>
                     <Td className={styles.td}>{friend.displayName}</Td>
                     <Td className={styles.td}>{shortDate(friend.linkedAt)}</Td>
@@ -197,7 +195,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
               {person.profileValues.map((value) => (
                   <li key={value.fieldKey} className={styles.value} title={value.sourceLabel ? `元：${value.sourceLabel}` : undefined}>
                     <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
-                    <span className={styles.valueText}>{value.valuePreview ?? '—'}</span>
+                    <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
                   </li>
               ))}
             </ul>
@@ -242,10 +240,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
         )}
       >
         <p className={styles.small}>{`解除する友だち：${m.unlinkTarget?.displayName ?? ''}`}</p>
-        <label className={styles.reasonLabel}>
-          <span>解除する理由<RequiredBadge /></span>
-          <TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" />
-        </label>
+        <Field label="解除する理由" required><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></Field>
       </Dialog>
     </PageFrame>
   )

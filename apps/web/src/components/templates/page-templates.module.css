@@ -11,24 +11,24 @@
 }
 :global([data-theme='v8']) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
 :global([data-theme='v8']) .heading {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field);
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom); flex-shrink: 0;
 }
 :global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
-:global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
-:global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
-:global([data-theme='v8']) .pageTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
+:global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
+:global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: visible; white-space: normal; overflow-wrap: anywhere; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
+:global([data-theme='v8']) .pageTitle { min-width: 0; overflow: visible; white-space: normal; overflow-wrap: anywhere; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
 :global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 :global([data-theme='v8']) .headingTabs { margin-top: var(--tpl-head-gap); }
 /* compact は間2・説明13/20を維持し、題は標準と同じ22/700/32。 */
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
 :global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
-:global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
-:global([data-theme='v8']) .tabs { padding: 0 24px; flex-shrink: 0; }
+:global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-row); flex-shrink: 0; }
+:global([data-theme='v8']) .tabs { padding: 0 var(--polish-space-section); flex-shrink: 0; }
 /* 境目は帯が持つ。包みは同じ線を重ねない。 */
 :global([data-theme='v8']) .stats { border: 0; flex-shrink: 0; }
-:global([data-theme='v8']) .notice { padding: 0 24px 16px; }
+:global([data-theme='v8']) .notice { padding: 0 var(--polish-space-section) var(--polish-space-card); }
 :global([data-theme='v8']) .section { padding: var(--tpl-section-pad); min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-section-gap); border-bottom: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .split { display: flex; flex: 1; min-width: 0; }
 :global([data-theme='v8']) .main { min-width: 0; flex: 1; }
@@ -38,7 +38,7 @@
 :global([data-theme='v8']) .content { min-width: 0; }
 :global([data-theme='v8']) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
-:global([data-theme='v8']) .folders { box-sizing: content-box; width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
+:global([data-theme='v8']) .folders { box-sizing: content-box; width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-row); }
 /*
  * 統括（/hq）の列（絵 JKjsE・LRc93 ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
  * border-box のままだと中身が 164 に縮み、右の中身が 36px 左へずれていた（2026-10-08）。
@@ -56,9 +56,9 @@
 /* 道具を渡さない画面で、広い板に空の段を出さない。 */
 :global([data-theme='v8']) .toolbar[data-collapsed-only] { display: none; }
 :global([data-theme='v8']) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-:global([data-theme='v8']) [data-page-template='dashboard'] .heading { padding-bottom: 16px; }
+:global([data-theme='v8']) [data-page-template='dashboard'] .heading { padding-bottom: var(--polish-space-card); }
 :global([data-theme='v8']) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
-:global([data-theme='v8']) .dashboardCell { min-width: 0; flex: 1; padding: 18px 24px; }
+:global([data-theme='v8']) .dashboardCell { min-width: 0; flex: 1; padding: var(--polish-space-card) var(--polish-space-section); }
 :global([data-theme='v8']) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardAside { width: 297px; flex-shrink: 0; border-left: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardAside[data-aside-size='wide'] { width: var(--tpl-dash-aside-wide); }
@@ -83,9 +83,11 @@
 :global([data-theme='v8']) [data-page-template='list'] .heading[data-has-crumbs] > .headingText { flex-basis: 100%; }
 :global([data-theme='v8']) [data-page-template='list'] .heading > .crumbs { flex: 1; min-width: 0; order: 2; }
 :global([data-theme='v8']) [data-page-template='list'] .heading[data-has-crumbs] > .actions { order: 3; margin-left: auto; }
+/* 詳細の補足行は題・操作の下。長い補足が題の幅を奪わない。 */
+:global([data-theme='v8']) [data-page-template='detail'] .heading > .crumbs { flex-basis: 100%; min-width: 0; order: 2; }
 :global([data-theme='v8']) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px var(--tpl-fx4-footer-inset); } /* 採用 A-1 浮いた下の帯（オーナー 2026-10-04）。左右は絵の下の帯（left 12）に合わせる */
-:global([data-theme='v8']) .detailSummary { width: 320px; padding: 20px 24px; border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
-:global([data-theme='v8']) .detailContent { padding: 20px 28px; display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
+:global([data-theme='v8']) .detailSummary { width: 320px; padding: var(--polish-space-card) var(--polish-space-section); border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
+:global([data-theme='v8']) .detailContent { padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
 :global([data-theme='v8']) .inbox { display: flex; flex: 1; min-height: 0; min-width: 0; }
 :global([data-theme='v8']) .inboxList { width: var(--tpl-inbox-list-width); flex-shrink: 0; border-right: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .conversation { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-table-head); }
@@ -94,17 +96,17 @@
 :global([data-theme='v8']) .composer { flex-shrink: 0; display: flex; flex-direction: column; padding: var(--tpl-composer-pad-top) var(--tpl-composer-pad-side) var(--tpl-composer-pad-bottom); gap: var(--tpl-composer-gap); }
 :global([data-theme='v8']) .inboxSummary { width: var(--tpl-inbox-summary-width); flex-shrink: 0; padding: var(--tpl-inbox-summary-pad); border-left: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--tpl-inbox-summary-gap); }
 :global([data-theme='v8']) .settings { display: flex; flex: 1; gap: var(--tpl-settings-gap); padding: 0; min-width: 0; }
-:global([data-theme='v8']) .settingsNav { width: var(--tpl-settings-nav-width); flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; padding: var(--tpl-settings-nav-pad-block) var(--tpl-settings-nav-pad-side); }
+:global([data-theme='v8']) .settingsNav { width: var(--tpl-settings-nav-width); flex-shrink: 0; display: flex; flex-direction: column; gap: var(--polish-space-row); padding: var(--tpl-settings-nav-pad-block) var(--tpl-settings-nav-pad-side); }
 :global([data-theme='v8']) .settingsNav:has(> [data-settings-nav='inline']) { width: auto; padding: 0; }
 :global([data-theme='v8']) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
-:global([data-theme='v8']) .period { padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-:global([data-theme='v8']) .analyticsContent { flex: 1; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
-:global([data-theme='v8']) .analyticsAside { width: 300px; flex-shrink: 0; padding: 20px; border-left: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: 12px; }
-:global([data-theme='v8']) .asideToggle { display: none; padding: 12px 24px; }
+:global([data-theme='v8']) .period { padding: var(--polish-space-field) var(--polish-space-section); display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-field); }
+:global([data-theme='v8']) .analyticsContent { flex: 1; min-width: 0; padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--polish-space-field); }
+:global([data-theme='v8']) .analyticsAside { width: 300px; flex-shrink: 0; padding: var(--polish-space-card); border-left: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: var(--polish-space-field); }
+:global([data-theme='v8']) .asideToggle { display: none; padding: var(--polish-space-field) var(--polish-space-section); }
 :global([data-theme='v8']) .createNotice { padding: var(--tpl-create-notice-pad); }
 :global([data-theme='v8']) .createNotice[data-notice-spacing='band'] { padding: var(--tpl-fe-band-slot-pad); }
 
-:global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+:global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--polish-space-row); }
 
 /* 段の高さは絵の高さを下限に、右の列の中身（理由の行など）が増えたら伸びる（下の段に重ねない）。 */
 :global([data-theme='v8']) .dashboardRow[data-row='trend'] { min-height: var(--tpl-dashboard-trend-min-h); }
@@ -119,26 +121,26 @@
 :global([data-theme='v8']) .heading[data-heading-size='large'] .title { font-size: var(--tpl-large-title-size); line-height: var(--tpl-large-title-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .title { font-size: var(--tpl-create-title-size); line-height: var(--tpl-create-title-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .description { font-size: var(--tpl-create-desc-size); line-height: var(--tpl-create-desc-lh); }
-:global([data-theme='v8']) [data-page-template='create'] .actions { gap: 14px; }
+:global([data-theme='v8']) [data-page-template='create'] .actions { gap: var(--polish-space-field); }
 :global([data-theme='v8']) [data-page-template='detail'] .tabs { border-bottom: 1px solid var(--color-hairline); }
 /* 横並びの段も数の帯と同じ等分の格子（隙間0）。flex の配分だと線の太さ分ずれる。高さは中身（並ぶマスは同じ高さ）。 */
 :global([data-theme='v8']) .dashboardColumns { min-height: 200px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 :global([data-theme='v8']) .dashboardColumns .dashboardCell { padding-inline: 20px; }
-:global([data-theme='v8']) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: 12px; }
-:global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+:global([data-theme='v8']) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: var(--polish-space-field); }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: var(--polish-space-card) var(--polish-space-card); display: flex; flex-direction: column; gap: var(--polish-space-row); }
 
 /* 入力側と各段は中身の高さを保つ。 */
 :global([data-theme='v8']) [data-page-template='create'] > .heading .headingText { flex: 1 1 auto; }
-:global([data-theme='v8']) .preview { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-:global([data-theme='v8']) .detailSummary { display: flex; flex-direction: column; gap: 18px; }
+:global([data-theme='v8']) .preview { display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-field); }
+:global([data-theme='v8']) .detailSummary { display: flex; flex-direction: column; gap: var(--polish-space-card); }
 :global([data-theme='v8']) .heading[data-heading-size='large'] { gap: var(--tpl-large-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='large'] .headingText { gap: var(--tpl-head-gap); }
 :global([data-theme='v8']) .heading[data-heading-size='large'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 :global([data-theme='v8']) .dashboardRow { flex-shrink: 0; }
 
-:global([data-theme='v8']) .dashboardColumns .dashboardCell { display: flex; flex-direction: column; gap: 8px; }
+:global([data-theme='v8']) .dashboardColumns .dashboardCell { display: flex; flex-direction: column; gap: var(--polish-space-row); }
 
-:global([data-theme='v8']) [data-page-template='dashboard'] .actions { gap: 12px; }
+:global([data-theme='v8']) [data-page-template='dashboard'] .actions { gap: var(--polish-space-field); }
 :global([data-theme='v8']) [data-page-template='detail'] .actions { gap: var(--tpl-detail-actions-gap); }
 :global([data-theme='v8']) [data-page-template='detail'] .tabs { padding-bottom: var(--tpl-detail-tabs-pad-bottom); }
 :global([data-theme='v8']) .createContent,
@@ -167,7 +169,7 @@
   /* 欄 − 左右の余白 − 1pxの区切り線。
      送り幅は余白へ収め、中身の幅を削らない。 */
   width: var(--tpl-preview-content-width); flex: 0 0 auto;
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-field);
 }
 :global([data-theme='v8']) [data-page-template='create'][data-has-footer] .createContent > *,
 :global([data-theme='v8']) [data-page-template='create'][data-has-footer] .preview > * { flex-shrink: 0; }
@@ -175,7 +177,7 @@
 /* 幅による切り替えは基本の並びより後に置く。右欄の display を再び上書きしない。 */
 @container v8-page (max-width: 1099px) {
   :global([data-theme='v8']) .folders { display: none; }
-  :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: 8px; }
+  :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: var(--polish-space-row); }
   :global([data-theme='v8']) .toolbar[data-collapsed-only] { display: flex; }
   /* 900 の板でも右の列は残す（幅 280）。消すのは狭い幅だけ。 */
   :global([data-theme='v8']) .preview { width: var(--tpl-preview-narrow-width); }
@@ -188,7 +190,7 @@
   :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global([data-theme='v8']) .asideToggle { display: block; }
   :global([data-theme='v8']) .inboxList { width: 348px; }
-  :global([data-theme='v8']) .settings { flex-direction: column; gap: 16px; }
+  :global([data-theme='v8']) .settings { flex-direction: column; gap: var(--polish-space-card); }
   :global([data-theme='v8']) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }
 }
 @media (max-width: 1023px) {
@@ -289,10 +291,10 @@
 :global([data-theme='v8']) .frame[data-template-layout='accounts'] .settingsContent { max-width: none; padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
 :global([data-theme='v8']) .frame[data-template-layout='account-detail'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
 :global([data-theme='v8']) .frame[data-template-layout='account-handover'] .settingsContent { max-width: none; padding: var(--tpl-acct-handover-content-pad); gap: var(--tpl-acd-gap); }
-:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) { --tpl-setnav-w: var(--tpl-sb-nav-w); --tpl-settings-gap: 0px; }
+:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) { --tpl-setnav-w: var(--tpl-sb-nav-w); --tpl-settings-gap: var(--polish-space-row); }
 :global([data-theme='v8']) .frame[data-template-layout='wide-nav'] { --tpl-head-gap: var(--tpl-sb-head-gap); --tpl-head-pad-bottom: var(--tpl-sb-head-pad-bottom); --tpl-desc-size: var(--tpl-sb-desc-size); --tpl-desc-lh: var(--tpl-sb-desc-lh); }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settingsContent { max-width: none; }
-:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settings { flex-direction: row; gap: 0px; }
+:global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settings { flex-direction: row; gap: var(--polish-space-row); }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) .settingsNav { width: auto; flex-direction: column; }
 :global([data-theme='v8']) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) > .footer { margin-inline: var(--tpl-sb-footer-side); }
 :global([data-theme='v8']) .frame[data-template-layout='narrow-nav'] { --tpl-setnav-w: var(--tpl-sb-nav-w-narrow); --tpl-settings-content-pad-block: var(--tpl-sb-narrow-pad-top) var(--tpl-sb-narrow-pad-bottom); --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side); --tpl-settings-content-gap: var(--tpl-sb-narrow-gap); }

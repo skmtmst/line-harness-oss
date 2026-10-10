@@ -12,6 +12,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
  * - 止めた鍵は一覧の口が返さないので、「止めている」行と「動かす」は出ない（動かす口も無い）。
  * - 発行・入れ替え・停止は統括だけ（R32）。閲覧のみの人には押せないボタンを置かず、場所だけ空ける。
  */
+import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Copy, KeyRound, LayoutTemplate, Plus, RefreshCw } from 'lucide-react'
 import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
@@ -44,6 +45,8 @@ import {
   useWebhookOverview,
 } from './shell'
 import styles from './api-tokens.module.css'
+import { formatDate as polishFormatDate } from '@/lib/format'
+
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
@@ -72,21 +75,11 @@ export function scopeLabel(scope: string): string {
 
 /** 作った日は「2026/06/02」、最後に使ったは「9/30 10:02」（絵の書き方）。読めない日時は「—」。 */
 export function tokenDate(value: string | null): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('year')}/${get('month')}/${get('day')}`
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 export function tokenUsedAt(value: string | null): string {
-  if (!value) return 'まだ使っていません'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date)
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return polishFormatDate(value, { style: 'list', fallback: value ? '—' : 'まだ使っていません' })
 }
 
 export default function WebhooksApiTokensV8() {
@@ -233,7 +226,7 @@ export default function WebhooksApiTokensV8() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setCreateError(describeApiFailure(caught, '発行', {
-        forbidden: '鍵の発行は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
@@ -274,7 +267,7 @@ export default function WebhooksApiTokensV8() {
         return
       }
       setDialogError(describeApiFailure(caught, '入れ替え', {
-        forbidden: '鍵の入れ替えは統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
@@ -307,30 +300,22 @@ export default function WebhooksApiTokensV8() {
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setDialogError(describeApiFailure(caught, '停止', {
-        forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
+        scope: 'store',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
     }
   }
 
-  const copyIssued = async () => {
-    if (!issued) return
-    try {
-      await navigator.clipboard.writeText(issued.token)
-      setCopied(true)
-    } catch {
-      // 手で選んで写せるので、失敗しても文は出さない。
-    }
-  }
+
 
   return (
     <ListPage
-      help="行の「…」から止める。止めても、すでに付けたタグは残ります。"
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「…」から止める。止めても、すでに付けたタグは残ります。"}</>}
       boardId="ralAc"
       headingSize="regular"
       title="外部連携"
-      description={WEBHOOKS_DESCRIPTION}
+
       actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={15} aria-hidden="true" />見本から作る</Button> : undefined}
       tabs={<WebhookTabs active="api-tokens" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
@@ -352,7 +337,7 @@ export default function WebhooksApiTokensV8() {
           confirmIcon={<KeyRound size={15} />}
           busy={creating}
           error={createError || undefined}
-          onConfirm={() => void handleCreate()}
+          onConfirm={() => handleCreate()}
           onCancel={() => { if (!creating) setCreateOpen(false) }}
         >
           <div className={styles.createBody}>
@@ -405,9 +390,7 @@ export default function WebhooksApiTokensV8() {
               <p className={styles.issuedNote}>この鍵は今だけ表示されます。閉じると二度と見られません。安全な場所に写してください。</p>
               <div className={styles.issuedTokenRow}>
                 <code className={styles.issuedToken}>{issued.token}</code>
-                <Button onClick={() => void copyIssued()}>
-                  <Copy size={15} aria-hidden="true" />{copied ? '写しました' : '鍵を写す'}
-                </Button>
+                <CopyTextButton value={issued!.token} aria-label="発行した鍵をコピー"  />
               </div>
               <p className={styles.issuedMeta} title={issued.name}>
                 {`接続の名前：${issued.name}${issued.scopes.length ? ` ・ できること：${issued.scopes.map(scopeLabel).join('・')}` : ''}`}
@@ -423,7 +406,7 @@ export default function WebhooksApiTokensV8() {
           confirmLabel="入れ替える"
           busy={mutating}
           error={dialogError}
-          onConfirm={() => void handleRotate()}
+          onConfirm={() => handleRotate()}
           onCancel={() => {
             if (mutating) return
             setRotateTarget(null)
@@ -438,7 +421,7 @@ export default function WebhooksApiTokensV8() {
           destructive
           busy={mutating}
           error={dialogError}
-          onConfirm={() => void handleRevoke()}
+          onConfirm={() => handleRevoke()}
           onCancel={() => {
             if (mutating) return
             setRevokeTarget(null)
@@ -488,7 +471,7 @@ export default function WebhooksApiTokensV8() {
             kind="error"
             title="鍵を読み込めませんでした"
             description={loadError}
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : null}
         {status === 'forbidden' ? (
@@ -543,7 +526,7 @@ export default function WebhooksApiTokensV8() {
                 {tokens.map((token) => {
                   const scopeText = token.scopes.map(scopeLabel).join('・')
                   return (
-                    <Tr key={token.id} data-table-layout="columns" data-ctx-row={token.id}>
+                    <Tr key={token.id} data-table-layout="columns" data-ctx-row={token.id} data-row-id={token.id}>
                       <Td className={styles.colName} title={token.name}><FolderDotName>{token.name}</FolderDotName></Td>
                       <Td className={styles.colScopes} title={scopeText}>{scopeText}</Td>
                       <Td className={styles.colCreated}>{tokenDate(token.createdAt)}</Td>

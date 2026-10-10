@@ -28,6 +28,10 @@ import TargetMissing from '@/components/shared/target-missing'
 import { richMenuError, richMenuErrorAll } from '@/v8/rich-menus/errors'
 import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model'
 import styles from './detail.module.css'
+import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
+import { DetailLoading } from '@/components/templates/detail-page'
 
 type Group = {
   id: string
@@ -113,7 +117,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       setRuns(res.data.runs)
       setRunsError('')
     } catch (caught) {
-      setRunsError(caught instanceof ApiError && caught.status === 403 ? '公開の履歴を見る権限がありません。' : '公開の履歴を読み込めませんでした。')
+      setRunsError(caught instanceof ApiError && caught.status === 403 ? permissionDeniedMessage('store') : '公開の履歴を読み込めませんでした。')
     }
   }, [groupId])
 
@@ -256,7 +260,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     return <TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadGroup()} />
   }
   const backLink = <Link href="/rich-menus" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />リッチメニューへ</Link>
-  if (!group) return <div className={styles.loadingHead}>{backLink}<p className={styles.loading} role="status">読み込み中…</p></div>
+  if (!group) return <div className={styles.loadingHead}>{backLink}<DetailLoading /></div>
 
   const audience = audienceOf(group)
   const head = latestSucceeded ? `公開しました・${runStamp(latestSucceeded.updatedAt)}` : '公開中'
@@ -270,7 +274,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   return (
     <div className={styles.page} data-design-node="hKr8f">
       <PageFrame kind="create">
-        <PageHeading title={group.name} identity={backLink} description={head} />
+        <PageHeading title={group.name} identity={backLink} help={head} />
         <div className={styles.split}>
           <div className={styles.content}>
             {failed ? (
@@ -302,7 +306,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
             <section className={styles.card} aria-label="公開の進み">
               <h2 className={styles.cardTitle}>公開の進み</h2>
-              {progressError ? <p className={styles.cardNote}>公開の進みを読み込めませんでした。</p> : progress === null ? <p className={styles.cardNote} role="status">読み込み中…</p> : progress.steps.length === 0 ? <p className={styles.cardNote}>まだ公開の記録はありません。</p> : progress.steps.map((step) => (
+              {progressError ? <p className={styles.cardNote}>公開の進みを読み込めませんでした。</p> : progress === null ? <DetailLoading /> : progress.steps.length === 0 ? <p className={styles.cardNote}>まだ公開の記録はありません。</p> : progress.steps.map((step) => (
                 <div key={step.key} className={styles.stepRow}>
                   {step.status === 'done' ? <CircleCheck size={18} aria-hidden="true" className={styles.stepOk} />
                     : step.status === 'failed' ? <CircleX size={18} aria-hidden="true" className={styles.stepNg} />
@@ -325,7 +329,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                       : diffs.length === 0 ? <span>{`管理画面の記録とLINE上の状態にずれはありませんでした${checkedAt ? `（${runStamp(checkedAt.toISOString(), true)}）` : ''}`}</span>
                         : (
                           <>
-                            <span className={styles.diffTitle}>{`${diffs.length}件のずれがあります`}</span>
+                            <span className={styles.diffTitle}>{`${diffs.length} 件のずれがあります`}</span>
                             <ul className={styles.diffList}>
                               {diffs.map((diff, index) => <li key={`${diff.kind}-${index}`}>{diff.detail}{diff.fix ? `（${diff.fix.label}）` : ''}</li>)}
                             </ul>
@@ -376,8 +380,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               <dl className={styles.aboutList}>
                 <div className={styles.aboutRow}><dt>状態</dt><dd className={styles.stateOk}>公開中</dd></div>
                 <div className={styles.aboutRow}><dt>出す相手</dt><dd>{audience === 'all' ? 'すべての友だち（既定）' : audience === 'targeted' ? '条件に当てはまる友だち' : '登録だけ（出す相手なし）'}</dd></div>
-                <div className={styles.aboutRow}><dt>出る人</dt><dd>{preview?.effective.value == null ? '—' : `${preview.effective.value.toLocaleString('ja-JP')}人`}</dd></div>
-                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{taps === undefined ? '読み込み中…' : taps === null ? '—' : `${taps.toLocaleString('ja-JP')}回`}</dd></div>
+                <div className={styles.aboutRow}><dt>出る人</dt><dd>{preview?.effective.value == null ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
+                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{taps === undefined ? '読み込み中…' : taps === null ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>
               </dl>
             </section>
           </aside>
@@ -391,7 +395,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="やり直す"
         busy={retrying}
         error={dialogError || undefined}
-        onConfirm={() => void retry()}
+        onConfirm={() => retry()}
         onCancel={() => { if (!retrying) setRetryTarget(null) }}
       />
       <ConfirmDialog
@@ -401,7 +405,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="ずれを直す"
         busy={fixing}
         error={dialogError || undefined}
-        onConfirm={() => void fix()}
+        onConfirm={() => fix()}
         onCancel={() => { if (!fixing) setFixOpen(false) }}
       />
       <ConfirmDialog
@@ -412,7 +416,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         destructive
         busy={unpublishing}
         error={dialogError || undefined}
-        onConfirm={() => void unpublish()}
+        onConfirm={() => unpublish()}
         onCancel={() => { if (!unpublishing) setUnpublishOpen(false) }}
       />
       <ConfirmDialog
@@ -422,7 +426,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         confirmLabel="複製する"
         busy={duplicating}
         error={dialogError || undefined}
-        onConfirm={() => void duplicate()}
+        onConfirm={() => duplicate()}
         onCancel={() => { if (!duplicating) setDuplicateOpen(false) }}
       />
     </div>

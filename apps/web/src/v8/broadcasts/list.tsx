@@ -1,5 +1,8 @@
 'use client'
 
+import SharedStatusBadge from '@/components/shared/status-badge'
+
+
 /*
  * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
  *
@@ -7,6 +10,9 @@
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import SharedStatusPill from '@/components/shared/status-pill'
+import { ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
@@ -63,12 +69,14 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { runOptimistic } from '@/lib/undoable'
-import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
+import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -135,10 +143,7 @@ function StatusBadge({ broadcast }: { broadcast: ApiBroadcast }) {
   const key = broadcast.displayStatus ?? broadcast.status
   const label = broadcast.displayStatusLabel ?? key
   return (
-    <span className={styles.badge} data-tone={BADGE_TONE[key] ?? 'neutral'}>
-      <span className={styles.badgeDot} aria-hidden="true" />
-      {label}
-    </span>
+    <SharedStatusPill tone={BADGE_TONE[key] ?? 'neutral'}>{label}</SharedStatusPill>
   )
 }
 
@@ -220,8 +225,8 @@ export default function BroadcastListV8() {
   const createAnchorRef = useRef<HTMLElement | null>(null)
   const [titleQuery, setTitleQuery] = useListUrlParam('q')
   const [savedViewId, setSavedViewId] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
+  const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
   const [datePopoverOpen, setDatePopoverOpen] = useState(false)
   const datePopoverRef = useRef<HTMLDivElement>(null)
   const [folders, setFolders] = useState<Folder[]>([])
@@ -233,9 +238,9 @@ export default function BroadcastListV8() {
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
-  const [pageSize, setPageSize] = useState(20)
-  const [sortKey, setSortKey] = useState<'newest' | 'oldest'>('newest')
-  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
+  const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
+  const [page, setPage] = useListUrlValue('page', 1)
   const [listTotal, setListTotal] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -510,26 +515,8 @@ export default function BroadcastListV8() {
     }
   }
 
-  /*
-   * 下書きの削除は、まだ誰にも届いていない・予約もしていないので影響が無い。確かめの窓を出さずに
-   * 一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。予約・送信済みなどは今までどおり窓。
-   */
-  const deferredDelete = useDeferredDelete()
-  const requestDelete = (broadcast: ApiBroadcast) => {
-    setDeleteError('')
-    if (broadcast.status !== 'draft') {
-      setDeleteTarget(broadcast)
-      return
-    }
-    if (panelId === broadcast.id) setPanelId(null)
-    deferredDelete.schedule({
-      ids: [broadcast.id],
-      message: `下書き「${broadcast.title}」を削除しました`,
-      commit: () => api.broadcasts.delete(broadcast.id),
-      onCommitted: () => loadList((page - 1) * pageSize),
-      failureMessage: 'この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。',
-    })
-  }
+  /* 削除は、利用状況にかかわらず確認してから実行する。 */
+  const requestDelete = (broadcast: ApiBroadcast) => { setDeleteError(''); setDeleteTarget(broadcast) }
 
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
@@ -574,7 +561,6 @@ export default function BroadcastListV8() {
 
   /* タイトル・内容は手元で絞る。フォルダも手元で当て直す（移動の重ねをすぐ表へ出すため）。 */
   const matchingBroadcasts = broadcasts.filter((b) => {
-    if (deferredDelete.isHidden(b.id)) return false
     if (folderFilter === UNFILED && b.folderId) return false
     if (folderFilter && folderFilter !== UNFILED && b.folderId !== folderFilter) return false
     const query = titleQuery.trim().toLowerCase()
@@ -642,7 +628,7 @@ export default function BroadcastListV8() {
       icon: Send,
       value: kpiPending ? null : (listKpis?.thisMonth ?? null),
       unit: '件',
-      detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)}人`}に届いた`,
+      detail: `${listKpis?.delivered == null ? emptyValue('unknown') : `${formatNumber(listKpis.delivered)}人`}に届いた`,
     },
     {
       key: 'openRate',
@@ -696,8 +682,8 @@ export default function BroadcastListV8() {
      */
     if (isFromHeadquarters(broadcast)) {
       return [
-        { id: 'view', label: '見る', external: true, onSelect: () => goDetail(broadcast.id) },
-        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: true, icon: <Copy size={14} aria-hidden="true" />, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
+        { id: 'view', label: '見る', external: true, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
+        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: true, icon: <Copy size={14} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
       ]
     }
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
@@ -708,7 +694,7 @@ export default function BroadcastListV8() {
         id: 'resume',
         label: '編集を続ける',
         external: true,
-        onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
+        href: `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
       })
     }
     items.push({
@@ -716,7 +702,7 @@ export default function BroadcastListV8() {
       label: '複製',
       external: true,
       icon: <Copy size={14} aria-hidden="true" />,
-      onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
+      href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
     })
     items.push({
       id: 'move-folder',
@@ -917,15 +903,7 @@ export default function BroadcastListV8() {
   )
 
   const sortButton = (
-    <button
-      type="button"
-      className={styles.sortButton}
-      aria-label={`並び順：${sortKey === 'newest' ? '新しい順' : '古い順'}（押すと入れ替え）`}
-      onClick={() => setSortKey((current) => (current === 'newest' ? 'oldest' : 'newest'))}
-    >
-      <ArrowUpDown size={14} aria-hidden="true" />
-      {sortKey === 'newest' ? '新しい順' : '古い順'}
-    </button>
+<ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
   )
 
   const folderSelect = (
@@ -1025,10 +1003,10 @@ export default function BroadcastListV8() {
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : forbidden ? (
-    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', '見るには権限が要ります。オーナーか管理者に追加を依頼してください。', null, true)
+    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', permissionDeniedMessage('store'), <Button onClick={() => void loadList((page - 1) * pageSize)}>もう一度読み込む</Button>, true)
   ) : error ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
-      <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>, true)
+      <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度読み込む</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
     /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない（2026-10-06 オーナー決定）。 */
     <EmptyList
@@ -1078,7 +1056,7 @@ export default function BroadcastListV8() {
                   event.preventDefault()
                   setPanelId(broadcast.id)
                 }
-              }}
+              }} data-row-id={broadcast.id}
             >
               <Td>
                 <FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>
@@ -1090,17 +1068,17 @@ export default function BroadcastListV8() {
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? formatDateTime(broadcast.sentAt) : '—')
-                    : (broadcast.scheduledAt ? formatDateTime(broadcast.scheduledAt) : '未設定')}
+                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : emptyValue('unknown'))
+                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : emptyValue('unconfigured'))}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>
               <Td>
                 {broadcast.status !== 'sent' ? (
-                  <span className={styles.cellMain}>—</span>
+                  <span className={styles.cellMain}>{emptyValue('unknown')}</span>
                 ) : (
                   <>
-                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)}人に届いた</span>
+                    <span className={styles.resultMain}>{formatNumber(insight?.delivered ?? broadcast.successCount)} 人に届いた</span>
                     {insight && (insight.openRate != null || insight.clickRate != null) ? (
                       <span className={styles.cellSub}>
                         {[
@@ -1150,8 +1128,8 @@ export default function BroadcastListV8() {
     <ListPagePagination>
       <span className={styles.pagerCount}>
         {pageCount > 1
-          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件中 ${rangeFirst}〜${rangeLast}件`
-          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)}件`}
+          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast} 件`
+          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件`}
       </span>
       {pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" />
@@ -1167,12 +1145,12 @@ export default function BroadcastListV8() {
       boardId={boardId}
       headingSize="compact"
       title="一斉配信"
-      description="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
+      help="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={<>
         {canEdit ? null : (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
           </div>
         )}
         <KpiBand>
@@ -1237,7 +1215,7 @@ export default function BroadcastListV8() {
           <FolderAddDialog
             kind="broadcast"
             note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
-            placeholder="例: 01_キャンペーン"
+            placeholder="例：01_キャンペーン"
             onClose={() => setFolderDialogOpen(false)}
             onAdded={() => void loadFolders()}
           />
@@ -1247,7 +1225,7 @@ export default function BroadcastListV8() {
             kind="broadcast"
             folder={editingFolder}
             note="配信を分けてしまう箱です。削除しても、中の配信は未分類に残ります。"
-            placeholder="例: 01_キャンペーン"
+            placeholder="例：01_キャンペーン"
             onClose={() => setEditingFolder(null)}
             onAdded={() => { setEditingFolder(null); void loadFolders() }}
           />
@@ -1301,7 +1279,7 @@ export default function BroadcastListV8() {
                 {panelRow.status === 'sent'
                   ? (panelRow.sentAt ? `送信済み：${formatDateTime(panelRow.sentAt)}` : '送信済み')
                   : (panelRow.scheduledAt ? `予約：${formatDateTime(panelRow.scheduledAt)}` : '下書き')}
-                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)}人に届いた` : ''}
+                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)} 人に届いた` : ''}
               </p>
             </DetailPanel>
           )
@@ -1311,12 +1289,12 @@ export default function BroadcastListV8() {
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
           description={`削除しても、中の配信は未分類に残ります。いまこのフォルダに入っているのは${
             deletingFolder ? broadcasts.filter((b) => b.folderId === deletingFolder.id).length : 0
-          }件です。`}
+          } 件です。`}
           confirmLabel="削除する"
           destructive
           busy={folderBusy}
           error={folderError || undefined}
-          onConfirm={() => void removeFolder()}
+          onConfirm={() => removeFolder()}
           onCancel={() => {
             if (folderBusy) return
             setDeletingFolder(null)
@@ -1331,7 +1309,7 @@ export default function BroadcastListV8() {
           destructive
           busy={deleting}
           error={deleteError}
-          onConfirm={() => void handleDelete()}
+          onConfirm={() => handleDelete()}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)

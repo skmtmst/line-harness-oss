@@ -458,7 +458,7 @@ export default function AdIntegration({
         kind="error"
         title="広告との接続状況を表示できませんでした"
         description="接続設定は消えていません。状態を読み直して、もう一度お試しください。"
-        action={<Button onClick={() => void load()}>広告の状態を再読み込み</Button>}
+        onRetry={() => void load()}
       />
     )
   }
@@ -790,7 +790,7 @@ export default function AdIntegration({
             kind="error"
             title="広告費を読み込めませんでした"
             description="記録は消えていません。もう一度読み込んでください。"
-            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+            onRetry={() => void load()}
           />
         ) : costRows.length === 0 ? (
           <ListState

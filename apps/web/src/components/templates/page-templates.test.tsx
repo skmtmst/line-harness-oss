@@ -52,7 +52,7 @@ describe('V8 の型へ渡す操作', () => {
     expect(help.getAttribute('aria-expanded')).toBe('false')
   })
   it('作る型の手順は題と説明の下の行だけ（同行の置き方は無い）', () => {
-    render(<CreatePage title="作成" description="説明" steps={<ol><li>手順</li></ol>} footerActions={<button>保存</button>}>入力</CreatePage>)
+    render(<CreatePage title="作成" help="説明" steps={<ol><li>手順</li></ol>} footerActions={<button>保存</button>}>入力</CreatePage>)
     const heading = screen.getByText('作成').closest('header')!
     expect(heading.hasAttribute('data-steps-placement')).toBe(false)
     expect(heading.querySelector('[data-template-region="steps"]')?.textContent).toBe('手順')

@@ -186,17 +186,19 @@ test.describe('Issue #710 保管済みタグの編集は名前と説明だけ（
     await expect(page.getByRole('region', { name: 'タグ連動' })).toBeVisible()
   })
 
-  test('一覧は archived タグに「保管済み」バッジを出し、active タグには出さない', async ({ page }) => {
+  test('保管したタグは保管一覧のバッジで識別でき、通常のタグへは付けない', async ({ page }) => {
     const tags = { [ACTIVE_TAG.id]: { ...ACTIVE_TAG }, [ARCHIVED_TAG.id]: { ...ARCHIVED_TAG } }
     await stubApi(page, tags)
 
     await page.goto(`${BASE}/tags`, { waitUntil: 'networkidle' })
 
-    await expect(page.getByRole('link', { name: `タグ「${ARCHIVED_TAG.name}」を編集`, exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: `タグ「${ACTIVE_TAG.name}」を編集`, exact: true })).toBeVisible()
-    const rows = page.locator('tr').filter({ has: page.getByRole('link', { name: `タグ「${ARCHIVED_TAG.name}」を編集`, exact: true }) })
-    await expect(rows.getByText('保管済み')).toBeVisible()
     const activeRows = page.locator('tr').filter({ has: page.getByRole('link', { name: `タグ「${ACTIVE_TAG.name}」を編集`, exact: true }) })
-    await expect(activeRows.getByText('保管済み')).toHaveCount(0)
+    await expect(activeRows.getByText('アーカイブ', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: `タグ「${ARCHIVED_TAG.name}」を編集`, exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: '保管', exact: true }).click()
+    const rows = page.locator('tr').filter({ has: page.getByRole('link', { name: `タグ「${ARCHIVED_TAG.name}」を編集`, exact: true }) })
+    await expect(rows.getByText('アーカイブ', { exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: `タグ「${ACTIVE_TAG.name}」を編集`, exact: true })).toHaveCount(0)
   })
 })

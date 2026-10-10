@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Folder } from '@line-crm/shared'
 import BroadcastAccountPicker, { type BroadcastAccount } from './account-picker'
@@ -25,6 +25,7 @@ describe('送るアカウントの選択窓', () => {
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '東日本をまとめて選ぶ' }))
     expect((screen.getByRole('checkbox', { name: '新宿店' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '梅田' } })
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     expect(screen.queryByRole('checkbox', { name: '銀座店' })).toBeNull()
     fireEvent.click(screen.getByRole('checkbox', { name: '梅田店' }))
     expect(screen.getByText(/3 アカウントを選んでいます/)).toBeTruthy()
