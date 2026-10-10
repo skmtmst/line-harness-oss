@@ -1,13 +1,14 @@
 {
   "generatedBy": "scripts/visual-qa/build-v8-design-map.mjs",
   "sources": [
-    "BOARD-INDEX.md",
-    "HANDOVER-MAP.md",
-    "V8B-HANDOVER-MAP.md",
-    "specs/pages/*.md"
+    "v8-design-map.json (route/state)",
+    "html/*.html",
+    "pencil-texts/*.tsv",
+    "review/PEN-ID-CHANGES-1010.tsv",
+    "review/PEN-FREEZE-1009.md §8"
   ],
   "designDir": "/Users/kentakenta/lh-work/design/v8",
-  "boardCount": 579,
+  "boardCount": 587,
   "retired": [],
   "boards": {
     "jQRsr": {
@@ -75,31 +76,6 @@
       "app": "liff",
       "state": {
         "manual": "紙のカードを送ったあとの確認待ち。AC 10-09 に地図へ足した"
-      }
-    },
-    "glL3g": {
-      "doc": "V8",
-      "name": "LIFF 席の予約 ① 人数と日時",
-      "kind": "画面",
-      "route": null,
-      "routes": [],
-      "width": null,
-      "shot": "lint/V8/shots/glL3g.png",
-      "url": "/restaurant/reserve/qa-token",
-      "app": "liff"
-    },
-    "km8EG": {
-      "doc": "V8",
-      "name": "LIFF 席の予約 ② 確認",
-      "kind": "画面",
-      "route": null,
-      "routes": [],
-      "width": null,
-      "shot": "lint/V8/shots/km8EG.png",
-      "url": "/restaurant/reserve/qa-token",
-      "app": "liff",
-      "state": {
-        "manual": "① で人数と日時を選んで進んだあと。AC 10-09 に地図へ足した"
       }
     },
     "sAnyy": {
@@ -305,16 +281,6 @@
       "shot": "lint/V8/shots/AcTHQ.png",
       "url": null
     },
-    "AjZhH": {
-      "doc": "V8-B",
-      "name": "予約台帳 予約の詳細 V8",
-      "kind": null,
-      "route": "/booking/bookings",
-      "routes": [],
-      "width": 1440,
-      "shot": "lint/V8-B/shots/AjZhH.png",
-      "url": "/booking/bookings"
-    },
     "Al4Ek": {
       "doc": "V8",
       "name": "シナリオ配信 複製のダイアログ V8",
@@ -462,7 +428,7 @@
     },
     "BVSbe": {
       "doc": "V8",
-      "name": "統括 リッチメニュー 作る④ 確かめて配る V8（G-10）",
+      "name": "統括 作る④ 確かめて配る V8",
       "kind": "画面",
       "route": "/hq/rich-menus",
       "routes": [
@@ -532,7 +498,7 @@
     },
     "BygrU": {
       "doc": "V8-B",
-      "name": "コンバージョン 一覧 1152 V8",
+      "name": "コンバージョン 一覧 1152 V8｜状態は型の見本 LS のとおり",
       "kind": "1152",
       "route": "/conversions",
       "routes": [
@@ -599,18 +565,6 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/CFAyf.png",
       "url": "/accounts/detail?id=visual-qa-account"
-    },
-    "CHz31": {
-      "doc": "V8-B",
-      "name": "店舗ダッシュボード V8",
-      "kind": "画面",
-      "route": "/restaurant-test/dashboard",
-      "routes": [
-        "/restaurant-test/dashboard"
-      ],
-      "width": 1440,
-      "shot": "lint/V8-B/shots/CHz31.png",
-      "url": "/restaurant-test/dashboard"
     },
     "CJlf4": {
       "doc": "V8-B",
@@ -860,7 +814,7 @@
     },
     "E2l8cw": {
       "doc": "V8-B",
-      "name": "★V8-B コンバージョン 一覧の状態",
+      "name": "★V8-B コンバージョン 一覧の状態｜状態は型の見本 LS のとおり",
       "kind": "状態",
       "route": "/conversions",
       "routes": [
@@ -912,16 +866,6 @@
       "width": 1440,
       "shot": "lint/V8/shots/EFV8l.png",
       "url": "/templates/edit"
-    },
-    "EML2F": {
-      "doc": "V8",
-      "name": "欄 一覧",
-      "kind": null,
-      "route": "/broadcasts",
-      "routes": [],
-      "width": 1440,
-      "shot": "lint/V8/shots/EML2F.png",
-      "url": "/broadcasts"
     },
     "EMUl9": {
       "doc": "V8-B",
@@ -1616,18 +1560,6 @@
       "width": 1440,
       "shot": "lint/V8/shots/JV2oR.png",
       "url": "/form-submissions"
-    },
-    "JXq9G": {
-      "doc": "V8-B",
-      "name": "コンバージョン 一覧 V8",
-      "kind": "画面",
-      "route": "/conversions",
-      "routes": [
-        "/conversions"
-      ],
-      "width": 1440,
-      "shot": null,
-      "url": "/conversions"
     },
     "JYfda": {
       "doc": "V8-B",
@@ -2961,18 +2893,6 @@
       "shot": "lint/V8/shots/UTbi1.png",
       "url": "/templates/detail"
     },
-    "UUQ7T": {
-      "doc": "V8-B",
-      "name": "コンバージョン 一覧 1152 V8",
-      "kind": "1152",
-      "route": "/conversions",
-      "routes": [
-        "/conversions"
-      ],
-      "width": 1152,
-      "shot": null,
-      "url": "/conversions"
-    },
     "UVnvR": {
       "doc": "V8",
       "name": "予約枠・在庫 休業日・貸切（E-10）V8",
@@ -3113,7 +3033,7 @@
     },
     "UgZPJ": {
       "doc": "V8",
-      "name": "統括 リッチメニュー 作る③ 配る先 V8（G-10）",
+      "name": "統括 作る③ 配る先 V8",
       "kind": "画面",
       "route": "/hq/rich-menus",
       "routes": [
@@ -3155,18 +3075,6 @@
       "width": 1440,
       "shot": "lint/V8-B/shots/UyUMw.png",
       "url": "/webinars"
-    },
-    "V1RQfI": {
-      "doc": "V8-B",
-      "name": "コンバージョン 作る V8",
-      "kind": "画面",
-      "route": "/conversions/new",
-      "routes": [
-        "/conversions/new"
-      ],
-      "width": 1440,
-      "shot": null,
-      "url": "/conversions/new"
     },
     "V4LjH": {
       "doc": "V8",
@@ -3255,7 +3163,7 @@
     },
     "VIij4": {
       "doc": "V8",
-      "name": "統括 リッチメニュー 作る① 形と画像 V8（G-10）",
+      "name": "統括 作る① 形と画像 V8",
       "kind": "画面",
       "route": "/hq/rich-menus",
       "routes": [
@@ -3430,19 +3338,19 @@
     },
     "WQmep": {
       "doc": "V8",
-      "name": "ダッシュボード V8",
-      "shot": null,
+      "name": "ダッシュボード V8｜状態は型の見本 LS のとおり",
       "kind": "画面",
       "route": "/",
-      "url": "/",
       "routes": [
         "/"
       ],
-      "width": 1440
+      "width": 1440,
+      "shot": null,
+      "url": "/"
     },
     "WSGvo": {
       "doc": "V8-B",
-      "name": "コンバージョン 一覧（閲覧のみ）V8",
+      "name": "コンバージョン 一覧（閲覧のみ）V8｜状態は型の見本 LS のとおり",
       "kind": "閲覧のみ",
       "route": "/conversions",
       "routes": [
@@ -4056,18 +3964,6 @@
       "shot": "lint/V8-B/shots/c7dxp.png",
       "url": "/automations"
     },
-    "c7grKU": {
-      "doc": "V8-B",
-      "name": "コンバージョン 作る（競合）V8",
-      "kind": "競合",
-      "route": "/conversions/new",
-      "routes": [
-        "/conversions/new"
-      ],
-      "width": 1440,
-      "shot": null,
-      "url": "/conversions/new"
-    },
     "cFo2p": {
       "doc": "V8",
       "name": "友だち追加時の配信 受け皿は止められない（案内） V8",
@@ -4107,7 +4003,7 @@
     },
     "cXqlS": {
       "doc": "V8-B",
-      "name": "コンバージョン 作る（競合）V8",
+      "name": "コンバージョン 作る（競合）V8｜状態は型の見本 CS のとおり",
       "kind": "競合",
       "route": "/conversions/new",
       "routes": [
@@ -4143,7 +4039,7 @@
     },
     "cmRZc": {
       "doc": "V8",
-      "name": "統括 リッチメニュー 作る② ボタンの動き V8（G-10）",
+      "name": "統括 作る② ボタンの動き V8",
       "kind": "画面",
       "route": "/hq/rich-menus",
       "routes": [
@@ -4210,16 +4106,6 @@
       "width": 1440,
       "shot": "lint/V8/shots/d5fmnM.png",
       "url": "/booking/staff/shifts"
-    },
-    "d8X09": {
-      "doc": "V8",
-      "name": "1. ダッシュボード",
-      "kind": null,
-      "route": "/",
-      "routes": [],
-      "width": 1440,
-      "shot": "lint/V8/shots/d8X09.png",
-      "url": "/"
     },
     "d9xoI": {
       "doc": "V8",
@@ -4725,6 +4611,7 @@
         "/restaurant-test/dashboard"
       ],
       "width": 1440,
+      "shot": "lint/V8-B/shots/CHz31.png",
       "url": "/restaurant-test/dashboard",
       "state": {
         "api": [
@@ -5177,7 +5064,7 @@
     },
     "j8p3yj": {
       "doc": "V8-B",
-      "name": "コンバージョン 作る V8",
+      "name": "コンバージョン 作る V8｜状態は型の見本 CS のとおり",
       "kind": "画面",
       "route": "/conversions/new",
       "routes": [
@@ -5201,15 +5088,15 @@
     },
     "jjFNi": {
       "doc": "V8",
-      "name": "一覧（1152）",
-      "shot": null,
+      "name": "一斉配信 一覧 V8（1152）｜状態は型の見本 CS のとおり",
       "kind": "1152",
       "route": "/broadcasts",
-      "url": "/broadcasts",
       "routes": [
         "/broadcasts"
       ],
-      "width": 1152
+      "width": 1152,
+      "shot": null,
+      "url": "/broadcasts"
     },
     "k32cn": {
       "doc": "V8",
@@ -5301,15 +5188,15 @@
     },
     "l5V9a": {
       "doc": "V8",
-      "name": "一覧",
-      "shot": null,
+      "name": "一斉配信 一覧 V8｜状態は型の見本 CS のとおり",
       "kind": "画面",
       "route": "/broadcasts",
-      "url": "/broadcasts",
       "routes": [
         "/broadcasts"
       ],
-      "width": 1440
+      "width": 1440,
+      "shot": null,
+      "url": "/broadcasts"
     },
     "l87p1J": {
       "doc": "V8",
@@ -5986,7 +5873,7 @@
     },
     "r6dJFy": {
       "doc": "V8-B",
-      "name": "コンバージョン 一覧 V8",
+      "name": "コンバージョン 一覧 V8｜状態は型の見本 LS のとおり",
       "kind": "画面",
       "route": "/conversions",
       "routes": [
@@ -6007,18 +5894,6 @@
       "width": 1440,
       "shot": "lint/V8/shots/r8dGXT.png",
       "url": "/rich-menus/edit"
-    },
-    "r9qd7r": {
-      "doc": "V8-B",
-      "name": "コンバージョン 一覧（閲覧のみ）V8",
-      "kind": "閲覧のみ",
-      "route": "/conversions",
-      "routes": [
-        "/conversions"
-      ],
-      "width": 1440,
-      "shot": null,
-      "url": "/conversions"
     },
     "rE0ML": {
       "doc": "V8",
@@ -6100,16 +5975,6 @@
       "width": 1440,
       "shot": "lint/V8/shots/rbAig.png",
       "url": "/reminders/detail"
-    },
-    "rfdmA": {
-      "doc": "V8",
-      "name": "欄 一覧（1152）",
-      "kind": null,
-      "route": "/broadcasts",
-      "routes": [],
-      "width": 1152,
-      "shot": "lint/V8/shots/rfdmA.png",
-      "url": "/broadcasts"
     },
     "rfhIf": {
       "doc": "V8",
@@ -7169,18 +7034,6 @@
       "shot": "lint/V8/shots/xxKtW.png",
       "url": "/contents/vars"
     },
-    "xzCK6": {
-      "doc": "V8-B",
-      "name": "予約台帳 今日（1152）V8",
-      "kind": "1152",
-      "route": "/restaurant-test/reservations",
-      "routes": [
-        "/restaurant-test/reservations"
-      ],
-      "width": 1152,
-      "shot": "lint/V8-B/shots/xzCK6.png",
-      "url": "/restaurant-test/reservations"
-    },
     "y0sapC": {
       "doc": "V8",
       "name": "統括 友だち属性 友だち情報欄 V8",
@@ -7431,6 +7284,286 @@
       "width": null,
       "shot": "lint/V8/shots/zz9R3.png",
       "url": null
+    },
+    "aRvrh": {
+      "doc": "V8",
+      "name": "G-8k 店頭の QR の小窓",
+      "kind": "小窓",
+      "route": "/visit-stamps",
+      "url": "/visit-stamps",
+      "routes": [
+        "/visit-stamps"
+      ],
+      "width": 1440,
+      "shot": null,
+      "exportHtml": "html/QX56l.html",
+      "exportNodeName": "G-8k 店頭の QR の小窓"
+    },
+    "B3oGt3": {
+      "doc": "V8",
+      "name": "LIFF ② 確認",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/km8EG.png",
+      "url": "/restaurant/reserve/qa-token",
+      "app": "liff",
+      "state": {
+        "manual": "① で人数と日時を選んで進んだあと。AC 10-09 に地図へ足した"
+      }
+    },
+    "Bb8xi": {
+      "doc": "V8",
+      "name": "後ろの画面",
+      "kind": "幕",
+      "route": null,
+      "url": null,
+      "routes": [],
+      "width": null,
+      "shot": null
+    },
+    "byCFU": {
+      "doc": "V8",
+      "name": "G-8a2 管理画面：紙のカードの移行タブ",
+      "kind": "画面",
+      "route": "/visit-stamps",
+      "url": "/visit-stamps?tab=paper",
+      "routes": [
+        "/visit-stamps?tab=paper"
+      ],
+      "width": 1440,
+      "shot": null
+    },
+    "Ct7aA": {
+      "doc": "V8",
+      "name": "提案 お客さま情報の欄を読みやすく（B-167）2026-10-10",
+      "kind": "採用の説明",
+      "route": "/chats",
+      "url": "/chats",
+      "routes": [
+        "/chats"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "cu3vm": {
+      "doc": "V8",
+      "name": "提案 G-5 シナリオの配信方式に図解",
+      "kind": "採用の説明",
+      "route": "/scenarios/new",
+      "url": "/scenarios/new",
+      "routes": [
+        "/scenarios/new"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "fpPlW": {
+      "doc": "V8",
+      "name": "G-8a 管理画面：QR の入口",
+      "kind": "画面",
+      "route": "/visit-stamps",
+      "url": "/visit-stamps",
+      "routes": [
+        "/visit-stamps"
+      ],
+      "width": 1440,
+      "shot": null
+    },
+    "Ft2Ey": {
+      "doc": "V8",
+      "name": "提案 G-4 アカウントへ配る（左にフォルダ）",
+      "kind": "採用の説明",
+      "route": "/hq/templates",
+      "url": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "G8KDe": {
+      "doc": "V8",
+      "name": "提案 G-1 来店スタンプ（ショップカードに合わせて足す）",
+      "kind": "採用の説明",
+      "route": "/visit-stamps",
+      "url": "/visit-stamps",
+      "routes": [
+        "/visit-stamps"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "GBTyR": {
+      "doc": "V8",
+      "name": "選ぶ窓/タグ（B-162・正の形 S2Vgi の使い方）",
+      "kind": "部品",
+      "route": "/chats",
+      "url": "/chats",
+      "routes": [
+        "/chats"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "K3qhdY": {
+      "doc": "V8",
+      "name": "提案 LINE来店フォローと新しい飲食の機能のつながり（B-196）2026-10-10",
+      "kind": "採用の説明",
+      "route": "/restaurant-test/line-followup",
+      "url": "/restaurant-test/line-followup",
+      "routes": [
+        "/restaurant-test/line-followup"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "KRppA": {
+      "doc": "V8",
+      "name": "LIFF ① 人数・日時・コース",
+      "kind": "画面",
+      "route": null,
+      "routes": [],
+      "width": null,
+      "shot": "lint/V8/shots/glL3g.png",
+      "url": "/restaurant/reserve/qa-token",
+      "app": "liff"
+    },
+    "NVN1Y": {
+      "doc": "V8",
+      "name": "G-8a3 管理画面：押した・使った記録タブ",
+      "kind": "画面",
+      "route": "/visit-stamps",
+      "url": "/visit-stamps?tab=history",
+      "routes": [
+        "/visit-stamps?tab=history"
+      ],
+      "width": 1440,
+      "shot": null
+    },
+    "oIFk7": {
+      "doc": "V8",
+      "name": "提案 G-2b リッチビデオを作る",
+      "kind": "採用の説明",
+      "route": "/hq/templates",
+      "url": "/hq/templates?kind=rich_video",
+      "routes": [
+        "/hq/templates?kind=rich_video"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "QUF2R": {
+      "doc": "V8",
+      "name": "案 流入と計測 作る（クーポンを渡す・B-174）",
+      "kind": "採用の説明",
+      "route": "/inflow-links/new",
+      "url": "/inflow-links/new",
+      "routes": [
+        "/inflow-links/new"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "T53Stv": {
+      "doc": "V8",
+      "name": "提案 G-3a 統括 メッセージを作る（下の帯）",
+      "kind": "採用の説明",
+      "route": "/hq/messages/new",
+      "url": "/hq/messages/new",
+      "routes": [
+        "/hq/messages/new"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "tfxQh": {
+      "doc": "V8",
+      "name": "下：一覧",
+      "kind": "採用の説明",
+      "route": "/hq/templates",
+      "url": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "Upx1c": {
+      "doc": "V8",
+      "name": "案 統括 テンプレート 一覧（左メニューと種類に3つ足す）",
+      "kind": "採用の説明",
+      "route": "/hq/templates",
+      "url": "/hq/templates",
+      "routes": [
+        "/hq/templates"
+      ],
+      "width": null,
+      "shot": null
+    },
+    "wVSxu": {
+      "doc": "V8-B",
+      "name": "流入と計測 QR コードの小窓（止めた経路）V8｜状態は型の見本 LS のとおり",
+      "kind": "小窓",
+      "route": "/inflow-links",
+      "url": "/inflow-links",
+      "routes": [
+        "/inflow-links"
+      ],
+      "width": 1440,
+      "shot": null
+    },
+    "xOQKw": {
+      "doc": "V8",
+      "name": "予約台帳 今日 1152（融合 B-186）",
+      "kind": "1152",
+      "route": "/restaurant-test/reservations",
+      "routes": [
+        "/restaurant-test/reservations"
+      ],
+      "width": 1152,
+      "shot": "lint/V8-B/shots/xzCK6.png",
+      "url": "/restaurant-test/reservations"
+    },
+    "Z3gJS": {
+      "doc": "V8",
+      "name": "後ろの画面",
+      "kind": "幕",
+      "route": null,
+      "url": null,
+      "routes": [],
+      "width": null,
+      "shot": null
     }
+  },
+  "frozenAt": "2026-10-10 19:37 JST",
+  "replacements": {
+    "JXq9G": "r6dJFy",
+    "V1RQfI": "j8p3yj",
+    "PbdMa": "E2l8cw",
+    "UUQ7T": "BygrU",
+    "r9qd7r": "WSGvo",
+    "c7grKU": "cXqlS",
+    "xLpnS": "n9vvGx",
+    "Z3FoM": "xzR4g",
+    "AjZhH": "xzR4g",
+    "l9NlC0": "R2w4j",
+    "xzCK6": "xOQKw",
+    "Y8SjT2": "eZPzk",
+    "hQQlt": "mVUo3",
+    "BERxg": "vOtK2",
+    "bSp4h": "cgESv",
+    "CHz31": "qwIZr",
+    "hKRRF": "qwIZr",
+    "glL3g": "KRppA",
+    "km8EG": "B3oGt3",
+    "gobhu": "VIij4",
+    "egdGx": "cmRZc",
+    "K0gu1": "UgZPJ",
+    "gQabc": "BVSbe",
+    "EML2F": "l5V9a",
+    "rfdmA": "jjFNi",
+    "d8X09": "WQmep"
   }
 }
