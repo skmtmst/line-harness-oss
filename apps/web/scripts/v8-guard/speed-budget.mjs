@@ -177,7 +177,7 @@ function apiCorsHeaders(route) {
 
 /* 偽APIの答えをそのまま運ぶ（待ち受けなし方式の差し替え）。 */
 export async function stubApi(page, mockFetch) {
-  await page.route('**/api/**', async (route) => {
+  const answer = async (route) => {
     const url = new URL(route.request().url())
     const path = `${url.pathname}${url.search}`
     const answered = await mockFetch(route.request().method(), path)
@@ -187,7 +187,11 @@ export async function stubApi(page, mockFetch) {
       headers: apiCorsHeaders(route),
       body: answered.body,
     })
-  })
+  }
+  await page.route('**/api/**', answer)
+  // The shell also requests version/manifest endpoints outside /api. Keep the same fixture
+  // as CI, rather than mixing real staging latency into a local-stub run.
+  await page.route('**/admin/**', answer)
 }
 
 export async function gotoTarget(page, target, waitUntil = 'commit') {
@@ -292,7 +296,7 @@ export async function waitForScreenReady(page, route, expectedRows = null) {
 }
 
 /* 友だち一覧に 2,000 行を返して、スクロール中の長い作業を測る。 */
-async function measureStress(browser, target) {
+export async function measureStress(browser, target) {
   const page = await newPage(browser)
   try {
   const responseState = await installStressApi(page, target)
