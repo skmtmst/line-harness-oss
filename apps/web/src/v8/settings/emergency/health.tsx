@@ -29,8 +29,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 /*
  * ★V8 運用状態 健全性チェック（Pencil `Y4LkX1`）。
  *
- * app/emergency/page.tsx の HealthPanel・OperationAlertsPanel を写し（src/v8 は @/app を読めない）、
- * 見た目だけ絵に合わせた：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
+ * 現役の健全性と異常の受領・通知をここに集める。絵の並びは：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
  * 動き（初回だけ読み込み中・5分ごとの取り直し・手動確認の世代照合・受領・通知のやり直し・
  * 古い確認と未確認の言い分け・アカウント切替の見張り）は同じ。
  */

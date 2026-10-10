@@ -1,10 +1,9 @@
 # 運用状態の動き（BEHAVIOR.md）
 
-対象：`screen.tsx`・`health.tsx`（★V8 健全性チェック `Y4LkX1`）。更新履歴（`I2V65v`）・緊急コントロール（`OHwbU`）は今の部品を入口から差し込む。
-写し元：`app/emergency/page.tsx` の EmergencyPageInner・HealthPanel・OperationAlertsPanel。
+対象：`screen.tsx`・`health.tsx`（★V8 健全性チェック `Y4LkX1`）・`history.tsx`（更新履歴 `I2V65v`）。緊急コントロール（`OHwbU`）は現役の `app/emergency/control-v8.tsx` を入口から差し込む。
 
 ## 入口・URL
-- `app/emergency/page.tsx`：見た目が v8 のときだけこの画面。`?tab=health|history|control`。
+- `app/emergency/page.tsx`：この V8 画面に固定。`?tab=health|history|control`。
 
 ## 読み込み（API）
 - `GET /api/operations/health`（手動は `POST …/runs`）・`GET /api/operations/alerts`・`GET /api/operations/history`（下の3枚）・`api.health.accounts()`。
@@ -14,3 +13,5 @@
 ## 操作
 - いますぐ確かめる（頭の右）。開いている異常：受領する（1回目でメモ欄、2回目「受領を記録する」で記録）・通知をやり直す。
 - 見るだけの人：受領・やり直し・緊急停止のボタンを出さない。
+
+- 緊急制御：競合で古い確認・窓・要求キーを破棄し、読み直し成功まで操作を止める。失敗後も再取得できる。停止/復旧/読み直しの連打は1要求だけ。本人確認の実行中は閉じず、成功・失敗後は理由が前面に出る。止める条件を変更したままの離脱は共通の番兵で確かめる。

@@ -161,7 +161,7 @@ const GUARDED = [
  */
 const COVERED_BY_PARENT: Record<string, string> = {
   // 動き1：画面のdirtyは型／共通の番兵が守る。
-  'app/emergency/page.tsx': 'components/shared/form-leave-guard.tsx',
+  'app/emergency/control-v8.tsx': 'components/shared/form-leave-guard.tsx',
   'components/templates/create-page.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/dashboard/dashboard-editor.tsx': 'components/templates/create-page.tsx',
   'v8/hq/settings.tsx': 'components/shared/form-leave-guard.tsx',

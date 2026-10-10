@@ -2,15 +2,17 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const page = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const page = readFileSync(join(import.meta.dirname, 'control-v8.tsx'), 'utf8')
 
-describe('V6 緊急停止の最終確認 U0BwS', () => {
-  it('設計の720px幅と影響・理由・止まらないものの3区画を持つ', () => {
-    // 低い画面ではみ出さないよう、高さ700に上限を併せる(#518 8)。
-    expect(page).toContain("style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}")
-    expect(page).toContain('停止前にすでにLINEへ渡したものは取り消せません。')
-    expect(page).toContain('<p className="text-xs font-medium text-ink">理由</p>')
-    expect(page).toContain('<p className="text-xs font-medium text-success">止まらないもの</p>')
-    expect(page).toContain('style={{ width: 280 }}')
+describe('V8 緊急停止の最終確認 EA8rM', () => {
+  it('現役の共通Dialogで対象・理由・止まらないものを確認し、低い画面でも閉じ込めない', () => {
+    expect(page).toContain("designNode={confirmMode === 'stop' ? 'EA8rM'")
+    expect(page).toContain('停止前にすでに LINE へ渡したものは取り消せません。')
+    expect(page).toContain('止める対象：{accountName}')
+    expect(page).toContain('label="止める理由"')
+    expect(page).toContain('止まらないもの：')
+    const css = readFileSync(join(import.meta.dirname, '../../components/shared/dialog.module.css'), 'utf8')
+    expect(css).toMatch(/max-height:[^;]*(?:100dvh|100vh)/)
+    expect(css).toContain('overflow-y: auto')
   })
 })

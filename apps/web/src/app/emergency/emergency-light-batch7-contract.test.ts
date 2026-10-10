@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const PAGE = ['page.tsx', 'control-v8.tsx', '../../v8/settings/emergency/screen.tsx'].map((file) => readFileSync(join(import.meta.dirname, file), 'utf8')).join('\n')
 
 describe('点検・軽 第7便運用状態(#585)', () => {
   it('補足は1000文字の上限と残り字数を見せる(#518 7)', () => {
@@ -11,12 +11,13 @@ describe('点検・軽 第7便運用状態(#585)', () => {
   })
 
   it('最終確認は低い画面でも閉じ込めない(#518 8)', () => {
-    expect(PAGE).toContain("maxHeight: 'calc(100vh - 32px)'")
+    const dialogCss = readFileSync(join(import.meta.dirname, '../../components/shared/dialog.module.css'), 'utf8')
+    expect(dialogCss).toMatch(/max-height:[^;]*(?:100dvh|100vh)/)
   })
 
   it('アカウント一覧の取得失敗は黙らせず読み直せる(#518 9)', () => {
-    expect(PAGE).toContain('アカウント一覧を取得できませんでした')
-    expect(PAGE).toContain('もう一度読む')
+    expect(PAGE).toContain('アカウント一覧を読み込めませんでした')
+    expect(PAGE).toContain('もう一度読み込む')
     expect(PAGE).not.toContain('.catch(() => undefined)')
   })
 
