@@ -204,7 +204,6 @@ shared-button-importer app/recipes/page.tsx
 shared-button-importer app/register/complete/page.tsx
 shared-button-importer app/register/page.tsx
 shared-button-importer app/register/sent/page.tsx
-shared-button-importer app/reminders/detail/registrants-panel.tsx
 shared-button-importer app/reminders/list-v8.tsx
 shared-button-importer app/reminders/new/new-v8.tsx
 shared-button-importer app/reminders/wizard-v8-ui.tsx
