@@ -1,6 +1,8 @@
 'use client'
 
 import { X } from 'lucide-react'
+import { RowMenu } from '@/components/shared/row-actions'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import StickyBar from '@/components/shared/sticky-bar'
 
 import { useEffect, useState } from 'react'
@@ -111,13 +113,31 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const [slots, setSlots] = useState<EventSlot[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
+  const role = useStaffRole()
+  const canDuplicate = role === null || canManageRole(role)
   const [loading, setLoading] = useState(true)
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft)
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving || duplicating })
 
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
+
+  async function duplicateSaved() {
+    if (!eventId || !canDuplicate || saving || duplicating || loading) return
+    const expectedVersion = savedDraft.version
+    if (typeof expectedVersion !== 'number') { setError('保存済みの版を読み直してから複製してください。'); return }
+    setDuplicating(true); setError(null)
+    try {
+      const response = await eventsApi.duplicate(accountId, eventId, expectedVersion)
+      notifyToast('複製した下書きを追加しました')
+      router.push(`/events?highlight=${encodeURIComponent(response.id)}`)
+    } catch (caught) {
+      setError(caught instanceof ApiError && caught.status === 409
+        ? '別の人が変更しました。読み直してから複製してください。' : '複製できませんでした。もう一度お試しください。')
+    } finally { setDuplicating(false) }
+  }
 
   async function copyValue(v: string) {
     try {
@@ -313,6 +333,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
             {eventId ? 'タブで各項目を編集できます' : 'まず「概要」を保存するとイベントが作成されます'}
           </p>
         </div>
+        {eventId && canDuplicate ? <RowMenu label="イベントの操作" triggerProps={{ disabled: saving || duplicating }} items={[{ id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) }]} /> : null}
         {eventId && (
           <Button
             href={`/events/bookings?id=${eventId}`}

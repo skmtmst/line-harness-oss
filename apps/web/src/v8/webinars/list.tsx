@@ -35,6 +35,8 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
+import { notifyToast } from '@/components/shared/toast'
+import { useSearchParams } from 'next/navigation'
 import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -173,9 +175,12 @@ function rowMenuItems(
   canEdit: boolean,
   go: (href: string) => void,
   onArchive: (target: WebinarListItem) => void,
+  onDuplicate: (target: WebinarListItem) => void,
+  duplicating: boolean,
 ): ActionMenuItem[] {
   const id = encodeURIComponent(w.id)
   return [
+    ...(canEdit ? [{ id: 'duplicate', label: '複製する', disabled: duplicating, onSelect: () => onDuplicate(w) }] : []),
     { id: 'participants', label: '参加者を見る', onSelect: () => go(`/webinars/edit?id=${id}&pane=participants`) },
     { id: 'analytics', label: '分析を見る', onSelect: () => go(`/webinars/edit?id=${id}&pane=analytics`) },
     { id: 'comments', label: 'コメント演出を開く', onSelect: () => go(`/webinars/edit?id=${id}&pane=comments`) },
@@ -406,6 +411,9 @@ function WebinarList() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
   const snapshotRef = useRef<ListSnapshot>({ items: [], total: 0, loadedAccountId: null })
+  const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [duplicateError, setDuplicateError] = useState('')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
@@ -654,6 +662,24 @@ function WebinarList() {
     setArchiveTarget(target)
   }, [])
 
+  const duplicateWebinar = async (item: WebinarListItem) => {
+    if (!canEdit || duplicatingId || !selectedAccountId) return
+    const accountId = selectedAccountId
+    setDuplicatingId(item.id); setDuplicateError('')
+    try {
+      const editor = await webinarApi.editor(item.id)
+      const copied = await webinarApi.duplicate(item.id, editor.data.version)
+      if (snapshotRef.current.loadedAccountId !== accountId) return
+      setHighlightedId(copied.data.id)
+      setQuery(''); setView({ q: '', status: 'draft', page: '1', sort: 'updated' })
+      setTotal((current) => current + 1)
+      setItems((current) => [{ ...copied.data, folderName: item.folderName, registrationCount: 0, viewerCount: 0 }, ...current])
+      notifyToast('複製した下書きを追加しました')
+      void refreshFolders()
+    } catch { setDuplicateError('複製できませんでした。一覧を読み直してお試しください。') }
+    finally { setDuplicatingId(null) }
+  }
+
   const archiveSelected = async () => {
     if (!archiveTarget || archiving) return
     setArchiving(true)
@@ -879,13 +905,14 @@ function WebinarList() {
             <TableHead />
             <tbody>
               {visibleItems.map((w) => {
-                const menuItems = rowMenuItems(w, canEdit, go, openArchive)
+                const menuItems = rowMenuItems(w, canEdit, go, openArchive, (item) => void duplicateWebinar(item), duplicatingId !== null)
                 const counts = showsCounts(w)
                 const period = periodSummary(w)
                 const menuLabel = `ウェビナー「${w.title}」の操作`
                 return (
                   <Tr
                     key={w.id}
+                    selected={highlightedId === w.id}
                     interactive
                     className={styles.row}
                     data-table-layout="columns"
@@ -1019,7 +1046,7 @@ function WebinarList() {
         </FolderPanel>
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{narrow ? narrowToolbar : wideToolbar}</>}
       pagination={pager}
       overlays={<>
         {archiveTarget ? (

@@ -14,11 +14,12 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const routerPush = vi.hoisted(() => vi.fn())
 const nav = vi.hoisted(() => ({ search: 'id=webinar-1&pane=participants' }))
 const roleState = vi.hoisted(() => ({ role: 'owner' as string | null }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/webinars/edit',
   useSearchParams: () => new URLSearchParams(nav.search),
 }))
@@ -77,6 +78,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
+  routerPush.mockReset()
   document.documentElement.dataset.theme = 'v8'
   roleState.role = 'owner'
   puts.length = 0
@@ -92,6 +94,7 @@ beforeEach(() => {
     const url = new URL(String(input))
     const path = url.pathname
     const method = init?.method ?? 'GET'
+    if (method === 'POST' && path.endsWith('/duplicate')) { puts.push({ path, body: JSON.parse(String(init?.body)) }); return json({ data: { ...webinar, id: 'copied-webinar', status: 'draft' } }) }
     if (method === 'POST' && path.endsWith('/pause')) { puts.push({ path, body: JSON.parse(String(init?.body)) }); return json({ data: { ...webinar, status: 'paused' } }) }
     if (method === 'PUT') {
       puts.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null })
@@ -298,11 +301,23 @@ it('WEB-166：公開中は編集の…から版を確認して停止する', asy
   const menu = buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!
   expect(menu).toBeTruthy()
   await act(async () => { menu.click() })
-  const pause = document.querySelector('[role="menuitem"]') as HTMLElement
+  const pause = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '停止') as HTMLElement
   expect(pause.textContent).toContain('停止')
   await act(async () => { pause.click() })
   const confirm = buttons().find(b => b.textContent?.trim() === '停止する')!
   expect(confirm).toBeTruthy()
   await act(async () => { confirm.click() })
   expect(puts.some(p => p.path.endsWith('/pause') && (p.body as { expectedVersion: number }).expectedVersion === 3)).toBe(true)
+})
+
+
+it('編集の複製は保存済みの版を送り、一覧で下書きを光らせる行き先へ移る', async () => {
+  nav.search = 'id=webinar-1&pane=participants'
+  await render(<WebinarEditV8 />)
+  await act(async () => { buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!.click() })
+  const duplicate = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '複製する') as HTMLElement
+  await act(async () => { duplicate.click() })
+  expect(puts).toContainEqual({ path: '/api/webinars/webinar-1/duplicate', body: { expectedVersion: 3 } })
+  expect(routerPush).toHaveBeenCalledWith('/webinars?status=draft&highlight=copied-webinar')
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
 })
