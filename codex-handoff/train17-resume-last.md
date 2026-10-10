@@ -7,7 +7,7 @@
 - 作業場所：`/Users/kentakenta/lh-work/lh-pages-custlook`
 - 専用ブランチ：`codex/kenta-custlook-1011`
 - 指定された列車17の開始SHA：`32a3a3ac3755471e854d4d84c7815437068e5024`
-- 最新コードSHA：`e2c3136a458899e36ef9a38393fd6e7e8b0ea36e`
+- 実装SHA：`3dde20f9aba0692a1486cff249862824ebdab74c`（検証済み実装から末尾の空行2つだけを除去）。画面測定・最終ビルド対象SHA：`e2c3136a458899e36ef9a38393fd6e7e8b0ea36e`。
 - 開始時doctorは`DOCTOR_LOCAL=1`で合格。指定された正本全文と採用済み画像を読み、画面領域の変更は元Slackスレッドで宣言済み。
 - 1→6の順に実装・コミット。動作確認は実施したが、画像一致は未合格。統合可能・全体完了とは判定しない。
 - 本線の取り込み、push、PR、migration作成、D1更新、配備、実送信は実施していない。親ECリポジトリは変更していない。
@@ -53,6 +53,7 @@ Webの失敗2件は、試験中に一時的な変異試験ファイルを作成�
 - 2,000友だち×選択7欄：108.3ms、SQL問い合わせ1回。ローカルSQLiteでの測定であり、遠隔D1の速度ではない：`worker-full-final.log`。
 - 実装と試験を一時コピーして、正常なら通過し、アレルギーの上限・列上限・店境界を故意に壊すと失敗することを確認：`mutation-results.log`と各control／mutantログ。コピーは除去済み。
 - 旧会員画面の白背景固定の見た目検査のみ、店のCSS変数を使う検査へ更新した。動作・権限・保存の試験は削除していない。
+- 開始SHAからブランチ全体への`git diff --check`は、末尾の余分な空行2つを除去した後に合格。実装のコミット直後はクリーン。作業元train12と親ECもクリーン。使用した開発サーバーは終了済み。
 
 ## 見た目：未合格
 
@@ -72,7 +73,7 @@ Webの失敗2件は、試験中に一時的な変異試験ファイルを作成�
 | T5ljMA | 1440 | 28.6% | 7 / 68 |
 | g3REI | 1440 | 2.0% | 50 / 196 |
 
-VsZ25とvX3wQは最新コードSHA、ほかは`56303afe5ef73c62661bf76e932c7622d80600b1`で撮影。詳細は`html-comparison.tsv`、`measure-final.log`、`measure-final-settings.log`。画像は`/Users/kentakenta/lh-work/design/v8/overlay/pages-custlook/`。
+VsZ25とvX3wQは`e2c3136a458899e36ef9a38393fd6e7e8b0ea36e`、ほかは`56303afe5ef73c62661bf76e932c7622d80600b1`で撮影。詳細は`html-comparison.tsv`、`measure-final.log`、`measure-final-settings.log`。画像は`/Users/kentakenta/lh-work/design/v8/overlay/pages-custlook/`。
 
 別途10画面状態×1440・1152・1920の30ケースで、文書の横はみ出しと表示中の主要部品の右端越えはすべて0。`overflow.json`、`overflow-1920.json`と画像参照。ブラウザーは1つずつ動かし、ビルドと重ねていない。重なり・切れの全面合格を意味しない。すべての対象板の両幅での画像一致は未完了。1152の設定画面で設定メニューが上段へ回る崩れは修正済み。
 
