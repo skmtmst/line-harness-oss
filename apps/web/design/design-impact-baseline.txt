@@ -66,7 +66,6 @@ shared-button-importer app/automations/runs-v8.tsx
 shared-button-importer app/automations/runs/page.tsx
 shared-button-importer app/automations/templates-v8.tsx
 shared-button-importer app/booking/bookings/booking-calendar.tsx
-shared-button-importer app/booking/bookings/booking-day-v8.tsx
 shared-button-importer app/booking/bookings/booking-detail-v8.tsx
 shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
@@ -766,3 +765,6 @@ shared-button-importer components/shared/reservation-board.tsx
 shared-button-importer components/shared/restaurant-floor-editor.tsx
 shared-button-importer v8/visit-stamps/qr.tsx
 shared-button-importer v8/restaurant/reservations/waitlist.tsx
+
+shared-button-importer v8/booking-bookings/day-list.tsx
+shared-button-importer v8/booking-bookings/visit-actions.tsx

@@ -28,7 +28,7 @@ const transport = vi.hoisted(() => ({
 }))
 const netCalls = vi.hoisted(() => ({ count: 0 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push, replace }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -45,6 +45,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return {
     ...actual,
     bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
       listMenus: transport.listMenus,
       listMenuStaff: transport.listMenuStaff,
       getAvailability: transport.getAvailability,

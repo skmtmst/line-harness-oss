@@ -22,7 +22,7 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
@@ -34,12 +34,13 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async () => ({
   ApiError: class extends Error { constructor(public status: number) { super('API error') } },
   api: {
     staff: { me: fixture.staffMe },
   },
   bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     listRequests: fixture.listRequests,
     requestsSummary: fixture.requestsSummary,
     listMenus: fixture.listMenus,
