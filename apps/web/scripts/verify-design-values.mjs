@@ -24,6 +24,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkTemporaryAllowances } from '../../../scripts/visual-qa/temporary-allowances.mjs'
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PARTS = join(WEB, 'design', 'design-parts.json')
@@ -760,7 +761,10 @@ if (process.argv[1] && process.argv[1].endsWith('verify-design-values.mjs')) {
     console.log('\n不合格:')
     for (const f of r.failures) console.log(`  ${f}`)
   }
-  const bad = r.shape.length + r.failures.length
+  const temporary = checkTemporaryAllowances('design', r.failures)
+  console.log(`\n理由・期限付き一時許可 ${temporary.allowed.length} / 未許可 ${temporary.unexpected.length}`)
+  for (const permit of temporary.allowed) console.log(`  ${permit.finding.split('\n')[0]}: ${permit.reason}（担当 ${permit.owner} / 期限 ${permit.expires}）`)
+  const bad = r.shape.length + temporary.unexpected.length
   console.log(bad === 0 ? (r.checked === 0 ? '\n合格（照合対象がまだありません）' : '\n合格') : '')
   process.exit(bad === 0 ? 0 : 1)
 }

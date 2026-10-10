@@ -3856,46 +3856,6 @@
       "note": "B-155/163/164/165/175。640の器と欄全体で開く操作を共有。フォルダ以外の増える候補はこの部品へ集約。 正本の担当・幅640は依頼と受信箱の実装で確認。画素の合格は別の照合記録を参照。",
       "declarations": [],
       "lastCheckedAt": "2026-10-10"
-    },
-    "read-only-notice": {
-      "name": "B-172 read-only-notice",
-      "role": "canonical",
-      "status": "active",
-      "reviewStatus": "investigating",
-      "code": "src/components/shared/read-only-notice.tsx",
-      "cssModule": "src/components/shared/read-only-notice.module.css",
-      "components": [
-        "ReadOnlyNotice"
-      ],
-      "pencilNodes": [],
-      "declarations": [],
-      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。"
-    },
-    "page-size-select": {
-      "name": "B-172 page-size-select",
-      "role": "canonical",
-      "status": "active",
-      "reviewStatus": "investigating",
-      "code": "src/components/shared/page-size-select.tsx",
-      "components": [
-        "PageSizeSelect"
-      ],
-      "pencilNodes": [],
-      "declarations": [],
-      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。"
-    },
-    "account-required-state": {
-      "name": "B-172 account-required-state",
-      "role": "canonical",
-      "status": "active",
-      "reviewStatus": "investigating",
-      "code": "src/components/shared/account-required-state.tsx",
-      "components": [
-        "AccountRequiredState"
-      ],
-      "pencilNodes": [],
-      "declarations": [],
-      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。"
     }
   },
   "investigations": {
@@ -3972,6 +3932,52 @@
       ],
       "observedRefsIncludingComponentDefinitions": 66,
       "lastCheckedAt": "2026-08-24"
+    },
+    "read-only-notice": {
+      "name": "B-172 read-only-notice",
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "investigating",
+      "code": "src/components/shared/read-only-notice.tsx",
+      "cssModule": "src/components/shared/read-only-notice.module.css",
+      "components": [
+        "ReadOnlyNotice"
+      ],
+      "pencilNodes": [],
+      "declarations": [],
+      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。",
+      "reason": "B-172持ち主の追加。固定した★V8との画素照合が未完了のため、確定済みの値の契約には入れず調査中として残す。",
+      "lastCheckedAt": "2026-10-10"
+    },
+    "page-size-select": {
+      "name": "B-172 page-size-select",
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "investigating",
+      "code": "src/components/shared/page-size-select.tsx",
+      "components": [
+        "PageSizeSelect"
+      ],
+      "pencilNodes": [],
+      "declarations": [],
+      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。",
+      "reason": "B-172持ち主の追加。固定した★V8との画素照合が未完了のため、確定済みの値の契約には入れず調査中として残す。",
+      "lastCheckedAt": "2026-10-10"
+    },
+    "account-required-state": {
+      "name": "B-172 account-required-state",
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "investigating",
+      "code": "src/components/shared/account-required-state.tsx",
+      "components": [
+        "AccountRequiredState"
+      ],
+      "pencilNodes": [],
+      "declarations": [],
+      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。",
+      "reason": "B-172持ち主の追加。固定した★V8との画素照合が未完了のため、確定済みの値の契約には入れず調査中として残す。",
+      "lastCheckedAt": "2026-10-10"
     }
   },
   "$snapshot": {

@@ -27,6 +27,7 @@ import { homedir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { checkTemporaryAllowances, patternFindingKey } from './temporary-allowances.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_CATALOG = join(HERE, 'v8-pattern-catalog.json')
@@ -741,7 +742,7 @@ export function newCodeFindings(before, after) {
   })
 }
 
-/** 同じ対応表を base と head に当てる。既存候補を隠す台帳は作らない。 */
+/** 同じ対応表を base と head に当てる。生の候補を全件残す。 */
 export function checkBase(args, head) {
   if (!args.code) throw new Error('--base には --code が必要です')
   const root = resolve(expandHome(args.code))
@@ -798,10 +799,12 @@ function main() {
   console.log(`→ ${join(out, 'pattern-audit.md')}`)
   if (args.base) {
     const gate = checkBase(args, report)
+    gate.temporary = checkTemporaryAllowances('pattern', gate.findings, patternFindingKey)
     writeFileSync(join(out, 'pattern-new-findings.json'), `${JSON.stringify(gate, null, 2)}\n`)
     for (const hit of gate.findings.slice(0, 50)) console.error(`(${hit.category}) ${hit.pattern} ${hit.file}:${hit.line} ${hit.text}`)
     console.log(`持ち主の見張り: base ${gate.sha} / 新しい候補 ${gate.findings.length}`)
-    if (gate.findings.length) process.exitCode = 1
+    console.log(`一時許可 ${gate.temporary.allowed.length} / 未許可 ${gate.temporary.unexpected.length}（対象・理由・担当・期限は pattern-new-findings.json）`)
+    if (gate.temporary.unexpected.length) process.exitCode = 1
   }
 }
 
