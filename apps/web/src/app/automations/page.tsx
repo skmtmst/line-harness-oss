@@ -201,7 +201,7 @@ function AutomationRowActions({
       {canManage ? (
         <>
           {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
-          <Button onClick={onEdit} disabled={busy} variant="secondary" size="compact" className="whitespace-nowrap">編集</Button>
+
           <IconButton
             aria-label={`${automation.name}のその他操作`}
             aria-expanded={menuOpen}
@@ -215,6 +215,7 @@ function AutomationRowActions({
             ariaLabel={`${automation.name}の操作`}
             onClose={() => setMenuOpen(false)}
             items={[
+              { id: 'edit', label: '編集する', disabled: busy, onSelect: onEdit },
               {
                 id: 'runs',
                 label: '動いた記録を見る',

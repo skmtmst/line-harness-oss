@@ -262,7 +262,7 @@ export default function BookingStaffPage() {
                       <div className="relative inline-flex items-center justify-end gap-1.5">
                         {canManageStaff ? (
                           <>
-                            <Button variant="secondary" size="compact" onClick={() => setEditing(s)}>編集</Button>
+
                             <IconButton
                               aria-label={`${s.display_name}のその他操作`}
                               aria-expanded={openMenuId === s.id}
@@ -274,7 +274,7 @@ export default function BookingStaffPage() {
                               open={openMenuId === s.id}
                               ariaLabel={`${s.display_name}の操作`}
                               onClose={() => setOpenMenuId(null)}
-                              items={[{
+                              items={[{ id: 'edit', label: '編集する', onSelect: () => setEditing(s) }, {
                                 id: 'shift',
                                 label: 'シフト',
                                 onSelect: () => router.push(`/booking/staff/shifts?staff_id=${s.id}`),

@@ -37,7 +37,7 @@
 }
 
 .field:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -93,7 +93,7 @@
 /* V8 正本HTMLの実寸。v7には適用しない。 */
 [data-theme='v8'] .single { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 [data-theme='v8'] .single[aria-invalid='true'] { outline-color: var(--color-danger); }
-[data-theme='v8'] .single:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .single:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 /* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
 [data-theme='v8'] .single[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
 [data-theme='v8'] .multi[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); border-color: var(--color-danger); }

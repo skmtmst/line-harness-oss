@@ -698,9 +698,7 @@ export default function RewardsTab() {
                   <FolderDotName folder={null}>
                     <span className={styles.rowName} ><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
-                  <span className={`${styles.rowSub} ${styles.dotIndent}`}>
-                    {reach ? `今すぐ交換できる人 ${formatMileageNumber(reach.reachableFriendCount)}` : '今すぐ交換できる人 —'}
-                  </span>
+
                 </Td>
                 <Td className={`${styles.colNeed} ${styles.num}`}>
                   <span className={styles.cellMain}>{formatMileageNumber(reward.currentVersion?.requiredMiles)}</span>
@@ -762,8 +760,8 @@ export default function RewardsTab() {
           </thead>
           <tbody>
             {failed.map((item) => (
-              <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
-                <Td className={styles.colName}><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></Td>
+              <Tr data-row-id={item.id} key={item.id} className={styles.row} data-table-layout="columns">
+                <Td className={styles.colName}><FolderDotName><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></FolderDotName></Td>
                 <Td className={styles.colStateWide}>
                   {item.status === 'delivering' ? (
                     <span className={styles.cellMain}>

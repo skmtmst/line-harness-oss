@@ -160,11 +160,13 @@ describe('V8 流入と計測の一覧', () => {
     expect(labels.some((text) => text?.includes('受付を再開する'))).toBe(true)
   })
 
-  it('未登録の ref の行は「登録する」、登録済みは「編集」', async () => {
+  it('未登録の ref の行は「登録する」、登録済みの編集はメニューへ', async () => {
     await render()
     expect(rowOf('mail-sign')?.textContent).toContain('未設定')
     expect(rowOf('mail-sign')?.textContent).toContain('登録する')
-    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeTruthy()
+    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="「夏のInstagram投稿」の操作"]')!.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('リンクを編集')
   })
 
   it('数の帯の「動きが未設定」は、タグもシナリオも無い登録済みの数（停止中も含む）', async () => {
@@ -231,7 +233,9 @@ describe('V8 流入と計測の一覧', () => {
     await render()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
     expect([...host.querySelectorAll('a, button')].some((el) => el.textContent?.includes('流入リンクを作る'))).toBe(true)
-    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeTruthy()
+    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="「夏のInstagram投稿」の操作"]')!.click() })
+    expect(document.querySelector('[role="menu"]')?.textContent).toContain('リンクを編集')
     expect([...host.querySelectorAll('button')].some((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').includes('フォルダを追加'))).toBe(false)
   })
 })

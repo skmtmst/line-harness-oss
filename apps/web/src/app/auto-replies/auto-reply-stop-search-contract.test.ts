@@ -109,9 +109,9 @@ describe('機能08 点検: 一覧検索（N-087）', () => {
 })
 
 describe('機能08 点検: どんなときに動くか列（N-088）', () => {
-  it('一覧は先頭の1語ではなく実情報の要約を出す', () => {
-    expect(PAGE).toContain('triggerSummary(r)')
-    expect(PAGE).toContain('conditionChips(r)')
+  it('B-194：名前は1行にし、実情報の要約と全条件は詳細パネルに残す', () => {
+    expect(PAGE).toContain('triggerSummary(panelRow)')
+    expect(PAGE).toContain('conditionChips(panelRow)')
   })
 
   it('複数の言葉は数え残し込みで出し、全文は title で読める', () => {

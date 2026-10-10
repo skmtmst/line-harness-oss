@@ -7,7 +7,7 @@ import styles from './section-header.module.css'
  *
  * 板の中の一段の頭。題（15px/600）に、必要なら補足・「？」・
  * 右端の行き先リンク（→つき）を付ける。「？」は help-tip、
- * リンクは text-link の既存部品をそのまま使う。
+ * リンクは text-action の既存部品をそのまま使う。
  */
 export default function SectionHeader({
   title,

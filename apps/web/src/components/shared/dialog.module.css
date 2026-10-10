@@ -380,7 +380,7 @@
 .stepItems { display: flex; align-items: center; gap: 10px; }
 .stepItem { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; min-height: 0; font-family: inherit; color: var(--color-ink); font-size: 13px; font-weight: 600; line-height: 20px; }
 .stepItem:disabled { opacity: 1; }
-.stepItem:focus-visible .stepCircle { outline: 2px solid var(--color-action); outline-offset: 2px; }
+.stepItem:focus-visible .stepCircle { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .stepCircle { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 22px; height: 22px; border-radius: 999px; background: var(--color-shell-gray); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 11px; line-height: 17px; font-weight: 600; }
 .stepDone { background: var(--color-accent-deep); color: var(--color-canvas); }
 .stepCurrent { background: var(--color-ink); color: var(--color-canvas); }

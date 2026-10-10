@@ -60,7 +60,7 @@
 }
 
 .box:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -136,7 +136,7 @@
 [data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { outline-color: var(--color-accent-deep); }
 [data-theme='v8'] .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
 [data-theme='v8'] .box:checked { outline-color: var(--color-accent-deep); }
-[data-theme='v8'] .box:focus-visible { outline: 2px solid var(--color-action); outline-offset: 3px; }
+[data-theme='v8'] .box:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
 [data-theme='v8'] .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
 [data-theme='v8'] .title { line-height: 21px; }
 [data-theme='v8'] .note { line-height: 18px; font-weight: 400; }

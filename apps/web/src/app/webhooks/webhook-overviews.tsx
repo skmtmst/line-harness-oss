@@ -444,7 +444,6 @@ export function OutgoingOverview({
                 <Tr key={item.id}>
                   <NameCell
                     name={<span className="block truncate" title={item.name}>{item.name}</span>}
-                    sub={<span className="block truncate" title={maskedUrl(item.url)}>{maskedUrl(item.url)}</span>}
                   />
                   <Td><span className="block truncate" title={firstEventLabel(item)}>{firstEventLabel(item)}</span></Td>
                   <Td><span className="block truncate" title={payloadLabel(item)}>{payloadLabel(item)}</span></Td>

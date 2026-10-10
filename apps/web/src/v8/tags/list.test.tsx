@@ -77,14 +77,14 @@ describe('V8 タグ タグの一覧', () => {
     await render(<TagsList fixture={fixture} />)
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
     // 左にフォルダの列があるので表にフォルダ列は置かない（2026-10-07 オーナー）。
-    expect(heads).toEqual(['タグ', '人数', '付け方', '連動', '使っている所', '操作'])
-    expect(container.querySelectorAll('tbody [role="group"][aria-label^="タグ「"]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
+    expect(heads).toEqual(['タグ', '状態', '人数', '付け方', '連動', '使っている所', '操作'])
+    expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     for (const label of ['タグ', '友だち情報欄', '対応マーク', '保存した検索']) {
       expect(screen.getAllByRole('tab', { name: label }).length).toBeGreaterThan(0)
     }
     expect(container.querySelector('[data-design-node="I1E7Bt"]')).not.toBeNull()
     expect(screen.getByText('EC顧客連携済み')).toBeTruthy()
-    expect(screen.getAllByText('1月13日（火）登録').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
+    expect(container.querySelector('[data-list-name]')?.textContent).not.toContain('登録')
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
@@ -94,7 +94,7 @@ describe('V8 タグ タグの一覧', () => {
     expect(container.querySelector('[data-design-node="aPeD8"]')).not.toBeNull()
     // 1152 でもタグ札の形は同じ。フォルダ列の出し入れは今のまま。
     expect([...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())).toContain('フォルダ')
-    expect(container.querySelectorAll('tbody [role="group"][aria-label^="タグ「"]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
+    expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     await act(async () => root.unmount())
     root = createRoot(container)
     role.value = 'staff'

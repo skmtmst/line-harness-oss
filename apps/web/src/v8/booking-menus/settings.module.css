@@ -759,7 +759,7 @@
 }
 
 .numInput:focus-visible {
-  outline: var(--tpl-bm-2) solid var(--color-action);
+  outline: var(--tpl-bm-2) solid var(--color-focus-ring);
   outline-offset: 1px;
 }
 
@@ -769,7 +769,6 @@
 }
 /* 保存で落ちた同時受付数（B-139）。枠を危険の色にする。 */
 .numInput[aria-invalid='true'] { border-color: var(--color-danger); outline-color: var(--color-danger); }
-
 
 .iconRemove {
   display: inline-flex;

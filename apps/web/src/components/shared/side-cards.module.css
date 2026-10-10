@@ -43,7 +43,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px; /* gap: 6 */
-  color: var(--color-status-info); /* fill: $status-info */
+  color: var(--color-action); /* fill: $status-info */
   font-size: var(--text-caption); /* fontSize: $size-caption */
   font-weight: 600; /* fontWeight: 600 */
 }

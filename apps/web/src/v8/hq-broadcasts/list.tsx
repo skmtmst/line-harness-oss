@@ -315,7 +315,7 @@ export default function HqBroadcastList() {
                       <Link href={href} className={styles.cellTitle} title={run.title}>{run.title}</Link>
                     </FolderDotName>
                   </div>
-                  <span className={styles.cellSub}>{run.input?.messageType === 'image' ? '画像' : run.input?.messageType === 'flex' ? 'カード型' : 'テキスト'}</span>
+
                 </Td>
                 <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                 <Td>

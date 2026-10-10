@@ -76,7 +76,7 @@
  * 外枠の ring を正本にする（focus-visible-contract の例外として許可）。
  */
 .field:focus-within {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -86,7 +86,7 @@
 
 .trailing:focus-visible,
 .create:focus-visible {
-  outline: 2px solid var(--color-action);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 

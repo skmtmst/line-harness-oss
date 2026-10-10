@@ -1158,17 +1158,15 @@ export default function TemplatesListV8() {
                         />
                       ) : null}
                     </Td>
-                    <NameCell
-                      name={
+                    <NameCell name={
                         <div className={styles.dotLine}>
-                          <FolderDotName folder={folderDotOf(t)}>
-                            <Link href={detailHref(t)}  className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
+                          <>
+                            <Link href={detailHref(t)} title=<TruncatedText value={String(t.name ?? '')} /> className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
                               <TruncatedText value={String(t.name ?? '')} />
                             </Link>
-                          </FolderDotName>
+                          </>
                         </div>
-                      }
-                      sub={<span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`} title={excerpt}>{excerpt}</span>}
+                      } folder={folderDotOf(t)}
                     />
                     <Td>
                       <span className={styles.kindBadge}>{isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}</span>

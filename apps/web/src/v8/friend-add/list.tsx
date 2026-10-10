@@ -791,10 +791,7 @@ function FriendAddList() {
                     <FolderDotName folder={folderDotOf(rule.folderName)}>
                       <Link href={editHref(rule.id)}  className={styles.name}><TruncatedText value={String(rule.name ?? '')} /></Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} title={rule.routeNames.join('、') || '未選択'}>
-                      <Link2 size={12} aria-hidden="true" />
-                      <span className={styles.subText}>{rule.routeNames.join('、') || '未選択'}</span>
-                    </span>
+
                   </Td>
                   {sendCell(rule)}
                   <Td className={styles.colStatus}><StatusPill rule={rule} /></Td>
@@ -815,10 +812,7 @@ function FriendAddList() {
                     <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
                       <Link href={editHref(sinkRule.id)}  className={styles.name}><TruncatedText value={String(sinkRule.name ?? '')} /></Link>
                     </FolderDotName>
-                    <span className={`${styles.sub} ${styles.nameSub}`} title={SINK_NOTE}>
-                      <CircleHelp size={12} aria-hidden="true" />
-                      <span className={styles.subText}>{SINK_NOTE}</span>
-                    </span>
+
                   </Td>
                   {sendCell(sinkRule)}
                   <Td className={styles.colStatus}><StatusPill rule={sinkRule} /></Td>

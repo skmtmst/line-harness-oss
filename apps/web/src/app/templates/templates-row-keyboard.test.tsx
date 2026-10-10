@@ -117,7 +117,7 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
   test('行内のリンク・ボタン上のEnterでは詳細を誤作動させない', async () => {
     await renderAndWait()
     const row = tableRow('来店お礼の詳細を開く')
-    const innerLink = row.querySelector('a') as HTMLElement
+    const innerLink = row.querySelector('a,button') as HTMLElement
     expect(innerLink).toBeTruthy()
     // 行内の操作にフォーカスがあるとき、キーは行へ伝搬するが行は開かない。
     fireEvent.keyDown(innerLink, { key: 'Enter' })

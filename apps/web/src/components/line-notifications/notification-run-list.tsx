@@ -541,9 +541,8 @@ export default function NotificationRunList({
                 <Tr key={item.id}>
                   <NameCell
                     name={<><span className="block whitespace-nowrap text-caption font-semibold">{formatJst(item.receivedAt)}</span><span className="mt-0.5 block">{item.notificationName}</span></>}
-                    sub={item.orderNumber ? `注文 ${item.orderNumber}` : item.source}
                   />
-                  <NameCell name={item.friendName || '名前は未取得'} sub={item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'} />
+                  <NameCell name={item.friendName || '名前は未取得'} />
                   <Td><StatusBadge status={item.status} /></Td>
                   <Td>
                     <span className="block text-caption leading-5 text-ink-secondary">{item.reason || '—'}</span>

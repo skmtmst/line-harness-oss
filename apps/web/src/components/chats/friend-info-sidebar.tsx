@@ -3,6 +3,8 @@
 import { formAnswerText } from '@/lib/form-answer'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionAccess } from '@/lib/use-feature-access'
+import TagOverflow from '@/components/shared/tag-overflow'
+
 import { DragHandle } from '@/components/shared/row-actions'
 
 import Link from 'next/link'
@@ -1129,7 +1131,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 </a>}
               </div>
               <div className="flex flex-wrap gap-1">
-                {(effectiveTags ?? []).map((tag) => isV8 ? (
+                <TagOverflow>{(effectiveTags ?? []).map((tag) => isV8 ? (
                   <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs"
                     onRemove={canEditFriend && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />
                 ) : (
@@ -1153,7 +1155,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       </button>
                     ) : null}
                   </span>
-                ))}
+                ))}</TagOverflow>
               </div>
               {(effectiveTags ?? []).length === 0 ? (
                 <p className="text-micro text-ink-faint italic mt-1.5">タグなし</p>
@@ -1725,7 +1727,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   <div className={v8.summaryRow}>
                     <dt>タグ</dt>
                     <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
-                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />) : <span className={v8.empty}>なし</span>}
+                      {(effectiveTags ?? []).length > 0 ? <TagOverflow>{(effectiveTags ?? []).map((tag) => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" />)}</TagOverflow> : <span className={v8.empty}>なし</span>}
                     </dd>
                   </div>
                   <div className={v8.summaryRow}>

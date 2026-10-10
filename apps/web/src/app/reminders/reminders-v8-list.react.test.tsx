@@ -131,9 +131,9 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('8')
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('42')
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('1')
-  // 行には名と副題、状態の札、予定・次回の実値
+  // B-194: 名前は1行。状態の札、予定・次回の実値は専用の列へ
   expect(host.textContent).toContain('契約終了の前に知らせる')
-  expect(host.textContent).toContain('基準日の 3日前 09:00')
+  expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('基準日の 3日前 09:00')
   expect(host.textContent).toContain('5通')
   expect(host.textContent).toContain('10/10')
 })

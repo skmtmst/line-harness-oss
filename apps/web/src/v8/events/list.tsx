@@ -149,7 +149,6 @@ export default function EventsListV8() {
     }
   }, [selectedAccountId])
 
-
   useEffect(() => {
     void loadFolders()
   }, [loadFolders])
@@ -537,10 +536,9 @@ export default function EventsListV8() {
               return (
                 <Tr key={e.id} data-row-id={e.id} selected={highlightedId === e.id}>
                   <NameCell
-                    className={styles.firstCell}
-                    name={(
+                    className={styles.firstCell} name={(
                       <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
-                        <FolderDotName folder={folderDotOf(e.folderId)}>{folderMove.checkbox(e)}
+                        <>{folderMove.checkbox(e)}
                           <button
                             type="button"
                             onClick={() => openDetail(e.id)}
@@ -550,10 +548,9 @@ export default function EventsListV8() {
                           >
                             {e.name}
                           </button>
-                        </FolderDotName>
+                        </>
                       </ContextMenu>
-                    )}
-                    sub={<span className={styles.cellSub} ><TruncatedText value={String(e.venue_name ?? '場所は未設定')} /></span>}
+                    )} folder={folderDotOf(e.folderId)}
                   />
                   <Td>
                     <span className={styles.whenMain} title={when}>{when}</span>
@@ -567,7 +564,7 @@ export default function EventsListV8() {
                   </Td>
                   <Td className={styles.stateCell}>
                     <span className={styles.stateLine}>
-                      {low ? <span className={`${styles.pill} ${styles.pillLow}`}>申し込みが少ない</span>
+                      {low ? <span data-status-pill="" className={`${styles.pill} ${styles.pillLow}`}>申し込みが少ない</span>
                         : state === 'open' && (e.total_capacity ?? 0) - e.total_active > 0 && (e.total_capacity ?? 0) - e.total_active <= 3
                           ? <span className={`${styles.pill} ${styles.pillWarn}`}>あと少しで満席</span>
                           : state === 'open' ? <span className={`${styles.pill} ${styles.pillOn}`}>公開中</span>

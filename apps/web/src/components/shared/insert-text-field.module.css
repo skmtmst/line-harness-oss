@@ -38,7 +38,7 @@
   resize: vertical;
 }
 .editorCompact:focus-visible {
-  outline: var(--tpl-nc-focus-ring) solid var(--color-action);
+  outline: var(--tpl-nc-focus-ring) solid var(--color-focus-ring);
 }
 
 /* 本文の検証も TextField と同じく、入力中のフォーカスで赤い枠を消さない。 */
@@ -82,7 +82,6 @@
 .chipIcon { width: 11px; height: 11px; flex-shrink: 0; }
 .chipLabel { white-space: nowrap; }
 
-
 /*
  * 下の「差し込む」の丸い枠のボタン（絵 OVCot ①の下の並び）。
  * 枠 1px control-border・角丸いっぱい・内側 3/8・間4・印12・文字 12/600。
@@ -107,7 +106,7 @@
 .insertButton svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--color-ink-secondary); }
 .insertButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
 .insertButton:disabled { cursor: not-allowed; opacity: 0.5; }
-.insertButton:focus-visible { outline: 2px solid var(--color-action); outline-offset: 1px; }
+.insertButton:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
 .insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
 }
 

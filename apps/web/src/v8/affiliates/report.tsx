@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 成果とアフィリエイト「レポート」（板 `Eo56k`）。
  *
@@ -298,17 +300,17 @@ export default function ReportTab() {
         </thead>
         <tbody>
           {shown.map((row) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id}>
-              <Td className={styles.colName}>
+            <Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout="columns">
+              <Td className={styles.colName}><FolderDotName>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
                     <button type="button" className={styles.rowLink} title={row.name}  onClick={() => openDrawer(row.id)}>{row.name}</button>
                   ) : (
                     <span className={styles.rowLinkText} ><TruncatedText value={String(row.name ?? '')} /></span>
                   )}
-                  <span className={styles.rowPlan}>{row.sub ?? emptyValue('unknown')}</span>
+
                 </span>
-              </Td>
+              </FolderDotName></Td>
               <Td className={styles.colRepConv}>
                 <span className={styles.stack}>
                   <span className={styles.cellMain}>{`${formatNumber(row.conversions)}件`}</span>

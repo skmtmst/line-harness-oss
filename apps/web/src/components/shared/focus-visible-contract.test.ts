@@ -62,7 +62,7 @@ describe('押せる部品のフォーカスが見える', () => {
     // 緑は「正常」の意味なので、輪郭の色は action にそろえる。
     for (const name of files.filter((n) => n.endsWith('.css'))) {
       const css = withoutComments(read(name))
-      if (/:(?:focus-within|has\(:focus-visible\))\s*\{[^}]*outline:\s*2px solid var\(--color-action\)/.test(css)) continue
+      if (/:(?:focus-within|has\(:focus-visible\))\s*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\)/.test(css)) continue
       // 通常時だけ輪郭を消す指定は、キーボードの輪郭を消さない。
       const focusCss = css.replace(/([^{}]+)\{([^{}]*)\}/g, (rule, selectors) =>
         selectors.split(',').every((selector: string) => selector.includes(':not(:focus-visible)')) ? '' : rule,
@@ -83,7 +83,7 @@ describe('押せる部品のフォーカスが見える', () => {
     ]
     for (const name of targets) {
       const css = withoutComments(read(name))
-      expect(css, `${name} の輪郭が action 色ではない`).toMatch(/:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-action\)/)
+      expect(css, `${name} の輪郭が action 色ではない`).toMatch(/:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\)/)
       expect(css, `${name} に緑の輪郭が残っている`).not.toMatch(/:focus-visible[^{]*\{[^}]*var\(--color-accent/)
     }
   })

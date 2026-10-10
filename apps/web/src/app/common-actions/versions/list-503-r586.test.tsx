@@ -141,7 +141,7 @@ describe('月次集計だけ失敗しても版詳細は読める（監査 R586�
     expect(container.textContent).toContain('テストアクション')
     expect(container.textContent).toContain('どこから呼ばれているか')
     expect(container.textContent).toContain('版の履歴')
-    expect(container.textContent).toContain('申込フォーム')
+    expect(container.querySelector('[data-list-name]')?.textContent).not.toContain('申込フォーム')
   })
 
   it('月次件数だけ未取得と明示し、そこだけ再試行できる', async () => {

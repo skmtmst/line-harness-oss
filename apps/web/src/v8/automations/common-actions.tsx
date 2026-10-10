@@ -341,7 +341,7 @@ export default function CommonActionsV8() {
                       <FolderDotName folder={folders.find((folder) => folder.id === item.folderId) ?? null}>{folderMove.checkbox(item)}
                         <a className={styles.name} href={versionsHref(item.id)}  onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}><TruncatedText value={String(item.name ?? '')} /></a>
                       </FolderDotName>
-                      <span className={`${styles.sub} ${styles.subIndent}`} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
+
                     </Td>
                     <Td className={styles.colState}>
                       <span className={styles.pill} data-tone={item.status === 'published' ? 'active' : 'neutral'}>

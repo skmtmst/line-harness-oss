@@ -185,7 +185,7 @@
 
 .targetCount {
   margin-top: 12px;
-  color: var(--color-status-info);
+  color: var(--color-action);
   font-size: var(--text-caption);
   font-weight: 600;
 }

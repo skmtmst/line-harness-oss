@@ -1,5 +1,7 @@
 'use client'
 
+import TagOverflow from '@/components/shared/tag-overflow'
+
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import TagPill from '@/components/shared/tag-pill'
@@ -989,7 +991,7 @@ function TagPicker({
         </button>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
-        {include.map((id) => isV8 ? (
+        <TagOverflow>{include.map((id) => isV8 ? (
           <TagPill key={id} name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
             onRemove={() => onChange(include.filter((value) => value !== id), exclude)} />
         ) : (
@@ -1006,8 +1008,8 @@ function TagPicker({
               ✕
             </button>
           </span>
-        ))}
-        {exclude.map((id) => isV8 ? (
+        ))}</TagOverflow>
+        <TagOverflow>{exclude.map((id) => isV8 ? (
           <span key={id} className="inline-flex items-center gap-1.5">
             <TagPill name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
               onRemove={() => onChange(include, exclude.filter((value) => value !== id))} />
@@ -1027,7 +1029,7 @@ function TagPicker({
               ✕
             </button>
           </span>
-        ))}
+        ))}</TagOverflow>
       </div>
     </div>
   )

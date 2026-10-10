@@ -40,10 +40,9 @@ describe('友だちの顔（★V7）', () => {
   it('頭文字の6組はどれも 4.5:1 以上', () => {
     const css = readFileSync(join(__dirname, 'avatar.module.css'), 'utf8')
     const globals = readFileSync(join(__dirname, '..', '..', 'app', 'globals.css'), 'utf8')
-    const token = (name: string) => {
-      const hex = globals.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?);`))![1]
-      const alpha = hex.length === 9 ? parseInt(hex.slice(7), 16) / 255 : 1
-      return '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
+    function token(name: string): string {
+      const match = globals.match(new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{6}|var\\(--color-([\\w-]+)\\));`))!
+      return match[2] ? token(match[2]) : match[1]
     }
     const lum = (hex: string) => {
       const [r, g, b] = [1, 3, 5].map((i) => {

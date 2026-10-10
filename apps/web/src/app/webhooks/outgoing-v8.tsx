@@ -935,7 +935,6 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
               <tr key={item.id} data-ctx-row={item.id}>
                 <td className={styles.nameCell}>
                   <span className={styles.nameText} ><TruncatedText value={String(item.name ?? '')} /></span>
-                  <span className={styles.urlText} title={item.url}>{maskedUrl(item.url)}</span>
                 </td>
                 <td><span className={styles.cellSub} title={firstEventLabel(item)}>{firstEventLabel(item)}</span></td>
                 <td><span className={styles.cellSub} title={payloadLabel(item)}>{payloadLabel(item)}</span></td>

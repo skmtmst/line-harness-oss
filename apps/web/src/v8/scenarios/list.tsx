@@ -236,7 +236,6 @@ export default function ScenariosListV8() {
     }
   }, [selectedAccountId])
 
-
   useEffect(() => {
     void loadFolders()
   }, [loadFolders])
@@ -950,10 +949,9 @@ export default function ScenariosListV8() {
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>}
                     </Td>
-                    <NameCell
-                      name={
+                    <NameCell name={
                         <div className={styles.nameRow}>
-                          <FolderDotName folder={rowFolder ? { name: rowFolder.name, color: rowFolder.color } : null}>
+                          <>
                             <Link
                               href={`/scenarios/detail?id=${s.id}`}
 
@@ -967,15 +965,14 @@ export default function ScenariosListV8() {
                             >
                               <TruncatedText value={String(s.name ?? '')} />
                             </Link>
-                          </FolderDotName>
+                          </>
                           {s.lineAccountId === null && (
                             <span className={styles.miniBadge} title="全アカウントに適用されるシナリオです">
                               全アカウント共通
                             </span>
                           )}
                         </div>
-                      }
-                      sub={<span className={styles.cellSub} title={sub}>{sub}</span>}
+                      } folder={rowFolder ? { name: rowFolder.name, color: rowFolder.color } : null}
                     />
                     <Td
                       className={styles.countCell}

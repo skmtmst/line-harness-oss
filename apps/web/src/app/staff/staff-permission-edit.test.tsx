@@ -96,12 +96,13 @@ const { default: StaffPage } = await import('./page')
 async function openEdit(expectOp = true) {
   await act(async () => { render(<StaffPage />) })
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: '変更する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /のその他操作$/ })).toBeTruthy()
   })
   await act(async () => {
-    // ★V7: 変更するは行に直接出す（「…」メニューはやめた）。
-    fireEvent.click(screen.getByRole('button', { name: '変更する' }))
+    // B-193: 変更するは「…」から開く。
+    fireEvent.click(screen.getByRole('button', { name: /のその他操作$/ }))
   })
+  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '変更する' })) })
   await waitFor(() => {
     expect(screen.getByRole('button', { name: '✓ 保存する' })).toBeTruthy()
   })

@@ -38,6 +38,10 @@ function tokenMap(): Map<string, string> {
     const color = [0, 2, 4].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + 255 * (1 - alpha)).toString(16).padStart(2, '0')).join('')
     map.set(match[1], '#' + color)
   }
+  for (const match of css.matchAll(/--color-([\w-]+):\s*var\(--color-([\w-]+)\)/g)) {
+    const resolved = map.get(match[2])
+    if (resolved) map.set(match[1], resolved)
+  }
   return map
 }
 

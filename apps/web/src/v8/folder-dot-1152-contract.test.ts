@@ -20,7 +20,7 @@ const SCREENS = [
 describe('1152 の一覧でも名前の前にフォルダの丸を出す', () => {
   it.each(SCREENS)('%s', (file) => {
     const source = readFileSync(join(SRC, file), 'utf8')
-    expect(source).toMatch(/<FolderDotName folder=\{[^}]+\}>/)
+    expect(source).toMatch(/(?:<FolderDotName folder=\{[^}]+\}>|<NameCell[\s\S]*?folder=\{)/)
     expect(source).not.toMatch(/<FolderDotName[^>]*dot=\{/)
   })
 })

@@ -114,7 +114,6 @@ const MAX_BATCH_DELETE_COUNT = 20
 /** 期限が近い帯の幅。7日以内に期限切れになるものを数える。 */
 const EXPIRING_SOON_MS = 7 * 24 * 3600_000
 
-
 /*
  * 道具の段の絞り込み（板 `FM94M`：空のまま・期限つき・使われていない・
  * 下書き・止めた）。1つだけ選べる。選んだ札をもう一度押すと「すべて」に戻る。
@@ -241,7 +240,6 @@ function CommonVarsListInner() {
     setPage(1)
     samePageUrl.replace(id ? `/contents/vars?folder=${encodeURIComponent(id)}` : '/contents/vars')
   }
-
 
   const loadFolders = useCallback(async () => {
     const accountAtRequest = selectedAccountId
@@ -1234,10 +1232,9 @@ function CommonVarsListInner() {
                         />
                       ) : null}
                     </Td>
-                    <NameCell
-                      name={
+                    <NameCell name={
                         <div className={styles.dotLine}>
-                          <FolderDotName folder={folderDotOf(item)}>
+                          <>
                             <Link
                               href={`/contents/vars/edit?id=${item.id}`}
 
@@ -1246,17 +1243,9 @@ function CommonVarsListInner() {
                             >
                               <TruncatedText value={String(item.name ?? '')} />
                             </Link>
-                          </FolderDotName>
+                          </>
                         </div>
-                      }
-                      sub={
-                        <span className={narrow ? styles.keyRow : `${styles.keyRow} ${styles.dotIndent}`}>
-                          <code title={placeholderText(item.varKey)} className={styles.keyCode}>
-                            {placeholderText(item.varKey)}
-                          </code>
-                          <CopyKeyButton value={placeholderText(item.varKey)} label={`${item.name}の差し込みキーをコピー`} />
-                        </span>
-                      }
+                      } folder={folderDotOf(item)}
                     />
                     <Td className={styles.valueCell} title={valueText || '（空）'}>
                       {valueText || <span className={styles.valueEmpty}>（空）</span>}

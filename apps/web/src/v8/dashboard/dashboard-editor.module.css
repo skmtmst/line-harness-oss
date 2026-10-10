@@ -164,7 +164,7 @@
 }
 
 .resetLink:focus-visible {
-  outline: var(--tpl-de-focus) solid var(--color-action);
+  outline: var(--tpl-de-focus) solid var(--color-focus-ring);
   outline-offset: var(--tpl-de-focus);
 }
 

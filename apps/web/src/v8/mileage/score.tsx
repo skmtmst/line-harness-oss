@@ -1,5 +1,7 @@
 'use client'
 
+import { FolderDotName } from '@/components/shared/folder-dot'
+
 /*
  * ★V8 マイル「行動スコア」（板 `IRPw8`、点数を手で直す `Nv7An`、
  * 点数の変化の明細 `R8NNi`、状態は見本帳 `zaqP9`）。
@@ -518,8 +520,8 @@ export default function ScoreTab() {
             const day = formatMileageMonthDay(item.lastChangedAt)
             const reason = actionScoreReasonLabel(item.lastReason)
             return (
-              <Tr key={item.friendId} className={styles.row} data-table-layout="columns" data-row-id={item.friendId}>
-                <Td className={styles.colName}><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></Td>
+              <Tr data-row-id={item.friendId} key={item.friendId} className={styles.row} data-table-layout="columns">
+                <Td className={styles.colName}><FolderDotName><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
                 <Td className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
                   <span className={styles.pill} data-tone={BAND_TONE[item.band]}>
@@ -657,11 +659,11 @@ export default function ScoreTab() {
                 const changed = ruleChanged(rule, publishedRules.get(rule.id))
                 const stopped = !rule.enabled
                 return (
-                  <Tr key={rule.id} className={styles.row} data-table-layout="columns" data-row-id={rule.id}>
-                    <Td className={styles.colName}>
-                      <span className={styles.rowNameInk} ><TruncatedText value={String(rule.name ?? '')} /></span>
-                      <span className={styles.rowSub}>{frequencyText(rule)}</span>
-                    </Td>
+                  <Tr data-row-id={rule.id} key={rule.id} className={styles.row} data-table-layout="columns">
+                    <Td className={styles.colName}><FolderDotName>
+                      <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
+
+                    </FolderDotName></Td>
                     <Td className={styles.colGives}><span className={styles.cellMain}>{ruleValueText(rule)}</span></Td>
                     <Td className={styles.colStateWide}>
                       <span className={styles.pill} data-tone={stopped ? 'neutral' : changed ? 'warn' : 'active'}>
