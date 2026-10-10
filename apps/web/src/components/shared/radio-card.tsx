@@ -160,7 +160,7 @@ export default function RadioCard({
         onChange={() => onChange(value)}
       />
       <span className={styles.body}>
-        <strong className={styles.title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
+        <strong className={styles.title} title={title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
         {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
       </span>

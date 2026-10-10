@@ -71,3 +71,5 @@
 
 /* B-191/192：4文字の状態を数文字に切らない。列の中で縮めない。 */
 html[data-theme='v8'] .pill { flex-shrink: 0; min-width: max-content; }
+/* 状態の隣の短い対応マークも、札の幅を確保した分だけ切らない。 */
+html[data-theme='v8'] .pill + [title^='対応マーク：'] { flex-shrink: 0; }

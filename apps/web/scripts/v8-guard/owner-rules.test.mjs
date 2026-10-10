@@ -111,3 +111,16 @@ test('共通の余白が実際に16pxになり、カレンダーを一覧の器�
     assert.equal(await page.locator('[data-table-presentation="calendar"]').evaluate(el => getComputedStyle(el).containerType), 'normal')
   } finally { await browser.close() }
 })
+
+
+test('選ぶ箱の短い題は1行、状態の隣の短いマークは切れない', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
+    await page.setContent(shell(`<style>${read('app/globals.css')}${read('components/shared/radio-card.module.css')}${read('components/shared/status-pill.module.css')}</style><strong class="title" style="display:block;width:110px" title="報酬なし（計測のみ）">報酬なし（計測のみ）</strong><div style="display:flex;width:90px;gap:8px;font:11px/18px sans-serif"><span class="pill" style="width:52px">状態</span><span title="対応マーク：担当中" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">担当中</span></div>`))
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'v8' })
+    assert.equal(await page.locator('strong').evaluate(el => getComputedStyle(el).whiteSpace), 'nowrap')
+    assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'short' && f.text === '担当中').length, 0)
+  } finally { await browser.close() }
+})

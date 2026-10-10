@@ -18,3 +18,11 @@ it('縦に並ぶカードの幅・高さを内容幅に縮めない', () => {
   expect(cards[1].style.alignSelf).toBe('')
   expect(cards[1].style.height).toBe('')
 })
+
+it('枠を外した入力段へ箱用の余白を追加せず、枠のある箱だけ対象にする', () => {
+  document.documentElement.dataset.theme = 'v8'
+  const { container } = render(<div><Card style={{ border: 0, outline: 'none', boxShadow: 'none' }}>入力段</Card><Card style={{ border: '1px solid black', outline: 'none', boxShadow: 'none' }}>枠の箱</Card></div>)
+  const cards = container.querySelectorAll<HTMLElement>('[data-design-part="card"]')
+  expect(cards[0].hasAttribute('data-card-unframed')).toBe(true)
+  expect(cards[1].hasAttribute('data-card-unframed')).toBe(false)
+})
