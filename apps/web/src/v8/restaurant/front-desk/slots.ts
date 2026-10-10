@@ -3,6 +3,7 @@
  * 予約台帳の電話の予約（reservations/phone.tsx）と同じ決まり（2時間いる・期限切れの押さえは数えない・
  * 人数が入る卓のうち余る席がいちばん少ない卓）。口の自動配席（chooseRestaurantTable）とも同じ。
  */
+import {seatBoardEntry} from '@line-crm/shared'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 
@@ -36,7 +37,7 @@ export function byCode(a: RestaurantTable, b: RestaurantTable): number {
 /** [start, end) とその卓の予約が重なるか。取消・無断と期限切れの押さえは数えない。 */
 export function tableBusy(tableId: string, start: number, end: number, rows: RestaurantReservation[], now = Date.now()): boolean {
   return rows.some((r) => {
-    if (r.table_id !== tableId || INACTIVE.includes(r.status)) return false
+    if (!seatBoardEntry(r as unknown as Record<string,unknown>).resourceIds.includes(tableId) || INACTIVE.includes(r.status)) return false
     if (r.status === 'pending' && r.hold_expires_at && Date.parse(r.hold_expires_at) <= now) return false
     return Date.parse(r.starts_at) < end && Date.parse(r.ends_at) > start
   })

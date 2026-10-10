@@ -226,7 +226,7 @@
 .text { border-color: transparent; background: transparent; color: var(--color-ink-secondary); }
 [data-theme='v8'] .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
 
-[data-theme='v8'] .button[data-presentation] {
+[data-theme='v8'] .button[data-presentation]:not([data-presentation='restaurant']) {
   flex-shrink: 0; min-height: 0; height: auto; border: 0; padding: 0;
   background: transparent; box-shadow: none; font-family: inherit; font-weight: 600; line-height: inherit;
 }
@@ -276,3 +276,7 @@
 /* B-152・仕上げ7 */
 [data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }
 [data-theme='v8'] .button:is(:hover, :active):not(:disabled) { filter: none; }
+
+@layer components {
+[data-theme='v8'] .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
+}

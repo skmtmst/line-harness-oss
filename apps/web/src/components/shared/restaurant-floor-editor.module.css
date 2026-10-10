@@ -1,0 +1,8 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.editor{min-width:0;min-height:577px;}.tools{display:flex;gap:var(--polish-space-row);align-items:center;flex-wrap:wrap;padding-block:0; margin-bottom: var(--polish-space-row);}
+
+.tools > :first-child { flex: 1; min-width: 0; }
+
+.tools [role='tablist']{transform:translateY(7px);}
+}

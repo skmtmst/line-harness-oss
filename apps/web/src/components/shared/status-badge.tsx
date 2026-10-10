@@ -23,7 +23,7 @@ export default function StatusBadge({
   children?: ReactNode
   status?: StandardStatus
   tone?: StatusBadgeTone
-  size?: 'default' | 'compact' | 'micro' | 'annotation'
+  size?: 'default' | 'compact' | 'micro' | 'annotation' | 'dining'
   /** 選んだ顧客の連携情報（rm92Y）だけ白地にする。 */
   surface?: 'tinted' | 'white'
   /**
@@ -48,7 +48,7 @@ export default function StatusBadge({
   const hasHelp = help !== undefined && help !== null
   const heading = helpLabel ?? (typeof label === 'string' ? label : 'この状態')
   return (
-    <span className={classes} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
+    <span className={classes} data-size={size} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
       {typeof label === 'string' ? <TruncatedText value={label} /> : label}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>

@@ -6,7 +6,7 @@ import { WALK_IN_NOTE } from '../front-desk/walk-in'
 import { canMarkVisited, canWriteRole, closeGroupKey, groupCloseTasks, openItems, reasonText, summarizeToday, visitState } from './summarize'
 import { mergeMediaLinks, toMedia } from './use-store-today'
 
-const today = (hour: number, minute = 0) => { const d = new Date(); d.setHours(hour, minute, 0, 0); return d.toISOString() }
+const today = (hour: number, minute = 0) => { const d = new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00` }
 const row = (id: string, over: Record<string, unknown>) => reservation(id, { starts_at: today(18), ends_at: today(20), ...over }) as unknown as RestaurantReservation
 
 describe('今日のお店の数（E-1）', () => {
@@ -47,7 +47,7 @@ describe('今日のお店の数（E-1）', () => {
 
   it('閲覧のみ（owner・admin・staff 以外）は変える操作を出さない', () => {
     expect(canWriteRole('staff')).toBe(true)
-    expect(canWriteRole(null)).toBe(true)
+    expect(canWriteRole(null)).toBe(false)
     expect(canWriteRole('viewer')).toBe(false)
   })
 })

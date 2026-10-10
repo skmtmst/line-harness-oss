@@ -201,3 +201,8 @@
 [data-theme='v8'] :is(.title, .headerStacked .title, .headerPanel .title) { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
 [data-theme='v8'] .meta { font-weight: var(--polish-weight-body); }
 [data-theme='v8'] .action { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }
+
+[data-theme='v8'] .headerRestaurant{min-height:58px;padding:20px 24px 15px;align-items:flex-start;}
+[data-theme='v8'] .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
+[data-theme='v8'] .headerRestaurant .title{font-size:15px;line-height:23px;}
+[data-theme='v8'] .headerRestaurant .meta{font-size:14px;line-height:21px;}

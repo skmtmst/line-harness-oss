@@ -2968,3 +2968,40 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   background: var(--color-canvas);
   box-shadow: var(--card-shadow);
 }
+
+[data-theme="v8"] { --tpl-floor-map-inset: 32px; --tpl-floor-aside-w: 400px; --tpl-floor-detail-row-h: 59px; --tpl-board-tabs-top: 18px; --tpl-board-body-top: 10px; --tpl-board-section-gap: 13px; --tpl-board-detail-w: 330px; --tpl-board-side-w: 304px; --tpl-board-resource-w: 86px; --tpl-board-row-h: 52px; --tpl-board-block-top: 4px; }
+@media print { body * { visibility: hidden; } [data-print-active="true"], [data-print-active="true"] * { visibility: visible; } [data-print-active="true"] { position: absolute; inset: 0; width: 100%; } }
+
+[data-theme="v8"] { --tpl-floor-outline-w: 3px; --tpl-floor-stopped-opacity: .5; }
+
+/* 飲食の融合1：各板で使う寸法。 */
+[data-theme="v8"] {
+  --tpl-rest1-restaurant-tables-tables-padding-inline-1: 24px;
+  --tpl-rest1-restaurant-tables-tables-font-size-1: 13px;
+  --tpl-rest1-restaurant-tables-tables-line-height-1: 20px;
+  --tpl-rest1-restaurant-tables-tables-width-1: 68px;
+  --tpl-rest1-restaurant-tables-tables-flex-1: 0 0 68px;
+  --tpl-rest1-restaurant-reservations-reservations-gap-1: 12px;
+  --tpl-rest1-restaurant-reservations-reservations-gap-2: 16px;
+  --tpl-rest1-restaurant-reservations-reservations-font-size-1: 13px;
+  --tpl-rest1-restaurant-reservations-reservations-line-height-1: 20px;
+  --tpl-rest1-restaurant-reservations-reservations-font-size-2: 16px;
+  --tpl-rest1-restaurant-reservations-reservations-line-height-2: 24px;
+  --tpl-rest1-restaurant-reservations-reservations-gap-3: 10px;
+  --tpl-rest1-restaurant-reservations-reservations-flex-basis-1: 138px;
+  --tpl-rest1-restaurant-reservations-reservations-width-1: 138px;
+  --tpl-rest1-restaurant-reservations-reservations-gap-4: 8px;
+  --tpl-rest1-restaurant-dashboard-dashboard-padding-1: 14px 24px 0;
+  --tpl-rest1-restaurant-dashboard-dashboard-gap-1: 8px;
+  --tpl-rest1-restaurant-dashboard-dashboard-padding-2: 8px;
+  --tpl-rest1-restaurant-dashboard-dashboard-font-size-1: 11px;
+  --tpl-rest1-restaurant-dashboard-dashboard-line-height-1: 18px;
+  --tpl-rest1-restaurant-dashboard-dashboard-font-size-2: 15px;
+  --tpl-rest1-restaurant-dashboard-dashboard-line-height-2: 23px;
+  --tpl-rest1-restaurant-dashboard-dashboard-gap-2: 12px;
+  --tpl-rest1-restaurant-booking-kit-shell-width-1: 142px;
+  --tpl-rest1-restaurant-booking-kit-shell-flex-1: 0 0 142px;
+  --tpl-rest1-restaurant-booking-kit-shell-padding-1: 0 24px 20px;
+}
+
+[data-theme="v8"] {--tpl-board-legend-radius:4px;--tpl-rest1-aside-outer-pad:0;}

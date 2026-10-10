@@ -2,6 +2,7 @@
  * 予約台帳（l9NlC0・Z3FoM・rm92Y・xzCK6）の表示の形。今の画面
  * （app/restaurant-test/v8/reservations.tsx・reservation-phone.tsx）から写し、絵の書き方に合わせた。
  */
+import {formatDate} from '@/lib/format'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 
 export type LedgerView = 'today' | 'week' | 'month' | 'list'
@@ -47,7 +48,7 @@ export function toYmd(day: Date): string {
 export function hm(value: string | Date): string {
   const date = typeof value === 'string' ? new Date(value) : value
   if (Number.isNaN(date.getTime())) return '—'
-  return `${date.getHours()}:${pad2(date.getMinutes())}`
+  return formatDate(date,{style:'time'})
 }
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
@@ -85,19 +86,19 @@ export function maskPhone(phone: string | null): string {
 export function dayRange(day: Date): { from: string; to: string } {
   const from = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0)
   const to = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0, 0)
-  return { from: from.toISOString(), to: to.toISOString() }
+  return { from: new Date(toYmd(from)+'T00:00:00+09:00').toISOString(), to: new Date(toYmd(to)+'T00:00:00+09:00').toISOString() }
 }
 
 export function monthRange(day: Date): { from: string; to: string } {
   const from = new Date(day.getFullYear(), day.getMonth(), 1, 0, 0, 0, 0)
   const to = new Date(day.getFullYear(), day.getMonth() + 1, 1, 0, 0, 0, 0)
-  return { from: from.toISOString(), to: to.toISOString() }
+  return { from: new Date(toYmd(from)+'T00:00:00+09:00').toISOString(), to: new Date(toYmd(to)+'T00:00:00+09:00').toISOString() }
 }
 
 export function weekRange(day: Date): { from: string; to: string } {
   const start = new Date(day.getFullYear(), day.getMonth(), day.getDate() - ((day.getDay() + 6) % 7), 0, 0, 0, 0)
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7, 0, 0, 0, 0)
-  return { from: start.toISOString(), to: end.toISOString() }
+  return { from: new Date(toYmd(start)+'T00:00:00+09:00').toISOString(), to: new Date(toYmd(end)+'T00:00:00+09:00').toISOString() }
 }
 
 export function sameDay(a: Date, b: Date): boolean {
@@ -111,7 +112,8 @@ export function floorOrder(a: RestaurantTable, b: RestaurantTable): number {
 
 export function minutesOf(value: string): number {
   const date = new Date(value)
-  return date.getHours() * 60 + date.getMinutes()
+  const jst=new Date(date.getTime()+9*3600000)
+  return jst.getUTCHours() * 60 + jst.getUTCMinutes()
 }
 
 export function slotLabel(minutes: number): string {

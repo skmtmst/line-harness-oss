@@ -1,4 +1,7 @@
 'use client'
+import ReservationBoard from '@/components/shared/reservation-board'
+import {peopleBoardEntry} from '@line-crm/shared'
+import {reservationBoardApi,allBoardPages} from '@/lib/api-reservation-board'
 
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -962,22 +965,14 @@ export default function BookingsPage() {
             onRetry={() => { setError(''); setCalendarSeq((n) => n + 1); void load() }}
           />
         ) : (
-          <BookingCalendar
-            mode={view}
-            items={calendarStatus === 'ready' ? calendarItems : []}
-            onOpen={setDetailId}
-            staffNames={staffList.map((item) => item.display_name)}
-            canCreate={canOperate}
-            anchorDay={calendarAnchor}
-            onAnchorChange={setCalendarAnchor}
-            availability={availability}
-            dataState={calendarStatus === 'ready' ? 'ready' : 'loading'}
-            /*
-             * #634: 空き枠の失敗からその場で読み直す。空き枠は集計・メニュー・
-             * 担当の候補が先に要るので、同じ取得列（summarySeq）を回し直す。
-             * 候補が揃うと空き枠の取得はuseEffectの依存で自動的に再実行される。
-             */
-            onRetryAvailability={() => setSummarySeq((n) => n + 1)}
+          <ReservationBoard kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
+            toolbar={<><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?-7:-1))}>‹</Button><strong>{Number(calendarFrom.slice(5,7))}月{Number(calendarFrom.slice(8))}日{view==='week'?`〜${Number(calendarTo.slice(5,7))}月${Number(calendarTo.slice(8))}日`:null}</strong><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?7:1))}>›</Button><Button onClick={()=>setCalendarAnchor(jstDay(new Date().toISOString()))}>今日</Button></>}
+            title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
+            notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}
+            slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
+            resources={staffList.map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
+            onOpen={setDetailId} canWrite={canOperate}
+            onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);setCalendarSeq(n=>n+1);await load()}}
           />
         )}
         {dialogs}

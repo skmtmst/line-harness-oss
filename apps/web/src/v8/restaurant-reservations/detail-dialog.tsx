@@ -1,4 +1,6 @@
 'use client'
+import {ReservationDining,ReservationFacts,ReservationSource} from '@/components/shared/reservation-board'
+import {seatBoardEntry} from '@line-crm/shared'
 
 /*
  * ★V8-B 予約台帳「予約の詳細」の窓（板 `AjZhH`）。
@@ -12,6 +14,8 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useState } from 'react'
 import { Pencil } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
 import {
   restaurantTestApi,
   type RestaurantMenuItem,
@@ -19,7 +23,7 @@ import {
   type RestaurantTable,
 } from '@/lib/restaurant-test-api'
 import { RsDialog } from '../restaurant/booking-kit/parts'
-import { INACTIVE_STATUSES, hm, mdWeek, sourceName } from '../restaurant/reservations/format'
+import { INACTIVE_STATUSES, hm, mdWeek, sourceName,maskPhone } from '../restaurant/reservations/format'
 import styles from './detail-dialog.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'
@@ -49,7 +53,8 @@ function historyText(history: History): string {
   return `これまでの来店 ${history.count.toLocaleString('ja-JP')} 回${last ? `・前回 ${last}` : ''}`
 }
 
-export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit }: {
+export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit, inline = false }: {
+  inline?: boolean
   reservation: RestaurantReservation | null
   accountId: string
   tables: RestaurantTable[]
@@ -93,6 +98,17 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const course = reservation.course_id ? courses.find((c) => c.id === reservation.course_id) ?? null : null
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
 
+  const dining=<ReservationDining entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
+  if(inline)return <Card surface="inset" contentPadding="16px" layout="vertical" gap="8px">
+    <SectionHeader title="予約の詳細" note={<Button size="inline" onClick={onClose}>閉じる</Button>}/>
+    <p className={styles.fact}>{`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)} ・ ${table?.code??'未配席'}`}</p>
+    <SectionHeader size="customer" title={`${reservation.customer_name} さま`} note={<ReservationSource value={reservation.source} note={reservation.note}/>}/>
+    <ReservationFacts items={[{label:'人数・コース',value:`${reservation.guest_count}名・${reservation.course_name??'席のみ'}${course?.price?` ${polishFormatYen(course.price)}`:''}`},{label:'電話',value:maskPhone(reservation.customer_phone)||'電話未登録'}]}/>
+    <ReservationDining dense entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)}/>
+    <ReservationFacts items={[{label:'来店',value:history.state==='ready'?`${history.count}回`:'—'}]}/>
+    <p className={styles.fact}>{historyText(history)}</p>
+    {canWrite?<><Button presentation="restaurant" variant="primary" onClick={()=>onEdit(reservation.id)}>変更する</Button><Button presentation="restaurant" onClick={()=>inactive?onRestore(reservation.id):onCancel(reservation.id)}>{inactive?'予約を有効に戻す':'取り消す'}</Button></>:null}
+  </Card>
   return (
     <RsDialog
       open
@@ -120,6 +136,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
         </>
       )}
     >
+      {dining}
       <div className={styles.facts}>
         <p className={styles.fact}>{detailWhen(reservation, table)}</p>
         <p className={styles.fact}>{detailCourse(reservation, course)}</p>

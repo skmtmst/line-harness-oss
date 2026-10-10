@@ -11,6 +11,7 @@ import styles from './section-header.module.css'
  */
 export default function SectionHeader({
   title,
+  description,
   size,
   note,
   help,
@@ -18,10 +19,13 @@ export default function SectionHeader({
   href,
   linkLabel,
   wrap,
+  linkTone,
 }: {
   /** 段の題（例「最近の動き」） */
   title: React.ReactNode
-  size?: 'small'
+  description?:React.ReactNode
+  size?: 'small' | 'customer'
+  linkTone?: 'action'
   /** 題の右の小さな補足（例「直近30日」） */
   note?: React.ReactNode
   /** 「？」を押すと出る補足文。helpLabel とセットで渡す */
@@ -40,14 +44,16 @@ export default function SectionHeader({
 }) {
   return (
     <div className={styles.root} data-size={size} data-wrap={wrap ? '' : undefined}>
-      <h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
+      {description?<div className={styles.labels}><h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
         {title}
-      </h3>
+      </h3><p className={styles.description}>{description}</p></div>:(<h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
+        {title}
+      </h3>)}
       {note ? <span className={styles.note}>{note}</span> : null}
       {help && helpLabel ? <HelpTip label={helpLabel} className={styles.help}>{help}</HelpTip> : null}
       {href && linkLabel ? (
         <span className={styles.link}>
-          <TextLink href={href}>{linkLabel}</TextLink>
+          <TextLink href={href} tone={linkTone}>{linkLabel}</TextLink>
         </span>
       ) : null}
     </div>

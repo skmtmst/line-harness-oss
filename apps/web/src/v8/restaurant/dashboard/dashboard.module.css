@@ -9,7 +9,7 @@
 
 /* 他の予約サイトの枠を閉じる知らせ（上下16・左右24の段に、琥珀の帯） */
 .closeRow {
-  padding: var(--tpl-e1-section-pad);
+  padding: var(--tpl-rest1-restaurant-dashboard-dashboard-padding-1);
 }
 
 .closeBand {
@@ -58,7 +58,7 @@
 .today {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-e1-today-gap);
+  gap: 0;
   min-width: 0;
 }
 
@@ -156,7 +156,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--tpl-e1-side-gap);
-  padding: var(--tpl-e1-side-pad);
+  padding: var(--tpl-rest1-aside-outer-pad);
 }
 
 .sideText {
@@ -256,3 +256,7 @@
   font-size: var(--text-label);
   line-height: var(--tpl-e1-lh-20);
 }
+
+.rotation{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap: var(--tpl-rest1-restaurant-dashboard-dashboard-gap-1);}.rotation>div{background:var(--color-surface-pearl);padding: var(--tpl-rest1-restaurant-dashboard-dashboard-padding-2);border-radius:var(--radius-control);font-size: var(--tpl-rest1-restaurant-dashboard-dashboard-font-size-1);line-height: var(--tpl-rest1-restaurant-dashboard-dashboard-line-height-1);}.rotation strong{display:block;font-size: var(--tpl-rest1-restaurant-dashboard-dashboard-font-size-2);line-height: var(--tpl-rest1-restaurant-dashboard-dashboard-line-height-2);}.reviewBody{display:flex;flex-direction:column;gap: var(--tpl-rest1-restaurant-dashboard-dashboard-gap-2);}
+
+.reviewBody>button{align-self:flex-start;}

@@ -323,3 +323,11 @@
 [data-theme='v8'] .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
   border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
 }
+
+/* 飲食の共通盤の数の帯（R2w4j / vOtK2）。 */
+[data-theme='v8'] .strip[data-restaurant-fusion] .card { padding: 14px 24px 16px; gap: 8px; }
+[data-theme='v8'] .strip[data-restaurant-fusion] .label { gap: 8px; }
+[data-theme='v8'] .strip[data-restaurant-fusion] .valueRow { padding-left: 0; }
+[data-theme='v8'] .strip[data-restaurant-fusion] .detail { padding-left: 0; }
+
+[data-theme='v8'] .strip[data-restaurant-fusion='dashboard'] { margin: 13px 24px 0; }

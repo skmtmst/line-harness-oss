@@ -23,8 +23,8 @@
 }
 
 .detailPanel {
-  flex: 0 0 var(--tpl-rs-table-detail-w);
-  width: var(--tpl-rs-table-detail-w);
+  flex: 0 0 var(--tpl-floor-aside-w);
+  width: var(--tpl-floor-aside-w);
 }
 
 .mapGrid {
@@ -46,7 +46,7 @@
   display: flex;
   align-items: center;
   gap: var(--tpl-rs-table-row-gap);
-  height: var(--tpl-rs-row-h);
+  height: var(--tpl-floor-detail-row-h);
   padding: 0 var(--tpl-rs-table-row-side);
   box-shadow: var(--tpl-rs-line-top);
 }
@@ -157,3 +157,8 @@
 .editorFields { display: flex; flex-direction: column; gap: var(--tpl-rs-dlg-gap); }
 
 .pair > * { flex: 1 1 0; min-width: 0; }
+
+.rules { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--polish-space-card); }
+@media (max-width: 700px) { .rules { grid-template-columns: minmax(0,1fr); } }
+
+.detailRow{padding-inline: var(--tpl-rest1-restaurant-tables-tables-padding-inline-1);}.detailName{font-size: var(--tpl-rest1-restaurant-tables-tables-font-size-1);line-height: var(--tpl-rest1-restaurant-tables-tables-line-height-1);}.detailStatus{width: var(--tpl-rest1-restaurant-tables-tables-width-1);flex: var(--tpl-rest1-restaurant-tables-tables-flex-1);}

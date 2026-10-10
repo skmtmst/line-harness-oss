@@ -1,4 +1,7 @@
 'use client'
+import {reservationBoardApi} from '@/lib/api-reservation-board'
+import {seatBoardEntry,type RestaurantFloor} from '@line-crm/shared'
+import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 
 /*
  * ★V8 座席・卓管理（板 `BERxg`・卓を止める `eY9F3`・卓を追加・変更 `gBrCz`）。
@@ -11,7 +14,7 @@
  */
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import KpiCard from '@/components/shared/kpi-card'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect,useMemo, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import SeatTile from '@/components/shared/seat-tile'
 import { DetailColumns } from '@/components/templates/detail-columns'
@@ -49,17 +52,19 @@ function seatTypeLabel(value: string): string {
 
 type Draft = {
   code: string; label: string; seatType: string; minCapacity: string; maxCapacity: string
-  floorX: string; floorY: string; joinGroup: string
+  floorX: string; floorY: string; joinGroup: string;floorId:string
 }
 
 type MoveMode = 'move' | 'unassign'
 
-function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
+function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:number }) {
   const { data, store, busy, mutate } = ctx
   const { selectedAccountId } = useAccount()
+  const [floors,setFloors]=useState<RestaurantFloor[]>([])
+  useEffect(()=>{let active=true;if(selectedAccountId&&store)void reservationBoardApi.floors(selectedAccountId,store.id).then(r=>{if(active)setFloors(r.data)}).catch(()=>{});return ()=>{active=false}},[selectedAccountId,store?.id,data.tables])
   const role = useStaffRole()
   /* 閲覧のみの人には、追加・変更・停止・再開・並べ替えを置かない（2026-10-06 オーナー）。 */
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const rows = useMemo(() => (store ? data.tables.filter((row) => row.store_id === store.id) : data.tables), [data.tables, store])
   const placed = useMemo(
     () => [...rows].sort((a, b) => a.floor_y - b.floor_y || a.floor_x - b.floor_x || a.code.localeCompare(b.code)),
@@ -77,19 +82,20 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const [stopId, setStopId] = useState('')
   const [stopError, setStopError] = useState('')
   const [moveMode, setMoveMode] = useState<MoveMode>('move')
+  useEffect(()=>{if(addRequest>0)openNew()},[addRequest]) // eslint-disable-line react-hooks/exhaustive-deps
   const editing = editor && editor !== 'new' ? rows.find((row) => row.id === editor) ?? null : null
   const stopping = rows.find((row) => row.id === stopId)
   const now = Date.now()
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
   const upcoming = useMemo(() => (stopping
     ? data.reservations
-      .filter((item) => item.table_id === stopping.id && !['cancelled', 'no_show', 'completed', 'visited'].includes(item.status))
+      .filter((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(stopping.id) && !['cancelled', 'no_show', 'completed'].includes(item.status))
       .filter((item) => new Date(item.ends_at).getTime() > now)
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
     : []), [data.reservations, stopping, now])
 
   const openNew = () => {
-    setDraft({ code: '', label: '', seatType: 'table', minCapacity: '1', maxCapacity: '2', floorX: String(rows.length % 3), floorY: String(Math.floor(rows.length / 3)), joinGroup: '' })
+    setDraft({ code: '', label: '', seatType: 'table', minCapacity: '1', maxCapacity: '2', floorX: String(40+(rows.length % 5)*120), floorY: String(40+Math.floor(rows.length / 5)*100), joinGroup: '',floorId:floors[0]?.id??'floor-'+store?.id })
     setFieldErrors({})
     setShowPlacement(false)
     setEditor('new')
@@ -98,7 +104,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
     setDraft({
       code: table.code, label: table.label, seatType: table.seat_type,
       minCapacity: String(table.min_capacity), maxCapacity: String(table.max_capacity),
-      floorX: String(table.floor_x), floorY: String(table.floor_y), joinGroup: table.join_group || '',
+      floorX: String(table.floor_x), floorY: String(table.floor_y), joinGroup: table.join_group || '',floorId:table.floor_id??'floor-'+table.store_id,
     })
     setFieldErrors({})
     setShowPlacement(false)
@@ -123,13 +129,15 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
       return
     }
     const body = {
+      floorId:draft.floorId,expectedTargetVersion:floors.find(f=>f.id===draft.floorId)?.version,
+      expectedVersion:editing?.floor_version??1,
       code: draft.code,
       label: draft.label,
       seatType: draft.seatType,
       minCapacity: Number(draft.minCapacity),
       maxCapacity: Number(draft.maxCapacity),
-      floorX: Number(draft.floorX),
-      floorY: Number(draft.floorY),
+      floorX: editing||showPlacement?Number(draft.floorX):undefined,
+      floorY: editing||showPlacement?Number(draft.floorY):undefined,
       joinGroup: draft.joinGroup.trim() || null,
     }
     const ok = editing
@@ -149,7 +157,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
     const reordered = [...placed]
     reordered.splice(to, 0, reordered.splice(from, 1)[0])
     void mutate(() => restaurantTestApi.saveTableLayout(selectedAccountId, {
-      storeId: store.id,
+      storeId: store.id, expectedVersion:reordered[0]?.floor_version??1,
       tables: reordered.map((t, index) => ({ id: t.id, floorX: index % 3, floorY: Math.floor(index / 3), joinGroup: t.join_group })),
     }), '卓の配置を保存しました。')
   }
@@ -165,7 +173,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         let unassigned = 0
         for (const item of reservations) {
           const target = moveMode === 'move' ? pickMoveTarget(item, rows.filter((row) => row.id !== table.id), taken) : null
-          await restaurantTestApi.updateReservation(selectedAccountId, item.id, { tableId: target?.id ?? null })
+          await restaurantTestApi.updateReservation(selectedAccountId, item.id, { tableId: target?.id ?? null, expectedVersion: item.customer_version ?? 1 })
           if (target) { moved += 1; taken.push({ ...item, table_id: target.id }) } else { unassigned += 1 }
         }
         await restaurantTestApi.updateTable(selectedAccountId, table.id, { isActive: false })
@@ -193,10 +201,11 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const placementFields = draft ? (
     <>
       <div className={styles.pair}>
-        <Field label="配置の列（0から）" htmlFor="rs-table-x" error={fieldErrors.floorX}>
+        <Field label="階・エリア"><Select aria-label="階・エリア" value={draft.floorId} onChange={v=>setDraft({...draft,floorId:v})} options={floors.map(f=>({value:f.id,label:f.name}))}/></Field>
+        <Field label="横の位置" htmlFor="rs-table-x" error={fieldErrors.floorX}>
           <NumberInput id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} />
         </Field>
-        <Field label="配置の行（0から）" htmlFor="rs-table-y" error={fieldErrors.floorY}>
+        <Field label="縦の位置" htmlFor="rs-table-y" error={fieldErrors.floorY}>
           <NumberInput id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} />
         </Field>
       </div>
@@ -208,20 +217,15 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
   return (
     <>
-      <StatRow>
-        <KpiCard title="卓数" valueText={`${rows.length}`} detail="稼働・停止を含む" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="総席数" valueText={`${rows.reduce((sum, item) => sum + item.max_capacity, 0)}`} detail="最大収容人数" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="結合可能" valueText={`${groups.size}`} detail="結合グループ" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="個室" valueText={`${rows.filter((item) => item.seat_type === 'private_room').length}`} detail="個室卓" icon={null} presentation="band" value={null} unit="" />
+      <StatRow fusion>
+        <KpiCard title="卓数" value={rows.length} unit="卓" detail="稼働・停止を含む" icon={undefined} presentation="band" />
+        <KpiCard title="総席数" value={rows.reduce((sum, item) => sum + item.max_capacity, 0)} unit="席" detail="最大収容人数" icon={undefined} presentation="band" />
+        <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={undefined} presentation="band" />
+        <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={undefined} presentation="band" />
       </StatRow>
-      {canEdit ? (
-        <div className={styles.addRow}>
-          <Button variant="primary" onClick={openNew}><Plus size={15} aria-hidden="true" />卓を追加する</Button>
-        </div>
-      ) : <div className={styles.addRow} aria-hidden="true" />}
       <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
         <div className={styles.detailPanel}>
-        <Panel title="卓の詳細" flush>
+        <Panel fusion title="卓の詳細" flush>
           <ul className={styles.detailList}>
             {rows.map((item) => (
               <li key={item.id} className={`${styles.detailRow} ${item.id === selectedId ? styles.detailRowSelected : ''}`}>
@@ -232,10 +236,10 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
                 <span className={styles.detailStatus}><Status value={item.is_active ? 'active' : 'suspended'} /></span>
                 {canEdit ? (
                   <>
-                    <Button disabled={busy} aria-label={`${item.code}・${item.label}を変更`} onClick={() => openEdit(item)}>変更</Button>
+                    <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を変更`} onClick={() => openEdit(item)}>変更</Button>
                     {item.is_active
-                      ? <Button disabled={busy} aria-label={`${item.code}・${item.label}を停止`} onClick={() => { setStopError(''); setMoveMode('move'); setStopId(item.id) }}>停止</Button>
-                      : <Button disabled={busy} aria-label={`${item.code}・${item.label}を再開`} onClick={() => resume(item)}>再開</Button>}
+                      ? <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を停止`} onClick={() => { setStopError(''); setMoveMode('move'); setStopId(item.id) }}>停止</Button>
+                      : <Button presentation="restaurant" disabled={busy} aria-label={`${item.code}・${item.label}を再開`} onClick={() => resume(item)}>再開</Button>}
                   </>
                 ) : null}
               </li>
@@ -245,45 +249,14 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         </div>
       )}>
         <div className={styles.floorPanel}>
-        <Panel
-          title="フロアマップ"
-          description={canEdit ? '卓を別の卓へドラッグして並べ替えると保存されます。「変更」から列・行・結合グループも指定できます。' : '卓の並びと結合グループを確かめられます。'}
-          flush
-        >
-          <ul className={styles.mapGrid}>
-            {placed.map((item) => {
-              const selected = item.id === selectedId
-              return (
-                <li key={item.id} onDragOver={(event) => { if (dragId && !busy) event.preventDefault() }} onDrop={(event) => { event.preventDefault(); moveTable(item.id) }}>
-                  <SeatTile
-                    code={item.code}
-                    label={item.label}
-                    capacity={`${item.min_capacity}〜${item.max_capacity}名`}
-                    joinGroup={item.join_group}
-                    stopped={!item.is_active}
-                    selected={selected}
-                    disabled={busy}
-                    draggable={canEdit && !busy}
-                    onDragStart={(event) => { setDragId(item.id); event.dataTransfer.setData('text/plain', item.id); event.dataTransfer.effectAllowed = 'move' }}
-                    onDragEnd={() => setDragId('')}
-                    data-floor-x={item.floor_x}
-                    data-floor-y={item.floor_y}
-                    aria-label={`${item.code} ${item.label} ${item.min_capacity}〜${item.max_capacity}名${item.join_group ? ` 結合${item.join_group}` : ''}${item.is_active ? '' : '（停止中）'}`}
-                    onClick={() => setSelectedId((current) => (current === item.id ? '' : item.id))}
-                  />
-                </li>
-              )
-            })}
-          </ul>
-        </Panel>
+          {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} resources={rows.map(t=>({id:t.id,label:t.code,capacity:t.max_capacity,active:!!t.is_active}))} canEdit={canEdit} onSelect={setSelectedId}/>:null}
         </div>
       </DetailColumns>
-      <Panel title="自動配席ルール" flush>
-        <div className={styles.ruleBody}>
-          <p className={styles.ruleTitle}>収容差が最小の卓を優先</p>
-          <p className={styles.ruleText}>少人数予約で大型卓を占有しないよう、人数を収容できる卓のうち余剰席が最も少ない卓を候補にします。結合卓は同一グループとして次段階で評価します。</p>
-        </div>
-      </Panel>
+      <div className={styles.rules}>
+        <Panel fusion title="自動配席ルール" description="収容差が最小の卓を優先"><p className={styles.ruleText}>人数を収容できる卓のうち、余裕が最も少ない卓を候補にします。電話・直接来店も同じ候補を使います。</p></Panel>
+        <Panel fusion title="結合のルール" description="結合グループ"><p className={styles.ruleText}>同じ結合グループの卓は全卓を一緒に確保します。配置と結合グループは卓の変更から設定できます。</p></Panel>
+        <Panel fusion title="卓を止めるとき"><p className={styles.ruleText}>先の予約を同じ人数が入る別の卓へ自動で移すか、未配席に戻します。お客さまへの通知はこの画面からは送りません。</p></Panel>
+      </div>
       <RsDialog
         open={editor !== null && draft !== null}
         title={editing ? `卓「${editing.code}・${editing.label}」を変更` : '新しい卓'}
@@ -296,11 +269,11 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         onSubmit={() => void save()}
         actions={(
           <>
-            <Button type="button" variant="text" size="inline" aria-expanded={showPlacement} onClick={() => setShowPlacement((open) => !open)}>
+            <Button presentation="restaurant" type="button" variant="text" size="inline" aria-expanded={showPlacement} onClick={() => setShowPlacement((open) => !open)}>
               {showPlacement ? '配置・結合グループを閉じる' : '配置・結合グループ'}
             </Button>
-            <Button type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button>
-            <Button type="submit" variant="primary" disabled={busy}>
+            <Button presentation="restaurant" type="button" onClick={() => setEditor(null)} disabled={busy}>キャンセル</Button>
+            <Button presentation="restaurant" type="submit" variant="primary" disabled={busy}>
               {editing ? <Check size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}{editing ? '保存する' : '追加する'}
             </Button>
           </>
@@ -342,8 +315,8 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         onCancel={() => setStopId('')}
         actions={(
           <>
-            <Button onClick={() => setStopId('')} disabled={busy}>キャンセル</Button>
-            <Button variant="danger" disabled={busy} onClick={() => { if (stopping) stop(stopping, upcoming) }}>
+            <Button presentation="restaurant" onClick={() => setStopId('')} disabled={busy}>キャンセル</Button>
+            <Button presentation="restaurant" variant="danger" disabled={busy} onClick={() => { if (stopping) stop(stopping, upcoming) }}>
               {upcoming.length === 0 ? '止める' : moveMode === 'move' ? '予約を移して止める' : '未配席に戻して止める'}
             </Button>
           </>
@@ -382,9 +355,11 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
 }
 
 export default function TablesPage() {
+  const [addRequest,setAddRequest]=useState(0)
+  const canEdit=canManageRole(useStaffRole())
   return (
-    <RestaurantShell templateHeading storeTab="tables" boardId="BERxg" title="座席・卓管理" description="フロア配置、席種、収容人数、結合ルールを管理します。">
-      {(ctx) => <TablesBoard ctx={ctx} />}
+    <RestaurantShell templateHeading boundary={false} storeTab="tables" boardId="BERxg" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}{canEdit?<Button presentation="restaurant" variant="primary" onClick={()=>setAddRequest(n=>n+1)}><Plus size={15}/>卓を追加する</Button>:null}</>}>
+      {(ctx) => <TablesBoard ctx={ctx} addRequest={addRequest} />}
     </RestaurantShell>
   )
 }

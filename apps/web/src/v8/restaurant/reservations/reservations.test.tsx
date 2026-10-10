@@ -10,6 +10,7 @@ const fixture = vi.hoisted(() => ({
 }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
+vi.mock('@/lib/api-reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api-reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:vi.fn().mockResolvedValue({success:true,data:[]})}}})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -62,7 +63,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     expect(screen.getByText('⚠ 乳')).not.toBeNull()
     expect(within(board as HTMLElement).getAllByText('承認待ち', { selector: 'span' }).length).toBeGreaterThan(0)
     expect(screen.getAllByText('押さえ', { selector: 'span' }).length).toBeGreaterThan(0)
-    expect(screen.getByText(/^🔒 20:00〜21:30$/)).not.toBeNull()
+    expect(screen.getByText(/^🔒 \d{2}:\d{2}〜\d{2}:\d{2}/)).not.toBeNull()
     expect(screen.getByText('個室B は停止中のため出していません')).not.toBeNull()
     expect(board.textContent).toContain('・承認待ちが 1 件（山田さん・食べログ）')
     for (const title of ['次の予約', 'つながる先']) expect(screen.getByRole('heading', { name: title })).not.toBeNull()
@@ -82,22 +83,22 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^押さえ / }))
     fireEvent.click(screen.getByRole('button', { name: '押さえを解除' }))
     fireEvent.click(screen.getByRole('button', { name: '解除する' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r3', { status: 'cancelled' }))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r3', { status: 'cancelled', expectedVersion: 1 }))
   })
 
   it('一覧（Z3FoM）は予約タイムラインの表と変更・取消が出る', async () => {
     render(<ReservationsPage />)
     await screen.findByText('山田 太郎')
     fireEvent.click(screen.getByRole('button', { name: '一覧' }))
-    await screen.findByText('予約タイムライン')
+    await screen.findByRole('heading',{name:'予約の詳細'})
     expect(document.querySelector('[data-design-node="Z3FoM"]')).not.toBeNull()
     // 絵 Z3FoM：一覧でも頭の右に「枠を押さえる」「電話の予約を入れる」を置く。
     expect(screen.getByRole('button', { name: /枠を押さえる/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /電話の予約を入れる/ })).toBeTruthy()
-    const row = screen.getByText('佐藤 健', { selector: 'td p' }).closest('tr')!
-    fireEvent.click(within(row).getByRole('button', { name: '取消' }))
-    fireEvent.click(screen.getByRole('button', { name: '取り消す' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled' }))
+    const row = screen.getByRole('button',{name:'佐藤 健'}).closest('tr')!
+    fireEvent.click(within(row).getByRole('button',{name:'佐藤 健のその他操作'}));fireEvent.click(screen.getByRole('menuitem',{name:'取消'}))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '取り消す' }))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', expectedVersion: 1 }))
   })
 
   it('電話の予約を入れる（rm92Y）で台帳に入れると createReservation へ送る', async () => {

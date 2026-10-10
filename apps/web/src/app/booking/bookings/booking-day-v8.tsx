@@ -1,6 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import ReservationBoard from '@/components/shared/reservation-board'
+import {peopleBoardEntry,seatBoardEntry,type ReservationAxis} from '@line-crm/shared'
+import {useRouter} from 'next/navigation'
 import ActionMenu from '@/components/shared/action-menu'
 import styles from './booking-day-v8.module.css'
 import Button from '@/components/shared/button'
@@ -174,6 +177,10 @@ export default function BookingDayTimeline({
   onMark: (row: BookingTodayRow, kind: 'visited' | 'late' | 'no_show', lateMinutes?: number) => Promise<boolean>
   onUnmark: (row: BookingTodayRow) => Promise<boolean>
 }) {
+  const router=useRouter()
+  const [axis,setAxis]=useState<ReservationAxis>('list')
+  const boardEntries=rows.map(row=>row.kind==='seat'?seatBoardEntry({...row,source:row.source??'manual'}):peopleBoardEntry({...row,line_account_id:row.line_account_id??'',lock_version:row.lock_version??0}))
+  const boardResources=Array.from(new Map(boardEntries.flatMap(e=>e.resourceIds.map(id=>[id,{id,label:e.resourceLabel??id,active:true,capacity:e.guestCount}] as const))).values())
   const [lateFor, setLateFor] = useState<string | null>(null)
   const [moreFor, setMoreFor] = useState<string | null>(null)
 
@@ -219,7 +226,7 @@ export default function BookingDayTimeline({
         <div className={`${styles.tile}`}><span className={`${styles.tileTitle}`}>{waitlistTitle}</span><span className={`${styles.tileNum}`}>{loading ? emptyValue('unknown') : waitlist.length}</span></div>
       </div>
       <div className={`${styles.cols}`}>
-        <ol className={`${styles.timeline}`} aria-label="時刻順の予約">
+        <ReservationBoard entries={boardEntries} resources={boardResources} axis={axis} onAxis={setAxis} canWrite={false} title="この日の予約" onOpen={id=>{const row=rows.find(r=>r.id===id);router.push(row?.kind==='seat'?`/restaurant-test/reservations?id=${encodeURIComponent(id)}`:`/booking/bookings?booking=${encodeURIComponent(id)}`)}} renderList={()=> <ol className={`${styles.timeline}`} aria-label="時刻順の予約">
           {loading ? (
             <li className={`${styles.row}`}><span className={`${styles.empty}`}>読み込んでいます</span></li>
           ) : rows.length === 0 ? (
@@ -238,7 +245,7 @@ export default function BookingDayTimeline({
               return nodes
             })
           )}
-        </ol>
+        </ol>}/>
         <aside className={`${styles.wait}`} aria-label={waitlistTitle}>
           <h3>{waitlistTitle} <span className={`${styles.waitCount}`}>{loading ? '' : `${waitlist.length}人`}</span></h3>
           {waitlist.length === 0 && !loading ? (

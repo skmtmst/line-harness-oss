@@ -12,6 +12,7 @@ const fetchApi = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
 // 行の「…」の移動は router.push（画面を丸ごと読み直さない）。
+vi.mock('@/lib/api-reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api-reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:vi.fn().mockResolvedValue({success:true,data:[]})}}})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
@@ -59,7 +60,8 @@ describe('hKRRF 今日のお店', () => {
     expect(board.textContent).toContain('ホットペッパー')
     /* 設定で保存した管理画面の URL が、知らせのボタンと右の列のリンクに使われる（提案 E-4 とのつなぎ）。 */
     expect(screen.getByRole('link', { name: 'ホットペッパーの管理画面を開く' }).getAttribute('href')).toBe('https://manager.hotpepper.jp/')
-    expect(screen.getByRole('link', { name: '店舗ページ' }).getAttribute('href')).toBe('https://hotpepper.jp/x/')
+    fireEvent.click(screen.getByRole('button',{name:'媒体のリンクのその他操作'}))
+    expect(screen.getByRole('menuitem', { name: 'ホットペッパーの店舗ページ' }).getAttribute('href')).toBe('https://hotpepper.jp/x/')
     expect(screen.getByRole('button', { name: /電話予約/ })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '鈴木 美咲さんを来店にする' }))
     await waitFor(() => expect(api.postSeatVisitMark).toHaveBeenCalledWith('account-1', 'r1', { kind: 'visited' }))

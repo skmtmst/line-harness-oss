@@ -58,3 +58,9 @@
 /* B-152②：役割ごとの文字の段。 */
 [data-theme='v8'] .title, [data-theme='v8'] .root[data-size='small'] .title { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); white-space: normal; overflow: visible; text-overflow: clip; }
 [data-theme='v8'] .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
+
+@layer components { .labels{min-width:0;display:flex;flex-direction:column;gap:2px;}.description{margin:0;font-size:11px;line-height:16px;color:var(--color-ink-secondary);}}
+
+@layer components { [data-theme='v8'] .root[data-size='customer'] .title{font-size:13px;line-height:20px;} }
+
+@layer components { [data-theme='v8'] .root[data-size='customer']{gap:6px;} }

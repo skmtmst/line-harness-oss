@@ -1,3 +1,4 @@
+import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
 /**
  * 画面確認だけのための、Workerの代わりになる小さなAPI。
  *
@@ -1341,6 +1342,10 @@ const RESTAURANT_TABLES = [
   { id: 'tbl-5', store_id: 'store-sby', code: '個室B', label: '個室', seat_type: 'private_room', min_capacity: 4, max_capacity: 6, floor_x: 1, floor_y: 2, join_group: null, is_active: 0 },
   { id: 'tbl-9', store_id: 'store-sby', code: 'TR1', label: 'テラス', seat_type: 'terrace', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 2, join_group: null, is_active: 1 },
 ]
+const RESTAURANT_FLOORS=[{id:'floor-store-sby',storeId:'store-sby',name:'1階',width:660,height:420,version:1,
+ outline:[{x:1,y:1},{x:659,y:1},{x:659,y:419},{x:1,y:419}],
+ fixtures:[{id:'toilet',kind:'toilet',x:16,y:16,width:80,height:60},{id:'kitchen',kind:'kitchen',x:470,y:16,width:170,height:90},{id:'window',kind:'window',x:160,y:1,width:260,height:8},{id:'entrance',kind:'entrance',x:280,y:390,width:90,height:24}],
+ tables:RESTAURANT_TABLES.map((t,i)=>{const boxes=[[130,110,64,64],[214,110,64,64],[300,110,84,64],[130,200,84,64],[500,140,36,36],[500,190,36,36],[250,200,120,90],[390,240,90,80],[130,300,84,64]];const [x,y,width,height]=boxes[i];return {id:t.id,x,y,width,height,rotation:0,shape:t.seat_type==='counter'?'circle':'rectangle',joinGroup:t.join_group}})}]
 /* 板 MJoJR（メニュー管理）の6品：有効4・申請中1（ランチコースの価格改定）・保管済1。 */
 const RESTAURANT_MENU = [
   { id: 'menu-6', store_id: 'store-sby', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
@@ -2859,6 +2864,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 飲食店向けテスト（`/restaurant-test/*`）。`restaurant-test-api.ts` の
    * 読み口だけを固定で返す。書き込み（発行・承認・保存）は従来どおり405。
    */
+  if(method==='GET'&&pathname==='/api/restaurant-test/floors')return {success:true,data:RESTAURANT_FLOORS.filter(f=>f.storeId===(query.get('storeId')??'store-sby'))}
+  if(method==='GET'&&pathname==='/api/restaurant-test/board'){
+   const from=Date.parse(query.get('from')),to=Date.parse(query.get('to')),offset=Number(query.get('offset')??0),limit=Number(query.get('limit')??500);
+   const entries=RESTAURANT_RESERVATIONS.filter(r=>Date.parse(r.starts_at)>=from&&Date.parse(r.starts_at)<to).map(r=>seatBoardEntry({...r,customer_version:1,dining_snapshot_json:JSON.stringify({allergy:r.allergy_note,anniversary:null,seatPreference:null,courseId:r.course_id,capturedAt:QA_CLOCK})}));
+   return {success:true,data:{entries:entries.slice(offset,offset+limit),total:entries.length,offset,limit}}
+  }
   if (method === 'GET' && pathname === '/api/restaurant-test/snapshot') {
     return { success: true, data: RESTAURANT_SNAPSHOT }
   }
