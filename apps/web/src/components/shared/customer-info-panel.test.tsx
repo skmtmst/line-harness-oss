@@ -31,7 +31,7 @@ test('birthday with age and six visible basics, view-only edits hidden, shared d
   expect(screen.queryByText('年齢')).toBeNull()
   expect(screen.getByText(/2000-01-01（\d+歳）/)).toBeTruthy()
   expect(screen.queryByText('編集')).toBeNull()
-  fireEvent.click(screen.getByRole('button',{name:'表示項目'}))
+  fireEvent.click(screen.getByRole('button',{name:'表示項目を編集'}))
   fireEvent.click(screen.getByRole('checkbox',{name:'タグ'}))
   expect(JSON.parse(localStorage.getItem('chat.friendInfoSections.v4')!).hidden).toContain('tags')
   first.unmount()
@@ -50,7 +50,7 @@ test('failed fetch is shown with retry instead of unregistered values',()=>{
 test('個々の基本欄と追加の節を隠せ、閉じても別画面へ設定を引き継ぐ', () => {
   const props = { friendId: 'f', fields, state: 'ready' as const, canEdit: false, sections: [], extraSections: [{ key: 'forms', label: 'フォーム回答', content: <p>回答履歴</p> }] };
   const first = render(<CustomerInfoPanel {...props} />);
-  fireEvent.click(screen.getByRole('button', { name: '表示項目' }));
+  fireEvent.click(screen.getByRole('button', { name: '表示項目を編集' }));
   fireEvent.click(screen.getByRole('checkbox', { name: 'メール' }));
   fireEvent.click(screen.getByRole('checkbox', { name: 'フォーム回答' }));
   fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
@@ -66,7 +66,7 @@ test('既存の並びを保ち、上下キーの変更を保存する。顧客�
   render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit={false} sections={[
     { key: 'support', label: '対応', content: '対応内容' }, { key: 'tags', label: 'タグ', content: 'タグ内容' },
   ]} />);
-  fireEvent.click(screen.getByRole('button', { name: '表示項目' }));
+  fireEvent.click(screen.getByRole('button', { name: '表示項目を編集' }));
   fireEvent.keyDown(screen.getByRole('button', { name: /対応.*並び/ }), { key: 'ArrowUp' });
   const saved = localStorage.getItem('chat.friendInfoSections.v4')!;
   expect(JSON.parse(saved).order).toEqual(['support', 'tags']);

@@ -70,9 +70,6 @@
 [data-theme='v8'] [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] + span {
   font-size: var(--text-micro);
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-density='compact'] [data-kpi-detail]:has(> span:only-child:empty) {
-  display: none;
-}
 
 [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-skeleton] {
   height: var(--tpl-band-number-lh);
@@ -81,8 +78,7 @@
   height: var(--tpl-band-compact-number-lh);
 }
 
-/* B-187：補足も操作も無いマスは空の段を取らない。 */
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail]:has(> span:only-child:empty) { display: none; }
+/* 補足の省略表示。空の段の有無は下のB-220で帯全体から決める。 */
 [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* B-178：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
@@ -94,3 +90,8 @@
 [data-theme='v8'] [data-list-skeleton] [data-kpi-strip]:not([data-kpi-density='compact']) [data-kpi-detail] > span {
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* B-220：補足はマスでなく帯全体で有無を決める。1つでもあれば全マスをそろえる。 */
+html[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band']:not(:has([data-kpi-detail-present])) [data-kpi-detail] { display: none; }
+html[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band']:has([data-kpi-detail-present]) [data-kpi-detail] { display: flex; min-height: var(--tpl-band-detail-h); }
+html[data-theme='v8'] [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']):not(:has([data-kpi-detail-present])) > [data-design-version] { min-height: var(--tpl-list-band-no-detail-h); }

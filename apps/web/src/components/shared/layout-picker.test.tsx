@@ -14,14 +14,15 @@ function Picker() {
   const [value, setValue] = useState('1')
   return <LayoutPicker options={options} value={value} onChange={setValue} />
 }
-it('形と面の文字を読み上げ、選んだタイルにだけ✓を出す', () => {
+it('形と面の文字を読み上げ、共通カードのラジオを1つだけ選ぶ', () => {
   render(<Picker />)
   const group = screen.getByRole('radiogroup', { name: '面の分け方' })
   const radio = within(group).getByRole('radio', { name: '上下2面（面 A・B）' }) as HTMLInputElement
   fireEvent.click(radio)
   expect(radio.checked).toBe(true)
   expect(within(group).getAllByRole('radio').filter((input) => (input as HTMLInputElement).checked)).toHaveLength(1)
-  expect(radio.parentElement?.textContent).toBe('AB✓上下2面')
+  expect(radio.closest('[data-choice-card]')).toBeTruthy()
+  expect(radio.parentElement?.textContent).toContain('上下2面')
   const areas = radio.parentElement!.querySelectorAll('span[style]') as NodeListOf<HTMLElement>
   expect(Array.from(areas).map((area) => [area.textContent, area.style.top, area.style.height])).toEqual([['A', '0%', '50%'], ['B', '50%', '50%']])
 })

@@ -15,6 +15,8 @@ export type DetailPanelProps = {
   open: boolean
   title: string
   description?: string
+  /** 本文の段を共通の16px間隔で積む。 */
+  contentSpacing?: 'sections'
   onClose: () => void
   /** 前・次の行へ。渡した方だけ上下キーとボタンが効く。 */
   onPrev?: () => void
@@ -61,6 +63,7 @@ export default function DetailPanel({
   open,
   title,
   description,
+  contentSpacing,
   onClose,
   onPrev,
   onNext,
@@ -141,7 +144,7 @@ export default function DetailPanel({
           </button>
         </div>
       </header>
-      <div className={styles.body}>{children}</div>
+      <div className={styles.body} data-content-spacing={contentSpacing}>{children}</div>
       {footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </aside>
   )

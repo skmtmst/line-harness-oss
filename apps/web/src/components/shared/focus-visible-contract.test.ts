@@ -26,7 +26,7 @@ const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
 /** 自分で押せる要素を描いている部品（共通 Button を使うだけの部品は対象外）。 */
 function drawsOwnControl(src: string): boolean {
-  return /<button|<a\s|role="button"|tabIndex=|<summary|<details|<input|<select|<textarea/.test(src)
+  return /<button|<a\s|role="button"|<[a-z][\w-]*\b[^>]*\btabIndex=|<summary|<details|<input|<select|<textarea/.test(src)
 }
 
 const PARTS = files

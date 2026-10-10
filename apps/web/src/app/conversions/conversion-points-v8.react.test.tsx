@@ -10,13 +10,8 @@ vi.hoisted(() => {
 
 import ConversionsPage from './page'
 
-/*
- * ★V8-B コンバージョンの一覧（Pencil `r6dJFy`・状態 `E2l8cw`・
- * 1152 `BygrU`・閲覧のみ `WSGvo`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
- * 見本が決めた見出し・数の帯・表の列・表の下の小窓が出ることを
- * 実DOMで固定する。v7 では従来の一覧が出ることも固定する。
- */
+/* B-226: 行から右の詳細へ移り、停止は理由必須の確認窓で実行する。
+ * 読み取り権限とAPIへの理由・保存版の受け渡しも守る。 */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
   usePathname: () => '/conversions',
@@ -208,40 +203,39 @@ test('v8 の下では Pencil r6dJFy の新しい一覧に切り替わる', async
   expect(host.textContent).toContain('使う場所を足す')
 })
 
-test('v8 で行を選ぶと詳細の小窓が出て、止める小窓は理由必須で止める', async () => {
+test('行から右の詳細を開き、停止の確認では理由を必須にする', async () => {
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<ConversionsPage />))
   await settle()
   await eventually(() => {
     expect(host.querySelector('[data-design-node="r6dJFy"]')).toBeTruthy()
   })
-  // 行の名前を押すと詳細の小窓が出る
+  // 行の名前を押すと右の詳細が出る
   const nameButton = [...host.querySelectorAll('button')].find((button) =>
     button.textContent?.includes('商品を買った'))
   expect(nameButton).toBeTruthy()
   await act(async () => { nameButton!.click() })
   await eventually(() => {
-    expect(host.textContent).toContain('詳細の小窓：商品を買った')
+    expect([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('鍵を発行する'))).toBeTruthy()
   })
-  expect(host.textContent).toContain('鍵を発行する')
-  // 小窓の「止める」で止める小窓が出る
-  const stopButton = [...host.querySelectorAll('button')].find((button) =>
+  expect(document.body.textContent).toContain('鍵を発行する')
+  // 小窓の「止める」で停止の確認が出る
+  const stopButton = [...document.querySelectorAll('[role="dialog"] button')].find((button) =>
     button.textContent === '止める')
   expect(stopButton).toBeTruthy()
   await act(async () => { stopButton!.click() })
   await eventually(() => {
-    expect(host.textContent).toContain('止めるときの小窓（3択）')
-    expect(host.textContent).toContain('対象：商品を買った')
+    expect([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('商品を買ったを止めますか？'))).toBeTruthy()
   })
-  expect(host.textContent).toContain('理由必須')
-  // 理由が空のままは止められない（詳細の小窓の「止める」と区別する）
-  const stopPanel = host.querySelector('section[aria-label="止めるときの小窓"]')
+  expect(document.body.textContent).toContain('理由必須')
+  // 理由が空のままは止められない（右の詳細の「止める」と区別する）
+  const stopPanel = [...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('商品を買ったを止めますか？'))
   expect(stopPanel).toBeTruthy()
   const confirmButton = [...stopPanel!.querySelectorAll('button')].find((button) =>
     button.textContent === '止める')
   expect(confirmButton?.hasAttribute('disabled')).toBe(true)
   expect(posted).toEqual([])
-  const reason = host.querySelector('input[aria-label="止める理由"]') as HTMLInputElement
+  const reason = document.querySelector('input[aria-label="止める理由"]') as HTMLInputElement
   expect(reason).toBeTruthy()
   await act(async () => { typeInto(reason, '計測の仕方を変えるため') })
   await eventually(() => {

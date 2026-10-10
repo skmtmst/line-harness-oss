@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
-import { FileText } from 'lucide-react'
+import { FileText, Settings2 } from 'lucide-react'
 import HelpTip from './help-tip'
 import Avatar from './avatar'
 import type { FriendField } from '@line-crm/shared'
@@ -103,7 +103,7 @@ export default function CustomerInfoPanel({
       </section>)}
       {more}
     </div> : null}
-    <Button variant="text" onClick={() => setSettings(true)}>表示項目</Button>
+    <Button variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</Button>
     <Dialog open={settings} title="表示項目" onCancel={() => setSettings(false)} cancelLabel="閉じる">
       <div className={styles.options}>
         {choices.map(choice => <div key={choice.key} className={styles.option} {...reorder.rowProps(choice.key)}>

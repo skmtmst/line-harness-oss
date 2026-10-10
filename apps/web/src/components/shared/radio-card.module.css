@@ -384,3 +384,7 @@ html[data-theme='v8'] .invalid, html[data-theme='v8'] .invalid .radio { border-c
 html[data-theme='v8'] .card:is(.compact, .form) > .radio { width: var(--choice-size); height: var(--choice-size); opacity: 1; pointer-events: auto; top: var(--space-16); right: var(--space-16); }
 html[data-theme='v8'] .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }
 html[data-theme='v8'] .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* B-229：カードのラジオは例外なく右上。行型は左のまま。 */
+html[data-theme='v8'] .card:not(.row) { position: relative; display: flex; flex-direction: column; }
+html[data-theme='v8'] .card:not(.row) > .radio { position: absolute; top: var(--space-16); right: var(--space-16); margin: 0; opacity: 1; pointer-events: auto; }

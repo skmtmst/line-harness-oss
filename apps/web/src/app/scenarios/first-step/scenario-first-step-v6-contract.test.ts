@@ -13,7 +13,7 @@ const PAGE = fs.readFileSync(new URL('../../../v8/scenario-first-step/first-step
 const COMPONENTS = path.join(__dirname, '..', '..', '..', 'components', 'scenarios')
 const PREVIEW = fs.readFileSync(path.join(COMPONENTS, 'step-preview.tsx'), 'utf8')
 
-describe('V6 1通目設定の契約', () => {
+describe('1通目設定の動きの契約', () => {
   it('作成の現在地と保存前の要点を同時に確認できる', () => {
     // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(PREVIEW).toContain('<LinePreview')
@@ -34,7 +34,7 @@ describe('V6 1通目設定の契約', () => {
 
   it('本文の文字数を出す', () => {
     expect(PAGE).toContain('const bodyLength = countTemplateTextCharacters(body)')
-    expect(PAGE).toContain("{formatNumber(bodyLength)} / {formatNumber(LINE_TEXT_LIMIT)}")
+    expect(PAGE).toContain('count={`${formatNumber(bodyLength)} / ${formatNumber(LINE_TEXT_LIMIT)}`}')
   })
 
   it('作成途中へ戻ったときは既存の1通目を表示し、重複追加せず更新する', () => {

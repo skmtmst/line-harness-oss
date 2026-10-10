@@ -3,7 +3,7 @@
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
-import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
 
 
@@ -33,6 +33,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/sh
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
@@ -68,7 +69,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「成果地点を作る」）・
  * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「使う場所を足す」と「…」。
- * 行を押すと表の下に詳細の小窓、「止める」は表の下の止める小窓（3択＋理由）。
+ * 行はURLに残る右の詳細パネル、「止める」は3択と理由を持つ確認画面。
  *
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
@@ -272,7 +273,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const accountIdRef = useRef(accountId)
   accountIdRef.current = accountId
 
-  /* 表の下の詳細の小窓（行を押すと開く）と、止める小窓。 */
+  /* 行の詳細パネルと、停止の確認画面。 */
   const [panelId, setPanelId] = useDetailPanelUrl('point')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [stopTarget, setStopTarget] = useState<ConversionDefinitionListItem | null>(null)
@@ -919,11 +920,11 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
     setPage(1)
   }
 
-  /* ===== 表の下の小窓（詳細・止める） ===== */
+  /* ===== 右の詳細パネルと停止の確認 ===== */
   const detailCard = panelPoint ? (
-    <Card variant="panel" aria-label="詳細の小窓">
+    <DetailPanel open contentSpacing="sections" title={panelPoint.name} onClose={() => setPanelId(null)}>
       <div className={styles.panelHead}>
-        <h2 className={styles.panelTitle}>{`詳細の小窓：${panelPoint.name}`}</h2>
+
         <RowMenu className={styles.panelMore} label={`詳細「${panelPoint.name}」のその他の操作`} size="row" items={[
           ...(canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.ingest.configured && panelPoint.status !== 'stopped' ? [{
             id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
@@ -937,6 +938,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         <StatePill point={panelPoint} />
         <span title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</span>
       </p>
+      <p className={styles.panelText}>{`今月の成果：${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・¥${formatNumber(panelPoint.metrics.netValue)}`}`}</p>
       <p className={styles.panelText}>{`使われている場所：${usageLabel(panelPoint)}`}</p>
       {panelPoint.measureMethod === 'webhook' ? (
         <p className={styles.panelText}>
@@ -962,12 +964,23 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button>
         </div>
       ) : null}
-    </Card>
+    </DetailPanel>
   ) : null
 
   const stopCard = stopTarget ? (
-    <Card variant="panel" aria-label="止めるときの小窓">
-      <h2 className={styles.panelTitle} title={`対象：${stopTarget.name}`}>止めるときの小窓（3択）</h2>
+    <Dialog open title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<div className={styles.panelActions}>
+        <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
+        <Button
+          variant="primary"
+          disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
+          onClick={() => void runStop()}
+          busy={stopping || stopImpactLoading}
+          busyLabel="止めています"
+        >
+          {stopAction === 'delete' ? '削除する' : '止める'}
+        </Button>
+      </div>}>
+
       <p className={styles.stopDescription}>
         {stopImpactLoading
           ? '利用先と影響を読み込んでいます。'
@@ -1028,25 +1041,13 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         /></SaveErrorField>
       </Field>
       {stopError ? <Notice tone="danger" >{stopError}</Notice> : null}
-      <div className={styles.panelActions}>
-        <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
-        <Button
-          variant="primary"
-          disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
-          onClick={() => void runStop()}
-          busy={stopping || stopImpactLoading}
-          busyLabel="止めています"
-        >
-          {stopAction === 'delete' ? '削除する' : '止める'}
-        </Button>
-      </div>
       <Disclosure title="操作の影響を確認する" size="compact">
         <p className={styles.panelText}>対象：{stopTarget.name}</p>
         <p className={styles.panelText}>止める：これから先は数えません。過去の記録と分析は残します。</p>
         <p className={styles.panelText}>差し替える：利用先を別の成果地点へ切り替え、過去の数字を残します。</p>
         <p className={styles.panelText}>削除する：成果0件・利用先0件のときに、この成果地点だけを削除できます。</p>
       </Disclosure>
-    </Card>
+    </Dialog>
   ) : null
 
   /* ===== 表 ===== */
@@ -1149,7 +1150,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             </tbody>
           </DataTable>
         </div>
-        {detailCard || stopCard ? <div className={styles.panels}>{detailCard}{stopCard}</div> : null}
+        {detailCard}{stopCard}
       </>
     )
   }

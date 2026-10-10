@@ -255,7 +255,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
           {data.total > 0 && pageCount > 1 ? (
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${data.total} 件・時刻はすべて日本時間（Asia/Tokyo）`} />
           ) : null}
-          <p className={styles.grayNote}>{`行の「…」から 中身を見る・Google から削除・Instagram へ再送。削除は元に戻せません（確認の小窓が出ます）。Instagram が失敗した投稿は再送でき、Google への公開はそのまま残ります。${data.writeEnabled ? '' : '検証環境では Google へは送りません。'}`}</p>
+          <p className={styles.grayNote}>{`行の「…」から 中身を見る・Google から削除・Instagram へ再送。削除は元に戻せません（確認画面が出ます）。Instagram が失敗した投稿は再送でき、Google への公開はそのまま残ります。${data.writeEnabled ? '' : '検証環境では Google へは送りません。'}`}</p>
         </Card>
       ) : null}
       <ConfirmDialog

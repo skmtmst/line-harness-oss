@@ -83,3 +83,6 @@ input.choiceInput[type='checkbox']:checked, .choice input[type='checkbox']:check
 .choiceInput:focus-visible, .choice input:focus-visible { outline: 2px solid var(--color-status-info); outline-offset: 2px; }
 
 .fileSlot { min-height: var(--upload-slot-height, var(--tpl-slot-h-compact)); padding: var(--upload-slot-padding, var(--tpl-slot-pad-compact)); }
+
+input.choiceInput[type='radio'], .choice input[type='radio'] { width: var(--liff-radio-size, 18px); height: var(--liff-radio-size, 18px); }
+input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { background: radial-gradient(circle, var(--color-selection-border) calc(var(--liff-radio-dot, 9px) / 2), var(--color-canvas) calc(var(--liff-radio-dot, 9px) / 2)); }

@@ -3156,3 +3156,5 @@ html[data-theme='v8'] input:is([type='radio'], [type='checkbox']):focus-visible 
 html[data-theme='v8'] button:is([aria-pressed='true'], [data-current]:not([data-current='false']), [aria-current='page'], [aria-current='step']) { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
 
 [data-theme='v8'] { --tpl-list-state-w: 104px; }
+
+[data-theme='v8'] { --tpl-band-detail-h: 18px; --tpl-list-band-no-detail-h: 90px; --tpl-insert-icon: 16px; --tpl-insert-footer-pad: 8px 12px; }

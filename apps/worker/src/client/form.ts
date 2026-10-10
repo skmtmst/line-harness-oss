@@ -1,3 +1,4 @@
+import '../../../liff/src/card-surface.css';
 import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
 /**
  * LIFF Form Page — Dynamic form renderer for LINE surveys / questionnaires
@@ -269,7 +270,7 @@ function injectStyles(): void {
     .form-profile { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; }
     .form-profile img { width: 36px; height: 36px; border-radius: 50%; }
     .form-profile span { font-size: 14px; font-weight: 600; }
-    .form-body { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .form-body { background: #fff; border-radius: 12px; padding: 20px; box-shadow: var(--liff-card-shadow); }
     .form-field { margin-bottom: 20px; }
     .form-label { display: block; font-size: 14px; font-weight: 600; color: #333; margin-bottom: 6px; }
     .required-mark { color: #e53e3e; margin-left: 2px; }
@@ -295,8 +296,8 @@ function injectStyles(): void {
       border-color: #06C755; background: #e8faf0;
     }
     .radio-label input, .checkbox-label input { accent-color: #06C755; width: 18px; height: 18px; }
-    .radio-label input[type="radio"] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border: 2px solid #ccc; border-radius: 50%; background: #fff; cursor: pointer; }
-    .radio-label input[type="radio"]:checked { background: #fff; border-color: #06C755; border-width: 5px; }
+    .radio-label input[type="radio"] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; border: 1.5px solid var(--color-choice-border, #c9ced6); border-radius: 50%; background: #fff; cursor: pointer; }
+    .radio-label input[type="radio"]:checked { border-color: var(--color-selection-border, #087a3e); background: radial-gradient(circle, var(--color-selection-border, #087a3e) calc(var(--liff-radio-dot) / 2), #fff calc(var(--liff-radio-dot) / 2)); }
     .submit-btn {
       width: 100%; padding: 14px; border: none; border-radius: 8px;
       background: #06C755; color: #fff; font-size: 16px; font-weight: 700;
