@@ -653,12 +653,13 @@ jobs:
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
-      - name: No large blank gaps on V8 at 1152 and 1440
+      # B-191/192 と B-187 はここに一本化。blank-gap.mjs を別ステップで重ねない。
+      - name: Broken fixtures must fail the V8 layout guard
         if: steps.scope.outputs.run == 'true'
-        run: |
-          node --test apps/web/scripts/v8-guard/blank-gap.test.mjs
-          node apps/web/scripts/v8-guard/blank-gap.mjs --self-test
-          node apps/web/scripts/v8-guard/blank-gap.mjs http://127.0.0.1:4310 /tmp/v8-guard/blank-gap.json
+        run: node --test apps/web/scripts/v8-guard/layout-defects.test.mjs
+      - name: No new overlap, wrap, squash, clipping, touching or blank space on V8
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv

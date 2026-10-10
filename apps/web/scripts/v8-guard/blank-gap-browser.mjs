@@ -40,13 +40,14 @@ export default function scanBlankGap(opts = {}) {
     return names.join(' < ')
   }
   const clsOf = (p) => typeof p.className === 'string' ? p.className.trim().split(/\s+/).filter((c) => c && !/^(v7|v8):?/.test(c)).slice(0, 3).join('.') : ''
-  const selectorOf = (el, depth = 3) => {
+  const selectorOf = (el, depth = opts.selectorDepth ?? 3) => {
     const parts = []
     for (let p = el; p && p !== document.body && parts.length < depth; p = p.parentElement) {
       const c = clsOf(p)
-      parts.unshift(p.tagName.toLowerCase() + (c ? '.' + c : ''))
+      const siblings = p.parentElement ? [...p.parentElement.children].filter(s => s.tagName === p.tagName) : [p]
+      parts.unshift(p.tagName.toLowerCase() + (c ? '.' + c : '') + (opts.exactSelectors ? ':nth-of-type(' + (siblings.indexOf(p) + 1) + ')' : ''))
     }
-    return parts.join(' > ').slice(0, 260)
+    return parts.join(' > ').slice(0, opts.selectorLimit ?? 260)
   }
   const textOf = (el) => (el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 60)
 
@@ -86,7 +87,8 @@ export default function scanBlankGap(opts = {}) {
     if (visCache.has(el)) return visCache.get(el)
     let v = true
     const s = CS(el)
-    if (s.display === 'none' || s.visibility === 'hidden' || s.visibility === 'collapse' || Number(s.opacity) < 0.03) v = false
+    if (el.matches('nav,[data-template-region="folders"],[data-template-region="collapsed-folders"],[data-line-preview-part="talk"]') || /フォルダの列|左メニュー/.test(el.getAttribute('data-pencil-name') || '') || /(?:^|[ _-])(?:bubbleBody|bubbleText|bubbleIn|bubbleOut|messageBubble|bubble)(?:[_ -]|$)/i.test(typeof el.className === 'string' ? el.className : '')) v = false
+    else if (s.display === 'none' || s.visibility === 'hidden' || s.visibility === 'collapse' || Number(s.opacity) < 0.03) v = false
     else if (el.parentElement && el.parentElement !== document.documentElement) v = visible(el.parentElement)
     visCache.set(el, v)
     return v
@@ -276,7 +278,7 @@ export default function scanBlankGap(opts = {}) {
       const gaps = []
       if (!merged.length) {
         // 中身の無い大きな箱
-        if (!isRoot && visBot - visTop - padT - padB >= TH) gaps.push({ where: 'empty-box', y1: visTop, y2: visBot, blank: visBot - visTop, excess: visBot - visTop - Math.min(padT, 24) - Math.min(padB, 24) })
+        if (!isRoot && !(opts.skipPanelBottom && cb.h >= 200 && cb.w >= 200) && visBot - visTop - padT - padB >= TH) gaps.push({ where: 'empty-box', y1: visTop, y2: visBot, blank: visBot - visTop, excess: visBot - visTop - Math.min(padT, 24) - Math.min(padB, 24) })
       } else {
         const first = merged[0], last = merged[merged.length - 1]
         const top = first.a - visTop
@@ -286,7 +288,7 @@ export default function scanBlankGap(opts = {}) {
           if (g >= TH) gaps.push({ where: 'between', y1: merged[k - 1].b, y2: merged[k].a, blank: g, excess: g, prev: merged[k - 1].lastIt, next: merged[k].firstIt })
         }
         const bot = visBot - last.b
-        if (bot - Math.min(padB, 24) >= TH) gaps.push({ where: isRoot ? 'page-bottom' : 'bottom', y1: last.b, y2: visBot, blank: bot, excess: bot - Math.min(padB, 24), prev: last.lastIt })
+        if (!opts.skipPanelBottom && bot - Math.min(padB, 24) >= TH) gaps.push({ where: isRoot ? 'page-bottom' : 'bottom', y1: last.b, y2: visBot, blank: bot, excess: bot - Math.min(padB, 24), prev: last.lastIt })
       }
       for (const g of gaps) {
         const f = describeGap(C, cb, g, its)
