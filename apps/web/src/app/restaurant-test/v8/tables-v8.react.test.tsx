@@ -106,7 +106,7 @@ it('ドラッグした配置をまとめて保存し、再取得した座標順�
  const dragged=screen.getByRole('button',{name:/T1 2人卓/})
  const target=screen.getByRole('button',{name:/T2 2人卓/})
  fireEvent.dragStart(dragged,{dataTransfer:{setData:vi.fn(),effectAllowed:''}});fireEvent.dragOver(target.closest('li')!);fireEvent.drop(target.closest('li')!)
- await waitFor(()=>expect(fixture.saveTableLayout).toHaveBeenCalledWith('account-1',{storeId:'store-1',tables:[{id:'t2',floorX:0,floorY:0,joinGroup:'A'},{id:'t1',floorX:1,floorY:0,joinGroup:null},{id:'t3',floorX:2,floorY:0,joinGroup:'A'},{id:'pb',floorX:0,floorY:1,joinGroup:null}]}))
+ await waitFor(()=>expect(fixture.saveTableLayout).toHaveBeenCalledWith('account-1',{storeId:'store-1',expectedVersion:1,tables:[{id:'t2',floorX:0,floorY:0,joinGroup:'A'},{id:'t1',floorX:1,floorY:0,joinGroup:null},{id:'t3',floorX:2,floorY:0,joinGroup:'A'},{id:'pb',floorX:0,floorY:1,joinGroup:null}]}))
  const map=(await screen.findByRole('heading',{name:'フロアマップ'})).closest('section')!
  await waitFor(()=>expect(within(map).getAllByRole('button')[0].textContent).toContain('T2'))
 })

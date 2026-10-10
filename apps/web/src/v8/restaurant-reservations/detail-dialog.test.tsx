@@ -9,13 +9,16 @@ const fixture = vi.hoisted(() => ({
 }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
+vi.mock('@/lib/api-reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api-reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:vi.fn().mockResolvedValue({success:true,data:[]})}}})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 
 import ReservationsPage from '../restaurant/reservations/reservations'
-import { at, reservation, snapshotOf } from '../restaurant/booking-kit/test-data'
+import { at as localAt, reservation, snapshotOf } from '../restaurant/booking-kit/test-data'
+
+const at=(day:number,hour:number,minute=0)=>{const d=new Date(localAt(day,hour,minute));return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00`}
 
 /* 鈴木（Hot Pepper・T4・秋の鹿肉コース・電話あり）と、押さえ（T1）。 */
 const reservationsToday = () => [
@@ -70,7 +73,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     const confirm = await screen.findByRole('dialog', { name: 'この予約を取り消しますか？' })
     fireEvent.click(within(confirm).getByRole('button', { name: '取り消す' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled' }))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', expectedVersion: 1 }))
   })
 
   it('変更するで今の変更の窓へ移る', async () => {

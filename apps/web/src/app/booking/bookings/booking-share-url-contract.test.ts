@@ -48,7 +48,7 @@ describe('閲覧のみの人への表示 (#933 N-401)', () => {
     expect(LIST).toContain('canOperateBookings(response.data)')
     // 代理予約の入口・行の操作・詳細パネルの操作がすべて canOperate で守られる
     expect(LIST).toContain('{canOperate ? (')
-    expect(LIST).toContain('<BookingCalendar')
-    expect(LIST).toContain('canCreate={canOperate}')
+    expect(LIST).toContain('<ReservationBoard')
+    expect(LIST).toContain('canWrite={canOperate}')
   })
 })

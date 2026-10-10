@@ -110,7 +110,7 @@
 
 /* B-152・仕上げ4 */
 [data-theme='v8'] .badge:not(.annotation) {
-  gap: var(--polish-status-gap); padding: var(--polish-status-pad);
+  gap: var(--polish-status-gap); padding: var(--badge-padding, var(--polish-status-pad));
   border: 0; border-radius: var(--radius-pill);
   background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink);
   font-size: var(--polish-text-support); font-weight: var(--polish-status-weight); line-height: 1.5;
@@ -142,3 +142,4 @@
 [data-theme='v8'] .warning { background: var(--color-badge-warning-bg); color: var(--color-badge-warning); }
 [data-theme='v8'] .danger { background: var(--color-badge-danger-bg); color: var(--color-badge-danger); }
 [data-theme='v8'] .info { background: var(--color-badge-info-bg); color: var(--color-badge-info); }
+@layer components { [data-theme='v8'] .badge[data-size='dining']{--badge-padding:2px 14px;} }

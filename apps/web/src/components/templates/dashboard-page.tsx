@@ -27,7 +27,7 @@ export function DashboardPage({ boardId, standalone, tabs, notice, stats, childr
  * 'column' は上の数の帯の1マス分（帯と同じ等分の格子に載せ、縦の線を帯の線と一直線にする）。
  * asideColumns：'column' のときの帯のマスの数（省くと --tpl-dash-cols）。
  */
-export function DashboardRow({ children, aside, asideRef, variant, asideSize, asideColumns }: { children: ReactNode; aside?: ReactNode; asideRef?: Ref<HTMLElement>; variant?: 'trend' | 'inbox' | 'link'; asideSize?: 'wide' | 'column'; asideColumns?: number }) {
+export function DashboardRow({ children, aside, asideRef, variant, asideSize, asideColumns }: { children: ReactNode; aside?: ReactNode; asideRef?: Ref<HTMLElement>; variant?: 'trend' | 'inbox' | 'link' | 'restaurant'; asideSize?: 'wide' | 'column' | 'restaurant'; asideColumns?: number }) {
   const gridStyle = asideSize === 'column' && asideColumns ? { '--tpl-dash-cols': asideColumns } as CSSProperties : undefined
   return <div className={styles.dashboardRow} data-template-region="row" data-row={variant} data-aside-size={aside ? asideSize : undefined} style={gridStyle}>
     <div className={styles.dashboardCell}>{children}</div>

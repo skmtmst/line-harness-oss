@@ -265,7 +265,7 @@ describe('飲食店の本人予約', () => {
     expect(
       (
         await request(`/api/liff/restaurant/reservations/${data.id}/cancel`, {
-          expectedVersion: 2,
+          expectedVersion: 3,
         })
       ).status,
     ).toBe(403);
@@ -273,7 +273,7 @@ describe('飲食店の本人予約', () => {
       (
         await request(
           `/api/liff/restaurant/reservations/${data.id}/reschedule`,
-          { expectedVersion: 2, startsAt: start, guestCount: 2 },
+          { expectedVersion: 3, startsAt: start, guestCount: 2 },
         )
       ).status,
     ).toBe(403);

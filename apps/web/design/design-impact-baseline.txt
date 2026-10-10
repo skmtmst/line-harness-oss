@@ -766,3 +766,5 @@ shared-button-importer v8/hq-templates/distribution-result-dialog.tsx
 shared-button-importer v8/automations/create/friend-multi-select.tsx
 shared-button-importer v8/form-edit/after-tab.tsx
 shared-button-importer v8/hq-deliveries/console.tsx
+shared-button-importer components/shared/reservation-board.tsx
+shared-button-importer components/shared/restaurant-floor-editor.tsx

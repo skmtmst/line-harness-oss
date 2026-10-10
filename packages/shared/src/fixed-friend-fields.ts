@@ -1,4 +1,4 @@
-/** フォーム・情報欄・要点の欄が共通で使う7つの項目。IDは配布先に持ち込まない。 */
+/** フォーム・情報欄・要点の欄が共通で使う10項目。IDは配布先に持ち込まない。 */
 export const FIXED_FRIEND_FIELDS = [
   { key: 'name', label: '名前', type: 'text', format: 'none' },
   { key: 'kana', label: 'ふりがな', type: 'text', format: 'kana' },
@@ -7,6 +7,9 @@ export const FIXED_FRIEND_FIELDS = [
   { key: 'email', label: 'メール', type: 'text', format: 'email' },
   { key: 'tel', label: '電話', type: 'text', format: 'tel' },
   { key: 'address', label: '住所', type: 'address', format: 'none' },
+  { key: 'allergy', label: 'アレルギー', type: 'text', format: 'none' },
+  { key: 'anniversary', label: '記念日', type: 'date', format: 'none' },
+  { key: 'seat_preference', label: '席の好み', type: 'text', format: 'none' },
 ] as const;
 export type FixedFriendFieldKey = typeof FIXED_FRIEND_FIELDS[number]['key'];
 export const isFixedFriendFieldKey = (key: unknown): key is FixedFriendFieldKey =>

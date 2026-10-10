@@ -46,7 +46,7 @@ export default function SegmentedControl<T extends string>({
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
   /** 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。 */
-  appearance?: 'track' | 'choices'
+  appearance?: 'track' | 'choices' | 'reservation'
   /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
   equalWidth?: boolean
 }) {

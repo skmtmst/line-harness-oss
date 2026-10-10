@@ -66,11 +66,11 @@ test('基本7欄と回答の出どころ・日時を返し、個人情報の閲�
   const read = await request('/api/friends/f/fields');
   expect(read.status).toBe(200);
   const data = (await read.json() as { data: { items: Record<string, unknown>[] } }).data;
-  expect(data.items.filter(field => field.fixedKey)).toHaveLength(7);
+  expect(data.items.filter(field => field.fixedKey)).toHaveLength(10);
   expect(data.items.find(field => field.fixedKey === 'email')).toMatchObject({ value: 'a@example.test', valueUpdatedAt: expect.any(String), valueSource: { type: 'form', id: 'form', name: '登録フォーム' } });
   const hidden = await request('/api/friends/f/fields', 'GET', undefined, 'viewer-key');
   expect(hidden.status).toBe(200);
-  expect(await hidden.json()).toMatchObject({ data: { items: [], hiddenPersonalCount: 7 } });
+  expect(await hidden.json()).toMatchObject({ data: { items: [], hiddenPersonalCount: 10 } });
   expect((await request('/api/friends/f/fields', 'PUT', { values: { 'fixed-email': 'b@example.test' } }, 'viewer-key')).status).toBe(403);
 });
 

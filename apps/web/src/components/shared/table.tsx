@@ -140,7 +140,7 @@ export function DataTable({
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
   columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
-  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string }
+  grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
 }) {
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
@@ -161,6 +161,8 @@ export function DataTable({
         '--table-columns': grid.columns,
         '--table-compact-columns': grid.compactColumns ?? grid.columns,
         '--table-row-padding': grid.padding,
+        '--table-grid-gap':grid.gap,
+        '--table-grid-row-height':grid.rowHeight,
         '--table-head-padding': grid.headPadding,
       } as CSSProperties : undefined}>{children}</table>
     </div>
