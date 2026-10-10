@@ -2,7 +2,7 @@
 
 入口：
 - 編集 `app/webinars/edit/page.tsx`（V8 のときだけ `src/v8/webinar-edit/edit.tsx`、それ以外は今の編集のまま）
-- 作る `app/webinars/new/page.tsx`（V8 のときだけ `src/v8/webinar-edit/new.tsx`、それ以外は `app/webinars/new/new-v8.tsx`）
+- 作る `app/webinars/new/page.tsx`（`src/v8/webinar-edit/new.tsx` に固定）
 
 絵：①基本設定（作る）`j7PP04`・②動画 `VWNaA`（オンデマンド）/`LPOe7`（日時指定・開催回）・③CTA・フォーム `Q0Jrk`（同時編集の帯 `pvimJ`）・
 ④通知 `E7iAYs`・⑤確認 `XCUNf`・参加者 `uNsEy`・分析 `z2dgw`・コメント演出 `Omqd4`。

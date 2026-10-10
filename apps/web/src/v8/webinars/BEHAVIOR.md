@@ -1,6 +1,6 @@
 # ウェビナーの一覧（V8）の動き
 
-入口：`app/webinars/page.tsx`（V8 のときだけ `src/v8/webinars/list.tsx`、それ以外は `app/webinars/list-v8.tsx`）。
+入口：`app/webinars/page.tsx`（`src/v8/webinars/list.tsx` に固定）。
 絵：一覧 `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`・アーカイブの確認 `VXZ6T`。
 
 ## 受け付ける URL と指定
