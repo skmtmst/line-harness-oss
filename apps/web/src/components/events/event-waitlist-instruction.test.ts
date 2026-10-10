@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FORM = readFileSync(join(HERE, 'event-form.tsx'), 'utf8')
-const LIST = readFileSync(join(HERE, '..', '..', 'app', 'events', 'page.tsx'), 'utf8')
+const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
 const BOOKINGS = readFileSync(join(HERE, '..', '..', 'app', 'events', 'bookings', 'page.tsx'), 'utf8')
 const ROUTES = readFileSync(join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'events.ts'), 'utf8')
 

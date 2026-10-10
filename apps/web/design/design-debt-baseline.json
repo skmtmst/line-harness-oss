@@ -114,9 +114,6 @@
     "arbitrary-value": 7,
     "direct-th": 6
   },
-  "app/events/page.tsx": {
-    "direct-primary-button": 1
-  },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
   },

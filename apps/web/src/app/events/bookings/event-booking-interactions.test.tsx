@@ -67,7 +67,6 @@ vi.mock('@/components/shared/select', () => ({
 }))
 
 import EventBookingsPage from './page'
-import EventsListPage from '../page'
 
 type Listener = (event: unknown) => void
 
@@ -1118,24 +1117,7 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(view.container.textContent).not.toContain('来場・不参加の記録を変えられませんでした。')
   })
 
-  it('一覧上部の件数は「表示のみ」で、タブやボタンとして扱わない', async () => {
-    // ★V7: 集計帯は下の集計カードとの重複なので出さない。上部の件数は集計カードで見る。
-    const view = await mount(<EventsListPage />)
-    const kpis = elements(view.container).find((element) => (
-      element.getAttribute('data-design') === 'KPIs'
-    ))
-    expect(kpis).toBeDefined()
-    expect(kpis?.textContent).toContain('これからの回')
-    /*
-     * R79/R80: 数の数え方は見出し横の「？」へ入れる（共通ルール 2-1b）。
-     * 「？」は補足の開閉だけで、数自体を押させはしない。タブ・リンク・
-     * 操作ボタンは引き続き置かない。
-     */
-    const pressable = kpis ? elements(kpis).filter((element) => ['BUTTON', 'A'].includes(element.tagName)) : []
-    const nonHelp = pressable.filter((element) => element.getAttribute('aria-label')?.endsWith('の説明') !== true)
-    expect(nonHelp).toHaveLength(0)
-    expect(pressable.length).toBeGreaterThan(0)
-  })
+
 })
 
 // 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。

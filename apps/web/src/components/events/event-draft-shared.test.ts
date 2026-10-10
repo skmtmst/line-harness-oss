@@ -18,7 +18,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 const FORM = read('event-form.tsx')
 const WIZARD = read('event-wizard.tsx')
-const LIST_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'page.tsx'), 'utf8')
+const LIST_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
 const BOOKINGS_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'bookings', 'page.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'edit', 'page.tsx'), 'utf8')
 
@@ -94,7 +94,7 @@ describe('イベント作成・編集の共有契約(#740)', () => {
   })
 
   it('KPI の札は1部品に統合され、旧重複定義は残らない', () => {
-    expect(LIST_PAGE).toContain(`from '@/components/events/event-kpi'`)
+    expect(LIST_PAGE).toContain(`from '@/components/shared/kpi-card'`)
     expect(BOOKINGS_PAGE).toContain(`from '@/components/events/event-kpi'`)
     expect(LIST_PAGE).not.toMatch(/function Kpi\(/)
     expect(BOOKINGS_PAGE).not.toMatch(/function EventKpi\(/)
@@ -162,7 +162,9 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
   it('編集画面の日時表示は端末の時間帯に依存しない(EVENT-05)', () => {
     expect(FORM).toMatch(/function formatJpDateTime[\s\S]*?formatDateTime\(d\)/)
     // 一覧側は既に JST 固定。両方が同じ固定を持つことだけを見る。
-    expect(LIST_PAGE).toContain('formatDay')
+    expect(LIST_PAGE).toContain("import { jstDay, jstTime } from './shared'")
+    expect(read('..', '..', 'v8', 'events', 'shared.ts')).toContain('time + 9 * 3600_000')
+    expect(read('..', '..', 'v8', 'events', 'shared.ts')).toContain('getUTCDate()')
   })
 
   it('作成画面は更新した枠を保存後に読み直してから次段階へ進む(EVENT-01)', () => {

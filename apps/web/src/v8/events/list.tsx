@@ -668,7 +668,10 @@ export default function EventsListV8() {
       headingSize="regular"
       title="イベント予約"
       layout="event-list"
-      help="教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"
+      help={<>
+        教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。
+        {dataReady && kpi.nearest_low_starts_at ? <p>申し込みが少ないのは{jstDay(kpi.nearest_low_starts_at)}の回。あと{daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')}日です。</p> : null}
+      </>}
       folderWidth={200}
 
       tabs={!canEdit ? (

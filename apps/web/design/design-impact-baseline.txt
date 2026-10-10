@@ -89,7 +89,6 @@ shared-button-importer app/events/change-review/change-review-v8.tsx
 shared-button-importer app/events/change-review/page.tsx
 shared-button-importer app/events/edit/page.tsx
 shared-button-importer app/events/events-list-v8.tsx
-shared-button-importer app/events/page.tsx
 shared-button-importer app/events/preview/page.tsx
 shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
 shared-button-importer app/friend-add-settings/publish/done-v8.tsx

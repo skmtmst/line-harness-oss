@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const EVENTS = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const EVENTS = readFileSync(join(HERE, '../../v8/events/list.tsx'), 'utf8')
 const BOOKINGS = readFileSync(join(HERE, 'bookings', 'page.tsx'), 'utf8')
 const EDIT = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 
@@ -20,7 +20,7 @@ function code(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
-describe('V6 イベント・申込者一覧の状態', () => {
+describe('V8 イベント・申込者一覧の状態', () => {
   for (const [name, source] of [['イベント', EVENTS], ['申込者', BOOKINGS]] as const) {
     const body = code(source)
 
@@ -57,14 +57,15 @@ describe('V6 イベント・申込者一覧の状態', () => {
     expect(body).toContain("'forbidden'")
     expect(body).toContain(": 'error'")
     expect(body).toContain("loadStatus === 'forbidden'")
-    expect(body).toContain('kind="forbidden"')
+    expect(body).toContain('イベントを見る権限がありません')
+    expect(body).toContain('管理者に権限を確かめてください')
   })
 
   it('イベント一覧は未取得の帯を0件にしない', () => {
     const body = code(EVENTS)
     // 帯は「数」ではなく「次にすること」を出す（R79/R80 で全体集計へ）。
-    expect(body).toContain("value={dataReady ? kpi.upcoming_slots : null}")
-    expect(body).toContain("value={dataReady ? kpi.upcoming_active : null}")
+    expect(body).toContain('value: dataReady ? kpi.upcoming_slots : null')
+    expect(body).toContain('value: dataReady ? kpi.upcoming_active : null')
     expect(body).toContain('登録したイベントは消えていません。')
   })
 
@@ -112,9 +113,10 @@ describe('V6 イベント・申込者一覧の状態', () => {
     const list = code(EVENTS)
     expect(list).toContain('setListTotal')
     // #625: 検索語は上限へ切り詰めてから送る
-    expect(list).toContain('q: clampSearchQuery(query.trim()) || undefined')
-    expect(list).toContain('filter,')
-    expect(list).toContain('sort,')
+    expect(list).toContain('clampSearchQuery(query.trim())')
+    expect(list).toContain("params.set('q', trimmed)")
+    expect(list).toContain("params.set('filter', filter)")
+    expect(list).toContain("params.set('sort', sort)")
     expect(EVENTS).not.toContain('200件まで表示しています')
   })
 

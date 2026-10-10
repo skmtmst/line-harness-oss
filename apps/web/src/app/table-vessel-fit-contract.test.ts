@@ -42,22 +42,27 @@ describe('表は器の幅にぴったり収める', () => {
   })
 
   it('/events: 操作列は固定幅で、中身が器からはみ出さない', () => {
-    const page = read('events/page.tsx')
+    const page = read('../v8/events/list.tsx')
+    const css = read('../v8/events/list.module.css')
     expect(page).toContain('<DataTable')
-    // 操作列は 2ボタン（約242px）に合わせた固定幅。割合（14%）に戻さない。
-    expect(page).toMatch(/<Th[^>]*w-64[^>]*>操作<\/Th>/)
+    // V8の行末メニューは共通の固定幅。旧2ボタン分の幅へ戻さない。
+    expect(page).toContain('<col className={styles.colMenu} />')
+    expect(page).toContain('<Th aria-label="操作" />')
+    expect(css).toContain('.colMenu { width: var(--tpl-fm-col-menu); }')
     expect(page).not.toMatch(/width:\s*['"]14%['"]/)
     expect(percentTotal(page)).toBeLessThan(100)
   })
 
   it('/events: 申込条件は1行で省略し、全文は title で確認する', () => {
-    const page = read('events/page.tsx')
+    const page = read('../v8/events/list.tsx')
     // 申込条件は状態の札の下へ畳む。独立した列に戻すと、狭い器で見出しが
     // 重なり「全員」が縦に折れる（m19d の撮影指摘）。
     expect(page).not.toContain('>申込条件</Th>')
     // タグ名は長さが読めない。省略を外して素の文字に戻さない。
-    expect(page).toContain('max-w-32 truncate')
-    expect(page).toContain('title={e.visible_tag_name}')
+    expect(page).toContain("<TagPill name={e.visible_tag_name ?? '消えたタグ'} size=\"sm\" />")
+    const tag = read('../components/shared/tag-pill.tsx')
+    expect(tag).toContain('<TruncatedText className={styles.name} value={name} />')
+    expect(read('../components/shared/truncated-text.module.css')).toContain('white-space: nowrap; text-overflow: ellipsis;')
   })
 
   it('/（対応が必要な受信）: 状態列は札に合わせた固定幅で、右に空けない', () => {
