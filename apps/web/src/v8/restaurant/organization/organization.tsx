@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 /*
  * ★V8 組織・権限（Pencil `bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`）。
  *
@@ -13,7 +15,7 @@ import { Field as SharedField } from '@/components/shared/form-controls'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Eye, MailPlus, Plus } from 'lucide-react'
+import { MailPlus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -364,7 +366,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   return (
     <>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
+        <ReadOnlyNotice role="note" />
       ) : null}
       <div className={styles.layout}>
         {prompt}

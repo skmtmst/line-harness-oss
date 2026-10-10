@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 /*
  * ★V8 LINE来店フォロー（Pencil `xLpnS`）。
  *
@@ -115,7 +117,7 @@ function LineFollowupBoard({ ctx }: { ctx: RestaurantContext }) {
         <span>いまは「確認用」です。保存しても、お客さまへはまだ送りません。本当に送るのは、本送信の準備ができてから（司令塔の確認のあと）切り替えます。</span>
       </div>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.cautionIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
+        <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
         <KpiCard density="compact" title="フロー" valueText={`${flows.length}`} detail="カードテンプレート" icon={null} presentation="band" value={null} unit="" />

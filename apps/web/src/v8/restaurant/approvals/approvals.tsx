@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 /*
  * ★V8 承認ワークフロー（Pencil `t8WgD8`、閲覧のみ `n4DT7`、差し戻す理由の小窓 `n4j0Rm`）。
  *
@@ -10,7 +12,7 @@
  */
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Check, Eye, Undo2 } from 'lucide-react'
+import { Check, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -207,7 +209,7 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
   return (
     <>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
+        <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
         <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />

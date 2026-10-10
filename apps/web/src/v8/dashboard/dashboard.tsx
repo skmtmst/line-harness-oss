@@ -1,9 +1,11 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { Fragment, useState, type ReactNode } from 'react'
-import { Calendar, Eye, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
+import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal } from 'lucide-react'
 import type { DashboardCardId } from '@line-crm/shared'
 import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
@@ -351,17 +353,11 @@ export default function DashboardV8() {
   const notice = start.summary || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
-        <div className={styles.viewerBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-        </div>
+        <ReadOnlyNotice />
       ) : null}
       {start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
       {d.error ? (
-        <div className={styles.errorBand} role="alert">
-          <span>{d.error}</span>
-          <Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>
-        </div>
+        <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => void d.load()}><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}
       {looseFailures.length ? (
         <Notice

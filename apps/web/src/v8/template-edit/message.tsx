@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 /*
  * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
  *
@@ -445,7 +447,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         boardId={boardId}
         title={title}
         description={description}
-        band={<p className={styles.readonly} role="status">閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</p>}
+        band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={<SenderCard />}
       >
         <Card padding="none" layout="vertical" className={styles.card}>

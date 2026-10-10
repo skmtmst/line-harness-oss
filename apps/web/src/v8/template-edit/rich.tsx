@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 /*
  * ★V8「リッチメッセージを作る」（絵 EFV8l・機能追加 F-4）。
  *
@@ -422,7 +424,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         boardId="EFV8l"
         title="リッチメッセージを作る"
         description="1枚の画像を面に分けて、押した面ごとに動く"
-        band={<p className={styles.readonly} role="status">閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</p>}
+        band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
         <Card padding="none" layout="vertical" className={styles.card}>

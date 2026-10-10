@@ -130,14 +130,7 @@
   .insertRow { flex-direction: column; align-items: stretch; gap: var(--tpl-body-gap); }
 }
 
-/* 閲覧のみの帯（決まり：押せない操作は置かず、帯で知らせる）。 */
-.readonly {
-  display: flex; align-items: center; gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ro-band-lh);
-}
+/* 閲覧のみの案内は ReadOnlyNotice が持つ。 */
 
 /* 比べる窓の中の差分。 */
 .diffList { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--tpl-side-row-gap); color: var(--color-ink); font-size: var(--text-label); }

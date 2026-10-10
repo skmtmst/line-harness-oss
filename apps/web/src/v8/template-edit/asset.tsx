@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 /*
  * ★V8「クーポンを作る」（絵 S6FEuB）・「リサーチを作る」（絵 EsYo4）。
  *
@@ -409,7 +411,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         boardId={meta.board}
         title={meta.heading}
         description={meta.lead}
-        band={<p className={styles.readonly} role="status">閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</p>}
+        band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
         <Card padding="none" layout="vertical" className={styles.card}>

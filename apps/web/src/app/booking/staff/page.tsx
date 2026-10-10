@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 import { PageHeading } from '@/components/templates/page-frame'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -173,7 +175,7 @@ export default function BookingStaffPage() {
         </Button> : null}
       </div>
 
-      {!canManageStaff ? <p role="status">閲覧のみで見ています。予約スタッフの変更には予約設定の変更権限が必要です。</p> : null}
+      {!canManageStaff ? <ReadOnlyNotice>閲覧のみで見ています。予約スタッフの変更には予約設定の変更権限が必要です。</ReadOnlyNotice> : null}
 
       {!selectedAccountId ? (
         <div className="bg-canvas rounded-card border border-hairline">
