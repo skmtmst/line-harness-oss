@@ -85,11 +85,11 @@ describe('#669 成功の緑を success に1本化する', () => {
   it('実Reactで描いた成功の札と通知に文が出る', () => {
     const html = renderToStaticMarkup(
       <div>
-        <StatusBadge tone="success">送信完了</StatusBadge>
+        <StatusBadge tone="success">送信済み</StatusBadge>
         <Notice tone="success" message="保存しました" />
       </div>,
     )
-    expect(html).toContain('送信完了')
+    expect(html).toContain('送信済み')
     expect(html).toContain('保存しました')
   })
 })
