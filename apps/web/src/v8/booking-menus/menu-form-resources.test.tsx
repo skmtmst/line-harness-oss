@@ -13,6 +13,7 @@
  *   - 選び直した値が保存 request に載ること
  */
 import React from 'react'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -121,6 +122,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
       tags: { list: (...args: unknown[]) => fixture.tagsList!(...(args as [])) },
     },
     bookingApi: {
+      putStaffMenus: async () => ({ ok: true }),
+      getStaffMenus: async () => ({ matrix: [] }),
       listStaff: async () => ({ staff: [{ id: 'staff-a', display_name: '担当A', is_active: 1 }] }),
       listStaffMenusBulk: async () => ({ staff: [{ staff_id: 'staff-a', matrix: [{ menu_id: 'menu-1', is_offered: 1 }] }] }),
       updateMenu: (...args: unknown[]) => fixture.updateMenu!(...args),
@@ -179,7 +182,7 @@ beforeEach(() => {
   fixture.selectedAccountId = 'account-a'
   fixture.activeTab = 'menus'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
-  fixture.updateMenu = vi.fn(async () => ({ ok: true }))
+  fixture.updateMenu = vi.fn(async () => ({ version: 2 }))
   fixture.patchMenu = vi.fn(async () => ({ ok: true }))
   fixture.listMenus = vi.fn(async () => ({ menus: [] }))
   fixture.getSettings = vi.fn(async () => ({ success: true, data: SETTINGS }))
@@ -349,5 +352,107 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     expect(screen.queryByRole('spinbutton', { name: '個室Aの必要数' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '設備の割当を保存する' }))
     await waitFor(() => expect(fixture.saveMenuResources).toHaveBeenCalledWith('account-a', 'menu-1', { expectedVersion: 1, resources: [] }))
+  })
+})
+
+describe('V8メニュー編集: 予約申込時に自動付与するタグ', () => {
+  function menu(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'menu-1',
+      name: 'カット',
+      category_label: null,
+      description: null,
+      duration_minutes: 60,
+      buffer_after_minutes: 0,
+      base_price: 8000,
+      price_mode: 'fixed',
+      sort_order: 0,
+      is_active: 1,
+      auto_tag_id: null as string | null,
+      concurrent_capacity: 1,
+      booking_window_days: null,
+      cutoff_hours_before: null,
+      cancel_deadline_hours_before: null,
+      intake_question: null,
+      assigned_staff: [{ id: 'staff-a', display_name: '担当A' }],
+      version: 1,
+      ...overrides,
+    }
+  }
+
+  async function openEditor(target: Record<string, unknown>) {
+    fixture.listMenus = vi.fn(async () => ({ menus: [menu(target)] }))
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByText('予約メニューを直す')
+  }
+  async function tagLabels() {
+    fireEvent.click(await screen.findByRole('button', { name: '予約後に付けるタグ' }))
+    const dialog = (await screen.findAllByRole('dialog')).at(-1)!
+    const labels = within(dialog).queryAllByRole('radio').map((item) => item.getAttribute('aria-label'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    return labels
+  }
+  function chosenTag() {
+    return screen.getByRole('button', { name: '予約後に付けるタグ' }).closest('[data-entity-picker-field]')!.textContent
+  }
+
+  test('候補は対象アカウントの有効タグだけ。整理済みも別アカウントも出さない', async () => {
+    await openEditor({ auto_tag_id: null })
+    const labels = await tagLabels()
+    expect(labels).toEqual(['予約中', '常連さん'])
+    expect(labels).not.toContain('旧キャンペーン')
+    expect(labels).not.toContain('B店のタグ')
+  })
+
+  test('アカウントを切り替えると、候補も切替先の有効タグになる', async () => {
+    await openEditor({ auto_tag_id: null })
+    expect(await tagLabels()).toEqual(['予約中', '常連さん'])
+    switchAccount('account-b')
+    await waitFor(() => expect(fixture.tagsList).toBeTruthy())
+    await screen.findByRole('button', { name: '予約後に付けるタグ' })
+    expect(await tagLabels()).toEqual(['B店のタグ', 'B店だけの分類'])
+  })
+
+  test('設定済みのタグが整理済みなら、黙って「なし」にせず選び直させる', async () => {
+    await openEditor({ auto_tag_id: 'tag-archived' })
+
+    // 値は残す。勝手に「なし」へ倒して気付かないまま保存させない。
+    expect(chosenTag()).toContain('旧キャンペーン（今は使えません）')
+    expect(await tagLabels()).toContain('旧キャンペーン（今は使えません）')
+    expect(screen.getByText(
+      '設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。',
+    )).toBeTruthy()
+  })
+
+  test('設定済みのタグが別アカウントのものでも、同じように選び直させる', async () => {
+    await openEditor({ auto_tag_id: 'tag-other-account' })
+    expect(chosenTag()).toContain('B店のタグ（今は使えません）')
+    expect(screen.getByText(
+      '設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。',
+    )).toBeTruthy()
+  })
+
+  test('選び直して保存すると、新しい auto_tag_id が保存 request に載る', async () => {
+    await openEditor({ auto_tag_id: 'tag-archived' })
+    await pickEntity('予約後に付けるタグ', '常連さん')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '変更を保存する' }))
+    })
+
+    await waitFor(() => { expect(fixture.updateMenu).toHaveBeenCalled() })
+    expect(fixture.updateMenu).toHaveBeenCalledWith(
+      'account-a',
+      'menu-1',
+      1,
+      expect.objectContaining({ auto_tag_id: 'tag-active-2' }),
+    )
+  })
+
+  test('使えるタグが1つも無いアカウントでは、タグなしで保存できることを出す', async () => {
+    fixture.tagsList = async () => ({ success: true, data: [TAGS[3]] })
+    await openEditor({ auto_tag_id: null })
+    expect(screen.queryByRole('button', { name: '予約後に付けるタグ' })).toBeNull()
+    expect(screen.getByText('このアカウントに使えるタグがありません。タグなしで保存できます。')).toBeTruthy()
   })
 })

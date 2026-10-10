@@ -393,6 +393,8 @@ export default function MenuFormV8() {
   const tagCandidates = tags.filter(
     (tag) => (tag.lineAccountId == null || tag.lineAccountId === selectedAccountId) && tag.status !== 'archived',
   )
+  const unavailableTag = tagStatus === 'ready' && autoTagId !== null && !tagCandidates.some((tag) => tag.id === autoTagId)
+  const unavailableTagName = tags.find((tag) => tag.id === autoTagId)?.name ?? '設定されていたタグ'
 
   const assignedIds = [...assigned].filter((id) => staff.some((person) => person.id === id))
   const activeResources = resources.filter((item) => item.isActive || resourceIds.has(item.id))
@@ -1177,7 +1179,7 @@ export default function MenuFormV8() {
                 </span>
               ) : tagStatus === 'error' ? (
                 <p className="text-ink-faint text-sm">タグを読み込めませんでした。タグなしで保存できます。</p>
-              ) : tagCandidates.length === 0 ? (
+              ) : tagCandidates.length === 0 && autoTagId === null ? (
                 <p className="text-ink-faint text-sm">このアカウントに使えるタグがありません。タグなしで保存できます。</p>
               ) : (
                 /* 打って絞り込める1つ選び（タグが多いアカウントでも探せる）。 */
@@ -1187,9 +1189,13 @@ export default function MenuFormV8() {
                   onChange={(value) => setAutoTagId(value === '' ? null : value)}
                   placeholder="付けるタグ：なし"
                   /* 「なし」は候補に入れず、空のときの見出し（placeholder）と × で表す。 */
-                  options={tagCandidates.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `付けるタグ：${tag.name}` }))}
+                  options={[
+                    ...tagCandidates.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `付けるタグ：${tag.name}` })),
+                    ...(unavailableTag ? [{ value: autoTagId!, label: `付けるタグ：${unavailableTagName}（今は使えません）`, disabled: true }] : []),
+                  ]}
                 /></SaveErrorField>
               )}
+              {unavailableTag && <p role="alert" className="text-ink-faint text-sm">設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。</p>}
               <div className={styles.toggleLineLead}>
                 <SaveErrorField names={["askQuestion","ask_question"]}><SettingCheckbox
                   label="予約するときに質問を出す"
