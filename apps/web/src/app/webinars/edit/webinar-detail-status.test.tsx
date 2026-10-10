@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaItem } from '@line-crm/shared'
 import type { Webinar, WebinarNotificationSettings } from '@/lib/api'
-import EditWebinarPage from './page'
+import VideoMediaLabel from '@/v8/webinar-edit/video-metadata'
+import { NOTIFICATION_ROW_STATE, NotificationStateBadge, notificationRowState, deliveryTimingSummary, missedNoticeSummary, completedNoticeSummary } from '@/v8/webinar-edit/notification-summary'
 
 /**
  * 監査 DETAIL-18・19・21 の固定検査。
@@ -19,15 +20,7 @@ import EditWebinarPage from './page'
  *   切った通知まで「送る」と読めてしまう。
  */
 
-const {
-  NOTIFICATION_ROW_STATE,
-  NotificationStateBadge,
-  VideoMediaLabel,
-  notificationRowState,
-  deliveryTimingSummary,
-  missedNoticeSummary,
-  completedNoticeSummary,
-} = EditWebinarPage.__testing
+
 
 function notificationSettings(overrides: Partial<WebinarNotificationSettings> = {}): WebinarNotificationSettings {
   return {
@@ -121,17 +114,17 @@ describe('通知概要の状態表示(DETAIL-19)', () => {
 
   it('4状態を色と文字で描き分け、未設定に成功色を付けない', () => {
     const cases: Array<['configured' | 'unset' | 'pending' | 'failed', string, string]> = [
-      ['configured', 'text-success', '設定済み'],
-      ['unset', 'text-ink-faint', '未設定'],
-      ['pending', 'text-ink-secondary', '確認中'],
-      ['failed', 'text-danger', '取得できません'],
+      ['configured', 'success', '設定済み'],
+      ['unset', 'neutral', '未設定'],
+      ['pending', 'info', '確認中'],
+      ['failed', 'danger', '取得できません'],
     ]
     for (const [state, tone, label] of cases) {
       const html = renderToStaticMarkup(<NotificationStateBadge state={state} />)
-      expect(html).toContain(tone)
+      expect(html).toContain(`data-tone="${tone}"`)
       expect(html).toContain(label)
-      expect(html).toContain('<svg')
-      if (state !== 'configured') expect(html).not.toContain('text-success')
+      expect(html).toContain('data-status-pill')
+      if (state !== 'configured') expect(html).not.toContain('data-tone="success"')
     }
     /* 4状態すべてが別の言葉になる */
     expect(new Set(Object.values(NOTIFICATION_ROW_STATE).map((view) => view.label)).size).toBe(4)
@@ -181,6 +174,33 @@ describe('通知の要約は有効フラグから組み立てる(WEBINAR-10)', (
 })
 
 describe('動画欄の表示名(DETAIL-18)', () => {
+  it('後の動画が先に届いても、前の動画の名前で上書きしない', async () => {
+    let resolveA!: (response: Response) => void
+    const pendingA = new Promise<Response>(resolve => { resolveA = resolve })
+    const response = (filename: string) => new Response(JSON.stringify({ success: true, data: { item: mediaItem({ filename }) } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => String(input).includes('media-a') ? pendingA : response('現在B.mov'))
+    await mount(<VideoMediaLabel webinar={webinar({ videoPrefix: 'videos/a', videoMediaId: 'media-a' })} />)
+    await mount(<VideoMediaLabel webinar={webinar({ videoPrefix: 'videos/b', videoMediaId: 'media-b' })} />)
+    expect(host.textContent).toContain('現在B.mov')
+    await act(async () => { resolveA(response('古いA.mov')); for (let i = 0; i < 5; i++) await Promise.resolve() })
+    expect(host.textContent).toContain('現在B.mov')
+    expect(host.textContent).not.toContain('古いA.mov')
+  })
+
+  it('店だけが切り替わっても以前の実名を残さず、失敗時は偽名を出さない', async () => {
+    let resolveB!: (response: Response) => void
+    const pendingB = new Promise<Response>(resolve => { resolveB = resolve })
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => String(input).includes('account-b') ? pendingB : new Response(JSON.stringify({ success: true, data: { item: mediaItem({ filename: '店A.mov' }) } }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    await mount(<VideoMediaLabel webinar={webinar({ videoPrefix: 'videos/a', videoMediaId: 'media-1' })} />)
+    expect(host.textContent).toContain('店A.mov')
+    await mount(<VideoMediaLabel webinar={webinar({ accountId: 'account-b', videoPrefix: 'videos/b', videoMediaId: 'media-1' })} />)
+    expect(host.textContent).not.toContain('店A.mov')
+    expect(host.textContent).toContain('設定済みの動画')
+    await act(async () => { resolveB(new Response('{}', { status: 404 })); for (let i = 0; i < 5; i++) await Promise.resolve() })
+    expect(host.textContent).toContain('設定済みの動画')
+    expect(host.textContent).not.toContain('店A.mov')
+  })
+
   it('選んだメディアの実ファイル名・種別・長さを出す', async () => {
     vi.stubGlobal('fetch', async () =>
       new Response(JSON.stringify({ success: true, data: { item: mediaItem(), folderName: null } }), {
@@ -190,8 +210,8 @@ describe('動画欄の表示名(DETAIL-18)', () => {
     )
     await mount(<VideoMediaLabel webinar={webinar({ videoPrefix: 'videos/recruit', videoMediaId: 'media-1' })} />)
     expect(host.textContent).toContain('オンボーディング本編.mov')
-    expect(host.textContent).toContain('動画')
-    expect(host.textContent).toContain('1:30')
+    expect(host.querySelector('[title]')?.getAttribute('title')).toContain('動画')
+    expect(host.querySelector('[title]')?.getAttribute('title')).toContain('動画・1:30')
     expect(host.textContent).not.toContain('recruit.mp4')
   })
 

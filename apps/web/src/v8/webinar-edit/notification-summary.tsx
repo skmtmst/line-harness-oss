@@ -1,0 +1,73 @@
+import type { WebinarNotificationSettings } from '@/lib/api'
+import StatusPill from '@/components/shared/status-pill'
+
+export type NotificationRowState = 'configured' | 'unset' | 'pending' | 'failed'
+export const NOTIFICATION_ROW_STATE = {
+  configured: { label: '設定済み', tone: 'success' },
+  unset: { label: '未設定', tone: 'neutral' },
+  pending: { label: '—（確認中）', tone: 'info' },
+  failed: { label: '取得できません', tone: 'danger' },
+} as const
+
+export function NotificationStateBadge({ state }: { state: NotificationRowState }) {
+  const view = NOTIFICATION_ROW_STATE[state]
+  return <StatusPill tone={view.tone}>{view.label}</StatusPill>
+}
+
+export function notificationRowState(
+  value: boolean | undefined,
+  ready: boolean,
+  failed: boolean,
+): NotificationRowState {
+  if (!ready) return 'pending'
+  if (failed) return 'failed'
+  return value ? 'configured' : 'unset'
+}
+
+/*
+  「当日・見逃し案内」の要約文は、時刻の有無ではなく保存された
+  各通知の有効フラグから組み立てる（監査 WEBINAR-10）。
+  全OFFで保存しても時刻の既定値は残るので、値だけ見ると
+  切った通知まで「送る」と読めてしまう。読み込み中・取得失敗・
+  まだ設定が無いのも「送る」ではないので、状態ごとに分ける。
+  説明は概要バッジと同じ NOTIFICATION_ROW_STATE の言葉を使う。
+*/
+export function deliveryTimingSummary(
+  settings: WebinarNotificationSettings | null,
+  ready: boolean,
+  failed: boolean,
+): string {
+  if (!ready) return NOTIFICATION_ROW_STATE.pending.label
+  if (failed) return NOTIFICATION_ROW_STATE.failed.label
+  if (!settings) return NOTIFICATION_ROW_STATE.unset.label
+  const parts: string[] = []
+  if (settings.dayBeforeEnabled) parts.push(`前日 ${settings.dayBeforeTime || '—'}`)
+  if (settings.hourBeforeEnabled) parts.push(settings.hourBeforeMinutes ? `${settings.hourBeforeMinutes}分前` : '開始前')
+  if (settings.startEnabled) parts.push('開始時')
+  return parts.length > 0 ? parts.join('／') : '送りません'
+}
+
+export function missedNoticeSummary(
+  settings: WebinarNotificationSettings | null,
+  ready: boolean,
+  failed: boolean,
+): string {
+  if (!ready) return NOTIFICATION_ROW_STATE.pending.label
+  if (failed) return NOTIFICATION_ROW_STATE.failed.label
+  if (!settings) return NOTIFICATION_ROW_STATE.unset.label
+  return settings.missedEnabled
+    ? `未視聴者へ翌日${settings.missedTime || '—'}に送信（期限${settings.missedWindowDays ?? 7}日）`
+    : '送りません'
+}
+
+export function completedNoticeSummary(
+  settings: WebinarNotificationSettings | null,
+  ready: boolean,
+  failed: boolean,
+): string {
+  if (!ready) return NOTIFICATION_ROW_STATE.pending.label
+  if (failed) return NOTIFICATION_ROW_STATE.failed.label
+  if (!settings) return NOTIFICATION_ROW_STATE.unset.label
+  return settings.completedEnabled ? '見終わった人へお礼を送信' : '送りません'
+}
+

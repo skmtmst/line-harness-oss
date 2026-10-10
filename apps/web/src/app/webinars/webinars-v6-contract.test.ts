@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'list-v8.tsx'), 'utf8')
-const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const EDIT = readUiSource(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'edit/participants-v8.tsx'), 'utf8')
 const REVIEW = fs.readFileSync(path.join(__dirname, 'edit/review-v8.tsx'), 'utf8')
 const ANALYTICS = fs.readFileSync(path.join(__dirname, 'edit/analytics-v8.tsx'), 'utf8')

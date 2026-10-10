@@ -35,6 +35,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './notifications.module.css'
+import { NotificationStateBadge, notificationRowState, deliveryTimingSummary, missedNoticeSummary, completedNoticeSummary } from './notification-summary'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -359,7 +360,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       <section className={form.card} data-gap="tight" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
         <div className={form.cardHeadRow}>
           <h2 id="webinar-notify-title" className={form.cardTitle}>通知とリマインド</h2>
-          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)}件・取消 ${count(overview?.cancelled)}件・合計 ${count(overview?.total)}件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)}人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)}件）` : emptyValue('unknown')}`}</HelpTip>
+          <HelpTip label="送った数と通知の対象">{`予定 ${count(overview?.pending)}件・取消 ${count(overview?.cancelled)}件・合計 ${count(overview?.total)}件。通知の対象：${overview?.audience ? `${formatNumber(overview.audience.people)}人（取消を除いた有効な申込。延べ予約は${formatNumber(overview.audience.bookings)}件）` : emptyValue('unknown')}`}<br /><NotificationStateBadge state={notificationRowState(settings ? SETTINGS_KEYS.filter(key => key.endsWith("Enabled")).some(key => Boolean(settings[key])) : undefined, loadState !== 'loading', loadState === 'error')} /><br />{deliveryTimingSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{missedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{completedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}</HelpTip>
         </div>
         <p className={styles.desc}>LINE で送るお知らせです。テストは全部をまとめて自分に送ります。</p>
         {notificationBody}

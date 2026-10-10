@@ -24,6 +24,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
+import VideoMetadata from './video-metadata'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -241,7 +242,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
     return () => registerSave(null)
   }, [registerSave, readOnly])
 
-  const fileName = webinar.videoPrefix ? (webinar.videoPrefix.split('/').pop() ?? webinar.videoPrefix) : null
+
   const showStages = asset !== undefined && asset !== null && asset.stage !== 'ready'
   const stageIndex = asset ? STAGE_ORDER.indexOf(asset.stage) : -1
   const firstOnce = webinar.schedule.find((rule) => rule.type === 'once' && rule.at)
@@ -300,8 +301,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         <div className={styles.videoRow}>
           <span className={styles.thumb} aria-hidden="true"><Play size={18} /></span>
           <span className={styles.videoText}>
-            <span className={styles.videoName} title={fileName ?? undefined}>{fileName ?? '動画がまだ選ばれていません'}</span>
-            <span className={styles.videoMeta}>{hasVideo ? `${fmtJaDuration(webinar.durationSeconds)}・16:9・自動再生なし` : '差し替えるから登録メディアの動画を選びます'}</span>
+            <VideoMetadata webinar={webinar} />
           </span>
           {readOnly ? null : <Button onClick={() => setReplaceOpen(true)}><Upload size={15} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</Button>}
         </div>

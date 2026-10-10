@@ -147,6 +147,19 @@ const buttons = () => [...document.querySelectorAll('button')] as HTMLButtonElem
 const buttonText = (text: string) => buttons().find((button) => button.textContent?.trim() === text)
 
 describe('V8 ウェビナーの編集', () => {
+  it('現在の通知の補足は有効フラグで組み立て、切ってある通知の時刻を出さない', async () => {
+    nav.search = 'id=webinar-1&pane=notifications'
+    await render(<WebinarEditV8 />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '送った数と通知の対象' })))
+    const summary = screen.getByRole('button', { name: '送った数と通知の対象' }).parentElement!.querySelector('[role="note"]')!
+    expect(summary.textContent).toContain('前日 19:00／開始時')
+    expect(summary.textContent).toContain('送りません')
+    expect(summary.textContent).toContain('見終わった人へお礼を送信')
+    expect(summary.textContent).not.toContain('15分前')
+    expect(summary.textContent).not.toContain('翌日10:00に送信')
+    expect(screen.getByText('設定済み').closest('[data-status-pill]')?.getAttribute('data-tone')).toBe('success')
+  })
+
   it('入口は保存された古いテーマがあっても現役のV8を出す', async () => {
     nav.search = 'id=webinar-1&pane=participants'
     await render(<EditPage />)
