@@ -2986,3 +2986,43 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   background: var(--color-canvas);
   box-shadow: var(--card-shadow);
 }
+
+/* B-159 / B-161 / B-180：採用済みの値。部品ごとの写しよりこの値を優先する。 */
+[data-theme='v8'] {
+  --text-body: 13px;
+  --text-label: 12px;
+  --radius-segment: 10px;
+  --color-table-head: #f7f8fa;
+  --color-focus-ring: #2563eb;
+  --shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12);
+  --shadow-float: var(--shadow-controls-pop);
+  --shadow-overlay: var(--shadow-controls-pop);
+  --select-menu-shadow: var(--shadow-controls-pop);
+  --v8-parts-dialog-shadow: var(--shadow-controls-pop);
+  --shadow-controls-toggle: 0 1px 2px rgba(29, 29, 31, 0.16);
+  --color-badge-neutral-bg: #94a3b81a; --color-badge-neutral: #475569;
+  --color-badge-success-bg: #16a34a1a; --color-badge-success: #087a3e;
+  --color-badge-warning-bg: #f973161a; --color-badge-warning: #c2410c;
+  --color-badge-danger-bg: #ef44441a; --color-badge-danger: #b91c1c;
+  --color-badge-info-bg: #2563eb1a; --color-badge-info: #1d4ed8;
+  --tpl-folder-create-h: 36px;
+  --tpl-folder-create-pad: 0 16px;
+  --tpl-button-h: 36px;
+  --tpl-button-pad-side: 16px;
+  --tpl-dialog-width: 560px;
+  --tpl-dialog-large-width: 720px;
+  --tpl-dialog-title-size: 18px;
+  --tpl-dialog-title-weight: 700;
+  --tpl-tabs-h: 36px;
+  --tpl-tabs-weight: 500;
+  --tpl-tabs-current-weight: 600;
+  --tpl-badge-h: 22px;
+  --tpl-tag-pill-h: 24px;
+  --tpl-section-title-size: 15px;
+  --tpl-section-title-weight: 700;
+  --tpl-field-label-size: 12px;
+  --tpl-field-label-weight: 500;
+  --tpl-card-pad: 16px;
+  --tpl-notice-pad: 12px 16px;
+  --tpl-thead-pad-side: 16px;
+}

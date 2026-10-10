@@ -149,7 +149,7 @@ button.item:disabled {
 
 [data-theme='v8'] .item {
   border: 0; border-radius: var(--polish-radius-control); color: var(--color-ink-secondary);
-  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow);
   font-family: var(--font-inter), Inter, sans-serif; line-height: 20px;
 }
 [data-theme='v8'] .current {

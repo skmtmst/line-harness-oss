@@ -260,7 +260,7 @@ export default function Dialog({
       data-design-content-padding={designContentPadding ? '' : undefined}
       style={({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
-        '--dialog-design-width': `${dialogWidth(designWidth ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
+        '--dialog-design-width': `${dialogWidth((designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth) ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),

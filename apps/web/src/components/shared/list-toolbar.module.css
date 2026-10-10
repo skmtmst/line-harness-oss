@@ -192,3 +192,6 @@
 [data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters > *,
 [data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1 > *,
 [data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .trailing { order: 0; }
+/* 畳む道具がない一覧では、実際の空き幅に合わせて折り返す。
+ * フォルダ列がある1440幅でも、検索・並び順・件数を切らない。 */
+[data-theme='v8'] .toolbar:not(:has(.optional)) { flex-wrap: wrap; }
