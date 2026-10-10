@@ -49,7 +49,6 @@ const KNOWN_FILES: string[] = [
   'app/accounts/new/page.tsx',
   'app/affiliates/affiliate-display.ts',
   'app/affiliates/tabs.tsx',
-  'app/booking/menus/new/page.tsx',
   'app/booking/menus/page.tsx',
   'app/emergency/page.tsx',
   'app/events/bookings/page.tsx',

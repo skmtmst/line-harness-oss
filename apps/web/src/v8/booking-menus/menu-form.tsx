@@ -888,7 +888,7 @@ export default function MenuFormV8() {
             <div className={styles.grid3}>
               <span className={styles.labelSmall}>かかる時間</span>
               <span className={styles.labelSmall}>金額（空なら「お問い合わせ」）</span>
-              <span className={styles.labelSmall}>予約したときのマイル</span>
+              <span className={styles.labelSmall}>予約したときのマイル <TextLink external href="/mileage?tab=earning-rules">設定を見る</TextLink></span>
               <span className={styles.unitField}>
                 <SaveErrorField names={["durationMinutes","duration_minutes"]}><NumberInput unit="分"
                   type="number"
@@ -1099,6 +1099,8 @@ export default function MenuFormV8() {
 
             <div className={styles.subSection}>
               <h2 className={styles.subTitle}>予約を受けたときにすること</h2>
+              <p className="text-ink-faint text-sm">予約を受け付けたことを知らせる：日時・メニュー・場所を書いた案内をLINEへ送ります。</p>
+              <p className="text-ink-faint text-sm">前日・開始前に思い出してもらう：確定した予約は、前日と設定時間前のリマインダへ登録されます。</p>
               {tagStatus === 'loading' ? (
                 <span className="inline-block w-full" aria-busy="true">
                   <span className="sr-only">タグを読み込んでいます</span>

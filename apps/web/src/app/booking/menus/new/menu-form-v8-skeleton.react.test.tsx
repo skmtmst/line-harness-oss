@@ -18,7 +18,7 @@ const fixture = vi.hoisted(() => ({
   listMenus: null as null | (() => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push?.(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -77,6 +77,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       mileage: { rules: async () => ({ success: true, data: [] }) },
     },
     bookingApi: {
+
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       listStaff: async () => ({ staff: [{ id: 'staff-a', display_name: '担当A', is_active: 1 }] }),
       getSettings: async () => ({ success: true, data: { bookingWindowDays: 30 } }),
