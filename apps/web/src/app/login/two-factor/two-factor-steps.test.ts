@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -12,7 +13,12 @@ describe('二段階認証の手順の列（m18e・320px）', () => {
   for (const page of ['app/login/two-factor/page.tsx', 'app/login/two-factor/setup/page.tsx']) {
     it(`${page} は狭い幅で1列`, () => {
       const source = readFileSync(join(APP, page), 'utf8')
-      expect(source).toContain('grid-cols-1 gap-2 text-xs sm:grid-cols-2')
+      if (page === 'app/login/two-factor/page.tsx') {
+        expect(readUiSource(join(APP, page))).toContain('scope="admin"')
+        const css = readFileSync(join(APP, 'v8/login/two-factor-ops.module.css'), 'utf8')
+        expect(css).toContain('flex-direction: column;')
+        expect(css).toContain('width: 100%;')
+      } else expect(source).toContain('grid-cols-1 gap-2 text-xs sm:grid-cols-2')
       expect(source).not.toContain('grid grid-cols-2 gap-2')
     })
   }

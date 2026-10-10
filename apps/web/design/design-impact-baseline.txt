@@ -124,7 +124,6 @@ shared-button-importer app/line-notifications/operator-notification-rules.tsx
 shared-button-importer app/line-notifications/operator/new/operator-new-v8.tsx
 shared-button-importer app/line-notifications/page.tsx
 shared-button-importer app/login/page.tsx
-shared-button-importer app/login/two-factor/page.tsx
 shared-button-importer app/login/two-factor/setup/page.tsx
 shared-button-importer app/mileage/action-score-tab.tsx
 shared-button-importer app/mileage/earning-rules/edit/page.tsx
