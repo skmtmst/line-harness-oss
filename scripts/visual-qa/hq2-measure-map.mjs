@@ -11,7 +11,6 @@ map.boards.BHEl9.state.click = ['佐野 直人さんの権限を変更']
 map.boards.I0w2e.state.click = ['アーカイブ']
 map.boards.X4JcOf.state.click = ['テンプレート「秋の新商品のお知らせ」の操作', '編集']
 map.boards.meBRB.state.click = ['秋の新商品のお知らせを配る']
-map.boards.p17Qku.state.click = []
 map.boards.p03ImY.url = '/hq/banners/project?id=banner-project-qa-1'
 map.boards.p03ImY.state.api = {
   match: 'GET /api/hq/banners/projects/banner-project-qa-1$',

@@ -1,180 +1,180 @@
 {
   "version": 1,
-  "authorization": "2026-10-10司令塔の列車16依頼：固定した写しは戻さず、必須検査の既知の失敗だけ理由付き一時許可。未知の対象・値・件数増・期限切れは失敗。",
+  "authorization": "2026-10-10司令塔の列車16依頼：固定した写しは戻さず、必須検査の既知の失敗だけ理由付き一時許可。未知の対象・値・件数増・期限切れは失敗。 2026-10-11司令塔のmapregen2依頼：10-11固定版で再照合し、解消済みは削除。期限は延長しない。",
   "base": "41d2589c97fa1b783311081310c6284210235a5a",
   "design": [
     {
-      "match": "不一致: pagination の border-color\n    設計 Pencil 2026-10-10 19:37 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #087a3e\n    実際 transparent\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
+      "match": "不一致: pagination の border-color\n    設計 Pencil 2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #087a3e\n    実際 transparent\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
-      "match": "不一致: pagination の background\n    設計 Pencil 2026-10-10 19:37 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #e8f5ec\n    実際 #1d1d1f\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
+      "match": "不一致: pagination の background\n    設計 Pencil 2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #e8f5ec\n    実際 #1d1d1f\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
-      "match": "不一致: pagination の color\n    設計 Pencil 2026-10-10 19:37 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #087a3e\n    実際 #ffffff\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
+      "match": "不一致: pagination の color\n    設計 Pencil 2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #087a3e\n    実際 #ffffff\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "V8不一致: リンク の fw\n    設計 Pencil g5Db8 = 500\n    実際 400",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "V8不一致: 動きの行 の fw\n    設計 Pencil EsjP2 = 500\n    実際 400",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "V8不一致: チェックのカード/オン の sw\n    設計 Pencil w6uYMd = 2\n    実際 1",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "V8不一致: チェックのカード/オン の fs\n    設計 Pencil w6uYMd = 13\n    実際 12",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "V8不一致: チェックのカード/オン の lh\n    設計 Pencil w6uYMd = 20\n    実際 18",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "V8不一致: 切り替え（3つ） の fw\n    設計 Pencil dtJVi = 600\n    実際 400",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "V8不一致: 削除ボタン の r\n    設計 Pencil prbOC = 16\n    実際 10",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "V8不一致: タブ の fw\n    設計 Pencil clV5c = 600\n    実際 400",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: 絞り込みの札/オン background src/components/shared/filter-chip.css [data-theme='v8'] .v6-filter-chip[aria-pressed='true'] background\n    設計 html/components-ZBjxY.html XGJDa 絞り込みの札/オン = #e8f5ec\n    実際 #1d1d1f",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: 絞り込みの札/オン color src/components/shared/filter-chip.css [data-theme='v8'] .v6-filter-chip[aria-pressed='true'] color\n    設計 html/components-ZBjxY.html XGJDa 文字 = #087a3e\n    実際 #ffffff",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: 絞り込みの札/オン outline-color src/components/shared/filter-chip.css [data-theme='v8'] .v6-filter-chip[aria-pressed='true'] outline-color\n    設計 html/components-ZBjxY.html XGJDa 絞り込みの札/オン = #087a3e\n    実際 #1d1d1f",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: 切り替え（3つ） background src/components/shared/segmented.module.css [data-theme='v8'] .selected background\n    設計 html/components-ZBjxY.html dtJVi 項目1 = #e8f5ec\n    実際 宣言なし（継承元の確認が必要）",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: 切り替え（3つ） color src/components/shared/segmented.module.css [data-theme='v8'] .selected color\n    設計 html/components-ZBjxY.html dtJVi 文字 = #087a3e\n    実際 #1d1d1f",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: 表の見出し（B-178） padding src/components/shared/table.module.css [data-theme='v8'] .headRow[data-table-layout='columns'] padding\n    設計 html/components-NbomF.html ASVsl 表の見出し（B-178） = 0px 24px\n    実際 13px 20px",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: ラジオ/オン width src/components/shared/radio.module.css .input width\n    設計 html/components-ZBjxY.html y4YQSB 丸 = 16px\n    実際 18px",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: ラジオ/オン height src/components/shared/radio.module.css .input height\n    設計 html/components-ZBjxY.html y4YQSB 丸 = 16px\n    実際 18px",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: ラジオ/オン outline-width src/components/shared/radio.module.css [data-theme='v8'] .input:checked outline-width\n    設計 html/components-ZBjxY.html y4YQSB 丸 = 1.5px\n    実際 5px",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: 選ぶカード/オン B-203 background-color src/components/shared/radio-card.module.css .card.checked background\n    設計 html/components-NbomF.html fNPdg = #f1f8f3\n    実際 #e8f8ee",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: チェックのカード/オン B-203 background-color src/components/shared/check-card.module.css .card.checked background\n    設計 html/components-NbomF.html w6uYMd = #f1f8f3\n    実際 #e8f8ee",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: 一斉配信一覧の名前 B-218 src/v8/broadcasts/list.module.css .cellTitle font-weight\n    設計 html/l5V9a.html 名前（一覧共通の決まりB-218） = 700\n    実際 500",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: シナリオ一覧の名前 B-218 src/v8/scenarios/list.module.css .cellTitle color\n    設計 html/l5V9a.html 名前（一覧共通の決まりB-218） = #1d1d1f\n    実際 #087a3e",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     },
     {
       "match": "固定値不一致: シナリオ一覧の名前 B-218 src/v8/scenarios/list.module.css .cellTitle font-weight\n    設計 html/l5V9a.html 名前（一覧共通の決まりB-218） = 700\n    実際 宣言なし（継承元の確認が必要）",
       "count": 1,
-      "reason": "MAPREGEN-1010-REPORT.md の既知25件。固定した★V8の写しを保ち、pendecが実装を合わせるまでの一時許可。",
+      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
       "owner": "pendec",
       "expires": "2026-10-17"
     }
@@ -503,30 +503,6 @@
       "pattern": "filter",
       "signal": "growing-select",
       "text": "<SaveErrorField names={[\"op\",\"c.op\"]}><Select"
-    },
-    {
-      "match": "[\"a\",\"filter\",\"apps/web/src/v8/restaurant/booking-kit/shell.tsx\",\"growing-select\",\"const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={[\\\"selectedStoreId\\\",\\\"selected_store_id\\\"]}>\"]",
-      "count": 1,
-      "reason": "rest1の固定Penにあるヘッダーの店舗選択。予約の対象店と見た目をこの統合で維持し、持ち主担当が増える候補の共通部品への移行を絵と照合する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "train16",
-      "file": "apps/web/src/v8/restaurant/booking-kit/shell.tsx",
-      "pattern": "filter",
-      "signal": "growing-select",
-      "text": "const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={[\"selectedStoreId\",\"selected_store_id\"]}>"
-    },
-    {
-      "match": "[\"a\",\"filter\",\"apps/web/src/v8/restaurant/dashboard/dashboard.tsx\",\"growing-select\",\"<><Select aria-label=\\\"店舗\\\" value={d.store.id} options={[{value:d.store.id,label:`店舗：${d.store.name}`}]} onChange={()=>{}}/>{canWrite?<><Button presentation=\\\"restaurant\\\" onClick={()\"]",
-      "count": 1,
-      "reason": "rest1の固定Penにあるヘッダーの店舗選択。予約の対象店と見た目をこの統合で維持し、持ち主担当が増える候補の共通部品への移行を絵と照合する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "train16",
-      "file": "apps/web/src/v8/restaurant/dashboard/dashboard.tsx",
-      "pattern": "filter",
-      "signal": "growing-select",
-      "text": "<><Select aria-label=\"店舗\" value={d.store.id} options={[{value:d.store.id,label:`店舗：${d.store.name}`}]} onChange={()=>{}}/>{canWrite?<><Button presentation=\"restaurant\" onClick={() "
     },
     {
       "match": "[\"a\",\"filter\",\"apps/web/src/v8/tag-edit/search-edit.tsx\",\"growing-select\",\"<SaveErrorField names={[\\\"op\\\",\\\"condition.op\\\"]}><Select aria-label=\\\"タグの比較\\\" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label\"]",
@@ -1043,30 +1019,6 @@
       "pattern": "picker-field",
       "signal": "select-entity",
       "text": "<SaveErrorField names={[\"size\"]}><Select"
-    },
-    {
-      "match": "[\"a\",\"picker-field\",\"apps/web/src/v8/restaurant/booking-kit/shell.tsx\",\"select-entity\",\"const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={[\\\"selectedStoreId\\\",\\\"selected_store_id\\\"]}>\"]",
-      "count": 1,
-      "reason": "rest1の固定Penにあるヘッダーの店舗選択。予約の対象店と見た目をこの統合で維持し、持ち主担当が増える候補の共通部品への移行を絵と照合する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "train16",
-      "file": "apps/web/src/v8/restaurant/booking-kit/shell.tsx",
-      "pattern": "picker-field",
-      "signal": "select-entity",
-      "text": "const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={[\"selectedStoreId\",\"selected_store_id\"]}>"
-    },
-    {
-      "match": "[\"a\",\"picker-field\",\"apps/web/src/v8/restaurant/dashboard/dashboard.tsx\",\"select-entity\",\"<><Select aria-label=\\\"店舗\\\" value={d.store.id} options={[{value:d.store.id,label:`店舗：${d.store.name}`}]} onChange={()=>{}}/>{canWrite?<><Button presentation=\\\"restaurant\\\" onClick={()\"]",
-      "count": 1,
-      "reason": "rest1の固定Penにあるヘッダーの店舗選択。予約の対象店と見た目をこの統合で維持し、持ち主担当が増える候補の共通部品への移行を絵と照合する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "train16",
-      "file": "apps/web/src/v8/restaurant/dashboard/dashboard.tsx",
-      "pattern": "picker-field",
-      "signal": "select-entity",
-      "text": "<><Select aria-label=\"店舗\" value={d.store.id} options={[{value:d.store.id,label:`店舗：${d.store.name}`}]} onChange={()=>{}}/>{canWrite?<><Button presentation=\"restaurant\" onClick={() "
     },
     {
       "match": "[\"a\",\"picker-field\",\"apps/web/src/v8/tag-edit/search-edit.tsx\",\"select-entity\",\"<SaveErrorField names={[\\\"op\\\",\\\"condition.op\\\"]}><Select aria-label=\\\"タグの比較\\\" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label\"]",
@@ -1669,42 +1621,6 @@
       "text": "<CheckedField id=\"vs-mul-to\" label=\"期間の終わり（任意）\" fields={fields} name=\"to\"><SaveErrorField names={[\"to\"]}><DateField {...checkedProps(fields, 'to', 'vs-mul-to')} value={to} onChange"
     },
     {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/app/accounts/new/register-v8.tsx\",\"own-invalid\",\"<div><Field label=\\\"Messaging API のチャネルシークレット\\\" htmlFor=\\\"v8-channel-secret\\\" required><SaveErrorField names={[\\\"channelSecret\\\",\\\"form.channelSecret\\\",\\\"channel_secret\\\",\\\"form.channel_secre\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/app/accounts/new/register-v8.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<div><Field label=\"Messaging API のチャネルシークレット\" htmlFor=\"v8-channel-secret\" required><SaveErrorField names={[\"channelSecret\",\"form.channelSecret\",\"channel_secret\",\"form.channel_secre"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/app/accounts/new/register-v8.tsx\",\"own-invalid\",\"<div><Field label=\\\"LINE Login のチャネルシークレット\\\" htmlFor=\\\"v8-login-channel-secret\\\" required><SaveErrorField names={[\\\"loginChannelSecret\\\",\\\"form.loginChannelSecret\\\",\\\"login_channel_secret\\\",\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/app/accounts/new/register-v8.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<div><Field label=\"LINE Login のチャネルシークレット\" htmlFor=\"v8-login-channel-secret\" required><SaveErrorField names={[\"loginChannelSecret\",\"form.loginChannelSecret\",\"login_channel_secret\","
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/app/accounts/new/register-v8.tsx\",\"own-invalid\",\"<div><Field label=\\\"表示名\\\" htmlFor=\\\"v8-display-name\\\"><SaveErrorField names={[\\\"name\\\",\\\"form.name\\\"]}><input id=\\\"v8-display-name\\\" className={styles.fieldInput} value={form.name} onChange=\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/app/accounts/new/register-v8.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<div><Field label=\"表示名\" htmlFor=\"v8-display-name\"><SaveErrorField names={[\"name\",\"form.name\"]}><input id=\"v8-display-name\" className={styles.fieldInput} value={form.name} onChange="
-    },
-    {
       "match": "[\"a\",\"field-error\",\"apps/web/src/app/booking/prepay-badge-v8.tsx\",\"raw-alert\",\"if (loadError) return <SaveErrorScope errors={saveErrors}><div role=\\\"alert\\\"><p>前払い情報を読み込めませんでした</p><Button onClick={reload}>もう一度読み込む</Button></div></SaveErrorScope>\"]",
       "count": 1,
       "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
@@ -1715,30 +1631,6 @@
       "pattern": "field-error",
       "signal": "raw-alert",
       "text": "if (loadError) return <SaveErrorScope errors={saveErrors}><div role=\"alert\"><p>前払い情報を読み込めませんでした</p><Button onClick={reload}>もう一度読み込む</Button></div></SaveErrorScope>"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/app/webinars/edit/basic-v8.tsx\",\"own-invalid\",\"<div className=\\\"wb-basic-fieldFull\\\"><Field label={<>名前 </>} htmlFor=\\\"webinar-basic-title\\\" required><SaveErrorField names={[\\\"title\\\"]}><input id=\\\"webinar-basic-title\\\" aria-label=\\\"タイト\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/app/webinars/edit/basic-v8.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<div className=\"wb-basic-fieldFull\"><Field label={<>名前 </>} htmlFor=\"webinar-basic-title\" required><SaveErrorField names={[\"title\"]}><input id=\"webinar-basic-title\" aria-label=\"タイト"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/app/webinars/edit/basic-v8.tsx\",\"own-invalid\",\"<SaveErrorField names={[\\\"slug\\\"]}><input id=\\\"webinar-basic-slug\\\" value={slug} onChange={(event) => setSlug(event.target.value)} className=\\\"wb-basic-input\\\" aria-invalid={Boolean(fiel\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/app/webinars/edit/basic-v8.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<SaveErrorField names={[\"slug\"]}><input id=\"webinar-basic-slug\" value={slug} onChange={(event) => setSlug(event.target.value)} className=\"wb-basic-input\" aria-invalid={Boolean(fiel"
     },
     {
       "match": "[\"a\",\"field-error\",\"apps/web/src/components/broadcasts/broadcast-form.tsx\",\"raw-alert\",\"<p role=\\\"status\\\">テンプレートを読み込んでいます…</p> : templateCandidatesStatus === 'error' ? <SaveErrorField names={[\\\"templatePickerFolderId\\\",\\\"template_picker_folder_id\\\"]}><p role=\\\"alert\\\">テンプレート\"]",
@@ -1801,66 +1693,6 @@
       "text": "return <><select id={props.id} aria-label={props['aria-label']} aria-invalid={Boolean(props.error || props.invalid) || undefined} disabled={props.disabled || props.loading} multipl"
     },
     {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/account-new/register.tsx\",\"own-invalid\",\"<SaveErrorField names={[\\\"channelId\\\",\\\"form.channelId\\\",\\\"channel_id\\\",\\\"form.channel_id\\\"]}><TextField id=\\\"v8-channel-id\\\" value={form.channelId} onChange={(event) => update('channelId',\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/account-new/register.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<SaveErrorField names={[\"channelId\",\"form.channelId\",\"channel_id\",\"form.channel_id\"]}><TextField id=\"v8-channel-id\" value={form.channelId} onChange={(event) => update('channelId', "
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/account-new/register.tsx\",\"own-invalid\",\"<SaveErrorField names={[\\\"channelSecret\\\",\\\"form.channelSecret\\\",\\\"channel_secret\\\",\\\"form.channel_secret\\\"]}><TextField id=\\\"v8-channel-secret\\\" type=\\\"password\\\" autoComplete=\\\"new-password\\\"\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/account-new/register.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<SaveErrorField names={[\"channelSecret\",\"form.channelSecret\",\"channel_secret\",\"form.channel_secret\"]}><TextField id=\"v8-channel-secret\" type=\"password\" autoComplete=\"new-password\" "
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/account-new/register.tsx\",\"own-invalid\",\"<SaveErrorField names={[\\\"loginChannelId\\\",\\\"form.loginChannelId\\\",\\\"login_channel_id\\\",\\\"form.login_channel_id\\\"]}><TextField id=\\\"v8-login-channel-id\\\" value={form.loginChannelId} onChange\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/account-new/register.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<SaveErrorField names={[\"loginChannelId\",\"form.loginChannelId\",\"login_channel_id\",\"form.login_channel_id\"]}><TextField id=\"v8-login-channel-id\" value={form.loginChannelId} onChange"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/account-new/register.tsx\",\"own-invalid\",\"<SaveErrorField names={[\\\"loginChannelSecret\\\",\\\"form.loginChannelSecret\\\",\\\"login_channel_secret\\\",\\\"form.login_channel_secret\\\"]}><TextField id=\\\"v8-login-channel-secret\\\" type=\\\"password\\\"\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/account-new/register.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<SaveErrorField names={[\"loginChannelSecret\",\"form.loginChannelSecret\",\"login_channel_secret\",\"form.login_channel_secret\"]}><TextField id=\"v8-login-channel-secret\" type=\"password\" "
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/account-new/register.tsx\",\"own-invalid\",\"<Field label=\\\"表示名\\\" htmlFor=\\\"v8-display-name\\\"><SaveErrorField names={[\\\"name\\\",\\\"form.name\\\"]}><TextField id=\\\"v8-display-name\\\" value={form.name} onChange={(event) => update('name', even\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/account-new/register.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<Field label=\"表示名\" htmlFor=\"v8-display-name\"><SaveErrorField names={[\"name\",\"form.name\"]}><TextField id=\"v8-display-name\" value={form.name} onChange={(event) => update('name', even"
-    },
-    {
       "match": "[\"a\",\"field-error\",\"apps/web/src/v8/automations/create/create.tsx\",\"raw-alert\",\"{inputError?.target === `v8-message-${row.key}` ? <p id=\\\"v8-action-error\\\" className={styles.inputError} role=\\\"alert\\\">{inputError.message}</p> : null}</Field>\"]",
       "count": 1,
       "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
@@ -1873,18 +1705,6 @@
       "text": "{inputError?.target === `v8-message-${row.key}` ? <p id=\"v8-action-error\" className={styles.inputError} role=\"alert\">{inputError.message}</p> : null}</Field>"
     },
     {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/common-vars-edit/edit.tsx\",\"own-invalid\",\"<SaveErrorField names={[\\\"value\\\",\\\"saved\\\"]}><textarea id=\\\"cv-value\\\" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/common-vars-edit/edit.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<SaveErrorField names={[\"value\",\"saved\"]}><textarea id=\"cv-value\" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2"
-    },
-    {
       "match": "[\"a\",\"field-error\",\"apps/web/src/v8/contents/list.tsx\",\"raw-alert\",\"hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role=\\\"alert\\\">{selectionError}</span><Button size=\\\"compact\\\" onClick={() => readSelectableMedia()} busyLabel=\\\"処理\"]",
       "count": 1,
       "reason": "列車15の媒体全選択の取得エラー案内を維持し、再読込を共通Buttonの処理中表示へ接続したため検出文が変わった。エラー時の再試行を残し、持ち主担当が案内の共通化を確認する。",
@@ -1895,78 +1715,6 @@
       "pattern": "field-error",
       "signal": "raw-alert",
       "text": "hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role=\"alert\">{selectionError}</span><Button size=\"compact\" onClick={() => readSelectableMedia()} busyLabel=\"処理"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/inflow-links/ads.tsx\",\"own-invalid\",\"<Field label=\\\"流入元の名前\\\"><SaveErrorField names={[\\\"manualLabel\\\",\\\"sourceLabel\\\",\\\"manual_label\\\"]}><TextField id=\\\"ad-cost-name\\\" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} ar\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/inflow-links/ads.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<Field label=\"流入元の名前\"><SaveErrorField names={[\"manualLabel\",\"sourceLabel\",\"manual_label\"]}><TextField id=\"ad-cost-name\" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} ar"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/inflow-links/ads.tsx\",\"own-invalid\",\"<Field label=\\\"費用（円）\\\"><SaveErrorField names={[\\\"manualAmount\\\",\\\"manual_amount\\\"]}><NumberInput numericText unit=\\\"円\\\" id=\\\"ad-cost-amount\\\" aria-invalid={Boolean(manualFieldErrors['ad-cost\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/inflow-links/ads.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<Field label=\"費用（円）\"><SaveErrorField names={[\"manualAmount\",\"manual_amount\"]}><NumberInput numericText unit=\"円\" id=\"ad-cost-amount\" aria-invalid={Boolean(manualFieldErrors['ad-cost"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/inflow-links/ads.tsx\",\"own-invalid\",\"<Field label=\\\"取り消す理由\\\" required><SaveErrorField names={[\\\"cancelReason\\\",\\\"cancel_reason\\\"]}><TextField id=\\\"ad-cancel-reason\\\" aria-invalid={Boolean(cancelReasonError)} aria-describedby=\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/inflow-links/ads.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<Field label=\"取り消す理由\" required><SaveErrorField names={[\"cancelReason\",\"cancel_reason\"]}><TextField id=\"ad-cancel-reason\" aria-invalid={Boolean(cancelReasonError)} aria-describedby="
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/inflow-links/site-script.tsx\",\"own-invalid\",\"<Field label=\\\"サイトの名前\\\"><SaveErrorField names={[\\\"label\\\",\\\"siteDialog.label\\\",\\\"site_dialog.label\\\",\\\"site_dialog\\\"]}><TextField id=\\\"site-name\\\" aria-invalid={Boolean(siteFieldErrors['site-n\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/inflow-links/site-script.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<Field label=\"サイトの名前\"><SaveErrorField names={[\"label\",\"siteDialog.label\",\"site_dialog.label\",\"site_dialog\"]}><TextField id=\"site-name\" aria-invalid={Boolean(siteFieldErrors['site-n"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/inflow-links/site-script.tsx\",\"own-invalid\",\"<Field label=\\\"計測を許可するドメイン\\\"><SaveErrorField names={[\\\"domainsText\\\",\\\"siteDialog.domainsText\\\",\\\"domains_text\\\",\\\"site_dialog.domains_text\\\",\\\"site_dialog\\\"]}><TextArea id=\\\"site-domains\\\" aria\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/inflow-links/site-script.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<Field label=\"計測を許可するドメイン\"><SaveErrorField names={[\"domainsText\",\"siteDialog.domainsText\",\"domains_text\",\"site_dialog.domains_text\",\"site_dialog\"]}><TextArea id=\"site-domains\" aria"
-    },
-    {
-      "match": "[\"a\",\"field-error\",\"apps/web/src/v8/inflow-links/site-script.tsx\",\"own-invalid\",\"<Field label=\\\"止める理由\\\" required><SaveErrorField names={[\\\"reason\\\",\\\"stopDialog.reason\\\",\\\"stop_dialog.reason\\\",\\\"stop_dialog\\\"]}><TextField id=\\\"site-stop-reason\\\" aria-invalid={Boolean(stopR\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/inflow-links/site-script.tsx",
-      "pattern": "field-error",
-      "signal": "own-invalid",
-      "text": "<Field label=\"止める理由\" required><SaveErrorField names={[\"reason\",\"stopDialog.reason\",\"stop_dialog.reason\",\"stop_dialog\"]}><TextField id=\"site-stop-reason\" aria-invalid={Boolean(stopR"
     },
     {
       "match": "[\"a\",\"tabs\",\"apps/web/src/v8/affiliates/report.tsx\",\"push-tab\",\"{ id: 'approvals', label: 'この人の成果承認を開く', external: false, href: `/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`, onSelect: () => router.push(`/affiliates?tab=ap\"]",
@@ -2689,126 +2437,6 @@
       "text": "<SaveErrorField names={[\"selectedFolder\",\"selected_folder\"]}><Select"
     },
     {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/affiliates/approvals.tsx\",\"prop:className\",\"<Tr key={item.eventId} className={styles.row} data-table-layout=\\\"columns\\\" onOpen={() => setDetailItem(item)}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/affiliates/approvals.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr key={item.eventId} className={styles.row} data-table-layout=\"columns\" onOpen={() => setDetailItem(item)}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/affiliates/report.tsx\",\"prop:className\",\"<Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout=\\\"columns\\\" onOpen={() => openDrawer(row.id)}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/affiliates/report.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout=\"columns\" onOpen={() => openDrawer(row.id)}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/auto-replies/runs.tsx\",\"prop:className\",\"<Tr key={item.id} className={styles.row} data-table-layout=\\\"columns\\\" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/auto-replies/runs.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr key={item.id} className={styles.row} data-table-layout=\"columns\" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/automations/common-actions.tsx\",\"prop:className\",\"<Tr key={item.id} className={styles.row} data-table-layout=\\\"columns\\\" data-row-id={item.id} href={versionsHref(item.id)}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/automations/common-actions.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr key={item.id} className={styles.row} data-table-layout=\"columns\" data-row-id={item.id} href={versionsHref(item.id)}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/automations/runs.tsx\",\"prop:className\",\"<Tr key={run.id} className={styles.row} data-table-layout=\\\"columns\\\" data-row-id={run.id} onOpen={() => setSelectedRun(run)}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/automations/runs.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr key={run.id} className={styles.row} data-table-layout=\"columns\" data-row-id={run.id} onOpen={() => setSelectedRun(run)}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/friend-add/list.tsx\",\"prop:className\",\"<Tr key={sinkRule.id} className={`${styles.row} ${styles.sinkRow}`} data-table-layout=\\\"columns\\\" data-row-id={sinkRule.id} href={editHref(sinkRule.id)}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/friend-add/list.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr key={sinkRule.id} className={`${styles.row} ${styles.sinkRow}`} data-table-layout=\"columns\" data-row-id={sinkRule.id} href={editHref(sinkRule.id)}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/inflow-links/detail.tsx\",\"prop:className\",\"<Tr key={friend.id} className={styles.row} data-table-layout=\\\"columns\\\" href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/inflow-links/detail.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr key={friend.id} className={styles.row} data-table-layout=\"columns\" href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/inflow-links/list.tsx\",\"prop:className\",\"<Tr key={r.refCode} href={r.source === 'entry_route' && r.entryRouteId ? `/inflow-links/detail?id=${encodeURIComponent(r.entryRouteId)}` : undefined} className={styles.row} data-ta\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/inflow-links/list.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr key={r.refCode} href={r.source === 'entry_route' && r.entryRouteId ? `/inflow-links/detail?id=${encodeURIComponent(r.entryRouteId)}` : undefined} className={styles.row} data-ta"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/nen-campaigns/list.tsx\",\"prop:className\",\"<Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout=\\\"columns\\\" onOpen={() => props.onPreviewCampaign(setting.campaignKey)}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/nen-campaigns/list.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr data-row-id={setting.campaignKey} key={setting.campaignKey} className={styles.row} data-table-layout=\"columns\" onOpen={() => props.onPreviewCampaign(setting.campaignKey)}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/nen-campaigns/list.tsx\",\"prop:className\",\"<Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout=\\\"columns\\\" selected={props.selectedColumnId === column.id} onOpen={() => props.onSelectColumn(co\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/nen-campaigns/list.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr data-row-id={column.id} key={column.id} className={styles.row} data-table-layout=\"columns\" selected={props.selectedColumnId === column.id} onOpen={() => props.onSelectColumn(co"
-    },
-    {
       "match": "[\"b\",\"table\",\"apps/web/src/v8/nen-members/list.tsx\",\"prop:className\",\"<GridHeadRow className={`${styles.mRow} ${styles.mHead}`}>\"]",
       "count": 1,
       "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
@@ -2831,138 +2459,6 @@
       "pattern": "table",
       "signal": "prop:className",
       "text": "<GridRow className={styles.mRow} data-row-id={member.friendId}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/restaurant/menu/menu.tsx\",\"prop:className\",\"<Tr data-row-id={item.id} key={item.id} className={styles.row} onOpen={() => openEdit(item)}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/restaurant/menu/menu.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr data-row-id={item.id} key={item.id} className={styles.row} onOpen={() => openEdit(item)}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/webinar-edit/participants.tsx\",\"prop:className\",\"<Tr data-row-id={participant.friendId} key={participant.friendId} className={styles.row} data-table-layout=\\\"columns\\\" href={`/friends/detail?id=${encodeURIComponent(participant.frie\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/webinar-edit/participants.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<Tr data-row-id={participant.friendId} key={participant.friendId} className={styles.row} data-table-layout=\"columns\" href={`/friends/detail?id=${encodeURIComponent(participant.frie"
-    },
-    {
-      "match": "[\"b\",\"field\",\"apps/web/src/v8/tags/mark-basic-fields.tsx\",\"prop:className\",\"<Field label=\\\"マーク名\\\"><SaveErrorField names={[\\\"name\\\"]}><TextField ref={nameRef} aria-label=\\\"マーク名\\\" invalid={Boolean(error)} disabled={disabled} className={styles.input} value={name} o\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/tags/mark-basic-fields.tsx",
-      "pattern": "field",
-      "signal": "prop:className",
-      "text": "<Field label=\"マーク名\"><SaveErrorField names={[\"name\"]}><TextField ref={nameRef} aria-label=\"マーク名\" invalid={Boolean(error)} disabled={disabled} className={styles.input} value={name} o"
-    },
-    {
-      "match": "[\"b\",\"primary-button\",\"apps/web/src/v8/settings/staff/staff.tsx\",\"prop:className\",\"return <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface} open title=\\\"ログインユーザーを編集する\\\" onCancel={onClose} footer={<div className=\\\"mt-6 flex justify-end gap-2\\\"><Butt\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/settings/staff/staff.tsx",
-      "pattern": "primary-button",
-      "signal": "prop:className",
-      "text": "return <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface} open title=\"ログインユーザーを編集する\" onCancel={onClose} footer={<div className=\"mt-6 flex justify-end gap-2\"><Butt"
-    },
-    {
-      "match": "[\"b\",\"toggle\",\"apps/web/src/app/webinars/edit/video-v8.tsx\",\"prop:className\",\"<SaveErrorField names={[\\\"noEnd\\\",\\\"publicationEndsAt\\\",\\\"no_end\\\"]}><Checkbox checked={noEnd} disabled={!canEdit} onCheckedChange={setNoEnd} className=\\\"mt-2 text-xs\\\">\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/app/webinars/edit/video-v8.tsx",
-      "pattern": "toggle",
-      "signal": "prop:className",
-      "text": "<SaveErrorField names={[\"noEnd\",\"publicationEndsAt\",\"no_end\"]}><Checkbox checked={noEnd} disabled={!canEdit} onCheckedChange={setNoEnd} className=\"mt-2 text-xs\">"
-    },
-    {
-      "match": "[\"b\",\"toggle\",\"apps/web/src/components/broadcasts/broadcast-form.tsx\",\"prop:className\",\"<SaveErrorField names={[\\\"broadcast-delivery-method\\\",\\\"value\\\",\\\"deliveryMethod\\\"]}><RadioCardGroup legend=\\\"配信方法\\\" className={styles.methodCards}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
-      "pattern": "toggle",
-      "signal": "prop:className",
-      "text": "<SaveErrorField names={[\"broadcast-delivery-method\",\"value\",\"deliveryMethod\"]}><RadioCardGroup legend=\"配信方法\" className={styles.methodCards}>"
-    },
-    {
-      "match": "[\"b\",\"toggle\",\"apps/web/src/components/broadcasts/broadcast-form.tsx\",\"prop:className\",\"<SaveErrorField names={[\\\"broadcast-target-mode\\\",\\\"value\\\",\\\"mode.value\\\",\\\"targetMode\\\"]}><RadioCardGroup legend=\\\"配信対象\\\" className={styles.audienceCards}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
-      "pattern": "toggle",
-      "signal": "prop:className",
-      "text": "<SaveErrorField names={[\"broadcast-target-mode\",\"value\",\"mode.value\",\"targetMode\"]}><RadioCardGroup legend=\"配信対象\" className={styles.audienceCards}>"
-    },
-    {
-      "match": "[\"b\",\"toggle\",\"apps/web/src/components/broadcasts/broadcast-form.tsx\",\"prop:className\",\"<SaveErrorField names={[\\\"broadcast-send-mode\\\",\\\"sendMode\\\",\\\"spreadMinutes\\\"]}><RadioCardGroup legend=\\\"配信日\\\" className={styles.methodCards}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
-      "pattern": "toggle",
-      "signal": "prop:className",
-      "text": "<SaveErrorField names={[\"broadcast-send-mode\",\"sendMode\",\"spreadMinutes\"]}><RadioCardGroup legend=\"配信日\" className={styles.methodCards}>"
-    },
-    {
-      "match": "[\"b\",\"toggle\",\"apps/web/src/v8/hq-broadcasts/create.tsx\",\"prop:className\",\"<SaveErrorField names={[\\\"hq-broadcast-method\\\",\\\"value\\\",\\\"method\\\"]}><RadioCardGroup legend=\\\"配信方法\\\" className={formStyles.methodCards}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
-      "pattern": "toggle",
-      "signal": "prop:className",
-      "text": "<SaveErrorField names={[\"hq-broadcast-method\",\"value\",\"method\"]}><RadioCardGroup legend=\"配信方法\" className={formStyles.methodCards}>"
-    },
-    {
-      "match": "[\"b\",\"toggle\",\"apps/web/src/v8/hq-broadcasts/create.tsx\",\"prop:className\",\"<SaveErrorField names={[\\\"target\\\"]}><RadioCardGroup id=\\\"hq-send-target\\\" legend=\\\"配信対象\\\" className={formStyles.audienceCards}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
-      "pattern": "toggle",
-      "signal": "prop:className",
-      "text": "<SaveErrorField names={[\"target\"]}><RadioCardGroup id=\"hq-send-target\" legend=\"配信対象\" className={formStyles.audienceCards}>"
-    },
-    {
-      "match": "[\"b\",\"toggle\",\"apps/web/src/v8/hq-broadcasts/create.tsx\",\"prop:className\",\"<SaveErrorField names={[\\\"hq-broadcast-send-mode\\\",\\\"when\\\"]}><RadioCardGroup legend=\\\"配信日\\\" className={formStyles.methodCards}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
-      "pattern": "toggle",
-      "signal": "prop:className",
-      "text": "<SaveErrorField names={[\"hq-broadcast-send-mode\",\"when\"]}><RadioCardGroup legend=\"配信日\" className={formStyles.methodCards}>"
     }
   ],
   "skeleton": [

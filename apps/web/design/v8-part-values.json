@@ -1,11 +1,11 @@
 {
   "$description": "固定済みHTMLの共通部品を名前で照合し、解決済みインライン値を深さ2まで写したもの。refは書き出しで展開済み。pad=[上下,左右]または4辺。lhは倍率。自動幅・高さのbw/bhはHTMLに計算値がないため収録しない。色・影も収録。checksは色・状態・画面共通の決まりの照合。画面コードの値は読み取らない。",
   "$snapshot": {
-    "frozenAt": "2026-10-10 19:37 JST",
+    "frozenAt": "2026-10-11 03:10 JST",
     "generatedBy": "apps/web/scripts/regenerate-v8-design-values.mjs",
     "exports": {
       "html/components-ZBjxY.html": "dd7293f366bb6280982eced45d7868e226410421a7668d91087fe5ebf85cab23",
-      "html/components-NbomF.html": "a4b2178c623d713b654b6ddb7a5d4e2c6c53340d426e714d7be300a4cdd8f9b5",
+      "html/components-NbomF.html": "9a08e6c8d88f0a1c811635aaab7a593bfe9c82fbdf39a7c06a6d90529062c0c0",
       "html/l5V9a.html": "21346c78b46c84581b66b43b71a107ec5c994c1f5a7458066b67ec73963a57f4"
     }
   },

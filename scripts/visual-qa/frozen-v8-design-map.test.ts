@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error Node CLI helper
-import { regenerateFrozenMap } from './frozen-v8-design-map.mjs'
+import { regenerateFrozenMap, regenerateFrozen1011Map } from './frozen-v8-design-map.mjs'
 
 const board = (url: string) => ({ doc: 'V8-B', name: '旧', kind: '画面', route: url, url, routes: [url], width: 1440 })
 const row = (kind: string, old: string, next: string) => ({ 種類: kind, 旧ID: old, 新ID: next, 名前: '板', 文書: 'V8.pen', route: '', 備考: '' })
@@ -35,5 +35,38 @@ describe('2026-10-10 固定書き出しへの付け替え', () => {
     expect(result.map.replacements.gobhu).toBe('VIij4')
     expect(result.map.boards.gobhu).toBeUndefined()
     expect(result.routeRows[0]['新ID']).toBe('VIij4')
+  })
+})
+
+
+describe('2026-10-11 固定書き出し', () => {
+  const inventory = (id: string) => ({ 板ID: id, 文書: 'V8', 板の名前: '新しい画面', 区分: '地図', 幅: '1440' })
+  it('消えた板は削除前の一覧にあっても復活せず、旧から正への対応を保つ', () => {
+    const seed = { boards: { old: board('/old'), live: board('/live') }, replacements: { old: 'live' } }
+    const result = regenerateFrozen1011Map(seed, [{ 旧ID: 'old', 新ID: '（なし）' }], [inventory('old'), inventory('live')], { old: '旧', live: '正' }, {})
+    expect(result.map.boards.old).toBeUndefined()
+    expect(result.map.replacements.old).toBe('live')
+    expect(result.map.deletedBoards).toContain('old')
+    expect(result.routeRows[0].route).toBe('/live')
+    expect(seed.boards.old).toBeDefined()
+  })
+  it('新しい状態へ撮影データを引き継ぎ、正のタブ・幅・固定写しの置き場を持つ', () => {
+    const seed = { boards: { live: { ...board('/live'), state: { api: ['fixture'] }, shot: 'old.png' } } }
+    const specs = { added: { from: 'live', url: '/live?tab=info', width: 1152, state: { manual: '情報欄を開く' } } }
+    const result = regenerateFrozen1011Map(seed, [], [inventory('added')], { added: '情報欄' }, specs)
+    const entry = result.map.boards.added
+    expect(entry.route).toBe('/live')
+    expect(entry.url).toBe('/live?tab=info')
+    expect(entry.width).toBe(1152)
+    expect(entry.state).toEqual({ api: ['fixture'], manual: '情報欄を開く' })
+    expect(entry.exportHtml).toBe('html/added.html')
+    expect(entry.exportTexts).toBe('pencil-texts/added.tsv')
+    expect(entry.shot).toBeNull()
+    expect(regenerateFrozen1011Map(result.map, [], [inventory('added')], { added: '情報欄' }, specs).map).toEqual(result.map)
+  })
+  it('未対応の新しい板は場所を推測せず一覧にする', () => {
+    const result = regenerateFrozen1011Map({ boards: {} }, [], [inventory('unknown')], { unknown: '新しい画面' }, {})
+    expect(result.unresolved).toEqual(['unknown'])
+    expect(result.map.boards.unknown.url).toBeNull()
   })
 })
