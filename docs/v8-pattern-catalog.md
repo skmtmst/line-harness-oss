@@ -580,7 +580,7 @@
 - **持ち主（コード）**：`apps/web/src/components/shared/read-only-notice.tsx`・`read-only-notice.module.css`（部品 `ReadOnlyNotice`）
 - **持ち主（Pen）**：**未定**（部品IDは司令塔の確定待ち）
 - **見つけ方（コード）**：
-  - own-band：`\b(ViewerBand|ReadOnlyBand|viewerBand|roBand|readonlyBand|readOnlyBand)\b` — 閲覧のみの帯を画面ごとに作る
+  - own-band：`\b(ViewerBand|ReadOnlyBand|viewerBand|roBand|readonlyBand|readOnlyBand)\b` と `styles.readOnly` / `styles.readonly` / 同名の見た目CSS — 閲覧のみの帯を画面ごとに作る
   - words：`閲覧のみで(見て|ご覧)` — 閲覧のみの文を画面で書く
   - (c) の割り当て：直書きの selector が `viewer|readOnly|readonly|roBand` に当たればこの型
   - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）

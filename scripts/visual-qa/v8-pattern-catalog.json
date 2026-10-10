@@ -1953,7 +1953,7 @@
         "signals": [
           {
             "id": "own-band",
-            "re": "\\b(ViewerBand|ReadOnlyBand|viewerBand|roBand|readonlyBand|readOnlyBand)\\b",
+            "re": "\\b(ViewerBand|ReadOnlyBand|viewerBand|roBand|readonlyBand|readOnlyBand)\\b|(?:styles\\.|\\.)(?:readOnly|readonly)\\b",
             "why": "閲覧のみの帯を画面ごとに作る"
           },
           {

@@ -84,6 +84,10 @@ describe('型の対応表の点検', () => {
     // 正しい帯を1つ使っていても、隣に手書きした帯を見逃さない。
     put(root, rel, `${good}\nexport const Example = () => <><ReadOnlyNotice /><p className={styles.viewerBand}>閲覧のみで見ています</p></>\n`)
     expect(audit().status).toBe(1)
+    put(root, rel, `${good}\nexport const Example = () => <p className={styles.readOnly}>閲覧のみで見ています</p>\n`)
+    expect(audit().status).toBe(1)
+    put(root, rel, `${good}\nexport const Example = () => <p className={styles.readonly}>閲覧のみで見ています</p>\n`)
+    expect(audit().status).toBe(1)
     put(root, rel, `${good}\nexport const Example = () => <ReadOnlyNotice />\n`)
     expect(audit().status).toBe(0)
     put(root, rel, `${good}\nexport const Warning = () => <Notice tone="warn" role="alert">制約があります</Notice>\n`)
