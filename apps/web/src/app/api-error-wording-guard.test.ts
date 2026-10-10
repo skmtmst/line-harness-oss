@@ -109,7 +109,6 @@ const BASELINE: Record<string, number> = {
   'app/restaurant-test/v8/shell.tsx': 1,
   'app/rich-menus/edit/page.tsx': 4,
   'app/rich-menus/new/create-v8.tsx': 2,
-  'app/scenarios/detail/scenario-detail-client.tsx': 3,
   'app/scenarios/first-step/page.tsx': 1,
   'app/staff/email-change/page.tsx': 1,
   'app/staff/invite/page.tsx': 1,

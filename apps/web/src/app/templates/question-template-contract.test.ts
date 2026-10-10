@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(join(HERE, 'questions', 'new', 'page.tsx'), 'utf8')
 const templates = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const scenarios = readFileSync(join(HERE, '..', 'scenarios', 'detail', 'scenario-detail-client.tsx'), 'utf8')
+const scenarios = readFileSync(join(HERE, '..', '..', 'v8', 'scenario-detail', 'detail.tsx'), 'utf8')
 const editor = readFileSync(join(HERE, '..', '..', 'components', 'scenarios', 'question-editor.tsx'), 'utf8')
 
 describe('V6 質問テンプレート', () => {

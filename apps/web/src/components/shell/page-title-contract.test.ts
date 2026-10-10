@@ -62,7 +62,6 @@ const NOT_YET_MIGRATED = [
   'reminders/page.tsx',
   'restaurant-test/restaurant-console.tsx',
   'restaurant-test/terms/page.tsx',
-  'scenarios/detail/scenario-detail-client.tsx',
   'scenarios/first-step/page.tsx',
   'scenarios/mode/page.tsx',
   'scenarios/page.tsx',
@@ -97,7 +96,7 @@ describe('画面名は上部バーだけが持つ', () => {
       'health/page.tsx',
       // NEN配信の編集の古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した（入口は campaign-editor-v8.tsx。上部バーの名前は持たず、本文のパンくずで戻す）。
       'templates/detail/page.tsx',
-      'scenarios/detail/scenario-detail-client.tsx',
+      '../v8/scenario-detail/detail.tsx',
       'events/edit/page.tsx',
       // events/new/page.tsx は V8（v8/events/create.tsx が usePageTitle('イベントを作る') を持つ）を出すだけになった（2026-10-09 V7 削除）。
       'form-submissions/edit/page.tsx',
@@ -121,7 +120,7 @@ describe('画面名は上部バーだけが持つ', () => {
       ['health/page.tsx', 'BAN検知ダッシュボード'],
       ['templates/detail/page.tsx', 'テンプレートの詳細'],
       ['nen-campaigns/edit/campaign-editor-v8.tsx', 'NEN配信を編集する'],
-      ['scenarios/detail/scenario-detail-client.tsx', 'シナリオ詳細'],
+      ['../v8/scenario-detail/detail.tsx', 'シナリオ詳細'],
       ['webinars/edit/page.tsx', 'ウェビナー編集'],
     ]
     for (const [rel, title] of cleaned) {

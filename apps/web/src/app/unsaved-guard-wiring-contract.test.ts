@@ -478,8 +478,6 @@ const UNTRIAGED: Record<string, string> = {
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/restaurant-test/restaurant-console.tsx':
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/scenarios/detail/scenario-detail-client.tsx':
-    's1: シナリオ詳細。手動保存で番兵なし。V6R-S1-d（board#1065）で付ける',
   'app/templates/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/templates/list-v8.tsx':

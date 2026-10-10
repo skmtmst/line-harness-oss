@@ -10,6 +10,9 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, getByRole } from '@testing-library/react'
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const SCENARIO_ID = 'sc-1'
@@ -80,7 +83,7 @@ vi.mock('next/link', () => ({
     </a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),
 }))
 /* SCENARIO-20 でフォルダ候補の取得にアカウントを使うようになったため、
@@ -211,7 +214,7 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
   return json({ success: false, error: `未用意の経路: ${method} ${pathname}` }, 404)
 })
 
-const { default: ScenarioDetailClient } = await import('./scenario-detail-client')
+const { default: ScenarioDetailClient } = await import('@/v8/scenario-detail/detail')
 const { scenarioReferenceData } = await import('@/components/scenarios/scenario-reference-data')
 
 let host: HTMLDivElement
@@ -228,11 +231,22 @@ async function flush(times = 6) {
 }
 
 async function clickText(text: string) {
-  const button = [...host.querySelectorAll('button')].find((el) => el.textContent === text)
+  const button = [...document.querySelectorAll('button')].find((el) => el.textContent === text)
   expect(button, `ボタンが見つかりません: ${text}`).toBeTruthy()
   await act(async () => {
     button!.click()
   })
+}
+
+function plannedNumber() {
+  const card = [...host.querySelectorAll('[data-kpi-presentation]')].find((item) => item.querySelectorAll('[data-kpi-number]').length === 1 && item.textContent?.includes('始まる見込み（試算）'))
+  return card?.querySelector('[data-kpi-number]')?.textContent
+}
+
+async function toggleConcurrent() {
+  await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '名前・説明・置き場を変える' })) })
+  await act(async () => { fireEvent.click(getByRole(document.body, 'checkbox', { name: /同時購読を許可する/ })) })
+  await clickText('この内容で保存する')
 }
 
 /** 指定した呼び出し番号（0始まり）の手動試算を、人数つきで解決する。 */
@@ -246,6 +260,7 @@ async function resolveSimulate(callIndex: number, planned: number) {
 }
 
 beforeEach(async () => {
+  rememberStaffIdentity({ role: 'owner', permissionKeys: [] } as unknown as StaffMember)
   network.simulateCalls = 0
   network.simulateMode = 'auto'
   network.plannedNow = 10
@@ -273,56 +288,58 @@ afterEach(() => {
     mounted = false
   }
   host.remove()
+  forgetStaffIdentity()
 })
 
 describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => {
   it('対象条件の保存で新しい人数へ更新される', async () => {
     await flush()
-    expect(host.textContent).toContain('予約中 10人')
+    expect(plannedNumber()).toBe('10')
     const before = network.simulateCalls
     expect(before).toBeGreaterThan(0)
 
     network.plannedNow = 42
     // 「対象の絞り込み」の窓を開いて保存する。
-    await clickText('対象：全員')
+    await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: 'このシナリオのその他操作' })) })
+    await act(async () => { fireEvent.click(getByRole(document.body, 'menuitem', { name: '対象を絞る' })) })
     await clickText('対象を保存する')
     await flush()
 
     expect(network.updateBodies.length).toBe(1)
     expect(network.updateBodies[0]).toHaveProperty('audienceCondition')
     expect(network.simulateCalls).toBeGreaterThan(before)
-    expect(host.textContent).toContain('予約中 42人')
-    expect(host.textContent).not.toContain('予約中 10人')
+    expect(plannedNumber()).toBe('42')
+    expect(plannedNumber()).not.toBe('10')
   })
 
   it('同時購読の切替保存でも取り直す', async () => {
     await flush()
-    expect(host.textContent).toContain('予約中 10人')
+    expect(plannedNumber()).toBe('10')
     const before = network.simulateCalls
 
     network.plannedNow = 7
-    await clickText('同時購読を許可中')
+    await toggleConcurrent()
     await flush()
 
     expect(network.simulateCalls).toBeGreaterThan(before)
-    expect(host.textContent).toContain('予約中 7人')
+    expect(plannedNumber()).toBe('7')
   })
 
   it('取り直し中は古い人数を出さず、遅い旧試算は新しい版を上書きしない', async () => {
     await flush()
-    expect(host.textContent).toContain('予約中 10人')
+    expect(plannedNumber()).toBe('10')
 
     network.simulateMode = 'manual'
     // 1回目の保存 → 取り直しが走る（新しい呼び出しが pending に乗る）
     const pendingBefore = network.pendingSimulate.length
-    await clickText('同時購読を許可中')
+    await toggleConcurrent()
     await flush(3)
     // 古い「10人」は確定値として残らず、計算中と分かる。
-    expect(host.textContent).toContain('計算しています')
-    expect(host.textContent).not.toContain('予約中 10人')
+    expect(plannedNumber()).toBe('—')
+    expect(plannedNumber()).not.toBe('10')
 
     // 2回目の保存（同時購読を元に戻す）→ さらに新しい世代の取り直し。
-    await clickText('同時に購読できるシナリオは 1つ')
+    await toggleConcurrent()
     await flush(3)
     const latestIndex = network.pendingSimulate.length - 1
     expect(latestIndex).toBeGreaterThanOrEqual(pendingBefore + 1)
@@ -330,12 +347,12 @@ describe('SCENARIO-15: 設定を保存し直すと試算を取り直す', () => 
     // 新しい世代が先に届く → その値を出す。
     await resolveSimulate(latestIndex, 42)
     await flush(2)
-    expect(host.textContent).toContain('予約中 42人')
+    expect(plannedNumber()).toBe('42')
 
     // 遅れて届いた旧世代（pending の先頭）を解決しても上書きされない。
     await resolveSimulate(pendingBefore, 999)
     await flush(2)
-    expect(host.textContent).toContain('予約中 42人')
+    expect(plannedNumber()).toBe('42')
     expect(host.textContent).not.toContain('999人')
   })
 })

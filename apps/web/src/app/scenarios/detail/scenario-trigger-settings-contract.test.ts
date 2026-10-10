@@ -4,7 +4,7 @@
  * - U007: 同時購読のラベルと説明を一致させる。
  * - U027: シナリオ一覧のフォルダ領域をスマホで折り畳む。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -15,25 +15,16 @@ const DETAIL = readFileSync(join(HERE, 'scenario-detail-client.tsx'), 'utf8')
 const LIST = readFileSync(join(HERE, '..', '..', '..', 'v8', 'scenarios', 'list.tsx'), 'utf8')
 
 describe('U007: 同時購読のラベルと説明を一致させる', () => {
-  it('許可中・不許可で説明を切り替える。固定の説明ではない', () => {
-    // 許可中の説明
-    expect(DETAIL).toContain('いまは同時購読を許しています')
-    expect(DETAIL).toContain('このシナリオに入らなくなります')
-    // 不許可の説明
-    expect(DETAIL).toContain('いまは同時に1つだけです')
-    expect(DETAIL).toContain('押すと同時購読を許すようになります')
-    // 以前の「許可中でも停止する」とだけ書く固定文は残さない。
-    expect(DETAIL).not.toContain(
-      'title="別のシナリオを開始すると、いま流れているシナリオは停止します',
-    )
+  it('許可中・不許可で見出しの状態を変え、編集窓は同じ値を使う', () => {
+    expect(DETAIL).toContain("'同時購読を許可中' : '同時に1つだけ'")
+    expect(DETAIL).toContain('checked={editForm.allowConcurrent}')
+    expect(DETAIL).toContain('allowConcurrent: scenario.allowConcurrent !== false')
   })
 
-  it('説明は実挙動（他のシナリオが動いている人は登録しない）と同じ意味', () => {
-    // 編集フォーム側の既存の説明と同じ実挙動を、カードのヘルプでも書く。
-    expect(DETAIL).toContain('他のシナリオが動いている人は登録しない')
-    expect(DETAIL).toContain('他のシナリオが動いている人はこのシナリオに入りません')
-    // 実挙動を変える切替は今までどおり allowConcurrent の更新だけ。
-    expect(DETAIL).toContain('api.scenarios.update(id, { allowConcurrent: allow })')
+  it('許可の意味を説明し、保存した値をAPIへ渡す', () => {
+    expect(DETAIL).toContain('同時購読を許可する（ほかのシナリオが動いている人にも並行して流す）')
+    expect(DETAIL).toContain('allowConcurrent: editForm.allowConcurrent')
+    expect(DETAIL).toContain('await api.scenarios.update(id, {')
   })
 })
 
