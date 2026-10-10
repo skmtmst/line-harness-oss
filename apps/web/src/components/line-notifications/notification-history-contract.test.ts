@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(
@@ -11,7 +11,7 @@ const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 describe('V6 LINE notification history contract', () => {
   it('keeps the page title in the shared top bar and places history in the tab row', () => {
     expect(PAGE).not.toContain('<Header')
-    expect(PAGE).toContain('<MergedTabs')
+    expect(PAGE).toContain('<Tabs')
     expect(PAGE).toContain("{ key: 'failures', label: '送れなかったもの' }")
     expect(PAGE).toContain("{ key: 'history', label: '記録' }")
   })

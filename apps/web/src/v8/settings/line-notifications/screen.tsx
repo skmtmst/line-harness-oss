@@ -1004,7 +1004,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       value={typeof kpi.value === 'number' || kpi.value === null ? kpi.value : null}
       valueText={kpi.valueText ?? (typeof kpi.value === 'string' ? kpi.value : undefined)}
       unit=""
-      detail={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
+      detail={kpi.note === '取得失敗' ? '取得失敗' : kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
       help={kpi.note || undefined}
       valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}

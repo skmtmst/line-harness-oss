@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { canOpenCustomerNotificationKpi, customerNotificationKpis } from './customer-kpis'
 
-const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(__dirname, '../../v8/settings/line-notifications/screen.tsx'), 'utf8')
 
 /** 「送れなかった」から対応一覧へ渡す（設計 `festr`）。 */
 describe('V6 LINE通知（festr）', () => {
@@ -18,8 +18,8 @@ describe('V6 LINE通知（festr）', () => {
     expect(failed.href).toBe('/line-notifications?tab=failures')
     expect(canOpenCustomerNotificationKpi(failed)).toBe(true)
     // 板 g3iDs：共通の数カードの行き先として付ける。
-    expect(PAGE).toContain('送れなかったものを見る')
-    expect(PAGE).toContain("action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '送れなかったものを見る', href: kpi.href } : undefined}")
+    expect(PAGE).toContain('見る')
+    expect(PAGE).toContain("action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '見る', href: kpi.href } : undefined}")
   })
 
   it('渡す先のタブが実在する', () => {

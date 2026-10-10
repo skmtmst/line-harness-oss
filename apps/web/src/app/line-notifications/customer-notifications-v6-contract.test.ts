@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -12,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = import.meta.dirname
 /** リポジトリの根。`apps/web/src/app/line-notifications` から5つ上。 */
 const REPO = join(HERE, '..', '..', '..', '..', '..')
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/settings/line-notifications/screen.tsx'), 'utf8')
 
 /**
  * 注釈を落とした page.tsx。「なぜ消したか」を書いた文が、消したはずの
@@ -29,20 +30,22 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
   it('一覧はページ送りなしで全部出す', () => {
     expect(PAGE).not.toContain('CUSTOMER_PAGE_SIZE')
     expect(PAGE).not.toContain('<Pagination')
-    expect(PAGE).toContain('{visible.map((setting) => <Tr key={setting.eventType}>')
+    expect(PAGE).toContain('{visible.map((setting) => {')
+    expect(PAGE).toContain('return <Tr key={setting.eventType}>')
   })
 
   // 板 g3iDs：絞り込み・表・数カードは共通部品。手描きのv6行・分類ボタンは置かない。
   it('絞り込み・表・数カードは共通部品を使う', () => {
     expect(PAGE).toContain('<FilterChip')
-    expect(PAGE).toContain('<DataTable>')
+    expect(PAGE).toContain('<DataTable label="顧客へのお知らせ"')
     expect(PAGE).toContain('<KpiCard')
     expect(PAGE).not.toContain('line-notification-v6-row')
     expect(PAGE).not.toContain('styles.category')
   })
 
   it('タブ帯は共通部品（高さ44）を使う', () => {
-    expect(PAGE).toContain("import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'")
+    expect(PAGE).toContain("import { Tabs } from '@/components/shared/tabs'")
+    expect(PAGE).toContain("<Tabs")
     const tabs = readFileSync(
       join(REPO, 'apps', 'web', 'src', 'components', 'shared', 'tabs.module.css'),
       'utf8',

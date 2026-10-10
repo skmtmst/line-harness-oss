@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const HERE = import.meta.dirname
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/settings/line-notifications/screen.tsx'), 'utf8')
 
 /** 注釈を落とした page.tsx（customer-notifications-v6-contract と同じやり方）。 */
 const CODE = PAGE
@@ -38,7 +38,7 @@ describe('お知らせの出す・止める確認窓の置き場所', () => {
   })
 
   it('実行は pendingToggle を閉じてから save に進む', () => {
-    expect(CODE).toContain('setPendingToggle(null); void save(')
+    expect(CODE).toContain('setPendingToggle(null); return save(')
     expect(CODE).toContain('onCancel={() => setPendingToggle(null)}')
   })
 })

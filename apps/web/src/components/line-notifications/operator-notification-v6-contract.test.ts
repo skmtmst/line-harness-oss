@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const list = readFileSync(new URL('../../app/line-notifications/operator-notification-rules.tsx', import.meta.url), 'utf8')
@@ -12,7 +12,7 @@ const dispatch = readFileSync(new URL('../../../../worker/src/services/operator-
 describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の接続', () => {
   it('4タブの2番目に運用者向けを置き、顧客向けと混ぜない', () => {
     expect(page).toMatch(/customer[\s\S]*operator[\s\S]*failures[\s\S]*history/)
-    expect(page).toContain('<OperatorNotificationRules lineAccountId={selectedAccountId}')
+    expect(page).toContain('<OperatorTab lineAccountId={selectedAccountId}')
   })
 
   it('一覧はアカウント別の実行記録APIを読み、未取得を0件にしない', () => {

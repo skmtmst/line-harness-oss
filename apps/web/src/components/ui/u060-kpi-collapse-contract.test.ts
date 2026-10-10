@@ -57,7 +57,8 @@ describe('V8の数の帯とメンバー一覧', () => {
 
   it('LINE通知の数の帯は小さい幅で1列、640px以上で2列にする', () => {
     const page = read('app/line-notifications/page.tsx')
-    expect(page).toContain('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4')
+    expect(page).toContain('<KpiBand presentation="band"')
+    expect(read('components/shared/kpi-card.module.css')).toMatch(/@media \(max-width: 639px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/)
     expect(page).toContain('kpisWithSendCountsState.map(renderKpiCard)')
   })
 
