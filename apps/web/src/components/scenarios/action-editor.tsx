@@ -41,6 +41,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import {
   api,
+  eventsApi,
   describeSaveFailure,
   type ScenarioAction,
   type ScenarioActionHook,
@@ -172,7 +173,7 @@ function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
       return [{ ...common, id: action.id, type: 'start_reminder', params: { reminderId: config.reminderId }, sortOrder: actionIndex * 10 }]
     }
     if (action.actionType === 'event_booking' && typeof config.eventId === 'string' && config.eventId) {
-      return [{ ...common, id: action.id, type: 'common_action', params: { eventId: config.eventId }, sortOrder: actionIndex * 10 }]
+      return [{ ...common, id: action.id, type: 'event_booking', params: config, sortOrder: actionIndex * 10 }]
     }
     return []
   })
@@ -270,7 +271,10 @@ export function describeAction(action: ScenarioAction, lookups: ActionLookups): 
       const target = typeof c.eventId === 'string' && c.eventId
         ? lookups.events.find((t) => t.id === c.eventId)?.name
         : undefined
-      return target ? `イベント予約「${target}」` : 'イベント予約未選択'
+      if (!target) return 'イベント予約未選択'
+      const operation = c.op === 'cancel' ? '申し込みを取り消す' : 'イベントに申し込む'
+      const slot = typeof c.slotId === 'string' && c.slotId ? '（選んだ回）' : ''
+      return `${operation}「${target}」${slot}`
     }
     default:
       return '設定した内容を実行'
@@ -947,7 +951,7 @@ export default function ActionEditor({
                         </div>
                         {open && (
                           <div className="border-hairline border-t p-4">
-                            <ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={(config) => save(action, { config })} />
+                            <ActionConfigEditor action={action} accountId={selectedAccountId} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} templates={templates} reminders={reminders} events={events} targetsLoading={targetsLoading} onChange={(config) => save(action, { config })} />
                             <Checkbox className="mt-3" checked={action.repeatOnRefire} onCheckedChange={(checked) => save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox>
                             <div className="mt-3 flex gap-2"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => remove(action)} className="text-danger">削除する</button></div>
                           </div>
@@ -1025,6 +1029,7 @@ function TargetSelector({
 
 export function ActionConfigEditor({
   action,
+  accountId,
   tags,
   fields,
   marks,
@@ -1037,6 +1042,7 @@ export function ActionConfigEditor({
   onChange,
 }: {
   action: ScenarioAction
+  accountId?: string | null
   tags: Option[]
   fields: Option[]
   marks: Option[]
@@ -1049,6 +1055,26 @@ export function ActionConfigEditor({
   onChange: (config: unknown) => void
 }) {
   const c = (action.config ?? {}) as Record<string, unknown>
+  const [eventSlots, setEventSlots] = useState<Array<{ id: string; starts_at: string }>>([])
+  const [eventSlotsLoading, setEventSlotsLoading] = useState(false)
+  const [eventSlotsFailed, setEventSlotsFailed] = useState(false)
+  const eventId = typeof c.eventId === 'string' ? c.eventId : ''
+
+  useEffect(() => {
+    let cancelled = false
+    setEventSlots([])
+    setEventSlotsFailed(false)
+    setEventSlotsLoading(Boolean(accountId && eventId))
+    if (!accountId || !eventId) return
+    void eventsApi.listSlots(accountId, eventId).then(({ items }) => {
+      if (!cancelled) setEventSlots(items.filter((slot) => slot.is_active === 1).map((slot) => ({ id: slot.id, starts_at: slot.starts_at })))
+    }).catch(() => {
+      if (!cancelled) { setEventSlots([]); setEventSlotsFailed(true) }
+    }).finally(() => {
+      if (!cancelled) setEventSlotsLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [accountId, eventId])
 
   switch (action.actionType) {
     case 'tag': {
@@ -1268,7 +1294,12 @@ export function ActionConfigEditor({
     case 'event_booking':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-semibold">イベント予約</span>
+          <Select
+            aria-label="イベント予約の操作"
+            value={c.op === 'cancel' ? 'cancel' : 'register'}
+            options={[{ value: 'register', label: 'イベントに申し込む' }, { value: 'cancel', label: '申し込みを取り消す' }]}
+            onChange={(op) => onChange({ ...c, op })}
+          />
           <TargetSelector
             label="イベント予約"
             kind="event"
@@ -1276,8 +1307,26 @@ export function ActionConfigEditor({
             value={typeof c.eventId === 'string' ? c.eventId : ''}
             options={events}
             loading={targetsLoading}
-            onChange={(value) => onChange({ ...c, eventId: value })}
+            onChange={(value) => onChange({ ...c, eventId: value, slotId: null })}
           />
+          {eventId && (
+            <Select
+              aria-label="開催回"
+              value={typeof c.slotId === 'string' ? c.slotId : ''}
+              options={[
+                { value: '', label: c.op === 'cancel' ? 'イベント全体の申込を取り消す' : '次に空いている回' },
+                ...eventSlots.map((slot) => ({
+                  value: slot.id,
+                  label: new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(slot.starts_at)),
+                })),
+              ]}
+              disabled={eventSlotsLoading || eventSlots.length === 0}
+              onChange={(value) => onChange({ ...c, slotId: value || null })}
+            />
+          )}
+          {eventSlotsLoading && <span className="text-ink-secondary text-xs" role="status">開催回を読み込み中…</span>}
+          {eventId && !eventSlotsLoading && eventSlotsFailed && <span className="text-ink-secondary text-xs" role="status">開催回を読み込めませんでした</span>}
+          {eventId && !eventSlotsLoading && !eventSlotsFailed && eventSlots.length === 0 && <span className="text-ink-secondary text-xs">選べる開催回がありません</span>}
         </div>
       )
 
