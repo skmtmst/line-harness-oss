@@ -185,10 +185,6 @@
   "app/login/two-factor/setup/page.tsx": {
     "arbitrary-value": 1
   },
-  "app/mileage/friends/detail/v8-friend-detail.tsx": {
-    "direct-th": 7,
-    "unresolved-classname": 1
-  },
   "app/mileage/page.tsx": {
     "arbitrary-value": 7
   },

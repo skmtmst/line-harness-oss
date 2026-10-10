@@ -9,7 +9,7 @@
 行動スコア `IRPw8`・点数を手で直す `Nv7An`・点数の変化の明細 `R8NNi`・使い道を作る `L2Bzp`・友だちのマイル詳細 `R6kIG`・
 状態の見本帳 `zaqP9`（見本帳なので画面としては測らない）。
 
-写し元（古い V8 の器。消していない）：`app/mileage/mileage-v8.tsx`・`v8-*-tab.tsx`・`rewards/edit/v8-reward-edit.tsx`・
+写し元（旧一覧は残りの区切りで削除、使い道編集と詳細・調整窓の写しは削除済み）：`app/mileage/mileage-v8.tsx`・`v8-*-tab.tsx`・`rewards/edit/v8-reward-edit.tsx`・
 `friends/detail/v8-friend-detail.tsx`・`v8-mileage-adjust-dialog.tsx`。表示の言い換えは `display.ts`、使い道の入力の確かめは
 `reward-form.ts` に写した（src/v8 は `@/app` を import できない）。
 

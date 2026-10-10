@@ -11,7 +11,7 @@ const NEW_RULE = readFileSync(join(HERE, 'earning-rules', 'new', 'v8-earning-rul
 const RULE_FIELDS = readFileSync(join(HERE, 'earning-rules', 'rule-fields.ts'), 'utf8')
 const HISTORY = readFileSync(join(HERE, 'mileage-history-tab.tsx'), 'utf8')
 const FRIEND_DETAIL = readFileSync(join(HERE, 'friends', 'detail', 'page.tsx'), 'utf8')
-const ADJUSTMENT = readFileSync(join(HERE, 'friends', 'detail', 'mileage-adjustment-dialog.tsx'), 'utf8')
+const ADJUSTMENT = readFileSync(join(HERE, '..', '..', 'v8', 'mileage', 'adjust-dialog.tsx'), 'utf8')
 const ACTION_SCORE = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
 const BROADCAST_NEW = readFileSync(join(HERE, '..', 'broadcasts', 'new', 'page.tsx'), 'utf8')
 const SEGMENT = readFileSync(join(HERE, '..', '..', 'lib', 'segment-condition.ts'), 'utf8')
@@ -130,10 +130,10 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(NEW_RULE).not.toContain('api.scoring.create')
   })
 
-  it('手動増減はV6実Node・確認段階・冪等キーを通して追記する', () => {
+  it('手動増減は現役の窓で変更前後を確認し、冪等キーを通して追記する', () => {
     expect(FRIEND_DETAIL).toContain('<MileageAdjustDialog')
-    expect(ADJUSTMENT).toContain('designNode="vz0Ji"')
-    expect(ADJUSTMENT).toContain("useState<'input' | 'confirm' | 'requested' | 'completed'>('input')")
+    expect(ADJUSTMENT).toContain('designNode="M8zhjL"')
+    expect(ADJUSTMENT).toContain("useState<'input' | 'requested' | 'completed'>('input')")
     expect(ADJUSTMENT).toContain('変更前')
     expect(ADJUSTMENT).toContain('変更量')
     expect(ADJUSTMENT).toContain('変更後')
@@ -153,7 +153,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(ADJUSTMENT).toContain('notifyFriend,')
     expect(API).toContain('expiresAt?: string')
     expect(API).toContain('notifyFriend?: boolean')
-    expect(ADJUSTMENT).toContain('変更後の残高が0未満になる操作は実行しません')
+    expect(ADJUSTMENT).toContain('利用可能な残高を超えて減らすことはできません')
     expect(ADJUSTMENT).not.toContain('API error:')
   })
 

@@ -31,7 +31,7 @@ describe('カードと窓の角丸は V8 の役割ごとの段に揃う', () => 
 
   it('窓の外枠がカードの角丸を使っていない', () => {
     const dialogs = [
-      'app/mileage/friends/detail/mileage-adjustment-dialog.tsx',
+      'v8/mileage/adjust-dialog.tsx',
       'components/forms/options-dialog.tsx',
       'components/shared/folder-add-dialog.tsx',
       'components/dashboard/qr-dialog.tsx',
