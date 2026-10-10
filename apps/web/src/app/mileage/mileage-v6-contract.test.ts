@@ -12,7 +12,7 @@ const RULE_FIELDS = readFileSync(join(HERE, 'earning-rules', 'rule-fields.ts'), 
 const HISTORY = readFileSync(join(HERE, '../../v8/mileage/history.tsx'), 'utf8')
 const FRIEND_DETAIL = readFileSync(join(HERE, 'friends', 'detail', 'page.tsx'), 'utf8')
 const ADJUSTMENT = readFileSync(join(HERE, '..', '..', 'v8', 'mileage', 'adjust-dialog.tsx'), 'utf8')
-const ACTION_SCORE = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
+const ACTION_SCORE = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
 const BROADCAST_NEW = readFileSync(join(HERE, '..', 'broadcasts', 'new', 'page.tsx'), 'utf8')
 const SEGMENT = readFileSync(join(HERE, '..', '..', 'lib', 'segment-condition.ts'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
@@ -190,12 +190,13 @@ describe('V6 マイルの正本URLと概念分離', () => {
   })
 
   it('行動スコアを既存の現在値・履歴から選択アカウント単位で表示する', () => {
-    expect(ACTION_SCORE).toMatch(/(?:data-design-node|boardId)="z3PB2"/)
+    expect(ACTION_SCORE).toContain("<MileageFrame")
+    expect(ACTION_SCORE).toContain("key: 'score', label: '行動スコア', board: 'IRPw8'")
     expect(ACTION_SCORE).toContain('api.actionScores.friends')
     /* 断り文は下の「3つの言い方で断る」で見る。ここは口と印だけ。 */
     expect(ACTION_SCORE).toContain('kind="loading"')
-    expect(ACTION_SCORE).toContain('kind="empty"')
-    expect(ACTION_SCORE).toContain('kind="error"')
+    expect(ACTION_SCORE).toContain('title="条件に合う友だちがいません"')
+    expect(ACTION_SCORE).toContain('tone="error"')
     expect(API).toContain('/api/action-scores/friends')
   })
 
@@ -219,7 +220,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
 
   it('スコアはマイルではないと3つの言い方で断る', () => {
     /*
-      設計 `z3PB2` の断り文そのまま。**「顧客には表示されず」だけでは足りない。**
+      現役の補足で概念の区別を保つ。**「顧客には表示されず」だけでは足りない。**
       「マイルが減るのでは」と聞かれたときに答えられるよう、
       **交換できないこと・残高が動かないこと**を先に言う。
       1文ではなく3つとも見る。言い換えると1つ落ちても気づけない。
