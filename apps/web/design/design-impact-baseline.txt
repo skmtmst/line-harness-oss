@@ -327,10 +327,8 @@ shared-button-importer components/accounts/account-ordering.tsx
 shared-button-importer components/accounts/account-setup-urls.tsx
 shared-button-importer components/accounts/account-switcher.tsx
 shared-button-importer components/auto-replies/edit-dialog.tsx
-shared-button-importer components/auto-replies/inline-action-list.tsx
 shared-button-importer components/auto-replies/inline-action-rows-v8.tsx
 shared-button-importer components/automations/automation-template-gallery.tsx
-shared-button-importer components/automations/common-action-editor.tsx
 shared-button-importer components/broadcasts/broadcast-approval.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
@@ -347,7 +345,6 @@ shared-button-importer components/events/event-form.tsx
 shared-button-importer components/events/event-questions-editor.tsx
 shared-button-importer components/events/event-wizard.tsx
 shared-button-importer components/feature-disabled-gate.tsx
-shared-button-importer components/forms/action-editor.tsx
 shared-button-importer components/forms/choice-table.tsx
 shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/forms/options-dialog.tsx
@@ -458,7 +455,6 @@ shared-button-importer v8/templates/carousel.tsx
 shared-button-importer v8/broadcasts/list.tsx
 shared-button-importer v8/broadcasts/quick-send.tsx
 shared-button-importer v8/forms/list.tsx
-shared-button-importer v8/form-edit/after-tab.tsx
 shared-button-importer v8/form-edit/appearance-tab.tsx
 shared-button-importer v8/form-edit/content-tab.tsx
 shared-button-importer v8/form-edit/edit.tsx
@@ -748,3 +744,7 @@ shared-button-importer v8/settings/ec-commerce/subscriptions.tsx
 shared-button-importer components/shared/message-composer.tsx
 shared-button-importer components/shared/message-composer-media.tsx
 shared-button-importer v8/template-edit/frame.tsx
+shared-button-importer components/friend-fields/linked-action-list.tsx
+shared-button-importer components/shared/action-list.tsx
+shared-button-importer components/templates/preview-launcher.tsx
+shared-button-importer v8/webhooks/incoming-actions.tsx

@@ -119,12 +119,12 @@ async function changeProvider(view: ReturnType<typeof render>, id: string) {
 }
 async function fillTagRule(name: string) {
   fireEvent.change(screen.getByRole('textbox', { name: '名前', exact: true }), { target: { value: name } })
-  fireEvent.click(screen.getByRole('button', { name: /^1つめのすること「.+」の操作$/ }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: '中身を直す' }))
-  const dialog = await screen.findByRole('dialog', { name: '1つめのすること', exact: true })
+  fireEvent.click(screen.getByRole('button', { name: '1つ目の行うことのその他操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '設定を変える' }))
   await pickEntity('自動化で付けるタグ', 'VIP')
-  fireEvent.keyDown(dialog, { key: 'Escape' })
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: '1つめのすること', exact: true })).toBeNull())
+  fireEvent.click(screen.getByRole('button', { name: '1つ目の行うことのその他操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '設定を閉じる' }))
+
 }
 async function save() {
   const calls = vi.mocked(api.automations.updateDraft).mock.calls.length

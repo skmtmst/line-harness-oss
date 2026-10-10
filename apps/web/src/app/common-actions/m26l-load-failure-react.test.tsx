@@ -237,6 +237,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     await flush()
 
     expect(text()).not.toContain('選択肢を読み込めませんでした')
+    await act(async () => { (container.querySelector('[data-action-row] button[aria-expanded]') as HTMLButtonElement).click() })
     expect(text()).toContain('選べるタグがありません')
     const save = buttonNamed('下書きを保存する')
     expect(save, '保存ボタンがある').toBeTruthy()

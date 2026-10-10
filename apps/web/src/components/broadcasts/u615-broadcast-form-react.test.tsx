@@ -187,7 +187,7 @@ describe('監査 #615：一斉配信の受け入れ', () => {
 
     const text = container.textContent ?? ''
     expect(text).not.toContain('8月キャンペーン配信済み')
-    expect(text).toContain('実行しない')
+    expect(text).toContain('行うことはまだありません。')
   })
 
   it('BC-03: メッセージ段のプレビューも、未定なのに固定の配信日時を出さない', async () => {

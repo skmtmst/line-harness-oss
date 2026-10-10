@@ -25,6 +25,9 @@ const transport = vi.hoisted(() => ({
   supportMarks: vi.fn(),
   scenarios: vi.fn(),
   commonVars: vi.fn(),
+  reminders: vi.fn(),
+  events: vi.fn(),
+  notificationRules: vi.fn(),
   staffMe: vi.fn(),
   lineAccounts: vi.fn(),
 }))
@@ -49,6 +52,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
+    eventsApi: { ...actual.eventsApi, listEvents: transport.events },
     api: {
       ...actual.api,
       autoReplies: {
@@ -64,6 +68,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
       supportMarks: { list: transport.supportMarks },
       scenarios: { list: transport.scenarios },
       commonVars: { list: transport.commonVars },
+      reminders: { list: transport.reminders },
+      notifications: { ...actual.api.notifications, operatorRules: { list: transport.notificationRules } },
       staff: { me: transport.staffMe },
       lineAccounts: { list: transport.lineAccounts },
     },
@@ -232,6 +238,9 @@ beforeEach(() => {
   transport.supportMarks.mockResolvedValue({ success: true, data: [] })
   transport.scenarios.mockResolvedValue({ success: true, data: [] })
   transport.commonVars.mockResolvedValue({ success: true, data: [] })
+  transport.reminders.mockResolvedValue({ success: true, data: [] })
+  transport.events.mockResolvedValue({ items: [], total: 0, limit: 200, sort: [] })
+  transport.notificationRules.mockResolvedValue({ success: true, data: { items: [] } })
 })
 
 afterEach(async () => {

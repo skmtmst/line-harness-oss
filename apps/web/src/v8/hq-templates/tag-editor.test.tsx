@@ -29,14 +29,16 @@ describe('統括の V8 タグ編集と保存先', () => {
     expect(store.retroactivePreview).not.toHaveBeenCalled()
   })
 
-  it('続けて作る場合も同じ保存口へ渡し、連動の窓を取り消しても OFF を変えない', async () => {
+  it('続けて作る場合も同じ保存口へ渡し、行うことのメニューを閉じても OFF を変えない', async () => {
     const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
     render(<HqTagEditorV8 definition={{ ...definition, tag: { name: '手動用', linkedEnabled: false } }} editing={false} saving={false} onCancel={() => {}} onSave={save} />)
     fireEvent.click(screen.getAllByRole('button', { name: '開く' })[0])
-    fireEvent.click(screen.getByRole('button', { name: 'アクションを追加する' }))
-    const dialog = await screen.findByRole('dialog')
-    expect(dialog.textContent).toContain('統括のひな形で使えるのは')
-    fireEvent.click(Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'キャンセル')!)
+    fireEvent.click(screen.getByRole('button', { name: '行うことを足す' }))
+    const menu = await screen.findByRole('menu')
+    expect(menu.textContent).toContain('テキスト送信')
+    expect(menu.textContent).toContain('マイル付与')
+    expect(menu.textContent).not.toContain('タグ追加')
+    fireEvent.keyDown(menu, { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     expect(save.mock.calls[0][0].tag.linkedEnabled).toBe(false)

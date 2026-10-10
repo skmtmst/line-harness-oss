@@ -7,7 +7,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const accountState = { id: 'acc-1' }
@@ -64,13 +64,6 @@ async function settle(milliseconds: number) {
   })
 }
 
-function combobox(): HTMLElement {
-  const fields = Array.from(host.querySelectorAll('[role="combobox"]'))
-  const tagField = fields.find((el) => el.getAttribute('aria-label') === 'タグを付ける')
-  if (!tagField) throw new Error('タグの選択欄が見つかりません')
-  return tagField as HTMLElement
-}
-
 describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
   beforeEach(() => {
     accountState.id = 'acc-1'
@@ -112,16 +105,11 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
       fireEvent.click(setup!)
     })
     await settle(50)
-    await act(async () => {
-      fireEvent.focus(combobox())
-    })
-    await settle(50)
-    // 候補の一覧は MenuPortal で document.body 直下に出る（host の中にはない）。
-    const option = Array.from(document.querySelectorAll('[role="option"]')).find((el) => el.textContent?.includes('会員'))
-    expect(option).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(option!)
-    })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })))
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: /タグを付ける/ })))
+    const dialog = screen.getByRole('dialog', { name: 'タグを選ぶ' })
+    await act(async () => fireEvent.click(within(dialog).getByRole('checkbox', { name: '会員' })))
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'この 1件にする' })))
     await settle(50)
     const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存する')
     expect(save).toBeTruthy()

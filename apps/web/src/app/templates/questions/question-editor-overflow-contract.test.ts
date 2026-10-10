@@ -24,21 +24,16 @@ describe('質問エディタのはみ出し（#973 U022）', () => {
   })
 
   it('友だち情報欄は選択と値を同じ行に押し込まない', () => {
-    // ラベル・選択・値は全幅の縦配置。横並びの flex 行ではない。
-    // 2026-09-25: 見出しの span を label へ（読み上げ対応）。見張りは配置のまま。
-    // 選び欄は共通 Select の size="full"、値は w-full の入力欄
-    // （placeholder と className の順で置くため、値は別に見張る）。
-    const block = EDITOR.match(/友だち情報欄<\/(span|label)>[\s\S]{0,1600}?セットする値（既存の値は上書き）/)
-    expect(block, '友だち情報欄のブロックが見つからない').not.toBeNull()
-    expect(block![0]).not.toContain('flex flex-wrap items-center')
-    expect(block![0]).toContain('size="full"')
-    const valueInput = EDITOR.match(/友だち情報欄にセットする値[\s\S]{0,1200}?w-full/)
-    expect(valueInput, '値の入力欄が全幅でない').not.toBeNull()
+    // B-169: 共通の行を縦に開き、対象の選ぶ欄と値の入力を分ける。
+    expect(EDITOR).toContain('<EntityPickerField label="友だち情報欄"')
+    expect(EDITOR).toContain('<TextField aria-label="友だち情報欄に書き込む値"')
+    expect(EDITOR).not.toContain('const selectClass =')
   })
 
   it('タグの選択欄は全幅の独立した行で、長いタグ名でカードを広げない', () => {
     // U022: タグの選択は全幅の独立行。選ぶ窓の欄（1行・名前は省略表示）を札の行と分けて置く。
-    const tagSelect = EDITOR.match(/<div className="mt-1\.5">[\s\S]{0,600}?<EntityKindField\s+kind="tag"\s+multiple/)
-    expect(tagSelect, 'タグ選択欄が見つからない').not.toBeNull()
+    expect(EDITOR).toContain('<ActionList<Effect>')
+    expect(EDITOR).toContain('<EntityPickerField label="タグ" noun="タグ" items={tags} multiple')
+    expect(EDITOR).not.toContain('<select')
   })
 })
