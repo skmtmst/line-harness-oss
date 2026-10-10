@@ -14,6 +14,7 @@ import {
 } from 'react'
 import styles from './media-slot.module.css'
 import { TextField } from './text-field'
+import { joinDescribedBy, useFieldContext } from './field-context'
 
 /**
  * 画像・動画・ファイルを入れる所。Pencil ★V8 の採用案 Z7vd2（B-128「画像を追加する所」）。
@@ -96,6 +97,9 @@ function reasonOf(caught: unknown): string {
 }
 
 export interface MediaSlotProps {
+  id?: string
+  invalid?: boolean
+  'aria-describedby'?: string
   /** 何を入れるか。印・言葉・入ったときの見せ方が変わる。 */
   kind?: MediaSlotKind
   /** 太字の題（「メイン画像を追加」など）。読み上げの名前にもなる。 */
@@ -160,6 +164,7 @@ export interface MediaSlotProps {
 }
 
 export default function MediaSlot({
+  id, invalid, 'aria-describedby': saveDescription,
   kind = 'image',
   title,
   value,
@@ -191,6 +196,10 @@ export default function MediaSlot({
   children,
   'data-testid': testId,
 }: MediaSlotProps) {
+  const field = useFieldContext()
+  id = id ?? field?.controlId
+  invalid = invalid || field?.invalid
+  saveDescription = joinDescribedBy(saveDescription, field?.describedBy)
   const inputRef = useRef<HTMLInputElement>(null)
   const dragCount = useRef(0)
   const gen = useRef(0)
@@ -487,7 +496,7 @@ export default function MediaSlot({
   }
 
   return (
-    <div className={styles.root} data-testid={testId}>
+    <div id={id} className={styles.root} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined}>
       <div
         role="group"
         aria-label={title}

@@ -1,5 +1,7 @@
 'use client'
 
+import { joinDescribedBy } from './field-context'
+
 /*
  * 作ってあるもの・配るアカウントを選ぶ窓（オーナー採用 B-131・B-133・Pen dJZ7Q／2026-10-09）。
  *
@@ -350,6 +352,7 @@ type FieldBase = {
   id?: string
   buttonRef?: Ref<HTMLButtonElement>
   describedBy?: string
+  'aria-describedby'?: string
 }
 type SingleField = FieldBase & {
   multiple?: false
@@ -375,7 +378,7 @@ type MultiField = FieldBase & {
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, onOpen, onClear }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear }: {
   label: string; noun: string; icon?: LucideIcon
   /** 選んだものの名前。空なら「（〇〇を選んでください）」。 */
   name?: string; meta?: string; placeholder?: string
@@ -383,6 +386,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, place
   buttonRef?: Ref<HTMLButtonElement>
   /** 欄の下の誤り・説明の id。［選ぶ］ボタンの読み上げにつなぐ。 */
   describedBy?: string
+  'aria-describedby'?: string
   onOpen: () => void
   /** 渡すと「外す」を出す。 */
   onClear?: () => void
@@ -398,7 +402,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, place
       </>}
     </span>
     {onClear && !empty && !readOnly ? <Button size="compact" variant="text" disabled={disabled} aria-label={`${label}を外す`} onClick={onClear}>外す</Button> : null}
-    {readOnly && empty ? null : <Button ref={buttonRef} size="compact" disabled={disabled} aria-label={`${label}：${actionLabel}`} aria-haspopup="dialog" aria-invalid={invalid || undefined} aria-describedby={describedBy} onClick={onOpen}>{actionLabel}</Button>}
+    {readOnly && empty ? null : <Button ref={buttonRef} size="compact" disabled={disabled} aria-label={`${label}：${actionLabel}`} aria-haspopup="dialog" aria-invalid={invalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy)} onClick={onOpen}>{actionLabel}</Button>}
   </div>
 }
 
@@ -425,7 +429,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const close = () => setOpen(false)
   return <>
     <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
-      invalid={invalid || picked.missing} id={id} buttonRef={buttonRef} describedBy={describedBy} onOpen={() => { onOpen?.(); setOpen(true) }}
+      invalid={invalid || picked.missing} id={id} buttonRef={buttonRef} describedBy={joinDescribedBy(describedBy, props['aria-describedby'])} onOpen={() => { onOpen?.(); setOpen(true) }}
       onClear={!props.multiple && props.clearable ? () => props.onChange('') : undefined} />
     {open ? props.multiple
       ? <EntityMultiPickerDialog title={title} description={description} items={items} folders={folders} foldersFailed={foldersFailed} initialIds={props.value} unit={props.unit} state={state} readOnly={readOnly}

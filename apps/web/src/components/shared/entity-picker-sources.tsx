@@ -204,6 +204,7 @@ type KindFieldBase = {
   buttonRef?: Ref<HTMLButtonElement>
   /** 欄の下の誤り・説明の id。 */
   describedBy?: string
+  'aria-describedby'?: string
 }
 
 /**
@@ -211,7 +212,8 @@ type KindFieldBase = {
  * 保存する値（ID）は今と同じ形で返す。
  */
 export function EntityKindField(props: KindFieldBase & ({ multiple?: false; value: string | null | undefined; onChange: (id: string) => void; clearable?: boolean } | { multiple: true; value: string[]; onChange: (ids: string[]) => void; allowEmpty?: boolean })) {
-  const { kind, label, options, meta, placeholder, disabled, readOnly, invalid, description, id, noPreview, buttonRef, describedBy } = props
+  const { kind, label, options, meta, placeholder, disabled, readOnly, invalid, description, id, noPreview, buttonRef, describedBy: suppliedDescription } = props
+  const describedBy = [suppliedDescription, props['aria-describedby']].filter(Boolean).join(' ') || undefined
   const account = useMaybeAccount()
   const accountId = props.accountId ?? account?.selectedAccountId ?? null
   const accountName = account?.selectedAccount?.name

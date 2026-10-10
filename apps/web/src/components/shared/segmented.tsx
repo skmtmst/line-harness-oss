@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import styles from './segmented.module.css'
+import { useFieldContext } from './field-context'
 
 /**
  * 切り替え（3つ）（Pencil ★V8 `dtJVi`）。
@@ -12,6 +13,8 @@ import styles from './segmented.module.css'
  * 排他的な切り替えに使う。
  */
 export default function SegmentedControl<T extends string>({
+  id,
+  invalid,
   options,
   value,
   onChange,
@@ -22,6 +25,8 @@ export default function SegmentedControl<T extends string>({
   appearance = 'track',
   equalWidth = false,
 }: {
+  id?: string
+  invalid?: boolean
   options: { value: T; label: string }[]
   value: T
   onChange: (value: T) => void
@@ -44,6 +49,8 @@ export default function SegmentedControl<T extends string>({
   /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
   equalWidth?: boolean
 }) {
+  const field = useFieldContext()
+  const bad = invalid || field?.invalid
   const rootRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [thumb, setThumb] = useState({ left: 0, width: 0 })
@@ -75,6 +82,10 @@ export default function SegmentedControl<T extends string>({
   return (
     <div
       ref={rootRef}
+      id={id ?? field?.controlId}
+      data-invalid={bad || undefined}
+      aria-describedby={field?.describedBy}
+      style={bad ? { outline: '1px solid var(--color-danger)' } : undefined}
       role="group"
       aria-label={ariaLabel}
       className={[styles.root, className].filter(Boolean).join(' ')}
