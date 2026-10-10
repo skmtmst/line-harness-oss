@@ -1,17 +1,4 @@
 'use client'
-
-/*
- * ★V8 成果地点を作る（Pencil：作る `j8p3yj`・競合 `cXqlS`）。
- *
- * 型（CreatePage）に、4つの段（何が起きたら・何回まで・金額・数えない条件）と
- * 下書き・詳細設定の段、右の列（この30日にあてはめると・使う場所）、下の帯を渡す。
- *
- * 聞く項目・保存の口・送る形は今の作る画面（app/conversions/new/conversion-create-v8.tsx）と同じ
- * （BEHAVIOR.md）。違うのは見せ方だけ：
- * - 使う場所は種類ごとの1行（チェック＝その種類を全部使う／外す）。1つずつ選ぶのは「使う場所を足す」の窓で
- * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
- *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
- */
 import { notifySaved } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -56,6 +43,21 @@ import styles from './create.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 成果地点を作る（Pencil：作る `j8p3yj`・競合 `cXqlS`）。
+ *
+ * 型（CreatePage）に、4つの段（何が起きたら・何回まで・金額・数えない条件）と
+ * 下書き・詳細設定の段、右の列（この30日にあてはめると・使う場所）、下の帯を渡す。
+ *
+ * 聞く項目・保存の口・送る形は今の作る画面（app/conversions/new/conversion-create-v8.tsx）と同じ
+ * （BEHAVIOR.md）。違うのは見せ方だけ：
+ * - 使う場所は種類ごとの1行（チェック＝その種類を全部使う／外す）。1つずつ選ぶのは「使う場所を足す」の窓で
+ * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
+ *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
+ */
 
 /* 数えるきっかけ6種（今の作る画面と同じ中身）。 */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'
@@ -151,6 +153,7 @@ export default function ConversionCreateV8() {
 }
 
 function ConversionCreate() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('成果地点を作る')
   usePageCrumbs([
     { label: 'ホーム', href: '/' },
@@ -403,13 +406,17 @@ function ConversionCreate() {
         router.push(`/conversions?tab=points${res.data.id ? `&highlight=${encodeURIComponent(res.data.id)}` : ''}`)
       }
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (error instanceof ApiError && error.status === 409) {
         /* ほかの人が先に同じ名前で保存していた。上書きせず、帯で比べ方を出す。 */
         setServerConflictName(name)
-        setSaveError(null)
+        { if (!fieldFailure)
+        setSaveError(null) }
         requestPoints()
       } else {
-        setSaveError('保存できませんでした。権限を確認して、もう一度お試しください。')
+        { if (!fieldFailure)
+        setSaveError('保存できませんでした。権限を確認して、もう一度お試しください。') }
       }
     } finally {
       setSaving(false)
@@ -490,12 +497,12 @@ function ConversionCreate() {
                     : chosen === 0 ? '使わない' : chosen === all ? '使う' : `${chosen}/${all} 件`
             return (
               <div key={group.kind} className={styles.usageRow}>
-                <Checkbox
+                <SaveErrorField names={["all","chosen"]}><Checkbox
                   checked={all > 0 && chosen === all}
                   indeterminate={chosen > 0 && chosen < all}
                   disabled={result.state !== 'ok' || all === 0}
                   onCheckedChange={(next) => toggleUsageGroup(group.kind, next)}
-                >{group.label}</Checkbox>
+                >{group.label}</Checkbox></SaveErrorField>
                 {result.state === 'error' ? (
                   <Button variant="text" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>もう一度読み込む</Button>
                 ) : (
@@ -546,7 +553,7 @@ function ConversionCreate() {
   ) : null
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="j8p3yj"
       title="成果地点を作る"
       help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
@@ -569,13 +576,13 @@ function ConversionCreate() {
           <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
         </div>
         <Field label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
-          <TextField
+          <SaveErrorField names={["name","fieldIssue","field_issue"]}><TextField
             aria-label="成果地点の名前"
             value={name}
             maxLength={120}
             placeholder="商品を買った"
             onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-name' ? null : current); setName(event.target.value) }}
-          />
+          /></SaveErrorField>
         </Field>
         {pointsFailed ? (
           <div className={styles.inlineRetry}>
@@ -586,25 +593,25 @@ function ConversionCreate() {
         <div className={styles.field}>
           <span className={styles.pickLabel}>できごと</span>
           <div className={styles.selectBox}>
-            <Select
+            <SaveErrorField names={["eventType","sourceType","event_type"]}><Select
               size="full"
               aria-label="できごと"
               value={eventType}
               options={TRIGGER_CHOICES.map((choice) => ({ value: choice.eventType, label: `${choice.label}（${choice.note}）` }))}
               onChange={selectTrigger}
-            />
+            /></SaveErrorField>
           </div>
         </div>
         {measureMethod === 'url_reach' ? (
           <Field label="数えてよいページ" htmlFor="cv-url" error={fieldIssue?.field === 'cv-url' ? fieldIssue.message : undefined}>
-            <TextField
+            <SaveErrorField names={["targetUrl","fieldIssue","target_url","field_issue"]}><TextField
               aria-label="数えてよいページ"
               inputMode="url"
               value={targetUrl}
               maxLength={2000}
               placeholder="https://example.com/thanks"
               onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-url' ? null : current); setTargetUrl(event.target.value) }}
-            />
+            /></SaveErrorField>
           </Field>
         ) : null}
         <div className={styles.chipRow}>
@@ -622,7 +629,7 @@ function ConversionCreate() {
           <h2 className={styles.cardTitle} id="cv-new-dedup">同じ人を何回まで数えるか</h2>
           <p className={styles.cardNote}>くり返し起きるできごとは、数えすぎを防ぎます</p>
         </div>
-        <RadioCardGroup legend="同じ人を何回まで数えるか" className={styles.dedupRow}>
+        <SaveErrorField names={["conversion-create-dedup","deduplicationMode"]}><RadioCardGroup legend="同じ人を何回まで数えるか" className={styles.dedupRow}>
           <RadioCard
             name="conversion-create-dedup"
             value="once_per_friend"
@@ -650,7 +657,7 @@ function ConversionCreate() {
             note="買うたびに数えます。売上を追うときに"
             size="small"
           />
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </Card>
 
       <Card variant="form" aria-labelledby="cv-new-value">
@@ -662,7 +669,7 @@ function ConversionCreate() {
           <div className={styles.field}>
             <span className={styles.pickLabel}>金額の出し方</span>
             <div className={styles.selectBox}>
-              <Select
+              <SaveErrorField names={["valueMode","fieldIssue","value_mode","field_issue"]}><Select
                 size="full"
                 id="cv-value-mode"
                 error={fieldIssue?.field === 'cv-value-mode' ? fieldIssue.message : undefined}
@@ -674,32 +681,32 @@ function ConversionCreate() {
                   setValueMode(next as ConversionValueMode)
                   setValueModeNotice(null)
                 }}
-              />
+              /></SaveErrorField>
             </div>
           </div>
           <div className={styles.field}>
             <span className={styles.pickLabel}>取り消されたとき</span>
             <div className={styles.selectBox}>
-              <Select
+              <SaveErrorField names={["reversalPolicy","reversal_policy"]}><Select
                 size="full"
                 aria-label="取り消されたとき"
                 value={reversalPolicy}
                 options={REVERSAL_OPTIONS}
                 onChange={(next) => setReversalPolicy(next as ConversionReversalPolicy)}
-              />
+              /></SaveErrorField>
             </div>
           </div>
         </div>
         {valueModeNotice ? <p className={styles.fieldNote} role="status">{valueModeNotice}</p> : null}
         {valueMode === 'fixed' ? (
           <Field label="1件あたりの金額（円）" htmlFor="cv-value" error={fieldIssue?.field === 'cv-value' ? fieldIssue.message : undefined}>
-            <NumberInput numericText unit="円"
+            <SaveErrorField names={["value","fieldIssue","field_issue"]}><NumberInput numericText unit="円"
               aria-label="決まった金額"
               inputMode="numeric"
               value={value}
               placeholder="0"
               onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-value' ? null : current); setValue(event.target.value) }}
-            />
+            /></SaveErrorField>
           </Field>
         ) : null}
       </Card>
@@ -709,7 +716,7 @@ function ConversionCreate() {
           <h2 className={styles.cardTitle} id="cv-new-exclusion">数えない条件</h2>
           <p className={styles.cardNote}>任意。テスト用の注文などを除きます</p>
         </div>
-        <Field label="メモ"><TextField
+        <Field label="メモ"><SaveErrorField names={["exclusionMemo","fieldIssue","exclusion_memo","field_issue"]}><TextField
             id="cv-memo"
             aria-label="数えない条件のメモ"
             invalid={fieldIssue?.field === 'cv-memo'}
@@ -718,7 +725,7 @@ function ConversionCreate() {
             maxLength={500}
             placeholder="例：テスト用の注文は条件で除いています"
             onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-memo' ? null : current); setExclusionMemo(event.target.value) }}
-          /></Field>
+          /></SaveErrorField></Field>
         {fieldIssue?.field === 'cv-memo' ? <p id="cv-memo-error" className={styles.fieldError} role="alert">{fieldIssue.message}</p> : null}
         <div id="cv-exclusion-fields" aria-invalid={fieldIssue?.field === 'cv-exclusion-fields' || undefined}>
           <Field label="除く条件" error={fieldIssue?.field === 'cv-exclusion-fields' ? fieldIssue.message : undefined}>
@@ -736,21 +743,21 @@ function ConversionCreate() {
           <h2 className={styles.cardTitle} id="cv-new-more">下書きと詳細設定</h2>
           <p className={styles.cardNote}>任意。すぐに数えはじめないときや、紐づける日数を変えるときに</p>
         </div>
-        <Checkbox
+        <SaveErrorField names={["saveAsDraft","draft","save_as_draft"]}><Checkbox
           checked={saveAsDraft}
           onCheckedChange={setSaveAsDraft}
           description="一覧の「下書き」に入ります。数えはじめるには一覧から公開します。"
-        >まだ計測せず、下書きとして保存する</Checkbox>
+        >まだ計測せず、下書きとして保存する</Checkbox></SaveErrorField>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
           <div className={styles.fieldRow}>
             <Field note={<>空欄なら既定の90日です。</>} label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
-              <NumberInput numericText unit="日"
+              <SaveErrorField names={["attributionDays","fieldIssue","attribution_days","field_issue"]}><NumberInput numericText unit="日"
                 aria-label="友だち追加からの計測期間"
                 inputMode="numeric"
                 value={attributionDays}
                 placeholder="90"
                 onChange={(event) => { setFieldIssue((current) => current?.field === 'cv-days' ? null : current); setAttributionDays(event.target.value) }}
-              />
+              /></SaveErrorField>
 
             </Field>
             <div className={styles.field}>
@@ -781,7 +788,7 @@ function ConversionCreate() {
                   <ul className={styles.pickerList}>
                     {result.targets.map((target) => (
                       <li key={usageKey(target)}>
-                        <Checkbox checked={selectedUsageKeys.has(usageKey(target))} onCheckedChange={() => toggleUsage(target)}>{target.label}</Checkbox>
+                        <SaveErrorField names={["target"]}><Checkbox checked={selectedUsageKeys.has(usageKey(target))} onCheckedChange={() => toggleUsage(target)}>{target.label}</Checkbox></SaveErrorField>
                       </li>
                     ))}
                   </ul>
@@ -799,6 +806,6 @@ function ConversionCreate() {
         </div>
       </Dialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した成果地点" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

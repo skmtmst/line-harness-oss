@@ -1473,3 +1473,12 @@ describe('#988 条件説明と表示例は実際の意味に合わせる', () =>
     }
   })
 })
+
+it('B-154：通知の共通保存関数は422の欄の理由を呼び出した画面へ残す', async () => {
+  const { saveCustomerNotification: saveV8 } = await import('@/v8/settings/line-notifications/screen')
+  const sent = setting()
+  fixture.updateDraft.mockRejectedValueOnce({ status: 422, fields: { introText: 'ご案内文を短くしてください' } })
+  const outcome = await saveV8({ api: mutationApi(), accountId: 'account-a', setting: sent,
+    definition: definition(), enabled: sent.isEnabled, guard: steadyGuard(sent) })
+  expect(outcome).toMatchObject({ kind: 'failed', fields: { introText: 'ご案内文を短くしてください' }, contentSaved: false, settleDraft: false })
+})

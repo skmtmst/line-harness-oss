@@ -7,6 +7,7 @@ import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import { EntityKindField, type EntityKind } from '@/components/shared/entity-picker-sources'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> = [
   { value: 'add_tag', label: 'タグを付ける' },
@@ -109,7 +110,7 @@ export default function CommonActionEditor({
           <div className="grid gap-3 lg:grid-cols-2">
             <label className="text-ink-secondary text-sm">
               処理
-              <Select
+              <SaveErrorField names={[`value.${index}.type`,"type","step.type"]}><Select
                 aria-label="処理"
                 size="full"
                 value={step.type}
@@ -119,11 +120,11 @@ export default function CommonActionEditor({
                 })}
                 className="mt-1 w-full"
                 options={ACTION_OPTIONS}
-              />
+              /></SaveErrorField>
             </label>
             <label className="text-ink-secondary text-sm">
               失敗したとき
-              <Select
+              <SaveErrorField names={[`value.${index}.onFailure`,`value.${index}.on_failure`,"onFailure","step.onFailure","on_failure","step.on_failure"]}><Select
                 aria-label="失敗したとき"
                 size="full"
                 value={step.onFailure}
@@ -133,7 +134,7 @@ export default function CommonActionEditor({
                   { value: 'stop', label: 'ここで止める' },
                   { value: 'continue', label: '次の処理へ進む' },
                 ]}
-              />
+              /></SaveErrorField>
             </label>
           </div>
 
@@ -159,6 +160,7 @@ export default function CommonActionEditor({
 
 /** 作ってあるものを選ぶ欄（共通の選ぶ窓・dJZ7Q）。保存する値は今と同じ ID。 */
 function ResourceSelect({
+  id, invalid, 'aria-describedby': describedBy,
   label,
   kind,
   value,
@@ -167,6 +169,9 @@ function ResourceSelect({
   resourcesFailed = false,
   clearable = false,
 }: {
+  id?: string
+  invalid?: boolean
+  'aria-describedby'?: string
   label: string
   kind: EntityKind
   value: string
@@ -179,7 +184,7 @@ function ResourceSelect({
   return (
     <div className="text-ink-secondary block text-sm">
       <span className="mb-1 block">{label}</span>
-      <EntityKindField kind={kind} label={label} options={options} value={value} onChange={onChange} clearable={clearable} />
+      <SaveErrorField names={["value"]}><EntityKindField id={id} invalid={invalid} describedBy={describedBy} kind={kind} label={label} options={options} value={value} onChange={onChange} clearable={clearable} /></SaveErrorField>
       {options.length === 0 && !resourcesFailed ? <span className="text-warning mt-1 block text-xs">選べる{label}がありません</span> : null}
     </div>
   )
@@ -197,23 +202,23 @@ function ActionParams({
   onChange: (params: Record<string, unknown>) => void
 }) {
   if (step.type === 'add_tag' || step.type === 'remove_tag') {
-    return <ResourceSelect label="タグ" kind="tag" value={String(step.params.tagId ?? '')} options={resources.tags} resourcesFailed={resourcesFailed} onChange={(tagId) => onChange({ tagId })} />
+    return <SaveErrorField names={["tagId","step.params.tagId","params.tagId"]}><ResourceSelect label="タグ" kind="tag" value={String(step.params.tagId ?? '')} options={resources.tags} resourcesFailed={resourcesFailed} onChange={(tagId) => onChange({ tagId })} /></SaveErrorField>
   }
   if (step.type === 'start_scenario' || step.type === 'stop_scenario' || step.type === 'resume_scenario') {
-    return <ResourceSelect label="シナリオ" kind="scenario" value={String(step.params.scenarioId ?? '')} options={resources.scenarios} resourcesFailed={resourcesFailed} onChange={(scenarioId) => onChange({ scenarioId })} />
+    return <SaveErrorField names={["scenarioId","step.params.scenarioId","params.scenarioId"]}><ResourceSelect label="シナリオ" kind="scenario" value={String(step.params.scenarioId ?? '')} options={resources.scenarios} resourcesFailed={resourcesFailed} onChange={(scenarioId) => onChange({ scenarioId })} /></SaveErrorField>
   }
   if (step.type === 'send_webhook') {
-    return <ResourceSelect label="送信先" kind="webhook" value={String(step.params.webhookId ?? '')} options={resources.webhooks} resourcesFailed={resourcesFailed} onChange={(webhookId) => onChange({ webhookId })} />
+    return <SaveErrorField names={["webhookId","step.params.webhookId","params.webhookId"]}><ResourceSelect label="送信先" kind="webhook" value={String(step.params.webhookId ?? '')} options={resources.webhooks} resourcesFailed={resourcesFailed} onChange={(webhookId) => onChange({ webhookId })} /></SaveErrorField>
   }
   if (step.type === 'switch_rich_menu') {
-    return <ResourceSelect label="リッチメニュー" kind="rich_menu" value={String(step.params.richMenuPageId ?? '')} options={resources.richMenus} resourcesFailed={resourcesFailed} onChange={(richMenuPageId) => onChange({ richMenuPageId })} />
+    return <SaveErrorField names={["richMenuPageId","step.params.richMenuPageId","params.richMenuPageId"]}><ResourceSelect label="リッチメニュー" kind="rich_menu" value={String(step.params.richMenuPageId ?? '')} options={resources.richMenus} resourcesFailed={resourcesFailed} onChange={(richMenuPageId) => onChange({ richMenuPageId })} /></SaveErrorField>
   }
   if (step.type === 'common_action') {
     const commonActionId = String(step.params.commonActionId ?? '')
     const selected = resources.commonActions.find((item) => item.id === commonActionId)
     return (
       <div>
-        <ResourceSelect label="共通アクション" kind="common_action" value={commonActionId} options={resources.commonActions} resourcesFailed={resourcesFailed} onChange={(nextId) => onChange({ commonActionId: nextId })} />
+        <SaveErrorField names={["commonActionId"]}><ResourceSelect label="共通アクション" kind="common_action" value={commonActionId} options={resources.commonActions} resourcesFailed={resourcesFailed} onChange={(nextId) => onChange({ commonActionId: nextId })} /></SaveErrorField>
         {selected ? <p className="text-ink-secondary mt-2 text-xs">共通アクション「{selected.name}」 v{selected.version}</p> : null}
       </div>
     )
@@ -222,7 +227,7 @@ function ActionParams({
     return (
       <label className="text-ink-secondary block max-w-xs text-sm">
         待つ時間（5分単位）
-        <TextField type="number" min={5} step={5} max={525600} value={Number(step.params.durationMinutes ?? 5)} onChange={(event) => onChange({ durationMinutes: Number(event.target.value) })} className="mt-1" />
+        <SaveErrorField names={["durationMinutes","step.params.durationMinutes","params.durationMinutes","duration_minutes","step.params.duration_minutes","params.duration_minutes"]}><TextField type="number" min={5} step={5} max={525600} value={Number(step.params.durationMinutes ?? 5)} onChange={(event) => onChange({ durationMinutes: Number(event.target.value) })} className="mt-1" /></SaveErrorField>
       </label>
     )
   }
@@ -231,7 +236,7 @@ function ActionParams({
     const selected = resources.templates.find((item) => item.id === templateId)
     return (
       <div className="space-y-3">
-        <ResourceSelect label="テンプレート" kind="template" clearable value={templateId} options={resources.templates} resourcesFailed={resourcesFailed} onChange={(next) => onChange(next ? { templateId: next } : { content: '' })} />
+        <SaveErrorField names={["templateId"]}><ResourceSelect label="テンプレート" kind="template" clearable value={templateId} options={resources.templates} resourcesFailed={resourcesFailed} onChange={(next) => onChange(next ? { templateId: next } : { content: '' })} /></SaveErrorField>
         {selected ? (
           <p className="text-ink-secondary text-xs">
             テンプレート「{selected.name}」　版: —（未取得。テンプレートの版を返す口が接続されると表示します）
@@ -240,7 +245,7 @@ function ActionParams({
         {!templateId ? (
           <label className="text-ink-secondary block text-sm">
             送る本文
-            <TextArea value={String(step.params.content ?? '')} onChange={(event) => onChange({ content: event.target.value })} rows={4} className="mt-1" placeholder="友だちに送る文章を入力" />
+            <SaveErrorField names={["content","step.params.content","params.content"]}><TextArea value={String(step.params.content ?? '')} onChange={(event) => onChange({ content: event.target.value })} rows={4} className="mt-1" placeholder="友だちに送る文章を入力" /></SaveErrorField>
           </label>
         ) : null}
       </div>
@@ -251,8 +256,8 @@ function ActionParams({
     const [key = '', value = ''] = entries[0] ?? []
     return (
       <div className="grid gap-3 lg:grid-cols-2">
-        <label className="text-ink-secondary text-sm">項目名<TextField value={key} onChange={(event) => onChange({ values: { [event.target.value]: value } })} className="mt-1" placeholder="例：来店店舗" /></label>
-        <label className="text-ink-secondary text-sm">入れる内容<TextField value={String(value)} onChange={(event) => onChange({ values: { [key]: event.target.value } })} className="mt-1" placeholder="例：新宿店" /></label>
+        <label className="text-ink-secondary text-sm">項目名<SaveErrorField names={["key"]}><TextField value={key} onChange={(event) => onChange({ values: { [event.target.value]: value } })} className="mt-1" placeholder="例：来店店舗" /></SaveErrorField></label>
+        <label className="text-ink-secondary text-sm">入れる内容<SaveErrorField names={["value"]}><TextField value={String(value)} onChange={(event) => onChange({ values: { [key]: event.target.value } })} className="mt-1" placeholder="例：新宿店" /></SaveErrorField></label>
       </div>
     )
   }

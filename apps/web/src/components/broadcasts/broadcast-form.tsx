@@ -1,5 +1,4 @@
 'use client'
-
 import { LinePreviewFlex } from '@/components/shared/line-preview'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
@@ -105,6 +104,7 @@ import { formatDateTime, formatDay, formatNumber, formatRelative, formatTime } f
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -302,7 +302,7 @@ export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = 
   }
   const setPreview = (url: string) => latest.current.onChange({ ...latest.current.bubble.content, previewImageUrl: url })
   const main = (
-    <MediaSlot
+    <SaveErrorField names={["original","main"]}><MediaSlot
       kind={isVideo ? 'video' : 'image'}
       title={`${noun}を追加`}
       value={original || null}
@@ -319,13 +319,13 @@ export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = 
       scope={scope}
       onChange={(url) => setMain(url ?? '')}
       onMediaPick={pickFrom ? () => setPicking('main') : undefined}
-    />
+    /></SaveErrorField>
   )
   return <div className="space-y-3">
     {isVideo ? (
       <div className={styles.mediaRow}>
         {main}
-        <MediaSlot
+        <SaveErrorField names={["preview"]}><MediaSlot
           size="compact"
           title="プレビュー画像を追加"
           previewAlt="動画のプレビュー画像"
@@ -337,11 +337,11 @@ export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = 
           onChange={(url) => setPreview(url ?? '')}
           onMediaPick={pickFrom ? () => setPicking('preview') : undefined}
           urlEntry={{ value: preview, onChange: setPreview, label: '動画のプレビュー画像のURL', placeholder: 'https://…（JPEG/PNG・1MBまで）' }}
-        />
+        /></SaveErrorField>
       </div>
     ) : main}
     {isVideo ? <p className="text-xs text-ink-faint">プレビュー画像は LINE 側で必須です（https・JPEG/PNG・1MBまで）。</p> : null}
-    {bubble.type === 'rich_video' && <input value={String(content.actionUrl ?? '')} onChange={(e) => onChange({ ...content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
+    {bubble.type === 'rich_video' && <SaveErrorField names={["actionUrl","content.actionUrl","action_url","content.action_url"]}><input value={String(content.actionUrl ?? '')} onChange={(e) => onChange({ ...content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>}
     <MediaPickerDialog
       open={picking !== null}
       accountId={pickFrom}
@@ -449,8 +449,8 @@ function MessageButtonsSection({ buttons, error, onChange, liffId, accountId }: 
       <div className="mt-3 space-y-2">
         {buttons.map((button, buttonIndex) => (
           <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
-            <input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
-            <TapActionField
+            <SaveErrorField names={[`buttons.${buttonIndex}.label`,"label","button.label"]}><input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" /></SaveErrorField>
+            <SaveErrorField names={["button"]}><TapActionField
               name={`ボタン${buttonIndex + 1}`}
               kindLabel={`ボタン${buttonIndex + 1}の種類`}
               value={buttonTapValue(button)}
@@ -461,9 +461,9 @@ function MessageButtonsSection({ buttons, error, onChange, liffId, accountId }: 
               liffSettingsHref={accountId ? `/accounts/detail?id=${encodeURIComponent(accountId)}` : '/accounts'}
               sources={sources}
               renderBody={(kind) => kind !== 'pdf' ? undefined : (
-                <TextField type="url" aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} placeholder="https://example.com/guide.pdf" onChange={(event) => patchButton(buttonIndex, { uri: event.target.value })} />
+                <SaveErrorField names={[`buttons.${buttonIndex}.value`,"value","button.value"]}><TextField type="url" aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} placeholder="https://example.com/guide.pdf" onChange={(event) => patchButton(buttonIndex, { uri: event.target.value })} /></SaveErrorField>
               )}
-            />
+            /></SaveErrorField>
             <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
           </div>
         ))}
@@ -551,6 +551,7 @@ export default function BroadcastForm({
   onStepChange,
   visualQaAugustCampaign = false,
 }: BroadcastFormProps) {
+  const saveErrors = useSaveFormErrors()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   /*
    * テスト送信と本番予約で同じ下書きを使う。
@@ -1256,7 +1257,9 @@ export default function BroadcastForm({
         if (selectedAccountIdRef.current !== accountId) return
         if (!detail.success || (detail.data.accountId && detail.data.accountId !== accountId)) { setTemplateApplyError('このアカウントで使えるテンプレートを読み込めませんでした。'); return }
         source = { ...template, carouselActions: detail.data.carouselActions, carouselTapLimitMode: detail.data.carouselTapLimitMode, carouselTapLimitText: detail.data.carouselTapLimitText }
-      } catch { if (selectedAccountIdRef.current === accountId) setTemplateApplyError('テンプレートを読み込めませんでした。もう一度選んでください。'); return }
+      } catch (saveFailure) {
+        const fieldFailure = saveErrors.capture(saveFailure);
+ if (selectedAccountIdRef.current === accountId) { if (!fieldFailure) setTemplateApplyError('テンプレートを読み込めませんでした。もう一度選んでください。'); } return }
       finally { templateApplyLock.current = false; if (selectedAccountIdRef.current === accountId) setComposerBusy(false) }
     }
     const bubble = messageTemplateToBubble(source)
@@ -1407,10 +1410,13 @@ export default function BroadcastForm({
         setPreflightStatus('error')
         if (!silent) setError(res.error)
       }
-    } catch {
+    } catch (saveFailure) {
       if (seq !== preflightSeq.current) return
-      setPreflightStatus('error')
-      if (!silent) setError('確認できませんでした')
+      const fieldFailure = saveErrors.capture(saveFailure)
+      setPreflightStatus('error');
+
+      if (!silent) { if (!fieldFailure)
+ setError('確認できませんでした') }
     }
   }
 
@@ -1500,10 +1506,12 @@ export default function BroadcastForm({
       if (!latest || latest.accountId !== accountId) break
       try {
         await latest.promise
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
         /* 先行の失敗はこの保存の判断に混ぜない。下で最新を送る。 */
       }
-      if ((selectedAccountIdRef.current || null) !== accountId) return null
+      if ((selectedAccountIdRef.current || null) !== accountId)
+ return null
     }
     const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
     if (saveAsDraft && autosaveStep) payload.draftStep = autosaveStep
@@ -1559,6 +1567,8 @@ export default function BroadcastForm({
       settleInFlight(result.broadcast)
       return result.broadcast
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (e instanceof ApiError && e.status === 409 && sessionForAccount.draftId) {
         /*
          * R626: 古いアカウントの409を今の画面の文言へ混ぜない。
@@ -1658,7 +1668,10 @@ export default function BroadcastForm({
        * R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
        */
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
-      setError(describeSaveFailure(error))
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+
+      setError(describeSaveFailure(error)) }
       return false
     } finally {
       setSaving(false)
@@ -1700,9 +1713,12 @@ export default function BroadcastForm({
           : testSendFailure(at)
       setTestResult(view)
       setTestHistory((history) => [view, ...history])
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
       const view = testSendFailure(at)
-      setTestResult(view)
+      { if (!fieldFailure)
+      setTestResult(view) }
       setTestHistory((history) => [view, ...history])
     } finally {
       setTestSending(false)
@@ -1729,8 +1745,10 @@ export default function BroadcastForm({
       const recipients = res.success && Array.isArray(res.data) ? res.data : []
       setTestRecipients(recipients)
       setTestRecipientState(res.success ? 'ready' : 'error')
-    } catch {
-      if (generation === testRecipientsGeneration.current) setTestRecipientState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (generation === testRecipientsGeneration.current) { if (!fieldFailure) setTestRecipientState('error') }
     }
   }
 
@@ -1939,7 +1957,9 @@ export default function BroadcastForm({
             if (selectedAccountIdRef.current !== selectedAccountId) return false
             if (!saved.success) throw new Error(saved.error)
             assetId = saved.data.id; payload = saved.data.payload
-          } catch { if (selectedAccountIdRef.current === selectedAccountId) setTemplateSaveError('テンプレートに保存できませんでした。'); return false }
+          } catch (saveFailure) {
+            const fieldFailure = saveErrors.capture(saveFailure);
+ if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。'); } return false }
           finally { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(false) }
         }
         bubble = { id: inlineBubble.id, type: 'rich_message', content: { ...payload, assetId, assetName: content.name, inline: true } }
@@ -1971,7 +1991,9 @@ export default function BroadcastForm({
       if (selectedAccountIdRef.current !== selectedAccountId) return
       if (!result.success) throw new Error(result.error)
       setTemplateSaveIndex(null); notifyToast('テンプレートに保存しました')
-    } catch { if (selectedAccountIdRef.current === selectedAccountId) setTemplateSaveError('テンプレートに保存できませんでした。もう一度お試しください。') }
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+ if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。もう一度お試しください。') } }
     finally { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(false) }
   }
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
@@ -2076,7 +2098,10 @@ export default function BroadcastForm({
     } catch (caught) {
       // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-      setError(describeSaveFailure(caught))
+      const fieldFailure = saveErrors.capture(caught)
+      { if (!fieldFailure)
+
+      setError(describeSaveFailure(caught)) }
     } finally { submittingRef.current = false; setSaving(false) }
   }
 
@@ -2089,7 +2114,7 @@ export default function BroadcastForm({
   if (draftParam) {
     if (draftError) {
       return (
-        <div className={styles.root}>
+        <SaveErrorScope errors={saveErrors}><div className={styles.root}>
           <div className="rounded-card border border-hairline bg-canvas p-8 text-center">
             <p className="text-ink text-sm font-semibold">{draftError}</p>
             <div className="mt-4 flex items-center justify-center gap-3">
@@ -2098,19 +2123,19 @@ export default function BroadcastForm({
               </Link>
             </div>
           </div>
-        </div>
+        </div></SaveErrorScope>
       )
     }
     if (!editingDraft) {
       return (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+        <SaveErrorScope errors={saveErrors}><div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           下書きを読み込んでいます…
-        </div>
+        </div></SaveErrorScope>
       )
     }
   }
 
-  return <MessageComposerPage active={v8 && currentStep === 'message'}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
+  return <SaveErrorScope errors={saveErrors}><MessageComposerPage active={v8 && currentStep === 'message'}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
     <header className={styles.header} data-steps-below={v8 || undefined}>
       <div className={styles.heading}>
         {showHeadBack ? <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button> : null}
@@ -2177,7 +2202,7 @@ export default function BroadcastForm({
         ) : null}
         <section id="broadcast-step-basic" className={shows('basic') ? styles.section : 'hidden'}>
           <h3>配信方法</h3>
-              <RadioCardGroup legend="配信方法" className={styles.methodCards}>
+              <SaveErrorField names={["broadcast-delivery-method","value","deliveryMethod"]}><RadioCardGroup legend="配信方法" className={styles.methodCards}>
                 {([
                   ['new', '新しいメッセージを作成', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
                   ['template', 'テンプレートを選択', '保存済みテンプレートを呼び出して手直しします。'],
@@ -2205,15 +2230,15 @@ export default function BroadcastForm({
                       : undefined}
                   />
                 ))}
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
           <label className={styles.nameField}>
             <span className={styles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={styles.textInput} />
+            <SaveErrorField names={["title"]}><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={styles.textInput} /></SaveErrorField>
             <small>友だちには表示されません。一覧で見分けるための名前です</small>
           </label>
           <div className={styles.basicFields}>
-            <label><span className={styles.labelRow}>フォルダ</span><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={folders.map(folderById)} onCreate={canCreateFolder ? createFolder : undefined} size="full" /></label>
-            <label><span className={styles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} className={styles.textInput} placeholder="配信の目的や運用メモ" /></label>
+            <label><span className={styles.labelRow}>フォルダ</span><SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={folders.map(folderById)} onCreate={canCreateFolder ? createFolder : undefined} size="full" /></SaveErrorField></label>
+            <label><span className={styles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません</HelpTip></span><SaveErrorField names={["internalMemo","internal_memo"]}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} className={styles.textInput} placeholder="配信の目的や運用メモ" /></SaveErrorField></label>
           </div>
           <div className={styles.recentHeader}><h3>最近の配信</h3><Link href="/broadcasts">一斉配信の一覧を見る →</Link></div>
           <div className={styles.recentList}>
@@ -2228,7 +2253,7 @@ export default function BroadcastForm({
         </section>
         <section id="broadcast-step-audience" className={shows('audience') ? styles.section : 'hidden'}>
           <h3>配信対象</h3>
-          <RadioCardGroup legend="配信対象" className={styles.audienceCards}>
+          <SaveErrorField names={["broadcast-target-mode","value","mode.value","targetMode"]}><RadioCardGroup legend="配信対象" className={styles.audienceCards}>
             {TARGET_MODES.map((mode) => (
               <RadioCard
                 key={mode.value}
@@ -2243,7 +2268,7 @@ export default function BroadcastForm({
                 note={mode.description}
               />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           {audienceNotice && targetMode === 'advanced' && conditionHasAnalyticsAudience(condition) && (
             <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
               <p className="text-ink text-sm">
@@ -2277,7 +2302,7 @@ export default function BroadcastForm({
           </div>
           {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
-            <Combobox
+            <SaveErrorField names={["scenarioId","scenario_id"]}><Combobox
               aria-label="どのシナリオ"
               placeholder="すべてのシナリオ（どれか1つでも購読中）"
               value={scenarioId}
@@ -2285,7 +2310,7 @@ export default function BroadcastForm({
               options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
               loading={scenariosStatus === 'loading'}
               className="mt-1 w-full sm:max-w-sm"
-            />
+            /></SaveErrorField>
             {scenariosStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">シナリオを読み込んでいます…</p>}
             {scenariosStatus === 'error' && <p className="mt-1 text-xs text-warning">シナリオを読み込めませんでした。別の絞り方を選んで戻ると再取得します。</p>}
           </div>}
@@ -2295,7 +2320,7 @@ export default function BroadcastForm({
               「すべて」は置かない。タグを選ばないままだと絞り込みが消えて
               全員に届く。全員に送るなら上の「友だち全員に配信する」を選ぶ。
             */}
-            <Combobox
+            <SaveErrorField names={["tagId","targetTagId","tag_id"]}><Combobox
               aria-label="どのタグ"
               placeholder="タグを選んでください"
               value={tagId}
@@ -2309,7 +2334,7 @@ export default function BroadcastForm({
                */
               disabled={tagsStatus !== 'ready'}
               className="mt-1 w-full sm:max-w-sm"
-            />
+            /></SaveErrorField>
             {/*
               R581: 通信失敗と真の0件を分ける。失敗は赤を使わず注意色で出し、
               同じ画面で再試行できるようにする（失敗・直し方は「？」に入れない）。
@@ -2353,7 +2378,7 @@ export default function BroadcastForm({
             <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
             <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
           </div>
-          <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><Select aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="full" /></label>
+          <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTagId","exclude_tag_id"]}><Select aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="full" /></SaveErrorField></label>
           <div className={styles.exclusion}>
             <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
             <small>最近送った人を除く機能は、まだ使えません</small>
@@ -2372,7 +2397,7 @@ export default function BroadcastForm({
             onPickTemplate={(index, kind) => { setComposerTemplateKind(kind); setComposerTemplateIndex(index); setShowTemplatePicker(true) }}
             onSaveTemplate={(index) => { setTemplateSaveCreatedId(null); setTemplateSaveIndex(index); setTemplateSaveName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? title)); setTemplateSaveError('') }}
             onCompose={(index, kind) => { setTemplateSaveError(''); setInlineComposer({ index, kind }) }}
-            extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <Combobox aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ value: item.id, label: item.name }))} /> : null}
+            extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <SaveErrorField names={["assetId","bubble.content.assetId","content.assetId","asset_id","bubble.content.asset_id","content.asset_id"]}><Combobox aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ value: item.id, label: item.name }))} /></SaveErrorField> : null}
           />
         </section>
         {showTemplatePicker && (
@@ -2386,17 +2411,17 @@ export default function BroadcastForm({
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="block text-xs font-medium text-ink-secondary">名前・本文で検索
-                <input
+                <SaveErrorField names={["templatePickerQuery","template_picker_query"]}><input
                   type="search"
                   aria-label="テンプレート名・本文で検索"
                   value={templatePickerQuery}
                   onChange={(event) => setTemplatePickerQuery(event.target.value)}
                   placeholder="テンプレート名・本文で検索"
                   className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
-                />
+                /></SaveErrorField>
               </label>
               <label className="block text-xs font-medium text-ink-secondary">フォルダ
-                <Select
+                <SaveErrorField names={["templatePickerFolderId","template_picker_folder_id"]}><Select
                   aria-label="テンプレートのフォルダ"
                   value={templatePickerFolderId}
                   onChange={setTemplatePickerFolderId}
@@ -2406,7 +2431,7 @@ export default function BroadcastForm({
                     { value: '__none__', label: '未分類' },
                   ]}
                   size="full"
-                />
+                /></SaveErrorField>
               </label>
             </div>
             <div className="mt-4 space-y-3">
@@ -2449,45 +2474,45 @@ export default function BroadcastForm({
             <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
           </div>
           <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
-            <Combobox aria-label="配信後のアクション" placeholder="実行しない" value={afterActionVersionId} onChange={setAfterActionVersionId} options={[{ value: '', label: '実行しない' }, ...publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))]} className="mt-2 w-full font-normal" />
+            <SaveErrorField names={["afterActionVersionId","after_action_version_id"]}><Combobox aria-label="配信後のアクション" placeholder="実行しない" value={afterActionVersionId} onChange={setAfterActionVersionId} options={[{ value: '', label: '実行しない' }, ...publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))]} className="mt-2 w-full font-normal" /></SaveErrorField>
           </div>
           {!afterActionVersionId && <p className="mt-2 text-xs text-ink-faint">実行しない</p>}
           {afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
         </section>}
-        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
+        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <details ref={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><summary>ほかの設定</summary><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></details> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
           <h3>配信日</h3>
-          <RadioCardGroup legend="配信日" className={styles.methodCards}>
+          <SaveErrorField names={["broadcast-send-mode","sendMode","spreadMinutes"]}><RadioCardGroup legend="配信日" className={styles.methodCards}>
             <RadioCard name="broadcast-send-mode" value="now" checked={sendMode === 'now' && Number(spreadMinutes) === 0} onChange={() => { setSendMode('now'); setSpreadMinutes('0') }} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
             <RadioCard name="broadcast-send-mode" value="scheduled" checked={sendMode === 'scheduled'} onChange={() => setSendMode('scheduled')} title="日時を指定して予約" note="決めた日時に送ります" />
             <RadioCard name="broadcast-send-mode" value="spread" checked={sendMode === 'now' && Number(spreadMinutes) > 0} onChange={() => { setSendMode('now'); setSpreadMinutes(Number(spreadMinutes) > 0 ? spreadMinutes : '30') }} title="時間を分散して送る" note="少しずつ送り、集中を避けます" />
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           {sendMode === 'scheduled' && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
                   配信日（日本時間）
                 </label>
-                <DateField
+                <SaveErrorField names={["scheduledDate","scheduled_date"]}><DateField
                   id="bc-date"
                   value={scheduledDate}
                   onChange={setScheduledDate}
                   aria-label="配信日（日本時間）"
-                />
+                /></SaveErrorField>
               </div>
               <div>
                 <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
                   時刻（日本時間）
                 </label>
-                <TimeField
+                <SaveErrorField names={["scheduledTime","scheduled_time"]}><TimeField
                   id="bc-time"
                   size="field"
                   value={scheduledTime}
                   onChange={setScheduledTime}
                   aria-label="時刻（日本時間）"
-                />
+                /></SaveErrorField>
               </div>
               {/*
                 設計 `Bw0zt` の注意書き。予約は条件を保存するだけで、実際の
@@ -2514,7 +2539,7 @@ export default function BroadcastForm({
         </span>
       </label>
       <div className="flex items-center gap-1.5">
-        <input
+        <SaveErrorField names={["spreadMinutes","spread_minutes"]}><input
           id="bc-spread"
           type="number"
           min={0}
@@ -2522,7 +2547,7 @@ export default function BroadcastForm({
           value={spreadMinutes}
           onChange={(e) => setSpreadMinutes(e.target.value)}
           className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
-        />
+        /></SaveErrorField>
         <span className="text-ink-faint text-xs">分かけて</span>
       </div>
       <p className="text-ink-faint mt-1 text-xs leading-relaxed">
@@ -2536,7 +2561,7 @@ export default function BroadcastForm({
             <p>{quota?.monthlyUsed == null || quota.monthlyLimit == null ? '送信枠は配信前チェックで確認します' : `使った ${formatNumber(quota.monthlyUsed)} + 今回 ${formatNumber(quota.planned)} / 上限 ${formatNumber(quota.monthlyLimit)}通`}</p>
             {quotaInsufficient && <p className="text-danger">送信枠が不足しています。配信する人数を減らしてください</p>}
           </div>
-          <Checkbox checked={measureOpens} onCheckedChange={setMeasureOpens}>開封数の集計を取る</Checkbox>
+          <SaveErrorField names={["measureOpens","measure_opens"]}><Checkbox checked={measureOpens} onCheckedChange={setMeasureOpens}>開封数の集計を取る</Checkbox></SaveErrorField>
           {sendMode === 'scheduled' && (
             <section className="mt-4 rounded-control border border-hairline p-4">
               <h4 className="text-sm font-bold text-ink">配信スケジュール</h4>
@@ -2618,7 +2643,7 @@ export default function BroadcastForm({
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
         <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
-        <Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox>
+        <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
       </aside>
     </div>
 
@@ -2978,6 +3003,6 @@ export default function BroadcastForm({
     </ConfirmDialog>
 
   {inlineComposer && inlineHost ? inlineComposer.kind === 'carousel' ? <CarouselV8 key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : inlineComposer.kind === 'rich_message' ? <TemplateRichEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : <TemplateRichVideoEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : null}
-  <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<input aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></label></Dialog>
-  </div></MessageComposerPage>
+  <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<SaveErrorField names={["templateSaveName","name","template_save_name"]}><input aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></SaveErrorField></label></Dialog>
+  </div></MessageComposerPage></SaveErrorScope>
 }

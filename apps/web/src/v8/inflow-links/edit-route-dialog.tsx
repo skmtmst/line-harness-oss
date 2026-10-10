@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * ★V8 の一覧（src/v8/inflow-links/list.tsx）用の写し。元は
- * app/inflow-links/_components/edit-route-modal.tsx（src/v8 からは import できない）。
- * 中身（保存する口・送る形・失敗の出し方）は元と同じ。元を直したらここも直す。
- */
-
 import { useEffect, useState } from 'react'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
@@ -27,6 +20,14 @@ import type {
 } from '@line-crm/shared'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 の一覧（src/v8/inflow-links/list.tsx）用の写し。元は
+ * app/inflow-links/_components/edit-route-modal.tsx（src/v8 からは import できない）。
+ * 中身（保存する口・送る形・失敗の出し方）は元と同じ。元を直したらここも直す。
+ */
 
 interface MessageTemplate {
   id: string
@@ -73,6 +74,7 @@ export default function EditRouteModal({
   onClose,
   onSaved,
 }: Props) {
+  const saveErrors = useSaveFormErrors()
   // Per-pool member account names, loaded lazily so the dropdown can show
   // "Pool 名 — アカA, アカB" instead of just the pool name.
   const [poolMembers, setPoolMembers] = useState<Record<string, string[]>>(poolMemberNames ?? {})
@@ -166,8 +168,11 @@ export default function EditRouteModal({
       if (res.success) onSaved(res.data, isNew)
       else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
+      const fieldFailure = saveErrors.capture(err)
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
-      setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))
+      { if (!fieldFailure)
+
+      setError(withPermissionFailure(err, describeSaveFailure(err), 'store')) }
     } finally {
       // 失敗時に「保存中…」のまま固まらないよう、必ず戻す。
       setSubmitting(false)
@@ -186,7 +191,7 @@ export default function EditRouteModal({
   // R270: 作成と同じくフォルダは任意。空欄は未分類のまま保存する。
   const saveDisabled = submitting
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title={isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
       busy={submitting}
@@ -212,7 +217,7 @@ export default function EditRouteModal({
               ? '左側で選択したフォルダへ登録されます。'
               : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
           </>} label="フォルダ（任意）">
-          <TextField
+          <SaveErrorField names={["genre","form.genre"]}><TextField
             list={genreLocked ? undefined : 'referral-genre-options'}
             value={form.genre ?? ''}
             // R270: 空欄は未分類として null で送る。空文字のまま送ると
@@ -221,7 +226,7 @@ export default function EditRouteModal({
             readOnly={genreLocked}
             placeholder="例：SNS（空欄なら未分類）"
             maxLength={80}
-          />
+          /></SaveErrorField>
           <datalist id="referral-genre-options">
             {existingGenres.map((genre) => <option key={genre} value={genre} />)}
           </datalist>
@@ -229,23 +234,23 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']}>
-          <TextField
+          <SaveErrorField names={["name","form.name"]}><TextField
             value={form.name}
             onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-name': '' })) }}
             placeholder="例：Instagram プロフィール"
             maxLength={120}
-          />
+          /></SaveErrorField>
         </Field>
 
         <Field label="URLに出る識別子" htmlFor="route-ref" error={fieldErrors['route-ref']}>
-          <TextField
+          <SaveErrorField names={["refCode","form.refCode","ref_code","form.ref_code"]}><TextField
             value={form.refCode}
             onChange={(e) => { setForm({ ...form, refCode: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-ref': '' })) }}
             // R271: 作成済みの識別子は口も変更を拒否する。保存時にはじめて
             // 拒否せず、欄自体を読み取り専用にして理由を近くに出す。
             disabled={refCodeLocked || !isNew}
             placeholder="例：youtube"
-          />
+          /></SaveErrorField>
           {refCodeLocked && (
             <p className="text-ink-faint mt-1 text-xs">
               既に流入があった識別子を登録中のため、URLに出る識別子は変更できません。
@@ -261,19 +266,19 @@ export default function EditRouteModal({
         <Field note={<>
             友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
           </>} label="自動付与タグ（任意）">
-          <Combobox
+          <SaveErrorField names={["tagId","form.tagId","tag_id","form.tag_id"]}><Combobox
             aria-label="自動付与タグ（任意）"
             placeholder="— 設定なし —"
             value={form.tagId ?? ''}
             onChange={(next) => setForm({ ...form, tagId: next || null })}
             options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
             className="w-full"
-          />
+          /></SaveErrorField>
 
         </Field>
 
         <Field label="送り先 Pool">
-          <Select
+          <SaveErrorField names={["poolId","form.poolId","pool_id","form.pool_id"]}><Select
             aria-label="送り先 Pool"
             value={form.poolId ?? ''}
             onChange={(value) => setForm({ ...form, poolId: value || null })}
@@ -289,32 +294,32 @@ export default function EditRouteModal({
                 label: `${p.name}${p.slug === 'main' ? '（既定）' : ''} ${memberText}`,
               }
             })}
-          />
+          /></SaveErrorField>
         </Field>
 
         <Field label="起動シナリオ（任意）">
-          <Combobox
+          <SaveErrorField names={["scenarioId","form.scenarioId","scenario_id","form.scenario_id"]}><Combobox
             aria-label="起動シナリオ（任意）"
             placeholder="— 設定なし —"
             value={form.scenarioId ?? ''}
             onChange={(next) => setForm({ ...form, scenarioId: next || null })}
             options={scenarios.map((s) => ({ value: s.id, label: s.name }))}
             className="w-full"
-          />
+          /></SaveErrorField>
         </Field>
 
         <Field label="即時 push テンプレ（任意）">
-          <Combobox
+          <SaveErrorField names={["introTemplateId","form.introTemplateId","intro_template_id","form.intro_template_id"]}><Combobox
             aria-label="即時 push テンプレ（任意）"
             placeholder="— 設定なし —"
             value={form.introTemplateId ?? ''}
             onChange={(next) => setForm({ ...form, introTemplateId: next || null })}
             options={templates.map((t) => ({ value: t.id, label: t.name }))}
             className="w-full"
-          />
+          /></SaveErrorField>
         </Field>
 
-        <Checkbox
+        <SaveErrorField names={["runAccountFriendAddScenarios","form.runAccountFriendAddScenarios","run_account_friend_add_scenarios","form.run_account_friend_add_scenarios"]}><Checkbox
           checked={form.runAccountFriendAddScenarios ?? true}
           onCheckedChange={(checked) => {
             setForm({
@@ -324,7 +329,7 @@ export default function EditRouteModal({
             setWarning(null)
           }}
           description="OFF にするとアカウント標準シナリオは抑止され、このリンクの設定だけが流れます。"
-        >アカウント標準の友だち追加時設定も実行する（並走モード）</Checkbox>
+        >アカウント標準の友だち追加時設定も実行する（並走モード）</Checkbox></SaveErrorField>
 
         {warning && (
           <Notice
@@ -344,6 +349,6 @@ export default function EditRouteModal({
       <CouponSettings accountId={route?.lineAccountId ?? accountId} disabled={submitting}
         value={{ couponEnabled: form.couponEnabled ?? false, couponAssetId: form.couponAssetId ?? null, couponAudience: form.couponAudience ?? 'new_friends' }}
         onChange={(next) => { setForm((current) => ({ ...current, ...next })); setFieldErrors((current) => ({ ...current, 'route-coupon': '' })) }} />
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 承認ワークフロー（Pencil `t8WgD8`、閲覧のみ `n4DT7`、差し戻す理由の小窓 `n4j0Rm`）。
- *
- * 数4 → 承認カード（種類・状態・店舗・申請者・変更内容・差戻しコメント・差戻し／承認する）→ 公開境界。
- * 閲覧のみ（変える権限が無い人）には案内の帯を出し、差戻し・承認するのボタンは置かない
- * （2026-10-06 オーナー決定。場所だけ空けて、下の並びを動かさない）。
- * 承認待ちのカードは閲覧のみのとき枠を緑にして目立たせる（n4DT7）。動きは BEHAVIOR.md。
- */
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Check, Eye, Undo2 } from 'lucide-react'
@@ -30,6 +21,17 @@ import styles from './approvals.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 承認ワークフロー（Pencil `t8WgD8`、閲覧のみ `n4DT7`、差し戻す理由の小窓 `n4j0Rm`）。
+ *
+ * 数4 → 承認カード（種類・状態・店舗・申請者・変更内容・差戻しコメント・差戻し／承認する）→ 公開境界。
+ * 閲覧のみ（変える権限が無い人）には案内の帯を出し、差戻し・承認するのボタンは置かない
+ * （2026-10-06 オーナー決定。場所だけ空けて、下の並びを動かさない）。
+ * 承認待ちのカードは閲覧のみのとき枠を緑にして目立たせる（n4DT7）。動きは BEHAVIOR.md。
+ */
 
 const kindLabel: Record<RestaurantApproval['kind'], string> = {
   gbp_post: 'Google投稿',
@@ -168,13 +170,13 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>
-          <Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><TextArea
+          <Field note={<>差し戻すと、申請は「差戻し」になり、直して出し直すまで公開されません。</>} label="差し戻す理由（・申請者に届きます）" required><SaveErrorField names={["reason"]}><TextArea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="例：原価の根拠（仕入れ値の表）を添えてください"
               rows={3}
               disabled={busy}
-            /></Field>
+            /></SaveErrorField></Field>
 
         </div>
       ) : null}

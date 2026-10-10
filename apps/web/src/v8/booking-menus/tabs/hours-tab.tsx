@@ -1,7 +1,4 @@
 'use client'
-
-/* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
-
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
@@ -33,6 +30,10 @@ import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -51,6 +52,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   onResourceDeleted: (id: string) => void
   onResourcesRetry: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [draft, setDraft] = useState<BusinessHoursDay[] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -128,7 +130,10 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
       notifySaved('受付時間を保存しました。')
       onSaved(response.data)
     } catch (error) {
-      setSaveError(businessHoursSaveError(error))
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
+      setSaveError(businessHoursSaveError(error)) }
     } finally {
       inFlightRef.current = false
       setSaving(false)
@@ -138,18 +143,18 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   // WEB053：失敗を先に見る（draft は成功したときだけできる）。
   if (settingsStatus === 'error' || (settingsStatus !== 'loading' && !settings)) {
     return (
-      <StateCard
+      <SaveErrorScope errors={saveErrors}><StateCard
         icon={<AccountIcon />}
         title="受付枠を読み込めませんでした"
         description={settingsError ?? '通信状態を確認して、もう一度お試しください。'}
         action={<Button onClick={onReload}>もう一度読み込む</Button>}
-      />
+      /></SaveErrorScope>
     )
   }
-  if (settingsStatus === 'loading' || draft === null || !settings) return <SkeletonRows rows={7} />
+  if (settingsStatus === 'loading' || draft === null || !settings) return <SaveErrorScope errors={saveErrors}><SkeletonRows rows={7} /></SaveErrorScope>
 
   return (
-    <div className={styles.tabStack} data-design="Week">
+    <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Week">
       <Band tone="hint">「同時」は1時間に受けられる数ではなく、同じ時間に重ねられる予約の数です。</Band>
       {!settings.businessHoursConfigured ? (
         <Band tone="warn">まだ週全体の営業時間を保存していません。時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。</Band>
@@ -191,11 +196,11 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
-                  <SettingCheckbox
+                  <SaveErrorField names={["isOpen","is_open"]}><SettingCheckbox
                     label={`${label}を${isOpen ? '休みにする' : '開ける'}`}
                     checked={isOpen}
                     onChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}
-                  />
+                  /></SaveErrorField>
                   <span className={styles.dayLabel}>{label.replace('曜日', '')}</span>
                 </div>
                 <div className={styles.dayBody}>
@@ -204,25 +209,25 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                   ) : null}
                   {intervals.map((interval, index) => (
                   <div key={index} className={styles.intervalLine}>
-                    <TimeField
+                    <SaveErrorField names={[`intervals.${index}.start`,"start","interval.start"]}><TimeField
                       invalid={isBad(weekday, index, 'start')}
                       aria-label={`${label}の開始時刻（${index + 1}区間目）`}
                       value={interval.start}
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, start: value } : entry))}
                       className={styles.timeInput}
                       size="compact"
-                    />
+                    /></SaveErrorField>
                     <span className={styles.intervalTilde}>〜</span>
-                    <TimeField
+                    <SaveErrorField names={[`intervals.${index}.end`,"end","interval.end"]}><TimeField
                       invalid={isBad(weekday, index, 'end')}
                       aria-label={`${label}の終了時刻（${index + 1}区間目）`}
                       value={interval.end}
                       onChange={(value) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, end: value } : entry))}
                       className={styles.timeInput}
                       size="compact"
-                    />
+                    /></SaveErrorField>
                     <span className={styles.sameTimeLabel}>同時</span>
-                    <NumberInput
+                    <SaveErrorField names={[`intervals.${index}.capacity`,"capacity","interval.capacity"]}><NumberInput
                       aria-label={`${label}の同時受付数（${index + 1}区間目）`}
                       aria-invalid={isBad(weekday, index, 'capacity') || undefined}
                       type="number"
@@ -231,7 +236,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       value={interval.capacity ?? 1}
                       onChange={(event) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, capacity: Number(event.target.value) } : entry))}
                       className={styles.numInput}
-                    />
+                    /></SaveErrorField>
                     <button
                       type="button"
                       className={styles.iconRemove}
@@ -310,7 +315,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
       <SlotCheckV8 accountId={accountId} menus={menus} />
         </div>
       </section>
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -321,6 +326,8 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
   onSaved: (resource: BookingResource) => void
   onDeleted: (id: string) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -339,7 +346,11 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       })
       onSaved(response.data)
     } catch (cause) {
-      setError(resourceSaveError(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(resourceSaveError(cause)) }
     } finally {
       inFlightRef.current = false
       setBusy(false)
@@ -356,7 +367,11 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       setConfirmDelete(false)
       onDeleted(resource.id)
     } catch (cause) {
-      setError(resourceSaveError(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(resourceSaveError(cause)) }
     } finally {
       inFlightRef.current = false
       setBusy(false)
@@ -387,7 +402,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
   ] : []
 
   return (
-    <div className={styles.equipRow}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.equipRow}>
       <span className={styles.equipName}>
         {resource.name}
         {!resource.isActive ? <span className={styles.cellWarn}>（受付停止中）</span> : null}
@@ -422,7 +437,7 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
         onCancel={() => { if (!busy) setConfirmDelete(false) }}
         onConfirm={() => remove()}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }
 
@@ -433,6 +448,8 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
   resource?: BookingResource
   onSaved: (resource: BookingResource) => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [name, setName] = useState('')
   const [type, setType] = useState('')
   const [capacity, setCapacity] = useState('1')
@@ -453,6 +470,7 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
     const parsedCapacity = Number(capacity)
     if (!name.trim() || name.trim().length > 100 || !type.trim() || type.trim().length > 50
       || !Number.isInteger(parsedCapacity) || parsedCapacity < 1 || parsedCapacity > 1000) {
+      if (!saveErrors.fail("name", '設備名は1〜100文字、種類は1〜50文字、受付上限は1〜1000の整数で入力してください。'))
       setError('設備名は1〜100文字、種類は1〜50文字、受付上限は1〜1000の整数で入力してください。')
       return
     }
@@ -476,7 +494,11 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
         onSaved(response.data)
       }
     } catch (cause) {
-      setError(resourceSaveError(cause))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+
+      setError(resourceSaveError(cause)) }
     } finally {
       inFlightRef.current = false
       setSaving(false)
@@ -484,23 +506,23 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
   }
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open={open}
       title={resource ? `「${resource.name}」を編集` : '設備を追加する'}
       onCancel={() => { if (!saving) onClose() }}
       busy={saving}
     >
       <div className="grid gap-3">
-        <Field label="設備名"><input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
-        <Field label="種類"><input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></Field>
-        <Field label="受付上限"><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></Field>
+        <Field label="設備名"><SaveErrorField names={["name"]}><input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
+        <Field label="種類"><SaveErrorField names={["type"]}><input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
+        <Field label="受付上限"><SaveErrorField names={["capacity"]}><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></SaveErrorField></Field>
         {error ? <p className="text-danger text-xs" role="alert">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <Button onClick={() => { if (!saving) onClose() }} disabled={saving}>キャンセル</Button>
           <Button variant="primary" onClick={() => void submit()} disabled={saving} busy={saving}>保存する</Button>
         </div>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }
 
@@ -575,7 +597,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
         <HelpTip label="空きを確かめるの説明">お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。</HelpTip>
       </div>
       <div className={styles.checkGrid}>
-        <EntityKindField
+        <SaveErrorField names={["menuId"]}><EntityKindField
           kind="booking_menu"
           label="確かめるメニュー"
           options={activeMenus}
@@ -583,10 +605,10 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
           onChange={(value) => { setMenuId(value); changeCriteria() }}
           placeholder={activeMenus.length === 0 ? '（受付中のメニューがありません）' : '（メニューを選ぶ）'}
           meta={() => undefined}
-        />
-        <Field label="日付"><DateField aria-label="確かめる日付" value={date} onChange={(value) => { setDate(value); changeCriteria() }} className="mt-1" /></Field>
-        <Field label="開始時刻"><TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" /></Field>
-        <EntityKindField
+        /></SaveErrorField>
+        <Field label="日付"><SaveErrorField names={["date"]}><DateField aria-label="確かめる日付" value={date} onChange={(value) => { setDate(value); changeCriteria() }} className="mt-1" /></SaveErrorField></Field>
+        <Field label="開始時刻"><SaveErrorField names={["time"]}><TimeField aria-label="確かめる開始時刻" size="field" value={time} onChange={(value) => { setTime(value); changeCriteria() }} className="mt-1" /></SaveErrorField></Field>
+        <SaveErrorField names={["staffId"]}><EntityKindField
           kind="staff"
           label="確かめる担当"
           options={staffRows}
@@ -595,7 +617,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
           clearable
           placeholder="（担当：指名なし）"
           meta={() => undefined}
-        />
+        /></SaveErrorField>
       </div>
       <div className={styles.checkAction}>
         {/* 絵 yRPxl：虫めがね付きの白いボタン */}

@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`、状態 `SXCb3`）。
- *
- * 手順と API は v7 と同じ `useFriendMigrations`。違いは見せ方——
- * 「← 友だち一覧 › データ管理 › CSVで書き出す・取り込む」と
- * 「データ管理 ▾」を頭に置き、書き出しと取り込みを同じ重さの2枚で
- * 並べ、確認の内訳（追加・更新・変更なし・競合・エラー）を
- * 反映の前に出す。
- */
 import { Info } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -29,6 +19,18 @@ import {
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`、状態 `SXCb3`）。
+ *
+ * 手順と API は v7 と同じ `useFriendMigrations`。違いは見せ方——
+ * 「← 友だち一覧 › データ管理 › CSVで書き出す・取り込む」と
+ * 「データ管理 ▾」を頭に置き、書き出しと取り込みを同じ重さの2枚で
+ * 並べ、確認の内訳（追加・更新・変更なし・競合・エラー）を
+ * 反映の前に出す。
+ */
 
 export default function FriendMigrationsV8() {
   usePageTitle('CSVで書き出す・取り込む')
@@ -70,7 +72,7 @@ export default function FriendMigrationsV8() {
       <div className={styles.duoCards}>
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>CSVで書き出す</h3>
-          <div className={styles.fieldStack}><Field label="アカウント" help={<>基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。</>}><Select
+          <div className={styles.fieldStack}><Field label="アカウント" help={<>基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。</>}><SaveErrorField names={["accountId","m.accountId","account_id","m.account_id"]}><Select
                 aria-label="書き出すLINEアカウント"
                 size="full"
                 value={m.accountId}
@@ -79,7 +81,7 @@ export default function FriendMigrationsV8() {
                   { value: '', label: 'アカウントを選択' },
                   ...m.accounts.map((account) => ({ value: account.id, label: account.name })),
                 ]}
-              /><fieldset className={styles.fieldStack} style={{ gap: 8 }}>
+              /></SaveErrorField><fieldset className={styles.fieldStack} style={{ gap: 8 }}>
               <legend className={styles.fieldLabel}>
                 書き出す項目
                 <HelpTip label="書き出す項目の説明">基本はLINEユーザーID・LINE表示名・本名・システム表示名・登録日の5列です。この5列はそのまま取り込めます。</HelpTip>
@@ -89,7 +91,7 @@ export default function FriendMigrationsV8() {
                 ['tags_fields', 'タグ・友だち情報', true],
                 ['support', '対応状況・対応マーク・担当者', true],
               ] as const).map(([value, label, unavailable]) => (
-                <Checkbox
+                <SaveErrorField names={["value"]} key={value}><Checkbox
                   key={value}
                   checked={m.columns.includes(value)}
                   onCheckedChange={() => m.toggleColumn(value)}
@@ -97,7 +99,7 @@ export default function FriendMigrationsV8() {
                   description={unavailable ? 'まだ書き出せません' : undefined}
                 >
                   {label}
-                </Checkbox>
+                </Checkbox></SaveErrorField>
               ))}
             </fieldset>
 <p className={styles.sectionDesc} style={{ margin: 0 }}>

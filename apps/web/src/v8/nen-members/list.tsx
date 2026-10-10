@@ -1,9 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 会員一覧（AOWoJ）。今の V8 の会員一覧（app/nen/members/members-v8.tsx の MembersTabV8）を
- * 写した。検索・よく使う札・並び・件数・ページ送り・行の「…」は今と同じ口・同じ指定。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -29,6 +24,13 @@ import {
 import { RankChip, yen } from './parts'
 import styles from './members.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 会員一覧（AOWoJ）。今の V8 の会員一覧（app/nen/members/members-v8.tsx の MembersTabV8）を
+ * 写した。検索・よく使う札・並び・件数・ページ送り・行の「…」は今と同じ口・同じ指定。
+ */
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -138,7 +140,7 @@ export default function MembersListV8({
           EC未連携
         </FilterChip>
         <span className={styles.toolbarRight}>
-          <Select
+          <SaveErrorField names={["rank"]}><Select
             aria-label="よく使う絞り込み"
             value={rank}
             onChange={(value) => { setRank(value); if (value) setChipTopRanks(false); setPage(1) }}
@@ -146,8 +148,8 @@ export default function MembersListV8({
               { value: '', label: 'よく使う絞り込み' },
               ...rankSource.map((item) => ({ value: item.key, label: `ランク：${item.name}` })),
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select
             aria-label="並び順"
             value={sort}
             onChange={(value) => { setSort(value as NenMemberSort); setPage(1) }}
@@ -157,7 +159,7 @@ export default function MembersListV8({
               { value: 'balance_desc', label: 'マイル残高が多い順' },
               { value: 'recent', label: '最終購入が新しい順' },
             ]}
-          />
+          /></SaveErrorField>
           <PageSizeSelect value={pageSize} options={[10, 20, 50]} onChange={(value) => { setPageSize(value); setPage(1) }} />
         </span>
       </div>

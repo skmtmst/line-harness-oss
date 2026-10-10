@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8 オートメーションの見本（Pencil `c7dxp`・`/automations?tab=templates`）。
- *
- * 2026-10-07 src/v8 に一から書いた（今の V8 は 8%）。データの口・下書きを作る動き・権限・失敗時の扱いは
- * 今までの V8（app/automations/templates-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——
- * 型（ListPage）に、タブ・数の帯（ルールの一覧と同じ）・きっかけの札の段・4列のカード・注記を渡す。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -31,6 +23,16 @@ import {
 } from './shell'
 import styles from './templates.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 オートメーションの見本（Pencil `c7dxp`・`/automations?tab=templates`）。
+ *
+ * 2026-10-07 src/v8 に一から書いた（今の V8 は 8%）。データの口・下書きを作る動き・権限・失敗時の扱いは
+ * 今までの V8（app/automations/templates-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——
+ * 型（ListPage）に、タブ・数の帯（ルールの一覧と同じ）・きっかけの札の段・4列のカード・注記を渡す。
+ */
 
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -59,6 +61,7 @@ export function templateTriggerChips(items: Pick<AutomationTemplateSummary, 'tri
 }
 
 export default function AutomationTemplatesV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('見本から作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -103,16 +106,20 @@ export default function AutomationTemplatesV8() {
       setSummary(listRes && listRes.success ? listRes.summary ?? null : null)
       setSkipped(runsRes && runsRes.success ? runsRes.data.summary.skipped : null)
       setStatus('ready')
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== requestRef.current) return
-      setItems([])
+      saveErrors.capture(saveFailure)
+      setItems([]);
+
       setStatus('error')
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
-    if (accountLoading) return
-    void load()
+    if (accountLoading)
+ return
+    void load();
+
     return () => { requestRef.current += 1 }
   }, [accountLoading, load])
   useEffect(() => { setTrigger('') }, [selectedAccountId])
@@ -136,8 +143,11 @@ export default function AutomationTemplatesV8() {
       if (!response.success) throw new Error(response.error)
       delete operationKeysRef.current[slot]
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
-    } catch {
-      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('下書きを作れませんでした。状態を読み直してから、もう一度お試しください。') }
       setCreating(null)
     }
   }
@@ -237,7 +247,7 @@ export default function AutomationTemplatesV8() {
   }
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId="c7dxp"
       headingSize="regular"
       title="オートメーション"
@@ -252,6 +262,6 @@ export default function AutomationTemplatesV8() {
       </>}
     >
       <div className={styles.body}>{body}</div>
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

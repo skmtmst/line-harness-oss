@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 予約枠・在庫「予約経路の連携」タブ（板 `hQQlt`）。
- *
- * 取り込みアドレス（メール転送）と今日の取り込み → 予約経路の表（媒体ごとの受け取り方・状態・
- * 今日の件数・最後に届いた時刻・読めなかった数）→ 読めなかったもの（手で直して取り込む）。
- * 口：/api/restaurant-test/intake-addresses・channels・inbound-emails（・/:id/manual-import）。
- * 検証環境は受信専用。媒体へは書き戻さない。
- */
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, Copy, FlaskConical } from 'lucide-react'
@@ -29,6 +20,17 @@ import styles from './inventory.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 予約枠・在庫「予約経路の連携」タブ（板 `hQQlt`）。
+ *
+ * 取り込みアドレス（メール転送）と今日の取り込み → 予約経路の表（媒体ごとの受け取り方・状態・
+ * 今日の件数・最後に届いた時刻・読めなかった数）→ 読めなかったもの（手で直して取り込む）。
+ * 口：/api/restaurant-test/intake-addresses・channels・inbound-emails（・/:id/manual-import）。
+ * 検証環境は受信専用。媒体へは書き戻さない。
+ */
 
 export type RestaurantChannel = {
   id: string
@@ -307,14 +309,14 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
         <div ref={importRef} className={styles.manualFields}>
         {importError ? <Notice tone="danger" message={importError} /> : null}
         <Field label="お客さまのお名前" htmlFor="rs-import-name" error={fieldErrors.customerName}>
-          <TextField id="rs-import-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} />
+          <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-import-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
         </Field>
         <div className={styles.pair}>
           <Field label="人数" htmlFor="rs-import-guests" error={fieldErrors.guestCount}>
-            <NumberInput id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} />
+            <SaveErrorField names={["guestCount","draft.guestCount","guest_count","draft.guest_count"]}><NumberInput id="rs-import-guests" type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} /></SaveErrorField>
           </Field>
           <Field label="来店の日時" htmlFor="rs-import-at" error={fieldErrors.startsAt}>
-            <DateTimeField id="rs-import-at" invalid={Boolean(fieldErrors.startsAt)} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} />
+            <SaveErrorField names={["startsAt","draft.startsAt","starts_at","draft.starts_at"]}><DateTimeField id="rs-import-at" invalid={Boolean(fieldErrors.startsAt)} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} /></SaveErrorField>
           </Field>
         </div>
         </div>

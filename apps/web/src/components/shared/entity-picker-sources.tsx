@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * 作ってあるものを選ぶ窓（EntityPicker）の、種類ごとの決まり。
- * - 名前・印・作る画面へのリンク・フォルダの読み込み口（一覧と同じ API）
- * - 候補の変換（API の行 → EntityPickerItem）
- * - 中身の見本（テンプレート＝LINE のトークのスマホ、回答フォーム＝お客さまのスマホ）。
- *   見本の無い種類（シナリオ・タグなど）は見本の列を出さない。
- * データは今の画面が読んでいる行をそのまま渡す。窓を開いたときだけフォルダ・見本を読む。
- */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import dynamic from 'next/dynamic'
 import TagPickerField from './tag-picker-field'
@@ -23,6 +14,16 @@ import LinePreview, { LinePreviewMessage } from './line-preview'
 import ListState from './list-state'
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
 import { EntityPickerDialog, EntityPickerField, type EntityPickerCategory, type EntityPickerFolder, type EntityPickerItem } from './entity-picker'
+
+
+/*
+ * 作ってあるものを選ぶ窓（EntityPicker）の、種類ごとの決まり。
+ * - 名前・印・作る画面へのリンク・フォルダの読み込み口（一覧と同じ API）
+ * - 候補の変換（API の行 → EntityPickerItem）
+ * - 中身の見本（テンプレート＝LINE のトークのスマホ、回答フォーム＝お客さまのスマホ）。
+ *   見本の無い種類（シナリオ・タグなど）は見本の列を出さない。
+ * データは今の画面が読んでいる行をそのまま渡す。窓を開いたときだけフォルダ・見本を読む。
+ */
 
 const FormPhone = dynamic(() => import('@/v8/form-edit/phone').then((mod) => mod.FormPhone), { ssr: false, loading: () => <ListState kind="loading" /> })
 
@@ -206,6 +207,7 @@ type KindFieldBase = {
   buttonRef?: Ref<HTMLButtonElement>
   /** 欄の下の誤り・説明の id。 */
   describedBy?: string
+  'aria-describedby'?: string
 }
 
 /**
@@ -213,7 +215,8 @@ type KindFieldBase = {
  * 保存する値（ID）は今と同じ形で返す。
  */
 export function EntityKindField(props: KindFieldBase & ({ multiple?: false; value: string | null | undefined; onChange: (id: string) => void; clearable?: boolean } | { multiple: true; value: string[]; onChange: (ids: string[]) => void; allowEmpty?: boolean })) {
-  const { kind, label, options, meta, placeholder, disabled, readOnly, invalid, description, id, noPreview, buttonRef, describedBy } = props
+  const { kind, label, options, meta, placeholder, disabled, readOnly, invalid, description, id, noPreview, buttonRef, describedBy: suppliedDescription } = props
+  const describedBy = [suppliedDescription, props['aria-describedby']].filter(Boolean).join(' ') || undefined
   const theme = useAdminTheme()
   const account = useMaybeAccount()
   const accountId = props.accountId === undefined ? account?.selectedAccountId ?? null : props.accountId

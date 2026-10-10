@@ -1,5 +1,4 @@
 'use client'
-
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -21,6 +20,7 @@ import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { formatDay, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : emptyValue('unknown')
 
@@ -350,11 +350,11 @@ export function PhotoReviewDetail({
     >
       {stepUpMethod === 'none' ? null : stepUpMethod === 'password' ? (
         <Field label="パスワード" htmlFor="photo-download-password">
-          <TextField id="photo-download-password" type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" />
+          <SaveErrorField names={["downloadCode","download_code"]}><TextField id="photo-download-password" type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" /></SaveErrorField>
         </Field>
       ) : (
         <Field label="再認証コード" htmlFor="photo-download-code">
-          <TextField id="photo-download-code" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" />
+          <SaveErrorField names={["downloadCode","download_code"]}><TextField id="photo-download-code" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" /></SaveErrorField>
         </Field>
       )}
     </Dialog>

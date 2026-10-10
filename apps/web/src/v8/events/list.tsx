@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
- *
- * 型（ListPage）に、数の帯（これからの回・申込・あと少しで満席・申し込みが少ない）、
- * 左のフォルダの列（上に「イベントを作る」）、案内の帯と道具の段、表、ページ送りをはめる。
- * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
- * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveEventToFolder } from '@/lib/move-to-folder'
@@ -53,6 +44,17 @@ import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
+ *
+ * 型（ListPage）に、数の帯（これからの回・申込・あと少しで満席・申し込みが少ない）、
+ * 左のフォルダの列（上に「イベントを作る」）、案内の帯と道具の段、表、ページ送りをはめる。
+ * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
+ * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -397,7 +399,7 @@ export default function EventsListV8() {
         trailing={(
           <>
             <div className={styles.savedBox}>
-              <Select
+              <SaveErrorField names={["savedValue","filter","saved_value"]}><Select
                 aria-label="よく使う絞り込み"
                 icon={<Bookmark aria-hidden="true" />}
                 size="full"
@@ -414,16 +416,16 @@ export default function EventsListV8() {
                     if (filter === 'full') setFilter('all')
                   }
                 }}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.perPageBox}>
-              <Select
+              <SaveErrorField names={["perPage","per_page"]}><Select
                 aria-label="表示件数"
                 size="page-size"
                 value={String(perPage)}
                 options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
                 onChange={(value) => setPerPage(Number(value))}
-              />
+              /></SaveErrorField>
             </div>
           </>
         )}

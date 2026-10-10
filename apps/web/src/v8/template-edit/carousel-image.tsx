@@ -1,11 +1,11 @@
 'use client'
-
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
 import { validateCarouselImage } from './carousel-image-upload'
 import styles from './carousel-image.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 受け取りの失敗理由。日本語の理由だけを出し、「API error: 500」などの英語は案内文に置き換える。 */
 function uploadReasonOf(caught: unknown): string {
@@ -53,7 +53,7 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
   }
   return (
     <div className={styles.column}>
-      <MediaSlot
+      <SaveErrorField names={["url"]}><MediaSlot
         size="compact"
         title="画像を追加"
         previewAlt="カードの画像"
@@ -67,7 +67,7 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
         onRemove={() => onUploaded('')}
         onMediaPick={onMediaPick}
         onUrl={onUrl}
-      />
+      /></SaveErrorField>
       {file && <span className={styles.filename} ><TruncatedText value={String(file.name ?? '')} /></span>}
       {error && file && !validateCarouselImage(file, maxMB) && <Button disabled={disabled || busy} onClick={() => void send(file)} busy={Boolean(busy)} busyLabel="処理中…">もう一度受け取る</Button>}
     </div>

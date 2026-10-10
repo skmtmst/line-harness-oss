@@ -1,12 +1,5 @@
 'use client'
-
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 ウェビナーの参加者（Pencil uNsEy）。
- * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
- * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import Link from 'next/link'
@@ -51,6 +44,13 @@ import styles from './participants.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 ウェビナーの参加者（Pencil uNsEy）。
+ * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
+ * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
+ */
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'
 
@@ -271,7 +271,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             trailing={<>
               <div className={styles.savedBox}>
                 <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-                <Select aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} />
+                <SaveErrorField names={["filter"]}><Select aria-label="よく使う絞り込み" value={filter} onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)} options={SAVED_OPTIONS} /></SaveErrorField>
               </div>
               <PageSizeSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1) }} options={[10, 20, 50]} label={null} />
             </>}

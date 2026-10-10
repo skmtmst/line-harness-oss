@@ -18,6 +18,7 @@ import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { scenarioReferenceData } from './scenario-reference-data'
 import Button from '@/components/shared/button'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
 
@@ -319,13 +320,13 @@ export default function QuestionEditor({
         <p className="text-ink-faint mt-0.5 mb-1.5 text-xs leading-relaxed">
           質問の前に、ふつうのテキストメッセージとして流れます。空なら送りません。名前などの差し込みが使えます。
         </p>
-        <textarea
+        <SaveErrorField names={["intro","value.intro"]}><textarea
           id={`${fieldBase}-intro`}
           rows={3}
           value={value.intro ?? ''}
           onChange={(e) => onChange({ ...value, intro: e.target.value })}
           className={areaClass}
-        />
+        /></SaveErrorField>
       </div>
 
       <div>
@@ -335,18 +336,18 @@ export default function QuestionEditor({
           </label>
           <CharCount value={value.text} max={160} />
         </div>
-        <input
+        <SaveErrorField names={["text","value.text"]}><input
           id={`${fieldBase}-text`}
           value={value.text}
           onChange={(e) => onChange({ ...value, text: e.target.value })}
           placeholder="例：体調はいかがですか？"
           className={`${inputClass} mt-1.5`}
-        />
+        /></SaveErrorField>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor={`${fieldBase}-tapmode`} className="text-ink-secondary text-xs font-medium">質問の回答は</label>
-        <Select
+        <SaveErrorField names={["tapMode","value.tapMode","tap_mode","value.tap_mode"]}><Select
           aria-label="質問の回答は"
           id={`${fieldBase}-tapmode`}
           value={value.tapMode}
@@ -355,7 +356,7 @@ export default function QuestionEditor({
             { value: 'single', label: '1つのみタップ可能' },
             { value: 'multiple', label: 'すべてタップ可能' },
           ]}
-        />
+        /></SaveErrorField>
       </div>
 
       <div className={choiceColumns ? 'grid gap-3 xl:grid-cols-2' : 'space-y-3'}>
@@ -417,12 +418,12 @@ export default function QuestionEditor({
                     </label>
                     <CharCount value={choice.label} max={20} />
                   </div>
-                  <input
+                  <SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><input
                     id={`${fieldBase}-choice-${index}-label`}
                     value={choice.label}
                     onChange={(e) => setChoice(index, { label: e.target.value })}
                     className={`${inputClass} mt-1.5`}
-                  />
+                  /></SaveErrorField>
                   <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                     10文字を超えると、機種によっては途中で切れて表示されます。
                   </p>
@@ -430,46 +431,46 @@ export default function QuestionEditor({
 
                 <div className="flex flex-wrap items-center gap-2">
                   <label htmlFor={`${fieldBase}-choice-${index}-behavior`} className="text-ink-secondary text-xs font-medium">選択後の挙動</label>
-                  <Select
+                  <SaveErrorField names={[`choices.${index}.behavior`,"behavior","choice.behavior"]}><Select
                     aria-label="選択後の挙動"
                     id={`${fieldBase}-choice-${index}-behavior`}
                     value={choice.behavior}
                     onChange={(next) => setChoice(index, { behavior: next as ChoiceBehavior })}
                     options={BEHAVIORS.map((b) => ({ value: b.value, label: b.label }))}
-                  />
+                  /></SaveErrorField>
                 </div>
 
                 {(choice.behavior === 'url' || choice.behavior === 'add_friend' || choice.behavior === 'form') && (
-                  <input
+                  <SaveErrorField names={[`choices.${index}.url`,"url","choice.url"]}><input
                     value={choice.url ?? ''}
                     onChange={(e) => setChoice(index, { url: e.target.value })}
                     placeholder="https://…"
                     aria-label={`選択肢${index + 1}のURL`}
                     className={inputClass}
-                  />
+                  /></SaveErrorField>
                 )}
                 {choice.behavior === 'tel' && (
-                  <input
+                  <SaveErrorField names={[`choices.${index}.tel`,"tel","choice.tel"]}><input
                     value={choice.tel ?? ''}
                     onChange={(e) => setChoice(index, { tel: e.target.value })}
                     placeholder="0312345678"
                     aria-label={`選択肢${index + 1}の電話番号`}
                     className={inputClass}
-                  />
+                  /></SaveErrorField>
                 )}
                 {choice.behavior === 'mail' && (
-                  <input
+                  <SaveErrorField names={[`choices.${index}.email`,"email","choice.email"]}><input
                     value={choice.email ?? ''}
                     onChange={(e) => setChoice(index, { email: e.target.value })}
                     placeholder="info@example.com"
                     aria-label={`選択肢${index + 1}のメールアドレス`}
                     className={inputClass}
-                  />
+                  /></SaveErrorField>
                 )}
                 {choice.behavior === 'scenario' && (
                   <div className="bg-canvas-sunken rounded-card space-y-2 px-3 py-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Select
+                      <SaveErrorField names={["op","choice.scenario?.op","scenario?.op"]}><Select
                         aria-label={`選択肢${index + 1}のシナリオ操作`}
                         value={choice.scenario?.op ?? 'start'}
                         onChange={(next) =>
@@ -481,9 +482,9 @@ export default function QuestionEditor({
                           { value: 'start', label: '購読を始める' },
                           { value: 'stop', label: '購読を止める' },
                         ]}
-                      />
+                      /></SaveErrorField>
                       <div className="min-w-0 flex-1">
-                        <EntityKindField
+                        <SaveErrorField names={["scenarioId","choice.scenario?.scenarioId","scenario?.scenarioId","choice"]}><EntityKindField
                           kind="scenario"
                           label={`選択肢${index + 1}の移動先シナリオ`}
                           value={choice.scenario?.scenarioId ?? ''}
@@ -499,12 +500,12 @@ export default function QuestionEditor({
                             })
                           }
                           options={scenarios}
-                        />
+                        /></SaveErrorField>
                       </div>
                     </div>
                     {(choice.scenario?.op ?? 'start') === 'start' && (
                       <>
-                        <RadioCardGroup legend="再開するときの続きかた" className="flex flex-wrap gap-2">
+                        <SaveErrorField names={["value","opt.value","restart","choice.scenario?.restart","scenario?.restart","choice"]}><RadioCardGroup legend="再開するときの続きかた" className="flex flex-wrap gap-2">
                         {(
                           [
                             { value: 'from_start', label: '最初から' },
@@ -528,8 +529,8 @@ export default function QuestionEditor({
                             title={opt.label}
                           />
                         ))}
-                      </RadioCardGroup>
-                      <Checkbox
+                      </RadioCardGroup></SaveErrorField>
+                      <SaveErrorField names={["rememberPrevious","choice.scenario?.rememberPrevious","scenario?.rememberPrevious","remember_previous","choice.scenario?.remember_previous","scenario?.remember_previous"]}><Checkbox
                         checked={choice.scenario?.rememberPrevious === true}
                         onCheckedChange={(checked) =>
                           setChoice(index, {
@@ -540,7 +541,7 @@ export default function QuestionEditor({
                             },
                           })
                         }
-                      >いまのシナリオを控えて、あとで戻せるようにする</Checkbox>
+                      >いまのシナリオを控えて、あとで戻せるようにする</Checkbox></SaveErrorField>
                       </>
                     )}
                   </div>
@@ -575,14 +576,14 @@ export default function QuestionEditor({
                     <label htmlFor={`${fieldBase}-choice-${index}-reply`} className="text-ink-secondary text-xs font-medium">選択時の返信</label>
                     <CharCount value={choice.reply ?? ''} max={4500} />
                   </div>
-                  <textarea
+                  <SaveErrorField names={[`choices.${index}.reply`,"reply","choice.reply"]}><textarea
                     id={`${fieldBase}-choice-${index}-reply`}
                     rows={3}
                     value={choice.reply ?? ''}
                     onChange={(e) => setChoice(index, { reply: e.target.value })}
                     placeholder="「〇〇」ですね。わかりました！"
                     className={`${areaClass} mt-1.5`}
-                  />
+                  /></SaveErrorField>
                 </div>
 
                 <details className="border-hairline rounded-control border">
@@ -595,22 +596,22 @@ export default function QuestionEditor({
                         <label htmlFor={`${fieldBase}-choice-${index}-usermsg`} className="text-ink-secondary text-xs font-medium">ユーザーメッセージ</label>
                         <CharCount value={choice.userMessage ?? ''} max={60} />
                       </div>
-                      <input
+                      <SaveErrorField names={[`choices.${index}.userMessage`,`choices.${index}.user_message`,"userMessage","choice.userMessage","user_message","choice.user_message"]}><input
                         id={`${fieldBase}-choice-${index}-usermsg`}
                         value={choice.userMessage ?? ''}
                         onChange={(e) => setChoice(index, { userMessage: e.target.value })}
                         placeholder={choice.label || '空欄なら選択肢の文字が使われます'}
                         disabled={choice.hideUserMessage === true}
                         className={`${inputClass} mt-1.5 disabled:opacity-50`}
-                      />
+                      /></SaveErrorField>
                       <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                         ボタンを押したときに、友だちの発言としてトークに残る文です。
                       </p>
-                      <Checkbox
+                      <SaveErrorField names={[`choices.${index}.hideUserMessage`,`choices.${index}.hide_user_message`,"hideUserMessage","choice.hideUserMessage","hide_user_message","choice.hide_user_message"]}><Checkbox
                         checked={choice.hideUserMessage === true}
                         onCheckedChange={(checked) => setChoice(index, { hideUserMessage: checked })}
                         className="mt-1.5"
-                      >ユーザーメッセージを使用しない</Checkbox>
+                      >ユーザーメッセージを使用しない</Checkbox></SaveErrorField>
                     </div>
 
                     <div>
@@ -618,14 +619,14 @@ export default function QuestionEditor({
                         <label htmlFor={`${fieldBase}-choice-${index}-repeat`} className="text-ink-secondary text-xs font-medium">二度押し時の返信</label>
                         <CharCount value={choice.repeatReply ?? ''} max={4500} />
                       </div>
-                      <textarea
+                      <SaveErrorField names={[`choices.${index}.repeatReply`,`choices.${index}.repeat_reply`,"repeatReply","choice.repeatReply","repeat_reply","choice.repeat_reply"]}><textarea
                         id={`${fieldBase}-choice-${index}-repeat`}
                         rows={3}
                         value={choice.repeatReply ?? ''}
                         onChange={(e) => setChoice(index, { repeatReply: e.target.value })}
                         placeholder="すでに押されています！"
                         className={`${areaClass} mt-1.5`}
-                      />
+                      /></SaveErrorField>
                       <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                         空欄なら「すでに押されています！」を返します。2度目はタグもシナリオも動かしません。
                       </p>
@@ -652,7 +653,7 @@ export default function QuestionEditor({
                     */}
                     <div>
                       <label htmlFor={`${fieldBase}-choice-${index}-field`} className="text-ink-secondary text-xs font-medium">友だち情報欄</label>
-                      <Select
+                      <SaveErrorField names={["fieldId","choice.field?.fieldId","field?.fieldId","field_id","choice.field?.field_id","field?.field_id"]}><Select
                         aria-label="友だち情報欄"
                         id={`${fieldBase}-choice-${index}-field`}
                         value={choice.field?.fieldId ?? ''}
@@ -669,9 +670,9 @@ export default function QuestionEditor({
                         ]}
                         size="full"
                         className="mt-1.5"
-                      />
+                      /></SaveErrorField>
                       {choice.field?.fieldId && (
-                        <input
+                        <SaveErrorField names={["value","choice.field.value","field.value"]}><input
                           aria-label={`選択肢${index + 1}の友だち情報欄にセットする値`}
                           value={choice.field.value}
                           onChange={(e) =>
@@ -681,7 +682,7 @@ export default function QuestionEditor({
                           }
                           placeholder="セットする値（既存の値は上書き）"
                           className="border-hairline rounded-control text-ink mt-2 h-9 w-full border px-3 text-sm"
-                        />
+                        /></SaveErrorField>
                       )}
                     </div>
                   </div>
@@ -709,13 +710,13 @@ export default function QuestionEditor({
           <label htmlFor={`${fieldBase}-alttext`} className="text-ink-secondary text-xs font-medium">PC版・通知欄での代替テキスト</label>
           <CharCount value={value.altText ?? ''} max={400} />
         </div>
-        <input
+        <SaveErrorField names={["altText","value.altText","alt_text","value.alt_text"]}><input
           id={`${fieldBase}-alttext`}
           value={value.altText ?? ''}
           onChange={(e) => onChange({ ...value, altText: e.target.value })}
           placeholder="空欄なら質問文が使われます"
           className={`${inputClass} mt-1.5`}
-        />
+        /></SaveErrorField>
       </div>
     </div>
   )
@@ -746,14 +747,14 @@ function TagPicker({
         {tags.length > 0 || selected.length > 0 ? (
           /* #973 U022: タグの選択は全幅の独立行にする。選ぶ窓でまとめて選び、外すのも窓で行う。
              候補から消えたタグも窓で外せるよう、選択済みの行を残す。 */
-          <EntityKindField
+          <SaveErrorField names={["selected"]}><EntityKindField
             kind="tag"
             multiple
             label={label}
             value={selected}
             onChange={onChange}
             options={[...tags, ...selectedTags.filter((tag) => !tags.some((item) => item.id === tag.id))]}
-          />
+          /></SaveErrorField>
         ) : (
           <span className="text-ink-faint text-xs">{status === 'loading' ? '読み込んでいます' : status === 'error' ? '候補を読み込めませんでした' : 'タグがまだありません'}</span>
         )}

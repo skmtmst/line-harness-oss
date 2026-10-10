@@ -1,17 +1,6 @@
 'use client'
-
 import TagOverflow from '@/components/shared/tag-overflow'
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
- *
- * v7 の一覧（app/friends/page.tsx の FriendsPageInner）とは別の部品として持つ。
- * 呼ぶ API・送る形・保存先（sessionStorage・localStorage）は今と同じ。
- * 違いは見せ方だけ：頭（題・CSV・取り込む）→ 閲覧のみの帯 → タブ → 数の帯 →
- * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
- * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
- */
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
@@ -84,6 +73,17 @@ import styles from './list.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
+ *
+ * v7 の一覧（app/friends/page.tsx の FriendsPageInner）とは別の部品として持つ。
+ * 呼ぶ API・送る形・保存先（sessionStorage・localStorage）は今と同じ。
+ * 違いは見せ方だけ：頭（題・CSV・取り込む）→ 閲覧のみの帯 → タブ → 数の帯 →
+ * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
+ * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
+ */
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
@@ -654,18 +654,18 @@ export default function FriendsListV8() {
           />
         </div>
         {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。 */}
-        <Select aria-label="タグで絞り込む" width={119} value={selectedTagId}
+        <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><Select aria-label="タグで絞り込む" width={119} value={selectedTagId}
           onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
-          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ value: tag.id, label: tag.name }))])} />
-        <Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
+          options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ value: tag.id, label: tag.name }))])} /></SaveErrorField>
+        <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
-          options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} />
-        <Select aria-label="担当で絞り込む" width={132} value={operatorId}
+          options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
+        <SaveErrorField names={["operatorId","operator_id"]}><Select aria-label="担当で絞り込む" width={132} value={operatorId}
           onChange={(value) => resetPageWith(() => setOperatorId(value))}
-          options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))])} />
-        <Select aria-label="シナリオで絞り込む" width={147} value={scenarioId}
+          options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))])} /></SaveErrorField>
+        <SaveErrorField names={["scenarioId","scenario_id"]}><Select aria-label="シナリオで絞り込む" width={147} value={scenarioId}
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
-          options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))])} />
+          options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
         <button
           type="button"
           aria-pressed={advanced !== null}
@@ -708,9 +708,9 @@ export default function FriendsListV8() {
           </button>
           <MenuPortal open={columnsOpen} align="end" getAnchor={() => columnsButtonRef.current} onClose={() => setColumnsOpen(false)}>
             <div className={styles.columnsMenu}>
-              {COLUMNS.map((column) => (
+              {COLUMNS.map((column, saveFieldIndex) => (
                 <div key={column.key} className={styles.columnsItem}>
-                  <Checkbox
+                  <SaveErrorField names={[`COLUMNS.${saveFieldIndex}.key`,"key","column.key","visible"]}><Checkbox
                     checked={visible.has(column.key)}
                     onCheckedChange={(checked) => setVisible((previous) => {
                       const next = new Set(previous)
@@ -720,27 +720,27 @@ export default function FriendsListV8() {
                     })}
                   >
                     {column.label}
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 </div>
               ))}
             </div>
           </MenuPortal>
         </span>
-        <Select
+        <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="表示件数"
           width={98}
           value={String(pageSize)}
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
           options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
-        />
-        <ListToolbarSort
+        /></SaveErrorField>
+        <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
           aria-label="並び順"
           treatment="text"
           width={171}
           value={sortMode}
           onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
           options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]}
-        />
+        /></SaveErrorField>
       </div>
       {advanced?.summary.length ? (
         <div className={styles.applied}>
@@ -788,12 +788,12 @@ export default function FriendsListV8() {
         <thead>
           <TableHeadRow>
             <Th className={styles.thCheck}>
-              <Checkbox
+              <SaveErrorField names={["allSelected","selectedIds","all_selected","selected_ids"]}><Checkbox
                 checked={allSelected}
                 indeterminate={selectedCount > 0 && !allSelected}
                 onCheckedChange={(checked) => setSelectedIds(checked ? new Set(friends.map((friend) => friend.id)) : new Set())}
                 aria-label="表示中の友だちをすべて選ぶ"
-              />
+              /></SaveErrorField>
             </Th>
             <Th colSpan={2} className={styles.thFriend}>
               <span className={styles.thFriendInner}><Star size={14} aria-label="注目" className={styles.thStar} />友だち</span>
@@ -808,7 +808,7 @@ export default function FriendsListV8() {
           items={loadStatus === 'ready' ? friends : []}
           itemKey={(friend) => friend.id}
           colSpan={colCount}
-          renderRow={(friend) => {
+          renderRow={(friend , saveFieldIndex) => {
             const status = statusOf(friend.chatStatus)
             const latest = friend.latestIncomingMessage
             const lastContact = lastContactOf(friend)

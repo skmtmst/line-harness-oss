@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
- *
- * 型（DetailPage）に、頭（題・戻る口・CSV・開催回の選び口）、数の帯（申込・承認待ち・キャンセル待ち・キャンセル）、
- * 申込者・キャンセル待ち・キャンセル・お知らせを送る の4枚をはめる。
- * 処理（口・確かめの窓・失敗の文）は今の V8（src/app/events/bookings/bookings-v8.tsx）から写した。
- * 行の操作は絵どおり行に直接出す（承認する／断る・キャンセルにする／参加済／無断・予約に繰上げ・待ち順を変える）。
- */
-
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -28,6 +18,17 @@ import { jstShort } from './shared'
 import styles from './bookings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
+ *
+ * 型（DetailPage）に、頭（題・戻る口・CSV・開催回の選び口）、数の帯（申込・承認待ち・キャンセル待ち・キャンセル）、
+ * 申込者・キャンセル待ち・キャンセル・お知らせを送る の4枚をはめる。
+ * 処理（口・確かめの窓・失敗の文）は今の V8（src/app/events/bookings/bookings-v8.tsx）から写した。
+ * 行の操作は絵どおり行に直接出す（承認する／断る・キャンセルにする／参加済／無断・予約に繰上げ・待ち順を変える）。
+ */
 
 /** 予約・申込の状態の見え方。色だけに頼らず、必ず文字で言う。 */
 type ChipTone = 'warning' | 'success' | 'info' | 'neutral' | 'danger'
@@ -89,6 +90,7 @@ function BookingsEntry() {
 }
 
 function Bookings({ eventId }: { eventId: string }) {
+  const saveErrors = useSaveFormErrors()
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
   const [event, setEvent] = useState<EventDetail | null>(null)
@@ -129,11 +131,13 @@ function Bookings({ eventId }: { eventId: string }) {
       const detail = await eventsApi.getEvent(selectedAccountId, eventId)
       setEvent(detail)
       setEventStatus('ready')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setEvent(null)
       setEventStatus('error')
     }
-  }, [selectedAccountId, eventId])
+  }, [selectedAccountId, eventId, saveErrors]);
+
 
   const refreshSlots = useCallback(async () => {
     if (!selectedAccountId) {
@@ -145,10 +149,12 @@ function Bookings({ eventId }: { eventId: string }) {
       const res = await eventsApi.listOccurrenceSelector(selectedAccountId, eventId)
       setSlots(res.items)
       setSelectedOccurrenceId((current) => current || res.items[0]?.id || '')
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setSlots([])
     }
-  }, [selectedAccountId, eventId])
+  }, [selectedAccountId, eventId, saveErrors]);
+
 
   const refreshApplicants = useCallback(async () => {
     if (!selectedAccountId || !selectedOccurrenceId) return
@@ -163,12 +169,13 @@ function Bookings({ eventId }: { eventId: string }) {
       setBroadcastPreview(null)
       setBroadcastConfirmOpen(false)
       setApplicantsStatus('ready')
-    } catch {
+    } catch (saveFailure) {
       if (requestId !== requestRef.current || scope !== startedScope) return
+      saveErrors.capture(saveFailure)
       setApplicants(null)
       setApplicantsStatus('error')
     }
-  }, [selectedAccountId, selectedOccurrenceId, scope])
+  }, [selectedAccountId, selectedOccurrenceId, scope, saveErrors])
 
   useEffect(() => {
     void refreshEvent()
@@ -184,7 +191,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
   if (!eventId) {
     return (
-      <div data-design-node="Mu8qW">
+      <SaveErrorScope errors={saveErrors}><div data-design-node="Mu8qW">
         <TargetMissing
           kind="unspecified"
           title="どのイベントの申込かが決まっていません"
@@ -192,15 +199,15 @@ function Bookings({ eventId }: { eventId: string }) {
           backHref="/events"
           backLabel="イベント一覧へ戻る"
         />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   if (!selectedAccountId) {
     return (
-      <div data-design-node="Mu8qW">
+      <SaveErrorScope errors={saveErrors}><div data-design-node="Mu8qW">
         <ListState kind="empty" title="LINEアカウントを選択してください" description="上のバーで運用するLINEアカウントを選んでください。" />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
@@ -231,11 +238,16 @@ function Bookings({ eventId }: { eventId: string }) {
         setRejectError('')
       }
       await refreshApplicants()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
       if (action === 'reject') {
+        { if (!fieldFailure)
         setRejectError('予約を拒否できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
+      }
       } else {
-        setActionError('予約を確定できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
+        { if (!fieldFailure)
+        setActionError('予約を確定できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。') }
       }
     } finally {
       setBusy(false)
@@ -252,8 +264,11 @@ function Bookings({ eventId }: { eventId: string }) {
       if (!res?.ok) throw new Error('cancel_not_applied')
       setCancelApplicant(null)
       await refreshApplicants()
-    } catch {
-      setCancelError('この予約をキャンセルできませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setCancelError('この予約をキャンセルできませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。') }
     } finally {
       setCancelling(false)
     }
@@ -266,8 +281,11 @@ function Bookings({ eventId }: { eventId: string }) {
     try {
       await eventsApi.updateBooking(accountId, eventId, applicant.id, { status })
       await refreshApplicants()
-    } catch {
-      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。') }
     } finally {
       setMarking((current) => {
         const next = new Set(current)
@@ -326,9 +344,11 @@ function Bookings({ eventId }: { eventId: string }) {
       setWaitlistDialog(null)
       setWaitlistReason('')
       await refreshApplicants()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       await refreshApplicants()
-      setWaitlistError('変えられませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を確かめてから、もう一度お試しください。')
+      { if (!fieldFailure)
+      setWaitlistError('変えられませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を確かめてから、もう一度お試しください。') }
     } finally {
       setWaitlistBusy(false)
     }
@@ -340,8 +360,11 @@ function Bookings({ eventId }: { eventId: string }) {
     setActionError('')
     try {
       await eventsApi.downloadOccurrenceApplicantsCsv(selectedAccountId, applicants.occurrence.id, applicants.snapshotId)
-    } catch {
-      setActionError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
     } finally {
       setCsvBusy(false)
     }
@@ -360,8 +383,11 @@ function Bookings({ eventId }: { eventId: string }) {
       }, crypto.randomUUID())
       setBroadcastPreview({ broadcastId: result.broadcastId, recipientCount: result.recipientCount })
       setBroadcastConfirmOpen(true)
-    } catch {
-      setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。') }
     } finally {
       setBroadcastBusy(false)
     }
@@ -376,8 +402,11 @@ function Bookings({ eventId }: { eventId: string }) {
       setBroadcastConfirmOpen(false)
       setBroadcastMessage('')
       setBroadcastPreview(null)
-    } catch {
-      setBroadcastError('送信を開始できませんでした。まだ送られていない可能性があるため、配信一覧で状態を確認してから再試行してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setBroadcastError('送信を開始できませんでした。まだ送られていない可能性があるため、配信一覧で状態を確認してから再試行してください。') }
     } finally {
       setBroadcastBusy(false)
     }
@@ -404,7 +433,7 @@ function Bookings({ eventId }: { eventId: string }) {
   const ready = applicantsStatus === 'ready'
 
   return (
-    <DetailPage
+    <SaveErrorScope errors={saveErrors}><DetailPage
       boardId="Mu8qW"
       title={title}
       help={(
@@ -418,13 +447,13 @@ function Bookings({ eventId }: { eventId: string }) {
             <Download size={15} aria-hidden="true" />CSVで書き出す
           </Button>
           <div className={styles.occurrencePick}>
-            <Select
+            <SaveErrorField names={["selectedOccurrenceId","selected_occurrence_id"]}><Select
               size="full"
               value={selectedOccurrenceId}
               onChange={setSelectedOccurrenceId}
               aria-label="開催回を選ぶ"
               options={slots.map((slot) => ({ value: slot.id, label: `開催回：${formatOccurrence(slot.starts_at)}` }))}
-            />
+            /></SaveErrorField>
           </div>
         </div>
       )}
@@ -626,13 +655,13 @@ function Bookings({ eventId }: { eventId: string }) {
             <p className={styles.cardNote}>この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）</p>
           </div>
           <div className={styles.field}><Field label="申込者へ送るメッセージ" htmlFor="ev-bk-message"><div className={styles.broadcastRow}>
-              <input
+              <SaveErrorField names={["broadcastMessage","messageContent","broadcast_message"]}><input
                 id="ev-bk-message"
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="当日は動きやすい服装でお越しください"
                 className={styles.input}
-              />
+              /></SaveErrorField>
               <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} busy={broadcastBusy} busyLabel="確かめています…">
                 送る
               </Button>
@@ -675,12 +704,12 @@ function Bookings({ eventId }: { eventId: string }) {
         }}
       >
         {rejectApplicant ? (
-          <Field label="断る理由（・内部メモ）"><textarea
+          <Field label="断る理由（・内部メモ）"><SaveErrorField names={["rejectReason","reject_reason"]}><textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={2}
               className={styles.textarea}
-            /></Field>
+            /></SaveErrorField></Field>
         ) : null}
       </ConfirmDialog>
 
@@ -755,12 +784,12 @@ function Bookings({ eventId }: { eventId: string }) {
                 </Button>
               </div>
             ) : null}
-            <Field label="理由（・記録に残ります）" required><textarea
+            <Field label="理由（・記録に残ります）" required><SaveErrorField names={["waitlistReason","reason","waitlist_reason"]}><textarea
                 value={waitlistReason}
                 onChange={(e) => setWaitlistReason(e.target.value)}
                 rows={2}
                 className={styles.textarea}
-              /></Field>
+              /></SaveErrorField></Field>
           </>
         ) : null}
       </ConfirmDialog>
@@ -779,6 +808,6 @@ function Bookings({ eventId }: { eventId: string }) {
           setBroadcastConfirmOpen(false)
         }}
       />
-    </DetailPage>
+    </DetailPage></SaveErrorScope>
   )
 }

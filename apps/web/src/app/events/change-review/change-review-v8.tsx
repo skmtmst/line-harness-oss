@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8-B イベント予約の「変更の確認」（板 `hmr2P`）。
- *
- * 処理は `change-review-model.ts` の useChangeReview で v7 と同じ。
- * 違いは置き場と見せ方だけ——左に開催回と変える内容、右に影響の確認と
- * 約束、下に追従する変える・やめるの帯。
- */
-
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -29,6 +20,16 @@ import styles from './change-review-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B イベント予約の「変更の確認」（板 `hmr2P`）。
+ *
+ * 処理は `change-review-model.ts` の useChangeReview で v7 と同じ。
+ * 違いは置き場と見せ方だけ——左に開催回と変える内容、右に影響の確認と
+ * 約束、下に追従する変える・やめるの帯。
+ */
 
 /** datetime-local の入力値（壁時計）を見やすく出す。 */
 function formatLocalInput(local: string): string {
@@ -199,20 +200,20 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                     </TableHeadRow>
                   </thead>
                   <tbody>
-                    {slotList.map((slot) => {
+                    {slotList.map((slot, saveFieldIndex) => {
                       const edit = edits[slot.id]
                       const impact = impactBySlot.get(slot.id)
                       const receiving = edit ? edit.isActive : slot.is_active === 1
                       return (
                         <Tr key={slot.id} interactive={activeSlotId === slot.id}>
                           <Td>
-                            <input
+                            <SaveErrorField names={[`slotList.${saveFieldIndex}.id`,"change-review-slot","activeSlotId","id","slot.id","selectedSlotId","active_slot_id","selected_slot_id"]}><input
                               type="radio"
                               name="change-review-slot"
                               checked={activeSlotId === slot.id}
                               onChange={() => setSelectedSlotId(slot.id)}
                               aria-label={`${formatJp(slot.starts_at)}の回を選ぶ`}
-                            />
+                            /></SaveErrorField>
                           </Td>
                           <Td className="whitespace-nowrap text-sm tabular-nums">{formatJp(slot.starts_at)}</Td>
                           <Td align="right" className="tabular-nums">{slot.capacity ?? emptyValue('unknown')}</Td>
@@ -238,21 +239,21 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
               <>
                 <p className={styles.cardNote}>{formatJp(activeSlot.starts_at)} の回</p>
                 <div className={`${styles.fieldGrid} mt-3`}>
-                  <Field label="開始日時"><input
+                  <Field label="開始日時"><SaveErrorField names={["startsAt","activeEdit?.startsAt","starts_at","active_edit?.starts_at"]}><input
                       type="datetime-local"
                       value={activeEdit?.startsAt ?? ''}
                       onChange={(e) => updateActiveEdit({ startsAt: e.target.value })}
                       aria-label="開始日時"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    /></Field>
-                  <Field label="終了日時"><input
+                    /></SaveErrorField></Field>
+                  <Field label="終了日時"><SaveErrorField names={["endsAt","activeEdit?.endsAt","ends_at","active_edit?.ends_at"]}><input
                       type="datetime-local"
                       value={activeEdit?.endsAt ?? ''}
                       onChange={(e) => updateActiveEdit({ endsAt: e.target.value })}
                       aria-label="終了日時"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    /></Field>
-                  <Field label="定員"><NumberInput
+                    /></SaveErrorField></Field>
+                  <Field label="定員"><SaveErrorField names={["capacity","activeEdit?.capacity","active_edit?.capacity"]}><NumberInput
                       type="number"
                       min={1}
                       value={activeEdit?.capacity ?? ''}
@@ -260,7 +261,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       onChange={(e) => updateActiveEdit({ capacity: e.target.value })}
                       aria-label="定員"
                       className="border-hairline rounded-control w-full border px-3 py-2 text-sm font-normal"
-                    /></Field>
+                    /></SaveErrorField></Field>
                   <div className="grid gap-1 text-xs font-medium text-ink-secondary">
                     受付の有無
                     <Select
@@ -275,7 +276,7 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                   </div>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Field label="会場"><input
+                  <Field label="会場"><SaveErrorField names={["venueName","venue_name"]}><input
                       value={venueName}
                       onChange={(e) => {
                         setVenueName(e.target.value)
@@ -283,8 +284,8 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       }}
                       placeholder={event.venue_name ?? emptyValue('unconfigured')}
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    /></Field>
-                  <Field label="オンラインのURL（確定した申込にだけ見せます）"><input
+                    /></SaveErrorField></Field>
+                  <Field label="オンラインのURL（確定した申込にだけ見せます）"><SaveErrorField names={["venueUrl","venue_url"]}><input
                       value={venueUrl}
                       onChange={(e) => {
                         setVenueUrl(e.target.value)
@@ -293,16 +294,16 @@ export default function ChangeReviewV8({ eventId }: { eventId: string }) {
                       placeholder={event.venue_url ?? emptyValue('unconfigured')}
                       inputMode="url"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    /></Field>
+                    /></SaveErrorField></Field>
                 </div>
-                <div className="mt-3"><Field note={<>理由は変更の記録に残ります。友だちには送りません。</>} label="変える理由" required={isPublished}><textarea
+                <div className="mt-3"><Field note={<>理由は変更の記録に残ります。友だちには送りません。</>} label="変える理由" required={isPublished}><SaveErrorField names={["reason"]}><textarea
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       rows={2}
                       placeholder="例：会場の都合で時間を30分遅らせます"
                       aria-label="変える理由"
                       className="border-hairline rounded-control border px-3 py-2 text-sm font-normal"
-                    /></Field></div>
+                    /></SaveErrorField></Field></div>
                 <div className="mt-3">
                   <Button variant="secondary" onClick={() => void runPreview()} disabled={previewBusy} busy={previewBusy} busyLabel="確かめています…">
                     影響を確かめる

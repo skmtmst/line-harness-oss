@@ -1,19 +1,4 @@
 'use client'
-
-/*
- * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行：
- * 一覧 `v19Ivv`、作る種類を選ぶ窓 `R9XUMr`、削除できない窓 `Z0g3si`、
- * 削除の確認 `V6JFnd`、状態の板 `susGP`）。
- *
- * v7 の一覧（app/templates/page.tsx 内の TemplatesPageV7）とは別の部品として
- * 持つ。データの口は同じ。違いは置き場と見せ方だけ——
- * 「テンプレートを作る」は左のフォルダの列の上で、押すと種類を選ぶ窓が開く。
- * 行の右端は「…」（編集・使っている所を見る・一斉配信で使う・複製・
- * フォルダへ移す・削除）、行の左の □ を選ぶと表の下にまとめての帯
- * （フォルダへ移す・削除）。行を押すと詳細画面 `/templates/detail` へ
- * 移る（v7 の引き出しは V8 の詳細画面に置き換わる）。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
@@ -83,6 +68,23 @@ import styles from './list-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行：
+ * 一覧 `v19Ivv`、作る種類を選ぶ窓 `R9XUMr`、削除できない窓 `Z0g3si`、
+ * 削除の確認 `V6JFnd`、状態の板 `susGP`）。
+ *
+ * v7 の一覧（app/templates/page.tsx 内の TemplatesPageV7）とは別の部品として
+ * 持つ。データの口は同じ。違いは置き場と見せ方だけ——
+ * 「テンプレートを作る」は左のフォルダの列の上で、押すと種類を選ぶ窓が開く。
+ * 行の右端は「…」（編集・使っている所を見る・一斉配信で使う・複製・
+ * フォルダへ移す・削除）、行の左の □ を選ぶと表の下にまとめての帯
+ * （フォルダへ移す・削除）。行を押すと詳細画面 `/templates/detail` へ
+ * 移る（v7 の引き出しは V8 の詳細画面に置き換わる）。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 /** 一覧のタブ。message/question は同じテンプレートの束を中身で分ける。 */
 type Section = 'message' | 'question' | BroadcastAssetKind
@@ -312,6 +314,7 @@ function usageRows(detail: UsageDetail) {
 }
 
 export default function TemplatesListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('テンプレート')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -439,16 +442,19 @@ export default function TemplatesListV8() {
         setFailure(failureOfResponse())
       }
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
         // 権限不足を「読み込めませんでした」に混ぜない。
-        setFailure(failureOf(e))
+        { if (!fieldFailure)
+        setFailure(failureOf(e)) }
       }
     } finally {
       if (activeAccountRef.current === accountId && requestGeneration === loadGenerationRef.current) {
         setLoading(false)
       }
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -463,10 +469,11 @@ export default function TemplatesListV8() {
       const result = await api.broadcastMessageAssets.counts({ accountId })
       if (activeAccountRef.current !== accountId) return
       if (result.success) setAssetCounts(result.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       /* 件数が取れなくても一覧は出す。黙って古い件数のままにする。 */
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadAssetCounts() }, [loadAssetCounts])
 
@@ -486,10 +493,13 @@ export default function TemplatesListV8() {
         setFolders(res.data)
         setUnfiledCount(res.unfiledCount ?? null)
       } else setFolderError('フォルダを読み込めませんでした。')
-    } catch {
-      if (activeAccountRef.current === accountId) setFolderError('フォルダを読み込めませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
+      if (activeAccountRef.current === accountId) { if (!fieldFailure) setFolderError('フォルダを読み込めませんでした。')
     }
-  }, [selectedAccountId])
+  }
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
 
@@ -712,8 +722,11 @@ export default function TemplatesListV8() {
       const res = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId ?? undefined)
       if (!res.success) throw new Error(res.error)
       await loadFolders()
-    } catch {
-      setFolderError('並び順を変えられませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('並び順を変えられませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -729,8 +742,11 @@ export default function TemplatesListV8() {
       setDeletingFolder(null)
       if (selectedCategory === deletingFolder.id) setSelectedCategory('all')
       await loadFolders()
-    } catch {
-      setFolderError('フォルダを削除できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを削除できませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -783,9 +799,11 @@ export default function TemplatesListV8() {
       setPendingDelete(null)
       // R195: 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
       await Promise.all([load(), loadFolders()])
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
-      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+      { if (!fieldFailure)
+      setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -819,11 +837,14 @@ export default function TemplatesListV8() {
       notifyToast('フォルダへ移しました', { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setMoveError(
         reason instanceof ApiError && reason.status === 403
           ? permissionDeniedMessage('store')
           : 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
       setMoving(false)
     }
@@ -858,11 +879,14 @@ export default function TemplatesListV8() {
       notifyToast(`「${source.name}」をコピーしました（下書きで作られました）`, { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setDuplicateError(
         reason instanceof ApiError && reason.status === 403
           ? permissionDeniedMessage('store')
           : '複製できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
       setDuplicating(false)
     }
@@ -889,11 +913,14 @@ export default function TemplatesListV8() {
       notifyToast(`${pendingBulkDelete.length}件のテンプレートを削除しました`, { tone: 'success' })
       await Promise.all([load(), loadFolders()])
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
       setBulkDeleteError(
         reason instanceof ApiError && reason.status === 403
           ? permissionDeniedMessage('store')
           : '削除できませんでした。状態を読み直してからお試しください。',
-      )
+      ) }
     } finally {
       setBulkDeleting(false)
     }
@@ -1161,12 +1188,12 @@ export default function TemplatesListV8() {
           <thead>
             <tr>
               <th className={styles.selectCell} aria-label="選択">
-                <Checkbox
+                <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                   checked={allOnPageSelected}
                   indeterminate={!allOnPageSelected && selectedCount > 0}
                   onCheckedChange={() => toggleAllOnPage()}
                   aria-label="このページのテンプレートをすべて選択"
-                />
+                /></SaveErrorField>
               </th>
               <th>テンプレート</th>
               <th>種類</th>
@@ -1178,7 +1205,7 @@ export default function TemplatesListV8() {
             </tr>
           </thead>
           <RovingTbody>
-            {shownItems.map((t) => {
+            {shownItems.map((t, saveFieldIndex) => {
               const publish = publishStateOf(t)
               const kindLabel = t.question ? 'question' : t.messageType
               return (
@@ -1199,11 +1226,11 @@ export default function TemplatesListV8() {
                   }}
                 >
                   <td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
-                    <Checkbox
+                    <SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
                       checked={selectedIds.has(t.id)}
                       onCheckedChange={() => toggleOne(t.id)}
                       aria-label={`「${t.name}」を選択`}
-                    />
+                    /></SaveErrorField>
                   </td>
                   <td>
                     <Link
@@ -1344,7 +1371,7 @@ export default function TemplatesListV8() {
   const isTemplateSection = activeSection === 'message' || activeSection === 'question'
 
   return (
-    <div className={styles.board} data-design-node={narrow ? 'L7zA7C' : undefined}>
+    <SaveErrorScope errors={saveErrors}><div className={styles.board} data-design-node={narrow ? 'L7zA7C' : undefined}>
       {/*
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと、設計と画面の対を調べる design-structure の検査が
@@ -1440,7 +1467,7 @@ export default function TemplatesListV8() {
               <div className={styles.toolbar}>
                 {createButton(styles.toolbarCreate)}
                 <div className={styles.folderSelectWrap}>
-                  <Select
+                  <SaveErrorField names={["selectedCategory","selected_category"]}><Select
                     aria-label="フォルダ"
                     value={selectedCategory}
                     onChange={(value) => {
@@ -1448,7 +1475,7 @@ export default function TemplatesListV8() {
                       setPage(1)
                     }}
                     options={folderSelectOptions}
-                  />
+                  /></SaveErrorField>
                 </div>
                 <div className={styles.searchWrap}>
                   <SearchField
@@ -1491,7 +1518,7 @@ export default function TemplatesListV8() {
                   使っていない
                 </FilterChip>
                 <span className={styles.toolbarSpacer} />
-                <Select
+                <SaveErrorField names={["savedFilter","saved_filter"]}><Select
                   aria-label="よく使う絞り込み"
                   value={savedFilter}
                   onChange={(value) => {
@@ -1499,8 +1526,8 @@ export default function TemplatesListV8() {
                     setPage(1)
                   }}
                   options={SAVED_FILTER_OPTIONS}
-                />
-                <Select
+                /></SaveErrorField>
+                <SaveErrorField names={["pageSize","page_size"]}><Select
                   aria-label="1ページに出す件数"
                   value={String(pageSize)}
                   onChange={(value) => {
@@ -1508,7 +1535,7 @@ export default function TemplatesListV8() {
                     setPage(1)
                   }}
                   options={PAGE_SIZE_OPTIONS}
-                />
+                /></SaveErrorField>
               </div>
 
               {listBody}
@@ -1605,7 +1632,7 @@ export default function TemplatesListV8() {
                     <>
                       <p className={styles.panelLabel}>移動先のフォルダ</p>
                       <div className={styles.moveBody}>
-                        <Select
+                        <SaveErrorField names={["moveDraft","move_draft"]}><Select
                           aria-label="移動先のフォルダ"
                           size="full"
                           value={moveDraft}
@@ -1615,7 +1642,7 @@ export default function TemplatesListV8() {
                             { value: '', label: '未分類' },
                             ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
                           ]}
-                        />
+                        /></SaveErrorField>
                         <Button
                           type="button"
                           variant="primary"
@@ -1809,7 +1836,7 @@ export default function TemplatesListV8() {
       >
         <div className={styles.moveBody}>
           <span className={styles.moveLabel}>移動先のフォルダ</span>
-          <Select
+          <SaveErrorField names={["moveDraft","move_draft"]}><Select
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
@@ -1819,7 +1846,7 @@ export default function TemplatesListV8() {
               { value: '', label: '未分類' },
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
       </ConfirmDialog>
 
@@ -1879,6 +1906,6 @@ export default function TemplatesListV8() {
         onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
         onConfirm={() => void removeFolder()}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

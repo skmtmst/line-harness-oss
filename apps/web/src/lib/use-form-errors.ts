@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 export type FormFieldProblem = {
   key: string
@@ -98,10 +98,46 @@ export function useFormErrors() {
    * 作り直さないと、消したカード・行の欄（card-2-text など）が古い値のまま残り、保存をずっと止める。
    */
   defsRef.current = new Map()
+  /** 共通の欄部品が登録した定義。画面の描画で消さない（B-154）。 */
+  const registeredRef = useRef(new Map<string, Map<HTMLElement, string>>())
+  const registrationOrder = useRef(new Map<string, number>())
+  const rememberOrder = useCallback((key: string) => { if (!registrationOrder.current.has(key)) registrationOrder.current.set(key, registrationOrder.current.size) }, [])
+  const revealsRef = useRef(new Map<string, () => void>())
+  const registerReveal = useCallback((key: string, reveal: () => void) => {
+    rememberOrder(key)
+    revealsRef.current.set(key, reveal)
+    return () => { if (revealsRef.current.get(key) === reveal) revealsRef.current.delete(key) }
+  }, [rememberOrder])
+  const definitions = () => {
+    const all = new Map(defsRef.current)
+    for (const [key, entries] of registeredRef.current) {
+      if (!all.has(key) && entries.size) all.set(key, { label: entries.values().next().value!, check: () => null })
+    }
+    for (const [key, reveal] of revealsRef.current) {
+      all.set(key, { label: key, check: () => null, ...all.get(key), reveal })
+    }
+    return new Map([...all].sort(([left], [right]) => {
+      const a = defsRef.current.has(left) ? -1 : registrationOrder.current.get(left) ?? Number.MAX_SAFE_INTEGER
+      const b = defsRef.current.has(right) ? -1 : registrationOrder.current.get(right) ?? Number.MAX_SAFE_INTEGER
+      return a - b
+    }))
+  }
+  const register = useCallback((key: string, label: string, el: HTMLElement) => {
+    rememberOrder(key)
+    const entries = registeredRef.current.get(key) ?? new Map<HTMLElement, string>()
+    entries.set(el, label)
+    registeredRef.current.set(key, entries)
+    return () => {
+      entries.delete(el)
+      serverTargets.current.get(key)?.delete(el)
+      if (!entries.size) registeredRef.current.delete(key)
+    }
+  }, [rememberOrder])
   /** 欄の要素（1つ目へフォーカスを移すため） */
   const elsRef = useRef(new Map<string, HTMLElement>())
   /** サーバーが返した欄の誤り。打ち直すか次の送信で消える。 */
   const serverRef = useRef(new Map<string, string>())
+  const serverTargets = useRef(new Map<string, Set<HTMLElement>>())
   /** 打ち直しでサーバーの誤りを消す見張り（要素ごとに1つ） */
   const listenersRef = useRef(new WeakMap<HTMLElement, () => void>())
   /** 送信ボタンが押されたか。押すまでは上のまとめを出さない。 */
@@ -127,6 +163,13 @@ export function useFormErrors() {
     return problemOf(key)
   }
 
+  /** 同名の欄が背景にもあるとき、保存した編集窓の欄だけへ理由を渡す。 */
+  const errorFor = (key: string, el: HTMLElement | null): string | null => {
+    const targets = serverTargets.current.get(key)
+    if (serverRef.current.has(key) && targets && (!el || !targets.has(el))) return null
+    return error(key)
+  }
+
   /** 欄を赤くするか。Field の error と input の invalid へ渡す。 */
   const invalid = (key: string): boolean => error(key) !== null
 
@@ -138,6 +181,7 @@ export function useFormErrors() {
   }
 
   const clearServer = (key: string) => {
+    serverTargets.current.delete(key)
     if (!serverRef.current.delete(key)) return
     bump((v) => v + 1)
   }
@@ -168,7 +212,7 @@ export function useFormErrors() {
   const listProblems = (): FormFieldProblem[] => {
     if (!submitted) return []
     const problems: FormFieldProblem[] = []
-    for (const [key, def] of defsRef.current) {
+    for (const [key, def] of definitions()) {
       if (problemOf(key)) problems.push({ key, label: def.label })
     }
     return problems
@@ -178,7 +222,7 @@ export function useFormErrors() {
   const countIn = (group: string): number => {
     if (!submitted) return 0
     let count = 0
-    for (const [key, def] of defsRef.current) {
+    for (const [key, def] of definitions()) {
       if (def.group === group && problemOf(key)) count += 1
     }
     return count
@@ -186,6 +230,8 @@ export function useFormErrors() {
 
   /** 要素へスクロールしてフォーカスする。 */
   const moveTo = (el: HTMLElement) => {
+    const disclosure = el.closest('details')
+    if (disclosure) disclosure.open = true
     const target = focusTarget(el)
     target.scrollIntoView?.({ block: "center" })
     target.focus({ preventScroll: true })
@@ -196,13 +242,15 @@ export function useFormErrors() {
    * 描き直しを待ってからスクロールしてフォーカスする。
    */
   const focusFirst = () => {
-    for (const [key, def] of defsRef.current) {
+    for (const [key, def] of definitions()) {
       if (!problemOf(key)) continue
-      const el = elsRef.current.get(key)
-      if (def.reveal) {
+      const registered = registeredRef.current.get(key)
+      const target = [...(serverTargets.current.get(key) ?? [])].find((node) => node.isConnected)
+      const el = target ?? elsRef.current.get(key) ?? (registered ? [...registered.keys()].find((node) => node.isConnected) : undefined)
+      if (def.reveal && !target?.closest('[role="dialog"], [role="alertdialog"]')) {
         def.reveal()
         afterPaint(() => {
-          const shown = elsRef.current.get(key)
+          const shown = elsRef.current.get(key) ?? [...(registeredRef.current.get(key)?.keys() ?? [])].find((node) => node.isConnected)
           if (shown) moveTo(shown)
         })
         return
@@ -222,8 +270,9 @@ export function useFormErrors() {
    */
   const submit = (): FormFieldProblem[] => {
     serverRef.current.clear()
+    serverTargets.current.clear()
     const problems: FormFieldProblem[] = []
-    for (const [key, def] of defsRef.current) {
+    for (const [key, def] of definitions()) {
       touchedRef.current.add(key)
       if (def.check()) problems.push({ key, label: def.label })
     }
@@ -239,11 +288,16 @@ export function useFormErrors() {
    */
   const setServerErrors = (errors: ServerFieldErrors): number => {
     serverRef.current.clear()
+    serverTargets.current.clear()
     let shown = 0
     for (const [key, message] of Object.entries(errors)) {
-      if (!message || !defsRef.current.has(key)) continue
+      if (!message || !definitions().has(key)) continue
       serverRef.current.set(key, message)
       touchedRef.current.add(key)
+      const candidates = [...(registeredRef.current.get(key)?.keys() ?? [])].filter((node) => node.isConnected)
+      const inDialog = candidates.filter((node) => node.closest('[role="dialog"], [role="alertdialog"]'))
+      if (candidates.length) serverTargets.current.set(key, new Set(inDialog.length ? inDialog : candidates))
+      if (!inDialog.length) definitions().get(key)?.reveal?.()
       shown += 1
     }
     setSubmitted(true)
@@ -266,11 +320,12 @@ export function useFormErrors() {
   const reset = () => {
     touchedRef.current.clear()
     serverRef.current.clear()
+    serverTargets.current.clear()
     setSubmitted(false)
     bump((v) => v + 1)
   }
 
-  return { define, error, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, fail, clear, reset }
+  return { register, registerReveal, define, error, errorFor, invalid, touch, bind, listProblems, countIn, focusFirst, submit, setServerErrors, fail, clear, reset }
 }
 
 export type FormErrors = ReturnType<typeof useFormErrors>

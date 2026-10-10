@@ -1,22 +1,7 @@
 'use client'
-
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { DetailLoading } from '@/components/templates/detail-page'
-
-/*
- * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
- * 板：有効 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
- * 窓：止める確認 `OPGU2`・複製 `Al4Ek`・開始の確認 `F1LK4e`。
- *
- * 動き（読み込み・保存・複製・削除・開始/停止・通の編集）は今までの
- * app/scenarios/detail/detail-v8.tsx から写した（src/v8 は @/app を読めない）。
- * 見た目だけを絵の寸法で組み直した：板の頭／中身（左＝3つの箱・数の帯・
- * 最後の1通の後・メッセージの行・通ごとの数・足すボタン、右＝選んだ通のスマホ）／
- * 下の帯（削除・キャンセル・複製する・保存する）。
- * 閲覧のみの人には、変える操作のボタンを置かない（オーナー決定 2026-10-06）。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -75,22 +60,6 @@ import MessageKindFields, {
   type MessageKind,
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
-
-/** 専用の入力欄で書く種別か。 */
-function isStructuredKind(type: MessageType): boolean {
-  return type === 'location' || type === 'video' || type === 'audio' || type === 'sticker'
-}
-
-/** 開始のきっかけ1件を、画面で読める1行にする（一覧 page.tsx と同じ言い方）。 */
-function describeStartTrigger(trigger: ScenarioTriggerItem, tagName: string | null): string {
-  if (trigger.kind === 'friend_add') return '友だち追加のとき'
-  if (trigger.kind === 'tag_added') {
-    return tagName ? `タグ「${tagName}」が付いたとき` : 'タグが付いたとき（タグ名を確認できません）'
-  }
-  if (trigger.kind === 'form_answer') return 'フォームに答えたとき'
-  if (trigger.kind === 'booking_confirmed') return '予約が確定したとき'
-  return '呼ばれたとき'
-}
 import QuestionEditor, {
   deadAnswerSettings,
   emptyQuestion,
@@ -154,6 +123,37 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
+ * 板：有効 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
+ * 窓：止める確認 `OPGU2`・複製 `Al4Ek`・開始の確認 `F1LK4e`。
+ *
+ * 動き（読み込み・保存・複製・削除・開始/停止・通の編集）は今までの
+ * app/scenarios/detail/detail-v8.tsx から写した（src/v8 は @/app を読めない）。
+ * 見た目だけを絵の寸法で組み直した：板の頭／中身（左＝3つの箱・数の帯・
+ * 最後の1通の後・メッセージの行・通ごとの数・足すボタン、右＝選んだ通のスマホ）／
+ * 下の帯（削除・キャンセル・複製する・保存する）。
+ * 閲覧のみの人には、変える操作のボタンを置かない（オーナー決定 2026-10-06）。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
+
+/** 専用の入力欄で書く種別か。 */
+function isStructuredKind(type: MessageType): boolean {
+  return type === 'location' || type === 'video' || type === 'audio' || type === 'sticker'
+}
+
+/** 開始のきっかけ1件を、画面で読める1行にする（一覧 page.tsx と同じ言い方）。 */
+function describeStartTrigger(trigger: ScenarioTriggerItem, tagName: string | null): string {
+  if (trigger.kind === 'friend_add') return '友だち追加のとき'
+  if (trigger.kind === 'tag_added') {
+    return tagName ? `タグ「${tagName}」が付いたとき` : 'タグが付いたとき（タグ名を確認できません）'
+  }
+  if (trigger.kind === 'form_answer') return 'フォームに答えたとき'
+  if (trigger.kind === 'booking_confirmed') return '予約が確定したとき'
+  return '呼ばれたとき'
+}
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -187,8 +187,6 @@ const ON_COMPLETE_SENTENCE: Record<OnCompleteMode, string> = {
   resume_previous: '1つ前のシナリオを再開する',
   move: '次のシナリオへ移す',
 }
-
-
 
 /** ①の箱「保存済み 10月1日 14:02」。 */
 function formatSavedAt(iso: string | null | undefined): string {
@@ -423,6 +421,7 @@ export default function ScenarioDetailV8({
   scenarioId: string
   showStarted?: boolean
 }) {
+  const saveErrors = useSaveFormErrors()
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -650,15 +649,19 @@ export default function ScenarioDetailV8({
         setError(res.error)
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught);
+
       if (caught instanceof ApiError && caught.status === 404) {
         setScenarioMissing(true)
       } else {
-        setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。')
+        { if (!fieldFailure)
+
+        setError('シナリオの読み込みに失敗しました。もう一度読み込んでください。') }
       }
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, saveErrors])
 
   useEffect(() => {
     loadScenario()
@@ -682,7 +685,8 @@ export default function ScenarioDetailV8({
             setConflict(true)
             setConflictLatest(detail.data)
           }
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           // 取れなくても今の画面は残す。次の機会に確かめる。
         }
       })()
@@ -694,7 +698,7 @@ export default function ScenarioDetailV8({
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('focus', recheck)
     }
-  }, [id, loading, scenario])
+  }, [id, loading, scenario, saveErrors])
 
   // 並列で stats / templates / tags を取得（リグレッションを起こさないよう失敗は無視）
   useEffect(() => {
@@ -888,6 +892,7 @@ export default function ScenarioDetailV8({
         })
         if (!updated.success) throw new Error(updated.error)
       } catch (cause) {
+        saveErrors.capture(cause)
         throw new DuplicateAborted(copy, 'シナリオ全体の設定（配信対象・終了後の処理）', cause)
       }
 
@@ -950,6 +955,7 @@ export default function ScenarioDetailV8({
           if (!added.success) throw new Error(added.error)
         }
       } catch (cause) {
+        saveErrors.capture(cause)
         throw new DuplicateAborted(copy, '開始のきっかけ', cause)
       }
 
@@ -996,6 +1002,7 @@ export default function ScenarioDetailV8({
           have.add(key)
         }
       } catch (cause) {
+        saveErrors.capture(cause)
         throw new DuplicateAborted(copy, 'アクション', cause)
       }
 
@@ -1003,6 +1010,8 @@ export default function ScenarioDetailV8({
       setDuplicateOpen(false)
       router.push(`/scenarios/detail?id=${copy}`)
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
       if (e instanceof DuplicateAborted) {
         // SCENARIO-09: 不完全なコピーが残っていることを隠さない。
         // 所在・止まった段階・やり直し/削除の窓を出す。
@@ -1012,9 +1021,12 @@ export default function ScenarioDetailV8({
           stage: e.stage,
           detail: e.message,
         })
+        { if (!fieldFailure)
         setError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが残っています。`)
+      }
       } else {
-        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。')
+        { if (!fieldFailure)
+        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。') }
       }
     } finally {
       setDuplicating(false)
@@ -1034,8 +1046,11 @@ export default function ScenarioDetailV8({
       if (!res.success) throw new Error(res.error)
       setDiscardDuplicateOpen(false)
       setDuplicateRemainder(null)
-    } catch {
-      setDiscardDuplicateError('作りかけのコピーを削除できませんでした。コピーを開いて状態を確認し、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDiscardDuplicateError('作りかけのコピーを削除できませんでした。コピーを開いて状態を確認し、もう一度お試しください。') }
     } finally {
       setDiscardingDuplicate(false)
     }
@@ -1050,8 +1065,11 @@ export default function ScenarioDetailV8({
       if (!res.success) throw new Error(res.error)
       setDeleteScenarioOpen(false)
       router.push('/scenarios')
-    } catch {
-      setDeleteScenarioError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteScenarioError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeletingScenario(false)
     }
@@ -1078,6 +1096,7 @@ export default function ScenarioDetailV8({
         setError(res.error)
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       /*
        * ★V8 kz2B6：ほかの人が先に保存していた（409）。入力は残し、帯で知らせて
        * 「違いを比べる」「最新を読み込んで続ける」を選んでもらう。
@@ -1087,11 +1106,14 @@ export default function ScenarioDetailV8({
         try {
           const latest = await api.scenarios.get(id)
           if (latest.success) setConflictLatest(latest.data as ScenarioWithSteps)
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           // 最新が取れなくても帯は出す。「最新を読み込んで続ける」で取り直せる。
         }
       } else {
-        setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError('保存に失敗しました。通信を確かめて、もう一度お試しください。') }
       }
     } finally {
       setSaving(false)
@@ -1143,8 +1165,11 @@ export default function ScenarioDetailV8({
       notifyToast('配信を始めました')
       loadScenario(true)
       reloadStats()
-    } catch {
-      setStartError('配信を始められませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStartError('配信を始められませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setStartBusy(false)
     }
@@ -1170,8 +1195,11 @@ export default function ScenarioDetailV8({
       notifyToast('配信を一時停止しました')
       loadScenario(true)
       reloadStats()
-    } catch {
-      setStopError('配信を止められませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStopError('配信を止められませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
       setStopBusy(false)
     }
@@ -1442,12 +1470,14 @@ export default function ScenarioDetailV8({
       if (stepForm.messageType === 'flex' || stepForm.messageType === 'image') {
         try {
           JSON.parse(stepForm.messageContent)
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           failStep('content',
             stepForm.messageType === 'flex'
               ? 'Flex メッセージの JSON が不正です'
               : '画像メッセージの JSON が不正です',
-          )
+          );
+
           return
         }
       }
@@ -1560,14 +1590,16 @@ export default function ScenarioDetailV8({
       loadScenario(true)
       reloadStats()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
       /*
        * R235: 入力の不備（400番台）と通信・サーバーの失敗を分ける。
        * 時刻の空などの入力エラーまで「通信を確かめて」と出すと、
        * 直せるものを直せず再試行を繰り返すことになる。
        */
+      { if (!fieldFailure)
       setStepError(error instanceof ApiError && error.status >= 400 && error.status < 500
         ? '入力内容に不備があります。時刻・本文を確かめて、もう一度お試しください。'
-        : 'ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。')
+        : 'ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
       setStepSaving(false)
     }
@@ -1622,8 +1654,11 @@ export default function ScenarioDetailV8({
       }
       loadScenario(true)
       reloadStats()
-    } catch {
-      setStepError('この通を複製できませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStepError('この通を複製できませんでした') }
     } finally {
       setDuplicatingStepId(null)
     }
@@ -1641,8 +1676,11 @@ export default function ScenarioDetailV8({
       setDeleteStepTarget(null)
       void loadScenario(true)
       void reloadStats()
-    } catch {
-      setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeletingStepId(null)
     }
@@ -1664,8 +1702,12 @@ export default function ScenarioDetailV8({
       loadScenario(true)
       // 到達率バッジは stepOrder ベースでマッチングするので、並び替え後は stats も再取得
       reloadStats()
-    } catch {
-      setError('並び替えに失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('並び替えに失敗しました。通信を確かめて、もう一度お試しください。') }
     }
   }
 
@@ -1739,13 +1781,13 @@ export default function ScenarioDetailV8({
           description="いつ送るか。送ったあと次の通へ進むかどうかも、設計どおりここでそろえて決めます。"
         >
           <div className="space-y-3">
-        <div><Field label="ステップ順序"><NumberInput
+        <div><Field label="ステップ順序"><SaveErrorField names={["stepOrder","stepForm.stepOrder","step_order","step_form.step_order","step_form"]}><NumberInput
             type="number"
             min={1}
             className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             value={stepForm.stepOrder}
             onChange={(e) => setStepForm({ ...stepForm, stepOrder: Number(e.target.value) })}
-          /></Field></div>
+          /></SaveErrorField></Field></div>
         <div {...stepFields.bind('time')} aria-invalid={stepFields.invalid('time') || undefined}>
           <ScheduleInput
             mode={deliveryMode}
@@ -1764,7 +1806,7 @@ export default function ScenarioDetailV8({
         */}
         <div><Field note={<>
             一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
-          </>} label="送信後"><Select
+          </>} label="送信後"><SaveErrorField names={["afterSend","stepForm.afterSend","after_send","step_form.after_send","step_form"]}><Select
             aria-label="送信後"
             value={stepForm.afterSend}
             onChange={(value) =>
@@ -1775,7 +1817,7 @@ export default function ScenarioDetailV8({
               { value: 'pause', label: '送信後：ここで止める' },
             ]}
             size="full"
-          />
+          /></SaveErrorField>
 </Field></div>
           </div>
         </FormSection>
@@ -1784,7 +1826,7 @@ export default function ScenarioDetailV8({
           <div className="space-y-3">
         {/* 入力モード切替: 直接入力 / テンプレート参照 */}
         <div className="space-y-2">
-          <RadioCardGroup legend="メッセージの指定方法" className="grid gap-2 sm:grid-cols-2">
+          <SaveErrorField names={["step-input-mode","inputMode","stepForm.inputMode","stepForm"]}><RadioCardGroup legend="メッセージの指定方法" className="grid gap-2 sm:grid-cols-2">
             <RadioCard
               name="step-input-mode"
               value="direct"
@@ -1799,7 +1841,7 @@ export default function ScenarioDetailV8({
               onChange={() => setStepForm({ ...stepForm, inputMode: 'template' })}
               title="テンプレートを使う"
             />
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
         </div>
 
         {/*
@@ -1849,7 +1891,7 @@ export default function ScenarioDetailV8({
           <div>
             <span className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></span>
             <div {...stepFields.bind('template')}>
-            <EntityKindField
+            <SaveErrorField names={["templateId","stepForm.templateId","stepForm"]}><EntityKindField
               kind="template"
               label="テンプレート"
               options={templates}
@@ -1871,7 +1913,7 @@ export default function ScenarioDetailV8({
                   messageContent: template?.messageContent ?? stepForm.messageContent,
                 })
               }}
-            />
+            /></SaveErrorField>
             </div>
             <FieldError id="step-template-error">{stepFields.error('template')}</FieldError>
             <p className="text-xs text-warning mt-1">
@@ -1882,13 +1924,13 @@ export default function ScenarioDetailV8({
 
         {!stepForm.question && stepForm.inputMode === 'direct' && (
           <>
-            <div><Field label="メッセージタイプ"><Select
+            <div><Field label="メッセージタイプ"><SaveErrorField names={["messageType","stepForm.messageType","message_type","step_form.message_type","step_form"]}><Select
                 aria-label="メッセージタイプ"
                 value={stepForm.messageType}
                 onChange={(value) => setStepForm({ ...stepForm, messageType: value as MessageType })}
                 options={messageTypeOptions}
                 size="full"
-              /></Field></div>
+              /></SaveErrorField></Field></div>
             {/*
               位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
               中身は JSON なので、生のまま書かせると必ず壊れる。
@@ -1930,7 +1972,7 @@ export default function ScenarioDetailV8({
                     />
                   </div>
                 )}
-<InsertTextField
+<SaveErrorField names={["messageContent","stepForm.messageContent","message_content","step_form.message_content","step_form"]}><InsertTextField
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
@@ -1939,7 +1981,7 @@ export default function ScenarioDetailV8({
                   onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
                   aria-invalid={stepFields.invalid('content') || undefined}
                   aria-describedby={stepFields.invalid('content') ? 'step-content-error' : undefined}
-                /></Field></div>
+                /></SaveErrorField></Field></div>
             )}
             <FieldError id="step-content-error">{stepFields.error('content')}</FieldError>
             </div>
@@ -2006,7 +2048,7 @@ export default function ScenarioDetailV8({
           <div className="space-y-3">
             <div><Field note={<>
                 このステップが配信完了したら、選んだタグを友だちに付与します
-              </>} label="到達したらタグ付与"><Select
+              </>} label="到達したらタグ付与"><SaveErrorField names={["onReachTagId","stepForm.onReachTagId","on_reach_tag_id","step_form.on_reach_tag_id","step_form"]}><Select
                 aria-label="到達したらタグ付与"
                 value={stepForm.onReachTagId ?? ''}
                 onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
@@ -2015,7 +2057,7 @@ export default function ScenarioDetailV8({
                   ...tags.map((t) => ({ value: t.id, label: t.name })),
                 ]}
                 size="full"
-              />
+              /></SaveErrorField>
 </Field></div>
             {!editingStepId && (
               <p className="text-ink-faint text-xs">
@@ -2026,12 +2068,12 @@ export default function ScenarioDetailV8({
         </FormSection>
 
         {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
-        <Checkbox
+        <SaveErrorField names={["isDraft","stepForm.isDraft","is_draft","step_form.is_draft","step_form"]}><Checkbox
           checked={stepForm.isDraft}
           onCheckedChange={(checked) => setStepForm({ ...stepForm, isDraft: checked })}
         >
           下書きにする（配信されません。テスト送信では送れます）
-        </Checkbox>
+        </Checkbox></SaveErrorField>
 
         {stepError && <p className="text-danger text-xs">{stepError}</p>}
 
@@ -2128,32 +2170,32 @@ export default function ScenarioDetailV8({
 
   if (loading) {
     return (
-      <div className={styles.board}>
+      <SaveErrorScope errors={saveErrors}><div className={styles.board}>
         <DetailLoading />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   if (!scenario && (scenarioMissing || !error)) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="このシナリオは見つかりません"
         description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
         backHref="/scenarios"
         backLabel="シナリオ一覧へ戻る"
-      />
+      /></SaveErrorScope>
     )
   }
 
   if (!scenario) {
     return (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="error"
         title="シナリオを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
         onRetry={() => void loadScenario(true)}
-      />
+      /></SaveErrorScope>
     )
   }
 
@@ -2282,7 +2324,7 @@ export default function ScenarioDetailV8({
   const startCompleteSummary = ON_COMPLETE_LABEL[(scenario.onCompleteMode ?? 'pause') as OnCompleteMode]
 
   return (
-    <PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
       {/* 板の頭：題＋状態の札＋鉛筆・説明の1行。右に操作（配信結果・下見・まとめてテスト・その他）。 */}
       <PageHeading title={scenario.name}
         crumbs={<><p className={styles.meta}>
@@ -2759,7 +2801,9 @@ export default function ScenarioDetailV8({
                         ) : (
                           <p className={styles.talkBubble}>画像（プレビューなし）</p>
                         )
-                      } catch {
+                      } catch (saveFailure) {
+                        saveErrors.capture(saveFailure);
+
                         return <p className={styles.talkBubble}>画像</p>
                       }
                     }
@@ -2880,23 +2924,23 @@ export default function ScenarioDetailV8({
         }
       >
         <div className="flex flex-col gap-4">
-          <Field label="シナリオ名" required><TextField
+          <Field label="シナリオ名" required><SaveErrorField names={["name","editForm.name","edit_form.name","edit_form"]}><TextField
               value={editForm.name}
               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               maxLength={80}
               required
               aria-label="シナリオ名"
-            /></Field>
-          <Field label="説明"><TextArea
+            /></SaveErrorField></Field>
+          <Field label="説明"><SaveErrorField names={["description","editForm.description","edit_form.description","edit_form"]}><TextArea
               value={editForm.description}
               onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               rows={3}
               maxLength={500}
               aria-label="説明"
-            /></Field>
+            /></SaveErrorField></Field>
           <div className="flex flex-col gap-1">
             <span className="text-ink-secondary text-xs font-semibold">置き場（フォルダ）</span>
-            <FolderSelect
+            <SaveErrorField names={["folderId","editForm.folderId","folder_id","edit_form.folder_id","edit_form"]}><FolderSelect
               value={editForm.folderId}
               onChange={(value) => setEditForm({ ...editForm, folderId: value })}
               aria-label="置き場（フォルダ）"
@@ -2905,7 +2949,7 @@ export default function ScenarioDetailV8({
               onCreate={canEdit
                 ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
                 : undefined}
-            />
+            /></SaveErrorField>
             {folderState === 'error' && (
               <p className="text-status-danger text-xs">フォルダ一覧を読み込めませんでした。</p>
             )}
@@ -2915,12 +2959,12 @@ export default function ScenarioDetailV8({
               </p>
             )}
           </div>
-          <Checkbox
+          <SaveErrorField names={["allowConcurrent","editForm.allowConcurrent","allow_concurrent","edit_form.allow_concurrent","edit_form"]}><Checkbox
             checked={editForm.allowConcurrent}
             onCheckedChange={(checked) => setEditForm({ ...editForm, allowConcurrent: checked })}
           >
             同時購読を許可する（ほかのシナリオが動いている人にも並行して流す）
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         </div>
       </Dialog>
 
@@ -3030,13 +3074,13 @@ export default function ScenarioDetailV8({
           始めると取り消せません。止めた人には、再開すると続きから届きます。
         </Notice>
         <div className="mt-3">
-          <Checkbox
+          <SaveErrorField names={["startConfirmed","start_confirmed"]}><Checkbox
             checked={startConfirmed}
             disabled={preflightLoading || preflightFailed}
             onCheckedChange={setStartConfirmed}
           >
             内容と対象を確かめました
-          </Checkbox>
+          </Checkbox></SaveErrorField>
         </div>
         {!startConfirmed && !preflightLoading && !preflightFailed && (
           <p className="text-ink-faint mt-2 text-xs">
@@ -3098,13 +3142,13 @@ export default function ScenarioDetailV8({
         }}
       >
         <div className={styles.dupBody}>
-          <Field label="新しい名前" required><TextField
+          <Field label="新しい名前" required><SaveErrorField names={["duplicateName","duplicate_name"]}><TextField
               value={duplicateName}
               onChange={(e) => setDuplicateName(e.target.value)}
               maxLength={80}
               required
               aria-label="新しい名前"
-            /></Field>
+            /></SaveErrorField></Field>
           <div className={styles.dupBox}>
             <p className={styles.dupBoxTitle}>引き継ぐもの</p>
             <p className={styles.dupBoxBody}>
@@ -3313,6 +3357,6 @@ export default function ScenarioDetailV8({
           onChanged={reloadActionCounts}
         />
       )}
-    </PageFrame>
+    </PageFrame></SaveErrorScope>
   )
 }

@@ -1,7 +1,4 @@
 'use client'
-
-/* ★V8 写し：src/app/contents/media-upload-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
-
 import { useEffect, useId, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -19,6 +16,10 @@ import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } f
 import { formatMediaSize } from './media-usage-display'
 import { formatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/* ★V8 写し：src/app/contents/media-upload-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 
@@ -324,13 +325,13 @@ export default function MediaUploadDialog({
           </div>
         ) : null}
 
-        <div><Field label="入れるフォルダ" htmlFor={`${inputId}-folder`}><FolderSelect
+        <div><Field label="入れるフォルダ" htmlFor={`${inputId}-folder`}><SaveErrorField names={["folderId","folder_id"]}><FolderSelect
             aria-label="入れるフォルダ"
             value={folderId}
             folders={folders.map(folderById)}
             onCreate={onCreateFolder}
             onChange={setFolderId}
-          /></Field></div>
+          /></SaveErrorField></Field></div>
         </div>
   </Dialog>
 }

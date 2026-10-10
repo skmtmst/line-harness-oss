@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 共通アクションを作る（板 `j2hfkS`）。
- *
- * v7（new/page.tsx の器）とは別の器。データの口・動きは v7 と同じ
- * （選択肢・下書き保存・版の約束・つながる先）。
- * 処理の段の器は共通の部品（CommonActionEditor・BranchEditors）を
- * そのまま使う。
- * v7 を直す必要が出たら new/page.tsx 側も同じ判断を入れる。
- */
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -33,12 +23,25 @@ import { mergeOrderedActions, stepNumbers } from './action-order'
 import styles from '@/app/automations/automations-v8.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 共通アクションを作る（板 `j2hfkS`）。
+ *
+ * v7（new/page.tsx の器）とは別の器。データの口・動きは v7 と同じ
+ * （選択肢・下書き保存・版の約束・つながる先）。
+ * 処理の段の器は共通の部品（CommonActionEditor・BranchEditors）を
+ * そのまま使う。
+ * v7 を直す必要が出たら new/page.tsx 側も同じ判断を入れる。
+ */
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
 }
 
 export function CommonActionNewV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('共通アクションを作る')
   const canManage = useCanManageCommonActions()
   const router = useRouter()
@@ -99,6 +102,7 @@ export function CommonActionNewV8() {
       return
     }
     if (!name.trim()) {
+      if (!saveErrors.fail("name", '共通アクション名を入力してください'))
       setError('共通アクション名を入力してください')
       return
     }
@@ -118,7 +122,11 @@ export function CommonActionNewV8() {
       if (!response.success) throw new Error(response.error)
       router.push(`/common-actions/versions?id=${encodeURIComponent(response.data.id)}`)
     } catch (caught) {
-      setError(describeSaveFailure(caught))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+
+      setError(describeSaveFailure(caught)) }
     } finally {
       setSaving(false)
     }
@@ -139,24 +147,24 @@ export function CommonActionNewV8() {
   }
 
   if (canManage === null) {
-    return <ListState kind="loading" title="権限を確認しています" />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="権限を確認しています" /></SaveErrorScope>
   }
 
   if (!canManage) {
     return (
-      <div data-design-node="j2hfkS">
+      <SaveErrorScope errors={saveErrors}><div data-design-node="j2hfkS">
         <ListState
           kind="forbidden"
           title="共通アクションは閲覧のみです"
           description="作成するには、オーナーまたは管理者の権限が必要です。"
           action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
         />
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   return (
-    <div data-design-node="j2hfkS">
+    <SaveErrorScope errors={saveErrors}><div data-design-node="j2hfkS">
       <div className={styles.head}>
         <div className={styles.headText}>
           <Link href="/common-actions" className={styles.backLink}>← 共通アクションへ</Link>
@@ -172,20 +180,20 @@ export function CommonActionNewV8() {
           <section className={styles.formCard}>
             <h2 className={styles.formTitle}>どんなアクションか</h2>
             <div className={styles.formGrid}>
-              <Field label="名前" htmlFor="v8-common-action-name"><TextField
+              <Field label="名前" htmlFor="v8-common-action-name"><SaveErrorField names={["name"]}><TextField
                   id="v8-common-action-name"
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   maxLength={120}
                   placeholder="例：購入のお礼"
-                /></Field>
-              <Field label="説明" htmlFor="v8-common-action-description"><TextField
+                /></SaveErrorField></Field>
+              <Field label="説明" htmlFor="v8-common-action-description"><SaveErrorField names={["description"]}><TextField
                   id="v8-common-action-description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   maxLength={200}
                   placeholder="使う場面や目的を書きます"
-                /></Field>
+                /></SaveErrorField></Field>
             </div>
           </section>
 
@@ -217,7 +225,7 @@ export function CommonActionNewV8() {
               <Button onClick={() => setActions((current) => [...current, newBranchStep()])} variant="secondary" size="compact">条件で分ける</Button>
               <Button onClick={() => setActions((current) => [...current, newCommonActionStep('wait')])} variant="secondary" size="compact">待ち時間を入れる</Button>
               {resources.commonActions.length > 0 ? (
-                <Field label="見本から受け渡す"><Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} /></Field>
+                <Field label="見本から受け渡す"><SaveErrorField names={["exampleId","example_id"]}><Select aria-label="見本から受け渡す" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} /></SaveErrorField></Field>
               ) : null}
             </div>
           </section>
@@ -274,6 +282,6 @@ export function CommonActionNewV8() {
           </>
         )}
       />
-    </div>
+    </div></SaveErrorScope>
   )
 }

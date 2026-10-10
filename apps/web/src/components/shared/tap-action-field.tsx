@@ -62,6 +62,9 @@ export interface TapActionSourceItem {
 export type TapActionSources = Partial<Record<'form' | 'booking' | 'visit_stamp', TapActionSourceItem[]>>
 
 export interface TapActionFieldProps {
+  id?: string
+  invalid?: boolean
+  'aria-describedby'?: string
   /** 読み上げ名の頭（「カード1のボタン1」「面 A」）。 */
   name: string
   value: TapActionValue
@@ -110,6 +113,7 @@ function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActi
 }
 
 export default function TapActionField({
+  id, invalid, 'aria-describedby': saveDescription,
   name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderBody,
   scope = 'shop', hasLiff, liffSettingsHref = '/accounts', readOnly = false, sources,
   layout = 'row', textMax, kindLabel, allowExtras = false, accountId, extrasUnavailable, extrasError, uriPlaceholder = 'https://example.com',
@@ -206,7 +210,7 @@ export default function TapActionField({
   }
 
   return (
-    <div className={styles.withExtras}><div className={layout === 'stack' ? `${styles.root} ${styles.stack}` : `${styles.root} ${styles.row}`} data-tap-kind={value.kind}>
+    <div id={id} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined} className={styles.withExtras}><div className={layout === 'stack' ? `${styles.root} ${styles.stack}` : `${styles.root} ${styles.row}`} data-tap-kind={value.kind}>
       <div className={styles.kind}>{kindControl}</div>
       <div className={styles.body}>{body}</div>
     </div>

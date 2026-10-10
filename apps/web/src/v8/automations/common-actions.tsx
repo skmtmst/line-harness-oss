@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 オートメーションの共通アクション（Pencil `LnGNw`）。
- *
- * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
- * （app/common-actions/common-actions-v8.tsx）と同じ（一覧・検索・状態の絞り込み・複製・保管・CSV）。
- * 違いは見せ方だけ——型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「共通アクションを作る」）・
- * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「中身を見る」と「…」。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { moveCommonActionToFolder } from '@/lib/move-to-folder'
@@ -63,6 +54,17 @@ import {
 import styles from './common-actions.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 オートメーションの共通アクション（Pencil `LnGNw`）。
+ *
+ * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
+ * （app/common-actions/common-actions-v8.tsx）と同じ（一覧・検索・状態の絞り込み・複製・保管・CSV）。
+ * 違いは見せ方だけ——型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「共通アクションを作る」）・
+ * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「中身を見る」と「…」。
+ */
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 type Summary = {
@@ -277,7 +279,7 @@ export default function CommonActionsV8() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["filter","status"]}><Select
         aria-label="よく使う絞り込み"
         value={filter === 'old_version' || filter === 'unused' ? filter : ''}
         onChange={(value) => setFilter((value || 'all') as Filter)}
@@ -286,7 +288,7 @@ export default function CommonActionsV8() {
           { value: 'old_version', label: '古い版のまま使われている' },
           { value: 'unused', label: 'どこからも呼ばれていない' },
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
   const toolbar = (

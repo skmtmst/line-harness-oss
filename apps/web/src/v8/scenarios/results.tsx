@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
- *
- * 型（DetailPage）に、戻る・題・説明・右上の操作（シナリオの編集へ・CSVで書き出す）と、
- * 中身（数の帯・通ごとの反応・参加中の友だちの表）を渡す。
- * 取得口・操作（止める・再開・失敗を再送・別のシナリオへ移す・予定を見る・CSV）は
- * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
- */
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -38,6 +29,17 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import styles from './results.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
+ *
+ * 型（DetailPage）に、戻る・題・説明・右上の操作（シナリオの編集へ・CSVで書き出す）と、
+ * 中身（数の帯・通ごとの反応・参加中の友だちの表）を渡す。
+ * 取得口・操作（止める・再開・失敗を再送・別のシナリオへ移す・予定を見る・CSV）は
+ * 今までの V8（app/scenarios/results/results-v8.tsx）と v7（results/page.tsx）から写した。
+ */
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 type Subscription = ScenarioRuns['subscriptions'][number]
@@ -533,7 +535,7 @@ export default function ScenarioResultsV8() {
             <div className={styles.tools}>
               {/* 状態の絞り込みはサーバーへ渡して全件へ掛ける（SCENARIO-12）。 */}
               <span className={styles.statusSelect}>
-                <Select
+                <SaveErrorField names={["subscriptionStatus","status","subscription_status"]}><Select
                   value={subscriptionStatus}
                   onChange={(value) => setSubscriptionStatus(value)}
                   aria-label="購読の状態で絞り込む"
@@ -544,7 +546,7 @@ export default function ScenarioResultsV8() {
                     { value: 'paused', label: '購読の状態：止まっている' },
                     { value: 'completed', label: '購読の状態：読み終えた' },
                   ]}
-                />
+                /></SaveErrorField>
               </span>
               {runs ? (
                 <span className={styles.count}>{`${formatNumber(runs.subscriptions.length)} / ${formatNumber(runs.pagination.total)} 人`}</span>
@@ -719,7 +721,7 @@ export default function ScenarioResultsV8() {
             </button>
           </p>
         ) : (
-          <EntityKindField
+          <SaveErrorField names={["moveScenarioId"]}><EntityKindField
             kind="scenario"
             label="移し先のシナリオ"
             value={moveScenarioId}
@@ -731,7 +733,7 @@ export default function ScenarioResultsV8() {
                 ? '（有効の他のシナリオがありません）'
                 : '（シナリオを選んでください）'}
             options={moveChoices}
-          />
+          /></SaveErrorField>
         )}
       </Dialog>
     </DetailPage>

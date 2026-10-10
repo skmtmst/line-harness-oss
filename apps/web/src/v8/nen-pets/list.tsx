@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 登録ペットの一覧（wTIej・1152 は t2SMXX）。
- * 案内の帯 → 道具の段（探す・種別・主食・体重更新・並び・件数）→ 表 → 件数 → ヒント。
- * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
- * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。
- */
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useRouter } from 'next/navigation'
@@ -31,6 +24,15 @@ import PetEditorV8 from './editor'
 import { NEUTERED_LABEL, Pill, RowMenu, feedingLines, monthDay, rangeText, type PetsQuery } from './parts'
 import styles from './pets.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 登録ペットの一覧（wTIej・1152 は t2SMXX）。
+ * 案内の帯 → 道具の段（探す・種別・主食・体重更新・並び・件数）→ 表 → 件数 → ヒント。
+ * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
+ * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。
+ */
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 const PAGE_SIZES = [10, 20, 50]
@@ -94,14 +96,14 @@ export default function PetsListV8({
           <SearchField aria-label="ペット名・飼い主で探す" placeholder="ペット名・飼い主で探す" value={draft} onChange={(value: string) => { setDraft(value); onQueryChange({ ...query, q: value.trim() }); setPage(1) }} onClear={() => { setDraft(''); onQueryChange({ ...query, q: '' }); setPage(1) }} />
         </span>
         <span className={styles.toolsBreak} aria-hidden="true" />
-        <Select
+        <SaveErrorField names={["species","query.species"]}><Select
           aria-label="種別で絞り込む"
           width={140}
           value={query.species}
           onChange={(value) => change({ species: value })}
           options={[{ value: '', label: '種別：すべて' }, { value: 'dog', label: '種別：犬' }, { value: 'cat', label: '種別：猫' }, { value: 'other', label: '種別：その他' }]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["product","query.product"]}><Select
           aria-label="主食で絞り込む"
           width={140}
           value={query.product}
@@ -111,15 +113,15 @@ export default function PetsListV8({
             ...(data?.products ?? []).map((p) => ({ value: p.id, label: `主食：${p.name}` })),
             { value: 'none', label: '主食：未設定' },
           ]}
-        />
-        <Select
+        /></SaveErrorField>
+        <SaveErrorField names={["weight","query.weight"]}><Select
           aria-label="体重の更新で絞り込む"
           width={140}
           value={query.weight}
           onChange={(value) => change({ weight: value === 'stale' || value === 'fresh' ? value : '' })}
           options={[{ value: '', label: '体重更新：すべて' }, { value: 'fresh', label: '体重更新：90日以内' }, { value: 'stale', label: '体重更新：90日以上前' }]}
-        />
-        <ListToolbarSort
+        /></SaveErrorField>
+        <SaveErrorField names={["sort","query.sort"]}><ListToolbarSort
           aria-label="並び順"
           width={170}
           value={query.sort}
@@ -130,9 +132,9 @@ export default function PetsListV8({
             { value: 'weight_desc', label: '並び：体重が重い順' },
             { value: 'age_desc', label: '並び：年齢が高い順' },
           ]}
-        />
+        /></SaveErrorField>
         <span className={styles.toolsTail}>
-          <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
+          <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} /></SaveErrorField>
         </span>
       </div>
 

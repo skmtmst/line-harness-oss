@@ -1,17 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 配信を直す（`w5pwG`）。
- *
- * v7（edit/campaign-editor）とは別の部品として持ち、data-theme="v8" の
- * ときだけこちらが出る。取得・保存・版つき競合・テスト送信の決めごとは
- * 同じ。違いは置き場と見せ方だけ——
- * ・節は 配信フロー・いつ送りますか・送るもの・押されたあとにすること。
- * ・右に届き方の見本・気をつけること・できないこと・テスト送信。
- * ・「リッチメッセージ／文字だけ」の選び分けと「届かない日」の口は
- *   まだ無いので、見え方の確認だけに使う（保存されるのは今の作りのまま）。
- * ・きっかけは配信ごとに決まっているので変えられない（見せるだけ）。
- */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ApiError, api, describeSaveFailure, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
@@ -39,6 +26,21 @@ import styles from './campaign-editor-v8.module.css'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 配信を直す（`w5pwG`）。
+ *
+ * v7（edit/campaign-editor）とは別の部品として持ち、data-theme="v8" の
+ * ときだけこちらが出る。取得・保存・版つき競合・テスト送信の決めごとは
+ * 同じ。違いは置き場と見せ方だけ——
+ * ・節は 配信フロー・いつ送りますか・送るもの・押されたあとにすること。
+ * ・右に届き方の見本・気をつけること・できないこと・テスト送信。
+ * ・「リッチメッセージ／文字だけ」の選び分けと「届かない日」の口は
+ *   まだ無いので、見え方の確認だけに使う（保存されるのは今の作りのまま）。
+ * ・きっかけは配信ごとに決まっているので変えられない（見せるだけ）。
+ */
 
 const TRIGGER_LABEL: Record<string, string> = {
   'ec.order.confirmed': '注文を受け付けたとき',
@@ -70,6 +72,7 @@ function openFormUrl(liffId: string | null | undefined, formId: string): string 
 }
 
 export default function CampaignEditorV8({ campaignKey }: { campaignKey: string }) {
+  const saveErrors = useSaveFormErrors()
   const [setting, setSetting] = useState<NenCampaignSetting | null>(null)
   const [draft, setDraft] = useState<Partial<NenCampaignSetting>>({})
   const [forms, setForms] = useState<FormOption[]>([])
@@ -191,13 +194,17 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
       const loginUsers = testLoginUsers.filter((candidate) => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
       const friends = response.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
       setTestCandidates([...new Map([...loginUsers, ...friends].map((candidate) => [candidate.id, candidate])).values()])
-    } catch {
-      setNotice('相手を探せませんでした。通信を確認してもう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setNotice('相手を探せませんでした。通信を確認してもう一度お試しください。') }
     }
   }
 
   const sendTest = async (friendId: string) => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId)
+ return
     setTesting(true)
     setError('')
     setNotice('')
@@ -210,8 +217,12 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
         },
       })
       setNotice('テスト送信しました')
-    } catch {
-      setError('テスト送信できませんでした')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('テスト送信できませんでした') }
     } finally {
       setTesting(false)
     }
@@ -223,6 +234,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
   const save = async () => {
     if (!setting || !selectedAccountId) return
     if (!merged.bodyText?.trim()) {
+      if (!saveErrors.fail("merged.bodyText", '本文を入力してください'))
       setError('本文を入力してください')
       return
     }
@@ -231,10 +243,12 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
       return
     }
     if (formIssueMessage) {
+      if (!saveErrors.fail("formAction", `${formIssueMessage}。フォームを外して選び直してから保存してください`))
       setError(`${formIssueMessage}。フォームを外して選び直してから保存してください`)
       return
     }
     if (mileageAction && (!Number.isInteger(mileageAction.amount) || mileageAction.amount < 1 || mileageAction.amount > 1_000_000)) {
+      if (!saveErrors.fail("mileageAction.amount", '付けるマイルは1〜1,000,000の整数で入力してください'))
       setError('付けるマイルは1〜1,000,000の整数で入力してください')
       return
     }
@@ -263,6 +277,8 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
       setNotice('配信内容を保存しました')
       setSetting({ ...merged, updatedAt: response.data?.updatedAt ?? merged.updatedAt })
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error);
+
       if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
         try {
           const reloaded = await api.nenCampaigns.settings(selectedAccountId)
@@ -270,25 +286,29 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             const found = reloaded.data.find((item) => item.campaignKey === campaignKey) ?? null
             if (found) setSetting(found)
           }
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           // 読み直しに失敗しても入力は残す。文面だけで理由を伝える。
         }
-        setError('ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。')
+        { if (!fieldFailure)
+
+        setError('ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。') }
         return
       }
-      setError(describeSaveFailure(error))
+      { if (!fieldFailure)
+      setError(describeSaveFailure(error)) }
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <ListState kind="loading" title="NEN配信を読み込んでいます" />
-  if (!setting) return <ListState kind="error" title={error || 'この配信が見つかりませんでした'} />
+  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="NEN配信を読み込んでいます" /></SaveErrorScope>
+  if (!setting) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title={error || 'この配信が見つかりませんでした'} /></SaveErrorScope>
 
   const timing = `${formatCampaignTiming({ campaignKey, delayDays: merged.delayDays, deliveryTime: merged.deliveryTime.slice(0, 5) })} に届きます`
 
   return (
-    <div data-design-node="w5pwG" className={styles.board}>
+    <SaveErrorScope errors={saveErrors}><div data-design-node="w5pwG" className={styles.board}>
       <div className={styles.head}>
         <nav className={styles.crumb} aria-label="パンくず">
           <Link href="/nen-campaigns">← NEN配信へ</Link>
@@ -323,8 +343,8 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
                 きっかけ
                 <p className={styles.static}>{triggerLabel(setting)}</p>
                 {!isBirthday ? <div className={styles.delay}>
-                  <NumberInput unit="日後" aria-label="きっかけからの日数" type="number" min={0} max={365}
-                    value={String(merged.delayDays)} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} />
+                  <SaveErrorField names={["delayDays","merged.delayDays","draft","delay_days","merged.delay_days"]}><NumberInput unit="日後" aria-label="きっかけからの日数" type="number" min={0} max={365}
+                    value={String(merged.delayDays)} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} /></SaveErrorField>
 
                 </div> : null}
               </div>
@@ -333,7 +353,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
                 {isBirthday ? (
                   <p className={styles.static}>10:00（固定）</p>
                 ) : (
-                  <TimeField aria-label="送る時刻" value={merged.deliveryTime.slice(0, 5)} onChange={(v) => setDraft((previous) => ({ ...previous, deliveryTime: v }))} />
+                  <SaveErrorField names={["draft"]}><TimeField aria-label="送る時刻" value={merged.deliveryTime.slice(0, 5)} onChange={(v) => setDraft((previous) => ({ ...previous, deliveryTime: v }))} /></SaveErrorField>
                 )}
               </div>
               <div className={styles.fieldLabel}>
@@ -346,15 +366,15 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             ) : (
               <>
                 <label className={styles.checkRow}>
-                  <Checkbox checked={merged.dedupWindowDays > 0} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, dedupWindowDays: checked ? 30 : 0 }))}>
+                  <SaveErrorField names={["dedupWindowDays","merged.dedupWindowDays","draft","dedup_window_days","merged.dedup_window_days"]}><Checkbox checked={merged.dedupWindowDays > 0} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, dedupWindowDays: checked ? 30 : 0 }))}>
                     同じ人に何度も送らない（30日のあいだに1回だけ）
-                  </Checkbox>
+                  </Checkbox></SaveErrorField>
                 </label>
                 {merged.campaignKey === 'review_request' ? (
                   <label className={styles.checkRow}>
-                    <Checkbox checked={Boolean(formAction) && merged.excludeFormRespondents} disabled={!formAction} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, excludeFormRespondents: checked }))}>
+                    <SaveErrorField names={["formAction","excludeFormRespondents","merged.excludeFormRespondents","draft","form_action","exclude_form_respondents","merged.exclude_form_respondents"]}><Checkbox checked={Boolean(formAction) && merged.excludeFormRespondents} disabled={!formAction} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, excludeFormRespondents: checked }))}>
                       すでに口コミを書いた人には送らない
-                    </Checkbox>
+                    </Checkbox></SaveErrorField>
                   </label>
                 ) : null}
               </>
@@ -366,22 +386,22 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             <p className={styles.note}>この配信は1通で届きます</p>
             <div className={styles.fieldLabel}>
               届く形
-              <RadioCardGroup legend="届く形" className={styles.row2}>
+              <SaveErrorField names={["message-kind"]}><RadioCardGroup legend="届く形" className={styles.row2}>
                 <RadioCard name="message-kind" value="rich" checked onChange={() => {}} title="リッチメッセージ" />
                 <RadioCard name="message-kind" value="text" checked={false} onChange={() => {}} title="文字だけ" disabled disabledReason="この配信では選べません" />
-              </RadioCardGroup>
+              </RadioCardGroup></SaveErrorField>
             </div>
             <Field label={<>配信本文
               <span className={styles.note}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span><span className={styles.toolbar}>
                 <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
-              </span></>}><textarea
+              </span></>}><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><textarea
                 ref={bodyRef}
                 rows={5}
                 value={merged.bodyText}
                 onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))}
                 aria-label="配信本文"
                 className={styles.textarea}
-              /></Field>
+              /></SaveErrorField></Field>
             {bodyCheck.fits ? (
               <p className={styles.note}>あと{formatNumber(NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length)}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
             ) : (
@@ -415,7 +435,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             )}
             {mileageAction?.kind === 'award_mileage' ? (
               <div className={styles.actionRow}>
-                <div><Field note={<>回答フォームへの送信をきっかけにしています</>} label="回答後に付けるマイル"><NumberInput unit="マイル" aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /></Field></div>
+                <div><Field note={<SaveErrorField names={["amount","mileageAction.amount","actions","mileage_action.amount"]}><>回答フォームへの送信をきっかけにしています</></SaveErrorField>} label="回答後に付けるマイル"><NumberInput unit="マイル" aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /></Field></div>
                 <Button type="button" variant="secondary" aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}>外す</Button>
               </div>
             ) : (
@@ -450,13 +470,13 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
           </section>
           <section className={styles.card} aria-label="自分にテストを送る">
             <h2 className={styles.cardTitle}>自分にテストを送る</h2>
-            <Field label="テスト送信の相手を名前で探す"><TextField
+            <Field label="テスト送信の相手を名前で探す"><SaveErrorField names={["testSearch","search","test_search"]}><TextField
                 aria-label="テスト送信の相手を名前で探す"
                 type="search"
                 value={testSearch}
                 onChange={(event) => setTestSearch(event.target.value)}
                 onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }}
-              /></Field>
+              /></SaveErrorField></Field>
             <span className={styles.selectFoot}>
               <Button type="button" variant="secondary" onClick={() => void searchFriends()}>探す</Button>
               {testCandidates.slice(0, 3).map((candidate) => (
@@ -483,6 +503,6 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
         )}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </div></SaveErrorScope>
   )
 }

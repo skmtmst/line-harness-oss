@@ -1,18 +1,5 @@
 'use client'
-
 import { jstDateOffset } from '@/lib/jst-datetime'
-
-/*
- * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
- * 状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-earning-rules-tab.tsx から動きを写し、見た目を一覧の型
- * （ListPage）で組み直した。データの口・操作は今と同じ（編集・テスト・
- * 止める／再開・公開・複製・削除・並び順の保存・CSV）。
- *
- * フォルダの列に割り当てる API は無いので、きっかけの種類で分けた
- * 見え方の切り替えとして持つ（保存はしない）。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -62,6 +49,19 @@ import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
+ * 状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-earning-rules-tab.tsx から動きを写し、見た目を一覧の型
+ * （ListPage）で組み直した。データの口・操作は今と同じ（編集・テスト・
+ * 止める／再開・公開・複製・削除・並び順の保存・CSV）。
+ *
+ * フォルダの列に割り当てる API は無いので、きっかけの種類で分けた
+ * 見え方の切り替えとして持つ（保存はしない）。
+ */
 
 const EVENT_LABELS: Record<string, string> = {
   friend_added: '友だち追加',
@@ -163,6 +163,7 @@ const PRESETS: Array<{ value: string; label: string; active: boolean; pending: b
 const PAGE_SIZE_OPTIONS = [10, 20, 50].map((size) => ({ value: String(size), label: `${size} 件表示` }))
 
 export default function EarningRulesTab() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { readonly, narrow, setCount } = useMileageShell()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -259,14 +260,16 @@ export default function EarningRulesTab() {
       setRuleOrder(items.map((rule) => rule.id))
       setOrderDirty(false)
       setPage(1)
-    } catch {
+    } catch (saveFailure) {
       if (isStale()) return
+      const fieldFailure = saveErrors.capture(saveFailure)
       setRules([])
-      setLoadError(true)
+      { if (!fieldFailure)
+      setLoadError(true) }
     } finally {
       if (!isStale()) setLoading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     if (accountLoading) return
@@ -313,12 +316,15 @@ export default function EarningRulesTab() {
       anchor.download = csvFileName("マイルの獲得ルール")
       anchor.click()
       URL.revokeObjectURL(url)
-    } catch {
-      setActionError(describeMileageCsvExportFailure(exportStatus))
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError(describeMileageCsvExportFailure(exportStatus)) }
     } finally {
       setExporting(false)
     }
-  }, [exporting, selectedAccountId])
+  }, [exporting, selectedAccountId, saveErrors])
 
   const activeRules = useMemo(() => rules.filter((rule) => rule.published.status === 'published'), [rules])
   const pendingRules = useMemo(() => rules.filter((rule) => rule.draft.initialStatus === 'pending'), [rules])
@@ -379,8 +385,11 @@ export default function EarningRulesTab() {
       const response = await api.mileage.saveEarningRulesOrder({ accountId: selectedAccountId, ids: ruleOrder })
       if (!response.success) throw new Error(response.error)
       await load()
-    } catch {
-      setActionError('並び順を保存できませんでした。最新の状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('並び順を保存できませんでした。最新の状態を読み直してから、もう一度お試しください。') }
       await load().catch(() => {})
     } finally {
       setSavingOrder(false)
@@ -404,13 +413,16 @@ export default function EarningRulesTab() {
     try {
       const res = await api.mileage.updateRule(rule.id, { isActive: next === 'published' })
       if (!res.success) throw new Error(res.error)
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
       setStatus(before)
+      { if (!fieldFailure)
       notifyToast(`「${rule.draft.name}」を${next === 'published' ? '再開' : '停止'}できませんでした。元に戻しました。`, {
         tone: 'error',
         actionLabel: 'もう一度',
         onAction: () => { void toggleRule({ ...rule, published: { ...rule.published, status: before } }) },
-      })
+      }) }
     } finally {
       setSavingId(null)
     }
@@ -426,9 +438,12 @@ export default function EarningRulesTab() {
       setDeleteTarget(null)
       await load()
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
       setDeleteError(caught instanceof Error && caught.message && !/^API error/.test(caught.message)
         ? caught.message
-        : '削除できませんでした。もう一度お試しください。')
+        : '削除できませんでした。もう一度お試しください。') }
     } finally {
       setSavingId(null)
     }
@@ -447,8 +462,11 @@ export default function EarningRulesTab() {
       if (!res.success) throw new Error(res.error)
       setPublishTarget(null)
       await load()
-    } catch {
-      setPublishError('公開できませんでした。下書きを読み直して内容を確かめてから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setPublishError('公開できませんでした。下書きを読み直して内容を確かめてから、もう一度お試しください。') }
     } finally {
       setSavingId(null)
     }
@@ -483,8 +501,11 @@ export default function EarningRulesTab() {
       if (!drafted.success) throw new Error(drafted.error)
       setMenuNotice(`「${name}」を止めた状態で作りました。`)
       await load()
-    } catch {
-      setActionError('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('複製できませんでした。もう一度お試しください。') }
     } finally {
       setSavingId(null)
     }
@@ -501,7 +522,10 @@ export default function EarningRulesTab() {
       if (!response.success) throw new Error(response.error)
       setTestResult(response.data)
     } catch (caught) {
-      setTestError(caught instanceof Error ? caught.message : 'テストできませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setTestError(caught instanceof Error ? caught.message : 'テストできませんでした。もう一度お試しください。') }
     } finally {
       setTestBusy(false)
     }
@@ -585,12 +609,12 @@ export default function EarningRulesTab() {
   /* きっかけで絞る（固定の分け方）。件数も添える。 */
   const folderSelect = (
     <div className={styles.narrowFolder}>
-      <Select
+      <SaveErrorField names={["folder"]}><Select
         aria-label="きっかけ"
         value={folder}
         options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' ? item.label : `${item.label} ${formatMileageNumber(folderCounts.get(item.key) ?? 0)}` }))}
         onChange={(value) => resetPage(() => setFolder(value as FolderKey))}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -640,7 +664,7 @@ export default function EarningRulesTab() {
   const savedBox = (
     <div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <Select
+      <SaveErrorField names={["presetValue","page","preset_value"]}><Select
         aria-label="よく使う絞り込み"
         value={presetValue}
         options={[
@@ -656,19 +680,19 @@ export default function EarningRulesTab() {
           setStoppedOnly(preset.stopped)
           setSort(preset.sort)
         }}
-      />
+      /></SaveErrorField>
     </div>
   )
 
   const perPageBox = (
     <div data-per-page-select>
-      <Select
+      <SaveErrorField names={["pageSize","page","page_size"]}><Select
         aria-label="1ページに出す件数"
         size="page-size"
         value={String(pageSize)}
         onChange={(value) => { setPage(1); setPageSize(Number(value)) }}
         options={PAGE_SIZE_OPTIONS}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -903,7 +927,7 @@ export default function EarningRulesTab() {
   ) : undefined
 
   return (
-    <MileageFrame
+    <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
@@ -975,6 +999,6 @@ export default function EarningRulesTab() {
       </>}
     >
       {body}
-    </MileageFrame>
+    </MileageFrame></SaveErrorScope>
   )
 }

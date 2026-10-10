@@ -1,15 +1,5 @@
 'use client'
-
 import SharedStatusBadge from '@/components/shared/status-badge'
-
-
-/*
- * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
- *
- * 今までの V8 一覧（app/broadcasts/list-v8.tsx）の動きを写し、見た目は
- * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import SharedStatusPill from '@/components/shared/status-pill'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -76,6 +66,15 @@ import styles from './list.module.css'
 import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
+ *
+ * 今までの V8 一覧（app/broadcasts/list-v8.tsx）の動きを写し、見た目は
+ * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -184,6 +183,7 @@ function HqMark() {
 }
 
 export default function BroadcastListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('一斉配信')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -288,12 +288,17 @@ export default function BroadcastListV8() {
       } else {
         setFolderError('フォルダを読み込めませんでした。')
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setFolderError('フォルダを読み込めませんでした。')
     }
-  }, [])
+  }
+  }, [saveErrors])
 
-  useEffect(() => { void loadFolders() }, [loadFolders])
+  useEffect(() => { void loadFolders() }, [loadFolders]);
+
 
   const moveFolderOrder = async (index: number, direction: -1 | 1) => {
     const target = folders[index]
@@ -305,8 +310,11 @@ export default function BroadcastListV8() {
       const result = await api.folders.swapOrder(target.id, neighbor.id)
       if (!result.success) throw new Error(result.error)
       await loadFolders()
-    } catch {
-      setFolderError('並び順を変えられませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('並び順を変えられませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -323,8 +331,11 @@ export default function BroadcastListV8() {
       setDeletingFolder(null)
       if (folderFilter === targetId) setFolderFilter('')
       await loadFolders()
-    } catch {
-      setFolderError('フォルダを削除できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを削除できませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -387,12 +398,15 @@ export default function BroadcastListV8() {
       }
     } catch (err) {
       if (seq !== loadSeqRef.current) return
+      const fieldFailure = saveErrors.capture(err);
+
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
-      else setError(searchError || loadFailureNotice(err, '一斉配信'))
+      else { if (!fieldFailure)
+ setError(searchError || loadFailureNotice(err, '一斉配信')) }
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
     }
-  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo, titleQuery])
+  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo, titleQuery, saveErrors])
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(!loading)
 
@@ -407,10 +421,11 @@ export default function BroadcastListV8() {
       if (scenariosRes && scenariosRes.success) {
         setScenarios(scenariosRes.data.map((item) => ({ id: item.id, name: item.name })))
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 名前が引けない行はID表示に倒す（一覧の取得とは別物）。
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     setPage(1)
@@ -507,8 +522,11 @@ export default function BroadcastListV8() {
       setSavedViews((current) => [...current, res.data])
       setSavedViewName('')
       setSavedViewOpen(false)
-    } catch {
-      setSavedViewError('この検索条件を保存できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setSavedViewError('この検索条件を保存できませんでした。') }
     } finally {
       setSavedViewBusy(false)
     }
@@ -527,8 +545,11 @@ export default function BroadcastListV8() {
       if (!res.success) throw new Error(res.error)
       setDeleteTarget(null)
       await loadList((page - 1) * pageSize)
-    } catch {
-      setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)
     }
@@ -790,8 +811,8 @@ export default function BroadcastListV8() {
       {datePopoverOpen ? (
         <div className={styles.datePopover} role="dialog" aria-label="配信日で絞る">
           <p className={styles.datePopoverLabel}>配信日で絞る（開始〜終了）</p>
-          <DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" />
-          <DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" />
+          <SaveErrorField names={["dateFrom","from","date_from"]}><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" /></SaveErrorField>
+          <SaveErrorField names={["dateTo","to","date_to"]}><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" /></SaveErrorField>
           <div className={styles.datePopoverActions}>
             {(dateFrom || dateTo) ? (
               <Button type="button" onClick={() => { setDateFrom(''); setDateTo('') }}>外す</Button>
@@ -872,7 +893,7 @@ export default function BroadcastListV8() {
 
   const statusSelect = (
     <div className={styles.statusSelect}>
-      <Select
+      <SaveErrorField names={["statusFilter","status_filter"]}><Select
         aria-label="状態で絞る"
         value={statusFilter}
         onChange={(value) => setStatusFilter(value as StatusChipKey)}
@@ -880,13 +901,13 @@ export default function BroadcastListV8() {
           value: chip.key,
           label: `状態：${chipText(chip.label, chipCount(statusCounts, chip.key))}`,
         }))}
-      />
+      /></SaveErrorField>
     </div>
   )
 
   const pageSizeBox = (
     <div className={styles.pageSizeBox}>
-      <Select
+      <SaveErrorField names={["pageSize","page_size"]}><Select
         aria-label="表示件数"
         size="page-size"
         value={String(pageSize)}
@@ -897,7 +918,7 @@ export default function BroadcastListV8() {
           { value: '50', label: '50件表示' },
           ...(pageSize === 100 ? [{ value: '100', label: '100件表示' }] : []),
         ]}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -907,7 +928,7 @@ export default function BroadcastListV8() {
 
   const folderSelect = (
     <div className={styles.folderSelect}>
-      <Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} />
+      <SaveErrorField names={["folderFilter","activeId","folder_filter"]}><Select aria-label="フォルダ" value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
     </div>
   )
 
@@ -931,13 +952,13 @@ export default function BroadcastListV8() {
       </div>
       {savedViewOpen ? (
         <div className={styles.saveRow}>
-          <input
+          <SaveErrorField names={["savedViewName","name","saved_view_name"]}><input
             aria-label="保存する検索の名前"
             placeholder="検索条件の名前"
             value={savedViewName}
             onChange={(event) => setSavedViewName(event.target.value)}
             className={styles.saveInput}
-          />
+          /></SaveErrorField>
           <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy} busyLabel="保存中">保存する</Button>
           <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
         </div>
@@ -1139,7 +1160,7 @@ export default function BroadcastListV8() {
   const boardId = narrow ? 'jjFNi' : canEdit ? 'l5V9a' : 'NtCE3'
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       boardId={boardId}
       headingSize="compact"
       title="一斉配信"
@@ -1328,6 +1349,6 @@ export default function BroadcastListV8() {
         </div>
       ) : null}
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }

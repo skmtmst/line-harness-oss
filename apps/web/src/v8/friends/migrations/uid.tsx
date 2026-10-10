@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 UID移行（Pencil `Z0jHp` 要確認の判断・`L48eY` 本移行と照合の完了）。/friends/migrations?tab=uid（`&run=` で履歴を選ぶ）。
- *
- * 判断・実行・切り戻しの口は今と同じ（use-uid-migration：行ごとの判断・実行と切り戻しは確認窓の確定だけ・
- * owner と作成者の決まり・結果不明のときの読み直し）。今の入口 /accounts?tab=migration はそのまま。
- * 見せ方：頭（← 友だちへ・タブ）→ 5つの段 → 判断中なら数4つと「要確認の判断」、終わったら結果の帯と「照合の結果」
- * → 移行の履歴 → 新しい移行の登録（開いて使う）。
- */
 import { useState } from 'react'
 import { CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
@@ -32,6 +23,17 @@ import { classLabel, decisionLabel, formatMappingBytes, ITEM_PAGE_SIZE, MIGRATIO
 import styles from './migrations.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 UID移行（Pencil `Z0jHp` 要確認の判断・`L48eY` 本移行と照合の完了）。/friends/migrations?tab=uid（`&run=` で履歴を選ぶ）。
+ *
+ * 判断・実行・切り戻しの口は今と同じ（use-uid-migration：行ごとの判断・実行と切り戻しは確認窓の確定だけ・
+ * owner と作成者の決まり・結果不明のときの読み直し）。今の入口 /accounts?tab=migration はそのまま。
+ * 見せ方：頭（← 友だちへ・タブ）→ 5つの段 → 判断中なら数4つと「要確認の判断」、終わったら結果の帯と「照合の結果」
+ * → 移行の履歴 → 新しい移行の登録（開いて使う）。
+ */
 
 const PRE_EXECUTE = ['dry_run', 'review', 'ready']
 
@@ -109,16 +111,16 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       <div className={styles.pair}>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>移行元</span>
-          <Select aria-label="移行元アカウント" size="full" value={m.fromAccountId} onChange={m.setFromAccountId} options={[{ value: '', label: '移行元アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+          <SaveErrorField names={["fromAccountId","m.fromAccountId","from_account_id","m.from_account_id"]}><Select aria-label="移行元アカウント" size="full" value={m.fromAccountId} onChange={m.setFromAccountId} options={[{ value: '', label: '移行元アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} /></SaveErrorField>
         </div>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>移行先</span>
-          <Select aria-label="移行先アカウント" size="full" value={m.toAccountId} onChange={m.setToAccountId} options={[{ value: '', label: '移行先アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+          <SaveErrorField names={["toAccountId","m.toAccountId","to_account_id","m.to_account_id"]}><Select aria-label="移行先アカウント" size="full" value={m.toAccountId} onChange={m.setToAccountId} options={[{ value: '', label: '移行先アカウントを選択' }, ...m.accounts.map((account) => ({ value: account.id, label: account.name }))]} /></SaveErrorField>
         </div>
       </div>
       <div className={styles.field}>
         <span className={styles.fieldLabel}>利用目的</span>
-        <TextField value={m.purpose} onChange={(event) => m.setPurpose(event.target.value)} aria-label="利用目的" />
+        <SaveErrorField names={["purpose","m.purpose"]}><TextField value={m.purpose} onChange={(event) => m.setPurpose(event.target.value)} aria-label="利用目的" /></SaveErrorField>
       </div>
       <FileDropzone title="対応表のCSVをここに置く" hint="old_uid・new_uid 列のCSVを選びます" accept=".csv,text/csv" chooseLabel="CSVをアップロード" onFiles={(files) => void m.onUidFile(files)} />
       {m.file ? (
@@ -218,7 +220,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                     </TableHeadRow>
                   </thead>
                   <tbody>
-                    {active.items?.map((item) => (
+                    {active.items?.map((item, saveFieldIndex) => (
                       <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`} data-row-id={item.id}>
                         <Td className={styles.td}>
                           <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`}  onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
@@ -237,7 +239,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                           {decisionsLocked || !canDecideItems ? (
                             <span className={styles.small}>{decisionLabel[item.decision]}</span>
                           ) : (
-                            <Select
+                            <SaveErrorField names={[`items.${saveFieldIndex}.decision`,"decision","item.decision"]}><Select
                               aria-label={`${item.oldUid} の引き継ぎ方`}
                               size="full"
                               disabled={m.busy || m.detailBusy}
@@ -248,7 +250,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                                 ...(item.newUid ? [{ value: 'link', label: '結び付ける' }, { value: 'create', label: '新しく作る' }] : []),
                                 { value: 'exclude', label: '除く' },
                               ]}
-                            />
+                            /></SaveErrorField>
                           )}
                         </Td>
                       </Tr>

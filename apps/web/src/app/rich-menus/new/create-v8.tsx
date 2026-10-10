@@ -1,25 +1,9 @@
 'use client'
-
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useStaffRole } from '@/lib/staff-role'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
-/*
- * ★V8 リッチメニューを作る（作る①〜④のウィザード）。
- *
- * Pencil の正本：
- *   ① 形と画像 `JeINq` / ② ボタンの動き `Z0uO6` / ③ 誰に出すか `OxEMM` / ④ 公開 `F4gELj`
- *
- * 立て付け：
- * - 「次へ：ボタンの動き」で下書き（rich_menu_groups）を作る。手順②以降は
- *   保存済みページに対して画像アップロード・公開前確認がそのまま使える。
- * - 形（大きさ・面の分けかた・タブ数）は作成 API だけが受け付ける。
- *   下書きができたあと手順①へ戻ると、それらは読み取り専用になる。
- * - 公開・予約・実機確認・照合の運用ロジックは編集画面（edit/）と同じ
- *   部品・関数を使い回し、別実装にしない。
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
@@ -118,6 +102,22 @@ import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 リッチメニューを作る（作る①〜④のウィザード）。
+ *
+ * Pencil の正本：
+ *   ① 形と画像 `JeINq` / ② ボタンの動き `Z0uO6` / ③ 誰に出すか `OxEMM` / ④ 公開 `F4gELj`
+ *
+ * 立て付け：
+ * - 「次へ：ボタンの動き」で下書き（rich_menu_groups）を作る。手順②以降は
+ *   保存済みページに対して画像アップロード・公開前確認がそのまま使える。
+ * - 形（大きさ・面の分けかた・タブ数）は作成 API だけが受け付ける。
+ *   下書きができたあと手順①へ戻ると、それらは読み取り専用になる。
+ * - 公開・予約・実機確認・照合の運用ロジックは編集画面（edit/）と同じ
+ *   部品・関数を使い回し、別実装にしない。
+ */
 
 /* ---------- 手順 ---------- */
 
@@ -480,6 +480,7 @@ function stepFromParam(key: string | null): StepKey | null {
  * （/rich-menus/edit の V8）。読み込むまでは手順の中身を出さず、すべての手順へ戻れる。
  */
 export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: string; host?: RichMenuCreateHost } = {}) {
+  const saveErrors = useSaveFormErrors()
   usePageTitle(host ? 'リッチメニュー' : 'リッチメニューを作る')
   /*
    * 統括のひな形（host）：手順の間は画面の中に持ち、最後に一度だけ保存する（店はこれまでどおり手順ごとに下書きを保存）。
@@ -740,10 +741,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       hydrate(res.data as Group)
       setEditLoad('ready')
     } catch (caught) {
+      saveErrors.capture(caught)
       setEditLoad(caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
     }
     // hydrate は state の setter だけを使う。
-  }, [editGroupId])
+  }, [editGroupId, saveErrors])
 
   useEffect(() => {
     void loadEditGroup()
@@ -784,6 +786,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * 保存で落ちた欄（B-139）。名前・トーク画面の下の文言は①、切り替えの行き先は②の面。
    * 帯ではなく欄を赤くして真下に理由を出し、別の手順・タブ・面ならそこを開いて移る。面の一覧に赤い丸。
    */
+  saveErrors.define('name', 'メニュー名', () => null, { reveal: () => setStep('shape') })
+  saveErrors.define('chatBarText', 'トーク画面の下の文言', () => null, { reveal: () => setStep('shape') })
   const fields = useFormErrors()
   fields.define('name', 'メニュー名', () => (name.trim() ? null : '名前を入力してください'), { reveal: () => setStep('shape') })
   fields.define('chatbar', 'トーク画面の下の文言', () => (chatBarText.trim() ? null : 'トーク画面の下の文言を入力してください'), { reveal: () => setStep('shape') })
@@ -903,7 +907,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       try {
         imageKeys.push((await host.uploadImage(file, size)).r2Key)
       } catch (e) {
-        setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e))
+        const fieldFailure = saveErrors.capture(e)
+
+        { if (!fieldFailure)
+
+        setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e)) }
         return null
       }
     }
@@ -970,8 +978,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         const file = image.file ?? (image.media && accountId ? await mediaToFile(image.media, accountId) : null)
         if (file) await api.richMenuGroups.uploadImage(createdId, pageId, file)
       } catch (e) {
+        const fieldFailure = saveErrors.capture(e)
         // 下書き自体はできている。画像だけ失敗として知らせる。
-        setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。')
+        { if (!fieldFailure)
+
+        setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。') }
       }
     }
     pendingImages.forEach((image) => { if (image?.url) URL.revokeObjectURL(image.url) })
@@ -1029,6 +1040,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       notifyToast('下書きを保存しました')
       return true
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e)
       // ★V8 `r8dGXT`：ほかの人が先に保存した（409）。入力は残したまま、
       // 帯を出して最新を取り直す。比べる文に使う。
       if (e instanceof ApiError && e.status === 409 && group) {
@@ -1037,19 +1049,22 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         try {
           const latest = await api.richMenuGroups.get(group.id)
           if (latest.success) setConflictLatest(latest.data as Group)
-        } catch {
+        } catch (saveFailure) {
+          saveErrors.capture(saveFailure)
           // 取り直しに失敗しても帯は出す。比べる文は出さない。
         }
         return false
       }
       const raw = e instanceof Error ? e.message : ''
+      { if (!fieldFailure)
+
       setError(
         /targetingPriority/.test(raw)
           ? '出す順番は1以上の整数で入力してください。小数は使えません。'
           : describeApiFailure(e, '下書きの保存', {
               scope: 'store',
             }),
-      )
+      ) }
       return false
     } finally {
       setSaving(false)
@@ -1221,7 +1236,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         updatePage(pageId, { imageR2Key: uploaded.r2Key, imageContentType: file.type })
         setImageVersion((v) => v + 1)
       } catch (e) {
-        setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e))
+        const fieldFailure = saveErrors.capture(e)
+
+        { if (!fieldFailure)
+
+        setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e)) }
       }
       return
     }
@@ -1233,7 +1252,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       })
       setImageVersion((v) => v + 1)
     } catch (e) {
-      setError(imageUploadErrorText(e))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
+      setError(imageUploadErrorText(e)) }
     }
   }
 
@@ -1244,7 +1267,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     try {
       await uploadPageImage(pageId, await mediaToFile(item, accountId))
     } catch (e) {
-      setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
+      setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。') }
     }
   }
 
@@ -1319,13 +1346,15 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       )
       if (!response.success) throw new Error(response.error)
       setTargetPreview(response.data)
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
       setTargetPreview(null)
-      setTargetPreviewError('対象人数を確認できませんでした。条件は保存できます。')
+      { if (!fieldFailure)
+      setTargetPreviewError('対象人数を確認できませんでした。条件は保存できます。') }
     } finally {
       setTargetPreviewLoading(false)
     }
-  }, [group, audience, targetingCondition, aggregateOnly, targetingPriority])
+  }, [group, audience, targetingCondition, aggregateOnly, targetingPriority, saveErrors])
 
   useEffect(() => {
     if (step !== 'audience' && step !== 'publish') return
@@ -1355,12 +1384,15 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         pages: { state: data.pageCount <= data.maxPages ? 'ok' : 'ng', count: data.pageCount, max: data.maxPages },
       }))
       setChecksError(false)
-    } catch {
-      setChecksError(true)
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setChecksError(true) }
     } finally {
       setChecksLoading(false)
     }
-  }, [group])
+  }, [group, saveErrors])
 
   useEffect(() => {
     if (step === 'publish' && group && !host) void loadChecks()
@@ -1415,8 +1447,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             }
           : prev,
       )
-    } catch {
-      setError('LINEの検査を通せませんでした。しばらくおいてから、もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('LINEの検査を通せませんでした。しばらくおいてから、もう一度お試しください。') }
     } finally {
       setValidating(false)
     }
@@ -1430,8 +1466,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       const res = await api.richMenuGroups.confirmDevice(group.id)
       if (!res.success) throw new Error(res.error)
       setChecks((prev) => (prev ? { ...prev, device: { state: 'ok', at: res.data.confirmedAt } } : prev))
-    } catch {
-      setError('実機で見た記録を残せませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('実機で見た記録を残せませんでした。もう一度お試しください。') }
     } finally {
       setRecording(false)
     }
@@ -1507,8 +1547,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       clearPublishPlanDraft(group.id)
       await reloadGroup(group.id)
     } catch (e) {
+      const fieldFailure = saveErrors.capture(e);
+
+
       const raw = e instanceof Error ? e.message : ''
       const isValidationMessage = /[ぁ-んァ-ヶ一-龠]/u.test(raw) && raw !== 'publish failed'
+      { if (!fieldFailure)
+
       setError(
         /targetingPriority/.test(raw)
           ? '出す順番は1以上の整数で入力してください。小数は使えません。'
@@ -1517,7 +1562,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             : draftSaved
               ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
               : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
-      )
+      ) }
       void loadChecks()
     } finally {
       setPublishing(false)
@@ -1531,10 +1576,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     if (timingIsScheduled) {
       const startsAt = publishPlan.startsAt
       if (!startsAt) {
+        if (!saveErrors.fail("startsAt", '公開を始める日時を選んでください。'))
         setError('公開を始める日時を選んでください。')
         return
       }
       if (publishPlan.mode === 'period' && !publishPlan.endsAt) {
+        if (!saveErrors.fail("publishPlan.endsAt", '終わる日時を選んでください。'))
         setError('終わる日時を選んでください。')
         return
       }
@@ -1705,16 +1752,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   if (editGroupId && editLoad !== 'ready') {
     if (editLoad === 'missing') {
-      return <TargetMissing kind="not-found" title="このリッチメニューは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/rich-menus" backLabel="リッチメニュー一覧へ戻る" />
+      return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このリッチメニューは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/rich-menus" backLabel="リッチメニュー一覧へ戻る" /></SaveErrorScope>
     }
     if (editLoad === 'error') {
-      return <TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadEditGroup()} />
+      return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadEditGroup()} /></SaveErrorScope>
     }
-    return <p className={styles.editLoading} role="status">読み込み中…</p>
+    return <SaveErrorScope errors={saveErrors}><p className={styles.editLoading} role="status">読み込み中…</p></SaveErrorScope>
   }
 
   return (
-    <fieldset disabled={busy} className="contents">
+    <SaveErrorScope errors={saveErrors}><fieldset disabled={busy} className="contents">
     <CreatePage boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
@@ -1810,8 +1857,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         } status={dirty ? '未保存の変更があります' : undefined} >
       {host?.notice}
 
-
-
       {error ? (
         <Notice
           tone="danger"
@@ -1833,9 +1878,6 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           {step === 'buttons' ? renderButtons() : null}
           {step === 'audience' ? renderAudience() : null}
           {step === 'publish' ? renderPublish() : null}
-
-
-
 
       {host ? null : <MediaPickerDialog
         open={mediaPickerOpen}
@@ -1917,7 +1959,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         <VersionCompare before={latestSummary} after={currentSummary} />
       </Dialog>
     </CreatePage>
-    </fieldset>
+    </fieldset></SaveErrorScope>
   )
 
   /* ======== 手順①：形と画像 ======== */
@@ -1933,10 +1975,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <SectionHeader title="名前とフォルダ" />
           <div className={styles.fieldGrid}>
             <Field label="メニュー名（友だちには見えません）" htmlFor="rm-name" error={fields.error('name')}>
-              <TextInput {...fields.bind('name')} id="rm-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：通常メニュー（会員向け）" invalid={fields.invalid('name')} />
+              <SaveErrorField names={["name"]}><TextInput {...fields.bind('name')} id="rm-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：通常メニュー（会員向け）" invalid={fields.invalid('name')} /></SaveErrorField>
             </Field>
             <Field label="フォルダ">
-              <FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId}
+              <SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId}
                 folders={folders.map(folderById)} size="full"
                 colors
                 onCreate={!canOperate
@@ -1946,17 +1988,17 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                       ? folderCreator(async (name, color) => ({ success: true as const, data: await host.createFolder!(name, color) }), folderById, (created) => setFolders((current) => [...current, created as Folder]))
                       : undefined)
                     // 一覧の左の列の「フォルダを追加」と同じ口（リッチメニューのフォルダは共有）。
-                    : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} />
+                    : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} /></SaveErrorField>
             </Field>
           </div>
           <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" error={fields.error('chatbar')}>
-            <TextInput {...fields.bind('chatbar')} id="rm-chatbar" value={chatBarText} maxLength={14} onChange={(e) => setChatBarText(e.target.value)} placeholder="メニュー" invalid={fields.invalid('chatbar')} />
+            <SaveErrorField names={["chatBarText","chat_bar_text"]}><TextInput {...fields.bind('chatbar')} id="rm-chatbar" value={chatBarText} maxLength={14} onChange={(e) => setChatBarText(e.target.value)} placeholder="メニュー" invalid={fields.invalid('chatbar')} /></SaveErrorField>
           </Field>
         </Card>
 
         <Card padding="roomy" layout="vertical" className={styles.stackSection}>
           <SectionHeader title="大きさと切替タブ" />
-          <RadioCardGroup legend="大きさ" className="grid grid-cols-2 gap-3">
+          <SaveErrorField names={["rich-menu-size","value","opt.value","size"]}><RadioCardGroup legend="大きさ" className="grid grid-cols-2 gap-3">
             {SIZE_OPTIONS.map((opt) => <RadioCard key={opt.value} name="rich-menu-size" value={opt.value}
               title={`${opt.label} ${opt.dims}`} note={opt.hint} icon={<opt.icon size={16} aria-hidden="true" />} checked={size === opt.value}
               disabled={locked}
@@ -1965,19 +2007,19 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 const first = V8_LAYOUT_KEYS[opt.value][0]
                 if (first) setTemplateKey(first)
               }} />)}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           {locked ? (
             <p className={styles.fieldHint}>形は下書きを作ったあとは変えられません。別の形で作るときは、新しく作り直してください。</p>
           ) : null}
           <div className={styles.segRow}>
             <span className={styles.segLabel}>切替タブの数</span>
-            <SegmentedControl
+            <SaveErrorField names={["length","pages.length","tabCount","MAX_TAB_PAGES"]}><SegmentedControl
               aria-label="切替タブの数"
               options={TAB_COUNT_OPTIONS}
               value={String(Math.min(group ? pages.length - 1 : tabCount, MAX_TAB_PAGES - 1))}
               onChange={(v) => requestTabCount(Number(v))}
               disabled={busy}
-            />
+            /></SaveErrorField>
             <span className={styles.segHint}>タブで別のメニューへ移れます</span>
           </div>
           {/* 採用案 K6Ot7O：タブの数だけ名前の欄（トーク画面のタブに出る名前）。 */}
@@ -1985,7 +2027,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             <div className={styles.tabNameGrid}>
               {Array.from({ length: slotCount }, (_, i) => (
                 <Field key={i} label={`タブ${i + 1}の名前（トーク画面のタブに出ます）`} htmlFor={`rm-tab-name-${i}`}>
-                  <TextInput
+                  <SaveErrorField names={[`pages.${i}.name`, `tabNames.${i}`]}><TextInput
                     id={`rm-tab-name-${i}`}
                     maxLength={14}
                     value={group ? pages[i]?.name ?? '' : tabNames[i] ?? defaultTabName(i, tabCount)}
@@ -2002,7 +2044,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                         return next
                       })
                     }}
-                  />
+                  /></SaveErrorField>
                 </Field>
               ))}
             </div>
@@ -2094,7 +2136,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       <>
         <div className={styles.imageRow}>
           <div className={styles.imageSlot}>
-            <MediaSlot
+            <SaveErrorField names={["src","image?.src"]}><MediaSlot
               size="compact"
               title="画像を追加"
               previewAlt={image ? `選択中の画像: ${image.name}` : undefined}
@@ -2107,7 +2149,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onFile={(file) => handlePickedFile(file, 0)}
               onRemove={() => clearPendingImage(0)}
               onMediaPick={host ? undefined : accountId ? () => { setImagePickTarget(0); setMediaPickerOpen(true) } : undefined}
-            />
+            /></SaveErrorField>
           </div>
           <div className={styles.imageMeta}>
             {image ? (
@@ -2145,7 +2187,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     return (
       <div key={index} className={styles.tabImageSlot}>
         <span className={styles.tabImageHead}>{`タブ${index + 1}「${tabName}」`}</span>
-        <MediaSlot
+        <SaveErrorField names={["src","image?.src"]}><MediaSlot
           size="compact"
           title={`タブ${index + 1}の画像を追加`}
           previewAlt={image ? `タブ${index + 1}の画像: ${image.name}` : undefined}
@@ -2158,7 +2200,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           onFile={(file) => handlePickedFile(file, index)}
           onRemove={() => clearPendingImage(index)}
           onMediaPick={host || !accountId ? undefined : () => { setImagePickTarget(index); setMediaPickerOpen(true) }}
-        />
+        /></SaveErrorField>
         {unsaved ? <p className={styles.fieldHint}>下書きを保存すると、このタブの画像を入れられます。</p> : null}
         {imageOk === false ? (
           <p className={styles.fieldError} role="alert">
@@ -2184,7 +2226,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     const tabSwitch = pages.length > 1 ? (
       <div className={styles.tabSwitchRow}>
         <span className={styles.segLabel}>直すタブ</span>
-        <SegmentedControl
+        <SaveErrorField names={["id","activePage.id","activePageId"]}><SegmentedControl
           aria-label="直すタブ"
           size="compact"
           options={pages.map((p, i) => ({ value: p.id, label: `タブ${i + 1}「${p.name}」` }))}
@@ -2193,7 +2235,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             setActivePageId(id)
             setSelectedAreaId(pages.find((p) => p.id === id)?.areas[0]?.id ?? null)
           }}
-        />
+        /></SaveErrorField>
         <Button type="button" variant="text" className={styles.tabSwitchLink} onClick={() => goToStep('shape')}>
           タブの数・名前・画像は ①形と画像 で変えます
         </Button>
@@ -2273,7 +2315,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         {/* 出す相手 */}
         <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <SectionHeader title="出す相手" />
-          <RadioCardGroup legend="出す相手" className="grid grid-cols-2 gap-3">
+          <SaveErrorField names={["audience"]}><RadioCardGroup legend="出す相手" className="grid grid-cols-2 gap-3">
             <RadioCard
               name="audience"
               value="all"
@@ -2299,7 +2341,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               icon={<CircleHelp aria-hidden="true" />}
               note={host ? '条件は配った先のアカウントで決めます' : 'タグ・友だち情報などで絞る'}
             />
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
 
           {host ? (
             <div className={styles.infoBand}>
@@ -2350,10 +2392,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               </li>
             </ol>
             <Field label="順番（1 がいちばん先）" htmlFor="rm-hq-order">
-              <NumberInput numericText id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
+              <SaveErrorField names={["targetingPriority","displayOrder","priority","targeting_priority"]}><NumberInput numericText id="rm-hq-order" inputMode="numeric" value={String(targetingPriority + 1)} onChange={(e) => {
                 const next = Number(e.target.value.replace(/[^0-9]/g, ''))
                 setTargetingPriority(Number.isFinite(next) && next > 0 ? Math.min(next, 999) - 1 : 0)
-              }} />
+              }} /></SaveErrorField>
             </Field>
           </Card>
         ) : null}
@@ -2384,7 +2426,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <SectionHeader title="トークを開いたとき" />
           <div className={styles.segRow}>
             <span className={`${styles.segLabel} ${styles.segLabelPlain}`}>メニューを</span>
-            <SegmentedControl
+            <SaveErrorField names={["defaultOpen"]}><SegmentedControl
               aria-label="トークを開いたときのメニュー"
               options={[
                 { value: 'open', label: '開いておく' },
@@ -2392,7 +2434,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               ]}
               value={defaultOpen ? 'open' : 'closed'}
               onChange={(v) => setDefaultOpen(v === 'open')}
-            />
+            /></SaveErrorField>
           </div>
         </Card>}
       </>
@@ -2438,7 +2480,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         {/* いつ公開するか */}
         <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <SectionHeader title="いつ公開するか" />
-          <RadioCardGroup legend="いつ公開するか" className="grid grid-cols-2 gap-3">
+          <SaveErrorField names={["timing","mode","publishPlan.mode","endEnabled","timingIsScheduled","publishPlan"]}><RadioCardGroup legend="いつ公開するか" className="grid grid-cols-2 gap-3">
             <RadioCard
               name="timing"
               value="now"
@@ -2461,22 +2503,22 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               icon={<CalendarClock aria-hidden="true" />}
               note="キャンペーンの始まりに合わせる"
             />
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
           {timingIsScheduled ? (
             <div className={styles.field}>
               <span className={styles.fieldLabel}>始める日時</span>
-              <DateTimeField
+              <SaveErrorField names={["startsAt","publishPlan.startsAt","starts_at","publish_plan.starts_at","publish_plan"]}><DateTimeField
                 value={publishPlan.startsAt}
                 onChange={(v) => setPublishPlan({ ...publishPlan, startsAt: v })}
                 aria-label="公開を始める日時"
-              />
+              /></SaveErrorField>
             </div>
           ) : null}
           {/* 板 `F4gELj`：終わりを決めるは枠の箱。上の行に題とトグル、下の行に「日時 に終わり、［戻す先］に戻す」。オフのときは入力を無効化。 */}
           <div className={styles.endBox}>
             <div className={styles.endHead}>
               <span className={styles.endTitle}>終わりを決める（任意）</span>
-              <SettingCheckbox
+              <SaveErrorField names={["endEnabled","end_enabled"]}><SettingCheckbox
                 label="終わりを決める"
                 checked={endEnabled}
                 onChange={(on) => {
@@ -2486,19 +2528,19 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     mode: on ? 'period' : publishPlan.mode === 'now' ? 'now' : 'scheduled',
                   })
                 }}
-              />
+              /></SaveErrorField>
             </div>
             <div className={styles.endRow}>
               <span className={styles.endDate}>
-                <DateTimeField
+                <SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
                   value={publishPlan.endsAt}
                   onChange={(v) => setPublishPlan({ ...publishPlan, endsAt: v })}
                   aria-label="終わる日時"
                   disabled={!endEnabled}
-                />
+                /></SaveErrorField>
               </span>
               <span>に終わり、</span>
-              <Select
+              <SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><Select
                 aria-label="終わったらどうする"
                 value={publishPlan.restoreGroupId}
                 onChange={(v) => setPublishPlan({ ...publishPlan, restoreGroupId: v })}
@@ -2507,7 +2549,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
                   ...restoreMenus.map((item) => ({ value: item.id, label: item.name })),
                 ]}
-              />
+              /></SaveErrorField>
               <span>に戻す</span>
             </div>
           </div>

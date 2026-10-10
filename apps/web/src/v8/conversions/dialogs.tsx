@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 成果地点の詳細・取消・編集の窓。
- *
- * 今の画面（app/conversions/_components/conversion-dialogs.tsx）から写したもの
- * （src/v8 から古い画面ファイルは import できないため）。文言・動き・送る形は
- * 今と同じ。止める操作は V8 では表の下の小窓（list.tsx）で行うので、
- * 止める窓は写していない。
- */
 import type { Dispatch, SetStateAction } from 'react'
 import Button from '@/components/shared/button'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -29,6 +20,17 @@ import { deduplicationLabel } from './dedup'
 import { originInfoOf } from './origin-labels'
 import { readExclusionView, type ExclusionCondition } from './exclusion'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 成果地点の詳細・取消・編集の窓。
+ *
+ * 今の画面（app/conversions/_components/conversion-dialogs.tsx）から写したもの
+ * （src/v8 から古い画面ファイルは import できないため）。文言・動き・送る形は
+ * 今と同じ。止める操作は V8 では表の下の小窓（list.tsx）で行うので、
+ * 止める窓は写していない。
+ */
 
 /**
  * 編集の入力（N-252）。
@@ -453,13 +455,13 @@ export function ConversionReversalDialog(props: ConversionReversalDialogProps) {
       onConfirm={() => submitReversal()}
       onCancel={() => setReversalTarget(null)}
     >
-      <Field label="理由"><TextField
+      <Field label="理由"><SaveErrorField names={["reversalReason","reversal_reason"]}><TextField
           className="mt-1"
           value={reversalReason}
           maxLength={500}
           placeholder="例：重複して届いた成果だったため"
           onChange={(e) => setReversalReason(e.target.value)}
-        /></Field>
+        /></SaveErrorField></Field>
     </Dialog>
     </>
   )
@@ -514,28 +516,28 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             起点：{originInfoOf(editForm.sourceType).trigger}／{originInfoOf(editForm.sourceType).target}
           </p>
           <Field label="名前" htmlFor="cv-edit-name" error={editFieldIssue?.field === 'cv-edit-name' ? editFieldIssue.message : undefined}>
-            <TextField
+            <SaveErrorField names={["name","editForm.name","edit_form.name","edit_form"]}><TextField
               aria-label="成果地点の名前"
               value={editForm.name}
               maxLength={120}
               onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
-            />
+            /></SaveErrorField>
           </Field>
           {/* R281: ページ到達の対象URLも編集できる。URL以外は起点が固定で入力欄は出さない。 */}
           {editForm.sourceType === 'url_reach' ? (
             <Field label="数えてよいページ" htmlFor="cv-edit-url" error={editFieldIssue?.field === 'cv-edit-url' ? editFieldIssue.message : undefined}>
-              <TextField
+              <SaveErrorField names={["targetUrl","editForm.targetUrl","target_url","edit_form.target_url","edit_form"]}><TextField
                 aria-label="数えてよいページ"
                 inputMode="url"
                 value={editForm.targetUrl}
                 maxLength={2000}
                 placeholder="https://example.com/thanks"
                 onChange={(event) => setEditForm({ ...editForm, targetUrl: event.target.value })}
-              />
+              /></SaveErrorField>
             </Field>
           ) : null}
           {/* 起点に金額が無いものは注文の金額を出さない。選択肢は対応表が持つ(作成と同じ)。 */}
-          <Field label="金額の決め方"><Select
+          <Field label="金額の決め方"><SaveErrorField names={["valueMode","editForm.valueMode","value_mode","edit_form.value_mode","edit_form"]}><Select
               id="cv-edit-value-mode"
               error={editFieldIssue?.field === 'cv-edit-value-mode' ? editFieldIssue.message : undefined}
               aria-label="金額の決め方"
@@ -548,7 +550,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
                 setEditForm({ ...editForm, valueMode: value as EditForm['valueMode'] })
                 setEditValueModeNotice(null)
               }}
-            />
+            /></SaveErrorField>
 {editValueModeNotice ? (
               <span className="text-warning mt-1 block text-xs" role="status">
                 {editValueModeNotice}
@@ -556,36 +558,36 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             ) : null}</Field>
           {editForm.valueMode === 'fixed' ? (
             <Field label="1件あたりの金額" htmlFor="cv-edit-value" error={editFieldIssue?.field === 'cv-edit-value' ? editFieldIssue.message : undefined}>
-              <NumberInput numericText
+              <SaveErrorField names={["fixedValue","editForm.fixedValue","fixed_value","edit_form.fixed_value","edit_form"]}><NumberInput numericText
                 aria-label="1件あたりの金額"
                 inputMode="numeric"
                 value={editForm.fixedValue}
                 onChange={(event) => setEditForm({ ...editForm, fixedValue: event.target.value })}
-              />
+              /></SaveErrorField>
             </Field>
           ) : null}
-          <Field label="同じ人を何回数えるか"><Select
+          <Field label="同じ人を何回数えるか"><SaveErrorField names={["deduplicationMode","editForm.deduplicationMode","deduplication_mode","edit_form.deduplication_mode","edit_form"]}><Select
               aria-label="同じ人を何回数えるか"
               value={editForm.deduplicationMode}
               options={DEDUP_OPTIONS}
               onChange={(value) => setEditForm({ ...editForm, deduplicationMode: value as EditForm['deduplicationMode'] })}
-            /></Field>
+            /></SaveErrorField></Field>
           {editForm.deduplicationMode === 'window' ? (
             <Field label="数えない日数（1〜365）" htmlFor="cv-edit-window" error={editFieldIssue?.field === 'cv-edit-window' ? editFieldIssue.message : undefined}>
-              <NumberInput numericText
+              <SaveErrorField names={["deduplicationWindowDays","editForm.deduplicationWindowDays","deduplication_window_days","edit_form.deduplication_window_days","edit_form"]}><NumberInput numericText
                 aria-label="数えない日数"
                 inputMode="numeric"
                 value={editForm.deduplicationWindowDays}
                 onChange={(event) => setEditForm({ ...editForm, deduplicationWindowDays: event.target.value })}
-              />
+              /></SaveErrorField>
             </Field>
           ) : null}
-          <Field label="取り消しの扱い"><Select
+          <Field label="取り消しの扱い"><SaveErrorField names={["reversalPolicy","editForm.reversalPolicy","reversal_policy","edit_form.reversal_policy","edit_form"]}><Select
               aria-label="取り消しの扱い"
               value={editForm.reversalPolicy}
               options={REVERSAL_OPTIONS}
               onChange={(value) => setEditForm({ ...editForm, reversalPolicy: value as EditForm['reversalPolicy'] })}
-            /></Field>
+            /></SaveErrorField></Field>
           {/* R281: 友だち追加からの計測期間も編集できる。空欄は既定の90日。 */}
           <Field
             label="友だち追加からの計測期間（日）"
@@ -595,13 +597,13 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             help="友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。"
             helpLabel="計測期間"
           >
-            <NumberInput numericText unit="日"
+            <SaveErrorField names={["attributionDays","editForm.attributionDays","attribution_days","edit_form.attribution_days","edit_form"]}><NumberInput numericText unit="日"
               aria-label="友だち追加からの計測期間"
               inputMode="numeric"
               value={editForm.attributionDays}
               placeholder="90"
               onChange={(event) => setEditForm({ ...editForm, attributionDays: event.target.value })}
-            />
+            /></SaveErrorField>
           </Field>
           {/* R40: 数えない条件とメモも編集できる。条件は作成と同じ共通部品。 */}
           <div id="cv-edit-exclusion" aria-invalid={editFieldIssue?.field === 'cv-edit-exclusion' || undefined}>
@@ -618,12 +620,12 @@ export function ConversionEditDialog(props: ConversionEditDialogProps) {
             いま使っている場所（{usageLabel(editTarget!)}）は、この成果地点のまま次の版へ引き継がれます。
             過去の成果は数えたときの金額のままなので、集計額は変わりません。
           </>} label="数えない条件のメモ（任意）" htmlFor="cv-edit-memo" error={editFieldIssue?.field === 'cv-edit-memo' ? editFieldIssue.message : undefined}>
-            <TextField
+            <SaveErrorField names={["exclusionMemo","editForm.exclusionMemo","exclusion_memo","edit_form.exclusion_memo","edit_form"]}><TextField
               aria-label="数えない条件のメモ"
               value={editForm.exclusionMemo}
               maxLength={500}
               onChange={(event) => setEditForm({ ...editForm, exclusionMemo: event.target.value })}
-            />
+            /></SaveErrorField>
           </Field>
 
           {editError ? <Notice tone="danger">{editError}</Notice> : null}

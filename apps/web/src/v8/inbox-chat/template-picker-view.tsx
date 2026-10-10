@@ -1,4 +1,15 @@
 'use client'
+import type { RefObject } from 'react'
+import { CornerDownLeft, FolderOpen, Send } from 'lucide-react'
+import FolderPickerShell from '@/components/shared/folder-picker-shell'
+import Button from '@/components/shared/button'
+import { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { SettingCheckbox } from '@/components/shared/checkbox'
+import SearchField from '@/components/shared/search-field'
+import styles from './inbox-chat.module.css'
+import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
 
 /*
  * ★V8「テンプレートを選ぶ」の窓（M0393 段2「4. テンプレートを選ぶ（ダイアログ 640）」）。
@@ -11,15 +22,6 @@
  * データ（読み込み・絞り込み・続き・差し込みの解決）は components/chats/template-picker の今の処理を使い、
  * ここは見た目だけを受け持つ。
  */
-import type { RefObject } from 'react'
-import { CornerDownLeft, FolderOpen, Send } from 'lucide-react'
-import FolderPickerShell from '@/components/shared/folder-picker-shell'
-import Button from '@/components/shared/button'
-import { type FolderPanelRow } from '@/components/shared/folder-panel'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import SearchField from '@/components/shared/search-field'
-import styles from './inbox-chat.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 

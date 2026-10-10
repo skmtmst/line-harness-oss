@@ -1,15 +1,4 @@
 'use client'
-
-/*
- * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
- *
- * データの口は v7 と同じ `useMergedUsers`。違いは見せ方——タブの段は
- * 「← 友だち一覧 › データ管理 › 統合ユーザー」＋「データ管理 ▾」に替える。
- * 詳細は v7 と同じく一覧の面を差し替える（merged-person-detail-v8.tsx）。
- *
- * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
- * 出さない（DEVIN-QUESTIONS に未接続として記録）。
- */
 import { useCallback, useEffect, useState } from 'react'
 import { CircleAlert, RotateCw, SearchX, UserPlus } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -29,6 +18,19 @@ import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useMergedUsers, USERS_PAGE_SIZE } from './use-merged-users'
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
+ *
+ * データの口は v7 と同じ `useMergedUsers`。違いは見せ方——タブの段は
+ * 「← 友だち一覧 › データ管理 › 統合ユーザー」＋「データ管理 ▾」に替える。
+ * 詳細は v7 と同じく一覧の面を差し替える（merged-person-detail-v8.tsx）。
+ *
+ * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
+ * 出さない（DEVIN-QUESTIONS に未接続として記録）。
+ */
 
 const UID_STATUS = {
   url_token: '要確認',
@@ -154,7 +156,7 @@ export default function UsersV8() {
           />
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["uid","u.uid"]}><Select
             aria-label="UID連携で絞り込む"
             label="UID連携"
             size="full"
@@ -165,10 +167,10 @@ export default function UsersV8() {
               { value: 'linked', label: 'UID：連携済み' },
               { value: 'unlinked', label: 'UID：未連携・要確認' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <div className={styles.selectWrap}>
-          <Select
+          <SaveErrorField names={["account","u.account"]}><Select
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
             size="full"
@@ -178,15 +180,15 @@ export default function UsersV8() {
               { value: '', label: '所属：すべて' },
               ...u.accountOptions.map((a) => ({ value: a.id, label: a.name })),
             ]}
-          />
+          /></SaveErrorField>
         </div>
-        <Checkbox
+        <SaveErrorField names={["onlyDups","u.onlyDups","only_dups","u.only_dups"]}><Checkbox
           checked={u.onlyDups}
           onCheckedChange={u.setOnlyDups}
           className="whitespace-nowrap"
         >
           複数アカウントのみ
-        </Checkbox>
+        </Checkbox></SaveErrorField>
         <span className={styles.toolbarSpacer} />
         <span className={styles.toolbarCount}>
           {/* WEB322：読めなかったときは 0人と言わない。 */}

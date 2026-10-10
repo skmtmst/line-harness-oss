@@ -1,21 +1,4 @@
 'use client'
-
-/*
- * ★V8-B NEN配信（Pencil「★V8-B 画面の地図」専用機能の組：
- * 自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・
- * クーポンの決めごと `oqSJP`・状態の板 `dzx5D`）。
- * コラムを書く `yRDwW`・配信を直す `w5pwG` は別の道の画面。
- *
- * v7（page.tsx の持ち方と nen-overview）とは別の見せ方として持ち、
- * data-theme="v8" のときだけこちらが出る。データの口（settings・
- * columns・overview・deliveries・coupon・columns関連）はすべて
- * page.tsx が持ったまま。違いは置き場と見せ方だけ——
- * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
- * ・札の順は 自動配信・コラム・停止中・送った履歴。
- * ・自動配信の列は今の作りと同じ。行末は「…」に集約。
- * ・コラムは表＋選んだコラムのカード。履歴は表＋「…」に再送。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import { Fragment, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Inbox, MailOpen, Megaphone, Newspaper } from 'lucide-react'
@@ -60,6 +43,25 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B NEN配信（Pencil「★V8-B 画面の地図」専用機能の組：
+ * 自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・
+ * クーポンの決めごと `oqSJP`・状態の板 `dzx5D`）。
+ * コラムを書く `yRDwW`・配信を直す `w5pwG` は別の道の画面。
+ *
+ * v7（page.tsx の持ち方と nen-overview）とは別の見せ方として持ち、
+ * data-theme="v8" のときだけこちらが出る。データの口（settings・
+ * columns・overview・deliveries・coupon・columns関連）はすべて
+ * page.tsx が持ったまま。違いは置き場と見せ方だけ——
+ * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
+ * ・札の順は 自動配信・コラム・停止中・送った履歴。
+ * ・自動配信の列は今の作りと同じ。行末は「…」に集約。
+ * ・コラムは表＋選んだコラムのカード。履歴は表＋「…」に再送。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 /** 板ごとの data-design-node（札で切り替える外枠の印）。 */
 const BOARD_NODE: Record<NenTab, string> = {
@@ -293,12 +295,12 @@ function AutoV8(props: NenOverviewProps & { pausedOnly: boolean }) {
           className={styles.searchGrow}
           onSubmit={(event) => { event.preventDefault(); setQuery(draft.trim()); resetPage() }}
         >
-          <TextField
+          <SaveErrorField names={["draft"]}><TextField
             aria-label="配信を探す"
             placeholder="配信名で探す"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-          />
+          /></SaveErrorField>
         </form>
         {pausedOnly ? null : (
           <>
@@ -329,7 +331,7 @@ function AutoV8(props: NenOverviewProps & { pausedOnly: boolean }) {
           </>
         )}
         <span className={styles.toolsTail}>
-          <Select
+          <SaveErrorField names={["category"]}><Select
             aria-label="よく使う絞り込み"
             value={category}
             onChange={(value) => { setCategory(value as NenCampaignSetting['category'] | ''); resetPage() }}
@@ -340,8 +342,8 @@ function AutoV8(props: NenOverviewProps & { pausedOnly: boolean }) {
               { value: 'column', label: 'コラム' },
               { value: 'birthday', label: 'ペットの誕生日' },
             ]}
-          />
-          <Select
+          /></SaveErrorField>
+          <SaveErrorField names={["sort"]}><Select
             aria-label="並び順"
             value={sort}
             onChange={(value) => { setSort(value as AutoSortV8); resetPage() }}
@@ -349,7 +351,7 @@ function AutoV8(props: NenOverviewProps & { pausedOnly: boolean }) {
               { value: 'sent_desc', label: '並び：今月多く送った順' },
               { value: 'name', label: '並び：配信名順' },
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.rangeLabel}>{visible.length === 0 ? emptyValue('unknown') : `${visible.length}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(visible.length, safePage * pageSize)}件`}</span>
           <PageSizeSelect
             value={pageSize}
@@ -516,12 +518,12 @@ function ColumnsV8(props: NenOverviewProps) {
           className={styles.searchGrow}
           onSubmit={(event) => { event.preventDefault(); setQuery(draft.trim()); resetPage() }}
         >
-          <TextField
+          <SaveErrorField names={["draft"]}><TextField
             aria-label="コラムを探す"
             placeholder="コラムを探す"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-          />
+          /></SaveErrorField>
         </form>
         <FilterChip
           selected={stateFilter === 'published'}
@@ -540,7 +542,7 @@ function ColumnsV8(props: NenOverviewProps) {
           下書き
         </FilterChip>
         <span className={styles.toolsTail}>
-          <Select
+          <SaveErrorField names={["categoryFilter","category_filter"]}><Select
             aria-label="よく使う絞り込み"
             value={categoryFilter}
             onChange={(value) => { setCategoryFilter(value); resetPage() }}
@@ -548,7 +550,7 @@ function ColumnsV8(props: NenOverviewProps) {
               { value: '', label: 'よく使う絞り込み' },
               ...categories.map(([name, count]) => ({ value: name, label: `${name} ${count}` })),
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.rangeLabel}>{visible.length === 0 ? emptyValue('unknown') : `${visible.length}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(visible.length, safePage * pageSize)}件`}</span>
           <PageSizeSelect
             value={pageSize}
@@ -672,22 +674,22 @@ function SelectedColumnV8(props: NenOverviewProps) {
     <section className={styles.selectPanel} aria-label={`選んだコラム：${selected.title}`} data-design-node="nen-column-plan-v8">
       <h2 className={styles.selectTitle}>選んだコラム：{selected.title}</h2>
       <p className={styles.selectDesc}>LINEに届くカードと、送る相手・日時を決めます。</p>
-      <div className={styles.selectGrid}><Field label="LINEに出る紹介文"><TextArea aria-label="LINEに出る紹介文" value={introDraft} onChange={(event) => props.onIntroChange(event.target.value)} rows={3} maxLength={1500} /><div className={styles.fieldLabel}>
+      <div className={styles.selectGrid}><Field label="LINEに出る紹介文"><SaveErrorField names={["introDraft","intro_draft"]}><TextArea aria-label="LINEに出る紹介文" value={introDraft} onChange={(event) => props.onIntroChange(event.target.value)} rows={3} maxLength={1500} /></SaveErrorField><div className={styles.fieldLabel}>
           だれに
           <p className={styles.selectDesc}>{selected.targetMode === 'tag' ? `タグで絞り込み（${audienceCount == null ? emptyValue('unknown') : num(audienceCount)}人）` : `友だち 全員（${audienceCount == null ? emptyValue('unknown') : num(audienceCount)}人）`}</p>
           <p className={styles.selectDesc}>送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。</p>
         </div></Field></div>
       <div className={styles.fieldLabel}>
         いつ
-        <RadioCardGroup legend="いつ">
+        <SaveErrorField names={["nen-deliver-when-v8","when","plan.when"]}><RadioCardGroup legend="いつ">
           <RadioCard name="nen-deliver-when-v8" value="now" checked={plan.when === 'now'} onChange={() => props.onPlanChange({ ...plan, when: 'now' })} title="今すぐ" note="すぐに配信待ちに入ります。" />
           <RadioCard name="nen-deliver-when-v8" value="schedule" checked={plan.when === 'schedule'} onChange={() => props.onPlanChange({ ...plan, when: 'schedule' })} title="日時を予約" note="決めた日時に送ります。" />
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
         {plan.when === 'schedule' ? (
           <>
             <span className={styles.fieldLabel}>
               送る日時
-              <DateTimeField aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(v) => props.onPlanChange({ ...plan, scheduledAt: v })} />
+              <SaveErrorField names={["scheduledAt","plan.scheduledAt","scheduled_at","plan.scheduled_at"]}><DateTimeField aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(v) => props.onPlanChange({ ...plan, scheduledAt: v })} /></SaveErrorField>
             </span>
             {schedulePast ? (
               <span className={styles.fieldLabel}>予約日時が過去になっています。いまより先の日時を選んでください。</span>
@@ -778,12 +780,12 @@ function HistoryV8(props: NenOverviewProps) {
           className={styles.searchGrow}
           onSubmit={(event) => { event.preventDefault(); const q = draft.trim(); setAppliedQuery(q); props.onChangeDeliveryView(historyViewStatus(filter), undefined, q) }}
         >
-          <TextField
+          <SaveErrorField names={["draft"]}><TextField
             aria-label="友だちの名前・配信の名前で探す"
             placeholder="友だちの名前・配信の名前で探す"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-          />
+          /></SaveErrorField>
         </form>
         <span className={styles.rangeLabel}>{rangeLabel}・送った日が新しい順</span>
       </div>
@@ -869,13 +871,13 @@ function HistoryV8(props: NenOverviewProps) {
                               <p className={styles.selectDesc}>{detail.content.bodyText || detail.content.reason}</p>
                               {detail.content.buttonLabel ? <p className={styles.selectDesc}>{detail.content.buttonLabel}</p> : null}
                               {canRetryDelivery(delivery) ? (
-                                <Field label="再送する理由（500文字まで）"><TextArea
+                                <Field label="再送する理由（500文字まで）"><SaveErrorField names={["retryReasons","retry_reasons"]}><TextArea
                                     value={retryReasons[delivery.id] ?? ''}
                                     onChange={(event) => setRetryReasons((current) => ({ ...current, [delivery.id]: event.target.value }))}
                                     rows={3}
                                     maxLength={500}
                                     autoFocus={retryFocusId === delivery.id}
-                                  />
+                                  /></SaveErrorField>
 <span className={styles.selectFoot}>
                                     <Button
                                       type="button"

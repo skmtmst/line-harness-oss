@@ -1,16 +1,5 @@
 'use client'
-
 import { Th } from '@/components/shared/table'
-
-/*
- * ★V8-B 共通アクションの一覧（板 `LnGNw`・状態 `S3pdQ`・1152 `En14p`）。
- *
- * v7（page.tsx の器）とは別の器。データの口・動きは v7 と同じ
- * （一覧・検索・状態の絞り込み・複製・保管・CSV）。
- * フォルダの列は口が無いので持たない（残所として報告する）。
- * 変える操作は器の外（共通の部品・API）へ触らない。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる。
- */
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
@@ -37,6 +26,17 @@ import {
 import styles from '@/app/automations/automations-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8-B 共通アクションの一覧（板 `LnGNw`・状態 `S3pdQ`・1152 `En14p`）。
+ *
+ * v7（page.tsx の器）とは別の器。データの口・動きは v7 と同じ
+ * （一覧・検索・状態の絞り込み・複製・保管・CSV）。
+ * フォルダの列は口が無いので持たない（残所として報告する）。
+ * 変える操作は器の外（共通の部品・API）へ触らない。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる。
+ */
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
 
@@ -277,27 +277,27 @@ export function V8CommonActionsTab({
       </div>
 
       <div className={styles.toolbar}>
-        <TextField
+        <SaveErrorField names={["query"]}><TextField
           aria-label="共通アクションを検索"
           placeholder="アクション名・中の処理で探す"
           value={query}
           onChange={(event) => { setQuery(event.target.value); setPage(1) }}
           className={styles.toolsSearch}
-        />
+        /></SaveErrorField>
         <Button onClick={() => void load()} variant="secondary" size="compact">
           <RefreshCw size={16} aria-hidden />
           一覧を更新する
         </Button>
-        <Select
+        <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="1ページに表示する件数"
           value={String(pageSize)}
           onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
           options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
-        />
+        /></SaveErrorField>
       </div>
 
       <div className={styles.toolbar}>
-        <RadioCardGroup legend="状態で絞り込む">
+        <SaveErrorField names={["common-action-filter-v8","value","option.value","filter"]}><RadioCardGroup legend="状態で絞り込む">
           {FILTERS.map((option) => {
             const count = filterCount(option.value)
             return (
@@ -311,7 +311,7 @@ export function V8CommonActionsTab({
               />
             )
           })}
-        </RadioCardGroup>
+        </RadioCardGroup></SaveErrorField>
       </div>
 
       {items.length === 0 ? (

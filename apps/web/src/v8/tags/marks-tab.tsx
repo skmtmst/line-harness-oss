@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
- *
- * 動き（読み込み・数の帯・絞り込み・並べ替え・保管の確認・行の詳細パネル・右クリック・
- * 名前のその場の直し）は今の V8 タブ（app/tags/marks-v8.tsx）から写した。数え方・判定・
- * 保管の窓は v7 と同じ部品（components/friend-fields/mark-list）を使う。見た目だけを絵に合わせた：
- * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
- * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
@@ -44,10 +34,21 @@ import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
 import styles from './list.module.css'
-
 import type { AttributeListHost } from './attribute-host'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
+ *
+ * 動き（読み込み・数の帯・絞り込み・並べ替え・保管の確認・行の詳細パネル・右クリック・
+ * 名前のその場の直し）は今の V8 タブ（app/tags/marks-v8.tsx）から写した。数え方・判定・
+ * 保管の窓は v7 と同じ部品（components/friend-fields/mark-list）を使う。見た目だけを絵に合わせた：
+ * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
+ * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
+ */
 
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -539,7 +540,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               onClear={() => setQuery('')}
             />
           </span>
-          <Select
+          <SaveErrorField names={["usage"]}><Select
             aria-label="使っているかで絞り込む"
             width={157}
             value={usage}
@@ -549,7 +550,7 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
               { value: 'used', label: '使っている：あり' },
               { value: 'unused', label: '使っている：なし' },
             ]}
-          />
+          /></SaveErrorField>
           {!host ? <FilterChip selected={onlyArchived} onChange={(next) => { setView({ archived: next ? '1' : '' }); setPage(1) }}>保管</FilterChip> : null}
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />

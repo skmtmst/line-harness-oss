@@ -18,6 +18,8 @@ export type FieldContextValue = {
   describedBy?: string
   invalid: boolean
   required: boolean
+  /** 入力部品の自動リセットは、欄の保存失敗を消さず値だけを戻す。 */
+  onInvalidReset?: () => void
 }
 
 export const FieldContext = createContext<FieldContextValue | null>(null)

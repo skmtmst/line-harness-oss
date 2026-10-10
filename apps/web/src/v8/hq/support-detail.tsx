@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 お問い合わせのやり取り（Pencil `OhguS`）。
- *
- * v7 の画面（app/hq/support/detail/page.tsx）と読み書きの口・失敗時の扱いは同じ。
- * 見た目だけを絵どおりに一から組んだ：頭（題＝件名・説明＝受付番号・種類・店舗・送った日時）・
- * 左の「統括の設定」の列・状態の札・やり取りのカード（自分は右の緑、運営は左の灰）・
- * 続きを送るカード・右に送信者とこれまでの問い合わせ。
- * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
- */
 import StatusPill from '@/components/shared/status-pill'
 import { Paperclip, Send, X } from 'lucide-react'
 import Link from 'next/link'
@@ -39,6 +29,18 @@ import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 お問い合わせのやり取り（Pencil `OhguS`）。
+ *
+ * v7 の画面（app/hq/support/detail/page.tsx）と読み書きの口・失敗時の扱いは同じ。
+ * 見た目だけを絵どおりに一から組んだ：頭（題＝件名・説明＝受付番号・種類・店舗・送った日時）・
+ * 左の「統括の設定」の列・状態の札・やり取りのカード（自分は右の緑、運営は左の灰）・
+ * 続きを送るカード・右に送信者とこれまでの問い合わせ。
+ * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
+ */
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
@@ -216,7 +218,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                 ))}
               </ol>
 
-              <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><TextArea
+              <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><SaveErrorField names={["body"]}><TextArea
                   id={`${uid}-body`}
                   value={body}
                   onChange={(event) => { setBody(event.target.value); setNotice('') }}
@@ -224,7 +226,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   maxLength={SUPPORT_BODY_MAX}
                   disabled={sending}
                   className={styles.textarea}
-                />
+                /></SaveErrorField>
 {attachments.length > 0 ? (
                   <ul className={styles.thumbs}>
                     {attachments.map((a, i) => (

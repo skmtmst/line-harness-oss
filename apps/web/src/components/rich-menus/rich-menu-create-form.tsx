@@ -22,6 +22,7 @@ import {
 import { SIZE_DIMENSIONS, TEMPLATES, type RichMenuTemplate } from '@/lib/rich-menu-templates'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import type { RichMenuAreaIntent } from '@line-crm/shared'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type RichMenuOption = { id: string; name: string }
 export type RichMenuFolderOption = RichMenuOption
@@ -256,16 +257,16 @@ export default function RichMenuCreateForm({
           <div className="grid gap-3 lg:grid-cols-6">
             <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-name">メニュー名<RequiredBadge /></label>
-              <input id="rich-menu-name" value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} aria-required="true" aria-invalid={Boolean(nameError)} aria-describedby={nameError ? 'rich-menu-name-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
+              <SaveErrorField names={["name","value.name"]}><input id="rich-menu-name" value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} aria-required="true" aria-invalid={Boolean(nameError)} aria-describedby={nameError ? 'rich-menu-name-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" /></SaveErrorField>
               {nameError ? <p id="rich-menu-name-error" role="alert" className="text-danger mt-1 text-xs">{nameError}</p> : <p className="text-ink-faint mt-1 text-xs">管理画面での識別用です。友だちには表示されません。</p>}
             </div>
             <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-folder">フォルダ</label>
-              <Select id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(value) => patch({ folderId: value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} size="full" />
+              <SaveErrorField names={["folderId","value.folderId","folder_id","value.folder_id"]}><Select id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(value) => patch({ folderId: value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} size="full" /></SaveErrorField>
             </div>
             <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-chat-bar-text">トーク画面下の文言</label>
-              <input id="rich-menu-chat-bar-text" value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} aria-required="true" aria-invalid={Boolean(chatBarTextError)} aria-describedby={chatBarTextError ? 'rich-menu-chat-bar-text-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
+              <SaveErrorField names={["chatBarText","value.chatBarText","chat_bar_text","value.chat_bar_text"]}><input id="rich-menu-chat-bar-text" value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} aria-required="true" aria-invalid={Boolean(chatBarTextError)} aria-describedby={chatBarTextError ? 'rich-menu-chat-bar-text-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" /></SaveErrorField>
               {chatBarTextError ? <p id="rich-menu-chat-bar-text-error" role="alert" className="text-danger mt-1 text-xs">{chatBarTextError}</p> : <p className="text-ink-faint mt-1 text-xs">14文字以内。メニューを開く前にトーク画面下に表示されます。</p>}
             </div>
           </div>
@@ -286,9 +287,9 @@ export default function RichMenuCreateForm({
           <div>
             <span className="text-ink-secondary mb-2 block text-sm font-medium">面の分けかた</span>
             <p className="text-ink-faint mb-3 text-xs">押せるところをいくつに分けるか。あとから編集画面で区切り直せます。</p>
-            <RadioCardGroup legend="面の分けかた" className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+            <SaveErrorField names={["template","key","item.key","templateKey","value.templateKey"]}><RadioCardGroup legend="面の分けかた" className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
               {shownTemplates.map((item) => <RadioCard key={item.key} name="template" value={item.key} checked={value.templateKey === item.key} disabled={locked} onChange={(selected) => selectTemplate(selected)} title={TEMPLATE_LABELS[item.key] ?? item.label} note={<RichMenuTemplatePreview template={item} />} />)}
-            </RadioCardGroup>
+            </RadioCardGroup></SaveErrorField>
           </div>
 
           {/*
@@ -302,19 +303,19 @@ export default function RichMenuCreateForm({
               {value.tabCount > 0 ? (
                 <div>
                   <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-default-page">最初に見せるページ</label>
-                  <Select
+                  <SaveErrorField names={["defaultPageIndex","value.defaultPageIndex","default_page_index","value.default_page_index"]}><Select
                     id="rich-menu-default-page"
                     aria-label="最初に見せるページ"
                     value={String(value.defaultPageIndex)}
                     disabled={locked}
                     onChange={(value) => patch({ defaultPageIndex: Number(value) })}
                     options={createPages.map((page) => ({ value: page.id, label: page.name }))}
-                  />
+                  /></SaveErrorField>
                   <p className="text-ink-faint mt-1 text-xs">タブを切り替えていない人が最初に見るページです。</p>
                 </div>
               ) : null}
               <div>
-                <RadioCardGroup legend="出す相手" legendVisible className="grid gap-2 sm:grid-cols-2">
+                <SaveErrorField names={["create-audience","targetingEnabled","value.targetingEnabled"]}><RadioCardGroup legend="出す相手" legendVisible className="grid gap-2 sm:grid-cols-2">
                   <RadioCard
                     name="create-audience"
                     value="all"
@@ -333,7 +334,7 @@ export default function RichMenuCreateForm({
                     title="条件に当てはまる友だちだけ"
                     note="当てはまらない人には、これより下のメニューが出ます"
                   />
-                </RadioCardGroup>
+                </RadioCardGroup></SaveErrorField>
               </div>
             </div>
 
@@ -352,7 +353,7 @@ export default function RichMenuCreateForm({
                 <div>
                   <label className="text-ink-secondary text-xs font-medium" htmlFor="create-targeting-priority">出す順番</label>
                   <div className="mt-1 flex items-center gap-2">
-                    <input
+                    <SaveErrorField names={["targetingPriority","value.targetingPriority","targeting_priority","value.targeting_priority"]}><input
                       id="create-targeting-priority"
                       aria-label="出す順番"
                       type="number"
@@ -361,7 +362,7 @@ export default function RichMenuCreateForm({
                       value={value.targetingPriority + 1}
                       onChange={(event) => patch({ targetingPriority: Math.max(0, Number(event.target.value) - 1) })}
                       className="border-hairline rounded-control w-20 border px-3 py-2 text-sm"
-                    />
+                    /></SaveErrorField>
                     <span className="text-ink-secondary text-xs">番目</span>
                   </div>
                   <p className="text-ink-faint mt-1 text-xs">ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます。</p>
@@ -369,7 +370,7 @@ export default function RichMenuCreateForm({
               </div>
             ) : null}
 
-            <Checkbox
+            <SaveErrorField names={["isDefaultForAll","value.isDefaultForAll","is_default_for_all","value.is_default_for_all"]}><Checkbox
               className={value.targetingEnabled ? 'opacity-50' : ''}
               checked={value.isDefaultForAll}
               disabled={locked || value.targetingEnabled}
@@ -379,7 +380,7 @@ export default function RichMenuCreateForm({
                 : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
             >
               公開したら「すべての友だち」の既定メニューにする
-            </Checkbox>
+            </Checkbox></SaveErrorField>
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2">

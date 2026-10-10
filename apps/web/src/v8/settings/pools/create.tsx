@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8-B プール管理「プールを作る」（Pencil `D0AOyx`・/pools/new）。
- *
- * 設定の板（中のメニューつき）の中に、左に「1. どのプールか」「2. いまの受け入れ先」の2枚、
- * 右に「プレビュー」。保存の帯は画面の下（キャンセル・保存してURLを発行）。
- * 動きは前の V8（app/pools/new/pool-new-v8.tsx。この画面に置き換えて消した）と同じ：LINEアカウントの一覧を読み（失敗は読み直しの口）、
- * 受け入れ先は複数・1件以上、URLに使う名前は半角英小文字・数字・ハイフンの2〜32文字、
- * 全部の受け入れ先を1回の保存で登録（落ちたらプールも所属も作られない・入力は残す）、作れたら一覧へ（作った行を目立たせる）。
- */
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
@@ -25,6 +15,18 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import styles from './create.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B プール管理「プールを作る」（Pencil `D0AOyx`・/pools/new）。
+ *
+ * 設定の板（中のメニューつき）の中に、左に「1. どのプールか」「2. いまの受け入れ先」の2枚、
+ * 右に「プレビュー」。保存の帯は画面の下（キャンセル・保存してURLを発行）。
+ * 動きは前の V8（app/pools/new/pool-new-v8.tsx。この画面に置き換えて消した）と同じ：LINEアカウントの一覧を読み（失敗は読み直しの口）、
+ * 受け入れ先は複数・1件以上、URLに使う名前は半角英小文字・数字・ハイフンの2〜32文字、
+ * 全部の受け入れ先を1回の保存で登録（落ちたらプールも所属も作られない・入力は残す）、作れたら一覧へ（作った行を目立たせる）。
+ */
 
 /** slug は URL に出る。日本語や記号を許すと /pool/xxx が壊れる。 */
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,31}$/
@@ -38,6 +40,7 @@ function accountHandle(account: LineAccount): string | null {
 }
 
 export default function PoolCreateV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle(TITLE)
   const router = useRouter()
   const [name, setName] = useState('')
@@ -75,10 +78,14 @@ export default function PoolCreateV8() {
       } else {
         setAccountsError('LINEアカウントを読み込めませんでした。もう一度お試しください。')
       }
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
       setAccountsError('LINEアカウントを読み込めませんでした。通信を確かめて、もう一度お試しください。')
     }
-  }, [])
+  }
+  }, [saveErrors])
 
   useEffect(() => { void loadAccounts() }, [loadAccounts])
 
@@ -118,14 +125,18 @@ export default function PoolCreateV8() {
       guard.disarm()
       router.push(createPageReturnHref(LIST_HREF, res.data.id))
     } catch (e) {
-      setError(createPageErrorMessage(e))
+      const fieldFailure = saveErrors.capture(e)
+
+      { if (!fieldFailure)
+
+      setError(createPageErrorMessage(e)) }
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
     <SbSettingsScreen
       boardId="D0AOyx"
       layout="narrow-nav"
@@ -147,14 +158,14 @@ export default function PoolCreateV8() {
           <section className={styles.card} aria-labelledby="pool-create-what">
             <h2 id="pool-create-what" className={styles.cardTitle}>1. どのプールか</h2>
             <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
-              <TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例：渋谷エリア" maxLength={100} />
+              <SaveErrorField names={["name"]}><TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例：渋谷エリア" maxLength={100} /></SaveErrorField>
             </Field>
             <Field note={<>
               {slugValid
                 ? `保存すると、このURLが発行されます：${publicUrl}`
                 : '半角英小文字・数字・ハイフンで2〜32文字。配ったURLが使えなくなるため、あとから変えられません。'}
             </>} label="URLに使う名前（あとから変えられません）" htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
-              <TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} />
+              <SaveErrorField names={["slug"]}><TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} /></SaveErrorField>
             </Field>
 
           </section>
@@ -182,7 +193,7 @@ export default function PoolCreateV8() {
             {pickerOpen ? (
               <div className={styles.picker}>
                 <span className={styles.pickerSelect}>
-                  <Select value={pickerValue} onChange={setPickerValue} aria-label="足すアカウント" size="full" options={addableAccounts.map((account) => ({ value: account.id, label: account.name }))} />
+                  <SaveErrorField names={["pickerValue","picker_value"]}><Select value={pickerValue} onChange={setPickerValue} aria-label="足すアカウント" size="full" options={addableAccounts.map((account) => ({ value: account.id, label: account.name }))} /></SaveErrorField>
                 </span>
                 <Button type="button" onClick={addAccount} disabled={!pickerValue}>追加</Button>
               </div>
@@ -219,6 +230,6 @@ export default function PoolCreateV8() {
       </form>
     </SbSettingsScreen>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="入力したプールの内容" busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

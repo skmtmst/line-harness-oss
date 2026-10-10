@@ -1,16 +1,5 @@
 'use client'
-
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 LINEアカウント（Pencil `V7vn3`）。
- *
- * 白い板の頭（題・説明・右に「並び順と親子を変える」「LINEアカウントを登録」）→
- * 左に「設定の中のメニュー」→ 右に数の4枚・探す欄と絞り込みの札・表・下の案内。
- * データの口は今の画面（app/accounts/page.tsx）と同じ：
- * 一覧（確かめ直しは live）・アーカイブ（理由・本人確認）・アーカイブから戻す。
- * 「並び順と親子を変える」は今ある並び替えの部品（components/accounts/account-ordering）を窓で開く。
- */
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -55,6 +44,17 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 LINEアカウント（Pencil `V7vn3`）。
+ *
+ * 白い板の頭（題・説明・右に「並び順と親子を変える」「LINEアカウントを登録」）→
+ * 左に「設定の中のメニュー」→ 右に数の4枚・探す欄と絞り込みの札・表・下の案内。
+ * データの口は今の画面（app/accounts/page.tsx）と同じ：
+ * 一覧（確かめ直しは live）・アーカイブ（理由・本人確認）・アーカイブから戻す。
+ * 「並び順と親子を変える」は今ある並び替えの部品（components/accounts/account-ordering）を窓で開く。
+ */
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
@@ -301,14 +301,14 @@ export default function AccountsV8() {
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
         onConfirm={() => runArchive()}
       >
-        <Field label="アーカイブの理由"><TextArea
+        <Field label="アーカイブの理由"><SaveErrorField names={["archiveReason","archive_reason"]}><TextArea
             rows={2}
             maxLength={500}
             placeholder="例：使わなくなった旧店舗のアカウント"
             value={archiveReason}
             onChange={(e) => setArchiveReason(e.target.value)}
             disabled={busy}
-          /></Field>
+          /></SaveErrorField></Field>
       </ConfirmDialog>
 
       <ConfirmDialog

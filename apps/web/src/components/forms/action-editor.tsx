@@ -13,6 +13,7 @@ import type { FormAction } from '@line-crm/shared'
 import Select from '@/components/shared/select'
 import { cellInput, miniButton, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const ACTION_LABELS: { kind: FormAction['kind']; label: string }[] = [
   { kind: 'send_text', label: 'テキストを送る' },
@@ -65,13 +66,13 @@ export default function ActionEditor({
           key={index}
           className="border-hairline rounded-control bg-canvas-sunken flex flex-wrap items-center gap-2 border p-2"
         >
-          <Select
+          <SaveErrorField names={[`value.${index}.kind`,"kind","action.kind"]}><Select
             value={action.kind}
             disabled={action.kind === 'research_action'}
             onChange={(value) => patch(index, emptyAction(value as Exclude<FormAction['kind'], 'research_action'>))}
             aria-label="動作の種類"
             options={[...ACTION_LABELS.map((a) => ({ value: a.kind, label: a.label })), ...(action.kind === 'research_action' ? [{ value: 'research_action', label: 'リサーチで設定した動作' }] : [])]}
-          />
+          /></SaveErrorField>
 
           {action.kind === 'research_action' && <p>変更はリサーチの編集から行ってください。</p>}
 
@@ -81,16 +82,18 @@ export default function ActionEditor({
             `basis-full` で折り返し、PC幅では元どおり横に並べる。
           */}
           {action.kind === 'send_text' && (
+            <SaveErrorField names={[`value.${index}.text`,"text","action.text"]}>
             <input
               type="text"
               value={action.text}
               onChange={(e) => patch(index, { ...action, text: e.target.value })}
               placeholder="送る文面"
               className={`${cellInput} min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[16rem]`}
-            />
+            /></SaveErrorField>
           )}
 
           {action.kind === 'send_template' && (
+            <SaveErrorField names={[`value.${index}.templateId`,`value.${index}.template_id`,"templateId","action.templateId","template_id","action.template_id"]}>
             <Select
               value={action.templateId}
               onChange={(value) => patch(index, { ...action, templateId: value })}
@@ -101,11 +104,12 @@ export default function ActionEditor({
                   .filter((t) => t.type === 'text')
                   .map((t) => ({ value: t.id, label: t.name })),
               ]}
-            />
+            /></SaveErrorField>
           )}
 
           {action.kind === 'tag' && (
             <>
+              <SaveErrorField names={[`value.${index}.op`,"op","action.op"]}>
               <Select
                 value={action.op}
                 onChange={(value) =>
@@ -116,7 +120,7 @@ export default function ActionEditor({
                   { value: 'add', label: '付ける' },
                   { value: 'remove', label: '外す' },
                 ]}
-              />
+              /></SaveErrorField>
               <Select
                 value={action.tagIds[0] ?? ''}
                 onChange={(value) =>
@@ -133,7 +137,7 @@ export default function ActionEditor({
 
           {action.kind === 'friend_field' && (
             <>
-              <Select
+              <SaveErrorField names={[`value.${index}.fieldId`,`value.${index}.field_id`,"fieldId","action.fieldId","field_id","action.field_id"]}><Select
                 value={action.fieldId}
                 onChange={(value) => patch(index, { ...action, fieldId: value })}
                 aria-label="書き込む友だち情報欄"
@@ -146,18 +150,21 @@ export default function ActionEditor({
                   })),
                 ]}
               />
-              <input
+              </SaveErrorField>
+              <SaveErrorField names={[`value.${index}.value`,"value","action.value"]}><input
                 type="text"
                 value={action.value}
                 onChange={(e) => patch(index, { ...action, value: e.target.value })}
                 placeholder="書き込む値"
                 className={`${cellInput} min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[10rem]`}
               />
+            </SaveErrorField>
             </>
           )}
 
           {action.kind === 'scenario' && (
             <>
+              <SaveErrorField names={[`value.${index}.op`,"op","action.op"]}>
               <Select
                 value={action.op}
                 onChange={(value) =>
@@ -168,7 +175,8 @@ export default function ActionEditor({
                   { value: 'start', label: '開始する' },
                   { value: 'stop', label: '停止する' },
                 ]}
-              />
+              /></SaveErrorField>
+              <SaveErrorField names={[`value.${index}.scenarioId`,`value.${index}.scenario_id`,"scenarioId","action.scenarioId","scenario_id","action.scenario_id"]}>
               <Select
                 value={action.scenarioId}
                 onChange={(value) => patch(index, { ...action, scenarioId: value })}
@@ -178,10 +186,12 @@ export default function ActionEditor({
                   ...refs.scenarios.map((s) => ({ value: s.id, label: s.name })),
                 ]}
               />
+            </SaveErrorField>
             </>
           )}
 
           {action.kind === 'reminder' && (
+            <SaveErrorField names={[`value.${index}.reminderId`,`value.${index}.reminder_id`,"reminderId","action.reminderId","reminder_id","action.reminder_id"]}>
             <Select
               value={action.reminderId}
               onChange={(value) => patch(index, { ...action, reminderId: value })}
@@ -190,7 +200,7 @@ export default function ActionEditor({
                 { value: '', label: '— リマインダ —' },
                 ...refs.reminders.map((r) => ({ value: r.id, label: r.name })),
               ]}
-            />
+            /></SaveErrorField>
           )}
 
           <button

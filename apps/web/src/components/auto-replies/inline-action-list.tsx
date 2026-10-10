@@ -11,6 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 応答したときに行うことの並び。
@@ -208,7 +209,7 @@ export default function InlineActionList({
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs">
               <span className="text-ink-faint shrink-0">失敗したら</span>
-              <Select
+              <SaveErrorField names={[`actions.${index}.onFailure`,`actions.${index}.on_failure`,"onFailure","action.onFailure","on_failure","action.on_failure"]}><Select
                 value={action.onFailure}
                 onChange={(value) => updateOnFailure(action.key, value === 'stop' ? 'stop' : 'continue')}
                 aria-label={`${index + 1}つ目の失敗したときの動き`}
@@ -217,11 +218,11 @@ export default function InlineActionList({
                   { value: 'continue', label: '次へ進む' },
                   { value: 'stop', label: 'ここで止める' },
                 ]}
-              />
+              /></SaveErrorField>
             </label>
             {action.actionType === 'notify_staff' ? <div className="space-y-2">
-              <label className="block text-xs">通知先<Select aria-label="通知先" value={String((action.config as Record<string,unknown>)?.notificationRuleId??'')} options={[{value:'',label:'選んでください'},...notificationRules.map(r=>({value:r.id,label:r.name}))]} onChange={value=>{const rule=notificationRules.find(r=>r.id===value);update(action.key,{...(action.config as object),notificationRuleId:value,notificationRuleVersion:rule?.version??0})}}/></label>
-              <label className="block text-xs">通知の本文<textarea aria-label="通知の本文" maxLength={2000} className="w-full border border-hairline rounded-control p-2" value={String((action.config as Record<string,unknown>)?.message??'')} onChange={e=>update(action.key,{...(action.config as object),message:e.target.value})}/></label>
+              <label className="block text-xs">通知先<SaveErrorField names={["notificationRuleId","(action.config as Record<string,unknown>)?.notificationRuleId","config as Record<string,unknown>)?.notificationRuleId","notification_rule_id","(action.config as _record<string,unknown>)?.notification_rule_id","config as _record<string,unknown>)?.notification_rule_id"]}><Select aria-label="通知先" value={String((action.config as Record<string,unknown>)?.notificationRuleId??'')} options={[{value:'',label:'選んでください'},...notificationRules.map(r=>({value:r.id,label:r.name}))]} onChange={value=>{const rule=notificationRules.find(r=>r.id===value);update(action.key,{...(action.config as object),notificationRuleId:value,notificationRuleVersion:rule?.version??0})}}/></SaveErrorField></label>
+              <label className="block text-xs">通知の本文<SaveErrorField names={["message","(action.config as Record<string,unknown>)?.message","config as Record<string,unknown>)?.message","(action.config as _record<string,unknown>)?.message","config as _record<string,unknown>)?.message"]}><textarea aria-label="通知の本文" maxLength={2000} className="w-full border border-hairline rounded-control p-2" value={String((action.config as Record<string,unknown>)?.message??'')} onChange={e=>update(action.key,{...(action.config as object),message:e.target.value})}/></SaveErrorField></label>
               {notificationRules.length===0&&<p className="text-xs text-ink-faint">公開済みの担当者通知を先に設定してください</p>}
             </div> : <ActionConfigEditor
               action={{

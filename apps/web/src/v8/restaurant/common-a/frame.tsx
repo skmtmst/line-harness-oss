@@ -1,16 +1,4 @@
 'use client'
-
-/*
- * ★V8 飲食店向け（テスト）の器（担当 a：ダッシュボード・承認・組織・LINE来店フォロー・Googleビジネス）。
- *
- * Pencil の飲食店向けの板（店舗ダッシュボード CHz31 ほか）は、どれも同じ形：
- *   板の頭（題 22/32・説明 13/19・右上に店舗を選ぶ欄 210×36）
- *   → 中身（上16・左右24・下24、段の間16）：検証環境の帯 → 板ごとの中身。
- * 板の頭の寸法は型（PageFrame・PageHeading）が持つ。ここは取得と置き場だけ。
- *
- * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
- * restaurantTestApi.snapshot。取得失敗と未登録を混ぜない（D024）。
- */
 import { notifySaved } from '@/components/shared/toast'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
@@ -27,6 +15,20 @@ import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import styles from './frame.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 飲食店向け（テスト）の器（担当 a：ダッシュボード・承認・組織・LINE来店フォロー・Googleビジネス）。
+ *
+ * Pencil の飲食店向けの板（店舗ダッシュボード CHz31 ほか）は、どれも同じ形：
+ *   板の頭（題 22/32・説明 13/19・右上に店舗を選ぶ欄 210×36）
+ *   → 中身（上16・左右24・下24、段の間16）：検証環境の帯 → 板ごとの中身。
+ * 板の頭の寸法は型（PageFrame・PageHeading）が持つ。ここは取得と置き場だけ。
+ *
+ * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
+ * restaurantTestApi.snapshot。取得失敗と未登録を混ぜない（D024）。
+ */
 
 export interface RestaurantContext {
   data: RestaurantSnapshot
@@ -140,7 +142,7 @@ export default function RestaurantFrame({
   )
 
   const picker = snapshot && snapshot.stores.length > 0 ? (
-    <StoreFilterTabs
+    <SaveErrorField names={["selectedStoreId","selected_store_id"]}><StoreFilterTabs
 
 
       value={selectedStoreId}
@@ -149,7 +151,7 @@ export default function RestaurantFrame({
         ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
         ...snapshot.stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` })),
       ]}
-    />
+    /></SaveErrorField>
   ) : null
 
   return (

@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * ★V8「友だち情報欄を作る」（Pencil `w9zY5`）の入口。
- *
- * 読み込み・重複確認・冪等キー・保存の動きは今の入口（app/tags/new-field-page-v8.tsx）と同じ。
- * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/new`・`?back=<戻り先>`。
- */
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { FriendField, Folder } from '@line-crm/shared'
@@ -18,8 +11,18 @@ import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import FieldEditor, { type FieldEditorValues } from './field-editor'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8「友だち情報欄を作る」（Pencil `w9zY5`）の入口。
+ *
+ * 読み込み・重複確認・冪等キー・保存の動きは今の入口（app/tags/new-field-page-v8.tsx）と同じ。
+ * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/new`・`?back=<戻り先>`。
+ */
 
 export default function FieldNew() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
   const back = params.get('back')
@@ -44,12 +47,16 @@ export default function FieldNew() {
       if (!res.success) throw new Error(res.error)
       setFolders(res.data)
       setFoldersState('ready')
-    } catch {
-      setFoldersState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFoldersState('error') }
     } finally {
       setReloading(false)
     }
-  }, [])
+  }, [saveErrors]);
+
 
   const loadExisting = useCallback(async () => {
     const account = selectedAccountId
@@ -63,12 +70,15 @@ export default function FieldNew() {
       if (!res.success) throw new Error(res.error)
       setExisting(res.data)
       setExistingState('ready')
-    } catch {
-      setExistingState('error')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setExistingState('error') }
     } finally {
       setReloading(false)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => { void loadFolders() }, [loadFolders])
   useEffect(() => { void loadExisting() }, [loadExisting])
@@ -97,16 +107,20 @@ export default function FieldNew() {
       notifyToast(`「${values.name.trim()}」を作りました`)
       router.push(back ?? `/tags?tab=fields&highlight=${res.data.id}`)
     } catch (reason) {
-      setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store'))
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure)
+
+      setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store')) }
     } finally {
       setSaving(false)
     }
   }
 
-  if (!canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
 
   return (
-    <FieldEditor
+    <SaveErrorScope errors={saveErrors}><FieldEditor
       mode="create"
       folders={folders}
       foldersState={foldersState}
@@ -132,6 +146,6 @@ export default function FieldNew() {
       ) : null}
       onCancel={() => router.push(back ?? '/tags?tab=fields')}
       onSubmit={(values, requestKey) => void save(values, requestKey)}
-    />
+    /></SaveErrorScope>
   )
 }

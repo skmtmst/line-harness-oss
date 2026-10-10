@@ -1,20 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 健康日記（Pencil「★V8-B 画面の地図」専用機能の組：
- * 一覧 `mIwA4`、30日のまとめ `BVuYh`、記録の項目 `z2tvtX`、状態の板 `dzx5D`）。
- *
- * v7（page.tsx 内の HealthInner と health-tab / items-tab /
- * summary-drawer）とは別の部品として持ち、data-theme="v8" のときだけ
- * こちらが出る。データの口（health・healthSummary・印刷）は同じ。
- * 違いは置き場と見せ方だけ——
- * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
- * ・道具の段は「ペットを探す」＋よく使う札3つ（気になる変化・今週記録あり・30日記録なし）。
- * ・行末の操作は「…」に集約（30日のまとめ・飼い主を開く）。
- * ・30日のまとめは右から出る引き出し（幅600・幕で暗くする）。
- * ・記録の項目は変えられない決まりの表（z2tvtX）。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import { useCallback, useEffect, useState } from 'react'
 import { Activity, Bell, CalendarCheck, PawPrint } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -51,6 +35,24 @@ import type { HealthTabKey } from './page'
 import styles from './health-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 健康日記（Pencil「★V8-B 画面の地図」専用機能の組：
+ * 一覧 `mIwA4`、30日のまとめ `BVuYh`、記録の項目 `z2tvtX`、状態の板 `dzx5D`）。
+ *
+ * v7（page.tsx 内の HealthInner と health-tab / items-tab /
+ * summary-drawer）とは別の部品として持ち、data-theme="v8" のときだけ
+ * こちらが出る。データの口（health・healthSummary・印刷）は同じ。
+ * 違いは置き場と見せ方だけ——
+ * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
+ * ・道具の段は「ペットを探す」＋よく使う札3つ（気になる変化・今週記録あり・30日記録なし）。
+ * ・行末の操作は「…」に集約（30日のまとめ・飼い主を開く）。
+ * ・30日のまとめは右から出る引き出し（幅600・幕で暗くする）。
+ * ・記録の項目は変えられない決まりの表（z2tvtX）。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 type ListStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -253,12 +255,12 @@ function HealthListV8({
           className={styles.searchGrow}
           onSubmit={(event) => { event.preventDefault(); setQuery(draft.trim()); resetPage() }}
         >
-          <TextField
+          <SaveErrorField names={["draft"]}><TextField
             aria-label="ペットを探す"
             placeholder="ペットを探す"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-          />
+          /></SaveErrorField>
         </form>
         {concernOnly ? null : (
           <>
@@ -288,7 +290,7 @@ function HealthListV8({
           </>
         )}
         <span className={styles.toolsTail}>
-          <Select
+          <SaveErrorField names={["change"]}><Select
             aria-label="よく使う絞り込み"
             value={concernOnly ? 'concern' : change === 'silent' ? '' : change}
             onChange={(value) => { if (!concernOnly) { setChange(value === 'concern' || value === 'none' ? value : ''); resetPage() } }}
@@ -297,9 +299,9 @@ function HealthListV8({
               { value: 'concern', label: '気になる変化' },
               { value: 'none', label: '変化なし' },
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.rangeLabel}>{data ? headCountLabel(data.total, data.page, data.pageSize) : emptyValue('unknown')}</span>
-          <Select
+          <SaveErrorField names={["sort"]}><Select
             aria-label="並び順"
             value={sort}
             onChange={(value) => { setSort(value as NenHealthSort); resetPage() }}
@@ -308,7 +310,7 @@ function HealthListV8({
               { value: 'recent', label: '並び：最終記録が新しい順' },
               { value: 'records_desc', label: '並び：30日の記録が多い順' },
             ]}
-          />
+          /></SaveErrorField>
         </span>
       </div>
 

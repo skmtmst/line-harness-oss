@@ -17,6 +17,7 @@ import Notice from '@/components/shared/notice'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
 import Select from '@/components/shared/select'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export const FIELD_TYPE_HINTS: Record<FriendFieldType, string> = {
   text: '短いテキスト', textarea: '長い文章', number: '体重など', date: '誕生日など', datetime: '予約日時など', time: '来店時刻など（HH:MM）',
@@ -275,14 +276,14 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
       <NoteBar className="mb-4">既定値は友だち情報が空欄のときの送信値です。種類は新規登録後に変更せず、回答フォーム・友だち詳細・変数挿入で同じ定義を使います。</NoteBar>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="項目名で検索" aria-label="項目名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label" />
-        <Select
+        <SaveErrorField names={["query"]}><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="項目名で検索" aria-label="項目名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label" /></SaveErrorField>
+        <SaveErrorField names={["type"]}><Select
           label="種類"
           aria-label="項目の種類"
           value={type}
           onChange={(value) => setType(value as typeof type)}
           options={[{ value: 'all', label: 'すべて' }, ...Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({ value, label }))]}
-        />
+        /></SaveErrorField>
         <span className="flex-1" />
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>

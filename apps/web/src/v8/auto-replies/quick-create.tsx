@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 自動応答 かんたんに作る（板 `G4GejG`、小窓 560）。
- *
- * 言葉（どれか1つを含む）と返す文だけ聞いて、その場で有効にする。
- * 重なりは作った下書きで確かめ、あるときは相手の名前を帯に出してから
- * 有効にする（確かめた分だけ承認する）。並び替えは詳しく作るで行う。
- * 見た目は絵どおりに組み直した（2026-10-07）：× は題の行に重ねる、キャンセル・保存は窓の真ん中、
- * 言葉は札（緑の地・青の字）、重なりは琥珀の帯。インラインの style は使わない。
- */
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { HelpCircle, ListOrdered, Send, X } from 'lucide-react'
@@ -22,6 +12,18 @@ import { isImeComposing } from '@/components/shared/ime'
 import styles from './quick-create.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 自動応答 かんたんに作る（板 `G4GejG`、小窓 560）。
+ *
+ * 言葉（どれか1つを含む）と返す文だけ聞いて、その場で有効にする。
+ * 重なりは作った下書きで確かめ、あるときは相手の名前を帯に出してから
+ * 有効にする（確かめた分だけ承認する）。並び替えは詳しく作るで行う。
+ * 見た目は絵どおりに組み直した（2026-10-07）：× は題の行に重ねる、キャンセル・保存は窓の真ん中、
+ * 言葉は札（緑の地・青の字）、重なりは琥珀の帯。インラインの style は使わない。
+ */
 
 /* 1欄ぶんの確かめ。文は「何をすれば直るか」を1文で書く。 */
 function validateKeywords(keywords: string[]): string | null {
@@ -51,6 +53,7 @@ export default function QuickCreateV8({
   /** 有効にしたら一覧を読み直す。 */
   onCreated: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [keywords, setKeywords] = useState<string[]>([])
   const [draft, setDraft] = useState('')
   const [reply, setReply] = useState('')
@@ -192,7 +195,10 @@ export default function QuickCreateV8({
       onCreated()
       onClose()
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : withPermissionFailure(cause, describeSaveFailure(cause), 'store'))
+      const fieldFailure = saveErrors.capture(cause)
+
+      { if (!fieldFailure)
+      setSaveError(cause instanceof Error ? cause.message : withPermissionFailure(cause, describeSaveFailure(cause), 'store')) }
       setPhase(draftIdRef.current ? 'confirming' : 'editing')
     } finally {
       savingRef.current = false
@@ -200,7 +206,7 @@ export default function QuickCreateV8({
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
     <Dialog
       open
       confirmation
@@ -254,7 +260,7 @@ export default function QuickCreateV8({
                 </button>
               </span>
             ))}
-            <input
+            <SaveErrorField names={["draft","keyword"]}><input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onBlur={blurKeywords}
@@ -275,11 +281,11 @@ export default function QuickCreateV8({
               placeholder="言葉を入れて Enter"
               aria-label="追加する言葉"
               className={styles.chipInput}
-            />
+            /></SaveErrorField>
           </div>
           {keywordError ? <p className={styles.fieldError} role="alert">{keywordError}</p> : null}
         </div>
-        <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply"><textarea
+        <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply"><SaveErrorField names={["reply"]}><textarea
             id="quick-create-reply"
             value={reply}
             onChange={(event) => {
@@ -291,7 +297,7 @@ export default function QuickCreateV8({
             placeholder="例：営業時間は10:00〜19:00です"
             className={styles.textarea}
             aria-invalid={replyError ? true : undefined}
-          />
+          /></SaveErrorField>
 {replyError ? <p className={styles.fieldError} role="alert">{replyError}</p> : null}</Field></div>
         {overlaps.length > 0 ? (
           <p className={styles.overlapBand} role="status">
@@ -302,6 +308,6 @@ export default function QuickCreateV8({
       </div>
     </Dialog>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

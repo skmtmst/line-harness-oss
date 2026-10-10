@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 タグ「友だち情報欄」タブ（Pencil `q5gbcM`）。
- *
- * 動き（読み込み・数の帯・絞り込み・フォルダ・並べ替え・削除の安全確認・移行への入口・
- * 行の詳細パネル・名前のその場の直し・右クリック）は今の V8 タブ（app/tags/fields-tab-v8.tsx）から写した。
- * 見た目は絵に合わせた：数の帯は板の端から端、左にフォルダの列（いちばん上が「項目を作る」）、
- * 右の上に案内の帯、表は名前の前にフォルダの色の丸（表にフォルダ列は置かない）、行の右端は必ず「…」、
- * 表の下に操作の説明。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -46,10 +36,21 @@ import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { FIELD_TYPE_LABELS, destinationLabel, fieldDeletionBlockedReason, knownUsageCount } from '@/components/friend-fields/field-list'
 import styles from './list.module.css'
-
 import type { AttributeListHost } from './attribute-host'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 タグ「友だち情報欄」タブ（Pencil `q5gbcM`）。
+ *
+ * 動き（読み込み・数の帯・絞り込み・フォルダ・並べ替え・削除の安全確認・移行への入口・
+ * 行の詳細パネル・名前のその場の直し・右クリック）は今の V8 タブ（app/tags/fields-tab-v8.tsx）から写した。
+ * 見た目は絵に合わせた：数の帯は板の端から端、左にフォルダの列（いちばん上が「項目を作る」）、
+ * 右の上に案内の帯、表は名前の前にフォルダの色の丸（表にフォルダ列は置かない）、行の右端は必ず「…」、
+ * 表の下に操作の説明。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -519,7 +520,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <Select aria-label="フォルダ" width={150} value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} />
+          <SaveErrorField names={["folderFilter","folder_filter"]}><Select aria-label="フォルダ" width={150} value={folderFilter} onChange={setFolderFilter} options={folderSelectOptions} /></SaveErrorField>
         </>}
         toolbar={<>
           {/* 案内の帯は道具の段の上（絵：表の列の上だけにかかる）。 */}
@@ -530,7 +531,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
           <span className={narrow ? styles.searchNarrow : styles.search}>
             <SearchField aria-label="項目名で探す" placeholder="項目名で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
           </span>
-          <Select
+          <SaveErrorField names={["type"]}><Select
             aria-label="種類で絞り込む"
             width={119}
             value={type}
@@ -539,7 +540,7 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
               { value: 'all', label: '種類：すべて' },
               ...(Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]).map((value) => ({ value, label: `種類：${fieldTypeWord(value)}` })),
             ]}
-          />
+          /></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <PageSizeSelect value={pageSize} onChange={(value) => setPageSize(value || 20)} options={PAGE_SIZES} label={null} />
         </>}

@@ -15,6 +15,7 @@ import Link from 'next/link'
 import Select from '@/components/shared/select'
 import { scenarioReferenceData } from './scenario-reference-data'
 import Button from '@/components/shared/button'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 interface SendableTemplateCandidate {
   accountId?: string | null
@@ -146,7 +147,7 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
         <span className="text-ink-secondary mb-1 block text-xs font-medium">
           カルーセル <span className="text-danger">*</span>
         </span>
-        <Select
+        <SaveErrorField names={["value"]}><Select
           value={value}
           onChange={(next) => {
             const picked = items.find((t) => t.id === next) ?? null
@@ -161,7 +162,7 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
             })),
           ]}
           size="full"
-        />
+        /></SaveErrorField>
       </label>
       <p className="text-ink-faint text-xs leading-relaxed">
         カルーセルを直すと、この通の中身も一緒に変わります。

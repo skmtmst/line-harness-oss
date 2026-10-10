@@ -28,6 +28,7 @@ import styles from './bulk-run-dialog.module.css'
 import { formatNumber } from '@/lib/format'
 import BulkOperationEditor from './bulk-operation-editor'
 import { buildBulkOperation, EMPTY_BULK_INPUT, type BulkOperationInput } from './bulk-operation-input'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 type Phase = 'operation' | 'confirm' | 'result'
 type ResultState = 'idle' | 'loading' | 'ready' | 'error'
@@ -497,10 +498,10 @@ export default function BulkRunDialog({
             ) : null}
 
             {!reversible ? (
-              <Checkbox checked={irreversibleConfirmed} onCheckedChange={setIrreversibleConfirmed}>
+              <SaveErrorField names={["irreversibleConfirmed","irreversible_confirmed"]}><Checkbox checked={irreversibleConfirmed} onCheckedChange={setIrreversibleConfirmed}>
                 {/* 取り消せないことを窓の中に書く。 */}
                 この操作は取り消せません。{countText(preview.targetCount, '人')}に実行することを確認しました。
-              </Checkbox>
+              </Checkbox></SaveErrorField>
             ) : null}
 
             {blocked ? <p className={styles.hint}>{blocked}</p> : null}

@@ -1,9 +1,4 @@
 'use client'
-
-/*
- * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
- * ページの札、ページのブロック（畳んだ行と開いた設定）、ブロックを足す欄。
- */
 import { Field } from '@/components/shared/form-controls'
 import { useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -38,6 +33,13 @@ import { FieldError } from '@/components/shared/form-controls'
 import { useFormEditAttempted } from './field-issues'
 import styles from './edit.module.css'
 import TextLink from '@/components/shared/text-link'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
+ * ページの札、ページのブロック（畳んだ行と開いた設定）、ブロックを足す欄。
+ */
 
 type Props = {
   readOnly?: boolean
@@ -167,7 +169,7 @@ function RenameDialog({ value, onCancel, onSave }: { value: string | null; onCan
   }
   return (
     <Dialog open={value !== null} title="ページの名前" confirmLabel="この名前にする" onConfirm={() => onSave(draft)} onCancel={onCancel}>
-      <TextField aria-label="ページの名前" value={draft} onChange={(e) => setDraft(e.target.value)} />
+      <SaveErrorField names={["draft"]}><TextField aria-label="ページの名前" value={draft} onChange={(e) => setDraft(e.target.value)} /></SaveErrorField>
     </Dialog>
   )
 }
@@ -274,7 +276,7 @@ function OpenBlock(props: RowProps) {
         {input ? (
           <label className={styles.required}>
             <span className={styles.requiredLabel}>必須</span>
-            <SettingCheckbox checked={input.required ?? false} onChange={(required) => patch({ required } as Partial<FormBlock>)} label="必須" />
+            <SaveErrorField names={["required","input.required"]}><SettingCheckbox checked={input.required ?? false} onChange={(required) => patch({ required } as Partial<FormBlock>)} label="必須" /></SaveErrorField>
           </label>
         ) : null}
         <RowActions className={styles.more} subjectName={`「${blockTitleLine(block)}」`} menuItems={menuItems} destructiveItem={menu.destructiveItem} />
@@ -305,12 +307,12 @@ function InputFields({ block, refs, patch }: { block: FormInputBlock; refs: Form
   return (
     <>
       <Labeled label="質問文" htmlFor={labelId}>
-        <TextField id={labelId} value={block.label} placeholder="質問の文" invalid={Boolean(labelError)} aria-describedby={labelError ? `${labelId}-error` : undefined} onChange={(e) => set({ label: e.target.value })} />
+        <SaveErrorField names={["label","block.label"]}><TextField id={labelId} value={block.label} placeholder="質問の文" invalid={Boolean(labelError)} aria-describedby={labelError ? `${labelId}-error` : undefined} onChange={(e) => set({ label: e.target.value })} /></SaveErrorField>
         <FieldError id={`${labelId}-error`}>{labelError}</FieldError>
       </Labeled>
       {['text', 'textarea', 'address', 'date'].includes(block.type) ? (
         <Labeled label="参考の文字（入力欄の中に薄く出る）" htmlFor={`${labelId}-placeholder`}>
-          <TextField id={`${labelId}-placeholder`} value={block.placeholder ?? ''} placeholder="例：山田 太郎" onChange={(e) => set({ placeholder: e.target.value })} />
+          <SaveErrorField names={["placeholder","block.placeholder"]}><TextField id={`${labelId}-placeholder`} value={block.placeholder ?? ''} placeholder="例：山田 太郎" onChange={(e) => set({ placeholder: e.target.value })} /></SaveErrorField>
         </Labeled>
       ) : null}
       {block.type === 'file' ? <FormFileSettings block={block} onChange={set} /> : null}
@@ -356,12 +358,12 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
               }
             }}
           />
-          <TextField
+          <SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><TextField
             aria-label={`選択肢${index + 1}`}
             className={styles.choiceInput}
             value={choice.label}
             onChange={(e) => set({ choices: choices.map((c, i) => (i === index ? { ...c, label: e.target.value } : c)) })}
-          />
+          /></SaveErrorField>
           <button
             type="button"
             className={styles.choiceRemove}
@@ -400,7 +402,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
     <div className={styles.saveTo}>
       <span className={styles.fieldLabel}>答えを保存する先</span>
       <span className={styles.saveSelect}>
-        <Select
+        <SaveErrorField names={["current"]}><Select
           aria-label="答えを保存する先"
           value={current}
           onChange={(value) => {
@@ -408,7 +410,7 @@ function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; s
             set({ destinations: value ? { ...block.destinations, friendFieldIds: [value, ...rest.filter((id) => id !== value)] } : { friendFieldIds: [] } })
           }}
           options={options}
-        />
+        /></SaveErrorField>
       </span>
     </div>
   )
@@ -427,7 +429,7 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
     <>
       <div className={styles.bookingRow}>
         <Labeled label="メニュー">
-          <EntityKindField
+          <SaveErrorField names={["menuId","booking?.menuId","booking"]}><EntityKindField
             kind="booking_menu"
             label="メニュー"
             options={menus}
@@ -438,10 +440,10 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
               const menu = menus.find((m) => m.id === row.id)
               return menu ? `${menu.durationMinutes}分` : undefined
             }}
-          />
+          /></SaveErrorField>
         </Labeled>
         <Labeled label="担当">
-          <EntityKindField
+          <SaveErrorField names={["staffId","booking?.staffId","booking"]}><EntityKindField
             kind="staff"
             label="担当"
             options={staff}
@@ -449,16 +451,16 @@ function BookingFields({ block, refs, set }: { block: FormInputBlock; refs: Form
             onChange={(staffId) => setBooking({ staffId: staffId || null })}
             clearable
             placeholder="（だれでも）"
-          />
+          /></SaveErrorField>
         </Labeled>
         <Labeled label="選べる期間">
-          <Select
+          <SaveErrorField names={["days","booking","daysAhead"]}><Select
             aria-label="選べる期間"
             size="full"
             value={String(days)}
             onChange={(value) => setBooking({ daysAhead: Number(value) })}
             options={(DAYS_AHEAD.includes(days) ? DAYS_AHEAD : [...DAYS_AHEAD, days].sort((a, b) => a - b)).map((d) => ({ value: String(d), label: `今日から ${d}日` }))}
-          />
+          /></SaveErrorField>
         </Labeled>
       </div>
       {/* 絵の2つのつまみ（メニューを選んでもらう・未承認で入れる）は保存する口がまだ無い。今の決まりを文で出す。 */}
@@ -500,24 +502,24 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
       return (
         <div className={styles.decoRow}>
           <Labeled label="見出し" htmlFor={id}>
-            <TextField id={id} value={block.text} onChange={(e) => patch({ text: e.target.value } as Partial<FormBlock>)} />
+            <SaveErrorField names={["text","block.text"]}><TextField id={id} value={block.text} onChange={(e) => patch({ text: e.target.value } as Partial<FormBlock>)} /></SaveErrorField>
           </Labeled>
           <Labeled label="大きさ">
-            <Select aria-label="大きさ" value={String(block.level ?? 2)} onChange={(v) => patch({ level: Number(v) as 1 | 2 | 3 } as Partial<FormBlock>)} options={[{ value: '1', label: '見出し1' }, { value: '2', label: '見出し2' }, { value: '3', label: '見出し3' }]} />
+            <SaveErrorField names={["level","block.level"]}><Select aria-label="大きさ" value={String(block.level ?? 2)} onChange={(v) => patch({ level: Number(v) as 1 | 2 | 3 } as Partial<FormBlock>)} options={[{ value: '1', label: '見出し1' }, { value: '2', label: '見出し2' }, { value: '3', label: '見出し3' }]} /></SaveErrorField>
           </Labeled>
         </div>
       )
     case 'text':
       return (
         <Labeled label="本文" htmlFor={id}>
-          <TextArea id={id} rows={3} value={block.text} onChange={(e) => patch({ text: e.target.value } as Partial<FormBlock>)} />
+          <SaveErrorField names={["text","block.text"]}><TextArea id={id} rows={3} value={block.text} onChange={(e) => patch({ text: e.target.value } as Partial<FormBlock>)} /></SaveErrorField>
         </Labeled>
       )
     case 'button':
       return (
         <div className={styles.decoRow}>
           <Labeled label="ボタンの文字" htmlFor={id}>
-            <TextField id={id} value={block.label} onChange={(e) => patch({ label: e.target.value } as Partial<FormBlock>)} />
+            <SaveErrorField names={["label","block.label"]}><TextField id={id} value={block.label} onChange={(e) => patch({ label: e.target.value } as Partial<FormBlock>)} /></SaveErrorField>
           </Labeled>
           <ButtonTapField id={id} url={block.url} accountId={accountId} onChange={(url) => patch({ url } as Partial<FormBlock>)} />
         </div>
@@ -526,7 +528,7 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
       return (
         <>
           <div className={styles.decoRow}>
-            <MediaSlot
+            <SaveErrorField names={["mediaUrl","block.mediaUrl","media_url","block.media_url"]}><MediaSlot
               size="compact"
               title="画像を追加"
               previewAlt={block.alt || "フォームの画像"}
@@ -536,9 +538,9 @@ function DecoFields({ block, patch, accountId }: { block: FormBlock; patch: (nex
               onChange={(url) => patch({ mediaUrl: url ?? '' } as Partial<FormBlock>)}
               onMediaPick={() => setPicking(true)}
               urlEntry={{ value: block.mediaUrl, onChange: (url) => patch({ mediaUrl: url } as Partial<FormBlock>), label: '画像のURL', placeholder: 'https://...' }}
-            />
+            /></SaveErrorField>
             <Labeled label="代わりの文" htmlFor={`${id}-alt`}>
-              <TextField id={`${id}-alt`} value={block.alt ?? ''} onChange={(e) => patch({ alt: e.target.value } as Partial<FormBlock>)} />
+              <SaveErrorField names={["linkUrl","block.linkUrl","link_url","block.link_url"]}><TextField id={`${id}-alt`} value={block.alt ?? ''} onChange={(e) => patch({ alt: e.target.value } as Partial<FormBlock>)} /></SaveErrorField>
             </Labeled>
             <ButtonTapField id={`${id}-link`} name="この画像" url={block.linkUrl ?? ''} accountId={accountId} onChange={url => patch({ linkUrl: url } as Partial<FormBlock>)} />
           </div>

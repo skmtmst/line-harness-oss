@@ -1,10 +1,4 @@
 'use client'
-
-/*
- * 情報欄タブ（Q5F2QE の 4.）。その人について決めた項目を2列に並べ、最後に1回保存する。
- * 分類（すべて・基本・フォルダ）は URL の group で選ぶ（FRIEND-21・今と同じ指定）。
- * 権限が無い人は欄を読み取りだけにし、保存ボタンを置かずに理由だけ出す（N-045）。
- */
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
@@ -20,6 +14,14 @@ import { fixedFieldValue } from '@/components/shared/fixed-friend-field-values'
 import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * 情報欄タブ（Q5F2QE の 4.）。その人について決めた項目を2列に並べ、最後に1回保存する。
+ * 分類（すべて・基本・フォルダ）は URL の group で選ぶ（FRIEND-21・今と同じ指定）。
+ * 権限が無い人は欄を読み取りだけにし、保存ボタンを置かずに理由だけ出す（N-045）。
+ */
 
 /** 種類の名前は絵では出さない。ラベルの title で読めるようにする。 */
 export const BASIC_GROUP = 'basic'
@@ -35,7 +37,7 @@ function FieldInput({ field, value, onChange, disabled, id }: {
   // 変えられないとき（権限が無い・ECが正本の項目）は、押せない部品を置かずに読み取りだけの欄で見せる（2026-10-06 オーナー決定）。
   const readOnly = disabled || !!field.ecIsMaster
   if (field.type === 'textarea') {
-    return <TextArea id={id} rows={3} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} onChange={(e) => onChange(e.target.value)} />
+    return <SaveErrorField names={["value"]}><TextArea id={id} rows={3} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
   }
   if (field.type === 'multi_select') {
     // 複数選択を単一選択で保存すると既存の複数値が黙って上書きされる（#496-16）。読むだけ。
@@ -49,30 +51,30 @@ function FieldInput({ field, value, onChange, disabled, id }: {
   if (readOnly && (field.type === 'select' || field.type === 'checkbox' || field.type === 'date')) {
     // 選ぶ部品は置かず、選んでいる値を文字で見せる。
     const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : (value || emptyValue('unconfigured'))
-    return <TextField id={id} value={shown} readOnly aria-readonly="true" aria-label={`${field.name}の値`} title={shown} />
+    return <SaveErrorField names={["shown"]}><TextField id={id} value={shown} readOnly aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
   }
   if (field.type === 'select') {
     return (
-      <Select
+      <SaveErrorField names={["value"]}><Select
         id={id}
         size="full"
         value={value}
         onChange={(v) => onChange(v)}
         aria-label={`${field.name}の値`}
         options={[{ value: '', label: '— 未設定 —' }, ...(field.options ?? []).map((o) => ({ value: o, label: o }))]}
-      />
+      /></SaveErrorField>
     )
   }
   if (field.type === 'checkbox') {
     return (
-      <Checkbox id={id} checked={value === '1'} onCheckedChange={(c) => onChange(c ? '1' : '')} aria-label={`${field.name}：はい`}>はい</Checkbox>
+      <SaveErrorField names={["value"]}><Checkbox id={id} checked={value === '1'} onCheckedChange={(c) => onChange(c ? '1' : '')} aria-label={`${field.name}：はい`}>はい</Checkbox></SaveErrorField>
     )
   }
   if (field.type === 'date') {
-    return <DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="未設定" />
+    return <SaveErrorField names={["value"]}><DateField id={id} value={value} onChange={onChange} aria-labelledby={`${id}-label`} placeholder="未設定" /></SaveErrorField>
   }
   const inputType = field.type === 'number' ? 'number' : field.type === 'url' ? 'url' : field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'
-  return <TextField id={id} type={inputType} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} placeholder="未設定" onChange={(e) => onChange(e.target.value)} />
+  return <SaveErrorField names={["value"]}><TextField id={id} type={inputType} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} placeholder="未設定" onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
 }
 
 export default function InfoTab({ friendId, group, data, perms }: {

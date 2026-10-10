@@ -10,6 +10,7 @@ import { onlyWhenVisible } from '@/lib/visible-polling'
 import { formatNumber } from '@/lib/format'
 import { Download } from 'lucide-react'
 import styles from './list.module.css'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 共通情報の「CSVで書き出す」（v7 の app/contents/vars/export-panel.tsx の写し）。
@@ -57,6 +58,8 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
   /** 「未分類」だけを対象にする絞り込み。 */
   ungrouped?: boolean
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [jobs, setJobs] = useState<CommonVarExportJob[]>([])
   const [active, setActive] = useState<CommonVarExportJob | null>(null)
   const [requesting, setRequesting] = useState(false)
@@ -69,10 +72,12 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
       const res = await api.commonVars.listExports(targetAccountId)
       if (generationRef.current !== generation) return
       if (res.success) setJobs(res.data)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+
       /* 履歴が読めなくても書き出し自体は止めない */
     }
-  }, [])
+  }, [saveErrors])
 
   // アカウントが変わったら履歴を読み直し、進行中の表示をリセットする。
   useEffect(() => {
@@ -92,11 +97,13 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
           const latest = res.data[0]
           if (latest) setActive(latest)
         }
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         /* 表示は一覧の下に出る補助。読めないときは何も出さない */
       }
     })()
-  }, [accountId])
+  }, [accountId, saveErrors])
 
   // queued/running の間は状態を聞き直す。
   useEffect(() => {
@@ -113,12 +120,14 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
             void refresh(accountId, generation)
           }
         }
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure)
+
         /* 一時的な通信障害では監視を止めない */
       }
     }), POLL_INTERVAL_MS)
     return () => window.clearInterval(timer)
-  }, [active, accountId, refresh])
+  }, [active, accountId, refresh, saveErrors])
 
   const start = async () => {
     if (!accountId || requesting) return
@@ -138,9 +147,11 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
       }
       setActive(res.data)
       void refresh(accountId, generation)
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       if (generationRef.current === generation) {
-        setError('書き出しを依頼できませんでした。接続を確かめて、もう一度お試しください。')
+        { if (!fieldFailure) setError('書き出しを依頼できませんでした。接続を確かめて、もう一度お試しください。') }
       }
     } finally {
       if (generationRef.current === generation) setRequesting(false)
@@ -161,9 +172,11 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
       }
       setActive(res.data)
       void refresh(accountId, generation)
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
       if (generationRef.current === generation) {
-        setError('もう一度書き出せませんでした。接続を確かめて、もう一度お試しください。')
+        { if (!fieldFailure) setError('もう一度書き出せませんでした。接続を確かめて、もう一度お試しください。') }
       }
     } finally {
       if (generationRef.current === generation) setRequesting(false)
@@ -173,7 +186,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
   const running = active?.status === 'queued' || active?.status === 'running'
 
   return (
-    <div className={styles.exportBox} data-testid="vars-export-panel">
+    <SaveErrorScope errors={saveErrors}><div className={styles.exportBox} data-testid="vars-export-panel">
       <Button
         type="button"
         variant="secondary"
@@ -277,6 +290,6 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
       ) : null}
       </div>
       ) : null}
-    </div>
+    </div></SaveErrorScope>
   )
 }

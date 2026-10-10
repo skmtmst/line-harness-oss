@@ -14,6 +14,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { webinarErrorText } from './webinar-error-text'
 import Notice from '@/components/shared/notice'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -58,6 +59,8 @@ export interface WebinarFormProps {
 }
 
 export default function WebinarForm({ initial, hideBar = false, onSaved, onDirtyChange, registerSave }: WebinarFormProps) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [title, setTitle] = useState(initial?.title ?? '')
@@ -225,7 +228,9 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
       router.push(`/webinars/published?id=${webinarId}`)
       return true
     } catch (err) {
-      setError(webinarErrorText(err, '公開できませんでした。確認ステップから公開してください。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure) setError(webinarErrorText(err, '公開できませんでした。確認ステップから公開してください。')) }
       return false
     }
   }
@@ -277,7 +282,9 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
       router.push(`/webinars/edit?id=${created.data.id}`)
       return true
     } catch (err) {
-      setError(webinarErrorText(err, '保存できませんでした。入力を見直してください。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure) setError(webinarErrorText(err, '保存できませんでした。入力を見直してください。')) }
       return false
     } finally {
       setSaving(false)
@@ -285,7 +292,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
   }
 
   return (
-    <div className="space-y-5">
+    <SaveErrorScope errors={saveErrors}><div className="space-y-5">
       {error && (
         <Notice tone="danger">
           {error}
@@ -302,16 +309,16 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             タイトル
             <RequiredBadge />
           </label>
-          <input
+          <SaveErrorField names={["title"]}><input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="例：はじめての定期便セミナー"
             className={inputClass}
-          />
+          /></SaveErrorField>
         </div>
         <div>
           <label className={labelClass}>公開状態</label>
-          <Select
+          <SaveErrorField names={["status"]}><Select
             aria-label="公開状態"
             value={status}
             onChange={(value) => setStatus(value as Webinar['status'])}
@@ -320,17 +327,17 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
               { value: 'active', label: '公開中' },
               { value: 'archived', label: 'アーカイブ' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <div>
           <label className={labelClass}>動画の長さ（分）</label>
-          <input
+          <SaveErrorField names={["durationMinutes","duration_minutes"]}><input
             type="number"
             value={durationMinutes}
             min={1}
             onChange={(e) => setDurationMinutes(Number(e.target.value))}
             className={`${inputClass} w-32`}
-          />
+          /></SaveErrorField>
         </div>
         <details className="group rounded-card border border-hairline bg-canvas-sunken/60">
           <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-ink-secondary">
@@ -340,7 +347,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
           <div className="space-y-4 border-t border-hairline p-4">
             <div>
               <label className={labelClass}>slug（URL 用・半角英数とハイフン）</label>
-              <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-seminar" className={`${inputClass} font-mono text-xs`} />
+              <SaveErrorField names={["slug"]}><input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-seminar" className={`${inputClass} font-mono text-xs`} /></SaveErrorField>
             </div>
             <div>
               <label className={labelClass}>配信動画（メディアライブラリの動画から選択）</label>
@@ -352,7 +359,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                   <button type="button" onClick={() => setMediaLoadKey((key) => key + 1)} className="ml-2 font-medium underline">もう一度読み込む</button>
                 </p>
               ) : (
-                <Select
+                <SaveErrorField names={["videoChoice","videoMediaId","video_choice"]}><Select
                   aria-label="配信動画"
                   size="full"
                   value={videoChoice}
@@ -369,7 +376,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                       ? [{ value: videoChoice, label: '現在の動画（ライブラリで見つかりません）' }]
                       : []),
                   ]}
-                />
+                /></SaveErrorField>
               )}
               {videoChoice === EXTERNAL_VIDEO && initial?.videoPrefix && (
                 <p className="mt-1 text-micro text-ink-faint">現在の設定: {initial.videoPrefix}</p>
@@ -411,9 +418,9 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             <div className="rounded-card border content-card bg-canvas p-4">
               <div className="mb-3 text-xs font-medium text-ink-secondary">毎日の枠をまとめて作成</div>
               <div className="flex flex-wrap items-end gap-3">
-                <span className="text-xs text-ink-faint">開始<TimeField value={bulkStart} onChange={setBulkStart} aria-label="まとめて作る枠の開始" className="mt-1" /></span>
-                <span className="text-xs text-ink-faint">終了<TimeField value={bulkEnd} onChange={setBulkEnd} aria-label="まとめて作る枠の終了" className="mt-1" /></span>
-                <label className="text-xs text-ink-faint">間隔<Select aria-label="間隔" value={String(bulkInterval)} onChange={(value) => setBulkInterval(Number(value))} options={[{ value: '30', label: '30分' }, { value: '60', label: '60分' }, { value: '120', label: '120分' }]} /></label>
+                <span className="text-xs text-ink-faint">開始<SaveErrorField names={["bulkStart","bulk_start"]}><TimeField value={bulkStart} onChange={setBulkStart} aria-label="まとめて作る枠の開始" className="mt-1" /></SaveErrorField></span>
+                <span className="text-xs text-ink-faint">終了<SaveErrorField names={["bulkEnd","bulk_end"]}><TimeField value={bulkEnd} onChange={setBulkEnd} aria-label="まとめて作る枠の終了" className="mt-1" /></SaveErrorField></span>
+                <label className="text-xs text-ink-faint">間隔<SaveErrorField names={["bulkInterval","bulk_interval"]}><Select aria-label="間隔" value={String(bulkInterval)} onChange={(value) => setBulkInterval(Number(value))} options={[{ value: '30', label: '30分' }, { value: '60', label: '60分' }, { value: '120', label: '120分' }]} /></SaveErrorField></label>
                 <button type="button" onClick={applyDailySchedule} className="rounded-control bg-ink px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-92">毎日の枠を置き換える</button>
               </div>
               <p className="mt-2 text-micro text-ink-faint">下の保存ボタンを押すまでは本番へ反映されません。</p>
@@ -421,7 +428,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
         {rules.map((r, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2 rounded-control border border-hairline p-2 text-sm">
-            <Select
+            <SaveErrorField names={[`rules.${i}.type`,"type","r.type"]}><Select
               aria-label="繰り返しパターン"
               value={r.type}
               onChange={(value) => {
@@ -438,10 +445,10 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                 { value: 'weekly', label: '毎週' },
                 { value: 'once', label: '単発' },
               ]}
-            />
+            /></SaveErrorField>
             {r.type === 'weekly' &&
               DAYS.map((d, di) => (
-                <Checkbox
+                <SaveErrorField names={["di"]} key={di}><Checkbox
                   key={di}
                   checked={r.days?.includes(di) ?? false}
                   onCheckedChange={(checked) =>
@@ -451,7 +458,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                         : (r.days ?? []).filter((x) => x !== di),
                     })
                   }
-                >{d}</Checkbox>
+                >{d}</Checkbox></SaveErrorField>
               ))}
             {r.type === 'once' ? (
               <DateTimeField
@@ -460,11 +467,11 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                 aria-label="開催日時"
               />
             ) : (
-              <TimeField
+              <SaveErrorField names={[`rules.${i}.time`,"time","r.time"]}><TimeField
                 value={r.time ?? '20:00'}
                 onChange={(v) => updateRule(i, { time: v })}
                 aria-label="開催時刻"
-              />
+              /></SaveErrorField>
             )}
             <button
               onClick={() => setRules((prev) => prev.filter((_, j) => j !== i))}
@@ -536,6 +543,6 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
           </div>
         </dl>
       </ConfirmDialog>
-    </div>
+    </div></SaveErrorScope>
   )
 }

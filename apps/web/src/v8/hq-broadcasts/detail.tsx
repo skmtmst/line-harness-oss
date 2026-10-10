@@ -1,12 +1,4 @@
 'use client'
-
-/*
- * ★V8 統括 一括配信の詳細（提案 E-9 `xOXuY`「⑤ 送った結果」）。
- *
- * 店ごとの送った・成功・失敗・状態と、失敗した店へのやり直し（retry）。予約中・送っている間は止める（stop）、
- * 送る前（下書き）・予約中は取り消す（cancel）。下書きは店ごとの確かめを見て、そのまま送れる（send）。
- * 送った LINE は取り消せない。動きは BEHAVIOR.md。
- */
 import { useTenantWideAccess } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useState } from 'react'
@@ -45,7 +37,16 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
+
+/*
+ * ★V8 統括 一括配信の詳細（提案 E-9 `xOXuY`「⑤ 送った結果」）。
+ *
+ * 店ごとの送った・成功・失敗・状態と、失敗した店へのやり直し（retry）。予約中・送っている間は止める（stop）、
+ * 送る前（下書き）・予約中は取り消す（cancel）。下書きは店ごとの確かめを見て、そのまま送れる（send）。
+ * 送った LINE は取り消せない。動きは BEHAVIOR.md。
+ */
 
 const n = (value: number) => polishFormatNumber(value)
 /** 開いた・押した・反応（API-18）。店の計測がまだ取れていない（null）は「—」。 */
@@ -227,7 +228,7 @@ function RecipientsTab({ run }: { run: HqBroadcastRun }) {
           <p className={styles.cardSub}>{total == null ? 'アカウントを選ぶと、その店の宛先が出ます' : `${n(total)} 人`}</p>
         </div>
         <span className={styles.accountPick}>
-          <Select aria-label="宛先を見るアカウント" size="full" value={accountId} onChange={setAccountId} options={sentTo.map((t) => ({ value: t.accountId, label: t.accountName }))} />
+          <SaveErrorField names={["accountId","account_id"]}><Select aria-label="宛先を見るアカウント" size="full" value={accountId} onChange={setAccountId} options={sentTo.map((t) => ({ value: t.accountId, label: t.accountName }))} /></SaveErrorField>
         </span>
       </div>
       {state === 'error' ? <ListState permissionScope="hq" kind="error" error={new Error('宛先を読み込めませんでした')} onRetry={() => void load(0, false)} /> : (

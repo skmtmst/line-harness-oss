@@ -1,15 +1,9 @@
 'use client'
-
 import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
-
-/*
- * ★V8 Googleビジネス 口コミ（一覧 `j0Wcg`・返信を作る `x9HIR`・公開の確認 `xSudF`）。
- * 口（一覧・絞り込み・並び・同期・下書き作成・保存・公開）は今の画面と同じ。
- */
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { RefreshCw, Sparkles } from 'lucide-react'
@@ -44,6 +38,12 @@ import styles from './google.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 Googleビジネス 口コミ（一覧 `j0Wcg`・返信を作る `x9HIR`・公開の確認 `xSudF`）。
+ * 口（一覧・絞り込み・並び・同期・下書き作成・保存・公開）は今の画面と同じ。
+ */
 
 const STATE_OPTIONS: Array<{ value: GoogleReviewFilter; label: string }> = [
   { value: 'all', label: '状態：すべて' },
@@ -156,8 +156,8 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         <span className={styles.search}>
           <SearchField placeholder="口コミを探す" aria-label="口コミを探す" value={search} onChange={setSearch} onClear={() => setSearch('')} />
         </span>
-        <Select aria-label="評価で絞り込み" width={150} value={rating} onChange={(value) => { setRating(value); setPage(1) }} options={RATING_OPTIONS} />
-        <Select aria-label="状態で絞り込み" width={160} value={filter} onChange={(value) => { setFilter(value as GoogleReviewFilter); setPage(1) }} options={STATE_OPTIONS} />
+        <SaveErrorField names={["rating"]}><Select aria-label="評価で絞り込み" width={150} value={rating} onChange={(value) => { setRating(value); setPage(1) }} options={RATING_OPTIONS} /></SaveErrorField>
+        <SaveErrorField names={["filter"]}><Select aria-label="状態で絞り込み" width={160} value={filter} onChange={(value) => { setFilter(value as GoogleReviewFilter); setPage(1) }} options={STATE_OPTIONS} /></SaveErrorField>
         <span className={styles.spacer} aria-hidden="true" />
         <IconButton
           aria-label={syncing ? 'Googleから取得中…' : 'Googleから同期する'}
@@ -166,7 +166,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         >
           <RefreshCw aria-hidden className={`${styles.icon16} ${syncing ? styles.spin : ''}`} />
         </IconButton>
-        <ListToolbarSort aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
+        <SaveErrorField names={["order"]}><ListToolbarSort aria-label="並び順" width={150} value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} /></SaveErrorField>
       </div>
       {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認</Link>}>この店舗を操作する権限がありません。</Notice> : null}
@@ -224,6 +224,8 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
 
 /** 返信を作る（x9HIR）＋公開の確認（xSudF）。 */
 export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { accountId: string; reviewId: string; data: GoogleConnectionData; go: GoogleNav; onPublished: () => void }) {
+  const saveErrors = useSaveFormErrors()
+
   const canPublish = data.permissions.canPublishReply
   const [review, setReview] = useState<GoogleReview | null>(null)
   const [loading, setLoading] = useState(true)
@@ -250,11 +252,14 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       setText(response.review.replyDraft ?? '')
       setAiGenerated(response.review.replyDraftAiGenerated)
     } catch (err) {
-      setLoadError(errorMessage(err, '口コミを読み込めませんでした。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setLoadError(errorMessage(err, '口コミを読み込めませんでした。')) }
     } finally {
       setLoading(false)
     }
-  }, [accountId, reviewId])
+  }, [accountId, reviewId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -268,7 +273,10 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       setText(response.draft)
       setAiGenerated(true)
     } catch (err) {
-      setActionError(errorMessage(err, 'AIの下書き作成に失敗しました。もう一度お試しください。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setActionError(errorMessage(err, 'AIの下書き作成に失敗しました。もう一度お試しください。')) }
     } finally {
       setBusy(null)
     }
@@ -283,7 +291,10 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       setAiGenerated(false)
       notifySaved('下書きを保存しました。まだGoogleには送信していません。')
     } catch (err) {
-      setActionError(errorMessage(err, '下書きを保存できませんでした。'))
+      const fieldFailure = saveErrors.capture(err)
+
+      { if (!fieldFailure)
+      setActionError(errorMessage(err, '下書きを保存できませんでした。')) }
     } finally {
       setBusy(null)
     }
@@ -298,25 +309,29 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       setConfirming(false)
       onPublished()
     } catch (err) {
+      const fieldFailure = saveErrors.capture(err);
+
       if (err instanceof ApiError && err.status === 409 && err.code === 'already_replied') {
         const existing = (err.data as { existingReply?: string } | undefined)?.existingReply
         setConflict(existing ?? '（返信文を読み込めませんでした）')
         setConfirming(false)
       } else if (err instanceof ApiError && err.status === 502) {
-        setActionError('Googleへの送信結果を確認できませんでした。重複を防ぐため、次に開いたときGoogle側の状態を照合してから再送します。')
+        { if (!fieldFailure)
+        setActionError('Googleへの送信結果を確認できませんでした。重複を防ぐため、次に開いたときGoogle側の状態を照合してから再送します。') }
         setConfirming(false)
         await load()
       } else {
-        setActionError(errorMessage(err, 'Googleへの返信に失敗しました。'))
+        { if (!fieldFailure)
+        setActionError(errorMessage(err, 'Googleへの返信に失敗しました。')) }
       }
     } finally {
       setBusy(null)
     }
   }
 
-  if (loading) return <div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div>
+  if (loading) return <SaveErrorScope errors={saveErrors}><div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div></SaveErrorScope>
   if (loadError || !review) {
-    return <ListState kind="error" title="口コミを表示できませんでした" description={loadError} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'reviews' })}>口コミ一覧へ戻る</Button>} />
+    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="口コミを表示できませんでした" description={loadError} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'reviews' })}>口コミ一覧へ戻る</Button>} /></SaveErrorScope>
   }
 
   const reviewer = review.reviewerDisplayName ?? '匿名'
@@ -330,7 +345,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
 
   if (confirming) {
     return (
-      <div className={styles.split} data-design-node="xSudF">
+      <SaveErrorScope errors={saveErrors}><div className={styles.split} data-design-node="xSudF">
         <div className={styles.mainColumn}>
           <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
             <SectionHeader size="small" title={<>この返信をGoogleに公開しますか？</>} />
@@ -345,18 +360,18 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
         </div>
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal" className={styles.sideColumn} aria-label="公開前の確認">
           <SectionHeader size="small" title="公開前の確認" />
-          <Checkbox checked={checked} onCheckedChange={setChecked}>返信先・内容・個人情報の有無を確認しました</Checkbox>
+          <SaveErrorField names={["checked"]}><Checkbox checked={checked} onCheckedChange={setChecked}>返信先・内容・個人情報の有無を確認しました</Checkbox></SaveErrorField>
           <p className={styles.checklist}>{'・予約内容や来店履歴などを追記していません\n・返信は店舗を代表して公開されます\n・通信結果が不明な場合はGoogle側を先に確認します'}</p>
           {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
           <Button onClick={() => setConfirming(false)} disabled={busy !== null} className={styles.fullButton}>修正する</Button>
           <Button variant="primary" onClick={() => void publish()} disabled={!checked || busy !== null} busy={busy === 'publish'} busyLabel="送信中…" className={styles.fullButton}>この内容で返信する</Button>
         </Card>
-      </div>
+      </div></SaveErrorScope>
     )
   }
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       {done ? <Notice tone="success">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</Notice> : null}
       {conflict !== null ? <Notice tone="danger">{`別の担当者がすでに返信しています。表示されている返信：「${conflict}」`}</Notice> : null}
       {pendingConfirm && !done ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
@@ -378,14 +393,14 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
           {!alreadyReplied ? (
             <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
               <SectionHeader size="small" title={<>{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</>} />
-              <TextArea
+              <SaveErrorField names={["text"]}><TextArea
                 density="compact" height="reply"
                 value={text}
                 onChange={(event) => { setText(event.target.value); setSaved('') }}
                 placeholder="返信文を入力するか、AIで下書きを作ります。"
                 aria-label="返信文"
                 aria-invalid={textLength > 4096 || undefined}
-              />
+              /></SaveErrorField>
               <div className={styles.draftTools}>
                 {data.aiAvailable ? (
                   <>
@@ -431,6 +446,6 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
-    </>
+    </></SaveErrorScope>
   )
 }

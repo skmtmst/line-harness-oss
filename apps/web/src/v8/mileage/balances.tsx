@@ -1,18 +1,6 @@
 'use client'
-
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
- *
- * app/mileage/v8-balances-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
- * フォルダの列は無い（絵どおり）。表は「友だち・ランク・いまの残高・今月の増減・
- * 消える予定・最終行動・操作（明細を見る・増減）」。承認待ちの板は今と同じ条件で出す。
- *
- * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
- * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -51,6 +39,18 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
+ *
+ * app/mileage/v8-balances-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
+ * フォルダの列は無い（絵どおり）。表は「友だち・ランク・いまの残高・今月の増減・
+ * 消える予定・最終行動・操作（明細を見る・増減）」。承認待ちの板は今と同じ条件で出す。
+ *
+ * 口に残高あり・確定待ちの絞り込みは無い。札を押したときは全件を読み切ってから
+ * 絞る（読んだ頁の中だけで絞ると 21 件目以降が検索に出ない）。
+ */
 
 function dateOnlyDaysAgo(days: number) {
   return jstDateOffset(-days)
@@ -559,13 +559,13 @@ export default function BalancesTab() {
           onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
           onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
         >
-          <Field label="差し戻す理由"><textarea
+          <Field label="差し戻す理由"><SaveErrorField names={["rejectReason","reject_reason"]}><textarea
               className={styles.textarea}
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
               placeholder="例：調整の根拠となる資料を確認できませんでした"
               rows={3}
-            /></Field>
+            /></SaveErrorField></Field>
         </Dialog>
       }
     >

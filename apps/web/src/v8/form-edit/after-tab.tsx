@@ -1,9 +1,4 @@
 'use client'
-
-/*
- * 「答え終わったあと」のタブ（XXFT4）。お礼の画面と、答え終わったら行うこと。
- * 行うことは上から順に動く。行の「…」で直す・並べ替える・消す。
- */
 import { useState } from 'react'
 import { FileText, IdCard, MessageSquare, Bell, Tag, Workflow } from 'lucide-react'
 import type { FormAction, FormOptions } from '@line-crm/shared'
@@ -19,6 +14,13 @@ import Select from '@/components/shared/select'
 import { ACTION_ADDERS, describeAfterAction, emptyAction } from './model'
 import styles from './edit.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * 「答え終わったあと」のタブ（XXFT4）。お礼の画面と、答え終わったら行うこと。
+ * 行うことは上から順に動く。行の「…」で直す・並べ替える・消す。
+ */
 
 const ADDER_ICON: Record<Exclude<FormAction['kind'], 'research_action'>, typeof Tag> = {
   send_text: MessageSquare,
@@ -78,7 +80,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
     <>
       <section className={styles.card} aria-labelledby="fe-thanks-title">
         <h2 id="fe-thanks-title" className={styles.cardTitle}>答え終わったときの画面</h2>
-        <div className={styles.field}><Field label="お礼の文" htmlFor="fe-thanks-text"><TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} /></Field></div>
+        <div className={styles.field}><Field label="お礼の文" htmlFor="fe-thanks-text"><SaveErrorField names={["thanksText","options.thanksText","thanks_text","options.thanks_text"]}><TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} /></SaveErrorField></Field></div>
         <div className={styles.endingRow}>
           <span className={styles.endingLabel}>終わったあと</span>
           <Segmented
@@ -92,7 +94,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
           />
         </div>
         {ending === 'url' ? (
-          <div className={styles.field}><Field label="開くURL" htmlFor="fe-thanks-url"><TextField
+          <div className={styles.field}><Field label="開くURL" htmlFor="fe-thanks-url"><SaveErrorField names={["thanksUrl","options.thanksUrl","urlDraft","thanks_url","options.thanks_url","url_draft"]}><TextField
               id="fe-thanks-url"
               type="url"
               value={options.thanksUrl ?? ''}
@@ -101,7 +103,7 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
                 setUrlDraft(e.target.value)
                 onChangeOptions({ thanksUrl: e.target.value || 'https://' })
               }}
-            /></Field></div>
+            /></SaveErrorField></Field></div>
         ) : null}
       </section>
 
@@ -156,12 +158,12 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
         <h2 id="fe-tag-title" className={styles.cardTitle}>回答したときに付けるタグ</h2>
         <p className={styles.cardNote}>このフォームに答えた人を、あとから絞り込めます。</p>
         <span className={styles.saveSelect}>
-          <Select
+          <SaveErrorField names={["onSubmitTagId","on_submit_tag_id"]}><Select
             aria-label="回答したときに付けるタグ"
             value={onSubmitTagId}
             onChange={onChangeSubmitTag}
             options={[{ value: '', label: '付けない' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
-          />
+          /></SaveErrorField>
         </span>
       </section>
 

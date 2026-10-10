@@ -33,6 +33,7 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import type { FeatureKey } from '@/lib/feature-settings'
 import { isCurrentTagListRequest, type TagListRequestKey } from './tag-list-state'
 import { formatDay, formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -282,6 +283,8 @@ export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
 }))
 
 function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }: { groups: TagGroup[]; items: Tag[]; countsKnown: boolean; active: string; onSelect: (id: string) => void; onChanged: () => void }) {
+  const saveErrors = useSaveFormErrors()
+
   const [menuId, setMenuId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [menuError, setMenuError] = useState('')
@@ -310,7 +313,9 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       if (!otherResult.success) throw new Error(otherResult.error)
       onChanged()
     } catch (reason) {
-      setMenuError(reason instanceof Error ? reason.message : '並び順を変更できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setMenuError(reason instanceof Error ? reason.message : '並び順を変更できませんでした') }
     } finally {
       setBusy(false)
     }
@@ -325,13 +330,15 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       setDeleteGroup(null)
       onChanged()
     } catch (reason) {
-      setMenuError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした')
+      const fieldFailure = saveErrors.capture(reason)
+
+      { if (!fieldFailure) setMenuError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした') }
     } finally {
       setBusy(false)
     }
   }
   return (
-    <aside className={`h-fit rounded-card border border-hairline bg-canvas ${cardShadow}`}>
+    <SaveErrorScope errors={saveErrors}><aside className={`h-fit rounded-card border border-hairline bg-canvas ${cardShadow}`}>
       <div className="flex items-center justify-between border-b border-hairline px-4 py-3"><h2 className="text-sm font-bold text-ink">フォルダ</h2>{/* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */}</div>
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
@@ -362,7 +369,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
         onCancel={() => setDeleteGroup(null)}
         onConfirm={() => { if (deleteGroup) void remove(deleteGroup) }}
       />
-    </aside>
+    </aside></SaveErrorScope>
   )
 }
 
@@ -548,7 +555,7 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
         {/* 設計 `seGRS`。 */}
         <label className="mt-4 block">
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
-          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" />
+          <SaveErrorField names={["text"]}><input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></SaveErrorField>
         </label>
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
@@ -592,6 +599,8 @@ export default function TagsPageV4({
   fixture?: { items: Tag[]; groups: TagGroup[] }
   accountId?: string | null
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
   const params = useSearchParams()
   const rawTab = params.get('tab')
@@ -650,10 +659,13 @@ export default function TagsPageV4({
       if (folders.success) setGroups(folders.data)
       setStatus('ready')
     } catch (reason) {
+
+
       if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
+      saveErrors.capture(reason)
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [fixture, accountId])
+  }, [fixture, accountId, saveErrors])
   useEffect(() => { void load() }, [load])
 
   /*
@@ -783,15 +795,17 @@ export default function TagsPageV4({
         setItems((current) => current.map((item) => item.id === tag.id ? { ...item, version } : item))
       }
     } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+
       /* 失敗は元に戻して理由を出し、取り直す。黙って上書きしない。 */
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
-      setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。')
+      { if (!fieldFailure) setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。') }
       void load()
     }
   }
 
   return (
-    <div>
+    <SaveErrorScope errors={saveErrors}><div>
       {/*
         タイトルと説明は共通トップバーが持つ。本文には置かない
         （`docs/v8-design-rules.md` §5）。
@@ -913,7 +927,7 @@ export default function TagsPageV4({
             同じ絞り込みをセレクトで受け、帯は「開く」まで畳んでおく。
           */}
           <div className="xl:hidden">
-            <Select
+            <SaveErrorField names={["folder"]}><Select
               aria-label="フォルダで絞る"
               value={folder}
               onChange={setFolder}
@@ -925,7 +939,7 @@ export default function TagsPageV4({
                 { value: UNGROUPED, label: '未分類' },
               ]}
               size="full"
-            />
+            /></SaveErrorField>
             {/*
               R165: 1280px未満でもフォルダの名前変更・色・削除へ到達できる。
               以前は操作のある帯が非表示で開く口も無く、作ったフォルダを
@@ -949,8 +963,8 @@ export default function TagsPageV4({
               filters={
                 <>
                   {/* 素の select は置かない（#640）。選び口は共通 Select。幅は部品の既定（176px）。 */}
-                  <Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} />
-                  <Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} />
+                  <SaveErrorField names={["usageFilter","usage_filter"]}><Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} /></SaveErrorField>
+                  <SaveErrorField names={["sourceFilter","source_filter"]}><Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} /></SaveErrorField>
                   {/*
                     設計 `UOmne` の「よく使う」5つ。**重ねて絞れるのは変えない。**
                     札を6つ並べると1440pxでも絞り込みが2行になり、件数が
@@ -978,7 +992,7 @@ export default function TagsPageV4({
                   */}
                   <span className="ml-auto flex shrink-0 items-center gap-2">
                     <span className="w-24">
-                      <Select aria-label="表示件数" className="w-full" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} size="page-size" />
+                      <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="表示件数" className="w-full" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} size="page-size" /></SaveErrorField>
                     </span>
                     <span className="whitespace-nowrap text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
                   </span>
@@ -1242,6 +1256,6 @@ export default function TagsPageV4({
       </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       </div>
       {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={(result) => { setDeleteTarget(null); if (result) notifyToast(result); void load() }} />}
-    </div>
+    </div></SaveErrorScope>
   )
 }

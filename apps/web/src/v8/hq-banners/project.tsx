@@ -1,17 +1,4 @@
 'use client'
-
-/*
- * ★V8 バナー生成・プロジェクトの中（Pencil `iMnph`・生成中 `p03ImY`・上限 `zOpMG`）。
- * 窓：画像の詳細 `rI5uh`・一覧から外す `B24oNg`・アーカイブ `I0w2e`・名前と説明を変える。
- *
- * v7 の画面（app/hq/banners/project/page.tsx）と、読み書きの口・1枚ずつ作る繰り返し・
- * 戻ったら続きから動く・失敗時の扱い・`?id=` `?from=` は同じ。見た目だけを絵どおりに一から組んだ：
- * 頭（型 ListPage：題・説明／来た道の案内・操作5つ）→ 左に札と画像のます、右に生成パネル。
- *
- * 右の生成パネルは共通の GenerationPanel をそのまま使う。絵（iMnph）は「用途の選ぶ欄・切り抜きの位置・
- * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
- * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import { Archive, ArchiveRestore, Copy, Hourglass, LoaderCircle, Pencil, Send, Sparkles, Star, Upload, X } from 'lucide-react'
@@ -63,6 +50,21 @@ import { bannerLimitKind } from './limit-notice'
 import { bannerFailureMessage, tileLabel } from './words'
 import styles from './project.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 バナー生成・プロジェクトの中（Pencil `iMnph`・生成中 `p03ImY`・上限 `zOpMG`）。
+ * 窓：画像の詳細 `rI5uh`・一覧から外す `B24oNg`・アーカイブ `I0w2e`・名前と説明を変える。
+ *
+ * v7 の画面（app/hq/banners/project/page.tsx）と、読み書きの口・1枚ずつ作る繰り返し・
+ * 戻ったら続きから動く・失敗時の扱い・`?id=` `?from=` は同じ。見た目だけを絵どおりに一から組んだ：
+ * 頭（型 ListPage：題・説明／来た道の案内・操作5つ）→ 左に札と画像のます、右に生成パネル。
+ *
+ * 右の生成パネルは共通の GenerationPanel をそのまま使う。絵（iMnph）は「用途の選ぶ欄・切り抜きの位置・
+ * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
+ * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
+ */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'notfound' | 'missing'
 type Filter = 'all' | 'favorite' | 'delivered'
@@ -76,6 +78,7 @@ export default function HqBannerProjectV8() {
 }
 
 function ProjectInner() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
   const projectId = params.get('id') ?? ''
@@ -164,11 +167,15 @@ function ProjectInner() {
       }
       setStatus('ready')
     } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 404) setStatus('notfound')
-      else if (caught instanceof ApiError && caught.status === 403) setStatus('forbidden')
+      saveErrors.capture(caught);
+
+      if (caught instanceof ApiError && caught.status === 404)
+ setStatus('notfound')
+      else if (caught instanceof ApiError && caught.status === 403)
+ setStatus('forbidden')
       else setStatus('error')
     }
-  }, [projectId])
+  }, [projectId, saveErrors])
 
   useEffect(() => { void load() }, [load])
 
@@ -217,7 +224,10 @@ function ProjectInner() {
       }
       void loadUsage()
     } catch (caught) {
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を作れませんでした。もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を作れませんでした。もう一度お試しください。') }
       void loadUsage()
     } finally {
       // 先に最新の状態を読み直してから止める（順を逆にすると、古い「生成中」を見た再開がもう一度状態確認を始める）。
@@ -230,7 +240,7 @@ function ProjectInner() {
       loopRef.current = null
       setRunning(null)
     }
-  }, [loadUsage])
+  }, [loadUsage, saveErrors])
 
   // 画面を離れて戻ってきたとき、途中の生成があれば状態確認を再開する。
   useEffect(() => {
@@ -271,7 +281,10 @@ function ProjectInner() {
       setGenerations((prev) => [res.data, ...prev])
       void runLoop(res.data)
     } catch (caught) {
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。') }
       void loadUsage()
     } finally {
       startingRef.current = false
@@ -285,7 +298,8 @@ function ProjectInner() {
     setCancelling(true)
     try {
       await api.hqBanners.generations.cancel(running.id)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       // 止められなくても、次の run で finished が返る。
     }
   }
@@ -300,7 +314,10 @@ function ProjectInner() {
       setProject(res.data)
       return res.data
     } catch (caught) {
-      setActionError(caught instanceof Error && caught.message ? caught.message : `${label}できませんでした。もう一度お試しください。`)
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setActionError(caught instanceof Error && caught.message ? caught.message : `${label}できませんでした。もう一度お試しください。`) }
       return null
     } finally {
       setBusyAction(null)
@@ -315,8 +332,11 @@ function ProjectInner() {
       const res = await api.hqBanners.projects.duplicate(project.id)
       if (!res.success) throw new Error(res.error)
       router.push(`/hq/banners/project?id=${encodeURIComponent(res.data.id)}`)
-    } catch {
-      setActionError('複製できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('複製できませんでした。もう一度お試しください。') }
     } finally {
       setBusyAction(null)
     }
@@ -333,8 +353,11 @@ function ProjectInner() {
       const res = await api.hqBanners.images.update(image.id, { isFavorite: !image.isFavorite })
       if (!res.success) throw new Error(res.error)
       replaceImage(res.data)
-    } catch {
-      setActionError('お気に入りを変更できませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setActionError('お気に入りを変更できませんでした。もう一度お試しください。') }
     }
   }
 
@@ -347,7 +370,10 @@ function ProjectInner() {
       replaceImage(res.data.image)
       return true
     } catch (caught) {
-      setModalError(bannerFailureMessage(caught, 'アカウントへの配布'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setModalError(bannerFailureMessage(caught, 'アカウントへの配布')) }
       return false
     } finally {
       setModalBusy(false)
@@ -373,6 +399,7 @@ function ProjectInner() {
           replaceImage(response.data.image)
           succeeded.push(image.id)
         } catch (caught) {
+          saveErrors.capture(caught)
           failures.push(`選んだ画像 ${index + 1}：${bannerFailureMessage(caught, 'アカウントへの配布')}`)
         }
       }
@@ -406,7 +433,10 @@ function ProjectInner() {
       setProject((p) => (p ? { ...p, imageCount: Math.max(p.imageCount - 1, 0) } : p))
       return true
     } catch (caught) {
-      setModalError(bannerFailureMessage(caught, '一覧からの削除'))
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setModalError(bannerFailureMessage(caught, '一覧からの削除')) }
       return false
     } finally {
       setModalBusy(false)
@@ -433,7 +463,10 @@ function ProjectInner() {
       const data = await readFileAsBase64(file)
       await upload({ filename: file.name, mimeType: file.type, data })
     } catch (caught) {
-      setActionError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setActionError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした') }
     } finally {
       setUploading(false)
     }
@@ -468,7 +501,10 @@ function ProjectInner() {
       const uploaded = await upload({ filename: file.name, mimeType: file.type, data })
       if (uploaded) addReference(uploaded)
     } catch (caught) {
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
+      const fieldFailure = saveErrors.capture(caught)
+
+      { if (!fieldFailure)
+      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした') }
     } finally {
       setReferenceBusy(false)
     }
@@ -494,18 +530,18 @@ function ProjectInner() {
     [images, filter],
   )
 
-  if (status === 'loading') return <ListState permissionScope="hq" kind="loading" title="プロジェクトを読み込んでいます" />
+  if (status === 'loading') return <SaveErrorScope errors={saveErrors}><ListState permissionScope="hq" kind="loading" title="プロジェクトを読み込んでいます" /></SaveErrorScope>
   if (status === 'missing') {
-    return <TargetMissing kind="unspecified" title="開くプロジェクトが指定されていません" description="一覧から、開きたいプロジェクトを選び直してください。" backHref="/hq/banners" backLabel="プロジェクト一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="開くプロジェクトが指定されていません" description="一覧から、開きたいプロジェクトを選び直してください。" backHref="/hq/banners" backLabel="プロジェクト一覧へ戻る" /></SaveErrorScope>
   }
   if (status === 'notfound') {
-    return <TargetMissing kind="not-found" title="プロジェクトが見つかりません" description="アーカイブされたか、別の統括のものかもしれません。一覧から選び直してください。" backHref="/hq/banners" backLabel="プロジェクト一覧へ戻る" />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="プロジェクトが見つかりません" description="アーカイブされたか、別の統括のものかもしれません。一覧から選び直してください。" backHref="/hq/banners" backLabel="プロジェクト一覧へ戻る" /></SaveErrorScope>
   }
   if (status === 'forbidden') {
-    return <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" action={<Button href="/hq/banners">プロジェクト一覧へ戻る</Button>} />
+    return <SaveErrorScope errors={saveErrors}><ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" action={<Button href="/hq/banners">プロジェクト一覧へ戻る</Button>} /></SaveErrorScope>
   }
   if (status === 'error' || !project) {
-    return <TargetMissing kind="error" title="プロジェクトを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="プロジェクトを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} /></SaveErrorScope>
   }
 
   const busy = busyAction !== null || distributionBusy
@@ -554,7 +590,7 @@ function ProjectInner() {
   ) : undefined
 
   return (
-    <ListPage boardId={boardId} title={project.name} help={description} actions={actions}
+    <SaveErrorScope errors={saveErrors}><ListPage boardId={boardId} title={project.name} help={description} actions={actions}
       crumbs={<Breadcrumb appearance="banner" items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />}>
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
@@ -573,10 +609,10 @@ function ProjectInner() {
                 <FilterChip selected={filter === 'delivered'} icon={<Star size={14} aria-hidden="true" />} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>{`配布済み ${deliveredCount}`}</FilterChip>
               </div>
               {canManage ? <div className={styles.selectionTools}>
-                <Checkbox checked={visible.length > 0 && visible.every((image) => selectedImages.includes(image.id))}
+                <SaveErrorField names={["length","visible.length","selectedImages","selected_images"]}><Checkbox checked={visible.length > 0 && visible.every((image) => selectedImages.includes(image.id))}
                   indeterminate={visible.some((image) => selectedImages.includes(image.id)) && !visible.every((image) => selectedImages.includes(image.id))}
                   disabled={distributionBusy || visible.length === 0}
-                  onCheckedChange={(checked) => setSelectedImages((current) => checked ? [...new Set([...current, ...visible.map((image) => image.id)])] : current.filter((id) => !visible.some((image) => image.id === id)))}>すべて選ぶ</Checkbox>
+                  onCheckedChange={(checked) => setSelectedImages((current) => checked ? [...new Set([...current, ...visible.map((image) => image.id)])] : current.filter((id) => !visible.some((image) => image.id === id)))}>すべて選ぶ</Checkbox></SaveErrorField>
                 <span className={styles.hint}>選ぶと右下からまとめて配れます</span>
               </div> : null}
             </div>
@@ -610,8 +646,8 @@ function ProjectInner() {
                   <PendingTile key={`pending-${item}`} running={item === 0} label={tileLabel(presets.find((p) => p.key === running?.presetKey), { generation: running, source: 'generated' })} />
                 ) : (() => { const image = item; return (
                   <article key={image.id} className={styles.tile} data-selected={selectedImages.includes(image.id) || undefined}>
-                    {canManage ? <div className={styles.tileSelect}><Checkbox aria-label={`画像 ${index + 1} を選ぶ`} checked={selectedImages.includes(image.id)} disabled={distributionBusy}
-                      onCheckedChange={(checked) => setSelectedImages((current) => checked ? [...new Set([...current, image.id])] : current.filter((id) => id !== image.id))} /></div> : null}
+                    {canManage ? <div className={styles.tileSelect}><SaveErrorField names={["id","image.id","selectedImages","imageId","selected_images"]}><Checkbox aria-label={`画像 ${index + 1} を選ぶ`} checked={selectedImages.includes(image.id)} disabled={distributionBusy}
+                      onCheckedChange={(checked) => setSelectedImages((current) => checked ? [...new Set([...current, image.id])] : current.filter((id) => id !== image.id))} /></SaveErrorField></div> : null}
                     <button type="button" className={styles.tileImage} onClick={() => { setModalError(''); setOpenImage(image) }} aria-label={`画像 ${index + 1} を開く`}>
                       <Thumb image={image} />
                     </button>
@@ -786,7 +822,7 @@ function ProjectInner() {
         onPick={applyReferences}
         onUpload={(file) => { setPickerOpen(false); void uploadReference(file) }}
       />
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 

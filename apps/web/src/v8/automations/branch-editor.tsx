@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { ACTION_LABELS } from './version-diff'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export function newBranchStep(): CommonActionStep {
   return {
@@ -182,14 +183,14 @@ export default function BranchEditors({
             <div className="space-y-2">
               {sideSteps.map((sideStep, sideIndex) => sideStep.type === 'common_action' ? (
                 <div key={sideStep.id} className="flex items-center gap-2">
-                  <Select
+                  <SaveErrorField names={["commonActionId","sideStep.params.commonActionId","params.commonActionId","common_action_id","side_step.params.common_action_id","params.common_action_id"]}><Select
                     size="full"
                     aria-label={`${sideLabel}${sideIndex + 1}の公開版`}
                     className="mt-1"
                     value={String(sideStep.params.commonActionId ?? '')}
                     onChange={(value) => onUpdate(step.id, { kind: 'sideAction', side, stepIndex: sideIndex, commonActionId: value })}
                     options={commonActionOptions}
-                  />
+                  /></SaveErrorField>
                   {sideSteps.length > 1 ? (
                     <Button aria-label={`${sideLabel}${sideIndex + 1}を外す`} onClick={() => onUpdate(step.id, { kind: 'sideRemove', side, stepIndex: sideIndex })}>外す</Button>
                   ) : null}
@@ -211,7 +212,7 @@ export default function BranchEditors({
             </div>
             <div className="mt-3">
               <span className="text-ink-secondary text-sm">条件の組み合わせ</span>
-              <Select
+              <SaveErrorField names={["operator","condition.operator"]}><Select
                 size="full"
                 aria-label="条件の組み合わせ"
                 className="mt-1"
@@ -221,7 +222,7 @@ export default function BranchEditors({
                   { value: 'AND', label: OPERATOR_LABEL.AND },
                   { value: 'OR', label: OPERATOR_LABEL.OR },
                 ]}
-              />
+              /></SaveErrorField>
             </div>
             <div className="mt-3 space-y-2">
               {condition.rules.map((rule, ruleIndex) => rule.type === 'tag_exists' || rule.type === 'tag_not_exists' ? (
@@ -229,13 +230,13 @@ export default function BranchEditors({
                   <div className="text-ink-secondary min-w-0 flex-1 text-sm">
                     <span>条件{ruleIndex + 1}（{RULE_TYPE_LABEL[rule.type]}）</span>
                     <div className="mt-1">
-                      <EntityKindField
+                      <SaveErrorField names={["value","rule.value"]}><EntityKindField
                         kind="tag"
                         label={`条件${ruleIndex + 1}のタグ`}
                         value={rule.value}
                         onChange={(value) => onUpdate(step.id, { kind: 'ruleTag', ruleIndex, tagId: value })}
                         options={tagOptions(rule.value)}
-                      />
+                      /></SaveErrorField>
                     </div>
                   </div>
                   {condition.rules.length > 1 ? (

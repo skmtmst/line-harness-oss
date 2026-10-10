@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 回答フォームの一覧（Pencil「★V8 画面の地図」の回答フォームの行）。
- * 一覧 `I3L41O`・1152 `GrnO4`・閲覧のみ `JV2oR`・アーカイブ・削除の窓 `GVizd`。
- *
- * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
- * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -91,6 +82,17 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 回答フォームの一覧（Pencil「★V8 画面の地図」の回答フォームの行）。
+ * 一覧 `I3L41O`・1152 `GrnO4`・閲覧のみ `JV2oR`・アーカイブ・削除の窓 `GVizd`。
+ *
+ * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
+ * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
@@ -106,6 +108,7 @@ function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
 }
 
 export default function FormsListV8() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('回答フォーム')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -246,12 +249,15 @@ export default function FormsListV8() {
         setFolderTotal(unassigned.length)
       } catch (error) {
         if (request !== formRequest.current) return
+        const fieldFailure = saveErrors.capture(error)
         // 権限が無い人は専用口が 403/404 を返す。エラー画面にせず「確認できるものは無い」と伝える。
         if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
           setReviewForbidden(true)
         } else {
-          setLoadFailure(error)
-          setLoadError('回答フォームを読み込めませんでした。')
+          { if (!fieldFailure)
+          setLoadFailure(error) }
+          { if (!fieldFailure)
+          setLoadError('回答フォームを読み込めませんでした。') }
         }
         clearList()
       } finally {
@@ -307,13 +313,16 @@ export default function FormsListV8() {
       }
     } catch (error) {
       if (request !== formRequest.current) return
-      setLoadFailure(error)
-      setLoadError('回答フォームを読み込めませんでした。')
+      const fieldFailure = saveErrors.capture(error)
+      { if (!fieldFailure)
+      setLoadFailure(error) }
+      { if (!fieldFailure)
+      setLoadError('回答フォームを読み込めませんでした。') }
       clearList()
     } finally {
       if (request === formRequest.current) setLoading(false)
     }
-  }, [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery])
+  }, [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery, saveErrors])
 
   useEffect(() => {
     void loadForms()
@@ -336,10 +345,12 @@ export default function FormsListV8() {
       } else {
         setStatsFailed(true)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure);
+
       if (activeAccountRef.current === accountId) setStatsFailed(true)
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   useEffect(() => {
     void loadStats()
@@ -383,8 +394,11 @@ export default function FormsListV8() {
       const res = await api.forms.createDraft(selectedAccountId)
       if (!res.success) throw new Error(res.error)
       router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
-    } catch {
-      setCreateError('フォームの下書きを作れませんでした。もう一度お試しください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setCreateError('フォームの下書きを作れませんでした。もう一度お試しください。') }
     } finally {
       setCreating(false)
     }
@@ -463,9 +477,12 @@ export default function FormsListV8() {
       // 複製は停止中の下書き。用途に合わせて直せるよう、編集画面を開く。
       router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
       setDuplicateError(error instanceof ApiError && error.status === 404
         ? '元のフォームが見つかりませんでした。一覧を開き直してください。'
-        : 'フォームを複製できませんでした。もう一度お試しください。')
+        : 'フォームを複製できませんでした。もう一度お試しください。') }
     } finally {
       setDuplicating(false)
     }
@@ -487,8 +504,11 @@ export default function FormsListV8() {
       const result = await api.forms.deleteImpact(form.id, selectedAccountId)
       if (!result.success) throw new Error(result.error)
       setDeleteImpact(result.data)
-    } catch {
-      setDeleteError('アーカイブしたときの影響を確認できませんでした。もう一度開き直してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setDeleteError('アーカイブしたときの影響を確認できませんでした。もう一度開き直してください。') }
     } finally {
       setDeleteImpactLoading(false)
     }
@@ -527,19 +547,24 @@ export default function FormsListV8() {
         : await api.forms.archive(targetId, selectedAccountId, deleteImpact.revision)
       if (!result.success) throw new Error('delete_failed')
       finish()
-    } catch {
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure);
+
       let gone = false
       try {
         await api.forms.get(targetId, selectedAccountId)
       } catch (checkError) {
+        saveErrors.capture(checkError);
+
         if (checkError instanceof ApiError && checkError.status === 404) gone = true
       }
       if (gone) {
         finish()
       } else {
+        { if (!fieldFailure)
         setDeleteError(permanentDelete
           ? 'この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。'
-          : 'この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
+          : 'この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。') }
       }
     } finally {
       setDeleting(false)
@@ -566,8 +591,11 @@ export default function FormsListV8() {
     }
     try {
       setRenameRevision(await readContentRevision(form.id, selectedAccountId))
-    } catch {
-      setRenameError('フォームの状態を確認できませんでした。開き直してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setRenameError('フォームの状態を確認できませんでした。開き直してください。') }
     }
   }
 
@@ -594,9 +622,12 @@ export default function FormsListV8() {
       // 名前は検索・名前順の対象。サーバー側の絞り込み・並びとずれないよう読み直す。
       void loadForms()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
       setRenameError(error instanceof ApiError && error.status === 409
         ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
-        : 'フォーム名を変更できませんでした。もう一度お試しください。')
+        : 'フォーム名を変更できませんでした。もう一度お試しください。') }
     } finally {
       setRenaming(false)
     }
@@ -623,8 +654,11 @@ export default function FormsListV8() {
       const result = await api.forms.deleteImpact(form.id, selectedAccountId)
       if (!result.success) throw new Error(result.error)
       setStopRevision(result.data.contentRevision)
-    } catch {
-      setStopError('フォームの状態を確認できませんでした。もう一度開き直してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setStopError('フォームの状態を確認できませんでした。もう一度開き直してください。') }
     } finally {
       setStopImpactLoading(false)
     }
@@ -657,9 +691,12 @@ export default function FormsListV8() {
       void loadForms()
       void loadStats()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
+
+      { if (!fieldFailure)
       setStopError(error instanceof ApiError && error.status === 409
         ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
-        : '回答の受付を止められませんでした。状態を読み直してから、もう一度お試しください。')
+        : '回答の受付を止められませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setStopping(false)
     }
@@ -703,13 +740,15 @@ export default function FormsListV8() {
       if (res.success) {
         setDeletingFolderCount(Array.isArray(res.data) ? res.data.length : res.data.total)
       }
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setDeletingFolderCount(null)
     }
   }
 
   const removeFolder = async () => {
-    if (!deletingFolder || folderBusy || !selectedAccountId) return
+    if (!deletingFolder || folderBusy || !selectedAccountId)
+ return
     const targetId = deletingFolder.id
     setFolderBusy(true)
     setFolderError('')
@@ -719,8 +758,11 @@ export default function FormsListV8() {
       setDeletingFolder(null)
       if (activeFolderId === targetId) setActiveFolderId('all')
       await loadForms()
-    } catch {
-      setFolderError('フォルダを削除できませんでした。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+      setFolderError('フォルダを削除できませんでした。') }
     } finally {
       setFolderBusy(false)
     }
@@ -761,14 +803,14 @@ export default function FormsListV8() {
       if (!res.success) throw new Error('move_failed')
       void loadForms()
     } catch (error) {
+      const fieldFailure = saveErrors.capture(error)
       setFolderOf(previousFolderId)
+      { if (!fieldFailure)
       notifyToast(error instanceof ApiError && error.status === 422
         ? 'そのフォルダはありません。開き直して、もう一度お試しください。'
-        : 'フォルダへ移せませんでした。', { tone: 'error' })
+        : 'フォルダへ移せませんでした。', { tone: 'error' }) }
     }
   }
-
-
 
   /* 名前のその場の書き換え（詳細パネル）。影響口で読んだ版を付けて同じ更新口へ送る。 */
   const renameForm = async (target: Form, next: string) => {
@@ -981,24 +1023,24 @@ export default function FormsListV8() {
   )
   const sortBox = (
     <div className={styles.sortBox}>
-      <ListToolbarSort
+      <SaveErrorField names={["formSort","sort","form_sort"]}><ListToolbarSort
         aria-label="並び順"
         label="並び"
         value={formSort}
         options={SORT_OPTIONS}
         onChange={(value) => updateListState({ sort: value as FormSort, page: 1 })}
-      />
+      /></SaveErrorField>
     </div>
   )
   const perPageBox = (
     <div className={styles.perPageBox}>
-      <Select
+      <SaveErrorField names={["pageSize","page_size"]}><Select
         aria-label="表示件数"
         size="page-size"
         value={String(pageSize)}
         options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
         onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
-      />
+      /></SaveErrorField>
     </div>
   )
 
@@ -1009,7 +1051,7 @@ export default function FormsListV8() {
         {reviewMode ? null : createButton(false)}
         {reviewMode ? null : (
           <div className={styles.narrowFolder}>
-            <Select aria-label="フォルダ" value={activeFolderId} onChange={selectFolder} options={folderSelectOptions} />
+            <SaveErrorField names={["activeFolderId","activeId","active_folder_id"]}><Select aria-label="フォルダ" value={activeFolderId} onChange={selectFolder} options={folderSelectOptions} /></SaveErrorField>
           </div>
         )}
         <div className={styles.narrowSearch}>
@@ -1350,7 +1392,7 @@ export default function FormsListV8() {
           )}
         >
           {moveError ? <p className={styles.alertText} role="alert">{moveError}</p> : null}
-          <RadioCardGroup legend="移動先のフォルダ" className={styles.radioList}>
+          <SaveErrorField names={["move-folder","id","folder.id","moveFolderId"]}><RadioCardGroup legend="移動先のフォルダ" className={styles.radioList}>
             {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
               <RadioCard
                 key={folder.id}
@@ -1361,7 +1403,7 @@ export default function FormsListV8() {
                 title={folder.name}
               />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
         </DetailPanel>
       ) : null}
 
@@ -1404,7 +1446,7 @@ export default function FormsListV8() {
             </div>
           )}
         >
-          <Field label="複製の名前"><input
+          <Field label="複製の名前"><SaveErrorField names={["duplicateName","duplicate_name"]}><input
               value={duplicateName}
               onChange={(event) => setDuplicateName(event.target.value)}
               onKeyDown={(event) => {
@@ -1412,7 +1454,7 @@ export default function FormsListV8() {
                 if (event.key === 'Enter') void duplicateForm()
               }}
               className={styles.panelInput}
-            /></Field>
+            /></SaveErrorField></Field>
           {duplicateError ? <p className={styles.alertText} role="alert">{duplicateError}</p> : null}
         </DetailPanel>
       ) : null}
@@ -1612,14 +1654,14 @@ export default function FormsListV8() {
           </div>
         )}
       >
-        <Field label="フォーム名"><input
+        <Field label="フォーム名"><SaveErrorField names={["renameName","rename_name"]}><input
             type="text"
             value={renameName}
             onChange={(e) => setRenameName(e.target.value)}
             disabled={renaming}
             maxLength={100}
             className={styles.panelInput}
-          /></Field>
+          /></SaveErrorField></Field>
         {renameError ? <p className={styles.alertText} role="alert">{renameError}</p> : null}
       </Dialog>
     </>
@@ -1627,7 +1669,7 @@ export default function FormsListV8() {
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */
-    <div
+    <SaveErrorScope errors={saveErrors}><div
       className={styles.root}
       data-list-state={accountLoading || loading ? 'loading' : loadError ? 'error' : visibleForms.length === 0 ? 'empty' : 'ready'}
     >
@@ -1684,6 +1726,6 @@ export default function FormsListV8() {
       >
         {listContent}
       </ListPage>
-    </div>
+    </div></SaveErrorScope>
   )
 }

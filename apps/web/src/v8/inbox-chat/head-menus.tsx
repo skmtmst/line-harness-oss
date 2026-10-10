@@ -10,6 +10,7 @@
 import { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Select from '@/components/shared/select'
 import { buildOperatorRows, type OperatorOption } from '@/components/chats/inbox-dropdown'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export type HeadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 
@@ -44,14 +45,14 @@ export function HeadOperatorMenu({
 }) {
   const rows = buildOperatorRows(operators, false, value)
   return (
-    <Select
+    <SaveErrorField names={["value"]}><Select
       aria-label={ariaLabel}
       label="担当"
       width={OPERATOR_WIDTH}
       value={value}
       onChange={onChange}
       options={rows.map((row) => ({ value: row.id, label: row.name }))}
-    />
+    /></SaveErrorField>
   )
 }
 
@@ -65,7 +66,7 @@ export function HeadStatusMenu({
   ariaLabel?: string
 }) {
   return (
-    <Select
+    <SaveErrorField names={["value"]}><Select
       aria-label={ariaLabel}
       width={STATUS_FIXED_WIDTH + STATUS_CHAR_WIDTH * HEAD_STATUS_LABEL[value].length}
       treatment="pill"
@@ -79,6 +80,6 @@ export function HeadStatusMenu({
         tone: SUPPORT_STATUS_TONES[status],
         leading: <StatusDot tone={SUPPORT_STATUS_TONES[status]} />,
       }))}
-    />
+    /></SaveErrorField>
   )
 }

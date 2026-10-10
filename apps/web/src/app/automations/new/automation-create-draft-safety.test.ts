@@ -629,6 +629,38 @@ async function openTestConfirmation(page: Page, friendId: string) {
 }
 
 describe('V8 ルールを作る（M4torY）の誤操作防止（#679）', () => {
+  it('保存の422を名前の下へ出して移り、1440・1152幅でも直した欄だけ消す（B-154）', async () => {
+    for (const width of [1440, 1152]) {
+      const { page } = await openPage()
+      await page.setViewportSize({ width, height: 1000 })
+      await fillTagRule(page, '入力を残すルール')
+      await page.route(`${API_ORIGIN}/api/automation-drafts/**`, async (route) => {
+        if (route.request().method() === 'OPTIONS') return answerPreflight(route)
+        if (route.request().method() !== 'PUT') return route.fallback()
+        await json(route, { success: false, error: '入力を確認してください', fields: { name: 'この名前は使われています' } }, 422)
+      })
+      await page.getByRole('button', { name: '下書きを保存', exact: true }).click()
+      const input = page.locator('#v8-rule-name')
+      const reason = page.getByText('この名前は使われています', { exact: true })
+      await reason.waitFor()
+      await expect.poll(() => input.evaluate((node) => document.activeElement === node)).toBe(true)
+      expect(await input.inputValue()).toBe('入力を残すルール')
+      expect(await input.getAttribute('aria-invalid')).toBe('true')
+      expect(await input.getAttribute('aria-describedby')).toContain(await reason.getAttribute('id'))
+      const inputBox = (await input.boundingBox())!
+      const reasonBox = (await reason.boundingBox())!
+      expect(reasonBox.y).toBeGreaterThanOrEqual(inputBox.y + inputBox.height - 1)
+      expect(reasonBox.x + reasonBox.width).toBeLessThanOrEqual(width)
+      expect(await page.getByText('入力を確認してください', { exact: true }).count()).toBe(0)
+      await input.fill('直した名前')
+      await expect.poll(() => reason.count()).toBe(0)
+      expect(await input.getAttribute('aria-invalid')).not.toBe('true')
+      const context = page.context()
+      await context.close()
+      contexts.delete(context)
+    }
+  }, 60_000)
+
   it('遅い新規保存を連打しても1件だけ作り、再読込・戻るでも同じ下書きを更新する', async () => {
     const { page, api } = await openPage({ slowCreate: true })
     await fillTagRule(page, '来店後フォロー')

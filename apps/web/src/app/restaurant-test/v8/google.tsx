@@ -48,6 +48,7 @@ import { errorMessage, formatDateTime, reviewReceivedAt } from '../google/google
 import { BoundaryBanner, Stat } from './shell'
 import shellStyles from './shell.module.css'
 import styles from './google.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TAB_LABELS = { reviews: '口コミ', posts: '投稿', performance: 'パフォーマンス', profile: 'プロフィール', settings: '設定' } as const
 type TabKey = keyof typeof TAB_LABELS
@@ -169,7 +170,7 @@ function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stor
           <p className={shellStyles.headDescription}>Googleの口コミ・投稿・営業時間を、店舗ごとに管理します。</p>
         </div>
         {stores.length > 0 ? (
-          <Select
+          <SaveErrorField names={["currentStoreId","selectedAccountId","current_store_id","selected_account_id"]}><Select
             aria-label="店舗を選ぶ"
             className={shellStyles.storePicker}
             value={currentStoreId}
@@ -178,7 +179,7 @@ function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stor
               if (next?.line_account_id && next.line_account_id !== accountId) setSelectedAccountId(next.line_account_id)
             }}
             options={stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
-          />
+          /></SaveErrorField>
         ) : null}
       </div>
       <div className={shellStyles.body}>
@@ -206,10 +207,10 @@ function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stor
           <span className={styles.toolbarSearch}>
             <SearchField placeholder="口コミを探す" aria-label="口コミを探す" value={search} onChange={setSearch} onClear={() => setSearch('')} />
           </span>
-          <Select aria-label="評価で絞り込み" value={rating} onChange={(value) => { setRating(value); setPage(1) }} options={RATING_OPTIONS} />
-          <Select aria-label="状態で絞り込み" value={filter} onChange={(value) => { setFilter(value as GoogleReviewFilter); setPage(1) }} options={STATE_OPTIONS} />
+          <SaveErrorField names={["rating"]}><Select aria-label="評価で絞り込み" value={rating} onChange={(value) => { setRating(value); setPage(1) }} options={RATING_OPTIONS} /></SaveErrorField>
+          <SaveErrorField names={["filter"]}><Select aria-label="状態で絞り込み" value={filter} onChange={(value) => { setFilter(value as GoogleReviewFilter); setPage(1) }} options={STATE_OPTIONS} /></SaveErrorField>
           <span className={styles.toolbarRight}>
-            <Select aria-label="並び順" value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
+            <SaveErrorField names={["order"]}><Select aria-label="並び順" value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} /></SaveErrorField>
           </span>
         </div>
         {connection.status === 'expired' ? <Notice tone="danger">Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}

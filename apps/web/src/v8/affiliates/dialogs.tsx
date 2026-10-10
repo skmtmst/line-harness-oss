@@ -1,11 +1,4 @@
 'use client'
-
-/*
- * 紹介を止める・アーカイブの確かめ（AffiliateArchiveDialog）と、1人ぶんの支払いの確定
- * （AffiliatePaymentConfirmDialog）。app/affiliates/action-dialogs.tsx から写した
- * （src/v8 は @/app を import できない）。行き先は新しい画面の住所に直した。
- */
-
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Landmark, X } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -25,6 +18,14 @@ import { formatDay, formatNumber } from '@/lib/format'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * 紹介を止める・アーカイブの確かめ（AffiliateArchiveDialog）と、1人ぶんの支払いの確定
+ * （AffiliatePaymentConfirmDialog）。app/affiliates/action-dialogs.tsx から写した
+ * （src/v8 は @/app を import できない）。行き先は新しい画面の住所に直した。
+ */
 
 type LoadPhase = 'loading' | 'ready' | 'empty' | 'error'
 
@@ -154,7 +155,7 @@ export function AffiliateArchiveDialog({
             </p>
           </section>
 
-          <RadioCardGroup legend="どうしますか？">
+          <SaveErrorField names={["archive-choice","value","choice"]}><RadioCardGroup legend="どうしますか？">
             {([
               ['pause', '紹介だけを止める（おすすめ）', 'あとから再開できます。過去の記録は残ります。'],
               ['pay_first', `先に ${yen(impact.unsettledReward)} を確定してから、また考える`, '支払いの画面へ移ります。アーカイブはしません。'],
@@ -162,15 +163,15 @@ export function AffiliateArchiveDialog({
             ] as const).map(([value, label, description]) => (
               <RadioCard key={value} name="archive-choice" value={value} checked={choice === value} onChange={() => setChoice(value)} title={label} note={description} />
             ))}
-          </RadioCardGroup>
+          </RadioCardGroup></SaveErrorField>
 
-          <Field label="確認のため「」と打ってください"><input
+          <Field label="確認のため「」と打ってください"><SaveErrorField names={["confirmationName","confirmation_name"]}><input
                 type="text"
                 value={confirmationName}
                 onChange={(event) => setConfirmationName(event.target.value)}
                 className="border-hairline rounded-control mt-2 w-full border px-3 py-2 font-normal"
                 autoComplete="off"
-              /></Field>
+              /></SaveErrorField></Field>
         </div>
       ) : (
         <ListState kind="empty" title="確認できる情報がありません" />
@@ -194,6 +195,8 @@ export function AffiliatePaymentConfirmDialog({
   onClose: () => void
   onConfirmed: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
+
   const [phase, setPhase] = useState<LoadPhase>('loading')
   const [preview, setPreview] = useState<AffiliateSettlementPreview | null>(null)
   const [busy, setBusy] = useState(false)
@@ -222,24 +225,29 @@ export function AffiliatePaymentConfirmDialog({
       if (!response.success) throw new Error(response.error)
       setPreview(response.data)
       setPhase(response.data.conversionCount === 0 ? 'empty' : 'ready')
-    } catch {
-      setPhase('error')
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
+      setPhase('error');
+
       return
     }
     // 依頼先の連絡手段は別口。ここが落ちても確定の画面自体は止めない。
     try {
-      const detail = await api.affiliates.get(target.id)
+      const detail = await api.affiliates.get(target.id);
+
       const row = detail.success && detail.data
         ? (detail.data as typeof detail.data & { friendId?: string | null })
         : null
       setContact(row ? { friendId: row.friendId ?? null, email: row.email ?? null } : null)
-    } catch {
+    } catch (saveFailure) {
+      saveErrors.capture(saveFailure)
       setContact(null)
     }
-  }, [accountId, target])
+  }, [accountId, target, saveErrors])
 
   useEffect(() => {
-    if (!target) return
+    if (!target)
+ return
     setIdempotencyKey(crypto.randomUUID())
     setStatementKey(crypto.randomUUID())
     setIssueStatement(true)
@@ -269,16 +277,23 @@ export function AffiliatePaymentConfirmDialog({
             expectedVersion: 1,
           }, statementKey)
           if (!statement.success) throw new Error(statement.error)
-        } catch {
+        } catch (saveFailure) {
+          const fieldFailure = saveErrors.capture(saveFailure)
           onConfirmed()
-          setError('支払いは確定しましたが、支払明細とLINE通知を作れませんでした。同じ画面でもう一度お試しください。')
+          { if (!fieldFailure)
+
+          setError('支払いは確定しましたが、支払明細とLINE通知を作れませんでした。同じ画面でもう一度お試しください。') }
           return
         }
       }
       onConfirmed()
       onClose()
-    } catch {
-      setError('支払いを確定できませんでした。内容を読み直してください。')
+    } catch (saveFailure) {
+      const fieldFailure = saveErrors.capture(saveFailure)
+
+      { if (!fieldFailure)
+
+      setError('支払いを確定できませんでした。内容を読み直してください。') }
     } finally {
       setBusy(false)
     }
@@ -292,7 +307,7 @@ export function AffiliatePaymentConfirmDialog({
   if (!target) return null
 
   return (
-    <Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={error || undefined} designNode="GqFTV" designWidth={960} footer={(
+    <SaveErrorScope errors={saveErrors}><Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={error || undefined} designNode="GqFTV" designWidth={960} footer={(
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
           <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
           <div className="flex shrink-0 items-center gap-2">
@@ -389,15 +404,15 @@ export function AffiliatePaymentConfirmDialog({
             （OFFなのにONに見える見た目を残さない）。
           */}
           <div className="space-y-2">
-            <Checkbox
+            <SaveErrorField names={["issueStatement","issue_statement"]}><Checkbox
               checked={issueStatement}
               onCheckedChange={setIssueStatement}
               description={`内訳が入った明細を作り、「${dateLabel(preview.paymentDate)} に ${yen(preview.amount)} をお振込みします」と届きます。`}
-            >支払明細を作成して、この方のLINEに知らせる</Checkbox>
+            >支払明細を作成して、この方のLINEに知らせる</Checkbox></SaveErrorField>
           </div>
         </div>
       ) : null}
         </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }

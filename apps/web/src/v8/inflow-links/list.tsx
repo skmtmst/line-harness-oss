@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8-B 流入と計測の一覧（Pencil「★V8-B 画面の地図」：
- * 一覧 `xbHxg`、1152 `y1ztx`、閲覧のみ `EMUl9`、QR コードの小窓 `GtI4Y`）。
- *
- * 型（ListPage）に、数の帯・左のフォルダの列（上に「流入リンクを作る」）・
- * 案内の帯・道具の段・表を置く。行は「コピー」「…」「編集」。
- * データの口と判断は今の一覧（app/inflow-links/page.tsx の InflowLinksPageInner）と同じ。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -87,6 +77,18 @@ import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8-B 流入と計測の一覧（Pencil「★V8-B 画面の地図」：
+ * 一覧 `xbHxg`、1152 `y1ztx`、閲覧のみ `EMUl9`、QR コードの小窓 `GtI4Y`）。
+ *
+ * 型（ListPage）に、数の帯・左のフォルダの列（上に「流入リンクを作る」）・
+ * 案内の帯・道具の段・表を置く。行は「コピー」「…」「編集」。
+ * データの口と判断は今の一覧（app/inflow-links/page.tsx の InflowLinksPageInner）と同じ。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 interface MessageTemplate {
   id: string
@@ -114,6 +116,7 @@ export default function InflowListV8({
   /** 入口（page.tsx）へ「この一覧に見えている経路の数」を渡す。読み込み前・失敗は null。 */
   onRouteCountChange?: (count: number | null) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('流入と計測')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -221,15 +224,17 @@ export default function InflowListV8({
       }
     } catch (e) {
       if (!isCurrent()) return
+      const fieldFailure = saveErrors.capture(e)
       // 空（1件も無い）と言い分けるため、失敗として覚える。403・429 は ListState が言い分ける。
       setLoadFailed(true)
-      setLoadError(e)
+      { if (!fieldFailure)
+      setLoadError(e) }
       setSummary(null)
       setSummaryAvailable(false)
     } finally {
       if (isCurrent()) setLoading(false)
     }
-  }, [])
+  }, [saveErrors])
 
   useEffect(() => {
     // アカウントを変えた瞬間に前の一覧・集計・開いた操作を捨てる。
@@ -272,12 +277,15 @@ export default function InflowListV8({
           total: connected.length,
           names: connected.map((platform) => platform.displayName ?? platform.name),
         })
-      } catch {
+      } catch (saveFailure) {
+        saveErrors.capture(saveFailure);
+
         if (!cancelled) setAdConnected(null)
       }
-    })()
+    })();
+
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [selectedAccountId, saveErrors])
 
   /*
    * PERF-03: 編集窓の候補（プール・シナリオ・テンプレート・タグ）。一覧の行を待たせない補助取得。
@@ -345,8 +353,6 @@ export default function InflowListV8({
     return () => { cancelled = true }
   }, [selectedAccountId, visibility.status, visibility.features])
 
-
-
   /*
    * 行の受付・停止を切り替える（行の「…」から）。押した瞬間に札を変え、裏で保存する
    * （動きの点検・7）。失敗したら元に戻して知らせる。終わったら取り直す。
@@ -367,12 +373,15 @@ export default function InflowListV8({
       void load()
       return true
     } catch (cause) {
+      const fieldFailure = saveErrors.capture(cause)
       if (!isCurrent()) return false
       setActive(!nextActive)
+      { if (!fieldFailure)
       notifyToast(
         cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '受付を切り替えられませんでした。',
         { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleRouteActive(entryRouteId, nextActive, name) } },
       )
+      }
       return false
     } finally {
       toggleLocks.current.delete(entryRouteId)
@@ -516,7 +525,7 @@ export default function InflowListV8({
   ]
   const selectGenre = (id: string) => { setSelectedGenre(id); setPage(1) }
   const folderSelect = (
-    <Select
+    <SaveErrorField names={["selectedGenre","selected_genre"]}><Select
       aria-label="フォルダ"
       value={selectedGenre}
       onChange={selectGenre}
@@ -525,7 +534,7 @@ export default function InflowListV8({
         ...availableGenres.map((genre) => ({ value: genre.name, label: `フォルダ：${genre.name}` })),
         ...(hasUncategorized ? [{ value: UNCATEGORIZED, label: 'フォルダ：未分類' }] : []),
       ]}
-    />
+    /></SaveErrorField>
   )
   // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = readonly
@@ -583,12 +592,12 @@ export default function InflowListV8({
             ))}
           </div>
           <span className={styles.presetLabel}>並び順</span>
-          <ListToolbarSort
+          <SaveErrorField names={["sort"]}><ListToolbarSort
             aria-label="並び順"
             value={sort}
             options={SORT_OPTIONS}
             onChange={(value) => { setSort(value as RouteSort); setPage(1); setPresetOpen(false) }}
-          />
+          /></SaveErrorField>
         </div>
       ) : null}
     </div>
@@ -677,14 +686,14 @@ export default function InflowListV8({
             <thead>
               <TableHeadRow className={styles.headRow} data-table-layout="columns">
                 <Th className={styles.colCheck}>
-                  {readonly ? null : <Checkbox
+                  {readonly ? null : <SaveErrorField names={["allShownSelected","selectedRouteIds","all_shown_selected","selected_route_ids"]}><Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
                     indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
                     disabled={selectableIds.length === 0}
                     title={selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
                     onCheckedChange={(checked) => setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())}
-                  />}
+                  /></SaveErrorField>}
                 </Th>
                 <Th className={styles.colName}>流入元名</Th>
                 <Th className={styles.colPool}>追加先</Th>
@@ -697,7 +706,7 @@ export default function InflowListV8({
               </TableHeadRow>
             </thead>
             <tbody>
-              {currentRows.map((r) => {
+              {currentRows.map((r, saveFieldIndex) => {
                 const pool = pools.find((p) => p.id === r.poolId)
                 const sc = scenarios.find((s) => s.id === r.scenarioId)
                 const tag = tags.find((t) => t.id === r.tagId)
@@ -718,7 +727,7 @@ export default function InflowListV8({
                   <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.entryRouteId ?? r.refCode}>
                     <Td className={styles.colCheck}>
                       {r.entryRouteId && !readonly ? (
-                        <Checkbox
+                        <SaveErrorField names={[`currentRows.${saveFieldIndex}.entryRouteId`,`currentRows.${saveFieldIndex}.entry_route_id`,"entryRouteId","r.entryRouteId","selectedRouteIds","entry_route_id","r.entry_route_id","selected_route_ids"]}><Checkbox
                           aria-label={`${r.name}をまとめて操作の対象にする`}
                           checked={selectedRouteIds.has(r.entryRouteId)}
                           onCheckedChange={(checked) => {
@@ -730,7 +739,7 @@ export default function InflowListV8({
                               return next
                             })
                           }}
-                        />
+                        /></SaveErrorField>
                       ) : (
                         <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
                       )}
@@ -840,7 +849,7 @@ export default function InflowListV8({
   ) : null
 
   return (
-    <ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage
       help={<>{"QRコード・URLごとに、どこから友だちになったかを数えます。友だちになったときに、タグ・メッセージ・シナリオを自動で動かせます。"}{readonly
             ? '行の「…」から QRコードを表示・URLをコピーできます。'
             : '行の「…」から QRコードを表示・URLをコピー・リンクを編集・止める。左のチェックで、まとめて操作できます。'}</>}
@@ -1008,7 +1017,7 @@ export default function InflowListV8({
       </>}
     >
       {listBody}
-    </ListPage>
+    </ListPage></SaveErrorScope>
   )
 }
 

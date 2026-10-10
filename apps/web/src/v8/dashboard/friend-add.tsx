@@ -1,5 +1,4 @@
 'use client'
-
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useEffect, useState } from 'react'
@@ -13,6 +12,7 @@ import Select from '@/components/shared/select'
 import SectionHeader from './head'
 import QrDialog from '@/components/dashboard/qr-dialog'
 import styles from './dashboard.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
  * 友だち追加リンク（WQmep 段C）。動きは v7 の FriendAddLinkCard と同じ：
@@ -69,8 +69,6 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
   const route = (routes ?? []).find((entry) => entry.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
 
-
-
   return (
     <>
       <SectionHeader
@@ -81,7 +79,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
       <div className={styles.linkRow}>
         <span className={styles.linkKey}>発行中</span>
         <span className={styles.routeSelect}>
-          <Select
+          <SaveErrorField names={["routeId","route_id"]}><Select
             value={routeId}
             onChange={(value) => setRouteId(value)}
             aria-label="発行中の追加URL"
@@ -89,7 +87,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
               { value: '', label: '基本の追加URL' },
               ...(routes ?? []).map((entry) => ({ value: entry.id, label: entry.name })),
             ]}
-          />
+          /></SaveErrorField>
         </span>
         <span className={styles.spacer} />
         {canManage ? (
@@ -97,13 +95,13 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
         ) : null}
       </div>
       <div className={styles.linkRow}>
-        <input
+        <SaveErrorField names={["link"]}><input
           readOnly
           value={link}
           onFocus={(event) => event.currentTarget.select()}
           aria-label="友だち追加リンク"
           className={styles.urlField}
-        />
+        /></SaveErrorField>
         <CopyTextButton value={link} aria-label="友だち追加URLをコピー"  />
         <Button type="button" onClick={() => writeQr(routeId || 'base')}>
           <QrCode size={15} aria-hidden="true" />QRを表示

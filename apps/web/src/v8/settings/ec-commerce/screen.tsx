@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 EC連携（Pencil `GmVR5`。つなぎ先は `iLJmw`、定期便は `wqC8x`）。
- *
- * 取り込みの記録（出来事ごとの処理）の動きは今までの画面（app/ec-commerce/page.tsx の EventsPanel）と同じ：
- * アカウントと一体で持つ値（#685）・サーバ側の絞り込みとページ送り・検索の遅らせ・もう一度やる（409 の読み直し）・
- * 注文の状況のパネル。処理はここへ写した（src/v8 は @/app を読めない）。
- * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { notifySaved } from '@/components/shared/toast'
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
@@ -53,6 +43,18 @@ import OrderDrawer from './order-drawer'
 import styles from './screen.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 EC連携（Pencil `GmVR5`。つなぎ先は `iLJmw`、定期便は `wqC8x`）。
+ *
+ * 取り込みの記録（出来事ごとの処理）の動きは今までの画面（app/ec-commerce/page.tsx の EventsPanel）と同じ：
+ * アカウントと一体で持つ値（#685）・サーバ側の絞り込みとページ送り・検索の遅らせ・もう一度やる（409 の読み直し）・
+ * 注文の状況のパネル。処理はここへ写した（src/v8 は @/app を読めない）。
+ * 定期便・つなぎ先・注文の状況のパネルは今の部品を入口（page.tsx）から差し込む。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
 
@@ -122,8 +124,6 @@ function actionDone(action: EcActionExecution): string {
   }
   return ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`
 }
-
-
 
 /** 一覧の日時（年なし・例 9/30 10:12、日本時間）。壊れた値は「—」。 */
 function dateTime(value: string | null): string {
@@ -391,7 +391,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
         ))}
         <span className={styles.spacer} />
         <span className={styles.sortBox}>
-          <ListToolbarSort
+          <SaveErrorField names={["sort"]}><ListToolbarSort
             aria-label="取り込みの並び順"
             value={sort}
             onChange={(value) => setSort(value as typeof sort)}
@@ -399,7 +399,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
               { value: 'newest', label: '新しい順' },
               { value: 'oldest', label: '古い順' },
             ]}
-          />
+          /></SaveErrorField>
         </span>
       </div>
 

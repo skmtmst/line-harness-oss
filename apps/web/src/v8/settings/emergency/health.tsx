@@ -1,13 +1,4 @@
 'use client'
-
-/*
- * ★V8 運用状態 健全性チェック（Pencil `Y4LkX1`）。
- *
- * app/emergency/page.tsx の HealthPanel・OperationAlertsPanel を写し（src/v8 は @/app を読めない）、
- * 見た目だけ絵に合わせた：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
- * 動き（初回だけ読み込み中・5分ごとの取り直し・手動確認の世代照合・受領・通知のやり直し・
- * 古い確認と未確認の言い分け・アカウント切替の見張り）は同じ。
- */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { TriangleAlert, CircleCheck, Info, OctagonAlert } from 'lucide-react'
@@ -27,12 +18,24 @@ import {
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
 import { onlyWhenVisible } from '@/lib/visible-polling'
-// 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
 import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
 import { formatTime as polishFormatTime, formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 運用状態 健全性チェック（Pencil `Y4LkX1`）。
+ *
+ * app/emergency/page.tsx の HealthPanel・OperationAlertsPanel を写し（src/v8 は @/app を読めない）、
+ * 見た目だけ絵に合わせた：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
+ * 動き（初回だけ読み込み中・5分ごとの取り直し・手動確認の世代照合・受領・通知のやり直し・
+ * 古い確認と未確認の言い分け・アカウント切替の見張り）は同じ。
+ */
+
+// 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
 
 type ReleaseSummary = { version: string; released: string | null }
 
@@ -233,13 +236,13 @@ function OpenAlerts({
                 ) : null}
               </div>
               {openNoteId === alert.id && alert.status === 'open' ? (
-                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><input
+                <Field label="受領メモ。「受領を記録する」で記録します。" htmlFor={`operation-alert-note-${alert.id}`}><SaveErrorField names={["notes"]}><input
                     id={`operation-alert-note-${alert.id}`}
                     value={notes[alert.id] ?? ''}
                     maxLength={500}
                     onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))}
                     disabled={busy}
-                  /></Field>
+                  /></SaveErrorField></Field>
               ) : null}
             </div>
           )

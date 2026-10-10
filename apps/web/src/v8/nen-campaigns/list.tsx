@@ -1,16 +1,5 @@
 'use client'
-
 import { FolderDotName } from '@/components/shared/folder-dot'
-
-/*
- * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
- * 自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・誕生日クーポンの決めごと（引き出し）`oqSJP`。
- *
- * 取得・保存は今の入口（app/nen-campaigns/page.tsx）が持ったまま。ここは見せ方だけ。
- * 外側（見出し・タブ・数の帯・案内・道具の段）は4つのタブで同じ形にし、
- * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useRouter } from 'next/navigation'
@@ -89,6 +78,17 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
+ * 自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・誕生日クーポンの決めごと（引き出し）`oqSJP`。
+ *
+ * 取得・保存は今の入口（app/nen-campaigns/page.tsx）が持ったまま。ここは見せ方だけ。
+ * 外側（見出し・タブ・数の帯・案内・道具の段）は4つのタブで同じ形にし、
+ * 表は「見出し 36・行 56」の同じ物差しで並べる（タブを替えても表の頭が動かない）。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 
 export type { NenTab } from './display'
 
@@ -402,7 +402,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                   ]}
                 />
               </span>
-              <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
+              <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} /></SaveErrorField>
             </>
           )}
         />
@@ -508,7 +508,7 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: { friends:
       </span>
     )
   }
-  return <Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} />
+  return <SaveErrorField names={["value"]}><Select aria-label="テスト送信先" value={value} onChange={onChange} options={friends.map((friend) => ({ value: friend.id, label: friend.displayName || '名前未取得' }))} /></SaveErrorField>
 }
 
 /* ───────────── 誕生日クーポンの決めごと（oqSJP） ───────────── */
@@ -568,30 +568,30 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
     >
       <div className={styles.couponForm}>
         <div className={styles.couponSwitch}>
-          <SettingCheckbox checked={coupon.isEnabled} label="クーポンを付ける" onChange={(next) => onChange({ ...coupon, isEnabled: next })} />
+          <SaveErrorField names={["isEnabled","coupon.isEnabled","is_enabled","coupon.is_enabled"]}><SettingCheckbox checked={coupon.isEnabled} label="クーポンを付ける" onChange={(next) => onChange({ ...coupon, isEnabled: next })} /></SaveErrorField>
           <div className={styles.couponSwitchText}>
             <strong>クーポンを付ける</strong>
             <span>切ると、誕生日のメッセージだけが届きます</span>
           </div>
         </div>
-        <Field label="特典の名前"><TextField value={coupon.benefitLabel} maxLength={40} onChange={(event) => onChange({ ...coupon, benefitLabel: event.target.value })} /></Field>
+        <Field label="特典の名前"><SaveErrorField names={["benefitLabel","coupon.benefitLabel","benefit_label","coupon.benefit_label"]}><TextField value={coupon.benefitLabel} maxLength={40} onChange={(event) => onChange({ ...coupon, benefitLabel: event.target.value })} /></SaveErrorField></Field>
         <div className={styles.fieldPair}>
-          <Field label="割引額（円）"><NumberInput unit="円" {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} />
+          <Field label="割引額（円）"><SaveErrorField names={["discountAmount","coupon.discountAmount","discount_amount","coupon.discount_amount"]}><NumberInput unit="円" {...fields.bind('coupon-discount')} type="number" min={1} max={100000} inputMode="numeric" value={coupon.discountAmount} onChange={(event) => onChange({ ...coupon, discountAmount: Number(event.target.value) })} /></SaveErrorField>
 <FieldError id="coupon-discount-error">{fields.error('coupon-discount')}</FieldError></Field>
-          <Field label="使える日数"><NumberInput {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} />
+          <Field label="使える日数"><SaveErrorField names={["validityDays","coupon.validityDays","validity_days","coupon.validity_days"]}><NumberInput {...fields.bind('coupon-days')} type="number" min={1} max={365} inputMode="numeric" value={coupon.validityDays} onChange={(event) => onChange({ ...coupon, validityDays: Number(event.target.value) })} /></SaveErrorField>
 <FieldError id="coupon-days-error">{fields.error('coupon-days')}</FieldError></Field>
         </div>
-        <Field label="コードの頭の文字（10文字まで・大文字）"><TextField {...fields.bind('coupon-prefix')} value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} />
+        <Field label="コードの頭の文字（10文字まで・大文字）"><SaveErrorField names={["codePrefix","coupon.codePrefix","code_prefix","coupon.code_prefix"]}><TextField {...fields.bind('coupon-prefix')} value={coupon.codePrefix} maxLength={10} title="半角大文字・数字・- で3〜10文字" onChange={(event) => onChange({ ...coupon, codePrefix: event.target.value.toUpperCase() })} /></SaveErrorField>
 <FieldError id="coupon-prefix-error">{fields.error('coupon-prefix')}</FieldError></Field>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>2月29日生まれの子への平年の扱い</span>
-          <Select
+          <SaveErrorField names={["leapYearPolicy","coupon.leapYearPolicy","leap_year_policy","coupon.leap_year_policy"]}><Select
             aria-label="2月29日生まれの子への平年の扱い"
             size="full"
             value={coupon.leapYearPolicy}
             onChange={(value) => onChange({ ...coupon, leapYearPolicy: value === 'mar1' || value === 'skip' ? value : 'feb28' })}
             options={[{ value: 'feb28', label: '2月28日に送る' }, { value: 'mar1', label: '3月1日に送る' }, { value: 'skip', label: 'その年は送らない' }]}
-          />
+          /></SaveErrorField>
         </div>
         <div className={styles.sample}>
           <span className={styles.sampleLabel}>届く見本</span>
@@ -698,7 +698,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                   ]}
                 />
               </span>
-              <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} />
+              <SaveErrorField names={["pageSize","page_size"]}><Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} options={PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))} /></SaveErrorField>
             </>
           )}
         />
@@ -806,7 +806,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
       <div className={styles.selectGrid}>
         <div className={styles.selectFields}>
           <Field label="LINE に出る紹介文">
-            <TextArea size="single-row" rows={1} aria-label="LINE に出る紹介文" value={introDraft} maxLength={1500} readOnly={!canEdit} onChange={(event) => props.onIntroChange(event.target.value)} />
+            <SaveErrorField names={["introDraft","intro_draft"]}><TextArea size="single-row" rows={1} aria-label="LINE に出る紹介文" value={introDraft} maxLength={1500} readOnly={!canEdit} onChange={(event) => props.onIntroChange(event.target.value)} /></SaveErrorField>
           </Field>
           {canEdit ? (
             <span className={styles.buttonRow}>
@@ -818,18 +818,18 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
         </div>
         <div className={styles.selectFields}>
           <Field label="だれに" help="送る相手はコラムを作るときに決めます。友だち解除・ブロックの人には送られません。">
-            <TextField aria-label="送る相手" value={audience} readOnly />
+            <SaveErrorField names={["audience"]}><TextField aria-label="送る相手" value={audience} readOnly /></SaveErrorField>
           </Field>
           {canEdit ? (
             <>
               <span className={styles.fieldLabel}>いつ</span>
               <span className={styles.radioRow} role="radiogroup" aria-label="いつ送るか">
-                <Radio name="nen-deliver-when-v8" checked={plan.when === 'now'} onChange={() => props.onPlanChange({ ...plan, when: 'now' })}>今すぐ</Radio>
-                <Radio name="nen-deliver-when-v8" checked={plan.when === 'schedule'} onChange={() => props.onPlanChange({ ...plan, when: 'schedule' })}>日時を予約</Radio>
+                <SaveErrorField names={["nen-deliver-when-v8","when","plan.when"]}><Radio name="nen-deliver-when-v8" checked={plan.when === 'now'} onChange={() => props.onPlanChange({ ...plan, when: 'now' })}>今すぐ</Radio></SaveErrorField>
+                <SaveErrorField names={["nen-deliver-when-v8","when","plan.when"]}><Radio name="nen-deliver-when-v8" checked={plan.when === 'schedule'} onChange={() => props.onPlanChange({ ...plan, when: 'schedule' })}>日時を予約</Radio></SaveErrorField>
               </span>
               {plan.when === 'schedule' ? (
                 <Field label="送る日時">
-                  <DateTimeField aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(value) => props.onPlanChange({ ...plan, scheduledAt: value })} />
+                  <SaveErrorField names={["scheduledAt","plan.scheduledAt","scheduled_at","plan.scheduled_at"]}><DateTimeField aria-label="予約日時（日本時間）" value={plan.scheduledAt} invalid={scheduleInvalid} onChange={(value) => props.onPlanChange({ ...plan, scheduledAt: value })} /></SaveErrorField>
                   {schedulePast ? <span className={styles.error} role="alert">予約日時が過去になっています。いまより先の日時を選んでください。</span> : null}
                 </Field>
               ) : null}
@@ -977,7 +977,7 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                             <span className={styles.sampleText}>{deliveryDetail.content.bodyText || deliveryDetail.content.reason}</span>
                             {deliveryDetail.content.buttonLabel ? <span className={styles.sampleText}>▶ {deliveryDetail.content.buttonLabel}</span> : null}
                             {retryable ? (
-                              <Field label="再送する理由（500文字まで）"><TextArea value={reasons[delivery.id] ?? ''} rows={3} maxLength={500} autoFocus={retryFocusId === delivery.id} onChange={(event) => setReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} />
+                              <Field label="再送する理由（500文字まで）"><SaveErrorField names={["reasons"]}><TextArea value={reasons[delivery.id] ?? ''} rows={3} maxLength={500} autoFocus={retryFocusId === delivery.id} onChange={(event) => setReasons((current) => ({ ...current, [delivery.id]: event.target.value }))} /></SaveErrorField>
 <span className={styles.buttonRow}>
                                   <Button type="button" variant="primary" disabled={!(reasons[delivery.id] ?? '').trim()} onClick={() => props.onRetryDelivery(delivery.id, delivery.version, reasons[delivery.id] ?? '')}>再送待ちへ戻す</Button>
                                 </span></Field>

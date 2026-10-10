@@ -1,14 +1,4 @@
 'use client'
-
-/*
- * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
- *
- * v7 の results/page.tsx（ResultsInner）と同じ取得口・同じ操作を持つ
- * 別の描画。違いは置き場と見せ方だけ——上に「届いた・送れなかった・
- * 進んでいる途中・全部終わった」の数の帯、その下に通ごとの結果、
- * いちばん下に友だちごとの記録の表。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -37,6 +27,18 @@ import { formatNumber } from '@/lib/format'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { PageHeading } from '@/components/templates/page-frame'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
+
+
+/*
+ * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
+ *
+ * v7 の results/page.tsx（ResultsInner）と同じ取得口・同じ操作を持つ
+ * 別の描画。違いは置き場と見せ方だけ——上に「届いた・送れなかった・
+ * 進んでいる途中・全部終わった」の数の帯、その下に通ごとの結果、
+ * いちばん下に友だちごとの記録の表。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ */
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -594,7 +596,7 @@ export default function ScenarioResultsV8() {
               手元の表示中ページだけを絞ると、総件数と食い違う。
             */}
             <div className={styles.filterRow}>
-              <Select
+              <SaveErrorField names={["subscriptionStatus","status","subscription_status"]}><Select
                 size="page-size"
                 value={subscriptionStatus}
                 onChange={(value) => setSubscriptionStatus(value)}
@@ -606,7 +608,7 @@ export default function ScenarioResultsV8() {
                   { value: 'paused', label: '停止中' },
                   { value: 'completed', label: '完了' },
                 ]}
-              />
+              /></SaveErrorField>
               {runs ? (
                 <span className="text-ink-faint text-xs tabular-nums">
                   {formatNumber(runs.subscriptions.length)} / {formatNumber(runs.pagination.total)}人
@@ -839,7 +841,7 @@ export default function ScenarioResultsV8() {
             </button>
           </p>
         ) : (
-          <Select
+          <SaveErrorField names={["moveScenarioId","move_scenario_id"]}><Select
             value={moveScenarioId}
             disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
             onChange={(value) => setMoveScenarioId(value)}
@@ -856,7 +858,7 @@ export default function ScenarioResultsV8() {
               },
               ...moveChoices.map((item) => ({ value: item.id, label: item.name })),
             ]}
-          />
+          /></SaveErrorField>
         )}
       </Dialog>
     </div>

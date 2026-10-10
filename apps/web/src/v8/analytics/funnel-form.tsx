@@ -1,16 +1,5 @@
 'use client'
-
 import { jstDateOffset } from '@/lib/jst-datetime'
-
-/*
- * ★V8-B 分析「ファネルを作る」（板 `VDPz5`）と「ファネルを直す」（同じ形）。
- *
- * 今の作る・直すフォーム（app/analytics/page.tsx の FunnelForm）の動きを写して一から書いた。
- * 絵は「段Nの名前 ｜ 何をしたら」の2列。何をしたらは、種類と相手（成果地点・タグ・フォーム）を
- * 1つの選ぶ欄にまとめる（例：成果「商品を買った」）。一覧に無い相手・IDで決める種類
- * （情報欄・サイトのページ・リンク・オートメーション）は「ほかの条件（IDで決める）」を選ぶと、
- * その段の下に種類とIDの欄が出る。保存の形（kind・match・版の追加）は今と同じ。
- */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
@@ -24,6 +13,17 @@ import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import type { FunnelEditDraft } from './funnel'
 import styles from './funnel-form.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+/*
+ * ★V8-B 分析「ファネルを作る」（板 `VDPz5`）と「ファネルを直す」（同じ形）。
+ *
+ * 今の作る・直すフォーム（app/analytics/page.tsx の FunnelForm）の動きを写して一から書いた。
+ * 絵は「段Nの名前 ｜ 何をしたら」の2列。何をしたらは、種類と相手（成果地点・タグ・フォーム）を
+ * 1つの選ぶ欄にまとめる（例：成果「商品を買った」）。一覧に無い相手・IDで決める種類
+ * （情報欄・サイトのページ・リンク・オートメーション）は「ほかの条件（IDで決める）」を選ぶと、
+ * その段の下に種類とIDの欄が出る。保存の形（kind・match・版の追加）は今と同じ。
+ */
 
 /** 段の種類（今の画面と同じ並び・同じ言葉）。hint は ID の欄の名前。 */
 export const FUNNEL_STEP_KINDS = [
@@ -112,6 +112,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
   edit?: FunnelEditDraft
   presetConversion?: { id: string; name: string } | null
 }) {
+  const saveErrors = useSaveFormErrors()
   const [name, setName] = useState(edit?.name ?? '')
   // 裏は1〜365日を受け付ける。7・30・90以外の日数も、直すときに失わないよう選ぶ欄に足す。
   const [windowDays, setWindowDays] = useState(edit?.windowDays ?? '30')
@@ -289,15 +290,16 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
         onCreated(res.data.funnelId, res.data.usageWarnings)
       }
     } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
       if (caught instanceof ApiError && (caught.status === 409 || isConflict(caught.code))) { conflict.mark(); return }
-      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      if (!fieldFailure) setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Dialog
+    <SaveErrorScope errors={saveErrors}><Dialog
       open
       title={edit ? 'ファネルを直す' : 'ファネルを作る'}
       designWidth={600}
@@ -327,11 +329,11 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
           </Notice>
         ) : null}
         <Field label="名前" htmlFor="fn-v8-name" error={fieldErrors['fn-v8-name']}>
-          <TextField id="fn-v8-name" value={name} onChange={(e) => { setName(e.target.value); clearFieldError('fn-v8-name') }} placeholder="例：広告から購入まで" />
+          <SaveErrorField names={["name"]}><TextField id="fn-v8-name" value={name} onChange={(e) => { setName(e.target.value); clearFieldError('fn-v8-name') }} placeholder="例：広告から購入まで" /></SaveErrorField>
         </Field>
         <div className={styles.field}>
           <span className={styles.subLabel} id="fn-v8-window-label">何日以内の通過で数えるか</span>
-          <Select
+          <SaveErrorField names={["windowDays","window_days"]}><Select
             id="fn-v8-window"
             aria-label="何日以内の通過で数えるか"
             size="full"
@@ -343,7 +345,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
               { value: '30', label: '30日以内' },
               { value: '90', label: '90日以内' },
             ]}
-          />
+          /></SaveErrorField>
         </div>
         <div className={styles.steps} role="group" aria-label="段（上から順に見ます）">
           {steps.map((step, i) => {
@@ -353,7 +355,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
                 <div className={styles.stepRow}>
                   <div className={styles.stepCol}>
                     <Field label={`段${i + 1}の名前`} htmlFor={`fn-v8-step-${i}`} error={fieldErrors[`fn-v8-step-${i}`]}>
-                      <TextField id={`fn-v8-step-${i}`} value={step.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="例：友だち追加" />
+                      <SaveErrorField names={[`steps.${i}.label`,"label","step.label"]}><TextField id={`fn-v8-step-${i}`} value={step.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="例：友だち追加" /></SaveErrorField>
                     </Field>
                       {steps.length > MIN_STEPS ? (
                         <button type="button" className={styles.removeStep} onClick={() => { setSteps((prev) => prev.filter((_, j) => j !== i)); setFieldErrors({}) }} aria-label={`段${i + 1}を外す`}>
@@ -363,7 +365,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
                   </div>
                   <div className={styles.stepCol}>
                     <span className={styles.subLabel}>何をしたら</span>
-                    <Select
+                    <SaveErrorField names={["step","targets"]}><Select
                       id={`fn-v8-choice-${i}`}
                       error={fieldErrors[`fn-v8-choice-${i}`]}
                       aria-label={`${i + 1}段目で何をしたら進むか`}
@@ -371,24 +373,24 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
                       value={choiceOf(step, targets)}
                       onChange={(value) => choose(i, value)}
                       options={optionsFor(step)}
-                    />
+                    /></SaveErrorField>
                   </div>
                 </div>
                 {step.other ? (
                   <div className={styles.stepRow}>
                     <div className={styles.stepCol}>
                       <span className={styles.subLabel}>種類</span>
-                      <Select
+                      <SaveErrorField names={[`steps.${i}.kind`,"kind","step.kind"]}><Select
                         aria-label={`${i + 1}段目の種類`}
                         size="full"
                         value={step.kind}
                         onChange={(value) => update(i, { kind: value, matchBase: undefined })}
                         options={FUNNEL_STEP_KINDS.map((k) => ({ value: k.key, label: k.label }))}
-                      />
+                      /></SaveErrorField>
                     </div>
                     <div className={styles.stepCol}>
                       <Field label={kindHint || '追加の指定はありません'} htmlFor={`fn-v8-value-${i}`} error={fieldErrors[`fn-v8-value-${i}`]}>
-                        <TextField id={`fn-v8-value-${i}`} value={step.value} disabled={!kindNeedsValue(step.kind)} onChange={(e) => update(i, { value: e.target.value })} />
+                        <SaveErrorField names={[`steps.${i}.value`,"value","step.value"]}><TextField id={`fn-v8-value-${i}`} value={step.value} disabled={!kindNeedsValue(step.kind)} onChange={(e) => update(i, { value: e.target.value })} /></SaveErrorField>
                       </Field>
                     </div>
                   </div>
@@ -404,6 +406,6 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
           <span className={styles.addNote}>段は2つ以上10個まで。上から順に、次へ進んだ人を数えます。</span>
         </div>
       </div>
-    </Dialog>
+    </Dialog></SaveErrorScope>
   )
 }
