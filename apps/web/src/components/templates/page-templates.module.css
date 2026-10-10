@@ -106,7 +106,7 @@
 :global([data-theme='v8']) .settingsNav { width: var(--tpl-settings-nav-width); flex-shrink: 0; display: flex; flex-direction: column; gap: var(--polish-space-row); padding: var(--tpl-settings-nav-pad-block) var(--tpl-settings-nav-pad-side); }
 :global([data-theme='v8']) .settingsNav:has(> [data-settings-nav='inline']) { width: auto; padding: 0; }
 :global([data-theme='v8']) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
-/* 採用 B237-5a（k0TPPS）：設定目次208、右380、各欄の内側24。 */
+/* 採用 B237-5a（VsZ25）：設定目次208、右380、各欄の内側24。 */
 :global([data-theme='v8']) .frame[data-template-layout='customer-look'] { --tpl-settings-nav-width:208px; --tpl-settings-gap:0px; --customer-look-preview-width:380px; --customer-look-pane-padding:24px; }
 :global([data-theme='v8']) .frame[data-template-layout='customer-look'] .settingsContent { max-width:none; padding:0; }
 .customerLookSplit { display:flex; flex:1; min-width:0; }
@@ -368,3 +368,10 @@
 :global([data-theme='v8']) [data-page-template='restaurant'] .heading[data-heading-inset='none'] .subtitle { line-height: var(--tpl-rs-lh-13); }
 
 :global([data-theme='v8']) [data-page-template='dashboard'][data-template-layout='restaurant'] .heading { padding-bottom: var(--polish-space-field); }
+
+/* B-237：PC では目次と型を横に置き、狭い白い板では見本だけを畳む。 */
+:global([data-theme='v8']) .frame[data-template-layout='customer-look'] .settings { flex-direction: row; gap: var(--tpl-settings-gap); }
+:global([data-theme='v8']) .frame[data-template-layout='customer-look'] .settingsNav { width: var(--tpl-settings-nav-width); flex-direction: column; }
+@media (max-width:1023px) {
+  :global([data-theme='v8']) .frame[data-template-layout='customer-look'] .settingsNav { display: none; }
+}
