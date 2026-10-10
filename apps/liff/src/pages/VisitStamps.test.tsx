@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const fx = vi.hoisted(() => ({ cards: vi.fn(), card: vi.fn(), showReward: vi.fn(), useReward: vi.fn(), requestPaper: vi.fn(), paperRequests: vi.fn(), uploadPaperPhoto: vi.fn() }));
 vi.mock('../lib/api.js', () => ({
-  api: {
+  api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     liffConfig: vi.fn().mockResolvedValue({ success: true, data: { accountId: 'acc-1', accountName: '然 - NEN - 銀座店', botBasicId: '@x' } }),
     bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),
   },

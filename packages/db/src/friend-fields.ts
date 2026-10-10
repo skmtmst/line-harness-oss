@@ -1077,7 +1077,7 @@ export async function getFriendFieldMap(
     .all<{ field_key: string; field_type: string; options_json: string | null; value: string | null }>();
   const out: Record<string, string> = {};
   for (const row of result.results) {
-    if (row.field_key === 'fixed_allergy') { out[row.field_key] = allergyValues(row.value).join('、'); continue; }
+    if (row.field_key === 'fixed_allergy' && row.value != null) { out[row.field_key] = allergyValues(row.value).join('、'); continue; }
     if (row.value == null || row.field_type === 'image' || row.field_type === 'pdf') continue;
     if (row.field_type === 'select' || row.field_type === 'multi_select') {
       try {

@@ -1,4 +1,4 @@
-import { allergyValues } from './fixed-friend-fields';
+import { allergyValues } from './fixed-friend-fields.js';
 /** 共通盤。保存先・状態・版は種類ごとの既存契約を保つ。 */
 export type ReservationAxis = 'resource' | 'floor' | 'list' | 'month';
 export type DiningSnapshot = { allergy: string | null; anniversary: string | null; seatPreference: string | null; courseId: string | null; courseAllergens?: string[]; capturedAt: string };

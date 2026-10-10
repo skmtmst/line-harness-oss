@@ -1,4 +1,4 @@
-import {FORM_THEME_DEFAULT, normalizeFormTheme, type FormOptions, type FormTheme, type CustomerDesignPreset} from './form-layout';
+import {FORM_THEME_DEFAULT, normalizeFormTheme, type FormOptions, type FormTheme, type CustomerDesignPreset} from './form-layout.js';
 export type CustomerHeadingFont = 'default' | 'mincho' | 'marugothic' | 'sans';
 export type CustomerLook = {preset: CustomerDesignPreset; primaryColor: string | null; backgroundColor: string | null; headingFont: CustomerHeadingFont};
 export const DEFAULT_CUSTOMER_LOOK: CustomerLook = {preset:'line',primaryColor:null,backgroundColor:null,headingFont:'default'};

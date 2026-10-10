@@ -204,6 +204,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'DELETE /api/traffic-pools/:id/accounts/:accountId',
     'DELETE /api/users/:id',
     'GET /api/account-handovers/:id',
+    'GET /api/account-settings/allergy-options',
+    'GET /api/account-settings/customer-look',
     'GET /api/account-settings/link-base-url',
     'GET /api/account-settings/test-recipient-login-users',
     'GET /api/account-settings/test-recipients',
@@ -518,6 +520,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/users/:id/link',
     'POST /api/users/match',
     'PUT /api/account-handovers/:id/decisions',
+    'PUT /api/account-settings/allergy-options',
+    'PUT /api/account-settings/customer-look',
     'PUT /api/account-settings/link-base-url',
     'PUT /api/account-settings/test-recipients',
     'PUT /api/account-settings/tracked-link-base-url',
@@ -551,7 +555,6 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/traffic-pools/:id',
     'PUT /api/traffic-pools/:id/accounts/:accountId',
     'PUT /api/users/:id',
-
 ];
 
 describe('staff 権限の deny-by-default の網羅 (N-423 #670)', () => {

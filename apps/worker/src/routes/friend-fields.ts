@@ -808,7 +808,7 @@ friendFields.get(
       const allowed = await getFriendFieldsForScope(c.env.DB, {tenantId:staff?.tenantId ?? DEFAULT_TENANT_ID,lineAccountId:friend?.line_account_id ?? ''});
       const allowedIds = new Set(allowed.map(field => field.id));
       const rows = (await getFriendFieldsWithValues(c.env.DB, friendId)).filter(field => (allowedIds.has(field.id) || field.field_key.startsWith('fixed_')) && field.status !== 'archived');
-      if (friend?.line_account_id) {
+      if (friend?.line_account_id && rows.some(field=>field.field_key==='fixed_allergy')) {
         const { options } = await accountAllergyOptions(c.env.DB, friend.line_account_id);
         for (const field of rows) if (field.field_key === 'fixed_allergy') field.options_json = JSON.stringify(options);
       }

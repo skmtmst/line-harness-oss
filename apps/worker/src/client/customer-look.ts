@@ -20,6 +20,10 @@ function installStyle() {
  if(document.getElementById('customer-look-style'))return;
  const style=document.createElement('style');style.id='customer-look-style';
  style.textContent=`
+ html[data-customer-look] :is(.bg-white,.bg-gray-50,.bg-gray-100) { background-color:var(--customer-ground); }
+ html[data-customer-look] :is(.text-gray-900,.text-gray-800,.text-gray-700) { color:var(--customer-text); }
+ html[data-customer-look] :is(.sb-line-green,.eb-line-green,.af-line-green,.wm-line-green) { color:var(--customer-on-primary); }
+ html[data-customer-look] :is(.sb-active,.eb-active,.af-active,.nm-active) :is(h1,h2,h3) { font-family:var(--liff-font-heading); }
  html[data-customer-look] body { background:var(--customer-background); color:var(--customer-text); }
  html[data-customer-look] :is(.form-body,.confirm-card,.booking-calendar,.slots-section,.confirm-section) { background:var(--customer-ground); color:var(--customer-text); }
  html[data-customer-look] :is(h1,h2,.form-title,.booking-title) { font-family:var(--liff-font-heading,inherit); }

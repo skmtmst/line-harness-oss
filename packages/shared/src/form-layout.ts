@@ -1,6 +1,6 @@
 import type { TapExtras } from './tap-extras.js';
 import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
-import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields";
+import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields.js";
 
 /**
  * 回答フォームの中身（レイアウト）。
