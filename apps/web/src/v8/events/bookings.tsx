@@ -12,13 +12,14 @@
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check, Download, Send } from 'lucide-react'
+import { Inbox, Check, Download, Send } from 'lucide-react'
 import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { DetailPage } from '@/components/templates'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -440,13 +441,13 @@ function Bookings({ eventId }: { eventId: string }) {
       ) : null}
       {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
-      {/* 数の帯。絵（Mu8qW）は4枚のカードなので、共通の KpiCard をカードの見せ方で並べる。 */}
-      <div className={styles.kpis} data-design="KPIs">
-        <KpiCard presentation="card" density="compact" icon={null} title="申込" value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} unit="" detail="人・この回" />
-        <KpiCard presentation="card" density="compact" icon={null} title="承認待ち" value={ready ? requestedSeats : null} unit="" detail="件" />
-        <KpiCard presentation="card" density="compact" icon={null} title="キャンセル待ち" value={ready ? waitingSeats + offeredSeats : null} unit="" detail="人" />
-        <KpiCard presentation="card" density="compact" icon={null} title="キャンセル" value={ready ? cancelledCount : null} unit="" detail="件" />
-      </div>
+      {/* 数の帯は共通の包みとマスに委ねる（Mu8qW）。 */}
+      <KpiBand gridClassName="grid grid-cols-4" data-design="KPIs">
+        <KpiCard presentation="band" icon={<Inbox size={14} />} title="申込" value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} unit="" detail="人・この回" />
+        <KpiCard presentation="band" icon={<Inbox size={14} />} title="承認待ち" value={ready ? requestedSeats : null} unit="" detail="件" />
+        <KpiCard presentation="band" icon={<Inbox size={14} />} title="キャンセル待ち" value={ready ? waitingSeats + offeredSeats : null} unit="" detail="人" />
+        <KpiCard presentation="band" icon={<Inbox size={14} />} title="キャンセル" value={ready ? cancelledCount : null} unit="" detail="件" />
+      </KpiBand>
 
       <section className={styles.card} aria-labelledby="ev-bk-applicants">
         <div className={styles.cardHeadSplit}>

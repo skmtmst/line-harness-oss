@@ -297,14 +297,6 @@
   gap: var(--tpl-toolbar-gap);
   margin-bottom: var(--tpl-toolbar-gap);
 }
-.kpis {
-  --tpl-band-number-size: var(--tpl-ev-bk-kpi-num);
-  --tpl-band-number-lh: var(--tpl-ev-bk-kpi-num-lh);
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-rule-row-gap);
-}
-
 /* 狭い板では名前と期限の列を残り幅へ合わせ、行の操作を右端に収める。 */
 @container v8-page (max-width: 1099px) {
   .mainGrid {

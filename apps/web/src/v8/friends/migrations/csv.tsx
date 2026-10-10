@@ -7,8 +7,8 @@
  * 見せ方：頭（← 友だちへ・タブ）→ 案内 → 書き出す／取り込むの2枚 → 確認の結果 → 履歴。
  * 確認の結果は、確認する前も場所と5つの区分を出しておく（数は「—」）。
  */
-import { jstDate } from '@/lib/jst-datetime'
-import { Download, FileSearch, Info } from 'lucide-react'
+
+import { Inbox, Download, FileSearch, Info } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
@@ -17,6 +17,7 @@ import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
@@ -148,7 +149,7 @@ export default function CsvMigrationsV8() {
           <h3 id="csv-result-title" className={styles.cardTitle}>{m.summary && m.file ? `確認の結果：${m.file.name}` : '確認の結果'}</h3>
           <p className={styles.cardSub}>{m.summary ? 'まだ友だち情報は変えていません' : 'CSVを選んで「まず確認だけする」を押すと、ここに内訳が出ます'}</p>
         </div>
-        <div className={styles.results}>
+        <KpiBand gridClassName="grid grid-cols-5">
           {([
             ['add', '追加', '人', ''],
             ['update', '更新', '人', ''],
@@ -160,17 +161,16 @@ export default function CsvMigrationsV8() {
             return (
               <KpiCard
                 key={key}
-                presentation="card"
-                icon={null}
+                presentation="band"
+                icon={<Inbox size={14} />}
                 title={title}
                 value={value}
                 unit={value == null ? '' : unit}
                 detail={detail || null}
-                className={styles.result}
               />
             )
           })}
-        </div>
+        </KpiBand>
         <div className={styles.resultActions}>
           {m.summary && m.importId ? (
             <>

@@ -49,14 +49,6 @@
 .link { color: var(--color-action); font-size: var(--text-caption); font-weight: 600; }
 .link:hover { text-decoration: underline; }
 
-.results { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); align-items: start; }
-
-:global([data-theme='v8']) .result.result { gap: var(--tpl-compact-gap); padding: var(--tpl-fr-dup-card-pad); }
-:global([data-theme='v8']) .result.result > div:first-child { min-height: 0; }
-:global([data-theme='v8']) .result.result p:first-child { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 400; line-height: var(--tpl-fr-desc-lh); }
-:global([data-theme='v8']) .result.result [data-kpi-number] { font-size: var(--tpl-fr-card-num-size); font-weight: 700; line-height: var(--tpl-fr-dup-num-lh); }
-:global([data-theme='v8']) .result.result > p:last-child { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-fr-sub-lh); }
-:global([data-theme='v8']) .result.result > p:last-child:has(> span:empty) { display: none; }
 
 .resultActions { display: flex; align-items: center; justify-content: center; gap: var(--tpl-toolbar-gap); min-height: var(--tpl-fr-control-h); }
 
@@ -100,8 +92,6 @@
 .faint { color: var(--color-ink-faint); }
 
 /* ── UID移行（Z0jHp・L48eY） ── */
-
-.cards4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); }
 
 .toolRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); min-width: 0; }
 .chipRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }

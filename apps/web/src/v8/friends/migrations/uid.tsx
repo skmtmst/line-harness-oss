@@ -9,7 +9,7 @@
  * → 移行の履歴 → 新しい移行の登録（開いて使う）。
  */
 import { useState } from 'react'
-import { CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
+import { Inbox, CheckCheck, CircleCheck, Download, Plus, Undo2 } from 'lucide-react'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -19,6 +19,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
@@ -160,16 +161,16 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
 
         {active && reviewing ? (
           <>
-            <div className={styles.cards4} role="group" aria-label="照合の内訳">
+            <KpiBand gridClassName="grid grid-cols-4" role="group" aria-label="照合の内訳">
               {([
                 ['auto', '自動で一致', active.counts.auto, 'そのまま引き継ぐ'],
                 ['review', '要確認', active.counts.review, 'いまここで決める'],
                 ['unmatched', '一致しない', active.counts.unmatched, '新しく作るか除く'],
                 ['conflict', '競合', active.counts.conflict, '同じ先に2人'],
               ] as const).map(([key, title, value, detail]) => (
-                <KpiCard key={key} presentation="card" icon={null} title={title} value={value} unit="人" detail={detail} className={styles.result} />
+                <KpiCard key={key} presentation="band" icon={<Inbox size={14} />} title={title} value={value} unit="人" detail={detail} />
               ))}
-            </div>
+            </KpiBand>
 
             <section className={styles.card} aria-labelledby="uid-review">
               <div className={styles.cardHead}>
