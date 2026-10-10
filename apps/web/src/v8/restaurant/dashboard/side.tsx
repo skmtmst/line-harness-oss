@@ -9,7 +9,6 @@
  */
 import {RowActions} from '@/components/shared/row-actions'
 import Card from '@/components/shared/card'
-import { CornerUpLeft } from 'lucide-react'
 import Button from '@/components/shared/button'
 import SectionHeader from '@/components/shared/section-header'
 import StatusBadge from '@/components/shared/status-badge'
@@ -17,7 +16,6 @@ import TextLink from '@/components/shared/text-link'
 import type { GoogleConnectionData, GoogleReview } from '@/lib/restaurant-google-api'
 import type { StoreMedium } from './use-store-today'
 import styles from './dashboard.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
 
 function stars(rating: number): string {
   const n = Math.max(0, Math.min(5, Math.round(rating)))
@@ -41,8 +39,8 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
   const connected = google?.connection.status === 'connected'
   return (
     <div className={styles.side}>
-      <Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action" title="今日の回転"/><div className={styles.rotation}>{['稼働率','回転','滞在','無断取消'].map(label=><div key={label}><span>{label}</span><strong title="この指標はまだ計測されていません">—</strong></div>)}</div></Card>
-      <Card padding="roomy" layout="vertical" gap="12px">
+      <Card variant="aside" padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action" title="今日の回転"/><div className={styles.rotation}>{['稼働率','回転','滞在','無断取消'].map(label=><div key={label}><span>{label}</span><strong title="この指標はまだ計測されていません">—</strong></div>)}</div></Card>
+      <Card variant="aside" padding="roomy" layout="vertical" gap="12px">
       <SectionHeader linkTone="action"
         title="予約サイト・グルメ媒体" note={media?.some(m=>m.storePageUrl||m.adminUrl)?<RowActions subjectName="媒体のリンク" menuItems={media.flatMap(m=>[...(m.storePageUrl?[{id:m.code+'-page',label:`${m.name}の店舗ページ`,href:m.storePageUrl,external:true,onSelect:()=>{}}]:[]),...(m.adminUrl?[{id:m.code+'-admin',label:`${m.name}の管理画面`,href:m.adminUrl,external:true,onSelect:()=>{}}]:[])])}/>:undefined}
         href="/settings/booking-media"
@@ -56,7 +54,7 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
         <p className={styles.sideText}>{media.map(m=>m.name).join('・')}</p>
       )}
 
-      </Card><Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action"
+      </Card><Card variant="aside" padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action"
         title="Google の口コミ"
         href={connected ? '/restaurant-test/google' : undefined}
         linkLabel={connected ? 'すべて見る' : undefined}
@@ -78,8 +76,8 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
           </div>
           {latestReview.comment ? <p className={styles.reviewText}>{latestReview.comment}</p> : null}
           {canWrite ? (
-            <Button variant="text" href={`/restaurant-test/google?tab=reviews&view=draft&id=${encodeURIComponent(latestReview.id)}`}>
-              <CornerUpLeft size={15} aria-hidden="true" />返信する
+            <Button variant="secondary" presentation="restaurant" href={`/restaurant-test/google?tab=reviews&view=draft&id=${encodeURIComponent(latestReview.id)}`}>
+              返信する
             </Button>
           ) : null}
         </div>
@@ -87,7 +85,7 @@ export function SidePanel({ media, google, latestReview, canWrite, now }: {
         <p className={styles.sideText}>未返信の口コミはありません。</p>
       )}
 
-      </Card><Card padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action"
+      </Card><Card variant="aside" padding="roomy" layout="vertical" gap="12px"><SectionHeader linkTone="action"
         title="Instagram の新着"
         help="いまの Instagram 連携は、Googleビジネスの投稿を Instagram にも同時に出すところまでです。DM とコメントの新着は、受け取る口ができてからここに出します。"
         helpLabel="Instagram の新着の説明"
