@@ -116,7 +116,6 @@ shared-button-importer app/login/page.tsx
 shared-button-importer app/login/two-factor/setup/page.tsx
 shared-button-importer app/mileage/action-score-tab.tsx
 shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
-shared-button-importer app/mileage/mileage-history-tab.tsx
 shared-button-importer app/mileage/score-rules/page.tsx
 shared-button-importer app/nen-campaigns/columns/new/column-new-v8.tsx
 shared-button-importer app/nen-campaigns/edit/campaign-editor-v8.tsx

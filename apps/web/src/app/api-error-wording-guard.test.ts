@@ -77,7 +77,6 @@ const BASELINE: Record<string, number> = {
   'app/login/two-factor/setup/page.tsx': 1,
   'app/login/two-factor/two-factor-error.ts': 1,
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx': 1,
-  'app/mileage/mileage-history-tab.tsx': 1,
   'app/mileage/page.tsx': 2,
   'app/nen-campaigns/edit/page.tsx': 1,
   'app/nen-members/photo-review-detail.tsx': 1,

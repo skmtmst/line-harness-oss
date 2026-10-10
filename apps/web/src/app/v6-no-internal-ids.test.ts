@@ -34,6 +34,7 @@ const SCREENS = [
 ] as const
 
 function read(path: string): string {
+  if (path === 'mileage/mileage-history-tab.tsx') return readFileSync(new URL('../v8/mileage/history.tsx', import.meta.url), 'utf8')
   if (path === 'mileage/friends/detail/page.tsx') return readFileSync(new URL('../v8/mileage/friend-detail.tsx', import.meta.url), 'utf8')
   if (['contents/media-detail-dialog.tsx', 'contents/media-replacement-dialog.tsx'].includes(path)) return readFileSync(new URL('../v8/' + path, import.meta.url), 'utf8')
   return readFileSync(new URL(`./${path}`, import.meta.url), 'utf8')
@@ -199,7 +200,7 @@ describe('マイルの発生元 MvZm5 / HIU5O', () => {
   it('履歴の発生元は「元の記録あり／なし」だけを出す', () => {
     const CELL = between(
       read('mileage/mileage-history-tab.tsx'),
-      '{mileageSourceLabel(item.source)}',
+      '<Td className={styles.colWhy}>',
       '</Td>',
     )
     expect(CELL).toContain('mileageSourceNoteText({')

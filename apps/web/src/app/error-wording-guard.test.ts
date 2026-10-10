@@ -59,7 +59,6 @@ const KNOWN_FILES: string[] = [
   'app/inflow-links/detail/page.tsx',
   'app/inflow-links/page.tsx',
   'app/line-notifications/page.tsx',
-  'app/mileage/mileage-history-tab.tsx',
   'app/nen-campaigns/nen-overview.tsx',
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-profile.tsx',

@@ -144,6 +144,10 @@ export default function HistoryTab() {
     setError(false)
     setExportError('')
     setInputRejected(null)
+    if (!selectedAccountId) {
+      setResult(null); setPeriodResult(null); setLoadedAccountId(null); setLoading(false)
+      return
+    }
     if (validateHistoryPeriod(from, to)) {
       setResult(null); setPeriodResult(null); setLoading(false)
       return
@@ -282,7 +286,7 @@ export default function HistoryTab() {
         icon={<History size={14} aria-hidden="true" />}
         value={ready ? mileagePaginationTotal(periodResult) : null}
         unit="件"
-        detail={ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : emptyValue('unknown')}
+        detail={<span title={`この条件で手で動かした分 ${result?.summary.manualCount == null ? '未取得' : `${formatNumber(result.summary.manualCount)} 件`}・反映を待っている ${result?.summary.pendingCount == null ? '未取得' : `${formatNumber(result.summary.pendingCount)} 件`}`}>{ready ? `付けた ${formatNumber(grantedCount)}・使った ${formatNumber(countOf('spend'))}・取り消し ${formatNumber(reversalCount)}` : emptyValue('unknown')}</span>}
       />
       <KpiCard
         presentation="band"
@@ -441,7 +445,9 @@ export default function HistoryTab() {
     </div>
   )
 
-  const body = loading ? (
+  const body = !accountLoading && !selectedAccountId ? (
+    <ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、マイルの履歴を確認できます。" />
+  ) : loading ? (
     <ListState kind="loading" title="マイルの履歴を読み込んでいます" />
   ) : (periodError ?? inputRejected) ? (
     <StateCard title="日付の条件を確認してください" description={periodError ?? inputRejected ?? undefined} />

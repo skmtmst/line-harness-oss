@@ -4,7 +4,7 @@ import { Blob as NodeBlob } from 'node:buffer'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ account: 'A', history: vi.fn() }))
+const mocks = vi.hoisted(() => ({ account: 'A' as string | null, history: vi.fn() }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: mocks.account, loading: false }),
@@ -27,7 +27,7 @@ const result = (name: string) => ({
       status: 'available', mode: 'automatic', executedByStaffName: null, balanceAfter: 500,
       source: 'purchase', sourceReferenceId: null, hasSourceEvent: false,
     }],
-    summary: { byType: [] }, pagination: { total: 1, limit: 20, offset: 0 },
+    summary: { byType: [], manualCount: 2, pendingCount: 1 }, pagination: { total: 1, limit: 20, offset: 0 },
   },
 })
 let blob: NodeBlob | undefined
@@ -50,6 +50,7 @@ test('絞り込み前後の件数が同じでも、表示中の新しい履歴�
   mocks.history.mockImplementation((query) => Promise.resolve(result(query.limit === 1 ? '集計' : query.entryType === 'grant' ? '=次の会員,"B"' : '前の会員')))
   render(<Screen />)
   await ready()
+  expect(screen.getByTitle('この条件で手で動かした分 2 件・反映を待っている 1 件')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '付けた' }))
   await waitFor(() => expect(screen.getByText('=次の会員,"B"')).toBeTruthy())
   await ready()
@@ -132,5 +133,13 @@ test('APIの400は再読み込みの通信障害にせず、日付条件の直�
   await screen.findByText('日付の条件を確認してください')
   expect(screen.getByText('入力した条件を確認してください。開始日は終了日より前の日付を入力してください。')).toBeTruthy()
   expect(screen.queryByText('マイルの履歴を読み込めませんでした')).toBeNull()
+  expect(screen.getByRole('button', { name: 'CSVで書き出す' }).hasAttribute('disabled')).toBe(true)
+})
+
+test('店が未選択なら履歴も集計も取得せず、店を選ぶ案内とCSV禁止を出す', async () => {
+  mocks.account = null
+  render(<Screen />)
+  await screen.findByText('LINEアカウントを選択してください')
+  expect(mocks.history).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: 'CSVで書き出す' }).hasAttribute('disabled')).toBe(true)
 })
