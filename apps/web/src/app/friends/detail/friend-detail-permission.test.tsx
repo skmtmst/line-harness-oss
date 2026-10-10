@@ -143,6 +143,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       Promise.resolve({ success: true, data: { items: [], nextCursor: null } }),
     api: {
       ...actual.api,
+      // 権限の正本は staff.me。固定の偽APIへ漏らさず、この試験の役割を返す。
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: storage.get('lh_staff_role') ?? 'staff' } }) },
       friends: {
         ...actual.api.friends,
         get: () => Promise.resolve({ success: true, data: fixtures.friendDetail }),
