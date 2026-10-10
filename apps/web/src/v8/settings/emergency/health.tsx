@@ -169,7 +169,7 @@ const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; re
 }
 
 /** 表の上の「開いている異常」。受領（メモつき）・通知のやり直し。異常なしと「読めない」を混同しない。 */
-function OpenAlerts({
+export function OpenAlerts({
   alerts,
   failed,
   busyId,
@@ -219,7 +219,7 @@ function OpenAlerts({
               <div className={styles.alertLine}>
                 <StatusPill severity={alert.severity} />
                 <p className={styles.alertText} title={detail}>{`${checkTitle}：${alert.summary}${formatDetectedSince(alert.firstDetectedAt)}`}</p>
-                {alert.status === 'acknowledged' ? <span className={styles.status} data-tone="info">受領済み</span> : null}
+                {alert.status === 'acknowledged' ? <span className={styles.status} data-tone="info">受領済み</span> : alert.status === 'resolved' ? <span className={styles.status} data-tone="info">解消済み</span> : null}
                 {response ? <Link href={response.href} className={styles.srOnly}>対象画面へ</Link> : null}
                 {canManage && alert.status === 'open' ? (
                   <Button variant="secondary" disabled={busy} busy={busy} onClick={() => {
@@ -470,7 +470,7 @@ export function HealthPanelV8({
 
   useEffect(() => { if (hasLoaded.current) onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
-  const openAlerts = alerts.filter((alert) => alert.status !== 'resolved')
+  const openAlerts = alerts.filter((alert) => alert.status !== 'resolved' || alert.notification.failed + alert.notification.unconfigured > 0)
 
   return (
     <>

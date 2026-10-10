@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { OperationAlert } from '@/lib/api'
-import EmergencyPage from './page'
+import { HealthPanelV8 as HealthPanel, OpenAlerts as OperationAlertsPanel } from '@/v8/settings/emergency/health'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -47,7 +47,6 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-const { HealthPanel, OperationAlertsPanel } = EmergencyPage.__test
 
 function alert(overrides: Partial<OperationAlert> = {}): OperationAlert {
   return {
@@ -88,7 +87,7 @@ afterEach(() => {
 describe('運用異常の受領・通知再開UI', () => {
   it('未受領alertへメモを入力して受領できる', () => {
     const onAcknowledge = vi.fn()
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[alert()]}
       failed={false}
       busyId={null}
@@ -96,8 +95,9 @@ describe('運用異常の受領・通知再開UI', () => {
       onRetry={vi.fn()}
     />)
 
-    fireEvent.change(screen.getByLabelText('受領メモ（任意）'), { target: { value: 'Webhook設定を確認中' } })
     fireEvent.click(screen.getByRole('button', { name: '受領する' }))
+    fireEvent.change(screen.getByLabelText('受領メモ。「受領を記録する」で記録します。'), { target: { value: 'Webhook設定を確認中' } })
+    fireEvent.click(screen.getByRole('button', { name: '受領を記録する' }))
 
     expect(onAcknowledge).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'alert-1', version: 1 }),
@@ -110,7 +110,7 @@ describe('運用異常の受領・通知再開UI', () => {
     const failedAlert = alert({
       notification: { queued: 0, sending: 0, sent: 1, failed: 2, unconfigured: 0, total: 3 },
     })
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[failedAlert]}
       failed={false}
       busyId={null}
@@ -118,23 +118,23 @@ describe('運用異常の受領・通知再開UI', () => {
       onRetry={onRetry}
     />)
 
-    expect(screen.getByText('2件の通知が送れませんでした。再送できます。')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '失敗した通知を再送する' }))
+    expect(screen.getByTitle(/2 件の通知が送れませんでした。再送できます。/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '通知をやり直す' }))
     expect(onRetry).toHaveBeenCalledWith(failedAlert)
   })
 
   it('取得失敗を異常なしへ倒さず、受領済みは再受領できない', () => {
-    const { rerender } = render(<OperationAlertsPanel
+    const { rerender } = render(<OperationAlertsPanel canManage
       alerts={[]}
       failed
       busyId={null}
       onAcknowledge={vi.fn()}
       onRetry={vi.fn()}
     />)
-    expect(screen.getByText(/異常の受領・通知記録を取得できませんでした/)).toBeTruthy()
+    expect(screen.getByText(/異常の受領・通知記録を読み込めませんでした/)).toBeTruthy()
     expect(screen.queryByText(/異常の記録はありません/)).toBeNull()
 
-    rerender(<OperationAlertsPanel
+    rerender(<OperationAlertsPanel canManage
       alerts={[alert({ status: 'acknowledged' })]}
       failed={false}
       busyId={null}
@@ -157,7 +157,7 @@ describe('運用異常の受領・通知再開UI', () => {
         actorId: null, note: null, alertVersion: 2, createdAt: '2026-09-16T00:10:00.000Z',
       }],
     })
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[resolved]}
       failed={false}
       busyId={null}
@@ -166,8 +166,8 @@ describe('運用異常の受領・通知再開UI', () => {
     />)
 
     expect(screen.getByText('解消済み')).toBeTruthy()
-    expect(screen.getByText('1件の通知が送れませんでした。再送できます。')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '失敗した通知を再送する' }))
+    expect(screen.getByTitle(/1 件の通知が送れませんでした。再送できます。/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '通知をやり直す' }))
     expect(onRetry).toHaveBeenCalledWith(resolved)
   })
 
@@ -176,7 +176,7 @@ describe('運用異常の受領・通知再開UI', () => {
     const unconfigured = alert({
       notification: { queued: 0, sending: 0, sent: 0, failed: 0, unconfigured: 1, total: 0 },
     })
-    render(<OperationAlertsPanel
+    render(<OperationAlertsPanel canManage
       alerts={[unconfigured]}
       failed={false}
       busyId={null}
@@ -184,7 +184,7 @@ describe('運用異常の受領・通知再開UI', () => {
       onRetry={onRetry}
     />)
 
-    expect(screen.getByText(/1件の通知先が未設定です/)).toBeTruthy()
+    expect(screen.getByTitle(/1 件の通知先が未設定です/)).toBeTruthy()
     expect(screen.queryByText(/0件の通知を送信しました/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '通知先を再確認する' }))
     expect(onRetry).toHaveBeenCalledWith(unconfigured)
@@ -192,9 +192,9 @@ describe('運用異常の受領・通知再開UI', () => {
 
   it('account選択解除後に旧accountの遅いalert応答を表示しない', async () => {
     alertRequest.promise = new Promise((resolve) => { alertRequest.resolve = resolve })
-    const { rerender } = render(<HealthPanel accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    const { rerender } = render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
 
-    rerender(<HealthPanel accountId={null} manualRunRequest={0} onSeverity={vi.fn()} />)
+    rerender(<HealthPanel canManage accountId={null} manualRunRequest={0} onSeverity={vi.fn()} />)
     await act(async () => {
       alertRequest.resolve?.({ success: true, data: [alert({ summary: '旧accountの異常' })] })
       await Promise.resolve()
@@ -220,12 +220,12 @@ describe('運用異常の受領・通知再開UI', () => {
       })],
     })
     alertRequest.retry = () => new Promise((resolve) => { resolveRetry = resolve })
-    const { rerender } = render(<HealthPanel accountId="account-A" manualRunRequest={0} onSeverity={vi.fn()} />)
+    const { rerender } = render(<HealthPanel canManage accountId="account-A" manualRunRequest={0} onSeverity={vi.fn()} />)
     // 板の1行は「項目名：内容（いつから〜）」の形。内容の部分一致で見る。
     await screen.findByText(/account-Aの異常/)
-    fireEvent.click(screen.getByRole('button', { name: '失敗した通知を再送する' }))
+    fireEvent.click(screen.getByRole('button', { name: '通知をやり直す' }))
 
-    rerender(<HealthPanel accountId="account-B" manualRunRequest={0} onSeverity={vi.fn()} />)
+    rerender(<HealthPanel canManage accountId="account-B" manualRunRequest={0} onSeverity={vi.fn()} />)
     await screen.findByText(/account-Bの異常/)
     await act(async () => {
       resolveRetry?.({ success: true, data: { retried: 1 } })
@@ -238,4 +238,30 @@ describe('運用異常の受領・通知再開UI', () => {
       expect(screen.queryByText(/通知または通知先を再確認しました/)).toBeNull()
     })
   })
+
+  it('現役の健全性画面でも解消済みの失敗通知を隠さず再送できる', async () => {
+    alertRequest.handler = async () => ({ success: true, data: [alert({
+      status: 'resolved', resolvedAt: '2026-09-16T00:10:00.000Z',
+      notification: { queued: 0, sending: 0, sent: 0, failed: 1, unconfigured: 0, total: 1 },
+    })] })
+    const retry = vi.fn(async () => ({ success: true, data: { retried: 1 } }))
+    alertRequest.retry = retry
+    render(<HealthPanel canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    await screen.findByText('解消済み')
+    expect(screen.getByTitle(/1 件の通知が送れませんでした/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '通知をやり直す' }))
+    await waitFor(() => expect(retry).toHaveBeenCalledWith('account-1'))
+    expect(await screen.findByText(/1 件の通知または通知先を再確認しました/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '受領する' })).toBeNull()
+  })
+
+  it('閲覧のみなら異常を読めても受領と通知再送の操作は出さない', () => {
+    render(<OperationAlertsPanel canManage={false} alerts={[alert({
+      notification: { queued: 0, sending: 0, sent: 0, failed: 1, unconfigured: 0, total: 1 },
+    })]} failed={false} busyId={null} onAcknowledge={vi.fn()} onRetry={vi.fn()} />)
+    expect(screen.getByTitle(/1 件の通知が送れませんでした/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '受領する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '通知をやり直す' })).toBeNull()
+  })
+
 })

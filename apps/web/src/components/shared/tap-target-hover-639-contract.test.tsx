@@ -105,15 +105,17 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
     expect(readApp('booking/menus/staff/page.tsx')).toContain('variant="primary"')
     // V8 移行 ①: 緊急停止の操作は共通 Button へ。塗りとホバー（brightness）の
     // 持ち主は共通部品で、画面側は寸法の指定だけを持つ。
-    expect(readApp('emergency/page.tsx')).toContain('variant="primary"')
-    expect(readApp('emergency/page.tsx')).toContain('min-h-9')
+    expect(readApp('../v8/settings/emergency/health.tsx')).toContain('variant="secondary"')
+    const buttonCss = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'button.module.css'), 'utf8')
+    expect(buttonCss).toContain('.secondary:hover:not(:disabled)')
+    expect(buttonCss).toContain('min-height:')
     // 流入経路モーダル・プールは brightness で沈む（生の色を増やさない）。
     // 2026-09-25: 白字 3.77:1 の bg-emerald-600 を bg-success（5.61:1）へ。
     // 見張りはホバー変化の有無（意図は変えない）。
     expect(readApp('inflow-links/_components/create-genre-modal.tsx')).toContain('bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90')
     // ★V7 C5: 流入リンク編集窓は共通 Dialog＋Button primary へ寄せた。ホバー変化は共通 Button が持つ。
     expect(readApp('inflow-links/_components/edit-route-modal.tsx')).toContain('variant="primary"')
-    expect(readApp('pools/page.tsx')).toContain('bg-action text-on-accent hover:brightness-90')
+    expect(readApp('../v8/settings/pools/pools.tsx')).toContain('variant="primary"')
     // 白地の枠付き口は沈み色へ、淡色ピルは brightness で応答する。
     // V8 移行 ①: 白地の枠付き口は共通 Button secondary へ。沈み色は部品が持つ。
     expect(readFileSync(join(HERE, '../../v8/tags/folder-page.tsx'), 'utf8')).toContain('<FolderEditorDialog')

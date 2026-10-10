@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const apiSource = readFileSync(join(process.cwd(), 'src/lib/api.ts'), 'utf8')
-const pageSource = readFileSync(join(process.cwd(), 'src/app/emergency/page.tsx'), 'utf8')
+const pageSource = ['src/app/emergency/page.tsx', 'src/v8/settings/emergency/health.tsx', 'src/v8/settings/emergency/screen.tsx'].map((file) => readFileSync(join(process.cwd(), file), 'utf8')).join('\n')
 const fixtureSource = readFileSync(join(process.cwd(), '../../scripts/visual-qa/fixtures.mjs'), 'utf8')
 const mockSource = readFileSync(join(process.cwd(), '../../scripts/visual-qa/mock-api.mjs'), 'utf8')
 

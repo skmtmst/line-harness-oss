@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const source = ['../../v8/settings/emergency/screen.tsx', '../../v8/settings/emergency/health.tsx', 'control-v8.tsx', '../../v8/settings/emergency/history.tsx'].map((file) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), file), 'utf8')).join('\n')
 
 /** 注釈を落とす。**「なぜ h1 をやめたか」を書いた注釈が見張りに当たらないように。** */
 const visible = source
@@ -19,8 +19,8 @@ const visible = source
  */
 describe('Y4LkX1 運用状態の表示確認', () => {
   it('板 Y4LkX1 の骨組みで作る', () => {
-    expect(source).toContain("data-design-node={tab === 'health' ? 'Y4LkX1'")
-    expect(source).toContain('<ReadonlyHeaderV8 title="運用状態"')
+    expect(source).toContain("boardId={tab === 'health' ? 'Y4LkX1'")
+    expect(source).toContain('title="運用状態"')
   })
 
   it('タブは板の並び（健全性チェック・更新履歴・緊急コントロール）', () => {
@@ -31,19 +31,19 @@ describe('Y4LkX1 運用状態の表示確認', () => {
   })
 
   it('確定済み画面と同じ小さな文字階層を使い、h1 を重ねない', () => {
-    expect(source).toContain('<PageHeader')
+    expect(source).toContain('<SbSettingsScreen')
     expect(visible).not.toMatch(/<h1[\s>]/)
-    expect(source).toContain('text-base font-bold text-ink">{`開いている異常')
-    expect(source).toContain('text-base font-bold text-ink">何を止めますか')
-    expect(source).toContain('text-base font-bold text-ink">復旧</h2>')
-    expect(source).toContain('text-base font-bold text-ink">止めた・戻した記録')
+    expect(source).toContain('className={styles.alertsTitle}')
+    expect(source).toContain('何を止めますか')
+    expect(source).toContain('復旧')
+    expect(source).toContain('止めた・戻した記録')
   })
 
   it('タブごとの説明をPenと同じ内容で表示する', () => {
-    expect(source).toContain('問題がないか自動で確認し、エラーがあれば内容と次の行動を表示します。')
+    expect(source).toContain('musubo とつながる先が動いているかを、9 つの項目を5分ごとに自動で確かめます。')
     expect(source).toContain('止める配信を選び、理由を入力して緊急停止します。')
     expect(source).toContain('エラー、緊急停止、システム更新、設定変更を時間順に確認できます。')
-    expect(source).toContain("description={tab === 'history' ? '' : description}")
+    expect(source).toContain('help={description}')
   })
 
   it('サーバーが保存した9つのチェック項目を板の言葉と並びで常に表示する', () => {
@@ -92,7 +92,7 @@ describe('Y4LkX1 運用状態の表示確認', () => {
 
   it('全体の帯・下の3枚と上部の主要操作を表示する', () => {
     for (const label of ['止めた回数', 'いちばん長かった停止', 'いまの版']) {
-      expect(source).toContain(`label="${label}"`)
+      expect(source).toContain(`title="${label}"`)
     }
     expect(source).toContain('いますぐ確かめる')
     expect(source).toContain('api.operations.history')
@@ -117,7 +117,7 @@ describe('Y4LkX1 運用状態の表示確認', () => {
     expect(source).toContain('api.operations.restore')
     expect(source).toContain('api.operations.history')
     expect(source).toContain('api.operations.stepUp')
-    expect(source).toContain('認証アプリの6桁コード')
+    expect(source).toContain('認証アプリの6桁')
     expect(source).toContain("item.historyKind === 'deployment'")
     expect(source).toContain("'auto_reply_dispatch'")
     expect(source).not.toContain('nen_emergency_snapshot_v1')
