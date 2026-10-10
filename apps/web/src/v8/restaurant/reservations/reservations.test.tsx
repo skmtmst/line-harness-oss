@@ -20,13 +20,18 @@ import ReservationsPage from './reservations'
 import { at, reservation, snapshotOf } from '../booking-kit/test-data'
 
 /* 今日：佐藤（LINE・T1）・山田（食べログ・承認待ち・T3・乳）・押さえ（T4）。 */
-const today = [
+const reservationsToday = () => [
   reservation('r1', { customer_name: '佐藤 健', source: 'line', starts_at: at(0, 18), ends_at: at(0, 20), table_id: 't1' }),
   reservation('r2', { customer_name: '山田 太郎', source: 'tabelog', status: 'pending', allergy_note: '乳', guest_count: 4, starts_at: at(0, 18, 30), ends_at: at(0, 20, 30), table_id: 't3', course_name: 'おまかせコース' }),
   reservation('r3', { customer_name: '押さえ', source: 'phone', status: 'pending', hold_expires_at: at(0, 23), note: '電話のお客さま用', guest_count: 4, starts_at: at(0, 20), ends_at: at(0, 21, 30), table_id: 't4' }),
 ]
 
+let today: ReturnType<typeof reservationsToday>
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+  today = reservationsToday()
   role.value = 'owner'
   fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
   fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: today } })
@@ -36,7 +41,7 @@ beforeEach(() => {
   fixture.customerSearch.mockResolvedValue({ data: [] })
   fixture.customerHistory.mockResolvedValue({ data: { visitCount: 0, visits: [] } })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   it('その日が臨時休業・貸切なら、帯と「休業日・貸切を見る」を出す（予約は取り消さない）', async () => {
@@ -112,7 +117,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '090-0000-1111' } })
     fireEvent.click(screen.getByRole('button', { name: '17:00' }))
     fireEvent.click(await screen.findByRole('button', { name: /台帳に入れる/ }))
-    await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledWith('account-1', expect.objectContaining({ customerName: '鈴木 花子', customerPhone: '090-0000-1111', guestCount: 2, source: 'phone', kind: 'customer' })))
+    await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledWith('account-1', expect.objectContaining({ customerName: '鈴木 花子', customerPhone: '090-0000-1111', guestCount: 2, source: 'phone', kind: 'customer', startsAt: '2026-10-10T08:00:00.000Z', endsAt: '2026-10-10T10:00:00.000Z' })))
   })
   it('電話予約の入力不足は欄で知らせ、最初の欄へ移動し、保存しない', async () => {
     const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
@@ -144,5 +149,28 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     expect(screen.getByText('お客様名を入れてください。')).not.toBeNull()
     scroll.mockRestore()
+  })
+})
+
+
+describe('日本時間の今日（端末の時間帯とは別）', () => {
+  it.each([
+    ['2026-10-11T00:09:00+09:00', true],
+    ['2026-10-11T23:59:00+09:00', false],
+    ['2026-10-11T09:00:00+09:00', true],
+  ] as const)('日本時間のその日の予約を読み、過ぎた予約は「次」に出さない（%s）', async (instant, hasNext) => {
+    vi.setSystemTime(new Date(instant))
+    today = reservationsToday()
+    fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
+    fixture.reservationsDay.mockResolvedValue({ data: { date: '2026-10-11', reservations: today } })
+    render(<ReservationsPage />)
+    await screen.findByRole('button', { name: /^佐藤 健 2名/ })
+    expect(fixture.reservationsDay).toHaveBeenCalledWith('account-1', 'store-1', '2026-10-11')
+    expect(screen.getByRole('heading', { name: '10月11日（日）' })).not.toBeNull()
+    expect(Boolean(screen.queryByRole('button', { name: '詳細を見る' }))).toBe(hasNext)
+    fireEvent.click(screen.getByRole('button', { name: '次の日' }))
+    await waitFor(() => expect(fixture.reservationsDay).toHaveBeenCalledWith('account-1', 'store-1', '2026-10-12'))
+    fireEvent.click(screen.getByRole('button', { name: '前の日' }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: '10月11日（日）' })).not.toBeNull())
   })
 })

@@ -3,6 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+
 const api = vi.hoisted(() => ({
   snapshot: vi.fn(), storeContext: vi.fn(), reservationsDay: vi.fn(), channelCloseTasks: vi.fn(), openingHours: vi.fn(),
   postSeatVisitMark: vi.fn(), deleteSeatVisitMark: vi.fn(), completeChannelCloseTask: vi.fn(), mediaLinks: vi.fn(),
@@ -22,11 +28,13 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRo
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 
 import RestaurantDashboardV8 from './dashboard'
-import { reservation, snapshotOf } from '../booking-kit/test-data'
+import { at, reservation, snapshotOf } from '../booking-kit/test-data'
 
-const today = (hour: number) => { const d = new Date(); d.setHours(hour, 0, 0, 0); return d.toISOString() }
+const today = (hour: number) => at(0, hour)
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
   api.snapshot.mockResolvedValue({ data: snapshotOf() })
   api.storeContext.mockResolvedValue({ data: { selectedStore: { id: 'store-1', name: '渋谷店' } } })
@@ -46,7 +54,7 @@ beforeEach(() => {
   google.connection.mockResolvedValue({ connection: { status: 'disconnected' }, summary: { unrepliedCount: 0 }, store: { name: '渋谷店' } })
   google.listReviews.mockResolvedValue({ reviews: [] })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('hKRRF 今日のお店', () => {
   it('店のタブ・枠を閉じる知らせ・数・今日の予約・媒体が出て、［来店］で来店の印を付ける', async () => {

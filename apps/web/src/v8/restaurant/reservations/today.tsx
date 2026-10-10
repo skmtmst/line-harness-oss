@@ -28,7 +28,7 @@ import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-te
 import { StatRow } from '../booking-kit/shell'
 import {
   INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, isHold, mdWeek, minutesOf,
-  sameDay, shortCourse, slotLabel, sourceKind, sourceName, dayRange, toYmd,
+  addDays, sameDay, shortCourse, slotLabel, sourceKind, sourceName, dayRange, toYmd,
 } from './format'
 import styles from './reservations.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -80,7 +80,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
 
   /* 次の予約：その日の残りから。無ければ（営業の後など）次の日以降の予約から出し、日付も書く。 */
   const next = useMemo(() => {
-    const nowMs = isToday ? Date.now() : new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime()
+    const nowMs = isToday ? Date.now() : Date.parse(dayRange(day).from)
     const sorted = (list: RestaurantReservation[]) => list
       .filter((item) => !INACTIVE_STATUSES.includes(item.status) && !isHold(item) && new Date(item.starts_at).getTime() >= nowMs)
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
@@ -122,9 +122,9 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
       <div className={styles.todayColumns}>
         <div className={styles.calendarWrap} role="region" aria-label={`${dayTitle(day)}の時間×卓`}>
         <ReservationBoard axis={axis} onAxis={v=>{setAxis(v);if(v==='list')onView('list');else if(v==='month')onView('month')}} toolbar={<>
-        <IconButton aria-label="前の日" onClick={() => onDay(new Date(day.getFullYear(), day.getMonth(), day.getDate() - 1))}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
+        <IconButton aria-label="前の日" onClick={() => onDay(addDays(day, -1))}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
         <h2 className={styles.dateTitle}>{dayTitle(day)}</h2>
-        <IconButton aria-label="次の日" onClick={() => onDay(new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1))}><ChevronRight size={16} aria-hidden="true" /></IconButton>
+        <IconButton aria-label="次の日" onClick={() => onDay(addDays(day, 1))}><ChevronRight size={16} aria-hidden="true" /></IconButton>
         <Button presentation="restaurant" onClick={() => onDay(new Date())} disabled={isToday}>今日</Button>
 
 
