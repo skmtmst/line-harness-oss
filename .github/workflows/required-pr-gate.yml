@@ -642,6 +642,11 @@ jobs:
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      - name: List row rules (B-190/193/194/195/198, with negative controls)
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          node apps/web/scripts/list-row-audit.mjs
+          node apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json
       - name: All admin page titles are 22px / 700 / 32px at 1440
         if: steps.scope.outputs.run == 'true'
         run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
