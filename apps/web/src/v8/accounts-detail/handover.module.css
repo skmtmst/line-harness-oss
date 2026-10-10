@@ -110,7 +110,6 @@
 }
 .pendingText {
   flex: 1;
-  min-width: 0;
   margin: 0;
   color: var(--tpl-acd-warn-ink);
   font-size: var(--tpl-acd-ho-band-size);
@@ -141,11 +140,7 @@
   line-height: var(--tpl-acd-note-lh);
   white-space: pre-line;
 }
-.error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--tpl-acd-value-size);
-}
+
 
 /* 下の行：未判断の数・引き継ぎをやめる・本実行する。 */
 .bottomNote {
@@ -168,3 +163,5 @@
 }
 
 .nameStack { display: flex; flex-direction: column; gap: var(--tpl-acd-ho-name-gap); min-width: 0; }
+
+.pendingText, .pendingTextNoticePlacement { min-width: 0; margin: 0; }

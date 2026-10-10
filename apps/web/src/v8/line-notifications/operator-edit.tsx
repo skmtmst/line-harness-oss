@@ -1,13 +1,12 @@
 'use client'
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
-
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { Check, Eye, Send } from 'lucide-react'
+import { Check, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
@@ -16,44 +15,27 @@ import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { Field as FormField } from '@/components/shared/form-controls'
+import { Field as FormField, FieldError } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import FormSection from '@/components/shared/form-section'
 import ListState from '@/components/shared/list-state'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type OperatorRecipientPreview } from '@/lib/api'
-import {
-  describeApiFailure,
-  isForbidden,
-  isForbiddenOrRateLimited,
-  loadFailureNotice,
-} from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { ROLE_LABELS } from '@/lib/hq-members'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import type { OperatorNotificationTeam } from '@line-crm/shared'
-import {
-  DEDUPE_OPTIONS,
-  DEFAULT_EVENT_TYPE,
-  EVENT_OPTIONS,
-  IMPORTANCE_OPTIONS,
-  RECIPIENTS_SAVE_GUARD_MESSAGE,
-  SCHEDULE_OPTIONS,
-  THRESHOLD_OPTIONS,
-  eventLabel,
-  eventPlaceLabel,
-  importanceLabel,
-  readConditions,
-} from './operator-words'
+import { DEDUPE_OPTIONS, DEFAULT_EVENT_TYPE, EVENT_OPTIONS, IMPORTANCE_OPTIONS, RECIPIENTS_SAVE_GUARD_MESSAGE, SCHEDULE_OPTIONS, THRESHOLD_OPTIONS, eventLabel, eventPlaceLabel, importanceLabel, readConditions } from './operator-words'
 import styles from './operator-edit.module.css'
 import { useFormErrors } from '@/lib/use-form-errors'
-import { FieldError } from '@/components/shared/form-controls'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 運用者へのお知らせを作る・なおす（板 `gjUz3` 作る・`hiBO8` なおす、公開前の確認 `sDXNy`）。
@@ -482,10 +464,7 @@ function OperatorEditInner() {
         <SettingsInnerNav inline />
         <div className={styles.content}>
           {canWrite ? null : (
-            <div className={styles.roBand} role="status">
-              <Eye size={14} aria-hidden="true" />
-              <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-            </div>
+            <div className={styles.roBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
           )}
           <DetailColumns
             presentation="notification"
@@ -576,7 +555,7 @@ function OperatorEditInner() {
                 {/* 絵 gjUz3：チームを選んでいるときはスタッフの箱を出さない（顔ぶれはチームのとおり）。 */}
                 {teamId ? (teamError ? (
                   <div className={styles.teamError}>
-                    <p role="alert">{teamError}</p>
+                    <Notice tone="danger" >{teamError}</Notice>
                     <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
                   </div>
                 ) : null) : (
@@ -609,11 +588,9 @@ function OperatorEditInner() {
                     : recipientsError !== null
                       ? (
                         <div>
-                          <p className={styles.cardNote} role="alert">
-                            {isForbiddenOrRateLimited(recipientsError)
+                          <Notice tone="danger" className={styles.cardNoteNoticePlacement} >{isForbiddenOrRateLimited(recipientsError)
                               ? loadFailureNotice(recipientsError, '受け取る人')
-                              : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}
-                          </p>
+                              : '受け取る人を読み込めませんでした。時間をおいて、もう一度お試しください。'}</Notice>
                           {isForbidden(recipientsError) ? null : (
                             <Button variant="secondary" onClick={() => loadRecipients()}>もう一度読み込む</Button>
                           )}
@@ -636,7 +613,7 @@ function OperatorEditInner() {
                   ) : null}
                   {teamError ? (
                     <div className={styles.teamError}>
-                      <p role="alert">{teamError}</p>
+                      <Notice tone="danger" >{teamError}</Notice>
                       <Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button>
                     </div>
                   ) : null}
@@ -661,7 +638,7 @@ function OperatorEditInner() {
                 <p className={styles.cardNote}>営業時間外のものは翌朝 10:00 にまとめて送ります。</p>
               </FormSection>
 
-              {error ? <p className={styles.formError} role="alert">{error}</p> : null}
+              {error ? <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice> : null}
               {notice ? <p className={styles.formNotice} role="status">{notice}</p> : null}
           </DetailColumns>
 

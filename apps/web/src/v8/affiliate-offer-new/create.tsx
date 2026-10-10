@@ -1,7 +1,6 @@
 'use client'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
@@ -21,13 +20,12 @@ import { TextField } from '@/components/shared/text-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import styles from './create.module.css'
-import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8-B 案件を作る（絵 Td4TN・機能追加 F-23）。
@@ -229,7 +227,7 @@ export default function AffiliateOfferCreateV8() {
 
   const retry = (what: string) => (
     <div className={styles.retry}>
-      <p className={styles.error} role="alert">{`${what}の候補を読み込めませんでした。`}</p>
+      <Notice tone="danger" >{`${what}の候補を読み込めませんでした。`}</Notice>
       <Button type="button" variant="secondary" size="compact" onClick={() => setCandidateSeq((n) => n + 1)}>もう一度読み込む</Button>
     </div>
   )
@@ -258,7 +256,7 @@ export default function AffiliateOfferCreateV8() {
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="Td4TN"
-      identity={<></>}
+
       title="案件を作る"
       help="「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。"
       preview={preview}
@@ -279,8 +277,8 @@ export default function AffiliateOfferCreateV8() {
         </>
       )} dirty={false}
     >
-      {canEdit ? null : <p className={styles.viewerBand} role="status">閲覧のみで見ています。案件を作るのはオーナーか管理者に頼んでください。</p>}
-      {saveError ? <p className={styles.error} role="alert">{saveError}</p> : null}
+      {canEdit ? null : <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。案件を作るのはオーナーか管理者に頼んでください。</ReadOnlyNotice></div>}
+      {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}
       {saveNote ? <p className={styles.note} role="status">{saveNote}</p> : null}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 

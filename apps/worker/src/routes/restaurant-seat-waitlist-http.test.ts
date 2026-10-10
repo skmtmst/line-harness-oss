@@ -102,6 +102,9 @@ function get(path: string) {
 }
 
 function patch(path: string, body: unknown) {
+  const id=path.match(/^\/api\/restaurant-test\/reservations\/([^/?]+)(?:\?|$)/)?.[1];
+  if(id&&body&&typeof body==='object'&&!('expectedVersion' in body))body={...body,expectedVersion:((testDb.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(id)) as {customer_version:number}|undefined)?.customer_version??1};
+
   return app().request(`${path}?account_id=account-1`, {
     method: 'PATCH',
     headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },

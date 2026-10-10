@@ -9,6 +9,7 @@ const fixture = vi.hoisted(() => ({
 }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
+vi.mock('@/lib/api-reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api-reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:vi.fn().mockResolvedValue({success:true,data:[]})}}})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -16,6 +17,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRo
 
 import ReservationsPage from '../restaurant/reservations/reservations'
 import { at, reservation, snapshotOf } from '../restaurant/booking-kit/test-data'
+
 
 /* 鈴木（Hot Pepper・T4・秋の鹿肉コース・電話あり）と、押さえ（T1）。 */
 const reservationsToday = () => [
@@ -26,7 +28,8 @@ let today: ReturnType<typeof reservationsToday>
 
 beforeEach(() => {
   // 台帳の「今日」と「次の予約」、来店日の年比較を固定する。待ち合わせのタイマーは実時間のまま。
-  vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 10, 12) })
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   today = reservationsToday()
   role.value = 'owner'
   fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 2 }) })
@@ -70,7 +73,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(fixture.updateReservation).not.toHaveBeenCalled()
     const confirm = await screen.findByRole('dialog', { name: 'この予約を取り消しますか？' })
     fireEvent.click(within(confirm).getByRole('button', { name: '取り消す' }))
-    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled' }))
+    await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', { status: 'cancelled', expectedVersion: 1 }))
   })
 
   it('変更するで今の変更の窓へ移る', async () => {

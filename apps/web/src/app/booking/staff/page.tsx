@@ -1,8 +1,8 @@
 'use client'
 
 import { usePermissionAccess } from '@/lib/use-feature-access'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PageHeading } from '@/components/templates/page-frame'
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
@@ -18,8 +18,10 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-// 編集窓は V8 予約設定の担当スタッフタブ（menus/settings-v8.tsx）と共用。
 import { EMPTY_STAFF as EMPTY, StaffEditModal } from './staff-edit-dialog'
+
+// 編集窓は V8 予約設定の担当スタッフタブ（menus/settings-v8.tsx）と共用。
+
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -172,7 +174,7 @@ export default function BookingStaffPage() {
         </Button> : null}
       </div>
 
-      {!canManageStaff ? <p role="status">閲覧のみで見ています。予約スタッフの変更には予約設定の変更権限が必要です。</p> : null}
+      {!canManageStaff ? <ReadOnlyNotice>閲覧のみで見ています。予約スタッフの変更には予約設定の変更権限が必要です。</ReadOnlyNotice> : null}
 
       {!selectedAccountId ? (
         <div className="bg-canvas rounded-card border border-hairline">

@@ -14,7 +14,7 @@ import { folderById, folderCreator } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import FieldEditor, { type FieldEditorValues } from './field-editor'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8「友だち情報欄を編集」（Pencil `w9zY5` の編集の形）の入口。
@@ -244,7 +244,7 @@ export default function FieldEdit() {
     )
   }
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   const notices = (
     <>

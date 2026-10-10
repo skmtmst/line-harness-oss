@@ -1,7 +1,7 @@
 'use client'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeftRight, Armchair, BookOpen, Check, TriangleAlert, RefreshCw, Trash2 } from 'lucide-react'
+import { Armchair, BookOpen, Check, Trash2 } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
@@ -12,7 +12,7 @@ import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextField } from '@/components/shared/text-field'
+
 import DateField from '@/components/shared/date-field'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import TimeField from '@/components/shared/time-field-v8'
@@ -494,7 +494,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               </Card>
             ) : null}
             <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta="曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）" />
-            {hoursError ? <p className={styles.hoursError} role="alert">{hoursError}</p> : null}
+            {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement} >{hoursError}</Notice> : null}
             {hoursDraft ? WEEK_ORDER.map((weekday) => {
               const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
               const open = day.periods.length > 0

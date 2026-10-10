@@ -6,7 +6,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Circle, CircleCheck, CircleAlert, CircleX, GitBranch, Pencil, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw } from 'lucide-react'
 import { api, ApiError, type RichMenuPublishRun, type RichMenuTargetPreview } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
@@ -20,9 +20,10 @@ import { audienceOf, progressStatusText, runAudienceText, runStamp, type Progres
 import styles from './detail.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 リッチメニューの詳細（公開した・公開の進み）`hKr8f`。一から書いた画面（2026-10-07）。
@@ -312,14 +313,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         <div className={styles.split}>
           <div className={styles.content}>
             {failed ? (
-              <div className={styles.failBand} role="alert">
-                <CircleAlert size={18} aria-hidden="true" className={styles.failIcon} />
-                <div className={styles.bandText}>
-                  <p className={styles.bandTitle}>公開が途中で止まりました</p>
-                  <p className={styles.bandNote}>{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</p>
-                </div>
-                {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={14} aria-hidden="true" />もう一度公開する</Button> : null}
-              </div>
+              <Notice tone="danger" heading={<> 公開が途中で止まりました </>} action={<> {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={14} aria-hidden="true" />もう一度公開する</Button> : null} </>} >{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</Notice>
             ) : progress ? (
               <div className={styles.doneBand} role="status">
                 <CircleCheck size={18} aria-hidden="true" className={styles.doneIcon} />
@@ -336,7 +330,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               </div>
             ) : null}
             {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-            {actionError ? <p className={styles.errorText} role="alert">{actionError}</p> : null}
+            {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
             <section className={styles.card} aria-label="公開の進み">
               <h2 className={styles.cardTitle}>公開の進み</h2>
@@ -408,7 +402,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                 <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
               </div>
             )}
-            {canOperate || role === null ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・取り下げは管理者の操作です。</p>}
+            {canOperate || role === null ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・取り下げは管理者の操作です。</ReadOnlyNotice></div>}
             <section className={styles.aboutBox} aria-label="いまの状態">
               <h2 className={styles.aboutTitle}>いまの状態</h2>
               <dl className={styles.aboutList}>

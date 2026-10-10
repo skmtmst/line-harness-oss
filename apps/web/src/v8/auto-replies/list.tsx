@@ -1,53 +1,27 @@
 'use client'
-import { Clock } from 'lucide-react';
-import { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import { scheduleChipLabels, scheduleText } from './words';
-
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-import { canManageRole } from '@/lib/staff-role';
+import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import SharedStatusPill from '@/components/shared/status-pill'
-import BulkBar from '@/components/shared/bulk-bar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { useListUrlValue, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
-import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Activity,
-  Ban,
-  ChevronDown,
-  CircleCheck,
-  CircleHelp,
-  Copy,
-  Folder as FolderIcon,
-  Layers,
-  MessageSquare,
-  Pause,
-  Pencil,
-  Square,
-  Play,
-  Trash2,
-  TriangleAlert,
-  Zap,
-  Bookmark,
-  Eye,
-  Plus,
-} from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
 import { useLiveReorder } from '@/lib/use-live-reorder'
@@ -61,7 +35,6 @@ import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import { ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import TagOverflow from '@/components/shared/tag-overflow'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
@@ -71,33 +44,19 @@ import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { compareEvaluationOrder, movePriorityUpdates } from './order'
-import {
-  LOAD_STATE_WORDS,
-  NO_WRITE_PERMISSION,
-  actionShortWord,
-  autoReplyMatchesQuery,
-  conditionChips,
-  responseTypeWord,
-  stopNote,
-  templateWord,
-  triggerSummary,
-  isCurrentAutoReplyLoad,
-  visibleAutoReplyLoadState,
-  type LoadState,
-} from './words'
 import QuickCreateV8 from './quick-create'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
@@ -1100,24 +1059,13 @@ export default function AutoRepliesListV8() {
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : visibleLoadState === 'error' || visibleLoadState === 'forbidden' ? (
-    <div className={styles.stateCard} style={{ padding: '28px 24px' }} data-design-node="G8i4xP">
-      <span className={`${styles.stateIcon} ${styles.stateIconError}`} style={{ width: 32, height: 32 }}>
-        <TriangleAlert size={16} aria-hidden="true" />
-      </span>
-      <p className={styles.stateTitle}>
-        {visibleLoadState === 'forbidden' ? LOAD_STATE_WORDS.forbidden.label : '自動応答を読み込めませんでした'}
-      </p>
-      <p className={styles.stateDesc}>
-        {visibleLoadState === 'forbidden'
+    <ListState kind="error" title={visibleLoadState === 'forbidden' ? LOAD_STATE_WORDS.forbidden.label : '自動応答を読み込めませんでした'} description={visibleLoadState === 'forbidden'
           ? LOAD_STATE_WORDS.forbidden.note
           : isForbiddenOrRateLimited(loadError)
             ? LOAD_STATE_WORDS.error.note
-            : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
-      </p>
-      {visibleLoadState === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-      )}
-    </div>
+            : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'} data-design-node="G8i4xP" action={<>{visibleLoadState === 'error' && (
+        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
+      )}</>} />
   ) : sortedItems.length === 0 ? (
     /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */
     <EmptyList
@@ -1329,7 +1277,7 @@ export default function AutoRepliesListV8() {
                         router.push(`/auto-replies/runs?id=${panelRow.id}`)
                       })
                     }
-                  >
+                   busyLabel="移動中…">
                     実行結果を見る
                   </Button>
                   {canEdit && <Button
@@ -1581,10 +1529,7 @@ export default function AutoRepliesListV8() {
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {!canEdit && (
-          <div className={styles.viewerBand} role="status" data-design-node="Q5lOCc">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="Q5lOCc"></ReadOnlyNotice></div>
         )}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
@@ -1651,9 +1596,7 @@ export default function AutoRepliesListV8() {
           </div>
         )}
         {toggleTargetStale && (
-          <p className="text-danger text-sm leading-relaxed" role="alert">
-            アカウントが切り替わりました。操作する自動応答を選び直してください。
-          </p>
+          <Notice tone="danger" >アカウントが切り替わりました。操作する自動応答を選び直してください。</Notice>
         )}
       </Dialog>
 
@@ -1720,9 +1663,7 @@ export default function AutoRepliesListV8() {
       >
         <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message="削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。" />
         {deleteTargetStale && (
-          <p className="text-danger text-sm leading-relaxed" role="alert">
-            アカウントが切り替わりました。削除する自動応答を選び直してください。
-          </p>
+          <Notice tone="danger" >アカウントが切り替わりました。削除する自動応答を選び直してください。</Notice>
         )}
       </Dialog>
 
@@ -1818,10 +1759,7 @@ export default function AutoRepliesListV8() {
           pagination={listPager}
       >
         {actionError ? (
-          <p className={styles.errorBand} style={{ padding: '10px 14px' }} role="alert">
-            {actionError}
-            <button type="button" onClick={() => void load()}>もう一度読み込む</button>
-          </p>
+          <Notice tone="danger" >{actionError}<button type="button" onClick={() => void load()}>もう一度読み込む</button></Notice>
         ) : null}
         {listBody}
       </ListPage></SaveErrorScope>

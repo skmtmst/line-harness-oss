@@ -3,24 +3,13 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react'
-import {
-  api,
-  ApiError,
-  describeSaveFailure,
-  type SaveSupportMarkAutomationRule,
-  type SupportMarkArchiveImpact,
-  type SupportMarkAutomationEvent,
-  type SupportMarkAutomationRule,
-  type SupportMarkListItem,
-} from '@/lib/api'
+import { api, ApiError, describeSaveFailure, type SaveSupportMarkAutomationRule, type SupportMarkArchiveImpact, type SupportMarkAutomationEvent, type SupportMarkAutomationRule, type SupportMarkListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -37,10 +26,8 @@ import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fiel
 import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
 import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。
@@ -437,7 +424,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   if (loadState === 'loading') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
 
-  const back = <></>
+  const back = null
   const description = editing && selected
     ? `${selected.friendCount} 人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
     : '対応の状態を、色つきの印で管理します。'
@@ -474,7 +461,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         identity={back}
         preview={aside}
         destructive={editing && selected && !hideForm ? (
-          <Button type="button" variant="danger" onClick={() => void openArchive()} disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
+          <Button type="button" variant="danger" onClick={() => openArchive()} busyLabel="処理中…" disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
             <Pause size={15} aria-hidden="true" />保管する
           </Button>
         ) : undefined}
@@ -514,8 +501,8 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                   {rulesState === 'forbidden' ? <p className={styles.fieldNote}>{permissionDeniedMessage('store')}</p> : null}
                   {rulesState === 'error' ? (
                     <div className={styles.inlineRetry}>
-                      <p className={styles.fieldError} role="alert">きまりを読み込めませんでした。</p>
-                      <Button type="button" variant="text" onClick={() => void loadRules()}>もう一度読み込む</Button>
+                      <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >きまりを読み込めませんでした。</Notice>
+                      <Button type="button" variant="text" onClick={() => loadRules()} busyLabel="処理中…">もう一度読み込む</Button>
                     </div>
                   ) : null}
                   {rulesState === 'ready' && rules.length === 0 ? <p className={styles.fieldNote}>今は自動で変えません。必要なときだけきまりを作ってください。</p> : null}

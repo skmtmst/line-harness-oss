@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
 import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 
 /*
@@ -75,7 +77,6 @@ import {
   AccountIcon,
   StateCard,
   SkeletonRows,
-  Band,
   sortedMenus,
   type LoadStatus,
   type V8TabEdit,
@@ -519,7 +520,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
 
         {accountId && tabReadOnly ? (
           <div className={styles.readOnlyRow} data-design="Bar">
-            <Band tone="hint">閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</Band>
+            <ReadOnlyNotice />
           </div>
         ) : null}
 

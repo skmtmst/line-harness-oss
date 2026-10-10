@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -8,29 +8,14 @@ import FilterChip from '@/components/shared/filter-chip'
 import StatusBadge from '@/components/shared/status-badge'
 import Select from '@/components/shared/select'
 import { Th } from '@/components/shared/table'
-import {
-  ApiError,
-  downloadApiFile,
-  webinarApi,
-  type WebinarAnalytics,
-  type WebinarParticipantClassification,
-  type WebinarParticipantPage,
-} from '@/lib/api'
+import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics, type WebinarParticipantClassification, type WebinarParticipantPage } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
-import {
-  fmtSec,
-  joinKindLabel,
-  ParticipantAvatar,
-  PARTICIPANT_FILTER_OPTIONS,
-  PARTICIPANTS_PAGE_SIZE,
-  participantStateLabel,
-  percent,
-  type ParticipantRow,
-} from './participants-shared'
+import { fmtSec, joinKindLabel, ParticipantAvatar, PARTICIPANT_FILTER_OPTIONS, PARTICIPANTS_PAGE_SIZE, participantStateLabel, percent, type ParticipantRow } from './participants-shared'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ListState from '@/components/shared/list-state'
 
 export type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 
@@ -217,9 +202,7 @@ export default function ParticipantsV8({
     <div className={styles.root} data-design-node="uNsEy">
       {!onExportChange && state === 'ready' ? <div className="flex justify-end"><Button disabled={csvBusy} onClick={() => downloadCsv(filter || undefined)} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button></div> : null}
       {csvError ? (
-        <p className="text-danger text-xs" role="alert">
-          {csvError}
-        </p>
+        <Notice tone="danger" >{csvError}</Notice>
       ) : null}
 
       {summary ? (
@@ -309,12 +292,9 @@ export default function ParticipantsV8({
         {state === 'loading' ? (
           <p className="text-ink-faint p-8 text-center text-sm">読み込み中...</p>
         ) : state === 'error' ? (
-          <div className="p-8 text-center text-sm" role="alert">
-            <p className="text-danger">参加者一覧を読み込めませんでした。</p>
-            <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-action mt-2 font-medium underline">
+          <ListState kind="error" title="参加者一覧を読み込めませんでした。" description="" action={<><button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-action mt-2 font-medium underline">
               もう一度読み込む
-            </button>
-          </div>
+            </button></>} />
         ) : pageItems.length === 0 ? (
           <p className="text-ink-faint p-8 text-center text-sm">
             {filter || query.trim() !== '' ? 'この条件に該当する人はいません。' : 'まだ参加者がいません。'}
@@ -377,9 +357,7 @@ export default function ParticipantsV8({
         {state === 'ready' && (nextCursor || moreError) ? (
           <div className="border-hairline border-t px-4 py-3 text-center">
             {moreError ? (
-              <p className="text-danger mb-2 text-xs" role="alert">
-                {moreError}
-              </p>
+              <Notice tone="danger" className="mb-2" >{moreError}</Notice>
             ) : null}
             {nextCursor ? (
               <Button onClick={() => void loadMore()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込み中…">

@@ -216,7 +216,6 @@
 
 /* 開ける時間：曜日の行（上下10・下に線） */
 .hoursError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
 }
@@ -499,3 +498,5 @@
 }
 
 .manualFields { display: flex; flex-direction: column; gap: var(--tpl-rs-dlg-gap); }
+
+.hoursError, .hoursErrorNoticePlacement { margin: 0; }

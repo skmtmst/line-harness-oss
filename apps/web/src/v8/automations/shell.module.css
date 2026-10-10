@@ -7,21 +7,6 @@
 .viewerRow {
   padding: var(--tpl-am-ro-row-pad);
 }
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-ro-band-gap);
-  padding: var(--tpl-ro-band-pad);
-  border-radius: var(--tpl-ro-band-radius);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-ro-band-lh);
-}
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
 
 /* タブ（絵：高さ28・文字の下10・文字 13/18）。共通のタブの V8 の値より詰める。 */
 :global([data-theme='v8']) .tabs [role='tab'] {
@@ -34,3 +19,6 @@
 }
 
 /* 数の帯の境目は共通の型と帯に任せる。画面側で線・影を重ねない。 */
+
+/* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
+.viewerBand { }

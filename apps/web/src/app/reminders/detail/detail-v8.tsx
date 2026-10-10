@@ -462,11 +462,11 @@ function ReminderDetailV8() {
         <aside className={styles.side}>
           <div className={styles.sideActions}>
             {isUnpublishedDraft ? null : data.reminder.isActive ? (
-              <Button size="field" onClick={() => void setReminderActive(false)} disabled={!canManage}>
+              <Button size="field" onClick={() => setReminderActive(false)} busyLabel="処理中…" disabled={!canManage}>
                 一時停止する
               </Button>
             ) : (
-              <Button size="field" onClick={() => void setReminderActive(true)} disabled={!canManage}>
+              <Button size="field" onClick={() => setReminderActive(true)} busyLabel="処理中…" disabled={!canManage}>
                 再開する
               </Button>
             )}

@@ -17,27 +17,15 @@ import { api } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import {
-  EMPTY_SUPPORT_INPUT,
-  SUPPORT_ATTACHMENT_MAX,
-  SUPPORT_BODY_MAX,
-  SUPPORT_SUBJECT_MAX,
-  validateSupportAttachment,
-  validateSupportInput,
-  type HqSupportContext,
-  type HqSupportInput,
-  type HqSupportKind,
-  type HqSupportRequest,
-} from '@/lib/hq-support'
+import { EMPTY_SUPPORT_INPUT, SUPPORT_ATTACHMENT_MAX, SUPPORT_BODY_MAX, SUPPORT_SUBJECT_MAX, validateSupportAttachment, validateSupportInput, type HqSupportContext, type HqSupportInput, type HqSupportKind, type HqSupportRequest } from '@/lib/hq-support'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support.module.css'
 import ImageFrame from '@/components/shared/image-frame'
-
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 統括のお問い合わせ（Pencil `b8xBtZ`。運営の LINE を登録する窓を開いた状態が `D6fh3`）。
@@ -317,8 +305,8 @@ export default function HqSupportV8() {
             ) : null}
           </div>
 
-          {error ? <p className={styles.error} role="alert">{error}</p> : null}
-          {blocked && (input.subject || input.body || input.kind) ? <p className={styles.warn} role="alert">{blocked}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
+          {blocked && (input.subject || input.body || input.kind) ? <Notice tone="danger" className={styles.warnNoticePlacement} >{blocked}</Notice> : null}
 
           <div className={styles.actions}>
             <Button onClick={clear} disabled={sending}>内容をクリア</Button>

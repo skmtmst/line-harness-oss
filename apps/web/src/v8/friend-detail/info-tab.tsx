@@ -15,7 +15,7 @@ import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import ListState from '@/components/shared/list-state'
 
 /*
  * 情報欄タブ（Q5F2QE の 4.）。その人について決めた項目を2列に並べ、最後に1回保存する。
@@ -90,10 +90,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
   }
   if (fieldsStatus === 'error') {
     return (
-      <div className={`${styles.pane} ${styles.centered}`} role="alert">
-        <p className={styles.paneNote}>情報欄を読み込めませんでした。</p>
-        <Button onClick={() => void data.loadFields()}>もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="情報欄を読み込めませんでした。" description="" action={<><Button onClick={() => data.loadFields()} busyLabel="処理中…">もう一度読み込む</Button></>} />
     )
   }
 

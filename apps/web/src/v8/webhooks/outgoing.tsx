@@ -24,9 +24,10 @@ import { RowMenu } from '@/components/shared/row-actions'
 import EmptyList from '@/components/shared/empty-list'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions } from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -540,7 +541,7 @@ export default function WebhooksOutgoingV8() {
       </div>
     )
   } else if (!selectedAccountId) {
-    listBody = <ListState kind="empty" title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+    listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (outgoingStatus === 'error') {
     listBody = (
       <ListState

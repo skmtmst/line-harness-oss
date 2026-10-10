@@ -20,6 +20,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 分析「クロス分析」（Pencil `u5CuB8`）。
@@ -371,7 +372,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
         {crossResult && crossResultId && canManage && renderSave ? <span title="条件の定義と、いま表示している結果を別々に固定して残します">{renderSave({ sourceResultId: crossResultId, defaultName: `クロス分析 ${resultAxes?.row ?? ''} × ${resultAxes?.column ?? ''}` })}</span> : null}
       </div>
       {sameAxis ? <p className={styles.warnText}>たてとよこに同じ軸は選べません</p> : null}
-      {error ? <p className={styles.inlineError} role="alert">{error}</p> : null}
+      {error ? <Notice tone="danger" >{error}</Notice> : null}
       {crossResult?.stateReason ? <p className={styles.warnText}>{crossResult.stateReason}</p> : null}
 
       {loading ? <div className={styles.waitBox} role="status">

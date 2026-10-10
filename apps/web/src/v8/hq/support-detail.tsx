@@ -14,24 +14,17 @@ import { TextArea } from '@/components/shared/text-field'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
-import {
-  SUPPORT_ATTACHMENT_MAX,
-  SUPPORT_BODY_MAX,
-  validateSupportAttachment,
-  type HqSupportDetail,
-  type HqSupportRequest,
-} from '@/lib/hq-support'
+import { SUPPORT_ATTACHMENT_MAX, SUPPORT_BODY_MAX, validateSupportAttachment, type HqSupportDetail, type HqSupportRequest } from '@/lib/hq-support'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
 import ImageFrame from '@/components/shared/image-frame'
-
 import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 お問い合わせのやり取り（Pencil `OhguS`）。
@@ -261,7 +254,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   </Button>
                 </div>
 {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-{error ? <p className={styles.error} role="alert">{error}</p> : null}</Field></div>
+{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div>
             </>
           )}
         </div>

@@ -28,33 +28,16 @@ import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Notice from '@/components/shared/notice'
 import UriTapActionField from '@/components/shared/uri-tap-action-field'
-import {
-  ApiError,
-  api,
-  fetchApi,
-  type EcCommerceOverview,
-  type EcNotificationSetting,
-  type LineNotificationDefinition,
-  type LineNotificationSendCounts,
-} from '@/lib/api'
+import { ApiError, api, fetchApi, type EcCommerceOverview, type EcNotificationSetting, type LineNotificationDefinition, type LineNotificationSendCounts } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import {
-  canOpenCustomerNotificationKpi,
-  customerNotificationKpis,
-  type CustomerNotificationKpi,
-  type LineNotificationQuota,
-} from './customer-kpis'
+import { canOpenCustomerNotificationKpi, customerNotificationKpis, type CustomerNotificationKpi, type LineNotificationQuota } from './customer-kpis'
 import KpiCard from '@/components/shared/kpi-card'
 import FilterChip from '@/components/shared/filter-chip'
-import {
-  isForbidden,
-  isForbiddenOrRateLimited,
-  loadFailureNotice,
-} from '@/components/shared/api-error-message'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { readSaveFieldErrors } from '@/lib/api-field-errors'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 LINE通知（Pencil `g3iDs`。運用者へのお知らせ `u8xibp`・送れなかったもの `DrwMm`・記録 `PZBVb`）。
@@ -1232,14 +1215,12 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       * #634・M031：運用者タブの件数だけが取れなかったとき、その場所に小さく1行だけ。403 は権限変更後に読み直せるようにする。
       */}
     {expandedSetting === null && (operatorState === 'error' || operatorState === 'forbidden') ? (
-      <p role="alert" className={styles.minor}>
-        {isForbiddenOrRateLimited(operatorCountError)
+      <Notice tone="danger" className={styles.minorNoticePlacement} >{isForbiddenOrRateLimited(operatorCountError)
           ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
           : '運用者へのお知らせの件数を読み込めませんでした。'}
-        <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button>
-      </p>
+        <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button></Notice>
     ) : null}
-    {!canManage && expandedSetting === null ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</p> : null}
+    {!canManage && expandedSetting === null ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
     {tab === 'failures' ? <RunsTab lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <RunsTab lineAccountId={selectedAccountId} mode="history" /> : null}
     {tab === 'operator' ? (renderOperatorRules
@@ -1327,7 +1308,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     <Notice tone="info">これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。</Notice>
     {sendCountsFailed && loadState === 'ready' ? <div className={styles.inlineRow}>
       <p className={styles.minor}>送信件数を読み込めませんでした。時間をおいて、もう一度お試しください。</p>
-      <Button variant="secondary" size="compact" onClick={() => void load()}>もう一度読み込む</Button>
+      <Button variant="secondary" size="compact" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
     </div> : null}
 
     {/* 板 g3iDs：絞り込みは共通の札。並びは送った数が多い順のまま。 */}

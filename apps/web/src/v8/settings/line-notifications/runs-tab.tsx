@@ -205,7 +205,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
       </div>
       {mode === 'history' ? <FilterChip selected={filter === 'clicked'} onChange={() => setFilter(filter === 'clicked' ? 'all' : 'clicked')}>クリック記録あり</FilterChip> : null}
       <span className={styles.runSpacer} />
-      <Button onClick={() => void load()}><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>
+      <Button onClick={() => load()} busyLabel="処理中…"><RotateCw size={15} aria-hidden="true" />記録を再読み込み</Button>
     </div>
 
     <section className={styles.table} data-design-node={mode === 'failures' ? 'DrwMm-table' : 'PZBVb-table'} data-list-state={listState} aria-label={title}>

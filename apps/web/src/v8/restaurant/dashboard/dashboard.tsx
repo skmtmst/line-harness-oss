@@ -3,6 +3,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, Bell, CalendarCheck, Check, Plus, Star, Users } from 'lucide-react'
 import { DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
+import EntitySelect from '@/components/shared/entity-select'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -130,10 +131,9 @@ function TodayStore() {
     }
   }
 
-  const actions = canWrite && d.store ? (
-    <>
-      <Button onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
-      <Button variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button>
+  const actions = d.store ? (
+    <><EntitySelect aria-label="店舗" noun="店舗" value={d.store.id} options={[{value:d.store.id,label:d.store.name}]} onChange={()=>{}}/>{canWrite?<><Button presentation="restaurant" onClick={() => setWalkInOpen(true)}><Plus size={15} aria-hidden="true" />ウォークイン</Button>
+      <Button presentation="restaurant" variant="primary" onClick={() => setPhoneOpen(true)}><Plus size={15} aria-hidden="true" />電話予約</Button></>:null}
     </>
   ) : null
 
@@ -147,6 +147,48 @@ function TodayStore() {
   } else {
     body = (
       <>
+        <div className={styles.stats}>
+          <KpiBand data-restaurant-fusion="dashboard" gridClassName="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <KpiCard
+              presentation="band"
+              title="今日の予約"
+              icon={<CalendarCheck size={13} aria-hidden="true" />}
+              value={summary?.groups ?? null}
+              unit="組"
+              loading={!summary}
+              detail={summary ? sourceBreakdown(summary) : '読み込んでいます'}
+            />
+            <KpiCard
+              presentation="band"
+              title="来店予定"
+              icon={<Users size={13} aria-hidden="true" />}
+              value={summary?.guests ?? null}
+              unit="人"
+              loading={!summary}
+              detail={summary ? (summary.peak ? `最多 ${summary.peak.label}（${summary.peak.guests}人）` : '今日の予約はまだありません') : '読み込んでいます'}
+            />
+            <KpiCard
+              presentation="band"
+              title="空席（いま）"
+              icon={<Armchair size={13} aria-hidden="true" />}
+              value={summary?.freeTables ?? null}
+              unit="卓"
+              loading={!summary}
+              detail={summary ? `全 ${summary.totalTables} 卓${summary.counterSeats ? `・カウンター ${summary.counterSeats} 席` : ''}` : '読み込んでいます'}
+              help="動いている卓のうち、いま予約が重なっていない卓の数です。"
+            />
+            <KpiCard
+              presentation="band"
+              title="未返信の口コミ"
+              icon={<Star size={13} aria-hidden="true" />}
+              value={googleConnected ? google.summary.unrepliedCount : null}
+              unit="件"
+              detail={googleConnected
+                ? `Google ★${google.connection.averageRating ?? emptyValue('unknown')}（${google.connection.totalReviewCount ?? 0}件）`
+                : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
+            />
+          </KpiBand>
+        </div>
         {first ? (
           <div className={styles.closeRow}>
             <div className={styles.closeBand} role="status" data-close-band="">
@@ -161,7 +203,7 @@ function TodayStore() {
                 <Button external href={firstMedium.adminUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
               ) : null}
               {canWrite && firstItem ? (
-                <Button onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`} busy={Boolean(busyId === firstItem.id)} busyLabel="処理中…">
+                <Button presentation="restaurant" variant="primary" doneLabel="閉じた" onClick={() => void closeOne(firstItem.id, firstItem.name)} disabled={busyId === firstItem.id} aria-label={`${firstItem.name}の枠を閉じた`} busy={Boolean(busyId === firstItem.id)} busyLabel="処理中…">
                   <Check size={15} aria-hidden="true" />閉じた
                 </Button>
               ) : null}
@@ -169,59 +211,12 @@ function TodayStore() {
             </div>
           </div>
         ) : null}
-        <div className={styles.stats}>
-          <KpiBand gridClassName="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <KpiCard
-              presentation="band"
-              title="今日の予約"
-              icon={<CalendarCheck size={13} aria-hidden="true" />}
-              value={summary?.groups ?? null}
-              unit="組"
-              loading={!summary}
-              detail={summary ? sourceBreakdown(summary) : '読み込んでいます'}
-              action={{ label: '予約台帳を開く', href: '/restaurant-test/reservations' }}
-            />
-            <KpiCard
-              presentation="band"
-              title="来店予定"
-              icon={<Users size={13} aria-hidden="true" />}
-              value={summary?.guests ?? null}
-              unit="人"
-              loading={!summary}
-              detail={summary ? (summary.peak ? `いちばん多いのは ${summary.peak.label}（${summary.peak.guests} 人）` : '今日の予約はまだありません') : '読み込んでいます'}
-              action={{ label: '時間ごとに見る', href: '/restaurant-test/reservations' }}
-            />
-            <KpiCard
-              presentation="band"
-              title="空席（いま）"
-              icon={<Armchair size={13} aria-hidden="true" />}
-              value={summary?.freeTables ?? null}
-              unit="卓"
-              loading={!summary}
-              detail={summary ? `全 ${summary.totalTables} 卓${summary.counterSeats ? `・カウンター ${summary.counterSeats} 席` : ''}` : '読み込んでいます'}
-              help="動いている卓のうち、いま予約が重なっていない卓の数です。"
-              action={{ label: '席を見る', href: '/restaurant-test/tables' }}
-            />
-            <KpiCard
-              presentation="band"
-              title="未返信の口コミ"
-              icon={<Star size={13} aria-hidden="true" />}
-              value={googleConnected ? google.summary.unrepliedCount : null}
-              unit="件"
-              delta={googleConnected && d.oldestReview ? <Chip tone="warn">{`最長 ${daysAgo(d.oldestReview.createTime, now)}`}</Chip> : null}
-              detail={googleConnected
-                ? `Google ★${google.connection.averageRating ?? emptyValue('unknown')}（${google.connection.totalReviewCount ?? 0}件）`
-                : google ? 'Google ビジネスとつないでいません' : '読み込めませんでした'}
-              action={googleConnected ? { label: '返信する', href: '/restaurant-test/google' } : { label: 'つなぐ', href: '/settings/sns' }}
-            />
-          </KpiBand>
-        </div>
         <DashboardRow
-          asideSize="wide"
+          variant="restaurant" asideSize="restaurant"
           aside={<SidePanel media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
         >
           <TodayTable
-            rows={d.today}
+            rows={d.today} tables={tables} storeName={d.store?.name}
             canWrite={canWrite}
             busyId={busyId}
             onVisited={(id) => void markVisited(id)}
@@ -235,9 +230,9 @@ function TodayStore() {
   return (
     <SaveErrorScope errors={saveErrors}><DashboardPage
       boardId="hKRRF"
-      headingSize="compact"
+      subtitle={d.store ? headDescription(d.hours,d.updatedAt) : undefined}
       title="今日のお店"
-      help={d.store ? headDescription(d.hours, d.updatedAt) : undefined}
+      help="お店の今日の予約と運用状況です。"
       actions={actions}
       tabs={<StoreTabs current="dashboard" flush />}
     >

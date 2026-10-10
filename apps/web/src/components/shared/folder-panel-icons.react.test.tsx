@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FolderPanel, { CollapsedFolderActions, type FolderPanelRow } from './folder-panel'
@@ -109,6 +109,28 @@ describe('フォルダの行ごとに追加する操作', () => {
 })
 
 
+describe('作る操作と閲覧時の場所取り', () => {
+  it('作る操作を一度だけ出し、閲覧時は同じ位置に空きを一つ残す', async () => {
+    const rows: FolderPanelRow[] = [{ id: 'all', kind: 'all', label: 'すべて' }]
+    await act(async () => root.render(<FolderPanel rows={rows} activeId="all" onSelect={() => {}} createAction={<button>作る</button>} />))
+    expect([...host.querySelectorAll('button')].filter(button => button.textContent === '作る')).toHaveLength(1)
+    expect(host.querySelectorAll('aside > div[aria-hidden="true"]')).toHaveLength(0)
+    await act(async () => root.render(<FolderPanel rows={rows} activeId="all" onSelect={() => {}} createAction={null} />))
+    expect(host.textContent).not.toContain('作る')
+    expect(host.querySelectorAll('aside > div[aria-hidden="true"]')).toHaveLength(1)
+    await act(async () => root.render(<FolderPanel readOnly rows={rows} activeId="all" onSelect={() => {}} />))
+    expect(host.querySelectorAll('aside > div[aria-hidden="true"]')).toHaveLength(1)
+  })
+
+  it('作る操作を持たない分類列には空きを足さず、選ぶ窓は明示して空きを省ける', async () => {
+    const rows: FolderPanelRow[] = [{ id: 'all', kind: 'all', label: 'すべて' }]
+    await act(async () => root.render(<FolderPanel rows={rows} activeId="all" onSelect={() => {}} />))
+    expect(host.querySelectorAll('aside > div[aria-hidden="true"]')).toHaveLength(0)
+    await act(async () => root.render(<FolderPanel readOnly reserveCreateSpace={false} rows={rows} activeId="all" onSelect={() => {}} />))
+    expect(host.querySelectorAll('aside > div[aria-hidden="true"]')).toHaveLength(0)
+  })
+})
+
 describe('選ぶだけのフォルダ列', () => {
   it('操作を渡されても追加・編集・並べ替えを出さず、選択だけはできる', async () => {
     const onSelect = vi.fn(), mutate = vi.fn()
@@ -121,6 +143,7 @@ describe('選ぶだけのフォルダ列', () => {
       createAction={<button onClick={mutate}>作る</button>} reserveCreateSpace>
       <button onClick={mutate}>追加操作</button>
     </FolderPanel>))
+    expect(host.querySelector('[aria-hidden="true"].v8-only')).not.toBeNull()
     const buttons = host.querySelectorAll('button')
     expect(buttons).toHaveLength(1)
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true')

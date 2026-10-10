@@ -4,13 +4,8 @@ import { hasDeliveryAccess } from '@line-crm/shared'
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import { useListUrlSetValue, useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  Folder,
-  MediaDeleteImpact,
-  MediaDeleteImpactReference,
-  MediaItem,
-} from '@line-crm/shared'
-import { Archive, Eye, EyeOff, HardDrive, Images, LayoutGrid, List as ListIcon, Plus } from 'lucide-react'
+import type { Folder, MediaDeleteImpact, MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
+import { Archive, EyeOff, HardDrive, Images, LayoutGrid, List as ListIcon, Plus } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -20,16 +15,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
 import MediaPreviewOverlay from './media-preview-overlay'
 import Dialog from '@/components/shared/dialog'
-import {
-  blockedReason,
-  canDelete as canDeleteMedia,
-  checkedAtText,
-  dialogTitle,
-  referenceKindText,
-  referenceNameText,
-  summarizeBulkDeleteResult,
-  usageText,
-} from './media-delete-impact'
+import { blockedReason, canDelete as canDeleteMedia, checkedAtText, dialogTitle, referenceKindText, referenceNameText, summarizeBulkDeleteResult, usageText } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
@@ -38,9 +24,8 @@ import { FolderDot, type FolderDotFolder } from '@/components/shared/folder-dot'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import BulkBar from '@/components/shared/bulk-bar'
-import { classifyApiFailure } from '@/components/shared/api-error-message'
+import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
-import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 import { formatNumber } from '@/lib/format'
@@ -56,10 +41,10 @@ import KpiCard from '@/components/shared/kpi-card'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { ListPager } from '@/components/templates/list-page'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 登録メディア一覧（Pencil `O7hUt7`）。
@@ -1175,10 +1160,7 @@ export default function MediaLibraryListV8() {
       title="登録メディア一覧"
       help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
       tabs={!canManageMedia ? (
-        <p className={styles.roBand} role="note">
-          <Eye size={16} aria-hidden="true" />
-          <span>{`閲覧のみで見ています。${managementPermissionReason}。`}</span>
-        </p>
+        <div className={styles.roBand}><ReadOnlyNotice role="note">{`閲覧のみで見ています。${managementPermissionReason}。`}</ReadOnlyNotice></div>
       ) : undefined}
       stats={(
         <KpiBand aria-label="登録メディアの集計">
@@ -1221,18 +1203,13 @@ export default function MediaLibraryListV8() {
             placeholder="例：01_商品写真"
           >
             {folderFailure ? (
-              <div role="alert">
-                <p>
-                  {folderForbidden
-                    ? permissionDeniedMessage('store')
-                    : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}
-                </p>
-                {folderForbidden ? null : (
+              <Notice tone="danger" action={<> {folderForbidden ? null : (
                   <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
                     {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
                   </Button>
-                )}
-              </div>
+                )} </>} >{folderForbidden
+                    ? permissionDeniedMessage('store')
+                    : 'フォルダを読み込めませんでした。登録したメディアは消えていません。'}</Notice>
             ) : null}
           </ManagedFolderPanel>
         </>
@@ -1380,12 +1357,12 @@ export default function MediaLibraryListV8() {
               count={selected.size}
               total={selectionTotal}
               onSelectAll={selectAllMedia}
-              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => void readSelectableMedia()}>もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
+              hint={selectionLoading ? 'すべての対象を確認しています…' : selectionError ? <><span role="alert">{selectionError}</span><Button size="compact" onClick={() => readSelectableMedia()} busyLabel="処理中…">もう一度読み込む</Button></> : '対象を確認してから操作を選んでください'}
             >
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
               </Button>
-              <Button type="button" variant="danger" onClick={() => void removeSelected()}>
+              <Button type="button" variant="danger" onClick={() => removeSelected()} busyLabel="処理中…">
                 選択したメディアを削除
                 {selected.size > 0 && <span>（{selected.size}）</span>}
               </Button>
@@ -1448,11 +1425,9 @@ export default function MediaLibraryListV8() {
           <p>使われている場所を確認しています…</p>
         ) : impactPhase === 'error' ? (
           <div>
-            <p role="alert">
-              使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
-            </p>
+            <Notice tone="danger" >使われている場所を確認できませんでした。読み直してから、もう一度お試しください。</Notice>
             {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
-            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
+            <Button type="button" onClick={() => { if (deleting) return openDelete(deleting) }} busyLabel="処理中…">もう一度読み込む</Button>
           </div>
         ) : impact ? (
           <div>
@@ -1462,7 +1437,7 @@ export default function MediaLibraryListV8() {
             </p>
             {impact.verified === false ? (
               <div>
-                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>もう一度読み込む</Button>
+                <Button type="button" onClick={() => { if (deleting) return openDelete(deleting) }} busyLabel="処理中…">もう一度読み込む</Button>
               </div>
             ) : null}
 
@@ -1855,8 +1830,8 @@ function MediaCardV8({
               <Button variant="secondary" onClick={onRenameCancel} disabled={renamingBusy}>
                 キャンセル
               </Button>
-              <Button variant="primary" onClick={onRenameConfirm} disabled={renamingBusy}>
-                {renamingBusy ? '保存中…' : '保存する'}
+              <Button variant="primary" onClick={onRenameConfirm} disabled={renamingBusy} busy={renamingBusy} busyLabel="保存中…">
+                保存する
               </Button>
             </div>
           </div>
@@ -1926,7 +1901,7 @@ function MediaCardV8({
                   : []),
                 {
                   id: 'download',
-                  label: downloading ? '取得中…' : 'ダウンロード',
+                  label: 'ダウンロード',
                   disabled: downloading,
                   disabledReason: downloading ? 'ファイルを取り出しています' : undefined,
                   onSelect: onDownload,

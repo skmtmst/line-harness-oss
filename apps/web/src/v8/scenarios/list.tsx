@@ -1,39 +1,18 @@
 'use client'
-import { useDetailPanelUrl } from '@/components/shared/detail-panel';
-
-import { canManageRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import StatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { collectListRows } from '@/components/shared/collect-list-rows'
-import BulkBar from '@/components/shared/bulk-bar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
-import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Bookmark,
-  CalendarPlus,
-  Copy,
-  Eye,
-  Folder as FolderIcon,
-  Lightbulb,
-  ListVideo,
-  Pause,
-  Play,
-  Plus,
-  Send,
-  ShieldCheck,
-  Square,
-  TriangleAlert,
-  UserCheck,
-  Users,
-  Workflow,
-} from 'lucide-react'
+import { Bookmark, CalendarPlus, Copy, Folder as FolderIcon, Lightbulb, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, UserCheck, Users, Workflow } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import { api, type ListStats } from '@/lib/api'
 import { useOffsetServerList } from '@/lib/use-server-list'
@@ -41,16 +20,14 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { completeReorder } from '@/lib/complete-reorder'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
 import { ROLE_LABELS } from '@/lib/hq-members'
-import { isForbidden } from '@/components/shared/api-error-message'
+import { isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NoPermissionBoard from '@/v8/no-permission/no-permission'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable, runOptimistic } from '@/lib/undoable'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -60,7 +37,8 @@ import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -68,7 +46,6 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
 import { TextField } from '@/components/shared/text-field'
@@ -81,11 +58,12 @@ import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/dupl
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
 import { notifyToast } from '@/components/shared/toast'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
@@ -102,7 +80,7 @@ import { notifyToast } from '@/components/shared/toast'
 const UNFILED = '__unfiled__'
 
 /** 1ページに出す件数の選択肢（表示は PageSizeSelect が「N件表示」にする）。 */
-const PAGE_SIZE_OPTIONS = [20, 50, 100]
+const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES
 
 /** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「有効のみ」。 */
 const SAVED_FILTER_OPTIONS = [
@@ -844,14 +822,7 @@ export default function ScenariosListV8() {
       </div>
     ) : scenarioList.error ? (
       /* 板 `BxGhV`「読み込めなかった」。数の帯は「—」のまま。 */
-      <div className={styles.stateCard} role="alert" data-design-node="BxGhV">
-        <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-          <TriangleAlert size={16} aria-hidden="true" />
-        </span>
-        <p className={styles.stateTitle}>シナリオを読み込めませんでした</p>
-        <p className={styles.stateDesc}>作ったシナリオは消えていません。通信を確かめて、もう一度試してください。</p>
-        <Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button>
-      </div>
+      <ListState kind="error" title="シナリオを読み込めませんでした" description="作ったシナリオは消えていません。通信を確かめて、もう一度試してください。" data-design-node="BxGhV" action={<><Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button></>} />
     ) : scenarios.length === 0 ? (
       /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */
       <EmptyList
@@ -1194,10 +1165,7 @@ export default function ScenariosListV8() {
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
         {!canEdit && (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
         )}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
@@ -1241,7 +1209,7 @@ export default function ScenariosListV8() {
                       router.push(`/scenarios/results?id=${encodeURIComponent(panelRow.id)}`)
                     })
                   }
-                >
+                 busyLabel="移動中…">
                   配信結果を見る
                 </Button>
                 {canEdit && <Button variant="secondary" onClick={() => openDuplicate(panelRow)}>
@@ -1356,10 +1324,7 @@ export default function ScenariosListV8() {
       pagination={listPager}
     >
       {actionError ? (
-        <p className={styles.errorBand} role="alert">
-          {actionError}
-          <button type="button" onClick={() => setActionError('')}>閉じる</button>
-        </p>
+        <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
       ) : null}
       {listBody}
     </ListPage></SaveErrorScope>

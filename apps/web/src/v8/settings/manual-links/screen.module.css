@@ -82,7 +82,6 @@
 }
 
 .danger {
-  margin: 0;
   padding: var(--tpl-sb-band-pad);
   border-radius: var(--tpl-sb-band-radius);
   background: var(--color-status-danger-soft);
@@ -180,3 +179,5 @@
   .toolbar { flex-wrap: wrap; }
   .search { width: var(--tpl-sb-search-w); }
 }
+
+.danger, .dangerNoticePlacement { margin: 0; }

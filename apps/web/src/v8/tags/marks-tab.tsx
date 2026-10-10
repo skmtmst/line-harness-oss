@@ -1,10 +1,10 @@
 'use client'
 
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlValue, useListUrlState } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react'
+import { CircleDot, Flag, GripVertical, History, Info, Loader, Send } from 'lucide-react'
 import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { ListPageBody } from '@/components/templates'
@@ -18,8 +18,7 @@ import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { describeApiFailure } from '@/components/shared/api-error-message'
-import { useListUrlState } from '@/components/shared/list-url-state'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -29,17 +28,18 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { notifyToast } from '@/components/shared/toast'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
 import styles from './list.module.css'
 import type { AttributeListHost } from './attribute-host'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
@@ -54,7 +54,7 @@ import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 type MarkRow = SupportMarkListItem
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export default function MarksTab({ accountId, canEdit, host }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow> }) {
   const router = useRouter()
@@ -364,31 +364,13 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
   const filterActive = Boolean(query || usage !== 'all' || onlyArchived)
 
   const table = status === 'forbidden' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>対応マークを見る権限がありません</p>
-      <p className={styles.stateDesc}>{permissionDeniedMessage('store')}</p>
-    </div>
+    <ListState kind="error" title="対応マークを見る権限がありません" description={permissionDeniedMessage('store')}  />
   ) : status === 'error' ? (
-    <div className={styles.stateCard}>
-      <AlertCircle className={styles.stateIconError} aria-hidden="true" />
-      <p className={styles.stateTitle}>対応マークを読み込めませんでした</p>
-      <p className={styles.stateDesc}>{error || '再読み込みしても直らない場合はエラー報告へ。'}</p>
-      <Button type="button" onClick={() => void load()}>もう一度読み込む</Button>
-    </div>
+    <ListState kind="error" title="対応マークを読み込めませんでした" description={error || '再読み込みしても直らない場合はエラー報告へ。'}  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : listReady && items.length === 0 ? (
-    <div className={styles.stateCard}>
-      <Flag className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだ対応マークはありません</p>
-      <p className={styles.stateDesc}>受信箱で、対応の進み具合を見分ける印です。</p>
-      {canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}
-    </div>
+    <ListState kind="empty" title="まだ対応マークはありません" description="受信箱で、対応の進み具合を見分ける印です。"  icon={<Flag className={styles.stateIcon} aria-hidden="true" />} action={<>{canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}</>} />
   ) : listReady && visible.length === 0 ? (
-    <div className={styles.stateCard}>
-      <p className={styles.stateTitle}>条件に合うものはありません</p>
-      <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
-      {filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all'); setView({ archived: '' }) }}>条件を外す</Button> : null}
-    </div>
+    <ListState kind="empty" title="条件に合うものはありません" description="検索や絞り込みを外すと、すべて出ます"  action={<>{filterActive ? <Button type="button" onClick={() => { setQuery(''); setUsage('all'); setView({ archived: '' }) }}>条件を外す</Button> : null}</>} />
   ) : (
     <DelayedSkeleton loading={!listReady} skeleton={<div className={styles.skeleton} aria-busy="true" />}>
       <DataTable className={styles.table}>
@@ -559,15 +541,11 @@ export default function MarksTab({ accountId, canEdit, host }: { accountId: stri
         </>}
       >
         {actionError ? (
-          <p role="alert" className={styles.errorBand}>
-            <AlertCircle className={styles.errorIcon} aria-hidden="true" />
-            {actionError}
-            {retryOrder ? (
+          <Notice tone="danger" >{actionError}{retryOrder ? (
               <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
             ) : (
               <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
-            )}
-          </p>
+            )}</Notice>
         ) : null}
         {table}
       </ListPageBody>

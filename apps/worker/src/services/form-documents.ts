@@ -1,7 +1,10 @@
-import { collectInputs, formFileKind, type FormInputBlock, type FormLayout } from '@line-crm/shared';
+import { collectInputs, formFileKind, formFileKinds, type FormInputBlock, type FormLayout } from '@line-crm/shared';
 import { getAccountSetting } from '@line-crm/db';
 import type { FormFileAnswer } from '@line-crm/shared';
 
+export function uploadedDocumentKind(block: FormInputBlock, mime: string): FormDocumentRow['file_kind'] {
+  return formFileKinds(block).includes('identity') ? 'identity' : mime === 'application/pdf' ? 'pdf' : 'image';
+}
 export const IDENTITY_RETENTION_KEY = 'forms.identityRetentionDays';
 export interface FormDocumentRow {
   id: string; line_account_id: string; form_id: string; form_version_id: string | null;
@@ -22,10 +25,11 @@ export function documentExpired(row: FormDocumentRow, now = new Date()): boolean
   return !!row.deleted_at || !!row.expires_at && Date.parse(row.expires_at) <= now.getTime();
 }
 export function documentAnswer(row: FormDocumentRow, role?: string, scanStatus = 'clean'): FormFileAnswer {
-  if (documentExpired(row)) return { fileId: row.id, state: 'expired', kind: row.file_kind, side: row.side };
   if (row.file_kind === 'identity' && role !== 'owner' && role !== 'admin') {
     return { fileId: row.id, state: 'restricted', kind: row.file_kind, side: row.side };
   }
+  if (scanStatus === 'quarantined' || scanStatus === 'rejected') return { fileId: row.id, state: scanStatus, kind: row.file_kind, side: row.side };
+  if (documentExpired(row)) return { fileId: row.id, state: 'expired', kind: row.file_kind, side: row.side };
   return { fileId: row.id, filename: row.filename, mimeType: row.mime_type, kind: row.file_kind,
     side: row.side, state: scanStatus === 'clean' ? 'ready' : 'pending' };
 }
@@ -57,9 +61,11 @@ export async function validateDocumentAnswers(db: D1Database, layout: FormLayout
       if (!v || typeof v !== 'object' || typeof v.fileId !== 'string') return '添付の情報が正しくありません';
       const row = await db.prepare('SELECT f.*, s.status AS scan_status FROM form_submission_files f LEFT JOIN media_file_scans s ON s.id = f.scan_id WHERE f.id = ?').bind(v.fileId).first<FormDocumentRow & { scan_status: string }>();
       if (!row || row.line_account_id !== scope.accountId || row.form_id !== scope.formId || row.friend_id !== scope.friendId
-        || row.block_id !== block.id || row.form_version_id !== scope.versionId || row.file_kind !== formFileKind(block)
+        || row.block_id !== block.id || row.form_version_id !== scope.versionId || row.file_kind !== uploadedDocumentKind(block, row.mime_type)
+        || (row.mime_type === 'application/pdf' ? !formFileKinds(block).includes('pdf') : !formFileKinds(block).some(kind => kind === 'image' || kind === 'identity'))
         || documentExpired(row)) return `${block.label} の書類を送りなおしてください`;
       if (row.submission_id && row.submission_id !== scope.submissionId) return 'この書類はすでに回答に添付されています';
+      if (row.scan_status === 'quarantined' || row.scan_status === 'rejected') return '安全を確認できませんでした。別のファイルを選んでください';
       if (row.scan_status !== 'clean') return '添付を検査しています。終わってから送信してください';
       sides.push(row.side);
       Object.keys(v).forEach(key => { if (key !== 'fileId') delete v[key]; });
@@ -82,15 +88,29 @@ export async function attachDocumentAnswers(db: D1Database, data: Record<string,
     if (attached.meta.changes !== 1) throw new Error('document_attachment_failed');
   }
 }
+/** A flagged document is never retained for the one-day abandoned-upload period. */
+export async function purgeUnsafeFormDocuments(db: D1Database, store: Pick<R2Bucket, 'delete'>, scanId: string): Promise<boolean> {
+  const rows = await db.prepare('SELECT * FROM form_submission_files WHERE scan_id = ? AND deleted_at IS NULL').bind(scanId).all<FormDocumentRow>().catch(() => null);
+  if (!rows) { console.error('unsafe form document lookup failed'); return false; }
+  let complete = true;
+  for (const row of rows.results) {
+    try {
+      await store.delete(row.r2_key);
+      await db.prepare("UPDATE form_submission_files SET deleted_at = ?, deletion_reason = 'unsafe' WHERE id = ? AND deleted_at IS NULL").bind(new Date().toISOString(), row.id).run();
+    } catch { complete = false; console.error('unsafe form document deletion failed'); }
+  }
+  return complete;
+}
 /** Delete R2 first; a failed delete remains due for the next cron. Keep the tombstone. */
 export async function purgeExpiredFormDocuments(db: D1Database, store: Pick<R2Bucket, 'delete'>, now = new Date()): Promise<number> {
-  const rows = await db.prepare(`SELECT * FROM form_submission_files WHERE deleted_at IS NULL AND expires_at <= ? UNION SELECT * FROM form_submission_files WHERE deleted_at IS NULL AND submission_id IS NULL AND created_at <= ? LIMIT 100`)
+  const rows = await db.prepare(`SELECT * FROM form_submission_files WHERE deleted_at IS NULL AND expires_at <= ? UNION SELECT * FROM form_submission_files WHERE deleted_at IS NULL AND submission_id IS NULL AND created_at <= ? UNION SELECT f.* FROM form_submission_files f JOIN media_file_scans s ON s.id = f.scan_id WHERE f.deleted_at IS NULL AND s.status = 'quarantined' LIMIT 100`)
     .bind(now.toISOString(), new Date(now.getTime() - 86400000).toISOString()).all<FormDocumentRow>();
   let deleted = 0;
   for (const row of rows.results) {
     try {
+      const scan = await db.prepare('SELECT status FROM media_file_scans WHERE id = ?').bind(row.scan_id).first<{ status: string }>();
       await store.delete(row.r2_key);
-      await db.prepare('UPDATE form_submission_files SET deleted_at = ?, deletion_reason = ? WHERE id = ? AND deleted_at IS NULL').bind(now.toISOString(), row.expires_at && Date.parse(row.expires_at) <= now.getTime() ? 'expired' : 'abandoned', row.id).run();
+      await db.prepare('UPDATE form_submission_files SET deleted_at = ?, deletion_reason = ? WHERE id = ? AND deleted_at IS NULL').bind(now.toISOString(), scan?.status === 'quarantined' ? 'unsafe' : row.expires_at && Date.parse(row.expires_at) <= now.getTime() ? 'expired' : 'abandoned', row.id).run();
       deleted++;
     } catch { console.error('form document retention failed'); }
   }

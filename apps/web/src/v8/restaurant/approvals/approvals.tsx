@@ -1,7 +1,9 @@
 'use client'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
-import { Check, Eye, Undo2 } from 'lucide-react'
+import { Check, Undo2 } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -9,12 +11,7 @@ import ListState from '@/components/shared/list-state'
 import { TextArea } from '@/components/shared/text-field'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useAccount } from '@/contexts/account-context'
-import {
-  restaurantTestApi,
-  type RestaurantApproval,
-  type RestaurantSnapshot,
-  type RestaurantStore,
-} from '@/lib/restaurant-test-api'
+import { restaurantTestApi, type RestaurantApproval, type RestaurantSnapshot, type RestaurantStore } from '@/lib/restaurant-test-api'
 import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
 import { formatStamp, StatRow, Status } from '../common-a/parts'
 import styles from './approvals.module.css'
@@ -22,7 +19,6 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 承認ワークフロー（Pencil `t8WgD8`、閲覧のみ `n4DT7`、差し戻す理由の小窓 `n4j0Rm`）。
@@ -209,7 +205,7 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
   return (
     <>
       {readOnly ? (
-        <div className={styles.readOnly} role="note"><Eye aria-hidden className={styles.readOnlyIcon} /><span>閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</span></div>
+        <ReadOnlyNotice role="note" />
       ) : null}
       <StatRow>
         <KpiCard title="承認待ち" valueText={`${pending.length}`} detail="対応が必要" valueTone={pending.length > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />

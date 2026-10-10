@@ -1,10 +1,9 @@
 'use client'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
 import { CircleDot, Download, Star } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { AUDIT_ACTION_LABEL, formatDateTime, opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
@@ -15,11 +14,11 @@ import Pagination from '@/components/shared/pagination'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './audit.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営の監査ログ V8（絵 `e7ljE`）。
@@ -150,7 +149,7 @@ export default function OpsAuditV8() {
         </div>
 
         {exportNote ? <p role="status" className={parts.status}>{exportNote}</p> : null}
-        {error && rows.length > 0 ? <p role="alert" className={parts.alert}>{error}</p> : null}
+        {error && rows.length > 0 ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
 
         {loading && rows.length === 0 ? (
           <ListState permissionScope="hq" kind="loading" title="記録を読み込んでいます" />

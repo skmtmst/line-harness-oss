@@ -42,14 +42,14 @@ export function closureAffectsTable(r:ClosureRow,tableId:string|null):boolean {
 export async function closurePreview(db:D1Database,input:RestaurantClosureInput,periods:ClosurePeriod[],excludeId:string|null=null):Promise<RestaurantClosurePreview> {
  const args=[input.storeId,JSON.stringify(periods),JSON.stringify(input.tableIds??[])];
  const overlap=`EXISTS(SELECT 1 FROM json_each(?) p WHERE julianday(r.starts_at)<julianday(json_extract(p.value,'$.endsAt')) AND julianday(r.ends_at)>julianday(json_extract(p.value,'$.startsAt')))
- AND (json_array_length(?)=0 OR r.table_id IS NULL OR r.table_id IN (SELECT value FROM json_each(?)))`;
+ AND (json_array_length(?)=0 OR r.table_id IS NULL OR EXISTS(SELECT 1 FROM rt_reservation_table_links l WHERE l.reservation_id=r.id AND l.table_id IN (SELECT value FROM json_each(?))))`;
  const reservations=(await db.prepare(`SELECT r.id,r.starts_at AS startsAt,r.ends_at AS endsAt,r.guest_count AS guestCount,r.customer_name AS customerName,r.customer_phone AS customerPhone,r.source,r.table_id AS tableId,
  (SELECT f.id FROM friends f JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=r.store_id AND f.line_user_id=r.line_uid AND f.is_following=1 LIMIT 1) AS friendId
  FROM rt_reservations r WHERE r.store_id=? AND r.status NOT IN ('cancelled','no_show') AND r.hold_expires_at IS NULL AND ${overlap} ORDER BY julianday(r.starts_at),r.id`)
  .bind(...args,args[2]).all<Omit<RestaurantClosurePreview['reservations'][number],'isLineFriend'|'contacted'>>()).results;
  const waiting=await db.prepare(`SELECT COUNT(*) AS count FROM (SELECT w.*,COALESCE(w.ends_at,datetime(w.starts_at,'+120 minutes')) AS end_time FROM rt_seat_waitlist w) r
  WHERE r.store_id=? AND r.status IN ('waiting','invited') AND EXISTS(SELECT 1 FROM json_each(?) p WHERE julianday(r.starts_at)<julianday(json_extract(p.value,'$.endsAt')) AND julianday(r.end_time)>julianday(json_extract(p.value,'$.startsAt')))
- AND (json_array_length(?)=0 OR r.table_id IS NULL OR r.table_id IN (SELECT value FROM json_each(?)))`).bind(...args,args[2]).first<{count:number}>();
+ AND (json_array_length(?)=0 OR r.table_id IS NULL OR EXISTS(SELECT 1 FROM rt_seat_waitlist_table_links l WHERE l.waitlist_id=r.id AND l.table_id IN (SELECT value FROM json_each(?))))`).bind(...args,args[2]).first<{count:number}>();
  const candidates=await closuresForRange(db,input.storeId,periods[0].startsAt,periods.at(-1)!.endsAt);
  const conflicts=candidates.filter(r=>r.id!==excludeId&&(input.tableIds!.length===0||JSON.parse(r.table_ids_json).length===0||input.tableIds!.some(id=>closureAffectsTable(r,id)))
  &&(JSON.parse(r.periods_json) as ClosurePeriod[]).some(a=>periods.some(b=>Date.parse(a.startsAt)<Date.parse(b.endsAt)&&Date.parse(a.endsAt)>Date.parse(b.startsAt)))).map(publicClosure);
@@ -64,14 +64,23 @@ export async function closurePreview(db:D1Database,input:RestaurantClosureInput,
  return {reservations:results,contactedCount:results.filter(r=>r.contacted).length,waitlistCount:waiting?.count??0,conflicts};
 }
 /** 空き照会・手動の自動配席・待機登録で共通。予約で埋まっていても閉じていない卓は候補に残せる。 */
-export async function openSeatTables(db:D1Database,storeId:string,startsAt:string,endsAt:string,guestCount:number,ignoreReservations=false):Promise<RestaurantSeatAvailability['tables']> {
+export async function openSeatTables(db:D1Database,storeId:string,startsAt:string,endsAt:string,guestCount:number,ignoreReservations=false,excludeReservationId=''):Promise<RestaurantSeatAvailability['tables']> {
  const closed=await closuresForRange(db,storeId,startsAt,endsAt);
- const tables=(await db.prepare(`SELECT t.id,t.label,t.seat_type AS seatType,t.min_capacity AS minCapacity,t.max_capacity AS maxCapacity FROM rt_tables t
- WHERE t.store_id=? AND t.is_active=1 AND t.min_capacity<=? AND t.max_capacity>=?
- AND (?=1 OR (NOT EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=t.store_id AND r.table_id=t.id AND r.status NOT IN ('cancelled','no_show')
- AND (r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?))
- AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.store_id=t.store_id AND w.table_id=t.id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')
+ const tables=(await db.prepare(`SELECT t.id,t.label,t.seat_type AS seatType,t.min_capacity AS minCapacity,t.max_capacity AS maxCapacity,t.join_group FROM rt_tables t
+ WHERE t.store_id=? AND t.is_active=1
+ AND (?=1 OR (NOT EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=t.store_id AND r.id<>? AND l.table_id=t.id AND r.status NOT IN ('cancelled','no_show')
+ AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?))
+ AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=w.id WHERE w.store_id=t.store_id AND l.table_id=t.id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')
  AND julianday(w.starts_at)<julianday(?) AND julianday(COALESCE(w.ends_at,datetime(w.starts_at,'+120 minutes')))>julianday(?)))) ORDER BY t.max_capacity,t.id`)
- .bind(storeId,guestCount,guestCount,Number(ignoreReservations),endsAt,startsAt,endsAt,startsAt).all<RestaurantSeatAvailability['tables'][number]>()).results;
- return tables.filter(t=>!closed.some(r=>closureAffectsTable(r,t.id)));
+ .bind(storeId,Number(ignoreReservations),excludeReservationId,endsAt,startsAt,endsAt,startsAt).all<RestaurantSeatAvailability['tables'][number]&{join_group:string|null}>()).results;
+ const open=tables.filter(t=>!closed.some(r=>closureAffectsTable(r,t.id)));
+ const candidates:RestaurantSeatAvailability['tables']=open.filter(t=>t.minCapacity<=guestCount&&t.maxCapacity>=guestCount);
+ const groups=new Set(open.map(t=>t.join_group).filter(Boolean));
+ // 全構成卓が空いている組だけ。片方が塞がれた組を縮めて使わない。
+ const all=(await db.prepare('SELECT id,join_group,is_active FROM rt_tables WHERE store_id=?').bind(storeId).all<{id:string;join_group:string|null;is_active:number}>()).results;
+ for(const group of groups){const members=open.filter(t=>t.join_group===group);
+ if(members.length<2||all.filter(t=>t.join_group===group).some(t=>!members.some(m=>m.id===t.id)))continue;
+ const min=members.reduce((n,t)=>n+t.minCapacity,0),max=members.reduce((n,t)=>n+t.maxCapacity,0);
+ if(guestCount>=min&&guestCount<=max&&members.every(t=>t.maxCapacity<guestCount))candidates.push({...members[0],tableIds:members.map(t=>t.id),label:members.map(t=>t.label).join('＋'),minCapacity:min,maxCapacity:max});}
+ return candidates.sort((a,b)=>a.maxCapacity-b.maxCapacity||a.id.localeCompare(b.id));
 }

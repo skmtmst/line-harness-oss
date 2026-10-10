@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { ArrowRight, TriangleAlert } from 'lucide-react'
 import type { FriendField, FriendFieldType } from '@line-crm/shared'
@@ -23,10 +22,10 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 import { FIELD_TYPE_WORDS } from './field-editor'
 import styles from './create.module.css'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 友だち情報欄の移行（種類を変える。Pencil `GobMd`）。
@@ -493,7 +492,7 @@ function FieldMigrate() {
   const back = <></>
   const rows = sample ? sampleRows(sample) : []
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
@@ -505,7 +504,7 @@ function FieldMigrate() {
       footerActions={<>
         <Button href="/tags?tab=fields">キャンセル</Button>
         {confirmed && !executedRunId ? (
-          <Button type="button" onClick={() => void runPreview()} disabled={checking || running}>確認をやり直す</Button>
+          <Button type="button" onClick={() => void runPreview()} busyLabel="確認しています…" disabled={checking || running}>確認をやり直す</Button>
         ) : null}
         {confirmed && !executedRunId ? (
           <Button variant="primary" type="button" onClick={() => void execute()} disabled={executing || running} busy={running} busyLabel="実行中…">移行を実行する</Button>
@@ -514,7 +513,7 @@ function FieldMigrate() {
           <Button type="button" onClick={() => void refetchRun()} disabled={executing}>結果を確認する</Button>
         ) : null}
         {needsPollAction ? (
-          <Button variant="primary" type="button" onClick={() => void resume()} disabled={executing}>{executing ? '再開中…' : '続きから再開する'}</Button>
+          <Button variant="primary" type="button" onClick={() => void resume()} disabled={executing} busy={executing} busyLabel="再開中…">続きから再開する</Button>
         ) : null}
         {!confirmed ? (
           <Button variant="primary" type="button" onClick={() => void runPreview()} disabled={checking || (!target && targetMode === 'existing' && !existingTargetId)} busy={checking} busyLabel="確認しています…">

@@ -1,4 +1,6 @@
 'use client'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -21,10 +23,9 @@ import LinePreview from '@/components/shared/line-preview'
 import TapAreaEditor from '@/components/shared/tap-area-editor'
 import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import { notifyToast } from '@/components/shared/toast'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import TapActionField from '@/components/shared/tap-action-field'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
 import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, tapExtraSaveError, type TapActionKind } from '@/lib/tap-actions'
@@ -35,9 +36,8 @@ import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import type { TemplateEditHost } from './host'
 import styles from './edit.module.css'
 import rich from './rich.module.css'
-import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8「リッチメッセージを作る」（絵 EFV8l・機能追加 F-4）。
@@ -431,7 +431,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         boardId="EFV8l"
         title="リッチメッセージを作る"
         description="1枚の画像を面に分けて、押した面ごとに動く"
-        band={<p className={styles.readonly} role="status">閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</p>}
+        band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
         <Card padding="none" layout="vertical" className={styles.card}>
@@ -473,7 +473,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         )}
       >
         {host?.notice}
-        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
 
         {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>

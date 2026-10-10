@@ -43,6 +43,10 @@
 /* 帯の右に置く操作（1つまで）。 */
 .action {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  flex-wrap: wrap;
   flex: none;
 }
 
@@ -131,7 +135,10 @@
 [data-theme='v8'] .twoLine .heading { color: var(--color-ink); font-size: 13px; font-weight: 700; line-height: 19px; }
 [data-theme='v8'] .twoLine .description { color: var(--color-ink-secondary); font-size: 12px; line-height: 17px; }
 [data-theme='v8'] .twoLine .action { display: flex; gap: 12px; }
-[data-theme='v8'] .twoLine .icon { color: var(--color-warning); }
+[data-theme='v8'] .twoLine.warn .icon { color: var(--color-warning); }
+/* 失敗を2行で示すときも、見出しと印はdangerの色を保つ（N43uVX）。 */
+[data-theme='v8'] .twoLine.danger .heading,
+[data-theme='v8'] .twoLine.danger .icon { color: var(--color-status-danger); }
 /* 小さなカードに入れる1行の注意。既存の帯は変えない。 */
 [data-theme='v8'] .notice[data-compact] {
   min-width: 0;

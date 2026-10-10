@@ -4,7 +4,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Eye, Play, RotateCcw } from 'lucide-react'
+import { Play, RotateCcw } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, type AccountHandover, type AccountHandoverDecision } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -18,7 +18,6 @@ import Card from '@/components/shared/card'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Th, Tr, Td, TableStateRow } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
@@ -35,6 +34,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 LINEアカウントの乗り換え（Pencil `x2dSNv`）。
@@ -396,7 +396,7 @@ export default function AccountHandoverV8() {
   }
 
   const viewerBand = !canManage ? (
-    <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />}>{NO_MANAGE_NOTE}</Notice>
+    <ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice>
   ) : null
 
   // 段1・段2の入口。出す側と受け取る側の両方の口を出す。
@@ -423,7 +423,7 @@ export default function AccountHandoverV8() {
                 <Button type="button" variant="primary" disabled={linking || !linkCode.trim()} busy={linking} busyLabel="確認中…" onClick={() => void submitLinkCode()}>コードを読む</Button>
               </div>
             ) : null}
-            {linkError ? <p role="alert" className={styles.error}>{linkError}</p> : null}
+            {linkError ? <Notice tone="danger" >{linkError}</Notice> : null}
           </Card>
         </div>
       </>
@@ -544,7 +544,7 @@ export default function AccountHandoverV8() {
       {canManage && (editCount > 0 || decisionError) ? (
         <div className={styles.pendingBand}>
           {decisionError
-            ? <p role="alert" className={styles.pendingText}>{decisionError}</p>
+            ? <Notice tone="danger" className={styles.pendingTextNoticePlacement} >{decisionError}</Notice>
             : <p className={styles.pendingText}>{editCount} 件の書き換えをまだ保存していません。保存するまで本実行へ進めません。</p>}
           <Button type="button" disabled={refreshing || !countsAreComplete} busy={refreshing} busyLabel="確認中…" onClick={() => void rerunPreview()}>
             <RotateCcw size={14} aria-hidden="true" />事前確認をやり直す
@@ -610,7 +610,7 @@ export default function AccountHandoverV8() {
         open={confirmOpen}
         title="本実行しますか？"
         description={`要確認はすべて決めました。本実行すると、決めた内容で友だちが「${destinationName}」へ移ります。元のアカウントの友だち・履歴・配信は消しません。`}
-        confirmLabel={executing ? '実行中…' : '本実行する'}
+        confirmLabel="本実行する" busyLabel="実行中…"
         busy={executing}
         error={executeError}
         onConfirm={() => executeHandover()}
@@ -620,7 +620,7 @@ export default function AccountHandoverV8() {
         open={cancelOpen}
         title="この引き継ぎを取り消しますか？"
         description="進行中の引き継ぎをやめます。コードは使えなくなり、決めた内容は破棄されます。元のアカウントの友だちは変わりません。"
-        confirmLabel={cancelling ? '取り消し中…' : '引き継ぎを取り消す'}
+        confirmLabel="引き継ぎを取り消す" busyLabel="取り消し中…"
         destructive
         busy={cancelling}
         onConfirm={() => runCancel()}
@@ -630,7 +630,7 @@ export default function AccountHandoverV8() {
         open={rollbackOpen}
         title="移した友だちを元へ戻しますか？"
         description={`本実行で「${destinationName}」へ移した友だちを、元の「${account.name}」へ戻します。移したあとで人が動かした人は戻しません。`}
-        confirmLabel={rollingBack ? '戻し中…' : '切り戻す'}
+        confirmLabel="切り戻す" busyLabel="戻し中…"
         destructive
         busy={rollingBack}
         error={rollbackError}

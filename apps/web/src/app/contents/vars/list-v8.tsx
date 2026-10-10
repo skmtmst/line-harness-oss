@@ -1435,7 +1435,7 @@ function CommonVarsListV8Inner() {
                   <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                     選択を外す
                   </Button>
-                  <Button type="button" variant="danger" onClick={() => void prepareRemoveSelected()}>
+                  <Button type="button" variant="danger" onClick={() => prepareRemoveSelected()} busyLabel="処理中…">
                     選択した共通情報を削除
                   </Button>
                 </BulkBar>
@@ -1460,7 +1460,7 @@ function CommonVarsListV8Inner() {
                       type="button"
                       variant="primary"
                       onClick={() => withViewTransition(() => router.push(`/contents/vars/edit?id=${activeItem.id}`))}
-                    >
+                     busyLabel="移動中…">
                       編集する
                     </Button>
                     {canWrite ? (
@@ -1476,7 +1476,7 @@ function CommonVarsListV8Inner() {
                       type="button"
                       variant="danger"
                       disabled={!canWrite}
-                      onClick={() => void openDelete(activeItem)}
+                      onClick={() => openDelete(activeItem)} busyLabel="処理中…"
                     >
                       削除する
                     </Button>
@@ -1528,10 +1528,8 @@ function CommonVarsListV8Inner() {
                           disabled={statusBusy}
                           busy={statusBusy}
                           onClick={() => void applyStatus()}
-                        >
-                          {statusBusy
-                            ? (statusAction === 'stop' ? '止めています…' : '再開しています…')
-                            : (statusAction === 'stop' ? '止める' : '再開する')}
+                         busyLabel={(statusAction === 'stop' ? '止めています…' : '再開しています…')}>
+                          {(statusAction === 'stop' ? '止める' : '再開する')}
                         </Button>
                       </div>
                       {statusError ? <p className={styles.panelError} role="alert">{statusError}</p> : null}

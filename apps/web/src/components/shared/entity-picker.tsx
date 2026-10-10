@@ -1,16 +1,13 @@
 'use client'
 
-import { ChevronRight } from 'lucide-react';
-import { folderDisplayColor } from './folder-dot';
-import { useFieldContext } from './field-context';
-import { joinDescribedBy } from './field-context'
+import { ChevronRight, ArrowUpRight, Check, type LucideIcon } from 'lucide-react'
+import { folderDisplayColor, FolderDot } from './folder-dot'
+import { useFieldContext, joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, Check, type LucideIcon } from 'lucide-react'
 import Button from './button'
 import Checkbox from './checkbox'
 import FilterChip from './filter-chip'
-import { FolderDot } from './folder-dot'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import Radio from './radio'
 import SearchField from './search-field'
@@ -156,6 +153,7 @@ function SingleEntityPickerDialog({
   searchPlaceholder = '名前で探す', designNode = 'M0393', query: controlledQuery, onQueryChange, createAction, onSelect, onConfirm, onCancel,
 }: SingleProps) {
   const id = useId()
+  const [panelRef, narrow] = useNarrow(560)
   const [selected, setSelected] = useState(initialId)
   const [ownQuery, setOwnQuery] = useState('')
   const query = controlledQuery ?? ownQuery
@@ -188,9 +186,9 @@ function SingleEntityPickerDialog({
     </div>
     </>}
   >
-    <div className={styles.tpBody}>
-      {hasFolders ? <div className={styles.tpSide}>
-        <FolderPanel readOnly disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
+    <div ref={panelRef} className={shell.body}>
+      {hasFolders && !narrow ? <div className={shell.folders}>
+        <FolderPanel readOnly reserveCreateSpace={false} disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
       </div> : null}
       <section className={styles.tpList} aria-label="候補の一覧"> <SearchField id={`${id}-search`} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />
         {foldersFailed ? <p className={styles.note}>フォルダを読み込めませんでした。すべての候補から選べます。</p> : null}
@@ -276,9 +274,9 @@ export function EntityMultiSelect({ items, folders = [], foldersFailed = false, 
   }
   const folderRows = pickerFolderRows(items, folders, Boolean(state), groupCheck)
   const rows = items.filter((item) => inFolder(item, folder) && matches(item, query) && (!onlySelected || set.has(item.id)))
-  return <div ref={panelRef} className={embedded ? `${styles.tpBody} ${styles.embedded}` : styles.tpBody}>
-    {hasFolders && !narrow ? <div className={styles.tpSide}>
-      <FolderPanel readOnly heading={folderHeading} disabled={busy || Boolean(state)} rows={folderRows} activeId={folder} onSelect={setFolder} />
+  return <div ref={panelRef} className={embedded ? `${shell.body} ${styles.embedded}` : shell.body}>
+    {hasFolders && !narrow ? <div className={shell.folders}>
+      <FolderPanel readOnly reserveCreateSpace={false} heading={folderHeading} disabled={busy || Boolean(state)} rows={folderRows} activeId={folder} onSelect={setFolder} />
     </div> : null}
     <section className={`${styles.tpList} ${styles.multiList}`} aria-label={listLabel}>
       {searchSlot}

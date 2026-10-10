@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import { reservation, tables } from '../booking-kit/test-data'
@@ -6,7 +12,7 @@ import { WALK_IN_NOTE } from '../front-desk/walk-in'
 import { canMarkVisited, canWriteRole, closeGroupKey, groupCloseTasks, openItems, reasonText, summarizeToday, visitState } from './summarize'
 import { mergeMediaLinks, toMedia } from './use-store-today'
 
-const today = (hour: number, minute = 0) => { const d = new Date(); d.setHours(hour, minute, 0, 0); return d.toISOString() }
+const today = (hour: number, minute = 0) => { const d = new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+09:00` }
 const row = (id: string, over: Record<string, unknown>) => reservation(id, { starts_at: today(18), ends_at: today(20), ...over }) as unknown as RestaurantReservation
 
 describe('今日のお店の数（E-1）', () => {
@@ -47,7 +53,7 @@ describe('今日のお店の数（E-1）', () => {
 
   it('閲覧のみ（owner・admin・staff 以外）は変える操作を出さない', () => {
     expect(canWriteRole('staff')).toBe(true)
-    expect(canWriteRole(null)).toBe(true)
+    expect(canWriteRole(null)).toBe(false)
     expect(canWriteRole('viewer')).toBe(false)
   })
 })
@@ -119,3 +125,9 @@ describe('枠の無い知らせ（予約・臨時休業から出たもの）', (
     expect(reasonText(groups[0])).toBe('LINE・電話で予約が入りました')
   })
 })
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+afterEach(() => vi.useRealTimers())

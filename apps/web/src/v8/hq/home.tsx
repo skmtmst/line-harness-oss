@@ -7,12 +7,12 @@ import { ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
-import { FolderDot, FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -34,13 +34,12 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs'
 import { connectionReasonLine } from './connection-reasons'
 import styles from './home.module.css'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors'
 import StatusPill from '@/components/shared/status-pill'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
  * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`。カードの「設定」で開く窓が `HMpVx`）。
@@ -70,7 +69,7 @@ const SORT_OPTIONS = [
   { value: 'display', label: '並び：登録順' },
 ]
 
-const PAGE_SIZES = [10, 20, 50]
+const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 function isArchived(account: AccountWithStats) {
   return Boolean(account.archivedAt)
@@ -383,7 +382,7 @@ export default function HqHomeV8() {
     <div className={styles.folderBox}>
       <FolderPanel
         /* 閲覧のみで登録ボタンを隠したときも、その場所は空けておく（下のフォルダの列が上へ詰まらない。絵 VtJQ6）。 */
-        createAction={createAccount ?? <span className={styles.createSpace} aria-hidden="true" />}
+        createAction={createAccount}
         heading="フォルダ"
         rows={folderRows}
         activeId={folder}
@@ -391,7 +390,7 @@ export default function HqHomeV8() {
         onAddFolder={canManage ? () => openFolderDialog(null) : undefined}
         addFolderLabel="フォルダを追加"
       >
-        <p className={styles.folderNote}>フォルダを消しても、アカウントは消えません</p>
+        <FolderPanelNote>フォルダを消しても、アカウントは消えません</FolderPanelNote>
       </FolderPanel>
     </div>
   )
@@ -507,7 +506,7 @@ export default function HqHomeV8() {
         <Notice
           tone="warn"
           message="保存はできましたが、一覧を読み直せませんでした。"
-          action={<Button type="button" onClick={() => void reloadAfterSave()}>もう一度読み込む</Button>}
+          action={<Button type="button" onClick={() => reloadAfterSave()} busyLabel="処理中…">もう一度読み込む</Button>}
         />
       ) : null}
 

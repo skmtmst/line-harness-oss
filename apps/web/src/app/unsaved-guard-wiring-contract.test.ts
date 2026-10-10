@@ -22,6 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 const GUARDED = [
   'v8/hq-deliveries/console.tsx',
   'v8/webhooks/incoming-actions.tsx',
+  'components/shared/restaurant-floor-editor.tsx',
   'app/booking/bookings/detail/page.tsx',
   'v8/automations/create/create.tsx',
   'v8/settings/pools/create.tsx',

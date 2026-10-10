@@ -99,12 +99,7 @@
 .linkAction:hover {
   text-decoration: underline;
 }
-.error {
-  margin: 0;
-  color: var(--color-status-danger);
-  font-size: var(--text-caption);
-  line-height: normal;
-}
+
 .muted {
   margin: 0;
   color: var(--color-ink-faint);

@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import { chromium } from '@playwright/test'
 import { openPage, WIDTHS } from './browser-env.mjs'
 import { scanListSkeleton, scanSharedSkeletonParts } from './list-skeleton-scan.mjs'
+import { checkTemporaryAllowances, skeletonFindingKey } from '../../../../scripts/visual-qa/temporary-allowances.mjs'
 
 const [baseUrl = 'http://127.0.0.1:4310', output = '/tmp/list-skeleton-audit.json'] = process.argv.slice(2)
 const registry = JSON.parse(readFileSync(new URL('../../design/list-skeleton.json', import.meta.url)))
@@ -20,9 +21,15 @@ try {
       if (!result.scopes) result.failures.push('B-178 一覧の型なし')
       const expectsTable = registry.boards.some((board) => board.url === route && board.layout !== 'cards')
       if (expectsTable && (!result.coverage.heads || !result.coverage.rows)) result.failures.push('B-178 表の見張り対象なし')
-      failed ||= result.failures.length > 0
+      result.temporary = checkTemporaryAllowances('skeleton', result.failures.map(failure => ({ route, width, failure })), skeletonFindingKey)
+      if (result.temporary.allowed.length && !await page.locator('[data-reservation-board][data-kind="seats"][data-axis="list"][data-columns="dining"]').evaluateAll(boards => boards.some(board => board.getBoundingClientRect().width > 1 && board.querySelector('tbody tr')))) {
+        const failure = 'B-178 共通予約盤の見張り対象なし'
+        result.failures.push(failure)
+        result.temporary.unexpected.push({ route, width, failure })
+      }
+      failed ||= result.temporary.unexpected.length > 0
       results.push({ width, route, ...result })
-      console.log(`${width} ${route}: ${result.failures.join('・') || '合格'}`)
+      console.log(`${width} ${route}: ${result.failures.join('・') || '合格'}${result.temporary.allowed.length ? `（理由・期限付き一時許可 ${result.temporary.allowed.length}。理由は結果JSON）` : ''}`)
     } finally { await page.close() }
   }
   for (const width of widths) for (const part of registry.parts) {

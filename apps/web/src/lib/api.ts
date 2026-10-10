@@ -14339,6 +14339,8 @@ export interface BookingVisitMark {
 
 /** 今日の予約の人（スタッフ）の行。 */
 export interface BookingTodayStaffRow {
+  line_account_id?: string;
+  lock_version?: number;
   kind: 'staff';
   id: string;
   starts_at: string;
@@ -14357,6 +14359,10 @@ export interface BookingTodayStaffRow {
 
 /** 今日の予約の席（卓）の行。 */
 export interface BookingTodaySeatRow {
+  customer_version?: number;
+  table_id?: string | null;
+  table_ids_json?: string;
+  source?: string;
   kind: 'seat';
   id: string;
   store_id: string;

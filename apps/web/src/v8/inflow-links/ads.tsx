@@ -1,18 +1,17 @@
 'use client'
 
-import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatDate as polishFormatDate, formatNumber, formatYen } from '@/lib/format'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AtSign, Check, Eye, Music, MoreHorizontal, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
+import { AtSign, Check, Music, Plug, Plus, RefreshCw, Search, Target, ThumbsUp, UserPlus, Wallet, XCircle } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, type AdPlatform } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatNumber, formatYen } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
-import IconButton from '@/components/shared/icon-button'
+import { MoreAction } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -24,11 +23,12 @@ import { DetailPage } from '@/components/templates'
 import { focusField } from './focus-field'
 import styles from './ads.module.css'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 広告連携（Pencil：画面 `qSTVR`・広告費を手で入れる `ZxKL5`）。
@@ -349,7 +349,7 @@ export default function AdsV8() {
       actions={manage ? <Button onClick={openManualEntry}><Plus size={15} aria-hidden="true" />費用を手で入れる</Button> : null}>
       <div className={styles.body}>
         {readonly ? (
-          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
         {loading && platforms.length === 0 ? (
           <ListState kind="loading" title="広告連携を読み込んでいます" />
@@ -419,7 +419,7 @@ export default function AdsV8() {
               )
             })}
           </div>
-          {importError ? <p className={styles.error} role="alert">{importError}</p> : null}
+          {importError ? <Notice tone="danger" >{importError}</Notice> : null}
 
           <h2 className={styles.sectionTitle} id="ads-costs">流入元ごとの費用</h2>
           {costFailed ? (
@@ -493,15 +493,13 @@ export default function AdsV8() {
                     <span className={styles.entryWho} title={`記録した日時 ${shortJst(entry.createdAt) ?? emptyValue('unknown')}`}>{`記録 ${shortJst(entry.createdAt)?.split(' ')[0] ?? emptyValue('unknown')}`}</span>
                     <span className={styles.entryMenu}>
                       {manage && !cancelled ? (
-                        <IconButton
+                        <MoreAction
                           title={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
                           aria-label={`${shortDay(entry.day)} ${entry.sourceLabel}の操作`}
                           aria-expanded={selectedEntryId === entry.id}
                           aria-controls="ads-entry-actions"
                           onClick={() => setSelectedEntryId((current) => (current === entry.id ? null : entry.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
+                         />
                       ) : null}
                     </span>
                   </div>

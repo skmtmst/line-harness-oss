@@ -162,7 +162,6 @@
 
 /* フォルダの列。 */
 .folderNote {
-  margin: 0;
   word-break: normal;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
@@ -179,19 +178,7 @@
 }
 
 /* 見るだけの人の帯（見出しの下・数の帯の上）。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-fm-band-gap);
-  margin-bottom: var(--tpl-fm-band-after);
-  padding: var(--tpl-fm-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-fm-band-lh);
-}
-.viewerBand > svg { flex-shrink: 0; color: var(--color-action); }
+.viewerBand { margin-bottom: var(--tpl-fm-band-after); }
 
 /* 右の詳細。 */
 .panelBody {
@@ -218,3 +205,5 @@
   gap: var(--tpl-toolbar-gap);
   margin-top: var(--tpl-toolbar-gap);
 }
+
+.folderNote, .folderNoteNoticePlacement { margin: 0; }

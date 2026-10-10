@@ -130,7 +130,7 @@ afterEach(cleanup)
 describe('監査 R315: 選択状態を意味で伝える', () => {
   it('表示切替（今日・今週・今月・一覧）は押下状態を持つ', async () => {
     render(<BookingsPage />)
-    const listTab = await screen.findByRole('button', { name: '一覧' })
+    const listTab = (await screen.findAllByRole('button', { name: '一覧' }))[0]
     // 初期表示は「日」なので一覧は押されていない。
     expect(listTab.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(listTab)

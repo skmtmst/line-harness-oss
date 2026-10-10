@@ -3,16 +3,7 @@ import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/
 import { notifySaved } from '@/components/shared/toast'
 import { Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  ApiError,
-  api,
-  type OpsAnnouncement,
-  type OpsAnnouncementAudience,
-  type OpsAnnouncementChannel,
-  type OpsAnnouncementInput,
-  type OpsAudiencePreview,
-  type OpsTenantRow,
-} from '@/lib/api'
+import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -33,13 +24,13 @@ import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 
 /**
  * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。
@@ -358,7 +349,7 @@ export default function OpsAnnouncementsV8() {
                 { text: `本文：入力 ${form.body} ／ 最新 ${collision.latest.body}` },
                 { text: `公開時刻：入力 ${form.publishAt || 'すぐに'} ／ 最新 ${toLocalInput(collision.latest.publishAt) || 'すぐに'}` },
               ] : null} />
-            {formError && !confirmSend ? <p role="alert" className={parts.alert}>{formError}</p> : null}
+            {formError && !confirmSend ? <Notice tone="danger" className={parts.alertNoticePlacement} >{formError}</Notice> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
             <div className={styles.field}><Field label="件名" htmlFor="ann-subject"><SaveErrorField names={["subject","form.subject"]}><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} /></SaveErrorField>
 <FieldError id="ann-subject-error">{fields.error('subject')}</FieldError></Field></div>

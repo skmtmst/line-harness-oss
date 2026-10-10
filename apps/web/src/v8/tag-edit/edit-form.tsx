@@ -1,12 +1,10 @@
 'use client'
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
-import { ActionDrawer } from '@/components/friend-fields/tag-editor-v4';
-
+import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react'
+import { ActionDrawer, RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api'
 import { formatDay } from '@/lib/format'
@@ -21,17 +19,15 @@ import { tagNameProblem } from '@/v8/tags/tag-name'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
-import Toggle from '@/components/shared/toggle'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import LinkedActionList from '@/components/friend-fields/linked-action-list'
-import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model'
 import styles from './edit.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, useSaveErrorReveal } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
@@ -231,7 +227,7 @@ export function TagEditForm({
         busy={saving}
         boardId={host ? 'MFgPZ' : 'Qat9s'}
         footerOutlined={Boolean(host)}
-        notice={<>{host?.notice}{readOnly ? <p className={styles.roBand} role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</p> : null}{conflictBand}</>}
+        notice={<>{host?.notice}{readOnly ? <div className={styles.roBand}><ReadOnlyNotice role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</ReadOnlyNotice></div> : null}{conflictBand}</>}
         title={host?.title ?? (tag.name || 'タグを編集')}
         identity={host ? undefined : <></>}
         help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}

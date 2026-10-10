@@ -617,7 +617,7 @@ export default function TemplateDetailV8() {
                 ) : versionsError ? (
                   <div>
                     <p className="text-ink-secondary" style={{ fontSize: 13, margin: '8px 0' }}>{versionsError}</p>
-                    <Button variant="secondary" onClick={() => void loadVersions()}>もう一度読み込む</Button>
+                    <Button variant="secondary" onClick={() => loadVersions()} busyLabel="処理中…">もう一度読み込む</Button>
                   </div>
                 ) : (
                   <>

@@ -26,7 +26,7 @@ import { tagNameProblem } from './tag-name'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8「タグを作る」（Pencil `d9xoI`）。
@@ -197,7 +197,7 @@ function TagCreate() {
 
   if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="複製元を読み込んでいます…" /></SaveErrorScope>
 
-  if (!canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" /></SaveErrorScope>
+  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
   const back = <></>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
@@ -256,7 +256,7 @@ function TagCreate() {
             </span>
             {foldersFailed ? (
               <div className={styles.inlineRetry}>
-                <p className={styles.fieldError} role="alert">フォルダを読み込めませんでした。未分類のまま作れます。</p>
+                <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >フォルダを読み込めませんでした。未分類のまま作れます。</Notice>
                 <Button type="button" variant="text" onClick={() => setFoldersReloadKey((key) => key + 1)}>フォルダを読み直す</Button>
               </div>
             ) : null}

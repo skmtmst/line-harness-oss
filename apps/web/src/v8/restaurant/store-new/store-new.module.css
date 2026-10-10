@@ -90,7 +90,6 @@
 }
 
 .errorBox {
-  margin: 0;
   padding: var(--tpl-rt-notice-pad);
   border-radius: var(--tpl-rt-band-radius);
   background: var(--color-status-danger-soft);
@@ -269,3 +268,5 @@
   padding-top: var(--tpl-rt-footer-pad-top);
   box-shadow: var(--tpl-rt-line-top);
 }
+
+.errorBox, .errorBoxNoticePlacement { margin: 0; }

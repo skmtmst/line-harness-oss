@@ -3332,9 +3332,9 @@ CREATE TABLE friend_fields (
   )), type_v8 TEXT
   CHECK (type_v8 IS NULL OR type_v8 = 'time'));
 
-CREATE TABLE friend_fixed_fields (
-  fixed_key TEXT PRIMARY KEY CHECK (fixed_key IN ('name','kana','birthday','age','email','tel','address')),
-  field_id TEXT NOT NULL UNIQUE REFERENCES friend_fields(id) ON DELETE RESTRICT
+CREATE TABLE "friend_fixed_fields" (
+ fixed_key TEXT PRIMARY KEY CHECK(fixed_key IN('name','kana','birthday','age','email','tel','address','allergy','anniversary','seat_preference')),
+ field_id TEXT NOT NULL UNIQUE REFERENCES friend_fields(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE friend_identity_links (
@@ -6385,7 +6385,7 @@ CREATE TABLE rt_customer_notice_outbox (
  id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id),
  reservation_id TEXT NOT NULL REFERENCES rt_reservations(id), customer_version INTEGER NOT NULL,
  line_uid TEXT NOT NULL, message TEXT NOT NULL, retry_key TEXT NOT NULL UNIQUE,
- sent_at TEXT, lease_until TEXT, lease_token TEXT, created_at TEXT NOT NULL DEFAULT(datetime('now')),
+ sent_at TEXT, lease_until TEXT, lease_token TEXT, created_at TEXT NOT NULL DEFAULT(datetime('now')), valid INTEGER NOT NULL DEFAULT 1 CHECK(valid IN(0,1)),
  UNIQUE(reservation_id,customer_version)
 );
 
@@ -6397,6 +6397,14 @@ CREATE TABLE rt_email_digests (
   reported_count INTEGER NOT NULL CHECK (reported_count >= 0),
   received_at TEXT NOT NULL DEFAULT (datetime('now')),
   inbound_email_id TEXT NOT NULL UNIQUE REFERENCES rt_inbound_emails(id)
+);
+
+CREATE TABLE rt_floors (
+ id TEXT PRIMARY KEY, store_id TEXT NOT NULL REFERENCES rt_stores(id), name TEXT NOT NULL,
+ width REAL NOT NULL DEFAULT 1000 CHECK(width>0), height REAL NOT NULL DEFAULT 700 CHECK(height>0),
+ outline_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(outline_json)),
+ fixtures_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(fixtures_json)),
+ version INTEGER NOT NULL DEFAULT 1, UNIQUE(store_id,name)
 );
 
 CREATE TABLE rt_gbp_posts (
@@ -6800,6 +6808,11 @@ CREATE TABLE rt_reservation_links (
  created_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
 
+CREATE TABLE rt_reservation_table_links (
+ reservation_id TEXT NOT NULL REFERENCES rt_reservations(id) ON DELETE CASCADE,
+ table_id TEXT NOT NULL REFERENCES rt_tables(id), PRIMARY KEY(reservation_id,table_id)
+);
+
 CREATE TABLE "rt_reservations" (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -6821,7 +6834,7 @@ CREATE TABLE "rt_reservations" (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT);
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)));
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
@@ -6874,6 +6887,11 @@ CREATE TABLE "rt_seat_waitlist" (
   updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE rt_seat_waitlist_table_links (
+ waitlist_id TEXT NOT NULL REFERENCES rt_seat_waitlist(id) ON DELETE CASCADE,
+ table_id TEXT NOT NULL REFERENCES rt_tables(id), PRIMARY KEY(waitlist_id,table_id)
+);
+
 CREATE TABLE rt_store_media_links (
  store_id TEXT NOT NULL REFERENCES rt_stores(id), media_id TEXT NOT NULL REFERENCES rt_media(id),
  page_url TEXT, login_url TEXT, close_on_booking INTEGER NOT NULL DEFAULT 0 CHECK(close_on_booking IN (0,1)),
@@ -6924,7 +6942,7 @@ CREATE TABLE rt_tables (
   join_group TEXT,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), floor_id TEXT REFERENCES rt_floors(id), shape TEXT NOT NULL DEFAULT 'rectangle' CHECK(shape IN ('rectangle','circle','long','counter','sofa')), width REAL NOT NULL DEFAULT 80 CHECK(width>0), height REAL NOT NULL DEFAULT 64 CHECK(height>0), rotation REAL NOT NULL DEFAULT 0,
   UNIQUE(store_id, code)
 );
 
@@ -10323,6 +10341,10 @@ CREATE INDEX rt_closures_store_dates ON rt_closures(store_id,start_date,end_date
 
 CREATE INDEX rt_inventory_outbox_pending ON rt_inventory_notification_outbox(sent_at,lease_until);
 
+CREATE INDEX rt_reserved_table ON rt_reservation_table_links(table_id,reservation_id);
+
+CREATE INDEX rt_waiting_table ON rt_seat_waitlist_table_links(table_id,waitlist_id);
+
 CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
   ON google_calendar_connections (staff_id)
   WHERE staff_id IS NOT NULL AND is_active = 1;
@@ -10449,12 +10471,7 @@ WHEN EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'conversion point with events or usages cannot be deleted'); END;
 
-CREATE TRIGGER fixed_friend_field_definition_guard BEFORE UPDATE ON friend_fields
-WHEN EXISTS (SELECT 1 FROM friend_fixed_fields WHERE field_id = OLD.id)
-  AND (NEW.name IS NOT OLD.name OR NEW.field_key IS NOT OLD.field_key
-    OR NEW.type IS NOT OLD.type OR NEW.type_v6 IS NOT OLD.type_v6 OR NEW.type_v8 IS NOT OLD.type_v8
-    OR NEW.folder_id IS NOT NULL OR NEW.is_personal <> 1 OR NEW.ec_is_master <> 0 OR NEW.status <> 'active')
-BEGIN SELECT RAISE(ABORT, 'FIXED_FRIEND_FIELD_IMMUTABLE'); END;
+CREATE TRIGGER fixed_friend_field_definition_guard BEFORE UPDATE ON friend_fields WHEN EXISTS(SELECT 1 FROM friend_fixed_fields WHERE field_id=OLD.id) AND (NEW.name IS NOT OLD.name OR NEW.field_key IS NOT OLD.field_key OR NEW.type IS NOT OLD.type OR NEW.type_v6 IS NOT OLD.type_v6 OR NEW.type_v8 IS NOT OLD.type_v8 OR NEW.folder_id IS NOT NULL OR NEW.is_personal<>1 OR NEW.ec_is_master<>0 OR NEW.status<>'active') BEGIN SELECT RAISE(ABORT,'FIXED_FRIEND_FIELD_IMMUTABLE'); END;
 
 CREATE TRIGGER fixed_name_friend_insert AFTER INSERT ON friends
 WHEN NEW.real_name IS NOT NULL AND TRIM(NEW.real_name) <> ''
@@ -10772,6 +10789,12 @@ CREATE TRIGGER rt_customer_table_insert BEFORE INSERT ON rt_reservations WHEN NE
 
 CREATE TRIGGER rt_customer_table_update BEFORE UPDATE OF table_id,starts_at,ends_at,status ON rt_reservations WHEN NEW.status NOT IN ('cancelled','no_show') AND (NEW.status<>'pending' OR NEW.hold_expires_at IS NULL OR julianday(NEW.hold_expires_at)>julianday('now')) AND NEW.table_id IS NOT NULL AND EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=NEW.store_id AND r.table_id=NEW.table_id AND r.id<>NEW.id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND (NEW.customer_request_id IS NOT NULL OR r.customer_request_id IS NOT NULL) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) BEGIN SELECT RAISE(ABORT,'customer_table_conflict'); END;
 
+CREATE TRIGGER rt_dining_snapshot_insert AFTER INSERT ON rt_reservations WHEN NEW.dining_snapshot_json IS NULL BEGIN UPDATE rt_reservations SET dining_snapshot_json=json_object( 'allergy',COALESCE(NEW.allergy_note,(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-allergy' LIMIT 1)), 'anniversary',(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-anniversary' LIMIT 1), 'seatPreference',(SELECT v.value FROM friend_field_values v JOIN friends f ON f.id=v.friend_id JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=NEW.store_id AND f.line_user_id=NEW.line_uid AND v.field_id='fixed-seat_preference' LIMIT 1), 'courseId',NEW.course_id,'courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=NEW.course_id AND store_id=NEW.store_id),'[]')),'capturedAt',NEW.created_at) WHERE id=NEW.id; END;
+
+CREATE TRIGGER rt_floor_new_store AFTER INSERT ON rt_stores BEGIN INSERT INTO rt_floors(id,store_id,name) VALUES('floor-'||NEW.id,NEW.id,'1階'); END;
+
+CREATE TRIGGER rt_floor_new_table AFTER INSERT ON rt_tables WHEN NEW.floor_id IS NULL BEGIN UPDATE rt_tables SET floor_id='floor-'||NEW.store_id WHERE id=NEW.id; END;
+
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (OLD.store_id); END;
 
 CREATE TRIGGER rt_inventory_reservation_insert AFTER INSERT ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (NEW.store_id); END;
@@ -10812,6 +10835,8 @@ CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.s
 
 CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
+CREATE TRIGGER rt_notice_booking_change AFTER UPDATE OF starts_at,ends_at,guest_count,status ON rt_reservations WHEN NEW.starts_at IS NOT OLD.starts_at OR NEW.ends_at IS NOT OLD.ends_at OR NEW.guest_count IS NOT OLD.guest_count OR (NEW.status IN('cancelled','no_show') AND NEW.status IS NOT OLD.status) BEGIN UPDATE rt_customer_notice_outbox SET valid=0 WHERE reservation_id=NEW.id AND sent_at IS NULL; END;
+
 CREATE TRIGGER rt_reservation_hold_insert BEFORE INSERT ON rt_reservations
 WHEN NEW.table_id IS NOT NULL AND NEW.status NOT IN ('cancelled', 'no_show')
  AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.store_id = NEW.store_id AND r.table_id = NEW.table_id
@@ -10828,6 +10853,16 @@ WHEN NEW.table_id IS NOT NULL AND NEW.status NOT IN ('cancelled', 'no_show')
   AND (r.hold_expires_at IS NULL OR r.status <> 'pending' OR datetime(r.hold_expires_at) > datetime('now')))
 BEGIN SELECT RAISE(ABORT, 'restaurant_table_conflict'); END;
 
+CREATE TRIGGER rt_reservation_table_links_guard BEFORE INSERT ON rt_reservation_table_links WHEN EXISTS(SELECT 1 FROM rt_reservations r WHERE r.id=NEW.reservation_id AND r.status NOT IN('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND ( NOT EXISTS(SELECT 1 FROM rt_tables t WHERE t.id=NEW.table_id AND t.store_id=r.store_id AND t.is_active=1) OR EXISTS(SELECT 1 FROM rt_reservations other JOIN rt_reservation_table_links l ON l.reservation_id=other.id WHERE other.id<>r.id AND l.table_id=NEW.table_id AND other.status NOT IN('cancelled','no_show') AND (other.status<>'pending' OR other.hold_expires_at IS NULL OR julianday(other.hold_expires_at)>julianday('now')) AND julianday(other.starts_at)<julianday(r.ends_at) AND julianday(other.ends_at)>julianday(r.starts_at)) OR EXISTS(SELECT 1 FROM rt_seat_waitlist other JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=other.id WHERE l.table_id=NEW.table_id AND other.status='invited' AND julianday(other.hold_expires_at)>julianday('now') AND julianday(other.starts_at)<julianday(r.ends_at) AND julianday(COALESCE(other.ends_at,datetime(other.starts_at,'+120 minutes')))>julianday(r.starts_at)) OR EXISTS(SELECT 1 FROM rt_closures c,json_each(c.periods_json) p WHERE c.store_id=r.store_id AND c.archived_at IS NULL AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IN(SELECT value FROM json_each(c.table_ids_json))) AND julianday(json_extract(p.value,'$.startsAt'))<julianday(r.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(r.starts_at)) )) BEGIN SELECT RAISE(ABORT,'restaurant_table_conflict'); END;
+
+CREATE TRIGGER rt_reservation_version AFTER UPDATE ON rt_reservations WHEN NEW.customer_version=OLD.customer_version AND ( NEW.customer_name IS NOT OLD.customer_name OR NEW.customer_phone IS NOT OLD.customer_phone OR NEW.guest_count IS NOT OLD.guest_count OR NEW.starts_at IS NOT OLD.starts_at OR NEW.ends_at IS NOT OLD.ends_at OR NEW.table_id IS NOT OLD.table_id OR NEW.course_id IS NOT OLD.course_id OR NEW.status IS NOT OLD.status OR NEW.allergy_note IS NOT OLD.allergy_note OR NEW.note IS NOT OLD.note OR NEW.hold_expires_at IS NOT OLD.hold_expires_at) BEGIN UPDATE rt_reservations SET customer_version=OLD.customer_version+1 WHERE id=NEW.id; END;
+
+CREATE TRIGGER rt_reservations_linked_insert AFTER INSERT ON rt_reservations BEGIN DELETE FROM rt_reservation_table_links WHERE reservation_id=NEW.id; INSERT INTO rt_reservation_table_links(reservation_id,table_id) SELECT NEW.id,t.id FROM rt_tables t JOIN rt_tables main ON main.id=NEW.table_id WHERE t.store_id=NEW.store_id AND (t.id=main.id OR (NEW.guest_count>main.max_capacity AND main.join_group IS NOT NULL AND t.join_group=main.join_group)); END;
+
+CREATE TRIGGER rt_reservations_linked_time_update BEFORE UPDATE OF starts_at,ends_at,status,hold_expires_at ON rt_reservations WHEN NEW.table_id IS OLD.table_id AND NEW.guest_count=OLD.guest_count AND NEW.status NOT IN('cancelled','no_show') AND (NEW.status<>'pending' OR NEW.hold_expires_at IS NULL OR julianday(NEW.hold_expires_at)>julianday('now')) AND (EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=NEW.store_id AND r.id<>NEW.id AND r.status NOT IN('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND l.table_id IN (SELECT table_id FROM rt_reservation_table_links WHERE reservation_id=NEW.id) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) OR EXISTS(SELECT 1 FROM rt_seat_waitlist w JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=w.id WHERE w.store_id=NEW.store_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND l.table_id IN (SELECT table_id FROM rt_reservation_table_links WHERE reservation_id=NEW.id) AND julianday(w.starts_at)<julianday(NEW.ends_at) AND julianday(COALESCE(w.ends_at,datetime(w.starts_at,'+120 minutes')))>julianday(NEW.starts_at))) BEGIN SELECT RAISE(ABORT,'restaurant_table_conflict'); END;
+
+CREATE TRIGGER rt_reservations_linked_update AFTER UPDATE OF table_id,guest_count ON rt_reservations WHEN NEW.table_id IS NOT OLD.table_id OR NEW.guest_count IS NOT OLD.guest_count BEGIN DELETE FROM rt_reservation_table_links WHERE reservation_id=NEW.id; INSERT INTO rt_reservation_table_links(reservation_id,table_id) SELECT NEW.id,t.id FROM rt_tables t JOIN rt_tables main ON main.id=NEW.table_id WHERE t.store_id=NEW.store_id AND (t.id=main.id OR (NEW.guest_count>main.max_capacity AND main.join_group IS NOT NULL AND t.join_group=main.join_group)); END;
+
 CREATE TRIGGER rt_reservations_rule_queue_delete AFTER DELETE ON rt_reservations BEGIN INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(OLD.store_id,'rt_reservations:delete:'||OLD.id) ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
 
 CREATE TRIGGER rt_reservations_rule_queue_insert AFTER INSERT ON rt_reservations BEGIN INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(NEW.store_id,'rt_reservations:insert:'||NEW.id) ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
@@ -10838,7 +10873,15 @@ CREATE TRIGGER rt_seat_waitlist_claim BEFORE UPDATE OF status ON rt_seat_waitlis
 
 CREATE TRIGGER rt_seat_waitlist_conversion AFTER INSERT ON rt_reservations WHEN NEW.waitlist_entry_id IS NOT NULL BEGIN UPDATE rt_seat_waitlist SET status='converted',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=NEW.waitlist_entry_id; END;
 
+CREATE TRIGGER rt_seat_waitlist_linked_insert AFTER INSERT ON rt_seat_waitlist BEGIN DELETE FROM rt_seat_waitlist_table_links WHERE waitlist_id=NEW.id; INSERT INTO rt_seat_waitlist_table_links(waitlist_id,table_id) SELECT NEW.id,t.id FROM rt_tables t JOIN rt_tables main ON main.id=NEW.table_id WHERE t.store_id=NEW.store_id AND (t.id=main.id OR (NEW.guest_count>main.max_capacity AND main.join_group IS NOT NULL AND t.join_group=main.join_group)); END;
+
+CREATE TRIGGER rt_seat_waitlist_linked_time_update BEFORE UPDATE OF starts_at,ends_at,status,hold_expires_at ON rt_seat_waitlist WHEN NEW.table_id IS OLD.table_id AND NEW.guest_count=OLD.guest_count AND NEW.status='invited' AND julianday(NEW.hold_expires_at)>julianday('now') AND (EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_reservation_table_links l ON l.reservation_id=r.id WHERE r.store_id=NEW.store_id AND r.status NOT IN('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND l.table_id IN (SELECT table_id FROM rt_seat_waitlist_table_links WHERE waitlist_id=NEW.id) AND julianday(r.starts_at)<julianday(NEW.ends_at) AND julianday(r.ends_at)>julianday(NEW.starts_at)) OR EXISTS(SELECT 1 FROM rt_seat_waitlist w JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=w.id WHERE w.store_id=NEW.store_id AND w.id<>NEW.id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND l.table_id IN (SELECT table_id FROM rt_seat_waitlist_table_links WHERE waitlist_id=NEW.id) AND julianday(w.starts_at)<julianday(NEW.ends_at) AND julianday(COALESCE(w.ends_at,datetime(w.starts_at,'+120 minutes')))>julianday(NEW.starts_at))) BEGIN SELECT RAISE(ABORT,'restaurant_table_conflict'); END;
+
+CREATE TRIGGER rt_seat_waitlist_linked_update AFTER UPDATE OF table_id,guest_count ON rt_seat_waitlist WHEN NEW.table_id IS NOT OLD.table_id OR NEW.guest_count IS NOT OLD.guest_count BEGIN DELETE FROM rt_seat_waitlist_table_links WHERE waitlist_id=NEW.id; INSERT INTO rt_seat_waitlist_table_links(waitlist_id,table_id) SELECT NEW.id,t.id FROM rt_tables t JOIN rt_tables main ON main.id=NEW.table_id WHERE t.store_id=NEW.store_id AND (t.id=main.id OR (NEW.guest_count>main.max_capacity AND main.join_group IS NOT NULL AND t.join_group=main.join_group)); END;
+
 CREATE TRIGGER rt_seat_waitlist_registration BEFORE INSERT ON rt_seat_waitlist BEGIN SELECT CASE WHEN julianday(NEW.starts_at)<=julianday('now','+1 hour') THEN RAISE(ABORT,'waitlist_registration_closed') WHEN ((SELECT COUNT(*) FROM booking_waitlist w WHERE w.line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=NEW.store_id) AND w.status IN ('waiting','invited') AND (w.friend_id=(SELECT id FROM friends WHERE line_user_id=NEW.line_uid AND line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=NEW.store_id)) OR (w.booking_customer_id IS NOT NULL AND w.booking_customer_id=NULL))) + (SELECT COUNT(*) FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=NEW.store_id) AND w.status IN ('waiting','invited') AND (w.line_uid=NEW.line_uid OR (NEW.line_uid IS NULL AND w.identity_key=NEW.identity_key))))>=3 THEN RAISE(ABORT,'waitlist_limit') END; END;
+
+CREATE TRIGGER rt_seat_waitlist_table_links_guard BEFORE INSERT ON rt_seat_waitlist_table_links WHEN EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.id=NEW.waitlist_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND ( NOT EXISTS(SELECT 1 FROM rt_tables t WHERE t.id=NEW.table_id AND t.store_id=w.store_id AND t.is_active=1) OR EXISTS(SELECT 1 FROM rt_reservations other JOIN rt_reservation_table_links l ON l.reservation_id=other.id WHERE l.table_id=NEW.table_id AND other.status NOT IN('cancelled','no_show') AND (other.status<>'pending' OR other.hold_expires_at IS NULL OR julianday(other.hold_expires_at)>julianday('now')) AND julianday(other.starts_at)<julianday(w.ends_at) AND julianday(other.ends_at)>julianday(w.starts_at)) OR EXISTS(SELECT 1 FROM rt_seat_waitlist other JOIN rt_seat_waitlist_table_links l ON l.waitlist_id=other.id WHERE other.id<>w.id AND l.table_id=NEW.table_id AND other.status='invited' AND julianday(other.hold_expires_at)>julianday('now') AND julianday(other.starts_at)<julianday(w.ends_at) AND julianday(COALESCE(other.ends_at,datetime(other.starts_at,'+120 minutes')))>julianday(w.starts_at)) OR EXISTS(SELECT 1 FROM rt_closures c,json_each(c.periods_json) p WHERE c.store_id=w.store_id AND c.archived_at IS NULL AND (json_array_length(c.table_ids_json)=0 OR NEW.table_id IN(SELECT value FROM json_each(c.table_ids_json))) AND julianday(json_extract(p.value,'$.startsAt'))<julianday(w.ends_at) AND julianday(json_extract(p.value,'$.endsAt'))>julianday(w.starts_at)) )) BEGIN SELECT RAISE(ABORT,'restaurant_table_conflict'); END;
 
 CREATE TRIGGER rt_tables_rule_queue_delete AFTER DELETE ON rt_tables BEGIN INSERT INTO rt_inventory_rule_queue(store_id,cause) VALUES(OLD.store_id,'rt_tables:delete:'||OLD.id) ON CONFLICT(store_id) DO UPDATE SET generation=generation+1,cause=excluded.cause,updated_at=datetime('now'); END;
 
@@ -11334,11 +11377,11 @@ CREATE VIEW rt_inventory_occupancy AS SELECT i.*,
   AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now'))
   AND datetime(r.starts_at)<datetime(i.starts_at, '+' || i.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(i.starts_at)),0) AS guest_count,
  COALESCE((SELECT SUM(t.max_capacity) FROM rt_tables t WHERE t.store_id=i.store_id AND t.is_active=1
-  AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.table_id=t.id AND r.store_id=i.store_id
+  AND EXISTS (SELECT 1 FROM rt_reservations r WHERE EXISTS(SELECT 1 FROM rt_reservation_table_links l WHERE l.reservation_id=r.id AND l.table_id=t.id) AND r.store_id=i.store_id
    AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now'))
    AND datetime(r.starts_at)<datetime(i.starts_at, '+' || i.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(i.starts_at))),0) AS occupied_seats,
  (SELECT json_group_array(t.id) FROM rt_tables t WHERE t.store_id=i.store_id AND t.is_active=1
-  AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.table_id=t.id AND r.store_id=i.store_id
+  AND EXISTS (SELECT 1 FROM rt_reservations r WHERE EXISTS(SELECT 1 FROM rt_reservation_table_links l WHERE l.reservation_id=r.id AND l.table_id=t.id) AND r.store_id=i.store_id
    AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now'))
    AND datetime(r.starts_at)<datetime(i.starts_at, '+' || i.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(i.starts_at))) AS occupied_table_ids_json,
  COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=i.store_id AND r.table_id IS NULL
@@ -11364,3 +11407,9 @@ INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,d
 INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('tel','fixed-tel');
 INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-address','住所','fixed_address','textarea','form',1,-1);
 INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('address','fixed-address');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-allergy','アレルギー','fixed_allergy','text','form',1,0);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('allergy','fixed-allergy');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-anniversary','記念日','fixed_anniversary','date','form',1,1);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('anniversary','fixed-anniversary');
+INSERT OR IGNORE INTO friend_fields (id,name,field_key,type,source,is_personal,display_order) VALUES ('fixed-seat_preference','席の好み','fixed_seat_preference','text','form',1,2);
+INSERT OR IGNORE INTO friend_fixed_fields (fixed_key,field_id) VALUES ('seat_preference','fixed-seat_preference');

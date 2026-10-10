@@ -118,7 +118,7 @@
 .checks { display: flex; flex-direction: column; gap: var(--tpl-fr-cmp-check-gap); }
 .fieldLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fr-cmp-panel-lh); margin-bottom: calc(var(--tpl-fr-cmp-check-gap) - var(--tpl-fr-stack-gap)); }
 .panelActions { display: flex; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
-.error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
+
 .note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); }
 
 .historyCard { align-self: flex-start; width: 100%; gap: var(--tpl-fr-cmp-card-gap); padding: var(--tpl-fr-cmp-panel-pad); }

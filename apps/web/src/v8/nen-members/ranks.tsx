@@ -3,7 +3,7 @@
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, GitCompareArrows, Plus, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Check, Plus, RefreshCw } from 'lucide-react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions'
@@ -26,6 +26,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8-B 会員 › ランク設定（fb9NJ）・ランクを消す（確認）（dEv6G）・競合（e5yBLx）。
@@ -292,7 +293,7 @@ export default function RankSettingsV8({
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-          {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
         </div>
       ) : null}
 

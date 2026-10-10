@@ -32,23 +32,7 @@
 }
 
 /* 閲覧のみの帯（OxSw8）。数の帯の上。薄い青の地・目の印・枠なし。 */
-.viewerBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-cv-band-gap);
-  margin-bottom: var(--tpl-cv-band-after);
-  padding: var(--tpl-cv-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  line-height: var(--tpl-cv-band-lh);
-}
-
-.viewerBand > svg {
-  flex-shrink: 0;
-  color: var(--color-action);
-}
+.viewerBand { margin-bottom: var(--tpl-cv-band-after); }
 
 /* 数の帯の境目は共通の型と帯に任せる。数字の字幅だけを絵に合わせる。 */
 

@@ -163,7 +163,6 @@
 .input:disabled { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 
 .fieldError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-caption);
   line-height: var(--tpl-bks-note-lh);
@@ -201,3 +200,5 @@
   .body { flex-direction: column; }
   .side { max-width: none; border-left: 0; border-top: 1px solid var(--color-hairline); }
 }
+
+.fieldError, .fieldErrorNoticePlacement { margin: 0; }

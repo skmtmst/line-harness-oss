@@ -1,54 +1,30 @@
 'use client'
-import { useDetailPanelUrl } from '@/components/shared/detail-panel';
-
-import { canManageRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
 import SharedStatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlValue, useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  AlertCircle,
-  ArrowUpDown,
-  Bookmark,
-  CalendarClock,
-  CalendarDays,
-  ChevronDown,
-  Copy,
-  Eye,
-  FilePen,
-  FileText,
-  Gauge,
-  List as ListIcon,
-  Lock,
-  MailOpen,
-  Plus,
-  Send,
-  SendHorizontal,
-  UserCheck,
-} from 'lucide-react'
+import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FilePen, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
-import { loadFailureNotice } from '@/components/shared/api-error-message'
+import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
@@ -64,13 +40,14 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { runOptimistic } from '@/lib/undoable'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format'
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
-import { formatListDateTime as polishFormatListDateTime } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 は `jjFNi`・閲覧のみは `NtCE3`）。
@@ -777,7 +754,7 @@ export default function BroadcastListV8() {
   /* ===== 部品（広い板・1152 で同じものを並べ替えて使う） ===== */
   /* 閲覧のみには押せない「配信を作る」を置かずに隠す（2026-10-06 オーナー決定）。
      広い板では場所だけ空けて、フォルダの列の並びを絵（NtCE3）どおりに保つ。 */
-  const createButton = (full: boolean) => (!canEdit ? (full ? <span className={styles.viewerCreateSpace} aria-hidden="true" /> : null) : (
+  const createButton = (full: boolean) => (!canEdit ? null : (
     <Button
       type="button"
       variant="primary"
@@ -971,10 +948,8 @@ export default function BroadcastListV8() {
         </div>
       ) : null}
       {savedViewError ? (
-        <p role="alert" className={styles.note}>
-          {savedViewError}
-          <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button>
-        </p>
+        <Notice tone="danger" className={styles.noteNoticePlacement} >{savedViewError}
+          <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button></Notice>
       ) : null}
     </ListToolbarFrame>
   )
@@ -1017,12 +992,7 @@ export default function BroadcastListV8() {
   )
 
   const stateCard = (icon: React.ReactNode, title: string, desc: string | null, action: React.ReactNode, danger = false) => (
-    <div className={styles.stateCard}>
-      {icon ? <span className={danger ? `${styles.stateIcon} ${styles.stateIconError}` : styles.stateIcon}>{icon}</span> : null}
-      <p className={styles.stateTitle}>{title}</p>
-      {desc ? <p className={styles.stateDesc}>{desc}</p> : null}
-      {action}
-    </div>
+    <ListState kind={danger ? 'error' : 'empty'} title={title} description={desc ?? undefined} icon={icon} action={action} />
   )
 
   const listBody = loading ? (
@@ -1030,10 +1000,10 @@ export default function BroadcastListV8() {
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
   ) : forbidden ? (
-    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', permissionDeniedMessage('store'), <Button onClick={() => void loadList((page - 1) * pageSize)}>もう一度読み込む</Button>, true)
+    stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', permissionDeniedMessage('store'), <Button onClick={() => loadList((page - 1) * pageSize)} busyLabel="処理中…">もう一度読み込む</Button>, true)
   ) : error ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
-      <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度読み込む</Button>, true)
+      <Button type="button" onClick={() => loadList((page - 1) * pageSize)} busyLabel="処理中…">もう一度読み込む</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
     /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない（2026-10-06 オーナー決定）。 */
     <EmptyList
@@ -1175,10 +1145,7 @@ export default function BroadcastListV8() {
       help="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={<>
         {canEdit ? null : (
-          <div className={styles.viewerBand} role="status">
-            <Eye size={16} aria-hidden="true" />
-            <span>閲覧のみで見ています。{permissionDeniedMessage('store')}</span>
-          </div>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
         )}
         <KpiBand>
           {kpis.map((kpi) => (
@@ -1198,7 +1165,7 @@ export default function BroadcastListV8() {
       folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
       folders={narrow ? undefined : (
         <FolderPanel
-          createAction={createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+          createAction={createButton(true)}
           activeId={folderFilter}
           onSelect={setFolderFilter}
           onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
@@ -1207,12 +1174,10 @@ export default function BroadcastListV8() {
         >
           {/* 閲覧のみ：「フォルダを追加」は置かず、場所だけ空ける */}
           {canEdit ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
-          <p className={styles.note}>フォルダを消しても、入っていたものは未分類に残ります</p>
+          <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
           {folderError ? (
-            <p role="alert" className={styles.note}>
-              {folderError}
-              <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button>
-            </p>
+            <Notice tone="danger" className={styles.noteNoticePlacement} >{folderError}
+              <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button></Notice>
           ) : null}
         </FolderPanel>
       )}
@@ -1279,7 +1244,7 @@ export default function BroadcastListV8() {
                   <Button
                     variant="secondary"
                     onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`) })}
-                  >
+                   busyLabel="移動中…">
                     編集を続ける
                   </Button>
                 ) : null}
@@ -1288,7 +1253,7 @@ export default function BroadcastListV8() {
                   <Button
                     variant="secondary"
                     onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) })}
-                  >
+                   busyLabel="移動中…">
                     複製する
                   </Button>
                   {fromHq ? null : (

@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { AlignLeft, Calendar, Check, CircleDot, Hash, ListChecks, Star, Type } from 'lucide-react'
 import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -19,7 +18,6 @@ import DefaultValueInput from '@/components/friend-fields/default-value-input'
 import { sameLabels, storedDefaultLabels, suggestKey } from './field-model'
 import styles from './create.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
 
 /*
  * ★V8 友だち情報欄を作る・編集（Pencil `w9zY5`）。
@@ -257,7 +255,7 @@ export default function FieldEditor({
     setOptions(next)
   }
 
-  const back = <></>
+  const back = null
   const help = (
     <>
       <AttributeKindGuide current="field" />
@@ -434,9 +432,7 @@ export default function FieldEditor({
             <span className={styles.labelStrong}>フォルダ</span>
             {foldersState === 'error' ? (
               <div className={styles.inlineRetry}>
-                <p className={styles.fieldError} role="alert">
-                  {mode === 'create' ? 'フォルダを読み込めませんでした。今は未分類にしか入れられません。' : '所属を読み込めませんでした。今の所属は変わらず保存されます。'}
-                </p>
+                <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{mode === 'create' ? 'フォルダを読み込めませんでした。今は未分類にしか入れられません。' : '所属を読み込めませんでした。今の所属は変わらず保存されます。'}</Notice>
                 {onRetryFolders ? <Button type="button" variant="text" onClick={onRetryFolders} disabled={foldersReloading}>もう一度読み込む</Button> : null}
               </div>
             ) : (

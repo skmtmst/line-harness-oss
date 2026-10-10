@@ -3,7 +3,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, CircleAlert, Copy, ExternalLink, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
+import { ArrowLeft, CircleAlert, Copy, GitCompare, List, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
 import { validateFlexContent } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -14,33 +14,20 @@ import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import LinePreview from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
 import { InsertText } from '@/components/shared/insert-text-field'
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
 import TargetMissing from '@/components/shared/target-missing'
-import { LinePreviewFlex as FlexPreviewComponent } from '@/components/shared/line-preview'
-import {
-  buildUsageRows,
-  insertionNames,
-  isTemplateDetailData,
-  lineChanges,
-  messageTypeText,
-  publishRowState,
-  shortStamp,
-  templateDeleteDescription,
-  type TemplateDetailData,
-  type TemplateVersionItem,
-  type UsageRow,
-} from './model'
+import { buildUsageRows, insertionNames, isTemplateDetailData, lineChanges, messageTypeText, publishRowState, shortStamp, templateDeleteDescription, type TemplateDetailData, type TemplateVersionItem, type UsageRow } from './model'
 import styles from './detail.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 テンプレートの詳細（一から書いた画面・2026-10-07）。
@@ -373,7 +360,7 @@ export default function TemplateDetailV8() {
           <RowMenu className={styles.moreButton} label="そのほかの操作" menuLabel={`テンプレート「${template.name}」の操作`} items={menuItems} />
         </div>
       ) : null}
-      {duplicateError ? <p className={styles.errorText} role="alert">{duplicateError}</p> : null}
+      {duplicateError ? <Notice tone="danger" >{duplicateError}</Notice> : null}
       <section className={styles.aboutBox} aria-label="このテンプレートについて">
         <h2 className={styles.aboutTitle}>このテンプレートについて</h2>
         <dl className={styles.aboutList}>
@@ -384,13 +371,8 @@ export default function TemplateDetailV8() {
         </dl>
       </section>
       {flexError ? (
-        <div role="alert" className={styles.flexError}>
-          <p className={styles.flexErrorTitle}>{flexError}</p>
-          <p className={styles.flexErrorNote}>
-            このままでは公開できません。
-            {canMutate ? <Link href={editHref} className={styles.inlineLink}>再編集で直してください。</Link> : 'オーナー・管理者に再編集を依頼してください。'}
-          </p>
-        </div>
+        <Notice tone="danger" heading={<> {flexError} </>} >このままでは公開できません。
+            {canMutate ? <Link href={editHref} className={styles.inlineLink}>再編集で直してください。</Link> : 'オーナー・管理者に再編集を依頼してください。'}</Notice>
       ) : (
         <LinePreview title="届き方" accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
           {template.messageType === 'flex' ? <FlexPreviewComponent content={draftContent} /> : (
@@ -418,7 +400,7 @@ export default function TemplateDetailV8() {
         description={[messageTypeText(template.messageType), folderLabel, `更新 ${shortStamp(template.updatedAt)}`].join('・')}
         preview={side}
       >
-        {canMutate ? null : <p className={styles.roBand} role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</p>}
+        {canMutate ? null : <div className={styles.roBand}><ReadOnlyNotice role="note">閲覧のみで見ています。編集・公開・削除はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>}
         {template.hasDraft ? (
           <div className={styles.draftBand} role="status">
             <CircleAlert size={18} aria-hidden="true" className={styles.draftIcon} />
@@ -489,7 +471,7 @@ export default function TemplateDetailV8() {
           {versions === null && !versionsError ? <DetailLoading /> : versionsError ? (
             <div className={styles.versionError}>
               <p className={styles.errorText}>{versionsError}</p>
-              <Button variant="secondary" onClick={() => void loadVersions()}>もう一度読み込む</Button>
+              <Button variant="secondary" onClick={() => loadVersions()} busyLabel="処理中…">もう一度読み込む</Button>
             </div>
           ) : (
             <>

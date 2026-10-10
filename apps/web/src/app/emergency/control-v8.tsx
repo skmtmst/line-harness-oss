@@ -1,17 +1,9 @@
 'use client'
 
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Eye, PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
+import { PauseCircle, ShieldCheck, Tag, Timer } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
-import {
-  api,
-  ApiError,
-  type OperationCapability,
-  type OperationControl,
-  type OperationHistoryEntry,
-  type OperationImpactPreview,
-  type OperationRestoreDrift,
-} from '@/lib/api'
+import { api, ApiError, type OperationCapability, type OperationControl, type OperationHistoryEntry, type OperationImpactPreview, type OperationRestoreDrift } from '@/lib/api'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import { formatOperationDate } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
@@ -35,6 +27,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）。
@@ -508,10 +501,7 @@ const EmergencyControlV8 = (
     <div data-design-node="OHwbU" className={styles.board}>
       {/* 権限が無い人には閲覧のみの帯。操作は出さず、記録は読める。 */}
       {previewSettled && !canControl ? (
-        <div className={styles.roBand} role="status">
-          <Eye size={16} aria-hidden="true" />
-          <span>閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</span>
-        </div>
+        <div className={styles.roBand}><ReadOnlyNotice role="status">閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</ReadOnlyNotice></div>
       ) : null}
 
       {needsReload ? (
@@ -527,8 +517,8 @@ const EmergencyControlV8 = (
         <div className={`${styles.feedbackBand} ${styles.feedbackWarn}`} role="status">
           <span>{stopBlockers.map((blocker) => blockerText[blocker]).join('')}</span>
           {stopBlockers.includes('unavailable') ? (
-            <Button type="button" onClick={() => void reloadControl()} disabled={reloading}>
-              {reloading ? '読み直しています…' : '最新の状態を読み直す'}
+            <Button type="button" onClick={() => void reloadControl()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
+              最新の状態を読み直す
             </Button>
           ) : null}
         </div>
@@ -541,8 +531,8 @@ const EmergencyControlV8 = (
         >
           <span>{feedback.text}</span>
           {feedback.tone !== 'success' && needsReload ? (
-            <Button type="button" onClick={() => void reloadControl()} disabled={reloading}>
-              {reloading ? '読み直しています…' : '最新の状態を読み直す'}
+            <Button type="button" onClick={() => void reloadControl()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
+              最新の状態を読み直す
             </Button>
           ) : null}
         </div>
@@ -681,7 +671,7 @@ const EmergencyControlV8 = (
                 <>
                   {/* WEB312：読めていないのに「止めていません」と言わない。読み直しを出す。 */}
                   <p className={styles.stoppedText}>いまの停止状態を確認できませんでした。読み直してください。</p>
-                  <Button type="button" variant="secondary" onClick={() => void reloadControl()} disabled={reloading}>
+                  <Button type="button" variant="secondary" onClick={() => void reloadControl()} busyLabel="読み直しています…" disabled={reloading}>
                     読み直す
                   </Button>
                 </>

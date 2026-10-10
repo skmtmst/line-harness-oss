@@ -63,7 +63,8 @@ function descendants(node: ReactNode): ReactElement[] {
   for (const child of Children.toArray(node)) {
     if (!isValidElement(child)) continue
     found.push(child)
-    found.push(...descendants((child.props as { children?: ReactNode }).children))
+    const props = child.props as { children?: ReactNode; action?: ReactNode }
+    found.push(...descendants(props.children), ...descendants(props.action))
   }
   return found
 }

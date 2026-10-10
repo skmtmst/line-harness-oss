@@ -1,32 +1,15 @@
 'use client'
 
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
 import TagOverflow from '@/components/shared/tag-overflow'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { collectListRows } from '@/components/shared/collect-list-rows'
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+import { useListUrlJsonValue, useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state'
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  CircleDot,
-  Bookmark,
-  Columns3,
-  Download,
-  Eye,
-  Megaphone,
-  MessageSquare,
-  UserRoundX,
-  SlidersHorizontal,
-  Star,
-  TrendingUp,
-  Upload,
-  UserPlus,
-  Users,
-} from 'lucide-react'
+import { CircleDot, Bookmark, Columns3, Download, Megaphone, MessageSquare, UserRoundX, SlidersHorizontal, Star, TrendingUp, Upload, UserPlus, Users } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type FriendListItem, type FriendStats, type SupportMarkListItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -49,7 +32,6 @@ import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
-import { useListScrollMemory } from '@/components/shared/list-url-state'
 import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
@@ -72,12 +54,13 @@ import { csvExportLine } from './csv-export'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { lastContactOf, monthDay, monthDayTime, statusOf, messageWord, splitTags } from './words'
 import styles from './list.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { ListPager } from '@/components/templates/list-page'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
  * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
@@ -89,7 +72,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 表示項目・件数・並び）→ 表（□・☆・友だち・対応/担当・シナリオ・最新・タグ・流入元・最終接触・…）→ ページ送り。
  */
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
+const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -958,10 +941,7 @@ export default function FriendsListV8() {
       tabs={(
         <>
           {readOnly ? (
-            <div className={styles.viewerBand} role="status">
-              <Eye size={16} aria-hidden="true" />
-              <span>{VIEWER_NOTE}</span>
-            </div>
+            <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div>
           ) : null}
           <FriendsTabs current="list" />
         </>

@@ -21,7 +21,6 @@
 
 .infoBand { background: var(--color-status-info-soft); }
 .infoBand .bandIcon { color: var(--color-action); }
-.viewerBand { background: var(--color-shell); }
 .warnBand { background: var(--color-status-warn-soft); }
 .dangerBand { background: var(--color-status-danger-soft); color: var(--color-danger); }
 

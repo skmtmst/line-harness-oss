@@ -159,7 +159,7 @@ describe('R602: フォーム取得の失敗は403と503で言い分ける', () =
       throw new Error(`unexpected fetch: ${url}`)
     })
     await mount()
-    expect(host.textContent).toContain('表示できませんでした')
+    expect(host.textContent).toContain('読み込めませんでした')
     expect(retryButtons()).toHaveLength(1)
   })
 
@@ -173,14 +173,14 @@ describe('R602: フォーム取得の失敗は403と503で言い分ける', () =
       throw new Error(`unexpected fetch: ${url}`)
     })
     await mount()
-    expect(host.textContent).toContain('表示できませんでした')
+    expect(host.textContent).toContain('読み込めませんでした')
     failing = false
     await act(async () => {
       retryButtons()[0]!.click()
     })
     await act(async () => {})
     expect(host.textContent).toContain('箱フォーム')
-    expect(host.textContent).not.toContain('表示できませんでした')
+    expect(host.textContent).not.toContain('読み込めませんでした')
   })
 })
 
@@ -195,7 +195,7 @@ describe('R603: フォルダだけ失敗しても一覧と件数を残す', () =
     expect(host.textContent).toContain('未分類フォーム')
     // 件数も残る（全面エラー・0件にしない）。1ページに収まるときは「N件」だけ（BEHAVIOR.md）。
     expect(host.textContent).toMatch(/(^|[^0-9])2 件(?!中)/)
-    expect(host.textContent).not.toContain('表示できませんでした')
+    expect(host.querySelector('[data-list-state="error"]')).toBeNull()
     // フォルダ欄だけ失敗と再試行。
     expect(host.textContent).toContain('フォルダを読み込めませんでした。')
     const folderRetry = [...host.querySelectorAll('button')].find(
@@ -257,7 +257,7 @@ describe('R602補足: 取れていない総件数は「すべて」に数を出�
     expect(host.textContent).toContain('すべて')
     expect(host.textContent).not.toMatch(/すべて\s*0/)
     // R602の案内と立て直しの口はそのまま。
-    expect(host.textContent).toContain('表示できませんでした')
+    expect(host.textContent).toContain('読み込めませんでした')
     expect(retryButtons()).toHaveLength(1)
   })
 

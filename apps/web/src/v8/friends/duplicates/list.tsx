@@ -2,13 +2,14 @@
 
 import { jstDate } from '@/lib/jst-datetime'
 import Link from 'next/link'
-import { Download, Info, RotateCw } from 'lucide-react'
+import { Inbox, Download, Info, RotateCw } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -21,7 +22,6 @@ import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDate
 import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
-
 
 /*
  * ★V8 重複検出（Pencil `hn6Y8`、1152 は `G9C4Uw`、状態の見本帳は `SXCb3`）。/friends?tab=duplicates。
@@ -114,22 +114,21 @@ export default function DuplicatesListV8() {
           <span>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</span>
         </p>
 
-        <div className={styles.cards}>
+        <KpiBand gridClassName="grid grid-cols-4">
           {kpis.map((kpi) => (
             <KpiCard
               key={kpi.key}
-              presentation="card"
-              icon={null}
+              presentation="band"
+              icon={<Inbox size={14} />}
               title={kpi.title}
               value={null}
               valueText={kpi.valueText}
               unit={kpi.unit}
               detail={kpi.detail}
               help={kpi.help}
-              className={styles.card}
             />
           ))}
-        </div>
+        </KpiBand>
 
         {statsCopy && (!d.data || isForbidden(d.statsFailure)) ? (
           <p className={styles.notice} role="status">

@@ -239,7 +239,7 @@ function BillingInner() {
         ) : null}
       </div>
 
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {error ? <Notice tone="danger" >{error}</Notice> : null}
 
       <div className={styles.plans} data-design="Plans">
         {summary.plans.map((plan) => {

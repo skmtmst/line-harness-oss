@@ -29,7 +29,7 @@ import styles from './reservations.module.css'
 
 /** 予約を変えられる役割か（口は owner・admin・staff。閲覧のみは 403）。読めるまでは出す（最後の守りは口の 403）。 */
 function canWriteRole(role: string | null | undefined): boolean {
-  return !role || role === 'owner' || role === 'admin' || role === 'staff'
+  return role === 'owner' || role === 'admin' || role === 'staff'
 }
 
 const VIEWS: Array<{ key: LedgerView; label: string }> = [
@@ -63,43 +63,23 @@ function HeadControls({ storePicker, view, day, storeId, busy, canWrite, onView,
   onView: (view: LedgerView) => void
   onPhone: (preset: PhonePreset) => void
 }) {
-  const { selectedAccountId } = useAccount()
-  const [counts, setCounts] = useState<Record<'today' | 'week' | 'month', number> | null>(null)
-  const countRef = useRef(0)
-  const dayKey = toYmd(day)
-  useEffect(() => {
-    if (!selectedAccountId) { setCounts(null); return }
-    const id = ++countRef.current
-    const m = monthRange(day)
-    const t = dayRange(day)
-    const w = weekRange(day)
-    void restaurantTestApi.snapshot(selectedAccountId, { from: m.from, to: m.to, limit: 500, offset: 0 }).then((res) => {
-      if (id !== countRef.current || !res.success) return
-      const scoped = storeId ? res.data.reservations.filter((r) => r.store_id === storeId) : res.data.reservations
-      const live = scoped.filter((r) => !['cancelled', 'no_show'].includes(r.status))
-      setCounts({
-        today: live.filter((r) => r.starts_at >= t.from && r.starts_at < t.to).length,
-        week: live.filter((r) => r.starts_at >= w.from && r.starts_at < w.to).length,
-        month: live.length,
-      })
-    }).catch(() => { /* 数が出ないときは数なしで出す */ })
-  }, [selectedAccountId, storeId, dayKey]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className={styles.headControls}>
       {storePicker}
-      <ViewSwitch view={view} counts={counts} onChange={onView} />
+
       {/* 絵 l9NlC0（今日）・Z3FoM（一覧）とも頭の右に置く。閲覧のみは押せないボタンを置かない。 */}
       {canWrite ? (
         <span className={styles.headButtons}>
-          <Button disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={15} aria-hidden="true" />枠を押さえる</Button>
-          <Button variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Plus size={15} aria-hidden="true" />電話の予約を入れる</Button>
+          <Button presentation="restaurant" disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={15} aria-hidden="true" />枠を押さえる</Button>
+          <Button presentation="restaurant" variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Plus size={15} aria-hidden="true" />電話の予約を入れる</Button>
         </span>
       ) : null}
     </div>
   )
 }
 
-function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay, onPeriod, onStatus, onPage, onSource, onPhone }: {
+function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay, onPeriod, onStatus, onPage, onSource, onPhone,onView }: {
+  onView:(view:LedgerView)=>void
   ctx: RestaurantV8Context
   view: LedgerView
   day: Date
@@ -130,6 +110,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const [dayClosures, setDayClosures] = useState<{ day: string; closures: RestaurantClosure[] } | null>(null)
   const [openId, setOpenId] = useState('')
   const [detailId, setDetailId] = useState('')
+  useEffect(()=>{const id=new URLSearchParams(window.location.search).get('id');if(id)setDetailId(id)},[])
   const [cancelId, setCancelId] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [lineWarning, setLineWarning] = useState('')
@@ -217,6 +198,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
       ) : null}
       {view === 'today' ? (
         <TodayView
+          onView={onView} onReload={()=>void reload()} storeId={storeId} storeName={store?.name}
           rows={rows}
           later={store ? data.reservations.filter((r) => r.store_id === store.id) : data.reservations}
           tables={tables}
@@ -229,10 +211,10 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onDay={onDay}
           onAdd={(preset) => onPhone(preset)}
           onOpen={setOpenId}
-          onDetail={setDetailId}
+          onDetail={id=>{const r=rows.find(r=>r.id===id);if(r?.hold_expires_at)setOpenId(id);else setDetailId(id)}}
         />
       ) : (
-        <ListView
+        <ListView onView={onView} day={day} storeId={storeId} storeName={store?.name} detail={<ReservationDetailDialog inline reservation={detailId==='closed'?null:detailed??rows[0]??null} accountId={accountId} tables={tables} courses={menuItems} busy={busy} canWrite={canWrite} onClose={()=>setDetailId('closed')} onEdit={setOpenId} onCancel={setCancelId} onRestore={id=>{void save(()=>restaurantTestApi.updateReservation(accountId,id,{status:'confirmed',expectedVersion:rows.find(r=>r.id===id)?.customer_version??1}),'予約を有効に戻しました。')}}/>}
           view={view}
           rows={rows}
           total={total}
@@ -248,13 +230,13 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           onPage={onPage}
           onImport={() => setShowImport(true)}
           onCreate={() => onPhone({})}
-          onOpen={setOpenId}
+          onOpen={setDetailId}
           onCancel={setCancelId}
-          onRestore={(id) => { void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed' }), '予約を有効に戻しました。') }}
+          onRestore={(id) => { void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。') }}
         />
       )}
       <ReservationDetailDialog
-        reservation={detailed}
+        reservation={view==='today'?detailed:null}
         accountId={accountId}
         tables={tables}
         courses={menuItems}
@@ -263,7 +245,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         onClose={() => setDetailId('')}
         onCancel={(id) => { setDetailId(''); setCancelId(id) }}
         onRestore={(id) => {
-          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed' }), '予約を有効に戻しました。').then((ok) => { if (ok) setDetailId('') })
+          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。').then((ok) => { if (ok) setDetailId('') })
         }}
         onEdit={(id) => { setDetailId(''); setOpenId(id) }}
       />
@@ -276,11 +258,11 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         onClose={() => setOpenId('')}
         onSave={(patch: ReservationPatch) => {
           if (!opened) return
-          void save(() => restaurantTestApi.updateReservation(accountId, opened.id, patch), '予約を変更しました。').then((ok) => { if (ok) setOpenId('') })
+          void save(() => restaurantTestApi.updateReservation(accountId, opened.id, {...patch, expectedVersion: opened.customer_version ?? 1}), '予約を変更しました。').then((ok) => { if (ok) setOpenId('') })
         }}
         onCancelReservation={(id) => { setOpenId(''); setCancelId(id) }}
         onRestore={(id) => {
-          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed' }), '予約を有効に戻しました。').then((ok) => { if (ok) setOpenId('') })
+          void save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'confirmed', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), '予約を有効に戻しました。').then((ok) => { if (ok) setOpenId('') })
         }}
       />
       <CancelReservationDialog
@@ -288,7 +270,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         busy={busy}
         onClose={() => setCancelId('')}
         onConfirm={(id) => {
-          return save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled' }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。').then((ok) => { if (ok) setCancelId('') })
+          return save(() => restaurantTestApi.updateReservation(accountId, id, { status: 'cancelled', expectedVersion: (rows.find(r=>r.id===id)?.customer_version ?? 1) }), cancelling && cancelling.hold_expires_at && cancelling.status === 'pending' ? '押さえを解除しました。' : '予約を取り消しました。').then((ok) => { if (ok) setCancelId('') })
         }}
       />
       <InboundTrialDialog
@@ -335,8 +317,7 @@ export default function ReservationsPage() {
     if (v === 'list' || v === 'week' || v === 'month') setView(v)
     const d = params.get('date')
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-      const [y, m, dd] = d.split('-').map(Number)
-      setDay(new Date(y, m - 1, dd))
+      setDay(new Date(`${d}T00:00:00+09:00`))
     }
     const s = params.get('source')
     if (s) setSource(s)
@@ -363,7 +344,7 @@ export default function ReservationsPage() {
     return (
       <RestaurantShell boardId="rm92Y" title="電話の予約を入れる" description="" bare query={query}>
         {(ctx) => (
-          <LedgerBody
+          <LedgerBody onView={changeView}
             ctx={ctx} view={view} day={day} period={period} status={status} page={page} source={source} phone={phone}
             onDay={setDay} onPeriod={setPeriod} onStatus={setStatus} onPage={setPage} onSource={setSource} onPhone={setPhone}
           />
@@ -374,9 +355,10 @@ export default function ReservationsPage() {
 
   return (
     <RestaurantShell
+      templateHeading boundary={false}
       boardId={view === 'today' ? 'l9NlC0' : 'Z3FoM'}
       title="予約台帳"
-      description={DESCRIPTION[view === 'today' ? 'today' : 'list']}
+      description={ctx=>`${ctx?.store?.name??''} ・ ${view==='today'?dayTitle(toYmd(day)):'今後の予約'}`}
       query={query}
       layout={view === 'today' ? 'ledgerTight' : 'ledger'}
       storeTab="reservations"
@@ -394,7 +376,7 @@ export default function ReservationsPage() {
       )}
     >
       {(ctx) => (
-        <LedgerBody
+        <LedgerBody onView={changeView}
           ctx={ctx} view={view} day={day} period={period} status={status} page={page} source={source} phone={null}
           onDay={setDay}
           onPeriod={(value) => { setPeriod(value); setPage(1) }}

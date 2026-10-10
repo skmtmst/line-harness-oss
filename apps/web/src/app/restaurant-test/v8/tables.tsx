@@ -104,7 +104,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
     const reordered = [...placed]
     reordered.splice(to,0,reordered.splice(from,1)[0])
     void mutate(()=>restaurantTestApi.saveTableLayout(selectedAccountId,{
-      storeId: store.id,
+      storeId: store.id, expectedVersion:reordered[0]?.floor_version??1,
       tables: reordered.map((t,index)=>({id:t.id,floorX:index%3,floorY:Math.floor(index/3),joinGroup:t.join_group})),
     }),'卓の配置を保存しました。')
   }

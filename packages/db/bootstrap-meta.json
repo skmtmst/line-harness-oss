@@ -566,7 +566,9 @@
     "621_form_submission_files.sql",
     "622_hq_delivery_templates.sql",
     "623_form_fixed_friend_fields.sql",
-    "624_entry_route_coupons.sql"
+    "624_entry_route_coupons.sql",
+    "626_restaurant_floor_layout.sql",
+    "627_restaurant_dining_fields.sql"
   ],
-  "migrationCount": 567
+  "migrationCount": 569
 }

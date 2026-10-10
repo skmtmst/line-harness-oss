@@ -3,9 +3,6 @@
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import TagPill from '@/components/shared/tag-pill'
-
-/* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
-
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
@@ -14,7 +11,6 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Pagination from '@/components/shared/pagination'
 import { RowMenu } from '@/components/shared/row-actions'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
@@ -24,17 +20,13 @@ import { bookingApi, type BookingMenu } from '@/lib/api'
 import { menuPriceLabel } from '../lib/menu-price'
 import { bookingErrorMessage } from '../lib/menu-validation'
 import MenuVersionHistory from '../menu-version-history'
-import {
-  AccountIcon,
-  Band,
-  MENU_PAGE_SIZE,
-  StateCard,
-  SkeletonRows,
-  sortedMenus,
-  type LoadStatus,
-} from './shared'
+import { AccountIcon, Band, MENU_PAGE_SIZE, StateCard, SkeletonRows, sortedMenus, type LoadStatus } from './shared'
 import styles from '../settings.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+
+/* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: {
   accountId: string
@@ -266,8 +258,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         )}
       </div>
 
-      {reorderError ? <p className="text-danger mt-2 text-xs" role="alert">{reorderError}</p> : null}
-      {visibilityError ? <p className="text-danger mt-2 text-xs" role="alert">{visibilityError}</p> : null}
+      {reorderError ? <Notice tone="danger" className="mt-2" >{reorderError}</Notice> : null}
+      {visibilityError ? <Notice tone="danger" className="mt-2" >{visibilityError}</Notice> : null}
 
       {shown.length === 0 ? (
         /* 修正案 D-2：空の一覧。 */

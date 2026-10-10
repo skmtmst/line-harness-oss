@@ -1,10 +1,9 @@
 'use client'
 
-import { canManageRole } from '@/lib/staff-role';
+import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
-import { useTenantWideAccess } from '@/lib/staff-role'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -13,30 +12,20 @@ import { templateKind, type HqTemplateFolder, type HqTemplateListStats, type HqT
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { ListPageBody } from '@/components/templates/list-page'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
-import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import TagPill from '@/components/shared/tag-pill'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
 import FolderSelect from '@/components/shared/folder-select'
 import { Th } from '@/components/shared/table'
-import { useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { freshDefinition } from '@/lib/hq-template-authoring'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
-import {
-  hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition,
-  type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType,
-} from '@/lib/hq-templates-api'
-import {
-  choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems,
-  uploadedKeysIn, type TemplateMedia,
-} from './definition'
+import { hqTemplatesApi, type DistributionMode, type DistributionResult, type HqAccount, type HqTemplate, type HqTemplateListItem, type MessageTemplateDefinition, type Preflight, type TemplateDefinition, type FormDefinition, type TemplateDetail, type TemplateInput, type TemplateType } from '@/lib/hq-templates-api'
+import { choiceKey, contentSummary, definitionError, definitionForName, definitionName, failedStores, referenceCount, resolvedItems, uploadedKeysIn, type TemplateMedia } from './definition'
 import MessageForm from './message-form'
 import { useFormErrors } from '@/lib/use-form-errors'
 import TemplateMessageEditor from '@/v8/template-edit/message'
@@ -71,13 +60,13 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import styles from './console.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { DistributionPage } from '@/components/templates/distribution-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { DistributionTable, DistributionProgress, DistributionAccountName, DistributionToolbar } from '@/components/shared/distribution-table'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8-B 統括のテンプレート（一覧 LRc93・メッセージのひな形を作る X4JcOf・アカウントへ配る meBRB）。
@@ -662,7 +651,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   </> : null
 
   const notices = <>
-    {!canEdit && stage === 'list' ? <p className={styles.readonlyBand} role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</p> : null}
+    {!canEdit && stage === 'list' ? <div className={styles.readonlyBand}><ReadOnlyNotice role="note">閲覧のみで見ています。変える操作は統括の管理者に頼んでください。</ReadOnlyNotice></div> : null}
     {conflictNotice}
     {error && !conflictNotice && stage !== 'saved' ? <Notice tone="danger" message={error} /> : null}
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
@@ -1067,7 +1056,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   richMenuReferences={{ tags: referenceOptions('tag'), templates: referenceOptions('template'), forms: referenceOptions('form') }}
                   formReferences={{ tags: referenceOptions('tag'), friendFields: [], scenarios: [], reminders: [], templates: [] }}
                 />
-              ) : <p role="alert">この種類のひな形は、ここでは編集できません。</p>}
+              ) : <Notice tone="danger" >この種類のひな形は、ここでは編集できません。</Notice>}
               {!canonicalEditorOwnsSave ? uncertainNotice : null}
               {!canonicalEditorOwnsSave ? <p className={styles.note}>{`参照先 ${referenceCount(type, definition)} 件を含めて配布します。`}</p> : null}
             </section>
@@ -1153,7 +1142,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           </> : <>
             <Button disabled={busy} onClick={toList}>{done ? 'ひな形一覧へ' : 'キャンセル'}</Button>
             {!done ? <Button variant="primary" disabled><Plus size={15} aria-hidden="true" />{`配っています（${finished}/${progressTotal}）`}</Button> : null}
-            {done || !result ? <Button disabled={busy} onClick={refreshResult}>結果を再確認</Button> : null}
+            {done || !result ? <Button disabled={busy} onClick={refreshResult } busyLabel = "処理中…">結果を再確認</Button> : null}
             {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
           </>}
       </>}

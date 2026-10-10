@@ -5,7 +5,7 @@ import { CircleHelp, Link2, UserX } from 'lucide-react'
 import type { IdentityCandidateDecision } from '@line-crm/shared'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
@@ -18,11 +18,10 @@ import { useIdentityReview } from '@/components/identity/identity-review'
 import { canSubmitDecision } from '@/components/identity/identity-view'
 import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from '../duplicates/words'
 import styles from './compare.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 重複候補を比べて決める（Pencil `fcg2D`：判定の小窓を開いた形、1152 は `p15At`：閉じた形）。
@@ -230,7 +229,7 @@ function CompareInner() {
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
                     /></SaveErrorField>
-{review.decideError ? <p className={styles.error} role="alert">{review.decideError}</p> : null}
+{review.decideError ? <Notice tone="danger" >{review.decideError}</Notice> : null}
 {!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
                       <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
                     ) : null}

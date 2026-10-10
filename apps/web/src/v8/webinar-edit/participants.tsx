@@ -16,7 +16,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import PageSizeSelect from '@/components/ui/page-size-select'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import {
@@ -290,7 +290,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
         {body}
         {state === 'ready' && (nextCursor || moreError) ? (
           <div className={styles.more}>
-            {moreError ? <p className={styles.moreError} role="alert">{moreError}</p> : null}
+            {moreError ? <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{moreError}</Notice> : null}
             {nextCursor ? <Button onClick={() => void loadMore()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込み中…">続きを読み込む</Button> : null}
           </div>
         ) : null}

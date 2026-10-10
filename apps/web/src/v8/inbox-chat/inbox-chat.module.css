@@ -404,3 +404,5 @@ a.sentFile:hover .sentFileName { text-decoration: underline; }
 .sentFileText { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 .sentFileName { overflow: hidden; color: var(--color-ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .sentFileSub { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+
+.tpError, .tpErrorNoticePlacement { width: 100%; }

@@ -20,19 +20,7 @@
   padding: var(--tpl-hb2-content-pad);
 }
 
-.roBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-hb2-op-chip-gap);
-  padding: var(--tpl-hb2-op-band-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-info-soft);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-}
-
 .cardNote {
-  margin: 0;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   line-height: normal;
@@ -212,7 +200,6 @@
 }
 
 .formError {
-  margin: 0;
   color: var(--color-danger);
   font-size: var(--text-label);
 }
@@ -315,3 +302,10 @@
   border-color: var(--color-danger);
   outline-color: var(--color-danger);
 }
+
+/* 共通部品を包む位置だけの口。見た目は shared が持つ。 */
+.roBand { }
+
+.cardNote, .cardNoteNoticePlacement { margin: 0; }
+
+.formError, .formErrorNoticePlacement { margin: 0; }

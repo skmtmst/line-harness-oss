@@ -1,29 +1,15 @@
 'use client'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
-import { useDetailPanelUrl } from '@/components/shared/detail-panel';
-
-import { ListToolbarSort } from '@/components/shared/list-toolbar'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ListToolbar, { ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import { useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import { useListScrollMemory } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Archive,
-  CircleCheck,
-  ClipboardList,
-  Eye,
-  FileText,
-  IdCard,
-  Inbox,
-  Link2,
-  Percent,
-  Plus,
-  TriangleAlert,
-} from 'lucide-react'
+import { Archive, CircleCheck, ClipboardList, FileText, IdCard, Inbox, Percent, Plus, TriangleAlert } from 'lucide-react'
 import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared'
 import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -37,17 +23,15 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
-import ListToolbar from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import DetailPanel from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
@@ -59,35 +43,16 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifyToast } from '@/components/shared/toast'
 import { loadFailureCopy } from '@/components/shared/api-error-message'
-import {
-  FORM_PAGE_SIZES,
-  SORT_OPTIONS,
-  UNFILED_VALUE,
-  answerSubText,
-  destinationText,
-  formAnswerCount,
-  formAnswerUrl,
-  listQueryString,
-  referenceLabel,
-  sortForms,
-  subLineText,
-  validFilter,
-  validPage,
-  validPageSize,
-  validSort,
-  type Form,
-  type FormFilter,
-  type FormListResponse,
-  type FormSort,
-} from './model'
+import { FORM_PAGE_SIZES, SORT_OPTIONS, UNFILED_VALUE, answerSubText, destinationText, formAnswerCount, formAnswerUrl, listQueryString, referenceLabel, sortForms, subLineText, validFilter, validPage, validPageSize, validSort, type Form, type FormFilter, type FormListResponse, type FormSort } from './model'
 import styles from './list.module.css'
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { insertDuplicateAfter, useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 回答フォームの一覧（Pencil「★V8 画面の地図」の回答フォームの行）。
@@ -985,14 +950,12 @@ export default function FormsListV8() {
       addFolderLabel="フォルダを追加"
       rows={folderRows}
     >
-      <p className={styles.folderNote}>フォルダを消しても、中のフォームは未分類に残ります。</p>
+      <FolderPanelNote>フォルダを消しても、中のフォームは未分類に残ります。</FolderPanelNote>
       {folderError ? (
-        <p role="alert" className={styles.folderNote}>
-          {folderError}
+        <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
           <button type="button" onClick={() => void loadForms()} className={styles.textButton}>
             もう一度
-          </button>
-        </p>
+          </button></Notice>
       ) : null}
     </FolderPanel>
   )
@@ -1102,12 +1065,7 @@ export default function FormsListV8() {
 
   /* ===== 一覧の中身（読込中・失敗・空・0件・表を分ける） ===== */
   const stateCard = (icon: ReactNode, title: string, desc: string, action?: ReactNode, error = false, node?: string) => (
-    <div className={styles.stateCard} data-design-node={node}>
-      <span className={styles.stateIcon} data-tone={error ? 'error' : undefined}>{icon}</span>
-      <p className={styles.stateTitle}>{title}</p>
-      <p className={styles.stateDesc}>{desc}</p>
-      {action}
-    </div>
+    <ListState kind={error ? 'error' : 'empty'} title={title} description={desc} data-design-node={node} icon={icon} action={action} />
   )
 
   const tableHead = (
@@ -1176,7 +1134,7 @@ export default function FormsListV8() {
       failure.title,
       failure.description,
       failure.retryable ? (
-        <Button type="button" variant="secondary" onClick={() => void loadForms()}>もう一度読み込む</Button>
+        <Button type="button" variant="secondary" onClick={() => loadForms()} busyLabel="処理中…">もう一度読み込む</Button>
       ) : null,
       true,
     )
@@ -1351,10 +1309,7 @@ export default function FormsListV8() {
 
   /* 閲覧のみの帯（`JV2oR`）。見出しの下・数の帯の上。 */
   const viewerBand = !canEditForms ? (
-    <div className={styles.viewerBand} role="status" data-design-node="JV2oR">
-      <Eye size={16} aria-hidden="true" />
-      <span>{VIEWER_NOTE}</span>
-    </div>
+    <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
   const overlays = (
@@ -1402,7 +1357,7 @@ export default function FormsListV8() {
             </div>
           )}
         >
-          {moveError ? <p className={styles.alertText} role="alert">{moveError}</p> : null}
+          {moveError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{moveError}</Notice> : null}
           <SaveErrorField names={["move-folder","id","folder.id","moveFolderId"]}><RadioCardGroup legend="移動先のフォルダ" className={styles.radioList}>
             {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
               <RadioCard
@@ -1417,8 +1372,6 @@ export default function FormsListV8() {
           </RadioCardGroup></SaveErrorField>
         </DetailPanel>
       ) : null}
-
-
 
       <DetailPanel
         open={active !== null}
@@ -1472,10 +1425,10 @@ export default function FormsListV8() {
               {canEditForms ? <>
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); openDuplicate(active) }}>複製</Button>
               {active.isActive ? (
-                <Button type="button" variant="secondary" onClick={() => { closeDetail(); void openStop(active) }}>受付を止める</Button>
+                <Button type="button" variant="secondary" onClick={() => { closeDetail(); return openStop(active) }} busyLabel="処理中…">受付を止める</Button>
               ) : null}
               <Button type="button" variant="secondary" onClick={() => { closeDetail(); openMove(active) }}>フォルダへ移す</Button>
-              <Button type="button" variant="secondary" onClick={() => { closeDetail(); void openDelete(active) }}>アーカイブ・削除</Button>
+              <Button type="button" variant="secondary" onClick={() => { closeDetail(); return openDelete(active) }} busyLabel="処理中…">アーカイブ・削除</Button>
               </> : null}
               <CopyTextButton value={formAnswerUrl(selectedAccount?.liffId, active.id) ?? ''} aria-label="回答フォームのURLをコピー" disabled={!formAnswerUrl(selectedAccount?.liffId, active.id)} />
             </div>
@@ -1588,7 +1541,7 @@ export default function FormsListV8() {
             ) : null}
           </>
         ) : null}
-        {deleteError ? <p className={styles.alertText} role="alert">{deleteError}</p> : null}
+        {deleteError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{deleteError}</Notice> : null}
         </div>
       </Dialog>
 
@@ -1676,10 +1629,7 @@ export default function FormsListV8() {
               </div>
             ) : null}
             {createError ? (
-              <p className={styles.errorBand} role="alert">
-                {createError}
-                <button type="button" className={styles.textButton} onClick={() => setCreateError('')}>閉じる</button>
-              </p>
+              <Notice tone="danger" >{createError}<button type="button" className={styles.textButton} onClick={() => setCreateError('')}>閉じる</button></Notice>
             ) : null}
           </>
         )}

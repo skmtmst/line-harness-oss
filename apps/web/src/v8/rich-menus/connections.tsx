@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react'
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api'
@@ -18,7 +17,6 @@ import { analyzeConnections, type ConnectionAnalysis, type ConnectionPage } from
 import styles from './connections.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
-
 
 /*
  * ★V8 リッチメニュー「切替のつながり」（Pencil `wxIQ7`）。
@@ -196,7 +194,7 @@ function Connections() {
       boardId="wxIQ7"
       title={`切替のつながり：${group.name}`}
       help="タブで行き来できるメニューの関係"
-      identity={<></>}
+
       preview={aside}
       footerActions={<>
         <Button href="/rich-menus">メニュー一覧へ</Button>

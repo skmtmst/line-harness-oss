@@ -60,3 +60,8 @@
 [data-theme='v8'] .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
 
 [data-theme='v8'] .root[data-size="small"] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); line-height: var(--tpl-rt-label-lh); }
+@layer components { .labels{min-width:0;display:flex;flex-direction:column;gap:2px;}.description{margin:0;font-size:11px;line-height:16px;color:var(--color-ink-secondary);}}
+
+@layer components { [data-theme='v8'] .root[data-size='customer'] .title{font-size:13px;line-height:20px;} }
+
+@layer components { [data-theme='v8'] .root[data-size='customer']{gap:6px;} }

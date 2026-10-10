@@ -9,7 +9,7 @@ import ListState from '@/components/shared/list-state'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { RowActions } from '@/components/shared/row-actions'
 import { TextField } from '@/components/shared/text-field'
-import { FieldError } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -18,11 +18,10 @@ import { formatNumber } from '@/lib/format'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { parseYen, yen, type LoadStatus, type SavedHandler } from './parts'
 import styles from './members.module.css'
-import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8-B 会員 › ライフタイム（zQ5vY）。
@@ -145,7 +144,7 @@ export default function LifetimeV8({
       {notice || error ? (
         <div className={styles.messages}>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-          {error ? <p className={styles.errorText} role="alert">{error}</p> : null}
+          {error ? <Notice tone="danger" >{error}</Notice> : null}
         </div>
       ) : null}
 

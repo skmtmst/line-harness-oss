@@ -19,6 +19,7 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import styles from '@/components/shared/entity-picker.module.css'
+import Notice from '@/components/shared/notice'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -146,8 +147,8 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                 </ul>
               )}
               {props.remaining > 0 ? (
-                <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore}>
-                  {props.loadingMore ? '読み込み中...' : `さらに表示（残り${props.remaining}件）`}
+                <Button variant="secondary" size="compact" onClick={props.onLoadMore} disabled={props.loadingMore} busy={props.loadingMore} busyLabel="読み込み中...">
+                  {`さらに表示（残り${props.remaining} 件）`}
                 </Button>
               ) : null}
             </div>

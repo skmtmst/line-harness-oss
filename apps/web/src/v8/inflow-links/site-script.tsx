@@ -2,10 +2,10 @@
 import CopyTextButton from '@/components/shared/copy-text-button'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleHelp, Copy, Eye, Mail, MoreHorizontal, Pause, Play, Plus, RefreshCw } from 'lucide-react'
+import { CircleHelp, Pause, Play, Plus, RefreshCw } from 'lucide-react'
 import { ApiError, api, type MeasurementSite } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { useResponseGate } from '@/lib/use-response-gate'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -13,19 +13,18 @@ import HelpTip from '@/components/shared/help-tip'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import IconButton from '@/components/shared/icon-button'
+import { MoreAction } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { DetailPage } from '@/components/templates'
 import { focusField } from './focus-field'
 import styles from './site-script.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Notice from '@/components/shared/notice'
 
 /*
  * ★V8 サイトスクリプト（Pencil `XjOte`）。
@@ -288,7 +287,7 @@ export default function SiteScriptV8() {
     <p className={styles.note}>まだサイトがありません。追加するとサイトごとの計測コードが出ます。</p>
   ) : (
     <>
-      {siteActionError ? <p className={styles.note} role="alert">{siteActionError}</p> : null}
+      {siteActionError ? <Notice tone="danger" className={styles.noteNoticePlacement} >{siteActionError}</Notice> : null}
       <div className={styles.siteTable} role="table" aria-label="成果を数えるサイト">
       <div className={styles.siteHead} role="row">
         <span className={styles.colSite} role="columnheader">サイト</span>
@@ -314,15 +313,13 @@ export default function SiteScriptV8() {
             <span className={styles.colLast} role="cell"><span className={styles.cellText}>{last ?? emptyValue('unknown')}</span></span>
             <span className={styles.colMenu} role="cell">
               {manage ? (
-                <IconButton
+                <MoreAction
                   title={`「${site.label}」の操作`}
                   aria-label={`「${site.label}」の操作`}
                   aria-expanded={selectedSiteId === site.id}
                   aria-controls="site-script-row-actions"
                   onClick={() => setSelectedSiteId((current) => (current === site.id ? null : site.id))}
-                >
-                  <MoreHorizontal size={16} aria-hidden="true" />
-                </IconButton>
+                 />
               ) : null}
             </span>
           </div>
@@ -355,7 +352,7 @@ export default function SiteScriptV8() {
       actions={<Button onClick={() => setHelpOpen(true)}><CircleHelp size={15} aria-hidden="true" />貼りかたが分からないときは</Button>}>
       <div className={styles.body}>
         {readonly ? (
-          <p className={styles.viewerBand} role="status"><Eye size={16} aria-hidden="true" />閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。</p>
+          <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
 
         {loading && summary == null && !failed ? (
@@ -391,7 +388,7 @@ export default function SiteScriptV8() {
                 ) : snippet ? (
                   <>
                     <div className={styles.codeBox}><code className={styles.code}>{snippet}</code></div>
-                    {copyFailed ? <p className={styles.small} role="alert">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
+                    {copyFailed ? <Notice tone="danger" className={styles.smallNoticePlacement} >コピーできませんでした。上のコードを選んでコピーしてください。</Notice> : null}
                     <div className={styles.buttons}>
                       <CopyTextButton value={snippet ?? ""} label="コードをコピー" aria-label="コードをコピー"  />
                       <CopyTextButton value={`ホームページの</head>の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`} label="制作会社へ送る文をコピー" aria-label="制作会社へ送る文をコピー"  />
@@ -443,7 +440,7 @@ export default function SiteScriptV8() {
                       <p className={styles.faint}>コードを貼ったあと、サイトを開くと数分で表示されます。</p>
                     </>
                   )}
-                  <span><Button onClick={() => void load()}><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
+                  <span><Button onClick={() => load()} busyLabel="処理中…"><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
                 </div>
                 <div className={styles.pageTable} role="table" aria-label="ページごとの表示">
                   <div className={styles.pageHead} role="row">

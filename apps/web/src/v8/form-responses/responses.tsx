@@ -10,10 +10,11 @@ import type { FormBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { fetchApi, ApiError } from '@/lib/api'
 import { formAnswerText } from '@/lib/form-answer'
 import { csvCell } from '@/lib/presentation'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import Notice from '@/components/shared/notice'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { DetailPage, DetailColumns } from '@/components/templates'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
@@ -25,19 +26,13 @@ import TargetMissing from '@/components/shared/target-missing'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import ListRange from '@/components/ui/list-range'
-import {
-  postActionStepLabel,
-  ratingAverageText,
-  type DestinationWrite,
-  type FormSubmissionSummary,
-  type SubmissionPostActions,
-} from './summary'
+import { postActionStepLabel, ratingAverageText, type DestinationWrite, type FormSubmissionSummary, type SubmissionPostActions } from './summary'
 import styles from './responses.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
@@ -464,7 +459,7 @@ function Responses() {
         />
       )}
     >
-      {!canEditForm && !canRetry ? <Notice tone="info" message="閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。" /> : null}
+      {!canEditForm && !canRetry ? <ReadOnlyNotice >閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。</ReadOnlyNotice> : null}
       <DetailColumns aside={rail} asideLabel="回答の詳細・絞り込み" expanded={asideExpanded} onExpandedChange={setAsideExpanded}>
           {total === 0 && !query.trim() ? (
             <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />

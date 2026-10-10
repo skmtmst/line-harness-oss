@@ -3,6 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
+})
+
 const api = vi.hoisted(() => ({
   snapshot: vi.fn(), storeContext: vi.fn(), reservationsDay: vi.fn(), channelCloseTasks: vi.fn(), openingHours: vi.fn(),
   postSeatVisitMark: vi.fn(), deleteSeatVisitMark: vi.fn(), completeChannelCloseTask: vi.fn(), mediaLinks: vi.fn(),
@@ -12,6 +18,7 @@ const fetchApi = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
 // 行の「…」の移動は router.push（画面を丸ごと読み直さない）。
+vi.mock('@/lib/api-reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api-reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:vi.fn().mockResolvedValue({success:true,data:[]})}}})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
@@ -21,11 +28,13 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRo
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 
 import RestaurantDashboardV8 from './dashboard'
-import { reservation, snapshotOf } from '../booking-kit/test-data'
+import { at, reservation, snapshotOf } from '../booking-kit/test-data'
 
-const today = (hour: number) => { const d = new Date(); d.setHours(hour, 0, 0, 0); return d.toISOString() }
+const today = (hour: number) => at(0, hour)
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
   api.snapshot.mockResolvedValue({ data: snapshotOf() })
   api.storeContext.mockResolvedValue({ data: { selectedStore: { id: 'store-1', name: '渋谷店' } } })
@@ -45,7 +54,7 @@ beforeEach(() => {
   google.connection.mockResolvedValue({ connection: { status: 'disconnected' }, summary: { unrepliedCount: 0 }, store: { name: '渋谷店' } })
   google.listReviews.mockResolvedValue({ reviews: [] })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('hKRRF 今日のお店', () => {
   it('店のタブ・枠を閉じる知らせ・数・今日の予約・媒体が出て、［来店］で来店の印を付ける', async () => {
@@ -53,7 +62,8 @@ describe('hKRRF 今日のお店', () => {
     await screen.findByText('鈴木 美咲')
     const board = document.querySelector('[data-design-node="hKRRF"]')!
     // 一覧の統合で名前の列が二重になると、名前だけでなく後ろの列もずれる。
-    const table = board.querySelector('[data-design="restaurant-today"]')!
+    const table = board.querySelector('[data-reservation-board][data-axis="list"] table')!
+    expect(table).not.toBeNull()
     const columnCount = table.querySelectorAll('thead th').length
     for (const row of table.querySelectorAll('tbody tr')) expect(row.querySelectorAll('td')).toHaveLength(columnCount)
     for (const label of ['ダッシュボード', '予約（今日・今月・一覧）', '座席・卓', '予約枠・在庫', '今日の予約', '来店予定', '空席（いま）', '未返信の口コミ', '予約サイト・グルメ媒体', 'Instagram の新着']) {
@@ -63,7 +73,8 @@ describe('hKRRF 今日のお店', () => {
     expect(board.textContent).toContain('ホットペッパー')
     /* 設定で保存した管理画面の URL が、知らせのボタンと右の列のリンクに使われる（提案 E-4 とのつなぎ）。 */
     expect(screen.getByRole('link', { name: 'ホットペッパーの管理画面を開く' }).getAttribute('href')).toBe('https://manager.hotpepper.jp/')
-    expect(screen.getByRole('link', { name: '店舗ページ' }).getAttribute('href')).toBe('https://hotpepper.jp/x/')
+    fireEvent.click(screen.getByRole('button',{name:'媒体のリンクのその他操作'}))
+    expect(screen.getByRole('menuitem', { name: 'ホットペッパーの店舗ページ' }).getAttribute('href')).toBe('https://hotpepper.jp/x/')
     expect(screen.getByRole('button', { name: /電話予約/ })).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '鈴木 美咲さんを来店にする' }))
     await waitFor(() => expect(api.postSeatVisitMark).toHaveBeenCalledWith('account-1', 'r1', { kind: 'visited' }))

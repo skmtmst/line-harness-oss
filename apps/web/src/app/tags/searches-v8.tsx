@@ -345,7 +345,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
             </span>
             <p className={styles.stateTitle}>保存した検索を読み込めませんでした</p>
             <p className={styles.stateDesc}>{loadError}</p>
-            <Button type="button" onClick={() => void load()}>もう一度試す</Button>
+            <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度試す</Button>
           </div>
         ) : items.length === 0 ? (
           <div className={styles.stateCard}>

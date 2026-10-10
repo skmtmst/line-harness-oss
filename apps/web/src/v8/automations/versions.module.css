@@ -3,19 +3,8 @@
  * 枠・見出しは型（DetailPage）が持つ。ここは数のマス・版の履歴・呼び出し元の表だけ。
  */
 
-.errorBand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-cell-gap-half);
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
-.errorText {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--text-caption);
-}
+
+
 
 /* 中身の段（絵：上 16・左右 24・間 14）。型の詳細の中身（上 20・左右 28・間 20）との差だけ外へ出す。 */
 .body {
