@@ -2970,7 +2970,12 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
 }
 
 [data-theme="v8"] { --tpl-floor-map-inset: 32px; --tpl-floor-aside-w: 400px; --tpl-floor-detail-row-h: 59px; --tpl-board-tabs-top: 18px; --tpl-board-body-top: 10px; --tpl-board-section-gap: 13px; --tpl-board-detail-w: 330px; --tpl-board-side-w: 304px; --tpl-board-resource-w: 86px; --tpl-board-row-h: 52px; --tpl-board-block-top: 4px; }
-@media print { body * { visibility: hidden; } [data-print-active="true"], [data-print-active="true"] * { visibility: visible; } [data-print-active="true"] { position: absolute; inset: 0; width: 100%; } }
+/* 印刷の内容は body 直下へ置き、画面のスクロール枠・高さ制限から外す。 */
+@media print {
+  body:has(> [data-reservation-print]) { background: var(--color-canvas); }
+  body:has(> [data-reservation-print]) > :not([data-reservation-print]) { display: none !important; }
+  body > [data-reservation-print] { position: static; width: 100%; height: auto; overflow: visible; }
+}
 
 [data-theme="v8"] { --tpl-floor-outline-w: 3px; --tpl-floor-stopped-opacity: .5; }
 

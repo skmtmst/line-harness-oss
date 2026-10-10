@@ -2,6 +2,7 @@
 
 import {useEffect,useMemo,useRef,useState,type ReactNode,type DragEvent} from 'react'
 import {Printer} from 'lucide-react'
+import {createPortal} from 'react-dom'
 import type {ReservationAxis,ReservationBoardEntry,ReservationBoardMove,ReservationBoardResource,RestaurantFloor} from '@line-crm/shared'
 import IconButton from './icon-button'
 import ActionMenu from './action-menu'
@@ -37,14 +38,14 @@ export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEnt
 }
 export type ReservationBoardSlot={resourceId:string;startsAt:string;href?:string}
 /** 保存先による違いは表示型と変更契約に閉じ、すべての入口を同じ盤で描く。 */
-export default function ReservationBoard({entries,resources,axis:controlledAxis='resource',onAxis,canWrite=false,busy=false,onOpen,onMove,actions,menus,toolbar,trailingToolbar,notice,floor,loadPrintEntries,title='予約台帳',compact=false,dates,slots,onSlot,kind:requestedKind,columns='standard',renderBody,renderList}: {
+export default function ReservationBoard({entries,resources,axis:controlledAxis='resource',onAxis,canWrite=false,busy=false,onOpen,onMove,actions,menus,toolbar,trailingToolbar,notice,floor,loadPrintEntries,printContext,title='予約台帳',compact=false,dates,slots,onSlot,kind:requestedKind,columns='standard',renderBody,renderList}: {
  renderBody?:(body:ReactNode)=>ReactNode;
  renderList?:()=>ReactNode;
  columns?:'standard'|'dining'|'today';
  kind?:'people'|'seats';entries:ReservationBoardEntry[];resources:ReservationBoardResource[];axis?:ReservationAxis;onAxis?:(axis:ReservationAxis)=>void;
  canWrite?:boolean;busy?:boolean;onOpen:(id:string)=>void;onMove?:(id:string,move:ReservationBoardMove)=>Promise<void>;
  menus?:(entry:ReservationBoardEntry)=>ReactNode; actions?:(entry:ReservationBoardEntry)=>ReactNode;toolbar?:ReactNode;trailingToolbar?:ReactNode;notice?:ReactNode;floor?:RestaurantFloor;
- loadPrintEntries?:()=>Promise<ReservationBoardEntry[]>;title?:string;compact?:boolean;dates?:string[];slots?:ReservationBoardSlot[];
+ loadPrintEntries?:()=>Promise<ReservationBoardEntry[]>;printContext?:string;title?:string;compact?:boolean;dates?:string[];slots?:ReservationBoardSlot[];
  onSlot?:(resourceId:string,startsAt:string)=>void;
 }) {
  const [localAxis,setLocalAxis]=useState(controlledAxis),[error,setError]=useState(''),[printing,setPrinting]=useState(false),[printRows,setPrintRows]=useState<ReservationBoardEntry[]|null>(null)
@@ -81,7 +82,7 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
    <Td>{paper?e.customerName:<><Button presentation="restaurant" variant="text" textTone="ink" size="inline" onClick={()=>onOpen(e.id)}>{e.customerName}</Button>{dining&&e.contactLabel?<span className={styles.contact}>{e.contactLabel}</span>:null}</>}</Td>
    <Td>{e.guestCount}</Td><Td>{e.resourceIds.length?(paper?e.resourceIds.map(id=>resources.find(r=>r.id===id)?.label??e.resourceLabel??id).join('＋'):<TruncatedText value={e.resourceIds.length>1?e.resourceIds.map(id=>resources.find(r=>r.id===id)?.label??id).join('＋'):e.resourceLabel??resources.find(r=>r.id===e.resourceIds[0])?.label??'—'}/>):<StatusBadge tone="warning">未配席</StatusBadge>}</Td>
    {dining?<><Td>{paper?`${e.courseName??'席のみ'}${e.dining?.courseAllergens?.length?'（含む：'+e.dining.courseAllergens.join('・')+'）':''}`:<TruncatedText value={e.courseName??'席のみ'}/>}</Td><Td>{paper?[e.dining?.allergy?'予約時：'+e.dining.allergy:'',e.currentAllergy?'今回：'+e.currentAllergy:'',e.dining?.anniversary?'記念日：'+e.dining.anniversary:'',e.dining?.seatPreference?'席の好み：'+e.dining.seatPreference:''].filter(Boolean).join(' ／ ')||'—':e.currentAllergy||e.dining?.allergy?<StatusBadge size="dining" tone="info" surface="white">{e.currentAllergy||e.dining?.allergy}</StatusBadge>:'—'}</Td></>:<Td><ReservationSource value={e.source} note={e.note}/></Td>}
-   <Td><StatusBadge tone={e.holdExpiresAt||['cancelled','no_show'].includes(e.status)?'neutral':e.status==='pending'?'warning':today&&e.status==='confirmed'?'info':'success'}>{e.holdExpiresAt?'押さえ':e.status==='confirmed'?(dining?'予約確定':'予約中'):state(e.status)}</StatusBadge></Td>{actions&&canWrite&&!paper?<Td>{actions(e)}</Td>:null}{menus&&canWrite&&!paper?<Td>{menus(e)}</Td>:null}
+   <Td>{paper?(e.holdExpiresAt?'押さえ':e.status==='confirmed'?'予約確定':state(e.status)):<StatusBadge tone={e.holdExpiresAt||['cancelled','no_show'].includes(e.status)?'neutral':e.status==='pending'?'warning':today&&e.status==='confirmed'?'info':'success'}>{e.holdExpiresAt?'押さえ':e.status==='confirmed'?(dining?'予約確定':'予約中'):state(e.status)}</StatusBadge>}</Td>{actions&&canWrite&&!paper?<Td>{actions(e)}</Td>:null}{menus&&canWrite&&!paper?<Td>{menus(e)}</Td>:null}
   </Tr>)}</tbody></DataTable>
  }
  const timeline=(date:string)=>{
@@ -103,7 +104,7 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
  <div className={styles.toolbar}>{toolbar}{columns==='today'?<><IconButton aria-label="印刷" onClick={()=>void print()} disabled={printing}><Printer size={16}/></IconButton><button ref={axisAnchor} type="button" className={styles.axisButton} aria-label={`予約の軸：${axisName[axis]}`} aria-haspopup="menu" aria-expanded={axisMenu} onClick={()=>setAxisMenu(!axisMenu)}>{axisName[axis]}</button><ActionMenu open={axisMenu} anchorRef={axisAnchor} onClose={()=>setAxisMenu(false)} items={(['list','resource',...(floor?['floor']:[]),'month'] as ReservationAxis[]).map(value=>({id:value,label:axisName[value],onSelect:()=>change(value)}))}/></>:!compact?<SegmentedControl appearance="reservation" aria-label="予約の軸" value={axis} onChange={change} options={[{value:'resource',label:kind==='people'?'時間×スタッフ':'時間×卓'},...(floor?[{value:'floor' as const,label:'座席表'}]:[]),{value:'list',label:'一覧'},{value:'month',label:'月'}]}/>:null}{trailingToolbar}{columns!=='today'?<Button presentation="restaurant" busyLabel="印刷" doneLabel="印刷" busy={printing} onClick={()=>void print()}><Printer size={16}/>印刷</Button>:null}</div>
  {error?<Notice tone="danger">{error}</Notice>:null}{notice}
  <div className={styles.screen}>{renderBody?renderBody(boardBody):boardBody}</div>
- {printing?<div data-reservation-print className={styles.print}><h2>{title}（{axisName[axis]}）</h2><p>{renderedDays[0]}〜{renderedDays.at(-1)}</p>{axis!=='list'?<ReservationBoard kind={kind} entries={printRows??entries} resources={resources} axis={axis} floor={floor} dates={renderedDays} onOpen={()=>{}} title={title}/>:null}{list(printRows??entries,true)}</div>:null}
+ {printing?createPortal(<div data-reservation-print data-theme="v8" className={styles.print}><h2>{title}（{axisName[axis]}）</h2><p>{printContext??[...new Set((printRows??entries).map(e=>e.scopeId))].join('・')}</p><p>{renderedDays[0]}〜{renderedDays.at(-1)}</p>{axis!=='list'?<ReservationBoard kind={kind} entries={printRows??entries} resources={resources} axis={axis} floor={floor} dates={renderedDays} onOpen={()=>{}} title={title}/>:null}{list(printRows??entries,true)}</div>,document.body):null}
  </>
  const props={className:styles.board,'data-kind':kind,'data-columns':columns,'aria-label':title,'data-reservation-board':true,'data-print-active':printing?'true':undefined,'data-axis':axis}
  return renderBody||compact?<section {...props}>{contents}</section>:<Card frame="inset" overflow="hidden" {...props}>{contents}</Card>

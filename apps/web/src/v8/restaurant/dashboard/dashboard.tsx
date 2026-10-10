@@ -209,7 +209,7 @@ function TodayStore() {
           aside={<SidePanel media={d.media} google={google} latestReview={d.latestReview} canWrite={canWrite} now={now} />}
         >
           <TodayTable
-            rows={d.today} tables={tables}
+            rows={d.today} tables={tables} storeName={d.store?.name}
             canWrite={canWrite}
             busyId={busyId}
             onVisited={(id) => void markVisited(id)}

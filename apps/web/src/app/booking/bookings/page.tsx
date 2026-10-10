@@ -965,7 +965,7 @@ export default function BookingsPage() {
             onRetry={() => { setError(''); setCalendarSeq((n) => n + 1); void load() }}
           />
         ) : (
-          <ReservationBoard kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
+          <ReservationBoard printContext={selectedAccount?.name??selectedAccountId??'予約管理'} kind="people" dates={Array.from({length:view==='week'?7:1},(_,i)=>moveDay(calendarFrom,i))}
             toolbar={<><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?-7:-1))}>‹</Button><strong>{Number(calendarFrom.slice(5,7))}月{Number(calendarFrom.slice(8))}日{view==='week'?`〜${Number(calendarTo.slice(5,7))}月${Number(calendarTo.slice(8))}日`:null}</strong><Button onClick={()=>setCalendarAnchor(moveDay(calendarAnchor,view==='week'?7:1))}>›</Button><Button onClick={()=>setCalendarAnchor(jstDay(new Date().toISOString()))}>今日</Button></>}
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}

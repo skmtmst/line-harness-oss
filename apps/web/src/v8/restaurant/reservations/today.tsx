@@ -38,10 +38,11 @@ const SLOT = 30
 const ROW_START = 17 * 60
 const ROW_END = 22 * 60
 
-export default function TodayView({ rows, later, tables, day, isToday, busy, canWrite, source, onSource, onDay, onAdd, onOpen, onDetail, onReload, storeId,onView }: {
+export default function TodayView({ rows, later, tables, day, isToday, busy, canWrite, source, onSource, onDay, onAdd, onOpen, onDetail, onReload, storeId,storeName,onView }: {
   onView:(view:import('./format').LedgerView)=>void
   /** その日の予約（取消・無断も含む。表と数では除く）。 */
   onReload:()=>void
+  storeName?:string
   storeId:string
   rows: RestaurantReservation[]
   /** 次の予約を探すための、その月の予約（その日の残りが無いとき、次の日以降から出す）。 */
@@ -140,7 +141,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
           resources={columns.map(t=>({id:t.id,label:`${t.code} ${t.max_capacity}名`,capacity:t.max_capacity,active:!!t.is_active}))}
           canWrite={canWrite} busy={busy} onOpen={onDetail}
           onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);onReload()}}
-          title={`${dayTitle(day)}の予約`}
+          printContext={`${storeName??storeId} ／ ${source==='all'?'予約元：すべて':SOURCE_LABEL[source]??source} ／ 有効な予約・押さえ`} title={`${dayTitle(day)}の予約`}
           loadPrintEntries={selectedAccountId?()=>allBoardPages('seats',selectedAccountId,dayRange(day).from,dayRange(day).to,storeId).then(es=>es.filter(e=>!INACTIVE_STATUSES.includes(e.status)&&(source==='all'||e.source===source))):undefined}
         />
         </div>

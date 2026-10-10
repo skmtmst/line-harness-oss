@@ -37,7 +37,8 @@ export function routeLabel(r: Pick<RestaurantReservation, 'source' | 'note'>): s
   return isWalkIn(r) ? 'ウォークイン' : sourceName(r.source)
 }
 
-export function TodayTable({ rows, tables=[],canWrite, busyId, onVisited, onUndo }: {
+export function TodayTable({ rows,storeName, tables=[],canWrite, busyId, onVisited, onUndo }: {
+  storeName?:string
   tables?:RestaurantTable[]
   rows: RestaurantReservation[] | null
   canWrite: boolean
@@ -61,7 +62,7 @@ export function TodayTable({ rows, tables=[],canWrite, busyId, onVisited, onUndo
       ) : list.length === 0 ? (
         <ListState kind="empty" title="今日の予約はまだありません" description={canWrite ? '電話予約・ウォークインから入れられます。' : undefined} />
       ) : (
-        <ReservationBoard loadPrintEntries={selectedAccountId?()=>allBoardPages('seats',selectedAccountId,range.from,range.to,rows?.[0]?.store_id).then(es=>es.filter(e=>e.status!=='cancelled')):undefined} toolbar={<SectionHeader
+        <ReservationBoard printContext={`${storeName??rows?.[0]?.store_name??storeId??'今日のお店'} ／ 取消を除く今日の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('seats',selectedAccountId,range.from,range.to,rows?.[0]?.store_id).then(es=>es.filter(e=>e.status!=='cancelled')):undefined} toolbar={<SectionHeader
         title="今日の予約"
         help="取消を除く今日の予約です。来店したお客さまは［来店］を押すと来店済みになります。30秒ごとに読み直します。"
         helpLabel="今日の予約の説明"

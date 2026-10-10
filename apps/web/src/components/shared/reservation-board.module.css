@@ -32,3 +32,5 @@
 .axisButton:focus-visible{outline:var(--polish-focus-width) solid var(--polish-focus);outline-offset:var(--polish-focus-offset);}
 
 @media print{.print td{white-space:normal;overflow-wrap:anywhere;}.print .board{overflow:visible;}}
+
+@media print{.print>div:has(>table){overflow:visible;}.print table{break-inside:auto;}}

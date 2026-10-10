@@ -28,10 +28,10 @@ describe('共通盤の操作',()=>{
  })
  it('印刷は読み直した全件を使い、変更のボタンを出さない',async()=>{
   let printed=''
-  const print=vi.spyOn(window,'print').mockImplementation(()=>{const sheet=document.querySelector('[data-reservation-print]');printed=sheet?.textContent??document.querySelector('h2')?.parentElement?.textContent??'';expect(sheet?.querySelector('[data-write-operation]')).toBeNull()})
+  const print=vi.spyOn(window,'print').mockImplementation(()=>{const sheet=document.querySelector('[data-reservation-print]');printed=sheet?.textContent??document.querySelector('h2')?.parentElement?.textContent??'';expect(sheet?.parentElement).toBe(document.body);expect(sheet?.textContent).toContain('然 渋谷店');expect(sheet?.querySelector('[data-write-operation]')).toBeNull()})
   vi.spyOn(window,'requestAnimationFrame').mockImplementation(cb=>setTimeout(()=>cb(0),0) as unknown as number)
   const second={...entry,id:'r2',customerName:'次のページのお客さま'}
-  render(<ReservationBoard axis="list" entries={[entry]} resources={resources} canWrite actions={()=> <button>予約を取り消す</button>} onOpen={()=>{}} loadPrintEntries={async()=>[entry,second]}/>)
+  render(<ReservationBoard printContext="然 渋谷店 ／ 有効な予約" axis="list" entries={[entry]} resources={resources} canWrite actions={()=> <button>予約を取り消す</button>} onOpen={()=>{}} loadPrintEntries={async()=>[entry,second]}/>)
   fireEvent.click(screen.getByRole('button',{name:'印刷'}));await waitFor(()=>expect(print).toHaveBeenCalledTimes(1))
   expect(printed).toContain('次のページのお客さま');expect(printed).not.toContain('予約を取り消す')
  })
