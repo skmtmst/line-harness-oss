@@ -35,6 +35,7 @@ import { VAR_TYPE_LABELS, commonVarValueError, isSecretLikeVarValue, COMMON_VAR_
 import { blockingErrors, checkedAtText, historicalText, isChangeItem, placeholderText, reflectionScopeText, reflectionTimingText, reviewWarnings, hiddenText, immediateItems, impactCsv, impactStateFromError, impactStateText, saveErrorText, scheduleErrorText, type ChangeImpactState } from './impact';
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format';
 import styles from './edit.module.css'
+import { characterCountText, impactBreakdown, urgentImpactCount, overLimitCount } from './impact'
 import { focusFieldById } from '@/lib/use-form-errors';
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls';
@@ -1196,7 +1197,7 @@ function EditCommonVarV8Inner() {
           <section className={styles.card} aria-labelledby="cv-edit-impact-heading">
             <div className={styles.cardHead}>
               <h2 id="cv-edit-impact-heading" className={styles.cardTitle}>変える前に影響を見る</h2>
-              <p className={styles.cardNote} title={impact ? [reflectionScopeText(impact), reflectionTimingText(impact), historicalText(impact)].filter(Boolean).join('\n') : undefined}>
+              <p className={styles.cardNote} title={impact ? [reflectionScopeText(impact), reflectionTimingText(impact), historicalText(impact), ...('canSave' in impact ? [impactBreakdown(impact), `予約中・配信中：${urgentImpactCount(impact) ?? NOT_AVAILABLE}か所`, `文字数超過：${overLimitCount(impact)}か所`] : [])].filter(Boolean).join('\n') : undefined}>
                 {impactState === 'ready' && impact
                   ? `${formatNumber(impact.total)}か所。次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません`
                   : '次に送る・動くときから新しい値が入ります。すでに届いた文は変わりません'}
@@ -1485,7 +1486,7 @@ function ImpactRows({
               </div>
               <div className={styles.impactPair}>
                 <p className={styles.impactBefore} title={row.currentPreview}>{`…${row.currentPreview}`}</p>
-                <p className={styles.impactAfter}>
+                <p className={styles.impactAfter} title={isChangeItem(row) ? characterCountText(row) : undefined} data-over-limit={isChangeItem(row) && row.exceedsCharacterLimit || undefined}>
                   {isChangeItem(row)
                     ? `…${row.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`}`
                     : '値を変えると、ここに保存後の文が出ます。'}

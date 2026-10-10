@@ -311,8 +311,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8-B 広告連携（qSTVR）。費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/inflow-links/site-script-v8.tsx':
     '★V8-B サイトスクリプト（XjOte）。サイトの追加・編集の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
-  'app/contents/vars/list-v8.tsx':
-    '★V8 の共通情報一覧。一覧上の操作（停止・再開・差し替え・削除・フォルダ追加）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。窓内の理由欄は開く・閉じるときに戻るダイアログ内の入力',
   'app/restaurant-test/v8/tables.tsx':
     '★V8-B の座席・卓管理（BERxg）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。卓の追加・変更は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
   'app/restaurant-test/v8/menu.tsx':
@@ -364,7 +362,7 @@ const EXEMPTIONS: Record<string, string> = {
   'v8/booking-staff/shifts.tsx':
     'app/booking/staff/shifts/staff-detail-v8.tsx と同じ画面の★V8版（d5fmnM・E3YDK・wvGke）。各段がそれぞれの「保存」「作る」「足す」でその場で確定する。元の画面と同じ扱い',
   'v8/common-vars/list.tsx':
-    'app/contents/vars/list-v8.tsx と同じ一覧の★V8版。一覧上の操作は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。窓内の理由欄は閉じると戻る',
+    '現役の共通情報一覧。一覧上の操作は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。窓内の理由欄は閉じると戻る',
   'v8/contents/list.tsx':
     'app/contents/list-v8.tsx と同じ一覧の★V8版（O7hUt7）。一覧上の操作は押した直後に確認窓か即時保存で確定し、名前・理由・移し先の入力は閉じると戻る札・窓の中だけ',
   'v8/contents/media-detail-dialog.tsx':

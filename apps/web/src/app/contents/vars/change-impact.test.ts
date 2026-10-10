@@ -25,7 +25,7 @@ import {
 } from './change-impact'
 
 const EDIT = readUiSource(new URL('./edit/page.tsx', import.meta.url), 'utf8')
-const IMPACT_REVIEW = readFileSync(new URL('./impact-review.tsx', import.meta.url), 'utf8')
+const IMPACT_REVIEW = readUiSource(new URL('../../../v8/common-vars-edit/edit.tsx', import.meta.url), 'utf8')
 
 /**
  * **ファイル全体を `toContain` で見ない。** 画面のどこかに同じ字が
@@ -302,12 +302,12 @@ describe('共通情報編集（V8）の画面', () => {
 
   it('1件ずつ見る画面では、保存後の文を作れない行を空文字で埋めない', () => {
     // 空で出すと「保存すると空になる」と読める。
-    expect(IMPACT_REVIEW).toContain("item.nextPreview ?? '—（未取得）'")
+    expect(IMPACT_REVIEW).toContain("row.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`")
   })
 
   it('1件ずつ見る画面では、上限を超える行の文字数を強調する', () => {
-    expect(IMPACT_REVIEW).toContain('item.exceedsCharacterLimit')
-    expect(IMPACT_REVIEW).toContain('characterCountText(item)')
+    expect(IMPACT_REVIEW).toContain('row.exceedsCharacterLimit')
+    expect(IMPACT_REVIEW).toContain('characterCountText(row)')
   })
 
   it('状態の語彙は口とそろえ、編集中・公開中・予約中の内訳を保存前に出す（IDEA-14）', () => {

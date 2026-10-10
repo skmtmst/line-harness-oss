@@ -79,11 +79,6 @@
     "height": 2,
     "font": 0
   },
-  "app/contents/vars/list-v8.module.css": {
-    "spacing": 38,
-    "height": 17,
-    "font": 30
-  },
   "app/ec-commerce/ec-commerce-v6.module.css": {
     "spacing": 28,
     "height": 5,
