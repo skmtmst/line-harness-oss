@@ -127,3 +127,36 @@ export function referenceTokenNames(references: {
     vars: Object.fromEntries(references.commonVars.map((item) => [item.varKey, item.name])),
   }
 }
+
+/** 解決済み本文の文字を保ち、差し込みに当たる部分だけ既存の札へ載せる。 */
+export function splitResolvedInsertTokens(value: string, resolvedValue: string, names: InsertTokenNames = {}): InsertPiece[] {
+  const source = splitInsertTokens(value, [], names)
+  const result: InsertPiece[] = []
+  let cursor = 0
+  const fallback = (): InsertPiece[] => [{ kind: 'text', text: resolvedValue }]
+  for (let index = 0; index < source.length; index++) {
+    const piece = source[index]
+    if (piece.kind === 'text') {
+      if (!resolvedValue.startsWith(piece.text, cursor)) return fallback()
+      result.push(piece)
+      cursor += piece.text.length
+      continue
+    }
+    // 隣り合った差し込みは口が個別の値を返さないので、まとまった値として札にする。
+    const group = [piece.spec]
+    while (source[index + 1]?.kind === 'chip') {
+      group.push((source[++index] as Extract<InsertPiece, { kind: 'chip' }>).spec)
+    }
+    const next = source[index + 1]
+    const end = next?.kind === 'text' ? resolvedValue.indexOf(next.text, cursor) : resolvedValue.length
+    if (end < 0) return fallback()
+    const label = resolvedValue.slice(cursor, end)
+    const token = group.map((spec) => spec.token).join('')
+    // 解決できなかった差し込みは、値が入った札に見せない。
+    result.push(label.includes('{{')
+      ? { kind: 'text', text: label }
+      : { kind: 'chip', spec: { ...piece.spec, token, label, hint: token } })
+    cursor = end
+  }
+  return cursor === resolvedValue.length ? result : fallback()
+}

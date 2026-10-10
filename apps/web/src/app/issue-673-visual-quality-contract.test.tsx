@@ -45,7 +45,6 @@ describe('#673 A. カード・パネルの立体感', () => {
 
   it('主要画面の任意値 shadow をトークンへ寄せた', () => {
     const migrated = [
-      ['components/chats/template-picker.tsx', 'shadow-card'],
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
       ['v8/dashboard/dashboard-editor.module.css', 'var(--shadow-card)'],
       ['app/chats/page.tsx', 'shadow-card'],

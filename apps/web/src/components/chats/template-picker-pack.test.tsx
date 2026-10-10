@@ -75,53 +75,53 @@ afterEach(() => {
 describe('テンプレートのパック呼出し(G-4)', () => {
   test('onPickPack が無い画面では「まとめて選ぶ」が出ない', async () => {
     await mountPicker(false)
-    expect(screen.queryByText('まとめて選ぶ')).toBeNull()
+    expect(screen.queryByRole('switch', { name: '2通以上を続けて送る' })).toBeNull()
   })
 
   test('選んだ順に番号が付き、まとめて送るで順序どおりの本文配列が渡る', async () => {
     await mountPicker()
-    await act(async () => { screen.getByText('まとめて選ぶ').click() })
+    await act(async () => { screen.getByRole('switch', { name: '2通以上を続けて送る' }).click() })
     // あえて逆順に選んで、クリック順が送る順になることを確かめる
     await act(async () => { listItem(3).click() })
     await act(async () => { listItem(1).click() })
-    const list = await screen.findByText(/まとめて送る順番/)
+    const list = await screen.findByText(/続けて送る順/)
     expect(list).toBeTruthy()
     await act(async () => {
-      screen.getByRole('button', { name: /まとめて送る（2通）/ }).click()
+      screen.getByRole('button', { name: '2通を続けて送る' }).click()
     })
     expect(fixture.picked).toEqual(['本文3', '本文1'])
   })
 
   test('「外す」で除外できる', async () => {
     await mountPicker()
-    await act(async () => { screen.getByText('まとめて選ぶ').click() })
+    await act(async () => { screen.getByRole('switch', { name: '2通以上を続けて送る' }).click() })
     await act(async () => { listItem(1).click() })
     await act(async () => { listItem(2).click() })
     await act(async () => {
-      screen.getByRole('button', { name: 'テンプレ1をまとめ送りから外す' }).click()
+      listItem(1).click()
     })
     await act(async () => {
-      screen.getByRole('button', { name: /まとめて送る（1通）/ }).click()
+      screen.getByRole('button', { name: '1通を続けて送る' }).click()
     })
     expect(fixture.picked).toEqual(['本文2'])
   })
 
   test('5通を超えては選べない', async () => {
     await mountPicker()
-    await act(async () => { screen.getByText('まとめて選ぶ').click() })
+    await act(async () => { screen.getByRole('switch', { name: '2通以上を続けて送る' }).click() })
     for (const n of [1, 2, 3, 4, 5, 6]) {
       await act(async () => { listItem(n).click() })
     }
     await act(async () => {
-      screen.getByRole('button', { name: /まとめて送る（5通）/ }).click()
+      screen.getByRole('button', { name: '5通を続けて送る' }).click()
     })
     expect(fixture.picked).toEqual(['本文1', '本文2', '本文3', '本文4', '本文5'])
   })
 
   test('パックモードでも未選択なら送れない', async () => {
     await mountPicker()
-    await act(async () => { screen.getByText('まとめて選ぶ').click() })
-    const button = screen.getByRole('button', { name: /まとめて送る（0通）/ })
+    await act(async () => { screen.getByRole('switch', { name: '2通以上を続けて送る' }).click() })
+    const button = screen.getByRole('button', { name: '0通を続けて送る' })
     expect((button as HTMLButtonElement).disabled).toBe(true)
   })
 })
