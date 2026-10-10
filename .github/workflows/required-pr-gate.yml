@@ -635,10 +635,21 @@ jobs:
           if [ "${{ steps.scope.outputs.diff }}" = "true" ]; then
             node apps/web/scripts/v8-guard/serve-out.mjs /tmp/base/apps/web/out 4311 > /tmp/serve-base.log 2>&1 &
           fi
+          ready=false
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:4310/login > /dev/null && break
+            if curl -sf http://127.0.0.1:4310/friends > /dev/null \
+              && curl -sf 'http://127.0.0.1:8788/api/friends?account_id=visual-qa-account' > /dev/null \
+              && { [ "${{ steps.scope.outputs.diff }}" != "true" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
+              ready=true
+              break
+            fi
             sleep 1
           done
+          if [ "$ready" != "true" ]; then
+            cat /tmp/mock-api.log /tmp/serve-head.log
+            echo "::error::速度・画面検査のサーバーが起動しませんでした"
+            exit 1
+          fi
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
@@ -676,11 +687,15 @@ jobs:
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4310 /tmp/v8-guard/head v7
           node apps/web/scripts/v8-guard/v7-pixel-diff.mjs /tmp/v8-guard/base /tmp/v8-guard/head /tmp/v8-guard/v7-diff
       - name: Upload V8 screen guard results
-        if: failure()
+        if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: v8-screen-guard
-          path: /tmp/v8-guard/
+          path: |
+            /tmp/v8-guard/
+            /tmp/mock-api.log
+            /tmp/serve-head.log
+            /tmp/serve-base.log
           retention-days: 7
 
   required-pr-gate:

@@ -103,40 +103,6 @@ class RequestBodyError extends Error {
   }
 }
 
-async function readBoundedJson(request: Request): Promise<Record<string, unknown>> {
-  const declared = Number.parseInt(request.headers.get('Content-Length') ?? '', 10);
-  if (Number.isFinite(declared) && declared > REPLACEMENT_BODY_MAX_BYTES) {
-    throw new RequestBodyError(413, '送信内容が大きすぎます');
-  }
-  const reader = request.body?.getReader();
-  if (!reader) return {};
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > REPLACEMENT_BODY_MAX_BYTES) {
-      await reader.cancel();
-      throw new RequestBodyError(413, '送信内容が大きすぎます');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object required');
-    return parsed as Record<string, unknown>;
-  } catch {
-    throw new RequestBodyError(400, '送信内容を読み取れませんでした');
-  }
-}
-
 async function replacementRevision(
   sourceId: string,
   replacementId: string,
@@ -1515,14 +1481,14 @@ contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'),
 // 画面で読んだ影響は信用せず、同じ7種類を実行直前にも読み直す。
 // scope=replaceable は「置換可能な使用先だけ」を明示選択した部分実行。
 // 置き忘れ防止に、scope の省略・不正値は全件実行として扱わず 400/409 で止める。
-contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: REPLACEMENT_BODY_MAX_BYTES }), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
     if (!accountId) return inputError(c, { success: false, error: 'accountId が必要です' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const body = await readBoundedJson(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const replacementId = typeof body.replacementMediaId === 'string'
       ? body.replacementMediaId.trim()
       : '';
@@ -2474,9 +2440,9 @@ contents.get('/api/common-vars/:id/delete-impact', requireRole('owner', 'admin')
   }
 });
 
-contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: REPLACEMENT_BODY_MAX_BYTES }), async (c) => {
   try {
-    const body = await readBoundedJson(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
@@ -2534,9 +2500,9 @@ contents.post('/api/common-vars/:id/impact-preview', requireRole('owner', 'admin
   }
 });
 
-contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: REPLACEMENT_BODY_MAX_BYTES }), async (c) => {
   try {
-    const body = await readBoundedJson(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     if (!accountId) return inputError(c, { success: false, error: 'accountId is required' }, 400, ["accountId"]);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
@@ -2701,7 +2667,7 @@ contents.get('/api/common-vars/:id/schedules', async (c) => {
   }
 });
 
-contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), inputJsonBoundary({}, { maxBytes: REPLACEMENT_BODY_MAX_BYTES }), async (c) => {
   try {
     const varId = c.req.param('id');
     const accountId = c.req.query('accountId')?.trim();
@@ -2713,7 +2679,7 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), i
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     // 同じ画面の impact-preview・replace と同じ16KB制限にする。
-    const body = await readBoundedJson(c.req.raw);
+    const body = await c.req.json<Record<string, unknown>>();
     const effectiveFrom = typeof body.effectiveFrom === 'string' ? body.effectiveFrom : '';
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(effectiveFrom)
       || !isValidScheduleDateTime(effectiveFrom)) {
