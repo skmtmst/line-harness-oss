@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
 const EDIT = readUiSource(path.join(__dirname, 'edit/page.tsx'), 'utf8')
-const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'edit/participants-v8.tsx'), 'utf8')
+const PARTICIPANTS = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/participants.tsx'), 'utf8')
 const REVIEW = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/review.tsx'), 'utf8')
 const ANALYTICS = fs.readFileSync(path.join(__dirname, 'edit/analytics-v8.tsx'), 'utf8')
 const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
@@ -166,7 +166,7 @@ describe('V8 ウェビナー一覧の契約', () => {
       'webinarApi.duplicate(id, editor.version)',
     ]) expect(PUBLISHED).toContain(call)
     expect(REVIEW).toContain('webinarApi.publishValidation(webinar.id)')
-    expect(PARTICIPANTS).toContain('webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, filter || undefined)')
+    expect(PARTICIPANTS).toContain('webinarApi.participants(webinar.id, nextCursor, PARTICIPANTS_PAGE_SIZE, filter || undefined)')
     expect(ANALYTICS).toContain('retention={analytics.retention')
     expect(PUBLISHED).toContain('editor.monitoring.notificationFailures')
   })

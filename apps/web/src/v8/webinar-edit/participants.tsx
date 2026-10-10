@@ -51,7 +51,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 /*
  * ★V8 ウェビナーの参加者（Pencil uNsEy）。
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
- * 口・権限・失敗の扱いは app/webinars/edit/participants-v8.tsx と同じ（BEHAVIOR.md）。
+ * 口・権限・失敗の扱いは BEHAVIOR.md に記録。
  */
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied'

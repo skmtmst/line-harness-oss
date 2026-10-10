@@ -175,7 +175,6 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   'app/webinars/edit/video-v8.tsx': 'app/webinars/edit/page.tsx',
-  'app/webinars/edit/participants-v8.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
   'app/affiliate-offers/new/page.tsx': 'app/affiliate-offers/new-offer-v8.tsx',

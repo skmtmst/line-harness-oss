@@ -4,13 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics } from '@/lib/api'
-import type { ParticipantExport } from './participants-v8'
 import AnalyticsFunnelV8 from './analytics-funnel-v8'
 import RetentionSection from './retention-section'
 import ViewerComments from './viewer-comments'
 import AnalyticsDetails from './analytics-details'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
+
+type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 
 export default function AnalyticsV8({ webinarId, durationSeconds, analytics, analyticsState, onRetry, onExportChange }: {
   webinarId: string
