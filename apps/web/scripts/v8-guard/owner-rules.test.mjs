@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import scan from './owner-rules-browser.mjs'
-import { assess, record } from './layout-defects.mjs'
+import { assess, record, measurePage } from './layout-defects.mjs'
 
 const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}button{font:inherit}p{margin:0}</style><main>${body}</main>`
 const row = (body,style='') => `<div role="row" style="display:flex;align-items:center;width:600px;height:56px;padding:0 24px;${style}">${body}</div>`
@@ -122,5 +122,33 @@ test('選ぶ箱の短い題は1行、状態の隣の短いマークは切れな�
     await page.evaluate(() => { document.documentElement.dataset.theme = 'v8' })
     assert.equal(await page.locator('strong').evaluate(el => getComputedStyle(el).whiteSpace), 'nowrap')
     assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'short' && f.text === '担当中').length, 0)
+  } finally { await browser.close() }
+})
+
+
+test('閉じた設定は描画扱いにせず、開いたら重なり・黒い面を検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(shell('<details><summary>設定</summary><div style="position:relative;background:#222;color:white;width:200px;height:80px"><span style="display:block">中の文字その一</span><span style="display:block;margin-top:-20px">中の文字その二</span></div></details>'))
+    assert.equal((await measurePage(page)).filter(f => /中の文字/.test(f.text)).length, 0)
+    await page.locator('summary').click()
+    const opened = await measurePage(page)
+    assert.ok(opened.some(f => f.kind === 'overlap' && /中の文字/.test(f.text)), JSON.stringify(opened))
+    assert.ok(opened.some(f => f.kind === 'dark' && /中の文字/.test(f.text)), JSON.stringify(opened))
+  } finally { await browser.close() }
+})
+
+test('編集用の吹き出しをLINEの見本と取り違えず、本当の重なりを検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const bubble = '<div class="bubble" style="position:relative;width:300px;height:150px"><span style="display:block">編集の文字その一</span><span style="display:block;margin-top:-20px">編集の文字その二</span><textarea style="position:absolute;left:0;top:30px;width:300px;height:100px" aria-label="本文"></textarea></div>'
+    await page.setContent(shell(`<section data-message-composer>${bubble}</section>`))
+    const findings = await measurePage(page)
+    assert.ok(findings.some(f => f.kind === 'overlap' && /編集の文字/.test(f.text)), JSON.stringify(findings))
+    assert.equal(findings.filter(f => f.kind.startsWith('blank-')).length, 0)
+    await page.setContent(shell(`<section data-line-preview-part="talk">${bubble}</section>`))
+    assert.equal((await measurePage(page)).filter(f => /編集の文字/.test(f.text)).length, 0)
   } finally { await browser.close() }
 })

@@ -5,6 +5,8 @@ export default function scanOwnerRules() {
   const css = el => { if (!styles.has(el)) styles.set(el, getComputedStyle(el)); return styles.get(el) }
   const visible = el => {
     for (let p = el; p; p = p.parentElement) {
+      // 閉じた設定は描画されない。開いた設定とsummaryは検査する。
+      if (p !== el && p.matches('details:not([open])') && !p.querySelector(':scope > summary')?.contains(el)) return false
       const c = css(p)
       if (c.display === 'none' || c.visibility === 'hidden' || c.visibility === 'collapse' || +c.opacity === 0 || c.clipPath === 'inset(50%)' || /^rect\(0px[, ]+0px[, ]+0px[, ]+0px\)$/.test(c.clip) || p.hasAttribute('inert')) return false
     }
