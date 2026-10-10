@@ -107,10 +107,6 @@
   "app/emergency/control-v8.tsx": {
     "direct-th": 6
   },
-  "app/emergency/page.tsx": {
-    "unresolved-classname": 1,
-    "arbitrary-value": 3
-  },
   "app/events/bookings/page.tsx": {
     "direct-th": 6
   },

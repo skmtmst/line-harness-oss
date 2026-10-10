@@ -81,7 +81,7 @@ describe('KPI折りたたみの適用（#975 U060）', () => {
     // app/hq/page.tsx は V8 のホーム（v8/hq/home.tsx・絵どおりの数の帯）を出すだけになったので外した（2026-10-09 V7 削除）。
     ['app/nen-campaigns/nen-overview.tsx', 'KpiCollapse'],
     ['app/ec-commerce/page.tsx', 'KpiCollapse'],
-    ['app/emergency/page.tsx', 'KpiCollapse'],
+    ['v8/settings/emergency/history-details.tsx', 'KpiBand'],
     ['app/nen/members/members-tab.tsx', 'KpiCollapse'],
     ['app/nen/members/lifetime-tab.tsx', 'KpiCollapse'],
     ['app/nen/pets/pets-tab.tsx', 'KpiCollapse'],
