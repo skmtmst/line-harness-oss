@@ -31,6 +31,17 @@ export default function scanLayoutDefects() {
     return parts.join(' > ')
   }
   const add = (kind, el, text, measure, other) => findings.push({ kind, target: selector(el), ...(other ? { other: selector(other) } : {}), text: text.replace(/\s+/g, ' ').slice(0, 120), measure })
+  // Range は省略・行数制限で隠れた文字の寸法も返す。重なりは実際に見える
+  // 各行だけで比べる。切れの検査には、後段で省略前の寸法を使う。
+  const paintedRects = (rects, el) => rects.map(r => {
+    let left = r.left, right = r.right, top = r.top, bottom = r.bottom
+    for (let p = el; p && p !== root; p = p.parentElement) {
+      const c = css(p), box = p.getBoundingClientRect()
+      if (c.overflowX !== 'visible') { left = Math.max(left, box.left); right = Math.min(right, box.right) }
+      if (c.overflowY !== 'visible') { top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom) }
+    }
+    return { left, right, top, bottom, width: right - left, height: bottom - top }
+  }).filter(r => r.width > 0 && r.height > 0)
   const leaves = []
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   while (walker.nextNode()) {
@@ -40,14 +51,17 @@ export default function scanLayoutDefects() {
     const rects = [...range.getClientRects()].filter(r => r.width > 0 && r.height > 0)
     if (!rects.length) continue
     const bb = range.getBoundingClientRect()
-    const lines = new Set(rects.map(r => Math.round(r.top / 4))).size
+    const painted = paintedRects(rects, el)
+    if (!painted.length) continue
+    const lines = new Set(painted.map(r => Math.round(r.top / 4))).size
     let layer = el
     while (layer && layer !== document.body) {
       if (/^(absolute|fixed)$/.test(css(layer).position)) break
       layer = layer.parentElement
     }
-    leaves.push({ el, text, bb, lines, layer })
-    if (lines >= 2 && text.length <= 24) add('wrap', el, text, { lines })
+    leaves.push({ el, text, rects: painted, lines, layer })
+    const explanation = el.closest('small,[role="note"]') || el.closest('p') && /[。！？]/.test(text)
+    if (!explanation && lines >= 2 && text.length <= 24) add('wrap', el, text, { lines })
     if (lines >= 2 && text.length / lines <= 2.5) add('squash', el, text, { lines })
     // 正規の1行省略は既存 layout-overflow の title 検査に任せる。
     const ellipsis = (() => { for (let p = el; p && p !== root; p = p.parentElement) if (css(p).textOverflow === 'ellipsis') return true; return false })()
@@ -67,10 +81,14 @@ export default function scanLayoutDefects() {
   }
   for (let i = 0; i < leaves.length; i++) for (let j = i + 1; j < leaves.length; j++) {
     const a = leaves[i], b = leaves[j]
-    const x = Math.min(a.bb.right, b.bb.right) - Math.max(a.bb.left, b.bb.left)
-    const y = Math.min(a.bb.bottom, b.bb.bottom) - Math.max(a.bb.top, b.bb.top)
-    if (x > 2 && y > 3 && a.layer === b.layer && a.el !== b.el && !a.el.contains(b.el) && !b.el.contains(a.el))
-      add('overlap', a.el, a.text + ' ⟂ ' + b.text, { x: Math.ceil(x), y: Math.ceil(y) }, b.el)
+    if (a.layer !== b.layer || a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue
+    let overlap = null
+    for (const ar of a.rects) for (const br of b.rects) {
+      const x = Math.min(ar.right, br.right) - Math.max(ar.left, br.left)
+      const y = Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top)
+      if (x > 2 && y > 3 && (!overlap || x * y > overlap.x * overlap.y)) overlap = { x, y }
+    }
+    if (overlap) add('overlap', a.el, a.text + ' ⟂ ' + b.text, { x: Math.ceil(overlap.x), y: Math.ceil(overlap.y) }, b.el)
   }
   const box = el => {
     const c = css(el)

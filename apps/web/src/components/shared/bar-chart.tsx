@@ -122,7 +122,7 @@ export function BarChart({
           </li>
         ))}
       </ul>
-      <div className={styles.plot} role="group" aria-label={label}>
+      <div className={styles.plot} role="group" aria-label={label} data-blank-ok="棒の高さを共通の縦目盛りと比べるための描画領域">
         {ticks.map((tick) => (
           <div
             key={tick}

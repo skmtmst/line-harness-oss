@@ -11,7 +11,7 @@ export function BookingPage({ children, ...heading }: PageHeadingProps & { child
 }
 
 export function BookingPageStats({ children }: { children: ReactNode }) {
-  return <div className={styles.bookingStats} data-template-region="stats">{children}</div>
+  return <div className={styles.bookingStats} data-template-region="stats" data-blank-ok="数の帯を予定の列幅にそろえ、右の予約詳細欄の幅を残す">{children}</div>
 }
 
 export function BookingPageContent({ children }: { children: ReactNode }) {

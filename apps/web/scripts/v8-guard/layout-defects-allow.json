@@ -381,13 +381,13 @@
     "route": "/conversions",
     "width": 1152,
     "kind": "wrap",
-    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(2) > div.list_tableWrap:nth-of-type(1) > div.data-table_frame:nth-of-type(1) > table.data-table_table:nth-of-type(1) > tbody:nth-of-type(1) > tr.data-table_row:nth-of-type(1) > td.data-table_bodyCell:nth-of-type(5) > span.list_usageMain:nth-of-type(1)",
+    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(2) > div.list_tableWrap:nth-of-type(1) > div.data-table_frame:nth-of-type(1) > table.data-table_table:nth-of-type(1) > tbody:nth-of-type(1) > tr.data-table_row:nth-of-type(1) > td.data-table_bodyCell:nth-of-type(6) > span.list_usageMain:nth-of-type(1)",
     "text": "ファネル 2・アフィリエイト 1",
     "measure": {
       "lines": 2
     },
     "count": 1,
-    "reason": "導入前の既存表示だけを残して新しい崩れを止めるため許可。この短文は開始時点で2行。B-191の画面照合で1行化または説明文としての扱いを確認する。"
+    "reason": "列車13（9da94f6fe7）の同じ幅・文字・実寸でも確認済みの既存表示。列車14の列位置・型の構造に対象を合わせる。文字・場所・件数・実寸の悪化は引き続き止める。基準実寸：{\"lines\": 2}。対象：ファネル 2・アフィリエイト 1"
   },
   {
     "route": "/conversions",
@@ -3309,13 +3309,13 @@
     "route": "/conversions",
     "width": 1440,
     "kind": "wrap",
-    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(2) > div.list_tableWrap:nth-of-type(1) > div.data-table_frame:nth-of-type(1) > table.data-table_table:nth-of-type(1) > tbody:nth-of-type(1) > tr.data-table_row:nth-of-type(1) > td.data-table_bodyCell:nth-of-type(5) > span.list_usageMain:nth-of-type(1)",
+    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(2) > div.list_tableWrap:nth-of-type(1) > div.data-table_frame:nth-of-type(1) > table.data-table_table:nth-of-type(1) > tbody:nth-of-type(1) > tr.data-table_row:nth-of-type(1) > td.data-table_bodyCell:nth-of-type(6) > span.list_usageMain:nth-of-type(1)",
     "text": "ファネル 2・アフィリエイト 1",
     "measure": {
       "lines": 2
     },
     "count": 1,
-    "reason": "導入前の既存表示だけを残して新しい崩れを止めるため許可。この短文は開始時点で2行。B-191の画面照合で1行化または説明文としての扱いを確認する。"
+    "reason": "列車13（9da94f6fe7）の同じ幅・文字・実寸でも確認済みの既存表示。列車14の列位置・型の構造に対象を合わせる。文字・場所・件数・実寸の悪化は引き続き止める。基準実寸：{\"lines\": 2}。対象：ファネル 2・アフィリエイト 1"
   },
   {
     "route": "/conversions",
@@ -4287,13 +4287,13 @@
     "route": "/conversions",
     "width": 1920,
     "kind": "wrap",
-    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(2) > div.list_tableWrap:nth-of-type(1) > div.data-table_frame:nth-of-type(1) > table.data-table_table:nth-of-type(1) > tbody:nth-of-type(1) > tr.data-table_row:nth-of-type(1) > td.data-table_bodyCell:nth-of-type(5) > span.list_usageMain:nth-of-type(1)",
+    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(2) > div.list_tableWrap:nth-of-type(1) > div.data-table_frame:nth-of-type(1) > table.data-table_table:nth-of-type(1) > tbody:nth-of-type(1) > tr.data-table_row:nth-of-type(1) > td.data-table_bodyCell:nth-of-type(6) > span.list_usageMain:nth-of-type(1)",
     "text": "ファネル 2・アフィリエイト 1",
     "measure": {
       "lines": 2
     },
     "count": 1,
-    "reason": "導入前の既存表示だけを残して新しい崩れを止めるため許可。この短文は開始時点で2行。B-191の画面照合で1行化または説明文としての扱いを確認する。"
+    "reason": "列車13（9da94f6fe7）の同じ幅・文字・実寸でも確認済みの既存表示。列車14の列位置・型の構造に対象を合わせる。文字・場所・件数・実寸の悪化は引き続き止める。基準実寸：{\"lines\": 2}。対象：ファネル 2・アフィリエイト 1"
   },
   {
     "route": "/affiliates/new",
@@ -4680,5 +4680,53 @@
     },
     "count": 1,
     "reason": "導入前の既存表示だけを残して新しい崩れを止めるため許可。この2つの文字領域は開始時点で横91px・縦6px重なる。B-191の照合で修正する。"
+  },
+  {
+    "route": "/auto-replies/edit?id=ar-new&step=trigger",
+    "width": 1440,
+    "kind": "wrap",
+    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > aside.page-templates_preview:nth-of-type(1) > div.page-templates_previewContent:nth-of-type(1) > section.card_card:nth-of-type(1) > h2.wizard-v8_sideTitle:nth-of-type(1)",
+    "text": "保存したあとに、過去28日で当たった数が出ます",
+    "measure": {
+      "lines": 2
+    },
+    "count": 1,
+    "reason": "列車13（9da94f6fe7）の同じ幅・文字・実寸でも確認済みの既存表示。列車14の列位置・型の構造に対象を合わせる。文字・場所・件数・実寸の悪化は引き続き止める。基準実寸：{\"lines\": 2}。対象：保存したあとに、過去28日で当たった数が出ます"
+  },
+  {
+    "route": "/hq/broadcasts/detail",
+    "width": 1440,
+    "kind": "blank-horizontal",
+    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(2) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.detail_split:nth-of-type(1) > aside.detail_side:nth-of-type(1) > dl.detail_rows:nth-of-type(1) > div.detail_row:nth-of-type(1) > dd:nth-of-type(1)",
+    "text": "right",
+    "measure": {
+      "excess": 156
+    },
+    "count": 1,
+    "reason": "列車13（9da94f6fe7）の同じ幅・文字・実寸でも確認済みの既存表示。列車14の列位置・型の構造に対象を合わせる。文字・場所・件数・実寸の悪化は引き続き止める。基準実寸：{\"excess\": 156}。対象：right"
+  },
+  {
+    "route": "/auto-replies/edit?id=ar-new&step=trigger",
+    "width": 1920,
+    "kind": "wrap",
+    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > aside.page-templates_preview:nth-of-type(1) > div.page-templates_previewContent:nth-of-type(1) > section.card_card:nth-of-type(1) > h2.wizard-v8_sideTitle:nth-of-type(1)",
+    "text": "保存したあとに、過去28日で当たった数が出ます",
+    "measure": {
+      "lines": 2
+    },
+    "count": 1,
+    "reason": "列車13（9da94f6fe7）の同じ幅・文字・実寸でも確認済みの既存表示。列車14の列位置・型の構造に対象を合わせる。文字・場所・件数・実寸の悪化は引き続き止める。基準実寸：{\"lines\": 2}。対象：保存したあとに、過去28日で当たった数が出ます"
+  },
+  {
+    "route": "/hq/broadcasts/detail",
+    "width": 1920,
+    "kind": "blank-horizontal",
+    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(2) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.detail_split:nth-of-type(1) > aside.detail_side:nth-of-type(1) > dl.detail_rows:nth-of-type(1) > div.detail_row:nth-of-type(1) > dd:nth-of-type(1)",
+    "text": "right",
+    "measure": {
+      "excess": 156
+    },
+    "count": 1,
+    "reason": "列車13（9da94f6fe7）の同じ幅・文字・実寸でも確認済みの既存表示。列車14の列位置・型の構造に対象を合わせる。文字・場所・件数・実寸の悪化は引き続き止める。基準実寸：{\"excess\": 156}。対象：right"
   }
 ]

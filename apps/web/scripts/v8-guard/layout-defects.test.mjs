@@ -75,6 +75,12 @@ test('除外を実寸で確認し、表内の文字の重なりは見逃さな�
     assert.ok((await measurePage(page)).some(f=>f.kind==='overlap'))
     await page.setContent(shell('<div style="width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="全文の名前">全文の名前が長い場合の省略</div>'))
     assert.equal((await measurePage(page)).some(f=>f.kind==='clip'),false)
+    await page.setContent(shell('<div style="display:flex;gap:16px"><span style="width:80px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="長い名前の全文">長い名前が右の文字の裏まで続く省略</span><span>隣の名前</span></div>'))
+    assert.equal((await measurePage(page)).some(f=>f.kind==='overlap'),false,'省略で隠れた文字は隣と重なっていない')
+    await page.setContent(shell('<small style="display:block;width:120px">買うたびに数えます。売上を追うときに</small>'))
+    assert.equal((await measurePage(page)).some(f=>f.kind==='wrap'),false,'説明文は短い名前の折り返しではない')
+    await page.setContent(shell('<div style="overflow:hidden;width:100px"><span style="white-space:nowrap">省略なしで切れた長い名前を検出する</span></div>'))
+    assert.ok((await measurePage(page)).some(f=>f.kind==='clip'),'隠れた重なりを除いても、省略なしの切れは検出する')
   } finally { await browser.close() }
 })
 test('既存だけ許可し、新しい場所・幅・種類・文字・件数・悪化を止める',()=>{
