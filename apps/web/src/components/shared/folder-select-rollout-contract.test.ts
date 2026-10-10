@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '../..')
-const read = (path: string) => (path === 'v8/tag-edit/edit.tsx' ? readUiSource : readFileSync)(join(SRC, path), 'utf8')
+const read = (path: string) => (['v8/tag-edit/edit.tsx', 'app/reminders/new/new-v8.tsx'].includes(path) ? readUiSource : readFileSync)(join(SRC, path), 'utf8')
 
 /** 画面 → onCreate を決める権限の値（その値が偽なら作らせない）。 */
 const SCREENS: Array<[string, RegExp]> = [
@@ -37,7 +37,7 @@ const SCREENS: Array<[string, RegExp]> = [
   ['v8/common-vars-edit/edit.tsx', /onCreate=\{canWrite && selectedAccountId\s*\?/],
   ['v8/common-vars-edit/new.tsx', /onCreate=\{canWrite && selectedAccountId\s*\?/],
   ['v8/reminders/basics-form.tsx', /onCreate=\{canCreateFolder\s*\?/],
-  ['app/reminders/basics-form-v8.tsx', /onCreate=\{canCreateFolder\s*\?/],
+  ['app/reminders/new/new-v8.tsx', /onCreate=\{canCreateFolder\s*\?/],
   ['v8/contents/list.tsx', /onCreateFolder=\{canManageMedia\s*\?/],
   ['app/rich-menus/new/create-v8.tsx', /onCreate=\{!canOperate\s*\?\s*undefined/],
   ['app/auto-replies/edit/wizard-v8.tsx', /onCreate=\{canManage\s*\?/],

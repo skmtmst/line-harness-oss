@@ -11,7 +11,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const SCREENS: Array<[string, string]> = [
   ['v8/form-edit/edit.tsx', ''],
   ['app/reminders/new/new-v8.tsx', ''],
-  ['app/reminders/edit/edit-v8.tsx', 'k32cn'],
+  ['v8/reminders/edit.tsx', 'k32cn'],
   ['app/tags/edit-tag-page-v8.tsx', 'xn95q'],
   ['v8/tag-edit/edit.tsx', 'xn95q'],
   ['app/templates/edit-v8.tsx', 'NCbYn'],

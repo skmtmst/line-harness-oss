@@ -72,7 +72,6 @@ const GUARDED = [
   // ★V8 マイペットのごはんの目安（h7A2F）。下の帯の保存まで画面に残る変更を useUnsavedGuard で守る。
   'v8/nen-pets/feeding.tsx',
   'app/ops/announcements/page.tsx',
-  'app/reminders/edit/edit-v8.tsx',
   'app/reminders/edit/issue469-reminder-screens.tsx',
   'app/reminders/new/new-v8.tsx',
   'app/reminders/new/page.tsx',
@@ -233,8 +232,6 @@ const EXEMPTIONS: Record<string, string> = {
     '編集を持たない探す窓（⌘K）。選んだ行き先への移動を共通の未保存確認へ委ねる',
   'v8/restaurant/closures/closure-dialog.tsx': '臨時休業・貸切を足す・変える窓（提案 E-10 nVvXy）。保存の口は窓の中だけで、開くたびに押した日か記録から作り直し、閉じると入力を破棄する。',
   'v8/restaurant/front-desk/phone-drawer.tsx': '電話予約の引き出し（提案 E-2）。保存の口は引き出しの中だけで、開くたびに空から始まり、閉じると入力を破棄する（入力中は題に * が付く）。',
-  'app/reminders/basics-form-v8.tsx':
-    'リマインダを作る画面（app/reminders/new/new-v8.tsx・番兵あり）の中の①基本の欄。保存の口に見えるのはフォルダを選ぶ欄からその場でフォルダを作る口（dLffh）だけで、入力の保存は親の画面の番兵が見張る',
   'v8/reminders/basics-form.tsx':
     'リマインダの作る・直す画面（v8/reminders/edit.tsx・番兵あり）の中の①基本の欄。保存の口に見えるのはフォルダを選ぶ欄からその場でフォルダを作る口（dLffh）だけで、入力の保存は親の画面の番兵が見張る',
   'app/hq/account-browser-v8.tsx': 'タグ名だけの小さな窓。保存の口は窓内だけにあり、閉じると入力を破棄する。',
@@ -263,8 +260,6 @@ const EXEMPTIONS: Record<string, string> = {
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/nen-campaigns/nen-overview.tsx':
     '紹介文の下書きは大きな一覧コンポーネント内のローカル状態。親の番兵へ載せるには報告口が要るため別途検討',
-  'app/reminders/detail/detail-v8.tsx':
-    '登録者の基準日は行内の小さな編集で「基準日を保存」で確定する。detail/page.tsx の registrants-panel（番兵なし）と同じ画面の★V8版のため、同じ扱いでここに置く',
   'app/scenarios/mode/page.tsx':
     '★V7: 方式選択はラジオの即時確定で未保存を持たない。名前・フォルダ欄は新規時は確定時に同送、既存時は欄内の保存で確定する小さな操作のため番兵を付けない',
   'app/staff/page.tsx':
