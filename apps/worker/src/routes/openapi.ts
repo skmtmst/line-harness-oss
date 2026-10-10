@@ -1,3 +1,4 @@
+import { restaurantFollowupPaths } from './restaurant-followup-openapi.js';
 import { reservationBoardPaths } from './reservation-board-openapi.js';
 import { archiveRestorePaths } from './archive-restore-openapi.js';
 import { formDocumentPaths } from './form-documents-openapi.js';
@@ -409,6 +410,7 @@ const spec = {
   paths: {
     ...pagesParityPaths,
     ...reservationBoardPaths,
+    ...restaurantFollowupPaths,
     ...folderUpgradePaths,
     ...archiveRestorePaths,
     ...formDocumentPaths,

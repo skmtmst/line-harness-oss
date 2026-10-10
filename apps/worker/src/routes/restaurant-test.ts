@@ -1,3 +1,5 @@
+import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
+import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
 import { restaurantRotation } from '../services/restaurant-rotation.js';
 import { processRestaurantEvents } from '../services/restaurant-events.js';
 import { setRestaurantAttendance, type AttendanceInput } from '../services/restaurant-attendance.js';
@@ -70,13 +72,14 @@ restaurantTest.use('/api/restaurant-test/*', async (c,next) => {
  await next();
  if(!['POST','PUT','PATCH','DELETE'].includes(c.req.method)||!c.res.ok||c.req.path.endsWith('/closures/preview'))return;
  await processVisitStampQueue(c.env);
- try{await processRestaurantEvents(c.env);}catch{console.error(JSON.stringify({event:"restaurant_event_dispatch_deferred"}));}
+ try{await processRestaurantEvents(c.env);await processScenarioSourceJobs(c.env);}catch{console.error(JSON.stringify({event:"restaurant_event_dispatch_deferred"}));}
  const organization=await organizationFor(c);if(!organization)return;
  const dirty=await dbFor(c.env).prepare(`SELECT q.store_id FROM rt_inventory_rule_queue q JOIN rt_stores s ON s.id=q.store_id
  WHERE s.organization_id=? AND (? IS NULL OR s.id=?) LIMIT 100`).bind(organization.id,organization.scopedStoreId,organization.scopedStoreId).all<{store_id:string}>();
  for(const row of dirty.results)try {await reconcileRestaurantInventory(c.env,row.store_id);}catch {console.error('飲食店の枠通知は次の定期処理で再試行します');}
 });
 restaurantTest.onError((error, c) => {
+  if (/followup_approval_version_conflict|edit_restaurant_followup_in_common_scenario/.test(String(error))) return c.json({success:false,error:'version_conflict',message:'共通シナリオの最新の版を読み直してください'},409);
   if (/departure_requires_visit|undo_departure_first/.test(String(error))) return c.json({success:false,error:'来店・退店の記録を確認してください'},409);
   if (String(error).includes('closure_conflict')) return c.json({ success: false, error: 'closure_conflict', code: 'closure_conflict', reason: '臨時休業・貸切の日時と卓に重なるため受付できません' }, 409);
   if (/(restaurant|customer)_table_conflict/.test(String(error))) return c.json({ success: false, error: '同じ卓に重なる予約または仮押さえがあります' }, 409);
@@ -1307,7 +1310,8 @@ restaurantTest.post('/api/restaurant-test/reservations/walk-in', requireRole('ow
   } finally {
     await releaseLock(dbFor(c.env, storeId), lockKey, lockOwner);
   }
-  return c.json({ success: true, data: { ...saved, status: 'visited', source: 'walk_in', startsAt: checked.value.startsAt, endsAt: checked.value.endsAt } }, 201);
+  const lineNotice = body.notifyLine === true ? await sendRestaurantLineConfirmation(c,{reservationId:saved.id,storeId,tenantId:organization.tenant_id??DEFAULT_TENANT_ID,lineUid:checked.value.lineUid??null,startsAt:checked.value.startsAt,endsAt:checked.value.endsAt,guestCount:checked.value.guestCount,courseId:checked.value.courseId??null,status:'visited'}) : {sent:false,reason:'not_requested'};
+  return c.json({ success: true, data: { ...saved, status: 'visited', source: 'walk_in', startsAt: checked.value.startsAt, endsAt: checked.value.endsAt,lineNotice } }, 201);
 });
 
 /**
@@ -2218,10 +2222,97 @@ restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('ow
   return c.json({ success: true, data: { id: c.req.param('id'), sent: false } });
 });
 
+restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner','admin','staff'),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),storeId=c.req.param('storeId');
+ if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
+ const db=dbFor(c.env,storeId);
+ const template=await db.prepare('SELECT * FROM rt_store_followup_templates WHERE store_id=?').bind(storeId).first();
+ if(!template)return c.json({success:false,error:'not_found'},404);
+ const bindings=(await db.prepare('SELECT * FROM rt_store_followup_step_bindings WHERE store_id=? ORDER BY trigger,step_id').bind(storeId).all()).results;
+ const jobs=(await db.prepare(`SELECT j.* FROM scenario_source_jobs j JOIN rt_reservation_events e ON e.id=j.source_event_id WHERE e.store_id=? ORDER BY j.scheduled_at DESC LIMIT 100`).bind(storeId).all()).results;
+ return c.json({success:true,data:{template,bindings,jobs,editor:'common_scenario'}});
+});
+
+const updateRestaurantFollowupBinding=async(c:Context<Env>)=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),storeId=c.req.param('storeId')??'';
+ if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
+ const b=await c.req.json<{expectedVersion?:number;trigger?:string;offsetMinutes?:number;enabled?:boolean}>().catch(()=>null);
+ if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited'].includes(b.trigger??'')||!Number.isSafeInteger(b.offsetMinutes)||Math.abs(Number(b.offsetMinutes))>525600||typeof b.enabled!=='boolean')return inputError(c,{success:false,error:'invalid_binding'},400,['expectedVersion','trigger','offsetMinutes','enabled']);
+ if((['reservation_24h','reservation_2h'].includes(b.trigger!)&&Number(b.offsetMinutes)>=0)||(['reservation_created','post_visit','review_request','waitlist_invited'].includes(b.trigger!)&&Number(b.offsetMinutes)<0))return inputError(c,{success:false,error:'invalid_timing'},400,['offsetMinutes']);
+ const changed=await dbFor(c.env,storeId).prepare(`INSERT INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled)
+  SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_store_followup_templates t JOIN scenario_steps step ON step.scenario_id=t.scenario_id
+   WHERE t.store_id=? AND t.template_version=? AND step.id=?)
+  AND (?='POST' OR EXISTS(SELECT 1 FROM rt_store_followup_step_bindings WHERE store_id=? AND trigger=? AND step_id=?))
+  ON CONFLICT(store_id,trigger,step_id) DO UPDATE SET offset_minutes=excluded.offset_minutes,enabled=excluded.enabled,version=version+1`)
+  .bind(storeId,b.trigger,c.req.param('stepId'),b.offsetMinutes,b.enabled?1:0,storeId,b.expectedVersion,c.req.param('stepId'),c.req.method,storeId,b.trigger,c.req.param('stepId')).run();
+ return changed.meta.changes?c.json({success:true,data:{stopped:true}}):c.json({success:false,error:'version_conflict'},409);
+};
+restaurantTest.post('/api/restaurant-test/followups/:storeId/bindings/:stepId',requireRole('owner','admin'),inputJsonBoundary(),updateRestaurantFollowupBinding);
+restaurantTest.patch('/api/restaurant-test/followups/:storeId/bindings/:stepId',requireRole('owner','admin'),inputJsonBoundary(),updateRestaurantFollowupBinding);
+
+restaurantTest.delete('/api/restaurant-test/followups/:storeId/bindings/:stepId',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),storeId=c.req.param('storeId');
+ if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
+ const b=await c.req.json<{expectedVersion?:number;trigger?:string}>().catch(()=>null);
+ if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||typeof b.trigger!=='string')return inputError(c,{success:false,error:'invalid_binding'},400,['expectedVersion','trigger']);
+ const changed=await dbFor(c.env,storeId).prepare(`DELETE FROM rt_store_followup_step_bindings WHERE store_id=? AND trigger=? AND step_id=?
+  AND EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE store_id=? AND template_version=?)`)
+  .bind(storeId,b.trigger,c.req.param('stepId'),storeId,b.expectedVersion).run();
+ return changed.meta.changes?c.json({success:true,data:{stopped:true}}):c.json({success:false,error:'version_conflict'},409);
+});
+
+restaurantTest.post('/api/restaurant-test/followups/:storeId/request-start',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),storeId=c.req.param('storeId');
+ if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
+ const b=await c.req.json<{expectedVersion?:number}>().catch(()=>null);
+ if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1)return inputError(c,{success:false,error:'expected_version_required'},400,['expectedVersion']);
+ const result=await requestRestaurantFollowupApproval(dbFor(c.env,storeId),storeId,b.expectedVersion!,c.get('staff')?.id??'');
+ return result?c.json({success:true,data:{approvalId:result.id,sendingStatus:'pending'}},201):c.json({success:false,error:'version_or_publication_conflict'},409);
+});
+
+restaurantTest.post('/api/restaurant-test/followups/:storeId/stop',requireRole('owner','admin'),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),storeId=c.req.param('storeId');
+ if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
+ await dbFor(c.env,storeId).prepare("UPDATE rt_store_followup_templates SET sending_status='stopped',approval_id=NULL,approved_version_id=NULL,template_version=template_version+1 WHERE store_id=?").bind(storeId).run();
+ return c.json({success:true,data:{sendingStatus:'stopped'}});
+});
+
+restaurantTest.get('/api/restaurant-test/reservations/:id/confirmations',requireRole('owner','admin','staff'),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c);
+ if(!org)return c.json({success:false,error:'not_found'},404);
+ const db=dbFor(c.env);
+ const reservation=await db.prepare('SELECT r.id,r.customer_version FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id WHERE r.id=? AND s.organization_id=? AND (? IS NULL OR s.id=?)').bind(c.req.param('id'),org.id,org.scopedStoreId,org.scopedStoreId).first<{id:string;customer_version:number}>();
+ if(!reservation)return c.json({success:false,error:'not_found'},404);
+ const data=(await db.prepare('SELECT *,reservation_version=? AS is_current FROM rt_reservation_confirmations WHERE reservation_id=? ORDER BY requested_at DESC').bind(reservation.customer_version,reservation.id).all()).results;
+ return c.json({success:true,data});
+});
+
+restaurantTest.get('/api/restaurant-test/followups/:storeId/review-history',requireRole('owner','admin','staff'),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c),storeId=c.req.param('storeId');
+ if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
+ const rows=await dbFor(c.env,storeId).prepare(`SELECT j.id source_job_id,j.source_id reservation_id,j.status,j.scheduled_at,j.message_log_id,
+  log.created_at sent_at,log.content FROM scenario_source_jobs j
+  JOIN rt_reservation_events e ON e.id=j.source_event_id AND e.store_id=?
+  JOIN scenario_versions v ON v.id=j.scenario_version_id
+  LEFT JOIN messages_log log ON log.id=j.message_log_id
+  WHERE EXISTS(SELECT 1 FROM json_each(v.steps_snapshot) st WHERE json_extract(st.value,'$.version_step_id')=j.step_id
+    AND EXISTS(SELECT 1 FROM rt_approval_requests a,json_each(a.payload_json,'$.bindings') binding WHERE a.store_id=e.store_id AND json_extract(a.payload_json,'$.scenarioVersionId')=j.scenario_version_id AND json_extract(binding.value,'$.trigger')='review_request' AND json_extract(binding.value,'$.step_id')=json_extract(st.value,'$.live_step_id'))) ORDER BY j.scheduled_at DESC LIMIT 100`).bind(storeId).all();
+ return c.json({success:true,data:{invitations:rows.results,origin:'line_invitation',verifiedGoogleReviewAttributions:[],reviewSelection:'all_customers'}});
+});
+
 restaurantTest.put('/api/restaurant-test/line-flows/:id', requireRole('owner', 'admin'), inputJsonBoundary({"title":["string"],"body":["string"],"timingMinutes":["null","number"],"isEnabled":["boolean"]}), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const managed=await dbFor(c.env).prepare(`SELECT t.scenario_id FROM rt_store_followup_templates t JOIN rt_line_flows f ON f.store_id=t.store_id WHERE f.id=? AND f.organization_id=? AND (? IS NULL OR f.store_id=?)`).bind(c.req.param('id'),organization.id,organization.scopedStoreId,organization.scopedStoreId).first<{scenario_id:string}>();
+  if(managed)return c.json({success:false,error:'common_scenario_editor_required',data:{scenarioId:managed.scenario_id}},409);
   const body = await c.req.json<{ title?: string; body?: string; timingMinutes?: number | null; isEnabled?: boolean }>();
   if (!body.title?.trim() || !body.body?.trim()) return inputError(c, { success: false, error: 'タイトルと本文が必要です' }, 400, ["title","body"]);
   const result = await dbFor(c.env).prepare(`UPDATE rt_line_flows SET title = ?, body = ?, timing_minutes = ?, is_enabled = ?,
@@ -2663,4 +2754,16 @@ restaurantTest.get('/api/restaurant-test/rotation',requireRole('owner','admin','
  if(!store)return c.json({success:false,error:'店舗がありません'},404);
  if(!validRestaurantDate(date))return inputError(c,{success:false,error:'日付を確認してください'},400,['date']);
  return c.json({success:true,data:await restaurantRotation(dbFor(c.env,storeId),storeId,date)});
+});
+
+restaurantTest.get('/api/restaurant-test/reservations/:id',requireRole('owner','admin','staff'),async c=>{
+ if(!hasOrganizationSelector(c))return requiredAccount(c);
+ const org=await organizationFor(c);if(!org)return c.json({success:false,error:'not_found'},404);
+ const row=await dbFor(c.env).prepare(`SELECT r.*,m.name course_name FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
+  LEFT JOIN rt_menu_items m ON m.id=r.course_id AND m.store_id=r.store_id
+  WHERE r.id=? AND s.organization_id=? AND (? IS NULL OR s.id=?)`)
+  .bind(c.req.param('id'),org.id,org.scopedStoreId,org.scopedStoreId).first<Record<string,unknown>>();
+ if(!row)return c.json({success:false,error:'not_found'},404);
+ const entry=seatBoardEntry(row);
+ return c.json({success:true,data:{reservation:entry,courseAllergens:entry.dining?.courseAllergens??null,allergensSource:'registered_at_booking'}});
 });

@@ -1,3 +1,4 @@
+import { processScenarioSourceJobs } from './services/scenario-source-jobs.js';
 import { formDocuments } from './routes/form-documents.js';
 import { purgeExpiredFormDocuments } from './services/form-documents.js';
 import { autoReplyUnmatched } from './routes/auto-reply-unmatched.js';
@@ -1728,6 +1729,7 @@ async function runFrequentHeavyJobs(
     },
     { name: 'visit stamps', run: () => processVisitStampQueue(env) },
     { name: 'restaurant events', run: () => processRestaurantEvents(env) },
+    { name: 'restaurant followup jobs', run: async () => { await processScenarioSourceJobs(env); } },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',
