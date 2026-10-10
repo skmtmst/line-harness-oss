@@ -12,7 +12,6 @@
  * 読み書き（一覧・分類・複製・削除・配る）は呼ぶ側（console.tsx）が今までどおり持つ。ここは見せ方と押した知らせだけ。
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   CircleDashed, ClipboardList, Copy, FileText, GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, Inbox, Link2,
   MessageSquare, Pencil, Plus, Send, Sparkles, Ticket, Trash2, Unlink, Users,
@@ -141,7 +140,6 @@ export interface HqStoreListProps {
 }
 
 export default function HqStoreList(props: HqStoreListProps) {
-  const router = useRouter()
   const {
     type, rows, ready, busy, canEdit, accountTotal, stats, kind, kindCounts, onKindChange, folders, folderLoadFailed, folderFilter, onFolderFilter,
     onAddFolder, onRenameFolder, onDeleteFolder, onReloadFolders, onCreate, onEdit, onOpen, onDistribute, onDistributeFolder, folderContents, onDuplicate, onRemove, notices, overlays,
@@ -525,14 +523,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       headingSize="regular"
       title={words.title}
       description={words.description}
-      tabs={<>
-        <div className={hqStyles.deliveryTabs} aria-label="統括で配る設定">
-          {([['/hq/templates', 'template', 'メッセージなど'], ['/hq/templates?type=auto_reply', 'auto_reply', '自動応答'], ['/hq/templates?type=friend_add_rule', 'friend_add_rule', '友だち追加時'], ['/hq/templates?type=reminder', 'reminder', 'リマインダ']] as const).map(([href, key, label]) => (
-            <Button key={href} aria-current={key === (type === 'template' ? 'template' : '') ? 'page' : undefined} onClick={() => router.push(href)}>{label}</Button>
-          ))}
-        </div>
-        {type === 'tag' ? <AttributeTabs tab={attribute.tab} onSelect={(key) => { attribute.select(key); setPage(1) }} /> : tabs}
-      </>}
+      tabs={type === 'tag' ? <AttributeTabs tab={attribute.tab} onSelect={(key) => { attribute.select(key); setPage(1) }} /> : tabs}
       stats={(
         <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
           {bandKpis.map((kpi) => (
