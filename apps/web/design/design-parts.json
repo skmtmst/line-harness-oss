@@ -3829,6 +3829,46 @@
           "resolved": "#087a3e"
         }
       ]
+    },
+    "read-only-notice": {
+      "name": "B-172 read-only-notice",
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "investigating",
+      "code": "src/components/shared/read-only-notice.tsx",
+      "cssModule": "src/components/shared/read-only-notice.module.css",
+      "components": [
+        "ReadOnlyNotice"
+      ],
+      "pencilNodes": [],
+      "declarations": [],
+      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。"
+    },
+    "page-size-select": {
+      "name": "B-172 page-size-select",
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "investigating",
+      "code": "src/components/shared/page-size-select.tsx",
+      "components": [
+        "PageSizeSelect"
+      ],
+      "pencilNodes": [],
+      "declarations": [],
+      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。"
+    },
+    "account-required-state": {
+      "name": "B-172 account-required-state",
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "investigating",
+      "code": "src/components/shared/account-required-state.tsx",
+      "components": [
+        "AccountRequiredState"
+      ],
+      "pencilNodes": [],
+      "declarations": [],
+      "note": "既存の共通部品またはV8変数へ委譲。Pen照合は別記の報告を参照。"
     }
   },
   "investigations": {

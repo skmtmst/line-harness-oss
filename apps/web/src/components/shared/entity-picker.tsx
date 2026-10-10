@@ -156,7 +156,7 @@ export function EntityPickerDialog({
   >
     <div ref={panelRef} className={shell.body}>
       {hasFolders && !narrow ? <div className={shell.folders}>
-        <FolderPanel readOnly disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
+        <FolderPanel readOnly reserveCreateSpace={false} disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
       </div> : null}
       <section className={shell.list} aria-label="候補の一覧">
         {hasFolders && narrow ? <Select disabled={busy || listState} aria-label="候補のフォルダ" value={folder} onChange={setFolder} options={folderOptions} /> : null}
@@ -250,7 +250,7 @@ export function EntityMultiSelect({ items, folders = [], foldersFailed = false, 
   const rows = items.filter((item) => inFolder(item, folder) && matches(item, query) && (!onlySelected || set.has(item.id)))
   return <div ref={panelRef} className={embedded ? `${shell.body} ${styles.embedded}` : shell.body}>
     {hasFolders && !narrow ? <div className={shell.folders}>
-      <FolderPanel readOnly heading={folderHeading} disabled={busy || Boolean(state)} rows={folderRows} activeId={folder} onSelect={setFolder} />
+      <FolderPanel readOnly reserveCreateSpace={false} heading={folderHeading} disabled={busy || Boolean(state)} rows={folderRows} activeId={folder} onSelect={setFolder} />
     </div> : null}
     <section className={`${shell.list} ${styles.multiList}`} aria-label={listLabel}>
       {searchSlot}

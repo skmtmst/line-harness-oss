@@ -9,6 +9,7 @@ import { ArrowDown, ArrowUp, Ellipsis, FolderOpen, FolderPlus, Inbox, Palette, P
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { RowMenu } from './row-actions'
 import styles from './folder-panel.module.css'
+import noteStyles from './managed-folder-panel.module.css'
 
 /** テンプレート一覧を正とする、全画面共通のフォルダ欄幅。 */
 export const FOLDER_RAIL_WIDTH = '15.75rem'
@@ -146,7 +147,7 @@ export default function FolderPanel({
   addFolderNote,
   children,
   createAction,
-  reserveCreateSpace = false,
+  reserveCreateSpace = true,
   readOnly = false,
   disabled = false,
 }: {
@@ -192,7 +193,7 @@ export default function FolderPanel({
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}>
-      {!readOnly && createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : !readOnly && reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
+      {!readOnly && createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
       {showHeading ? <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
         {headingHelp ? <p className="v7:text-ink v7:text-sm font-semibold">{heading}<HelpTip label={`${heading}の説明`}>{headingHelp}</HelpTip></p>
           : <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>}
@@ -317,6 +318,11 @@ export default function FolderPanel({
       )}
     </aside>
   )
+}
+
+/** フォルダを消した後の案内。文字の形も列の持ち主へ寄せる。 */
+export function FolderPanelNote({ itemLabel, children }: { itemLabel?: string; children?: ReactNode }) {
+  return <p className={noteStyles.note}>{children ?? `フォルダを消しても、中の${itemLabel}は未分類に残ります`}</p>
 }
 
 /** フォルダ列を畳んだときも、追加操作を同じメニューへ残す。 */

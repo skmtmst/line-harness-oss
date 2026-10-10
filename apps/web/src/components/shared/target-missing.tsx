@@ -64,6 +64,8 @@ export type TargetMissingProps = {
   error?: unknown
   /** 読み直している間。二度押しを止める。 */
   retrying?: boolean
+  /** 既存の再試行や権限確認の操作。渡したときは既定の再試行と重ねない。 */
+  action?: ReactNode
   /**
    * いまの LINE アカウント名（`not-found` のみ・任意）。
    * 渡すと説明のあとに「いまの LINE アカウントは「◯◯」です。」を足す
@@ -82,6 +84,7 @@ export default function TargetMissing({
   onRetry,
   error,
   retrying = false,
+  action: suppliedAction,
   accountName,
 }: TargetMissingProps) {
   const Icon = ICONS[kind]
@@ -121,6 +124,8 @@ export default function TargetMissing({
     )
   }
 
+  const finalAction = suppliedAction !== undefined ? suppliedAction : action
+
   return (
     <div
       className={styles.root}
@@ -136,7 +141,7 @@ export default function TargetMissing({
         {failure && !failure.retryable ? failure.description : description}
         {accountLine ? <span> {accountLine}</span> : null}
       </p>
-      {action ? <div className={styles.action}>{action}</div> : null}
+      {finalAction ? <div className={styles.action}>{finalAction}</div> : null}
     </div>
   )
 }

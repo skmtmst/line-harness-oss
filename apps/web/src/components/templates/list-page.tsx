@@ -4,6 +4,7 @@ import Select from '@/components/shared/select'
 import HelpTip from '@/components/shared/help-tip'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /**
  * 左の列（フォルダ・タグ・設定のメニュー）を、白い板が狭いとき（1100 未満）に
@@ -23,6 +24,7 @@ export interface ListFolderNav {
   width?: number
 }
 export interface ListPageBodyProps {
+  readOnly?: boolean
   stats?: ReactNode
   folders?: ReactNode
   /** 狭い板でも同じフォルダ選択・作る操作へ到達できる口。渡すと folderNav より優先する。 */
@@ -55,10 +57,11 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, listHelp, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, listHelp, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
   const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
   return <div className={styles.listBody} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
+    {readOnly ? <ReadOnlyNotice /> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
       {folders ? <aside className={styles.folders} data-template-region="folders" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}

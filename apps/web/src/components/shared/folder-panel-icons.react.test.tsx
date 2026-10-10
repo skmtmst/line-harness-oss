@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React, { act } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FolderPanel, { CollapsedFolderActions, type FolderPanelRow } from './folder-panel'
@@ -121,6 +121,7 @@ describe('選ぶだけのフォルダ列', () => {
       createAction={<button onClick={mutate}>作る</button>} reserveCreateSpace>
       <button onClick={mutate}>追加操作</button>
     </FolderPanel>))
+    expect(host.querySelector('[aria-hidden="true"].v8-only')).not.toBeNull()
     const buttons = host.querySelectorAll('button')
     expect(buttons).toHaveLength(1)
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true')
