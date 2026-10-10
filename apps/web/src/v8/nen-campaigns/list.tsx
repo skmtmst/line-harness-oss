@@ -345,7 +345,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
 
   const menuFor = (setting: NenCampaignSetting): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
-    if (canEdit) items.push({ id: 'edit', label: '編集', external: true, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
+    if (canEdit) items.push({ id: 'edit', label: '編集', external: false, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
     items.push({ id: 'preview', label: '中身を見る', onSelect: () => props.onPreviewCampaign(setting.campaignKey) })
     if (canEdit) {
       items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
@@ -428,7 +428,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
                 const timing = formatCampaignTiming(setting)
                 const audience = formatCampaignAudience(setting)
                 return (
-                  <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns">
+                  <Tr key={setting.campaignKey} className={styles.row} data-table-layout="columns" onOpen={() => props.onPreviewCampaign(setting.campaignKey)}>
                     <Td className={styles.colName}>
                       {canEdit ? (
                         <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className={styles.name} title={setting.label}>{setting.label}</Link>
@@ -735,7 +735,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                 const views = metric?.articleOpened.value
                 const draft = column.publishedAt == null
                 return (
-                  <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id}>
+                  <Tr key={column.id} className={styles.row} data-table-layout="columns" selected={props.selectedColumnId === column.id} onOpen={() => props.onSelectColumn(column.id)}>
                     <Td className={styles.colName}>
                       <span className={styles.nameStack}>
                         <button type="button" className={styles.name} title={column.title} onClick={() => props.onSelectColumn(column.id)}>{column.title}</button>

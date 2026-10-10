@@ -1,6 +1,7 @@
 'use client'
 
 
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
@@ -21,7 +22,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
  * まとめての帯（止める・再開・フォルダへ移す）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
-import { useCallback, useDeferredValue, useEffect, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useState, useRef } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -68,7 +69,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
@@ -83,6 +84,7 @@ import { completeReorder } from '@/lib/complete-reorder'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import { formatTriggerOffset } from './reminder-timing'
 import styles from './list-v8.module.css'
+import { notifyToast } from '@/components/shared/toast'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -186,6 +188,7 @@ export default function RemindersListV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const role = useStaffRole()
   const canEdit = canManageRole(role)
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
@@ -207,7 +210,7 @@ export default function RemindersListV8() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('reminder')
   const [actionError, setActionError] = useState('')
   const [foldersError, setFoldersError] = useState(false)
 
@@ -223,9 +226,9 @@ export default function RemindersListV8() {
   const [deleteError, setDeleteError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-  const [duplicateTarget, setDuplicateTarget] = useState<ReminderRow | null>(null)
+  const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError = (message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   const [moveNotice, setMoveNotice] = useState('')
 
   const loadFolders = useCallback(async () => {
@@ -428,8 +431,10 @@ export default function RemindersListV8() {
 
   /* ===== 複製（下書きとして写す） ===== */
 
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: ReminderRow) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
+    duplicateLock.current = true
     setDuplicating(true)
     setDuplicateError('')
     try {
@@ -442,13 +447,15 @@ export default function RemindersListV8() {
       })
       if (!res.success) throw new Error(res.error)
       const newId = String(res.data.reminderId)
-      setDuplicateTarget(null)
+
+      notifyToast('複製しました', { tone: 'success' })
       reminderList.retry()
-      router.push(`/reminders/edit?id=${encodeURIComponent(newId)}&stage=target`)
+      duplicateFeedback.mark(duplicateTarget.id, newId)
     } catch {
       setDuplicateError('複製できませんでした。通信を確かめて、もう一度お試しください。')
       reminderList.retry()
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
@@ -692,7 +699,7 @@ export default function RemindersListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const panelIndex = panelId === null ? -1 : reminders.findIndex((row) => row.id === panelId)
@@ -727,7 +734,7 @@ export default function RemindersListV8() {
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => {
           setDuplicateError('')
-          setDuplicateTarget(row)
+          void runDuplicate(row)
         },
       },
       status === 'active'
@@ -883,8 +890,8 @@ export default function RemindersListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody reorderKey={reorder.shown.map((row) => row.id).join(',')}>
-              {reorder.shown.map((row) => {
+            <RovingTbody reorderKey={duplicateFeedback.order(reorder.shown, reminders).map((row) => row.id).join(',')}>
+              {duplicateFeedback.order(reorder.shown, reminders).map((row) => {
                 const view = rowView(row)
                 const planned =
                   view.status === 'draft' || view.status === 'stopped'
@@ -896,7 +903,7 @@ export default function RemindersListV8() {
                   view.status === 'active' ? formatNextSend(row.nextScheduledAt) : '—'
                 return (
                   <Tr interactive
-                    key={row.id}
+                    highlighted={duplicateFeedback.highlightedId === row.id} key={row.id}
                     {...reorder.rowProps(row.id)}
                     className={styles.rowClick}
                     tabIndex={0}
@@ -1060,7 +1067,7 @@ export default function RemindersListV8() {
                           variant="secondary"
                           onClick={() => {
                             setDuplicateError('')
-                            setDuplicateTarget(panelRow)
+                            void runDuplicate(panelRow)
                             setPanelId(null)
                           }}
                         >
@@ -1256,20 +1263,7 @@ export default function RemindersListV8() {
       />
 
       {/* 複製の窓。下書きとして写し、確認してから有効にする。 */}
-      <ConfirmDialog
-        open={duplicateTarget !== null}
-        title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : ''}
-        description="設定と通知の中身を写して、新しいリマインダを「下書き」で作ります。登録者と送信履歴は写りません。作ったあとは確認してから有効にしてください。"
-        confirmLabel={duplicating ? '複製中…' : '複製する'}
-        busy={duplicating}
-        error={duplicateError}
-        onConfirm={() => void runDuplicate()}
-        onCancel={() => {
-          if (duplicating) return
-          setDuplicateTarget(null)
-          setDuplicateError('')
-        }}
-      />
+      <></>
 
       {/* フォルダ移動の窓。1件でも複数件でも同じ形。 */}
       <ConfirmDialog

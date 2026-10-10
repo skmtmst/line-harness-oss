@@ -449,7 +449,7 @@ function Responses() {
     <DetailPage
       boardId={view === 'summary' ? 'v0SbYR' : 'MKQyJ'}
       tabSpacing="compact"
-      identity={<Link href="/form-submissions" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />回答フォームへ</Link>}
+      identity={<></>}
       title={`集まった回答：${form.name}`}
       description={headLine}
       tabs={(

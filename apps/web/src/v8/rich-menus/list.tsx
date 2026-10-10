@@ -79,6 +79,8 @@ import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import { richMenuError, richMenuErrorAll } from './errors'
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog'
 import styles from './list.module.css'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { notifyToast } from '@/components/shared/toast'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
@@ -261,9 +263,10 @@ export default function RichMenusListV8() {
   const [importedMenuName, setImportedMenuName] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [duplicateTarget, setDuplicateTarget] = useState<RichMenuGroupListItem | null>(null)
+  const duplicateLock = useRef(false)
+  const duplicateFeedback = useDuplicateFeedback(selectedAccount?.id)
   const [duplicateBusy, setDuplicateBusy] = useState(false)
-  const [duplicateError, setDuplicateError] = useState<string | null>(null)
+  const setDuplicateError = (message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   const [reorderBusy, setReorderBusy] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [moveNotice, setMoveNotice] = useState('')
@@ -302,7 +305,7 @@ export default function RichMenusListV8() {
     setImportedMenuName(null)
     setDeleteBusy(false)
     setDeleteError(null)
-    setDuplicateTarget(null)
+
     setDuplicateBusy(false)
     setDuplicateError(null)
     setTagNameById(new Map())
@@ -488,6 +491,7 @@ export default function RichMenusListV8() {
   /* 押した瞬間に並べ、裏で保存する。失敗したら元に戻し「もう一度」でやり直せる。 */
   const applyOrderedIds = useCallback((orderedIds: string[], notice: string) => {
     if (!selectedAccount?.id || reorderBusy) return
+    duplicateFeedback.clear()
     const accountId = selectedAccount.id
     const fullView = groups.length === groupTotal && orderedIds.length === groups.length
     const previous = groups
@@ -532,7 +536,7 @@ export default function RichMenusListV8() {
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
   const liveOrder = useLiveReorder(groups, (g) => g.id, dragId)
   const bodyRef = useRef<HTMLTableSectionElement>(null)
-  useFlipRows(bodyRef, liveOrder.shown.map((g) => g.id).join(','))
+  useFlipRows(bodyRef, duplicateFeedback.order(liveOrder.shown).map((g) => g.id).join(','))
 
   const dropOn = useCallback(async (targetId: string) => {
     const dragging = dragId
@@ -603,18 +607,23 @@ export default function RichMenusListV8() {
     setImpactPhase('idle')
   }
 
-  async function confirmDuplicate() {
+  async function confirmDuplicate(duplicateTarget: RichMenuGroupListItem) {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicateBusy) return
+    duplicateLock.current = true
     setDuplicateBusy(true)
     setDuplicateError(null)
     try {
       const res = await api.richMenuGroups.duplicate(duplicateTarget.id, crypto.randomUUID())
       if (!res.success) throw new ApiError(500, res.error ?? 'duplicate_failed')
-      setDuplicateTarget(null)
-      router.push(`/rich-menus/edit?id=${res.data.id}`)
+
+      notifyToast('複製しました', { tone: 'success' })
+      await reload()
+      duplicateFeedback.mark(duplicateTarget.id, res.data.id)
     } catch (e) {
       setDuplicateError(richMenuErrorAll(e, 'duplicate'))
     } finally {
+      duplicateLock.current = false
       setDuplicateBusy(false)
     }
   }
@@ -762,7 +771,7 @@ export default function RichMenusListV8() {
       label: '複製する',
       onSelect: () => {
         setDuplicateError(null)
-        setDuplicateTarget(g)
+        void confirmDuplicate(g)
       },
     })
     items.push({
@@ -1020,7 +1029,7 @@ export default function RichMenusListV8() {
           {tableCols}
           {tableHead}
           <tbody ref={bodyRef}>
-            {liveOrder.shown.map((g) => {
+            {duplicateFeedback.order(liveOrder.shown).map((g) => {
               const cells = thumbCells(g)
               const shape = menuShapeText(g)
               const audienceMain = audienceMainText(g, tagNameById)
@@ -1388,20 +1397,7 @@ export default function RichMenusListV8() {
           <ApplyToTagModal groupId={applyTo.id} groupName={applyTo.name} onClose={() => setApplyTo(null)} />
         ) : null}
 
-        <ConfirmDialog
-          open={duplicateTarget !== null}
-          title={duplicateTarget ? `「${duplicateTarget.name}」を複製しますか？` : 'リッチメニューを複製しますか？'}
-          description="名前・画像・ボタン・出し分けの設定を写した下書きを新しく作ります。LINE上の表示は変わりません。"
-          confirmLabel="下書きとして複製する"
-          busy={duplicateBusy}
-          error={duplicateError ?? undefined}
-          onCancel={() => {
-            if (duplicateBusy) return
-            setDuplicateTarget(null)
-            setDuplicateError(null)
-          }}
-          onConfirm={() => void confirmDuplicate()}
-        />
+        <></>
 
         <ConfirmDialog
           open={importTarget !== null}

@@ -883,7 +883,7 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
       label: menuItem.label,
       danger: menuItem.tone === 'danger',
       disabled: menuItem.disabled,
-      onSelect: () => menuItem.onSelect(),
+      onSelect: () => menuItem.onSelect?.(),
     }))
     : []
   return (

@@ -340,7 +340,7 @@ export default function RankSettingsV8({
                     {/* 行の右端は「…」（タグを開く・ランクを削除する）。1つの機能の印にしない。 */}
                     <RowActions
                       subjectName={`ランク「${label}」`}
-                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: true, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
+                      menuItems={row.tagId ? [{ id: 'tag', label: 'タグを開く', external: false, onSelect: () => router.push(`/tags/edit?id=${encodeURIComponent(row.tagId ?? '')}`) }] : []}
                       destructiveItem={readonly ? undefined : {
                         id: 'delete',
                         label: 'ランクを削除する',

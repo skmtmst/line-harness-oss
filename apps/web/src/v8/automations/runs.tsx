@@ -511,7 +511,7 @@ export default function AutomationRunsV8() {
                 const versionLine = `v${run.versionNumber}${run.isTest ? '・テスト' : ''}`
                 const menuLabel = `記録「${run.subject ?? '友だち名なし'}・${run.automationName}」の操作`
                 return (
-                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id}>
+                  <Tr key={run.id} className={styles.row} data-table-layout="columns" data-row-id={run.id} onOpen={() => setSelectedRun(run)}>
                     <Td className={styles.colWhen}>
                       <button type="button" className={styles.subject} onClick={() => setSelectedRun(run)}>
                         {run.subject ?? '友だち名なし'}
@@ -541,7 +541,7 @@ export default function AutomationRunsV8() {
                           label={menuLabel}
                           open={openMenuId === run.id}
                           onOpenChange={(next) => setOpenMenuId(next ? run.id : null)}
-                          items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>

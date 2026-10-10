@@ -724,7 +724,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         </>
       ) : (
         /* 閲覧のみ：変える操作（保存・次へ・有効にする）は置かない。 */
-        <Button href="/friend-add-settings">一覧へ戻る</Button>
+        <></>
       )}
     >
       {!canEdit ? (

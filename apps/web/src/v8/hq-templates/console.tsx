@@ -164,7 +164,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [result, setResult] = useState<DistributionResult | null>(null)
   const [pendingRun, setPendingRun] = useState<string | null>(null)
   /** 配った結果の窓（★V8-B dEvJM）。結果が出たら開く。閉じても同じ画面の進み具合と操作は残る。 */
-  const [resultDialogFor, setResultDialogFor] = useState<string | null>(null)
   const [requestBusy, setBusy] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
   const busy = requestBusy || uploadBusy
@@ -547,9 +546,6 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
 
-  useEffect(() => {
-    if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
-  }, [result])
   const reloadFolders = async () => setFolders(await hqTemplatesApi.folders.list())
   /* フォルダを選ぶ欄からその場で作る（dLffh）。左の列の「フォルダを追加」と同じ口。名前と色を保存する。 */
   const createFolder = async (folderName: string, color: string | null) => {
@@ -1007,9 +1003,21 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }
   const shortName = (accountName: string) => accountName.replace(/^然\s*-NEN-\s*/, '')
 
+  if (stage === 'result' && result && done) return (
+      <DistributionResultDialog
+        open
+        title={`配った結果：${detail?.template.name ?? ''}`}
+        tag={type === 'tag' ? { name, color: tagColor } : undefined}
+        summary={result ? `${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}` : ''}
+        rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
+        busy={busy} onClose={toList} onRefresh={refreshResult}
+        onRetry={() => checkStores(failures.map((store) => store.accountId))}
+      />
+  )
+
   return (
-    <PageFrame kind="wizard" boardId={stage === 'result' ? 'dEvJM' : 'meBRB'}>
-      <PageHeading title={type === 'tag' ? <>アカウントへ配る：<TagPill name={name} color={tagColor} /></> : pageTitle} help="1つのアカウントだけ、または複数のアカウントを選んで一括で配れます。一括設定のあと、必要な項目だけアカウントごとに変えられます。" />
+    <Dialog open designWidth={720} title={`アカウントへ配る：${name}`} busy={busy} onCancel={toList} footer={<></>}>
+      {type === 'tag' ? <TagPill name={name} color={tagColor} /> : null}
       {folderBatch ? <p className={styles.distributionNotice}>{`フォルダ「${folderBatch.name}」：${folderBatch.index + 1} / ${folderBatch.runs.length} 件目の配布方法を確かめています。すべて確かめてから配ります。`}</p> : null}
       {error || message ? <div className={styles.distributionNotice}>{notices}</div> : null}
       <ListPageBody
@@ -1140,16 +1148,8 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             {done && failures.length > 0 ? <Button variant="primary" disabled={busy} onClick={() => checkStores(failures.map((s) => s.accountId))}>{`失敗${failures.length}アカウントを再確認`}</Button> : null}
           </>}
         </div>
-      <DistributionResultDialog
-        open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
-        title={`配った結果：${detail?.template.name ?? ''}`}
-        tag={type === 'tag' ? { name, color: tagColor } : undefined}
-        summary={result ? `${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}` : ''}
-        rows={(result?.stores ?? []).map((store) => ({ key: store.accountId, name: store.accountName ?? accountName(accounts, store.accountId), store }))}
-        busy={busy} onClose={() => setResultDialogFor(null)}
-        onRetry={() => { setResultDialogFor(null); checkStores(failures.map((store) => store.accountId)) }}
-      />
-    </PageFrame>
+
+    </Dialog>
   )
 }
 

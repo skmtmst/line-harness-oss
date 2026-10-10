@@ -248,7 +248,7 @@ export default function AffiliateOfferCreateV8() {
   return (
     <CreatePage
       boardId="Td4TN"
-      identity={<Link href="/affiliates" className={styles.back}>← 成果とアフィリエイトへ</Link>}
+      identity={<></>}
       title="案件を作る"
       description="「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。"
       preview={preview}

@@ -320,11 +320,11 @@ export default function CommonActionsV8() {
                   ? `古い版 ${item.oldVersionBindingCount}`
                   : item.status === 'published' && item.draftVersion != null ? '下書きあり' : null
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id} href={versionsHref(item.id)}>
                     <Td className={styles.colName}>
                       {/* 名前の前にフォルダの丸（共通アクションはフォルダに入れないので未分類の輪）。説明は名前の頭にそろえる。 */}
                       <FolderDotName folder={null}>
-                        <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}>{item.name}</a>
+                        <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) { event.preventDefault(); router.push(versionsHref(item.id)) } }}>{item.name}</a>
                       </FolderDotName>
                       <span className={`${styles.sub} ${styles.subIndent}`} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
                     </Td>
@@ -348,7 +348,7 @@ export default function CommonActionsV8() {
                           open={openMenuId === item.id}
                           onOpenChange={(next) => setOpenMenuId(next ? item.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
-                          items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect() } }))}
+                          items={rowMenuItems(item).map((menuItem) => ({ ...menuItem, onSelect: () => { setOpenMenuId(null); menuItem.onSelect?.() } }))}
                         />
                       </div>
                     </Td>

@@ -223,7 +223,7 @@ export default function CsvMigrationsV8() {
                           {JOB_STATUS_LABELS[job.status] ?? '確認中'}
                         </span>
                         {downloadable ? (
-                          <a className={styles.link} href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}>CSVをダウンロード</a>
+                          <a className={styles.link}>CSVをダウンロード</a>
                         ) : null}
                       </span>
                     </Td>

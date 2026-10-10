@@ -164,7 +164,7 @@ function Connections() {
   const taps = group.monthlyStats?.taps ?? null
 
   const menuItems: ActionMenuItem[] = [
-    { id: 'open', label: 'メニューを開く', external: true, onSelect: () => router.push(editHref) },
+    { id: 'open', label: 'メニューを開く', external: false, onSelect: () => router.push(editHref) },
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
@@ -192,7 +192,7 @@ function Connections() {
       boardId="wxIQ7"
       title={`切替のつながり：${group.name}`}
       description="タブで行き来できるメニューの関係"
-      identity={<Link href="/rich-menus" className={styles.backLink}>← リッチメニューへ</Link>}
+      identity={<></>}
       preview={aside}
       footerActions={<>
         <Button href="/rich-menus">メニュー一覧へ</Button>

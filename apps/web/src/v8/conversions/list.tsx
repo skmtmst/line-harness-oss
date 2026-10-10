@@ -249,15 +249,15 @@ function ListSkeleton() {
   )
 }
 
-export default function ConversionListV8({ accountId }: { accountId: string | null }) {
+export default function ConversionListV8({ accountId, editId }: { accountId: string | null; editId?: string | null }) {
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <ConversionList accountId={accountId} />
+      <ConversionList accountId={accountId} editId={editId} />
     </Suspense>
   )
 }
 
-function ConversionList({ accountId }: { accountId: string | null }) {
+function ConversionList({ accountId, editId }: { accountId: string | null; editId?: string | null }) {
   usePageTitle('コンバージョン')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
@@ -431,7 +431,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     setIngestError('')
   }, [panelId, detailTarget])
 
-  const openEdit = (target: ConversionDefinitionListItem) => {
+  const beginEdit = (target: ConversionDefinitionListItem) => {
     if (!canEdit) return
     setDetailTarget(null)
     setEditTarget(target)
@@ -450,6 +450,12 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   }
 
   /* 編集を送る。開いたときの版をそのまま渡し、409 は上書きせずに読み直しを促す。 */
+  const openEdit = (target: ConversionDefinitionListItem) => router.push(`/conversions/edit?id=${encodeURIComponent(target.id)}`)
+  useEffect(() => {
+    const target = definitions?.items.find((item) => item.id === editId)
+    if (target) beginEdit(target)
+  }, [editId, definitions])
+
   const submitEdit = async () => {
     if (!editTarget || !editForm || editSaving || !canEdit) return
     const invalid = (field: string, message: string) => {
@@ -501,6 +507,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
       setEditForm(null)
       setEditValueModeNotice(null)
       await load()
+      if (editId !== undefined) router.push('/conversions')
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
       setEditError(message.includes('更新されています')
@@ -781,7 +788,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
     { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
     { id: 'usage', label: '使う場所を見る', onSelect: () => setPanelId(point.id) },
     ...(canEdit ? [
-      { id: 'add-usage', label: '使う場所を足す', external: true, onSelect: () => router.push(addUsageHref(point)) },
+      { id: 'add-usage', label: '使う場所を足す', external: false, onSelect: () => router.push(addUsageHref(point)) },
       ...(point.status !== 'stopped' ? [{ id: 'edit', label: '編集する', onSelect: () => openEdit(point) }] : []),
       ...(point.state === 'draft'
         ? [{ id: 'publish', label: '公開する', disabled: publishing, onSelect: () => void publishDraft(point) }]
@@ -1113,7 +1120,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
                           label={menuLabel}
                           open={openMenuId === point.id}
                           onOpenChange={(next) => setOpenMenuId(next ? point.id : null)}
-                          items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>
@@ -1141,6 +1148,35 @@ function ConversionList({ accountId }: { accountId: string | null }) {
   const reportUnavailable = listUnavailable || reportFailed
   const delta = kpi.previousCount === null ? null : kpi.currentCount - kpi.previousCount
 
+  const editSurface = (<ConversionEditDialog surface={editId !== undefined ? 'page' : 'dialog'}
+          editTarget={editTarget}
+          setEditTarget={(target) => { setEditTarget(target); if (!target && editId) router.push('/conversions') }}
+          editForm={editForm}
+          setEditForm={(next) => {
+            const changed = typeof next === 'function' ? next(editForm) : next
+            if (editFieldIssue && editForm && changed) {
+              const fieldKeys: Record<string, keyof EditForm> = {
+                'cv-edit-name': 'name', 'cv-edit-url': 'targetUrl', 'cv-edit-value-mode': 'valueMode',
+                'cv-edit-value': 'fixedValue', 'cv-edit-window': 'deduplicationWindowDays',
+                'cv-edit-days': 'attributionDays', 'cv-edit-memo': 'exclusionMemo', 'cv-edit-exclusion': 'exclusion',
+              }
+              const key = fieldKeys[editFieldIssue.field]
+              if (key && editForm[key] !== changed[key]) setEditFieldIssue(null)
+            }
+            setEditForm(changed)
+          }}
+          editValueModeNotice={editValueModeNotice}
+          setEditValueModeNotice={setEditValueModeNotice}
+          editSaving={editSaving}
+          editError={editError}
+          editFieldIssue={editFieldIssue}
+          submitEdit={() => void submitEdit()}
+        />)
+  if (editId !== undefined) {
+    if (loading) return <ListState kind="loading" />
+    if (!canEdit || !editTarget) return <ListState kind="error" title="この成果地点を編集できません" description="権限と成果地点を確認してください。" />
+    return editSurface
+  }
   return (
     <ListPage
       help={canEdit
@@ -1261,30 +1297,7 @@ function ConversionList({ accountId }: { accountId: string | null }) {
           setReversalReason={setReversalReason}
           submitReversal={() => void submitReversal()}
         />
-        <ConversionEditDialog
-          editTarget={editTarget}
-          setEditTarget={setEditTarget}
-          editForm={editForm}
-          setEditForm={(next) => {
-            const changed = typeof next === 'function' ? next(editForm) : next
-            if (editFieldIssue && editForm && changed) {
-              const fieldKeys: Record<string, keyof EditForm> = {
-                'cv-edit-name': 'name', 'cv-edit-url': 'targetUrl', 'cv-edit-value-mode': 'valueMode',
-                'cv-edit-value': 'fixedValue', 'cv-edit-window': 'deduplicationWindowDays',
-                'cv-edit-days': 'attributionDays', 'cv-edit-memo': 'exclusionMemo', 'cv-edit-exclusion': 'exclusion',
-              }
-              const key = fieldKeys[editFieldIssue.field]
-              if (key && editForm[key] !== changed[key]) setEditFieldIssue(null)
-            }
-            setEditForm(changed)
-          }}
-          editValueModeNotice={editValueModeNotice}
-          setEditValueModeNotice={setEditValueModeNotice}
-          editSaving={editSaving}
-          editError={editError}
-          editFieldIssue={editFieldIssue}
-          submitEdit={() => void submitEdit()}
-        />
+        {editSurface}
       </>}
     >
       {listBody}

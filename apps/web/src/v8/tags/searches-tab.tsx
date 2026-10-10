@@ -251,9 +251,9 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
     const list: ActionMenuItem[] = []
     const index = filteredList.findIndex((item) => item.id === search.id)
     if (search.lineAccountId) {
-      list.push({ id: 'open', label: '友だち一覧へ', external: true, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
+      list.push({ id: 'open', label: '友だち一覧へ', external: false, onSelect: () => router.push(`/friends?savedSearch=${search.id}`) })
       if (canEdit) {
-        list.push({ id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
+        list.push({ id: 'edit', label: '編集', external: false, onSelect: () => router.push(`/tags/searches/edit?id=${encodeURIComponent(search.id)}`) })
         list.push({
           id: 'duplicate',
           label: '複製して保存',
@@ -292,7 +292,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const sharedCount = items.filter((item) => item.isShared).length

@@ -765,14 +765,14 @@ function CommonVarsListV8Inner() {
         id: entry.id,
         label: entry.label,
         disabled: entry.disabled,
-        onSelect: () => entry.onSelect(),
+        onSelect: () => entry.onSelect?.(),
       })),
       {
         id: contextMenus.destructiveItem.id,
         label: contextMenus.destructiveItem.label,
         danger: true,
         disabled: contextMenus.destructiveItem.disabled,
-        onSelect: () => contextMenus.destructiveItem.onSelect(),
+        onSelect: () => contextMenus.destructiveItem.onSelect?.(),
       },
     ]
     : []

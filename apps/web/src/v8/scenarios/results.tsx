@@ -427,7 +427,7 @@ export default function ScenarioResultsV8() {
   return (
     <DetailPage
       boardId="X4STXS"
-      identity={<Link href="/scenarios" className={styles.backLink}>← シナリオ配信へ</Link>}
+      identity={<></>}
       title={scenario ? `配信結果：${scenario.name}` : '配信結果'}
       description="始まった・読み終えた・どの通まで届いたかを見ます。"
       actions={(

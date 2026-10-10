@@ -734,7 +734,7 @@ export default function EarningRulesTab() {
               {
                 id: 'edit',
                 label: '編集',
-                external: true,
+                external: false,
                 onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
               },
               {

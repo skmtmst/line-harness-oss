@@ -312,7 +312,7 @@ export default function HqBroadcastList() {
             const failed = live.filter((t) => t.status === 'failed' || failedCount(t) > 0).length
             const sent = statusKeyOf(run) === 'sent' || statusKeyOf(run) === 'error'
             return (
-              <Tr key={run.id} className={styles.row}>
+              <Tr key={run.id} className={styles.row} href={href}>
                 <Td>
                   <div className={styles.titleLine}>
                     <FolderDotName folder={(() => { const folder = (folders ?? []).find((f) => f.id === folderIdOf(run)); return folder ? { name: folder.name, color: folder.color } : null })()}>

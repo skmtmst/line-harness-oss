@@ -272,7 +272,7 @@ export default function TemplateDetailV8() {
     return <TargetMissing kind="error" title="テンプレートを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void reload()} />
   }
 
-  const backLink = <Link href="/templates" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />テンプレートへ</Link>
+  const backLink = <></>
   if (loading || !template) {
     return (
       <div className={styles.page} data-design-node="UTbi1">

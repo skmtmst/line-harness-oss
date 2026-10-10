@@ -20,7 +20,7 @@ import { describeApiFailure, isForbiddenOrRateLimited, loadFailureNotice } from 
 import QuestionEditor, { emptyQuestion, newChoiceKey, type QuestionChoice, type ScenarioQuestion } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import InlineSettings from '@/components/shared/inline-settings'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -106,7 +106,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [publishConfirm, setPublishConfirm] = useState(false)
-  const [actionsOpen, setActionsOpen] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState<number | null>(null)
   const [canMutate] = useState(() => (typeof window === 'undefined' ? true : isOwnerOrAdmin()))
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
@@ -226,7 +226,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     return (
       <TemplateEditFrame boardId="l87p1J" title="質問テンプレート" description="質問テンプレートの作成・変更はオーナーと管理者だけができます" side={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
-        <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
+        <></>
       </TemplateEditFrame>
     )
   }
@@ -344,11 +344,14 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
                 {host ? null : <div className={styles.inline}>
                   <span className={styles.smallLabel}>押されたら</span>
-                  <button type="button" className={styles.pick} title="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める" onClick={() => setActionsOpen(true)}>
+                  <button type="button" className={styles.pick} title="押したときの動き（タグ・友だち情報・シナリオ・URL など）を決める" onClick={() => setActionsOpen(index)}>
                     <span className={styles.pickText}>{summaryOf(choice)}</span>
                     <ChevronDown className={styles.pickIcon} aria-hidden="true" />
                   </button>
                 </div>}
+                <InlineSettings open={actionsOpen === index} title={`選択肢 ${index + 1} の押したときの動き`} onClose={() => setActionsOpen(null)}>
+                  <QuestionEditor value={{ ...question, choices: [choice] }} onChange={(next) => setChoice(index, next.choices[0])} choiceColumns />
+                </InlineSettings>
                 <label className={styles.field}>
                   <span className={styles.label}>押したときの返信<span className={styles.optional}>任意</span></span>
                   <input className={styles.input} value={choice.reply ?? ''} maxLength={4500} onChange={(event) => setChoice(index, { reply: event.target.value })} />
@@ -365,9 +368,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       </TemplateEditFrame>
 
       {/* 押したときの動きは今の部品で決める（全部の選択肢をまとめて直せる）。 */}
-      <Dialog open={actionsOpen} size="large" title="押したときの動き" onCancel={() => setActionsOpen(false)}>
-        {actionsOpen ? <QuestionEditor value={question} onChange={setQuestion} choiceColumns /> : null}
-      </Dialog>
+
       <ConfirmDialog
         open={publishConfirm}
         title="この質問を公開しますか？"

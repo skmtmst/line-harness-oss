@@ -30,7 +30,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import InlineSettings from '@/components/shared/inline-settings'
 import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
@@ -317,7 +317,7 @@ export default function ActionEditor({
   const errorRef = useRef('')
   const retryRef = useRef<(() => Promise<void>) | null>(null)
   const closeWhenSaved = () => { if (!pendingRef.current && !errorRef.current) onClose() }
-  const panelRef = useOverlayFocus(true, closeWhenSaved)
+
   // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
   const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
   const [actions, setActions] = useState<ScenarioAction[]>([])
@@ -775,8 +775,8 @@ export default function ActionEditor({
   const editing = actions.find((a) => a.id === conditionFor) ?? null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-editor-title" data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-float`}>
+    <InlineSettings open title={title} onClose={closeWhenSaved}>
+      <div data-design-node="hz9ti">
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
           <div className="min-w-0">
@@ -970,7 +970,7 @@ export default function ActionEditor({
         {/* R242: キャンセルは開く前の値に戻して閉じる。反映は今の内容のまま閉じる。 */}
         {!editing && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4"><Button onClick={cancel} disabled={cancelling} busy={cancelling} busyLabel="戻しています…">キャンセル</Button><Button variant="primary" disabled={pendingCount > 0 || Boolean(error) || loading || !draftReady} onClick={closeWhenSaved}>このアクションを反映</Button></div>}
       </div>
-    </div>
+    </InlineSettings>
   )
 }
 

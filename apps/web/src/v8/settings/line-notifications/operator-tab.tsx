@@ -207,7 +207,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
               const published = rule.status === 'published'
               const recipients = conditionsOf(rule).recipientLabel ?? (rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし')
               const schedule = conditionsOf(rule).scheduleLabel ?? 'いつでも'
-              return <Tr key={rule.id}>
+              return <Tr key={rule.id} href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`}>
                 <Td className={styles.opName}>
                   {/* 名前から編集画面へ。保存したお知らせを開き直して直せる。 */}
                   <Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className={styles.opNameLink} title={rule.name}>{rule.name}</Link>

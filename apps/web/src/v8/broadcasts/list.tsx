@@ -47,7 +47,7 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
@@ -239,7 +239,7 @@ export default function BroadcastListV8() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('broadcast')
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
   /* 「フォルダへ移す」を選んだ直後の onClose は2段目への切り替えなので閉じない。 */
   const keepMenuOpenRef = useRef(false)
@@ -694,8 +694,8 @@ export default function BroadcastListV8() {
      */
     if (isFromHeadquarters(broadcast)) {
       return [
-        { id: 'view', label: '見る', external: true, onSelect: () => goDetail(broadcast.id) },
-        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: true, icon: <Copy size={14} aria-hidden="true" />, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
+        { id: 'view', label: '見る', external: false, onSelect: () => goDetail(broadcast.id) },
+        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={14} aria-hidden="true" />, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
       ]
     }
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
@@ -705,14 +705,14 @@ export default function BroadcastListV8() {
       items.push({
         id: 'resume',
         label: '編集を続ける',
-        external: true,
+        external: false,
         onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
       })
     }
     items.push({
       id: 'duplicate',
       label: '複製',
-      external: true,
+      external: false,
       icon: <Copy size={14} aria-hidden="true" />,
       onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
     })
@@ -742,6 +742,7 @@ export default function BroadcastListV8() {
       id: item.id,
       label: item.label,
       external: item.external,
+      href: item.href,
       dividerBefore: item.dividerBefore,
       icon: item.icon,
       danger: item.tone === 'danger',

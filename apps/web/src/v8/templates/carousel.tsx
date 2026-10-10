@@ -26,7 +26,7 @@ import { readInlineActions, type InlineAction } from '@/components/auto-replies/
 import { ACTION_KINDS } from '@/components/scenarios/action-editor'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import InlineSettings from '@/components/shared/inline-settings'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -362,7 +362,20 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     return (
       <TemplateEditFrame boardId="J60utH" title="カルーセル" description="カルーセルの作成・変更はオーナーと管理者だけができます" side={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
-        <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
+        <></>
+      <InlineSettings open={actionsFor !== null && Boolean(panel?.actions[actionsFor ?? 0])} title="押されたときの動き" onClose={() => setActionsFor(null)}>
+        {actionsFor !== null && panel?.actions[actionsFor] ? (
+          <InlineActionList
+            actions={panel.actions[actionsFor].actions}
+            onChange={(next) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === actionsFor ? { ...a, actions: next } : a)) })}
+            tags={actionOptions.tags}
+            fields={actionOptions.fields}
+            marks={actionOptions.marks}
+            scenarios={actionOptions.scenarios}
+            vars={actionOptions.vars}
+          />
+        ) : null}
+      </InlineSettings>
       </TemplateEditFrame>
     )
   }
@@ -631,19 +644,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         )}
       </TemplateEditFrame>
 
-      <Dialog open={actionsFor !== null && Boolean(panel?.actions[actionsFor ?? 0])} size="large" title="押されたときの動き" onCancel={() => setActionsFor(null)}>
-        {actionsFor !== null && panel?.actions[actionsFor] ? (
-          <InlineActionList
-            actions={panel.actions[actionsFor].actions}
-            onChange={(next) => update(selectedIndex, { actions: panel.actions.map((a, j) => (j === actionsFor ? { ...a, actions: next } : a)) })}
-            tags={actionOptions.tags}
-            fields={actionOptions.fields}
-            marks={actionOptions.marks}
-            scenarios={actionOptions.scenarios}
-            vars={actionOptions.vars}
-          />
-        ) : null}
-      </Dialog>
+
       <ConfirmDialog
         open={publishCheck !== null}
         title="この内容を公開しますか？"

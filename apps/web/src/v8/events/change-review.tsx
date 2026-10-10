@@ -86,7 +86,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
         boardId="hmr2P"
         title="変更の確認"
         description={description}
-        footerActions={<Button href="/events">一覧へ戻る</Button>}
+        footerActions={<></>}
       >
         {!selectedAccountId ? (
           <ListState kind="empty" title="上のバーでLINE公式アカウントを選んでください" />

@@ -94,7 +94,7 @@ describe('実際の統括編集とパンくずの所有', () => {
     await waitFor(() => expect(crumbs?.find((item) => item.href === '/')?.label).toBe('ホーム'))
     fireEvent.click(screen.getByRole('checkbox', { name: /本店/ }))
     fireEvent.click(screen.getByRole('button', { name: '1 アカウントへ配る' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await screen.findByRole('dialog', { name: 'アカウントへ配る：案内' })
     await waitFor(() => expect(crumbs?.find((item) => item.href === '/hq/templates')?.onSelect).toBeTypeOf('function'))
     act(() => crumbs!.find((item) => item.href === '/hq/templates')!.onSelect!())
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

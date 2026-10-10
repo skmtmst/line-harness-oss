@@ -229,7 +229,7 @@ export default function BroadcastDetail({
       id: 'duplicate',
       label: '複製して作る',
       icon: <Copy size={14} aria-hidden="true" />,
-      external: true,
+      external: false,
       onSelect: () => router.push(duplicateHref),
     },
   ]

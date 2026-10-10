@@ -299,7 +299,7 @@ function WebhooksCreateV8Inner() {
         boardId="hsD8e"
         title="送り先を作る"
         description="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        footerActions={<Button href="/webhooks">一覧へ戻る</Button>}
+        footerActions={<></>}
       >
         <Notice tone="info">送り先の作成は統括だけができます。必要なときは統括に頼んでください。</Notice>
       </CreatePage>

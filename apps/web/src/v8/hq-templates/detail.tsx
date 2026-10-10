@@ -177,7 +177,7 @@ export default function HqTemplateDetail({
     </div>
   )
 
-  const backLink = <button type="button" className={styles.backLink} onClick={onBack}><ArrowLeft size={14} aria-hidden="true" />テンプレートへ</button>
+  const backLink = <></>
   /* 配った先の名前（API-14 はアカウントの今の表示名）からアカウントを引く。同じ名前が無ければ、末尾が一致する1件だけ。 */
   const accountIdOf = (name: string) => {
     const exact = accounts.find((account) => account.name === name)

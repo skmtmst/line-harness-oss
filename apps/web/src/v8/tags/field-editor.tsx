@@ -251,7 +251,7 @@ export default function FieldEditor({
     setOptions(next)
   }
 
-  const back = <Link href={backHref} className={styles.backLink}>← 友だち情報欄へ</Link>
+  const back = <></>
   const help = (
     <>
       <AttributeKindGuide current="field" />

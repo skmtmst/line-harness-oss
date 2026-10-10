@@ -250,7 +250,7 @@ export default function FriendMigrationsV8() {
                         <a
                           className={styles.linkAction}
                           style={{ display: 'block', marginTop: 4 }}
-                          href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/friends/exports/${job.id}/download`}
+
                         >
                           CSVをダウンロード
                         </a>

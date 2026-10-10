@@ -24,6 +24,7 @@ import HelpTip from '@/components/shared/help-tip'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import InlineSettings from '@/components/shared/inline-settings'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import { Field, RequiredBadge } from '@/components/shared/form-controls'
@@ -2742,30 +2743,7 @@ export function NewAutomationV8({
                     />
                   </span>
                 ) : null}
-              </li>
-            )
-          })}
-        </ol>
-        {inputError?.target === 'v8-add-action' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
-        {canEdit ? (
-          <div className={styles.linkRow}>
-            <button id="v8-add-action" type="button" className={styles.linkButton} onClick={() => { setInputError(null); addAction('add_tag') }}>＋ すること を足す</button>
-            <button type="button" className={styles.linkButton} onClick={() => addAction('common_action')}>共通アクションから選ぶ</button>
-          </div>
-        ) : null}
-      </Card>
-
-      {/* することの中身を直す窓。種類と「どれを」をここで選ぶ。失敗したら、いまはその場で止まる。 */}
-      <Dialog
-        open={editingRow !== null}
-        title={editingRow ? `${actions.findIndex((row) => row.key === editingRow.key) + 1}つめのすること` : 'すること'}
-        description="上から順に動きます。失敗したときは、いまはここで止まります。"
-        designWidth={560}
-        confirmLabel="閉じる"
-        cancelLabel="閉じる"
-        onConfirm={() => setEditingActionKey(null)}
-        onCancel={() => setEditingActionKey(null)}
-      >
+                <InlineSettings open={editingActionKey === row.key} title={`${index + 1}つめのすること`} onClose={() => setEditingActionKey(null)}>
         {editingRow ? (
           <div className={styles.dialogBody}>
             <label className={styles.field} htmlFor={`v8-action-${editingRow.key}`}>
@@ -2842,7 +2820,22 @@ export function NewAutomationV8({
             )}
           </div>
         ) : null}
-      </Dialog>
+                </InlineSettings>
+              </li>
+            )
+          })}
+        </ol>
+        {inputError?.target === 'v8-add-action' ? <p className={styles.inputError} role="alert">{inputError.message}</p> : null}
+        {canEdit ? (
+          <div className={styles.linkRow}>
+            <button id="v8-add-action" type="button" className={styles.linkButton} onClick={() => { setInputError(null); addAction('add_tag') }}>＋ すること を足す</button>
+            <button type="button" className={styles.linkButton} onClick={() => addAction('common_action')}>共通アクションから選ぶ</button>
+          </div>
+        ) : null}
+      </Card>
+
+      {/* することの中身を直す窓。種類と「どれを」をここで選ぶ。失敗したら、いまはその場で止まる。 */}
+
 
       {/* だれに：条件の窓。一斉配信・シナリオと同じ条件（標準互換・15軸）。 */}
       <Dialog

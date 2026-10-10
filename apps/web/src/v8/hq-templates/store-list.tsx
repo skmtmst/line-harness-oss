@@ -467,7 +467,7 @@ export default function HqStoreList(props: HqStoreListProps) {
             const folder = folderOf(row.folder_id)
             const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
             return (
-              <Tr key={row.id} data-row-id={row.id} density="template">
+              <Tr key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
                 {type === 'rich_menu' ? <Td className={storeStyles.cellPlain}>{rankOf.get(row.id) ?? '—'}</Td> : null}
                 <NameCell
                   name={(

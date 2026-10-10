@@ -476,8 +476,8 @@ export default function TagsTab({
       ]
     }
     const list: ActionMenuItem[] = [
-      { id: 'edit', label: '編集', external: true, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
-      { id: 'copy', label: '複製して作る', external: true, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
+      { id: 'edit', label: '編集', external: false, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
+      { id: 'copy', label: '複製して作る', external: false, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
     /* 保管済みに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
@@ -525,7 +525,7 @@ export default function TagsTab({
         }
         continue
       }
-      list.push({ id: item.id, label: item.label, danger: item.tone === 'danger', disabled: item.disabled, onSelect: () => item.onSelect() })
+      list.push({ id: item.id, label: item.label, danger: item.tone === 'danger', disabled: item.disabled, onSelect: () => item.onSelect?.() })
     }
     return list
   }

@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import type { VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
+import EditorSurface from '@/components/shared/editor-surface'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { FieldError } from '@/components/shared/form-controls'
@@ -49,13 +50,13 @@ export function RewardDialog({ open, reward, onClose, onSave }: {
   fields.define('name', '特典の名前', () => (name.trim() ? null : '特典の名前を入れてください。'))
   fields.define('stamps', '何個で使えるか', () => (Number.isInteger(n) && n >= 1 ? null : '何個で使えるかを 1 以上の数で入れてください。'))
   return (
-    <Dialog open={open} title={reward ? '特典を変える' : '特典を足す'} confirmLabel={reward ? '変える' : '足す'} onCancel={onClose}
+    <EditorSurface surface={reward ? 'inline' : 'dialog'} open={open} title={reward ? '特典を変える' : '特典を足す'} confirmLabel={reward ? '変える' : '足す'} onCancel={onClose}
       onConfirm={() => { if (fields.submit().length === 0) onSave({ id: reward?.id ?? `reward-${Date.now().toString(36)}`, name: name.trim(), stamps: n }) }}>
       <div className={styles.dialogBody}>
         <CheckedField id="vs-reward-name" label="特典の名前" fields={fields} name="name"><TextField {...checkedProps(fields, 'name', 'vs-reward-name')} value={name} onChange={(e) => setName(e.target.value)} placeholder="例：ドリンク 1杯" maxLength={100} /></CheckedField>
         <CheckedField id="vs-reward-stamps" label="何個で使えるか" fields={fields} name="stamps"><TextField {...checkedProps(fields, 'stamps', 'vs-reward-stamps')} value={stamps} onChange={(e) => setStamps(e.target.value)} inputMode="numeric" placeholder="例：5" /></CheckedField>
       </div>
-    </Dialog>
+    </EditorSurface>
   )
 }
 
@@ -103,7 +104,7 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
   const timeOptions = [{ value: '', label: '指定なし' }, ...MINUTES.map((m) => ({ value: String(m), label: minuteLabel(m) }))]
   const endOptions = [{ value: '', label: '指定なし' }, ...MINUTES.slice(1).map((m) => ({ value: String(m), label: minuteLabel(m) })), { value: '1440', label: '24:00' }]
   return (
-    <Dialog open={open} title={multiplier ? '倍率を変える' : '倍率を足す'} confirmLabel={multiplier ? '変える' : '足す'} onCancel={onClose}
+    <EditorSurface surface={multiplier ? 'inline' : 'dialog'} open={open} title={multiplier ? '倍率を変える' : '倍率を足す'} confirmLabel={multiplier ? '変える' : '足す'} onCancel={onClose}
       onConfirm={() => {
         if (fields.submit().length > 0) return
         onSave({
@@ -137,7 +138,7 @@ export function MultiplierDialog({ open, multiplier, onClose, onSave }: {
           <CheckedField id="vs-mul-to" label="期間の終わり（任意）" fields={fields} name="to"><TextField {...checkedProps(fields, 'to', 'vs-mul-to')} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></CheckedField>
         </div>
       </div>
-    </Dialog>
+    </EditorSurface>
   )
 }
 
@@ -149,9 +150,9 @@ export function BonusDialog({ open, value, onClose, onSave }: { open: boolean; v
   const n = toInt(count)
   fields.define('count', 'はじめての来店で足す個数', () => (Number.isInteger(n) && n >= 1 ? null : '1 以上の数で入れてください。'))
   return (
-    <Dialog open={open} title="初回来店ボーナス" confirmLabel="変える" onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(n) }}>
+    <EditorSurface surface={'inline'} open={open} title="初回来店ボーナス" confirmLabel="変える" onCancel={onClose} onConfirm={() => { if (fields.submit().length === 0) onSave(n) }}>
       <CheckedField id="vs-bonus-count" label="はじめての来店で足す個数" fields={fields} name="count"><TextField {...checkedProps(fields, 'count', 'vs-bonus-count')} value={count} onChange={(e) => setCount(e.target.value)} inputMode="numeric" /></CheckedField>
-    </Dialog>
+    </EditorSurface>
   )
 }
 
@@ -168,7 +169,7 @@ export function RankDialog({ open, settings, onClose, onSave }: {
   const used = rows.filter((r) => r.tagName.trim())
   rows.forEach((row, i) => fields.define(`rate-${i}`, `倍率 ${i + 1}`, () => (row.tagName.trim() && !(Number(row.multiplier) >= 1 && Number(row.multiplier) <= 100) ? '倍率は 1〜100 で入れてください。' : null)))
   return (
-    <Dialog open={open} title="会員ランクの倍率" description="友だちに付いたタグの名前ごとに倍率を決めます。いくつも当たるときは、いちばん高い倍率だけを使います。" confirmLabel="変える" onCancel={onClose}
+    <EditorSurface surface={'inline'} open={open} title="会員ランクの倍率" description="友だちに付いたタグの名前ごとに倍率を決めます。いくつも当たるときは、いちばん高い倍率だけを使います。" confirmLabel="変える" onCancel={onClose}
       onConfirm={() => {
         if (fields.submit().length > 0) return
         /* 前からあるランクの名前・止めているかは残す（タグの名前で突き合わせる）。 */
@@ -186,7 +187,7 @@ export function RankDialog({ open, settings, onClose, onSave }: {
         ))}
         {rows.length < 20 ? <button type="button" className={styles.link} onClick={() => setRows([...rows, { tagName: '', multiplier: '1.2' }])}>＋ ランクを足す</button> : null}
       </div>
-    </Dialog>
+    </EditorSurface>
   )
 }
 

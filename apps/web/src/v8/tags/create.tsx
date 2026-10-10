@@ -191,7 +191,7 @@ function TagCreate() {
 
   if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
 
-  const back = <Link href="/tags" className={styles.backLink}>← タグへ</Link>
+  const back = <></>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
   // その場でタグのフォルダを作る（dLffh）。左の列の「フォルダを追加」と同じ受け口・同じ権限。
   const createGroup = async (name: string, color: string | null) => {

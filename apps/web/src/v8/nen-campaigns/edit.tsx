@@ -392,7 +392,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <Button href="/nen-campaigns">キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
         </>
-      ) : <Button href="/nen-campaigns">一覧へ戻る</Button>}
+      ) : <></>}
     >
       {!canEdit ? (
         <Notice tone="info" role="status" icon={<Eye size={16} aria-hidden="true" />} message="閲覧のみで見ています。配信を直すのは管理者に頼んでください。" />

@@ -50,7 +50,7 @@ import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -193,7 +193,7 @@ function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
     label: item.label,
     danger: item.tone === 'danger',
     disabled: item.disabled,
-    onSelect: () => item.onSelect(),
+    onSelect: () => item.onSelect?.(),
   }))
 }
 
@@ -406,7 +406,7 @@ function WebinarList() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
   const snapshotRef = useRef<ListSnapshot>({ items: [], total: 0, loadedAccountId: null })
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useDetailPanelUrl('webinar')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
   const [archiving, setArchiving] = useState(false)
@@ -933,7 +933,7 @@ function WebinarList() {
                           open={openMenuId === w.id}
                           onOpenChange={(next) => setOpenMenuId(next ? w.id : null)}
                           note={canEdit ? undefined : READONLY_REASON}
-                          items={menuItems.map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
+                          items={menuItems.map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
                     </Td>

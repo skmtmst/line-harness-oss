@@ -628,7 +628,7 @@ function VisitStampsScreen() {
                             const f = friendById(row.friend_id)
                             const names = f ? friendNames(f) : { name: '友だち', line: null }
                             return (
-                              <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`}>
+                              <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`} onOpen={() => setPhoto(row)}>
                                 <Td className={styles.colPhoto}>
                                   <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${names.name}さんの写真を大きく見る`}>
                                     <PaperThumb accountId={selectedAccountId} url={row.photo_url} />
@@ -656,7 +656,7 @@ function VisitStampsScreen() {
                                     ) : null}
                                     <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
                                       { id: 'photo', label: '写真を大きく見る', onSelect: () => setPhoto(row) },
-                                      { id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
+                                      { id: 'friend', label: '友だちの詳細を開く', external: false, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
                                     ]} />
                                   </span>
                                 </Td>
@@ -701,7 +701,7 @@ function VisitStampsScreen() {
                                   <Td className={styles.colActor}><span className={styles.muted} title={row.actor}>{row.actor}</span></Td>
                                   <Td className={styles.colMenu}>
                                     <RowActions subjectName={`${shortDateTime(row.at)} の記録`}
-                                      menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: true, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friendId)}`) } }]}
+                                      menuItems={[{ id: 'friend', label: '友だちの詳細を開く', external: false, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friendId)}`) } }]}
                                       destructiveItem={canManage && row.reversible ? { id: 'reverse', label: 'この記録を取り消す', onSelect: () => { setDialogError(''); setReversing(row.id) } } : undefined} />
                                   </Td>
                                 </Tr>

@@ -547,15 +547,15 @@ async function switchAccount(page: Page, accountId: string) {
 async function editFirstAction(page: Page) {
   await page.getByRole('button', { name: /^1つめのすること「.+」の操作$/ }).click()
   await page.getByRole('menuitem', { name: '中身を直す' }).click()
-  const dialog = page.getByRole('dialog', { name: '1つめのすること', exact: true })
+  const dialog = page.getByRole('region', { name: '1つめのすること', exact: true })
   await dialog.waitFor()
   return dialog
 }
 
 async function closeActionEditor(page: Page) {
-  // V8の窓はEscでも入力を保ったまま閉じる。
-  await page.keyboard.press('Escape')
-  await page.getByRole('dialog', { name: '1つめのすること', exact: true }).waitFor({ state: 'hidden' })
+  // 項目内の設定は入力を保って閉じる。保存・送信の検査はそのまま行う。
+  await page.getByRole('region', { name: '1つめのすること', exact: true }).getByRole('button', { name: '設定を閉じる' }).click()
+  await page.getByRole('region', { name: '1つめのすること', exact: true }).waitFor({ state: 'hidden' })
 }
 
 async function pickTag(page: Page, label: string) {

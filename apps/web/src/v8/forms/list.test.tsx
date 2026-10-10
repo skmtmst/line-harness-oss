@@ -93,6 +93,7 @@ async function mount() {
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/form-submissions')
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -177,7 +178,7 @@ describe('V8 回答フォーム一覧', () => {
     expect(screen.getByRole('menuitem', { name: '集まった回答' })).toBeTruthy()
     expect(screen.queryByRole('menuitem', { name: '編集' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '削除' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」の詳細を見る' }))
+    fireEvent.click(host.querySelector('[data-row-id="f-1"]')!)
     await flush()
     expect(screen.queryByRole('button', { name: 'フォーム名を変更する' })).toBeNull()
     expect(screen.queryByText('編集する')).toBeNull()

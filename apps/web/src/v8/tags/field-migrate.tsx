@@ -462,7 +462,7 @@ function FieldMigrate() {
   const pollAttention = pollProblem !== '' && (!run || RUN_RUNNING.has(run.status))
   const status = pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0}人` : undefined
   const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)}人に値が入っている` : '値が入っている人数は未集計'
-  const back = <Link href="/tags?tab=fields" className={styles.backLink}>← 友だち情報欄へ</Link>
+  const back = <></>
   const rows = sample ? sampleRows(sample) : []
 
   if (staffRole !== null && !canManageRole(staffRole)) return <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />

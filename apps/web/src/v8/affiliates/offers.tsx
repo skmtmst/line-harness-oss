@@ -474,7 +474,7 @@ export default function OffersTab() {
           {paged.map((offer) => {
             const stat = offerStats.get(offer.id)
             return (
-              <Tr key={offer.id} className={styles.row} data-table-layout="columns">
+              <Tr key={offer.id} className={styles.row} data-table-layout="columns" onOpen={readonly ? undefined : () => { setEditTarget(offer); setFormOpen(true) }}>
                 <Td className={styles.colName}>
                   <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
                     <FolderDotName folder={null} dot={!narrow}>

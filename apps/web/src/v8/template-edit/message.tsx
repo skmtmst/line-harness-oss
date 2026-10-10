@@ -446,7 +446,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
       >
         <Card padding="none" layout="vertical" className={styles.card}>
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
-          <Link href="/templates" className={styles.back}>一覧へ戻る</Link>
+          <></>
         </Card>
       </TemplateEditFrame>
     )

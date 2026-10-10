@@ -121,7 +121,7 @@ async function fillTagRule(name: string) {
   fireEvent.change(screen.getByRole('textbox', { name: '名前', exact: true }), { target: { value: name } })
   fireEvent.click(screen.getByRole('button', { name: /^1つめのすること「.+」の操作$/ }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '中身を直す' }))
-  const dialog = await screen.findByRole('dialog', { name: '1つめのすること', exact: true })
+  const dialog = await screen.findByRole('region', { name: '1つめのすること', exact: true })
   await pickEntity('自動化で付けるタグ', 'VIP')
   fireEvent.keyDown(dialog, { key: 'Escape' })
   await waitFor(() => expect(screen.queryByRole('dialog', { name: '1つめのすること', exact: true })).toBeNull())

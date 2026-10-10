@@ -103,7 +103,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={(
           <>
-            <Button onClick={close} disabled={busy}><ArrowLeft aria-hidden="true" />ナレッジ一覧へ</Button>
+            <Button onClick={close} disabled={busy}>キャンセル</Button>
             {editing ? (
               <Button variant="primary" onClick={() => void save()} disabled={busy}>承認待ちで保存する</Button>
             ) : (

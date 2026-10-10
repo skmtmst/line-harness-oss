@@ -235,7 +235,7 @@ export function TagEditForm({
         footerOutlined={Boolean(host)}
         notice={host?.notice}
         title={host?.title ?? (tag.name || 'タグを編集')}
-        identity={host ? undefined : <Link href="/tags" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />タグへ</Link>}
+        identity={host ? undefined : <></>}
         description={host ? <>{host.description}{readOnly ? <p className={styles.roBand} role="note">閲覧のみで見ています。変える操作は管理者に頼んでください。</p> : null}</> : (
           <>
             {`${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}

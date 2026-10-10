@@ -18,6 +18,9 @@ import { Tabs } from '@/components/shared/tabs'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import EditorSurface from '@/components/shared/editor-surface'
+import ListState from '@/components/shared/list-state'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -576,7 +579,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
   </div>
 }
 
-function EditModal({ member, administrator, currentUserId, activeAdministratorCount, onClose, onSaved }: { member: StaffMember; administrator: boolean; currentUserId: string | null; activeAdministratorCount: number; onClose: () => void; onSaved: () => Promise<void> }) {
+function EditModal({ member, administrator, currentUserId, activeAdministratorCount, onClose, onSaved, surface }: { surface?: 'page' | 'dialog'; member: StaffMember; administrator: boolean; currentUserId: string | null; activeAdministratorCount: number; onClose: () => void; onSaved: () => Promise<void> }) {
   const [name, setName] = useState(member.name), [email, setEmail] = useState(member.email ?? '')
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string }>({})
   const nameRef = useRef<HTMLInputElement>(null)
@@ -638,7 +641,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   const unlinkLine = async (stepUpToken?: string) => { if (unlinking) return; setUnlinking(true); setUnlinkError(''); try { const res = await api.staff.update(member.id, { lineLinked: false }, stepUpToken); if (!res.success) throw new Error(res.error); setUnlinkOpen(false); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: unlinkLine }); return } setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setUnlinking(false) } }
   // R500: 無効化・再有効化の後は行が絞り込みから出し入れされるので、行き先を知らせる。
   const toggleActive = async (stepUpToken?: string) => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }, stepUpToken); await onSaved(); notifyToast(member.isActive ? '無効にしました。「利用状態」で「無効のみ」を選ぶと、この人を一覧に戻せます。' : '有効にしました。対象者はもう一度ログインが必要です。'); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: toggleActive }); return } setError(messageOf(caught)) } finally { setStatusSaving(false) } }
-  return <Modal onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">見せる範囲を決める</h2><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
+  return <EditorSurface surface={surface} open title="ログインユーザーを編集する" onCancel={onClose} footer={<div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving}>✓ {saving ? '保存中…' : '保存する'}</Button></div>}><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">見せる範囲を決める</h2><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
     {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)}>{statusSaving ? '変更中…' : member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></Field></div>
@@ -646,7 +649,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <Checkbox key={key} checked={permissions.includes(key)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</Checkbox>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><Checkbox checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</Checkbox></div></div>}
     <div className="mt-5"><p className="text-sm font-semibold text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-semibold ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <Button variant="secondary" className="px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() => { setUnlinkError(''); setUnlinkOpen(true) }}>連携解除</Button>}</div></div>
     <div className="mt-5"><p className="text-sm font-semibold text-ink">通知設定</p><div className="mt-2 divide-y divide-hairline overflow-hidden rounded-card border border-hairline">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className={`${styles.notifyRow} items-center gap-4 p-3`}><div><p className="text-sm text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs">メール<NotificationSwitch checked={notifications[key].email} onChange={() => toggleNotification(key, 'email')} label={`${label}メール`} /></div><div className="flex items-center gap-2 text-xs">LINE<NotificationSwitch checked={notifications[key].line} onChange={() => toggleNotification(key, 'line')} label={`${label}LINE`} /></div></div>)}</div></div>
-    <div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving}>✓ {saving ? '保存中…' : '保存する'}</Button></div>
+
     {/* 連携はあとから張り直せる。赤は本当に戻せない操作に取っておく。 */}
     <ConfirmDialog
       open={unlinkOpen}
@@ -661,7 +664,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
       <p className="text-ink-secondary text-sm">通知設定でLINEを選んでいるお知らせは、解除したあと届かなくなります。メールを選んでいるぶんはそのまま届きます。</p>
     </ConfirmDialog>
     {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-  </div></Modal>
+  </div></EditorSurface>
 }
 
 function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onClose: () => void; onSaved: () => Promise<void> }) {
@@ -744,7 +747,8 @@ function StaffRoleGuide() {
   )
 }
 
-function StaffPageHost() {
+function StaffPageHost({ editId }: { editId?: string | null }) {
+  const router = useRouter()
 
   const tab = useMergedTab(STAFF_TAB_KEYS, 'tab', 'members')
   const { selectedAccountId } = useAccount()
@@ -1009,7 +1013,7 @@ function StaffPageHost() {
     const resendable = tab === 'invited' && administrator && member !== undefined && member.inviteStatus !== 'active'
     const close = () => setOpenMenuId(null)
     const items: ActionMenuItem[] = []
-    if (editable && member) items.push({ id: 'edit', label: '役割を変える', qaOpen: 'EOTS4-edit', onSelect: () => { close(); setEditing(member) } })
+    if (editable && member) items.push({ id: 'edit', label: '役割を変える', qaOpen: 'EOTS4-edit', onSelect: () => { close(); router.push(`/staff/edit?id=${encodeURIComponent(member.id)}`) } })
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
     if (isSelf && member) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '2段階の確認を解除する' : '2段階の確認を設定する', onSelect: () => { close(); openTwoFactor(member) } })
     if (resendable && member) items.push({ id: 'resend', label: resendingId === member.id ? '送信中…' : 'もう一度送る', disabled: resendingId !== null, onSelect: () => { close(); void runResend(member) } })
@@ -1074,6 +1078,12 @@ function StaffPageHost() {
       </GridTable>
     </section>
   )
+  if (editId !== undefined) {
+    const member = members.find((member) => member.id === editId)
+    if (loading) return <ListState kind="loading" />
+    if (!member || !canEdit(member)) return <ListState kind="error" title="このユーザーを編集できません" description="権限とユーザーを確認してください。" />
+    return <EditModal surface="page" member={member} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => router.push('/staff')} onSaved={load} />
+  }
   return (
     <PageFrame kind="settings" boardId={administrator ? 'nku0f' : 'A35Gh'}>
       <PageHeading
@@ -1213,3 +1223,5 @@ function StaffPageHost() {
 export default function StaffV8() {
   return <Suspense fallback={<div className="text-sm text-ink-faint">読み込み中…</div>}><StaffPageHost /></Suspense>
 }
+
+export function StaffEditV8() { return <StaffPageHost editId={useSearchParams().get('id') ?? ''} /> }

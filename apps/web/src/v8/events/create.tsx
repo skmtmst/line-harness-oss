@@ -218,7 +218,7 @@ function EventsCreateV8Inner() {
         boardId="d4adD4"
         title="イベントを作る"
         description="中身・回と定員・申し込みのきまりを決めます。下書きのあいだは、お客さまには見えません。"
-        footerActions={<Button href="/events">一覧へ戻る</Button>}
+        footerActions={<></>}
       >
         <Notice tone="info">イベントを作れるのは統括と管理者だけです。必要なときは統括に頼んでください。</Notice>
       </CreatePage>

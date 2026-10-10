@@ -102,8 +102,10 @@ const INFLOW_LINKS_EDIT_KEY = '/inflow-links'
 
 export default function InflowListV8({
   onRouteCountChange,
+  editId,
 }: {
   /** 入口（page.tsx）へ「この一覧に見えている経路の数」を渡す。読み込み前・失敗は null。 */
+  editId?: string | null
   onRouteCountChange?: (count: number | null) => void
 }) {
   usePageTitle('流入と計測')
@@ -144,6 +146,9 @@ export default function InflowListV8({
   const [page, setPage] = useState(1)
   // null＝閉じている／'new'＝作る／EntryRoute＝直す／{register}＝未登録 ref を登録する
   const [editing, setEditing] = useState<EntryRoute | 'new' | { register: string } | null>(null)
+  useEffect(() => {
+    if (editId) setEditing(routes.find((route) => route.id === editId) ?? null)
+  }, [editId, routes])
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [copyFailedId, setCopyFailedId] = useState<string | null>(null)
   const [selectedGenre, setSelectedGenre] = useState('')
@@ -464,7 +469,7 @@ export default function InflowListV8({
         items.push({
           id: 'edit',
           label: 'リンクを編集',
-          onSelect: () => { setOpenMenuRefCode(null); setEditing(target) },
+          onSelect: () => { setOpenMenuRefCode(null); router.push(`/inflow-links/edit?id=${encodeURIComponent(target.id)}`) },
         })
       }
       items.push(row.isActive === false
@@ -704,7 +709,7 @@ export default function InflowListV8({
                   <span className={styles.nameText} title={r.name}>{r.name}</span>
                 )
                 return (
-                  <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.refCode}>
+                  <Tr key={r.refCode} href={r.source === 'entry_route' && r.entryRouteId ? `/inflow-links/detail?id=${encodeURIComponent(r.entryRouteId)}` : undefined} className={styles.row} data-table-layout="columns" data-row-id={r.refCode}>
                     <Td className={styles.colCheck}>
                       {r.entryRouteId && !readonly ? (
                         <Checkbox
@@ -799,7 +804,7 @@ export default function InflowListV8({
                         {/* 閲覧のみ：編集・登録するは置かない（列の幅は残す） */}
                         {readonly ? null : editTarget ? (
                           <Button
-                            onClick={() => setEditing(editTarget)}
+                            onClick={() => router.push(`/inflow-links/edit?id=${encodeURIComponent(editTarget.id)}`)}
                             aria-label={`${r.name}のリンクを編集`}
                           >
                             編集
@@ -842,6 +847,30 @@ export default function InflowListV8({
     </ListPagePagination>
   ) : null
 
+  const routeEditor = editing ? (<EditRouteDialog surface={editId !== undefined ? 'page' : 'dialog'}
+            route={editing === 'new' || (typeof editing === 'object' && 'register' in editing) ? null : editing}
+            initialRefCode={typeof editing === 'object' && editing !== null && 'register' in editing ? editing.register : undefined}
+            initialGenre={editing === 'new' && selectedGenre !== UNCATEGORIZED ? selectedGenre : undefined}
+            pools={pools}
+            scenarios={scenarios}
+            templates={templates}
+            tags={tags}
+            existingGenres={genreNames}
+            poolMemberNames={poolMemberNames}
+            accountId={selectedAccountId}
+            onClose={() => editId ? router.push('/inflow-links') : setEditing(null)}
+            onSaved={(savedRoute, created) => {
+              if (editId !== undefined) { router.push(`/inflow-links?highlight=${savedRoute.id}`); return }
+              setEditing(null)
+              void load()
+              if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre, isActive: savedRoute.isActive, id: savedRoute.id })
+            }}
+          />) : null
+  if (editId !== undefined) {
+    if (loading) return <ListState kind="loading" />
+    if (readonly || !routeEditor) return <ListState kind="error" title="この経路を編集できません" description="権限と経路を確認してください。" />
+    return routeEditor
+  }
   return (
     <ListPage
       help={readonly
@@ -922,8 +951,8 @@ export default function InflowListV8({
               openId={openTileMenu}
               onOpenChange={setOpenTileMenu}
               items={[
-                { id: 'ads', label: '広告連携を開く', external: true, onSelect: () => router.push('/inflow-links?tab=ads') },
-                { id: 'connections', label: '広告とのつなぎを開く', external: true, onSelect: () => router.push('/inflow-links?tab=connections') },
+                { id: 'ads', label: '広告連携を開く', external: false, onSelect: () => router.push('/inflow-links?tab=ads') },
+                { id: 'connections', label: '広告とのつなぎを開く', external: false, onSelect: () => router.push('/inflow-links?tab=connections') },
               ]}
             />}
           />
@@ -946,26 +975,7 @@ export default function InflowListV8({
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>
-        {editing ? (
-          <EditRouteDialog
-            route={editing === 'new' || (typeof editing === 'object' && 'register' in editing) ? null : editing}
-            initialRefCode={typeof editing === 'object' && editing !== null && 'register' in editing ? editing.register : undefined}
-            initialGenre={editing === 'new' && selectedGenre !== UNCATEGORIZED ? selectedGenre : undefined}
-            pools={pools}
-            scenarios={scenarios}
-            templates={templates}
-            tags={tags}
-            existingGenres={genreNames}
-            poolMemberNames={poolMemberNames}
-            accountId={selectedAccountId}
-            onClose={() => setEditing(null)}
-            onSaved={(savedRoute, created) => {
-              setEditing(null)
-              void load()
-              if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre, isActive: savedRoute.isActive, id: savedRoute.id })
-            }}
-          />
-        ) : null}
+        {routeEditor}
         {editingGenre ? (
           <GenreDialog
             genre={editingGenre === 'new' ? null : editingGenre}
@@ -1026,7 +1036,7 @@ function TileMenu({
         label={label}
         open={open}
         onOpenChange={(next) => onOpenChange(next ? id : null)}
-        items={items.map((item) => ({ ...item, onSelect: () => { onOpenChange(null); item.onSelect() } }))}
+        items={items.map((item) => ({ ...item, onSelect: () => { onOpenChange(null); item.onSelect?.() } }))}
       />
     </span>
   )

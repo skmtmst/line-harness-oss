@@ -157,7 +157,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
           {
             id: 'shifts',
             label: '勤務とシフト',
-            external: true,
+            external: false,
             onSelect: () => router.push(`/booking/staff/shifts?staff_id=${person.id}`),
           },
           ...(canEdit ? [

@@ -144,6 +144,9 @@ describe('V8 コンバージョンの一覧', () => {
     await flush()
     fireEvent.click(screen.getByRole('menuitem', { name: '編集する' }))
     await flush()
+    expect(push).toHaveBeenCalledWith('/conversions/edit?id=cp-1')
+    await act(async () => { root.render(<ConversionListV8 accountId="account-a" editId="cp-1" />) })
+    await flush()
     const input = screen.getByLabelText('成果地点の名前') as HTMLInputElement
     const scroll = vi.fn()
     input.scrollIntoView = scroll

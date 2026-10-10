@@ -14,7 +14,7 @@ import styles from './chrome.module.css'
 
 export function BackLink() {
   return (
-    <Link href="/webinars" className={styles.back}>← ウェビナーへ</Link>
+    <></>
   )
 }
 

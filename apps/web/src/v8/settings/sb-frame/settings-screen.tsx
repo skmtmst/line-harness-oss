@@ -61,5 +61,5 @@ export function SbSettingsScreen({
 
 /** 板の頭の戻るリンク（「← 機能設定へ」13/600・青）。 */
 export function SbBackLink({ href, label }: { href: string; label: string }) {
-  return <Link href={href} className={styles.back}>{`← ${label}`}</Link>
+  return <></>
 }

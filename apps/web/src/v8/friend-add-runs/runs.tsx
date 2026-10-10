@@ -549,7 +549,7 @@ function FriendAddRunsInner() {
                 const done = actionText(item)
                 const kindLabel = item.friendKind === 'first_time' ? 'はじめて' : '再追加'
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" href={detailHref(item.id)}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.receivedAt} title={formatJstDateTime(item.receivedAt)} className={styles.when}>{jstTime(item.receivedAt)}</time>
                     </Td>

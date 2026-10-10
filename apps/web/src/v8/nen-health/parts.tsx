@@ -79,7 +79,7 @@ export function RowMenu({ subject, items }: { subject: string; items: ActionMenu
         label={`「${subject}」の操作`}
         open={open}
         onOpenChange={setOpen}
-        items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect() } }))}
+        items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect?.() } }))}
       />
     </span>
   )

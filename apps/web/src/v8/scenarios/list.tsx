@@ -10,6 +10,7 @@
  * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
@@ -70,7 +71,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
 import { TextField } from '@/components/shared/text-field'
@@ -81,6 +82,7 @@ import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import styles from './list.module.css'
+import { notifyToast } from '@/components/shared/toast'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -130,6 +132,7 @@ export default function ScenariosListV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const router = useRouter()
   // 1152 の板（`wjfLe`）。板IDと道具の段の並びだけを切り替える。
   const narrow = useNarrowViewport()
@@ -174,15 +177,14 @@ export default function ScenariosListV8() {
   const [deleteError, setDeleteError] = useState('')
 
   /* 複製の窓（★V8 `Al4Ek`）。 */
-  const [duplicateTarget, setDuplicateTarget] = useState<ScenarioRow | null>(null)
-  const [duplicateName, setDuplicateName] = useState('')
+  const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
-  const [duplicateError, setDuplicateError] = useState('')
+  const setDuplicateError = (message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
 
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。開いている行のID。 */
-  const [panelId, setPanelId] = useState<string | null>(null)
+  const [panelId, setPanelId] = useDetailPanelUrl('scenario')
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
   /** キーボードで動かした結果を読み上げる（live 領域）。 */
@@ -567,24 +569,23 @@ export default function ScenariosListV8() {
 
   /* ===== 複製（★V8 `Al4Ek`） ===== */
 
-  const openDuplicate = (s: ScenarioRow) => {
-    setDuplicateName(`${s.name} のコピー`)
-    setDuplicateError('')
-    setDuplicateTarget(s)
-  }
+  const openDuplicate = (s: ScenarioRow) => { void runDuplicate(s) }
 
-  const runDuplicate = async () => {
+  const runDuplicate = async (duplicateTarget: ScenarioRow) => {
+    if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
-    const name = duplicateName.trim() || `${duplicateTarget.name} のコピー`
+    duplicateLock.current = true
+    const name = `${duplicateTarget.name}のコピー`
     setDuplicating(true)
     setDuplicateError('')
     try {
       const copyId = await duplicateScenario(duplicateTarget.id, name)
-      setDuplicateTarget(null)
+
+      notifyToast('複製しました', { tone: 'success' })
       void loadScenarios()
       void loadOverallTotal()
       void loadStats()
-      router.push(`/scenarios/detail?id=${copyId}`)
+      duplicateFeedback.mark(duplicateTarget.id, copyId)
     } catch (e) {
       if (e instanceof DuplicateAborted) {
         setDuplicateError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが一覧に残っています。`)
@@ -593,22 +594,10 @@ export default function ScenariosListV8() {
       }
       void loadScenarios()
     } finally {
+      duplicateLock.current = false
       setDuplicating(false)
     }
   }
-
-  /** 複製の窓の「引き継ぐもの」：通の数と配信方式は対象のシナリオから書く。 */
-  const duplicateCarries = duplicateTarget
-    ? [
-        `メッセージ ${duplicateTarget.stepCount === undefined ? '' : `${duplicateTarget.stepCount}通`}（質問を含む）`,
-        '開始のきっかけ',
-        'アクション',
-        '配信対象の条件',
-        '最後の1通の後',
-        `配信方式（${deliveryModeLabels[duplicateTarget.deliveryMode ?? 'relative']}）`,
-        'フォルダ',
-      ].join('・')
-    : ''
 
   /* ===== 並び替え ===== */
 
@@ -773,7 +762,7 @@ export default function ScenariosListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
-      onSelect: () => item.onSelect(),
+      onSelect: () => item.onSelect?.(),
     }))
 
   const panelIndex = panelId === null ? -1 : scenarios.findIndex((s) => s.id === panelId)
@@ -901,8 +890,8 @@ export default function ScenariosListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <RovingTbody reorderKey={liveOrder.shown.map((s) => s.id).join(',')}>
-              {liveOrder.shown.map((s) => {
+            <RovingTbody reorderKey={duplicateFeedback.order(liveOrder.shown, scenarios).map((s) => s.id).join(',')}>
+              {duplicateFeedback.order(liveOrder.shown, scenarios).map((s) => {
                 const rowFolder = s.folderId ? folders.find((f) => f.id === s.folderId) : undefined
                 const folderName = s.folderId
                   ? rowFolder?.name ?? 'フォルダ'
@@ -919,6 +908,7 @@ export default function ScenariosListV8() {
                 return (
                   <Tr
                     interactive
+                    highlighted={duplicateFeedback.highlightedId === s.id}
                     key={s.id}
                     data-reorder-id={s.id}
                     onDragEnter={() => liveOrder.enter(s.id)}
@@ -1366,47 +1356,7 @@ export default function ScenariosListV8() {
         </ConfirmDialog>
 
         {/* 複製の窓（★V8 `Al4Ek`：新しい名前・引き継ぐもの・引き継がないもの・停止中で作られる）。題の左に印は置かない（絵どおり）。 */}
-        <Dialog
-          open={duplicateTarget !== null}
-          title="このシナリオを複製する"
-          confirmation
-          designNode="Al4Ek"
-          confirmLabel={duplicating ? '複製中…' : '複製する'}
-          confirmIcon={<Copy size={14} aria-hidden="true" />}
-          busy={duplicating}
-          error={duplicateError}
-          onConfirm={() => void runDuplicate()}
-          onCancel={() => {
-            if (duplicating) return
-            setDuplicateTarget(null)
-            setDuplicateError('')
-          }}
-        >
-          <div className={styles.dupBody}>
-            <label className={styles.dupField}>
-              <span className={styles.dupLabel}>新しい名前</span>
-              <TextField
-                value={duplicateName}
-                onChange={(event) => setDuplicateName(event.target.value)}
-                disabled={duplicating}
-                maxLength={80}
-                aria-label="新しい名前"
-              />
-            </label>
-            <div className={styles.dupBox}>
-              <p className={styles.dupBoxTitle}>引き継ぐもの</p>
-              <p className={styles.dupBoxText}>{`・${duplicateCarries}`}</p>
-            </div>
-            <div className={styles.dupBox}>
-              <p className={styles.dupBoxTitle}>引き継がないもの</p>
-              <p className={styles.dupBoxText}>・購読中の人・配信の記録</p>
-            </div>
-            <div className={styles.dupNote}>
-              <ShieldCheck size={16} aria-hidden="true" />
-              <span>複製は「停止中」で作られます。開始のきっかけも写しますが、配信を始めるまで誰にも届きません。</span>
-            </div>
-          </div>
-        </Dialog>
+        <></>
       </>}
       folders={<>
         {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}

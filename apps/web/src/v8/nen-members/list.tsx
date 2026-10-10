@@ -252,12 +252,12 @@ function MemberRow({
         <RowActions
           subjectName={member.name || 'この会員'}
           menuItems={[
-            { id: 'detail', label: '会員の詳細', external: true, onSelect: () => onOpen(friendDetail) },
-            { id: 'friend', label: '友だちを開く', external: true, onSelect: () => onOpen(`${friendDetail}&tab=info`) },
+            { id: 'detail', label: '会員の詳細', external: false, onSelect: () => onOpen(friendDetail) },
+            { id: 'friend', label: '友だちを開く', external: false, onSelect: () => onOpen(`${friendDetail}&tab=info`) },
             {
               id: 'ec',
               label: 'ECで開く',
-              external: true,
+              external: false,
               disabled: !member.customerId,
               disabledReason: 'ECと結びついていません',
               onSelect: () => onOpen('/ec-commerce'),

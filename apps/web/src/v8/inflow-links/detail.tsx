@@ -425,7 +425,7 @@ function InflowDetailContent() {
   const qrDownloadUrl = url
     ? `${workerBase.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}&download=1&filename=${encodeURIComponent(`referral-${route?.refCode ?? ''}`)}`
     : undefined
-  const back = <Link href="/inflow-links" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />流入と計測へ</Link>
+  const back = <></>
 
   return (
     <DetailPage
@@ -659,7 +659,7 @@ function InflowDetailContent() {
                 {friendPageRows.map((friend) => {
                   const blocked = isBlockedFriend(friend)
                   return (
-                    <Tr key={friend.id} className={styles.row} data-table-layout="columns">
+                    <Tr key={friend.id} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
                       <Td className={styles.colWhen}>
                         <span className={styles.when}>
                           {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/').replace(/^0/, '') : '日時不明'}
@@ -746,6 +746,7 @@ function InflowDetailContent() {
       ) : null}
       {editingRoute && route ? (
         <EditRouteModal
+          surface="inline"
           route={route}
           pools={pools}
           scenarios={scenarios}

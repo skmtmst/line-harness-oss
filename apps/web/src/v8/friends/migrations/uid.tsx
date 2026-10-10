@@ -217,7 +217,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                   </thead>
                   <tbody>
                     {active.items?.map((item) => (
-                      <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`}>
+                      <Tr key={item.id} className={`${styles.row} ${styles.rowTall}`} onOpen={() => { m.setDetailError(null); m.setDetailItem(item) }}>
                         <Td className={styles.td}>
                           <button type="button" className={`${styles.mono} ${styles.uidButton}`} title={`${item.oldUid}（詳細を見る）`} onClick={() => { m.setDetailError(null); m.setDetailItem(item) }}>
                             {shortUid(item.oldUid)}

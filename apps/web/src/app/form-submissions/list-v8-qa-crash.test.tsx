@@ -41,6 +41,7 @@ const FORM_PAGE = {
 let unassignedData: unknown = []
 const formsDeleteImpact = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
+const formsDuplicate = vi.hoisted(() => vi.fn())
 const foldersCreate = vi.hoisted(() => vi.fn())
 /* 読み込み中試験：ここに入れた先頭の口は返さず止める */
 let pendingPrefixes: string[] = []
@@ -62,7 +63,7 @@ vi.mock('@/lib/api', async importOriginal => {
         throw new Error(`unexpected GET ${path}`)
       }
       if (path.startsWith('/api/forms/unassigned')) return { success: true, data: unassignedData }
-      if (path.startsWith('/api/forms?')) return { success: true, data: FORM_PAGE }
+      if (path.startsWith('/api/forms?')) return { success: true, data: new URLSearchParams(path.split('?')[1]).has('q') && formsDuplicate.mock.calls.length ? { ...FORM_PAGE, items: [...FORM_PAGE.items, { ...FORM_PAGE.items[0], id: 'form-copy', name: '来店アンケートのコピー', isActive: false, status: 'draft' }] } : FORM_PAGE }
       throw new Error(`unexpected GET ${path}`)
     },
     api: {
@@ -73,7 +74,7 @@ vi.mock('@/lib/api', async importOriginal => {
         create: foldersCreate,
         swapOrder: actual.api.folders.swapOrder,
       },
-      forms: { ...actual.api.forms, deleteImpact: formsDeleteImpact, update: formsUpdate },
+      forms: { ...actual.api.forms, deleteImpact: formsDeleteImpact, update: formsUpdate, duplicate: formsDuplicate },
       listStats: { get: async () => ({ success: true, data: null }) },
     },
   }
@@ -113,6 +114,8 @@ beforeEach(() => {
   unassignedData = []
   formsDeleteImpact.mockReset()
   formsUpdate.mockReset()
+  formsDuplicate.mockReset()
+  formsDuplicate.mockResolvedValue({ success: true, data: { id: 'form-copy', isActive: false } })
   foldersCreate.mockReset()
   formsDeleteImpact.mockResolvedValue({ success: true, data: { contentRevision: 7 } })
   formsUpdate.mockResolvedValue({ success: true, data: {} })
@@ -190,9 +193,8 @@ describe('管理者確認の切り替え', () => {
  * 共通パネルは最上層へ描画されるため、パネル内の操作は文書全体から探す。 */
 describe('行の詳細パネルと右クリック', () => {
   const detailButton = () => {
-    const found = [...host.querySelectorAll('button')]
-      .find((b) => b.getAttribute('aria-label') === '「来店アンケート」の詳細を見る')
-    expect(found, '行名のボタンがある').toBeTruthy()
+    const found = host.querySelector<HTMLElement>('[data-row-id="form-1"]')
+    expect(found, '名前以外も押せる行がある').toBeTruthy()
     return found!
   }
 
@@ -279,7 +281,7 @@ describe('入力の右パネル移設', () => {
     expect(errors.map(String).join('\n')).toBe('')
   })
 
-  it('複製は右のパネルで名前を入れられる', async () => {
+  it('複製は窓を開かず1回だけ作り、元の行の下に下書きを出す', async () => {
     await act(async () => { root.render(<FormSubmissionsListV8 />) })
     await flush()
     const menuButton = [...host.querySelectorAll('button')]
@@ -287,14 +289,16 @@ describe('入力の右パネル移設', () => {
     await act(async () => { fireEvent.click(menuButton!) })
     await flush()
     const duplicateItem = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-      .find((m) => m.textContent === '複製')
+      .find((m) => m.textContent === '複製する')
     expect(duplicateItem, '複製の項目がある').toBeTruthy()
     await act(async () => { fireEvent.click(duplicateItem!) })
     await flush()
-    const panel = document.querySelector('[data-design-part="detail-panel"]')
-    expect(panel, '右のパネルが開く').toBeTruthy()
-    expect(panel?.textContent).toContain('複製しますか')
-    expect(panel?.textContent).toContain('複製の名前')
+    expect(formsDuplicate).toHaveBeenCalledTimes(1)
+    expect(formsDuplicate).toHaveBeenCalledWith('form-1', 'visual-qa-account', '来店アンケートのコピー')
+    expect(document.querySelector('[data-design-part="detail-panel"]')).toBeNull()
+    expect([...host.querySelectorAll('[data-row-id]')].map(row => row.getAttribute('data-row-id'))).toEqual(['form-1', 'form-copy'])
+    expect(host.querySelector('[data-row-id="form-copy"][data-highlighted]')).toBeTruthy()
+    expect(host.querySelector('[data-row-id="form-copy"]')?.textContent).toContain('下書き')
     expect(errors.map(String).join('\n')).toBe('')
   })
 })

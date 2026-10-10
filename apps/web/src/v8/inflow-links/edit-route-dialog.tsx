@@ -12,7 +12,7 @@ import Select from '@/components/shared/select'
 import { api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import EditorSurface from '@/components/shared/editor-surface'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
@@ -33,6 +33,7 @@ interface MessageTemplate {
 }
 
 interface Props {
+  surface?: 'page' | 'dialog' | 'inline'
   route: EntryRoute | null
   pools: TrafficPool[]
   scenarios: Scenario[]
@@ -67,6 +68,7 @@ export default function EditRouteModal({
   initialRefCode,
   poolMemberNames,
   accountId,
+  surface,
   onClose,
   onSaved,
 }: Props) {
@@ -179,7 +181,7 @@ export default function EditRouteModal({
   // R270: 作成と同じくフォルダは任意。空欄は未分類のまま保存する。
   const saveDisabled = submitting
   return (
-    <Dialog
+    <EditorSurface surface={surface}
       open
       title={isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
       busy={submitting}
@@ -334,6 +336,6 @@ export default function EditRouteModal({
           />
         )}
       </div>
-    </Dialog>
+    </EditorSurface>
   )
 }

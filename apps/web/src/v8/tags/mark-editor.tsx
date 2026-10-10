@@ -396,7 +396,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   if (loadState === 'loading') return <ListState kind="loading" />
 
-  const back = <Link href="/tags?tab=marks" className={styles.backLink}>← 対応マークへ</Link>
+  const back = <></>
   const description = editing && selected
     ? `${selected.friendCount}人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
     : '対応の状態を、色つきの印で管理します。'
@@ -437,7 +437,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
             <Pause size={15} aria-hidden="true" />保管する
           </Button>
         ) : undefined}
-        footerActions={hideForm ? <Button href="/tags?tab=marks">一覧へ戻る</Button> : <>
+        footerActions={hideForm ? <></> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>
           <Button type="button" variant="primary" disabled={saveDisabled} title={blockedReason ?? undefined} onClick={() => void save()} busy={saving}>
             <Check size={15} aria-hidden="true" />{editing ? '保存する' : '対応マークを作る'}

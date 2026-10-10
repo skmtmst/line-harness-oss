@@ -255,7 +255,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   if (loadState === 'error') {
     return <TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadGroup()} />
   }
-  const backLink = <Link href="/rich-menus" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />リッチメニューへ</Link>
+  const backLink = <></>
   if (!group) return <div className={styles.loadingHead}>{backLink}<p className={styles.loading} role="status">読み込み中…</p></div>
 
   const audience = audienceOf(group)

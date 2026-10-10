@@ -295,7 +295,7 @@ export default function ReportTab() {
         </thead>
         <tbody>
           {shown.map((row) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns">
+            <Tr key={row.id} className={styles.row} data-table-layout="columns" onOpen={() => openDrawer(row.id)}>
               <Td className={styles.colName}>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
@@ -319,7 +319,7 @@ export default function ReportTab() {
                     label={`${row.name}の操作`}
                     items={[
                       { id: 'view', label: '成果を見る', onSelect: () => openDrawer(row.id) },
-                      { id: 'approvals', label: 'この人の成果承認を開く', external: true, onSelect: () => router.push(`/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`) },
+                      { id: 'approvals', label: 'この人の成果承認を開く', external: false, onSelect: () => router.push(`/affiliates?tab=approvals&affiliate=${encodeURIComponent(row.id)}`) },
                     ]}
                   />
                 ) : null}

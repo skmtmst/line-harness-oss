@@ -412,8 +412,8 @@ export default function BookingMediaPage() {
                           icon: row.closeOnBooking ? <Check size={14} aria-hidden="true" /> : undefined,
                           onSelect: () => setRow(row.code, { closeOnBooking: !row.closeOnBooking }),
                         }] : []),
-                        ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, onSelect: () => { window.open(row.pageUrl!, '_blank', 'noopener,noreferrer') } }] : []),
-                        ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, onSelect: () => { window.open(row.loginUrl!, '_blank', 'noopener,noreferrer') } }] : []),
+                        ...(row.pageUrl ? [{ id: 'open-page', label: '店舗ページを開く', external: true, href: row.pageUrl! }] : []),
+                        ...(row.loginUrl ? [{ id: 'open-login', label: '管理画面を開く', external: true, href: row.loginUrl! }] : []),
                       ]}
                     />
                   ) : null}

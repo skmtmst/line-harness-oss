@@ -878,7 +878,7 @@ export default function SavedSearchEditV8() {
     <div className={styles.page}>
       <CreatePage
         title={original.name}
-        identity={<Link href="/tags?tab=searches" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />保存した検索へ</Link>}
+        identity={<></>}
         description={[
           previewCount === null ? '人数はまだ数えていません' : `${previewCount.toLocaleString('ja-JP')}人が当てはまる`,
           original.isShared ? '全員に共有' : '自分だけ',

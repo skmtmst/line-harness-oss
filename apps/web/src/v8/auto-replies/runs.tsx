@@ -380,7 +380,7 @@ export default function AutoReplyRunsV8() {
         id: 'chat',
         label: 'トークを開く',
         icon: <MessageCircle size={14} aria-hidden="true" />,
-        external: true,
+        external: false,
         onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
@@ -401,7 +401,7 @@ export default function AutoReplyRunsV8() {
       boardId="nWmLg"
       title={`実行結果：${data?.rule.name ?? '自動応答'}`}
       description="いつ・誰に・何を返したか、失敗した処理を見ます。"
-      identity={<Link href="/auto-replies" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />自動応答へ</Link>}
+      identity={<></>}
       actions={<div className={styles.headActions}>
         {canManage ? (
           <Button onClick={() => setStopOpen(true)} disabled={!isActiveRule || stopping}>
@@ -543,7 +543,7 @@ export default function AutoReplyRunsV8() {
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
-                  <Tr key={item.id} className={styles.row} data-table-layout="columns">
+                  <Tr key={item.id} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>
                     <Td className={styles.colWhen}>
                       <time dateTime={item.occurredAt} title={formatDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
                     </Td>

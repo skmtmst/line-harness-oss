@@ -70,7 +70,7 @@ export function TodayTable({ rows, canWrite, busyId, onVisited, onUndo }: {
               const state = visitState(r)
               const seated = r.status === 'seated' || r.status === 'visited'
               const menuItems = [
-                { id: 'open', label: '予約台帳で見る', external: true, onSelect: () => { router.push(`/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`) } },
+                { id: 'open', label: '予約台帳で見る', external: false, onSelect: () => { router.push(`/restaurant-test/reservations?date=${r.starts_at.slice(0, 10)}`) } },
                 ...(canWrite && seated ? [{ id: 'undo', label: '来店の印を取り消す', onSelect: () => onUndo(r.id) }] : []),
               ]
               return (

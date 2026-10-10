@@ -110,11 +110,11 @@ function FriendDetailV8Inner() {
   ]
   // 「…」＝関連する画面を開く。別の画面へ移るものは ↗（external）。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: true, onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: true, onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: false, onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: false, onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: false, onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: false, onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: false, onSelect: () => router.push('/duplicates') },
     { id: 'back-to-list', label: '友だち一覧へ戻る', icon: <ArrowLeft size={16} />, dividerBefore: true, onSelect: () => router.push('/friends') },
   ]
 
