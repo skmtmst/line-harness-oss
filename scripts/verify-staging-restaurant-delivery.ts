@@ -268,10 +268,18 @@ async function countSessionLeftovers(query: QueryD1, sessionHash: string): Promi
   return countRows(query, 'SELECT COUNT(*) AS count FROM admin_sessions WHERE token_hash = ?', [sessionHash]);
 }
 
+export type TitleInfo = { text: string; size: string; weight: string; lh: string };
+
 /**
- * 題を読む。型の題を優先し、札・窓・引き出し・外側の帯の見出しは数えない
- * （`scripts/visual-qa/title-audit.mjs` と同じ選び方。横の案内の文字を拾わない）。
+ * ブラウザの中で動かす読み取りは、関数ではなく**文字列**で渡す。
+ *
+ * 関数のまま `page.evaluate` へ渡すと、`pnpm tsx` の変換（esbuild の
+ * `keepNames`）が関数の中の名前付きの矢印を `__name(...)` で包むため、
+ * ブラウザ側に `__name` が無く `ReferenceError: __name is not defined` で
+ * 落ちる（検証環境の実行 38141457930 で発生）。文字列は変換の対象に
+ * ならないので、ここに書いた本文がそのままブラウザで動く。
  */
+
 /**
  * 画面の中で「読み込めなかった」を出していないか見る。
  *
@@ -279,39 +287,47 @@ async function countSessionLeftovers(query: QueryD1, sessionHash: string): Promi
  * `kind="error"` / `kind="forbidden"` のとき必ず `data-list-state` が付く。
  * 3画面とも同じ部品で出すので、ここを見れば取得の失敗を取りこぼさない。
  */
-function readFailureStatesInPage(): string[] {
-  const visible = (el: Element) => el.getBoundingClientRect().height > 1
-    && getComputedStyle(el).visibility !== 'hidden';
+export const READ_FAILURE_STATES_SOURCE = `(() => {
   return Array.from(
     document.querySelectorAll('[data-list-state="error"], [data-list-state="forbidden"]'),
   )
-    .filter(visible)
+    .filter((el) => el.getBoundingClientRect().height > 1
+      && getComputedStyle(el).visibility !== 'hidden')
     .map((el) => {
       const kind = el.getAttribute('data-list-state') || 'error';
       // 見出しだけを残す。説明文に識別子が入ることがあるので長さも切る。
-      const text = (el.querySelector('h1, h2, h3, p')?.textContent || '')
-        .trim().replace(/\s+/g, ' ').slice(0, 40);
-      return `${kind}:${text}`;
+      const head = el.querySelector('h1, h2, h3, p');
+      const text = ((head && head.textContent) || '')
+        .trim().replace(/\\s+/g, ' ').slice(0, 40);
+      return kind + ':' + text;
     });
-}
+})()`;
 
-function readTitleInPage(): { text: string; size: string; weight: string; lh: string } | null {
-  const visible = (el: Element) => el.getBoundingClientRect().height > 1
-    && getComputedStyle(el).visibility !== 'hidden';
+/**
+ * 題を読む。型の題を優先し、札・窓・引き出し・外側の帯の見出しは数えない
+ * （`scripts/visual-qa/title-audit.mjs` と同じ選び方。横の案内の文字を拾わない）。
+ */
+export const READ_TITLE_SOURCE = `(() => {
   const root = document.querySelector('main') || document.body;
   const title = Array.from(root.querySelectorAll('[data-template-region="heading"] h1, [data-template-region="heading"] h2'))
-    .find(visible)
+    .find((el) => el.getBoundingClientRect().height > 1
+      && getComputedStyle(el).visibility !== 'hidden')
     || Array.from(root.querySelectorAll('h1, h2'))
-      .find((el) => visible(el) && !el.closest('[role="dialog"], aside, [data-template-region="folders"]'));
+      .find((el) => el.getBoundingClientRect().height > 1
+        && getComputedStyle(el).visibility !== 'hidden'
+        && !el.closest('[role="dialog"], aside, [data-template-region="folders"]'));
   if (!title) return null;
   const css = getComputedStyle(title);
   return {
-    text: (title.textContent || '').trim().replace(/\s+/g, ' '),
+    text: (title.textContent || '').trim().replace(/\\s+/g, ' '),
     size: css.fontSize,
     weight: css.fontWeight,
     lh: css.lineHeight,
   };
-}
+})()`;
+
+/** 字が出そろうのを待つ。これも同じ理由で文字列で渡す。 */
+export const FONTS_READY_SOURCE = 'document.fonts.ready.then(() => true)';
 
 /**
  * 3画面を実ブラウザで開く。ログイン済みの状態は `sessionStorage` の合言葉で作る。
@@ -355,9 +371,9 @@ async function inspectScreens(
       try {
         await page.goto(`${admin.adminUrl}${SCREEN_PATH}${screen.search}`, { waitUntil: 'load' });
         await page.waitForTimeout(4000);
-        await page.evaluate(() => document.fonts.ready.then(() => true));
-        const title = await page.evaluate(readTitleInPage);
-        const loadFailures = await page.evaluate(readFailureStatesInPage);
+        await page.evaluate<boolean>(FONTS_READY_SOURCE);
+        const title = await page.evaluate<TitleInfo | null>(READ_TITLE_SOURCE);
+        const loadFailures = await page.evaluate<string[]>(READ_FAILURE_STATES_SOURCE);
         const landedOnLogin = new URL(page.url()).pathname.startsWith('/login');
         reports.push({
           view: screen.view,
