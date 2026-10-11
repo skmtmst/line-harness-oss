@@ -25,6 +25,7 @@ import { DetailLoading } from '@/components/templates/detail-page';
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import { notifySaved } from '@/components/shared/toast'
 
 /*
  * ★V8 リッチメニューの詳細（公開した・公開の進み）`hKr8f`。一から書いた画面（2026-10-07）。
@@ -278,6 +279,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       const res = await api.richMenuGroups.duplicate(groupId, crypto.randomUUID())
       if (!res.success) throw new Error(res.error)
       setDuplicateOpen(false)
+      notifySaved('下書きを複製しました')
       router.push(`/rich-menus/edit?id=${encodeURIComponent(res.data.id)}&step=shape`)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)

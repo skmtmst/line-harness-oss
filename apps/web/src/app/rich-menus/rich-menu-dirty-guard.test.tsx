@@ -4,6 +4,7 @@ import React, { act } from 'react'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -16,36 +17,22 @@ const richMenuPublish = vi.hoisted(() => vi.fn())
 const richMenuPreviewTargets = vi.hoisted(() => vi.fn())
 const richMenuDuplicate = vi.hoisted(() => vi.fn())
 
-vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
-  useRouter: () => ({
+vi.mock('next/navigation', async () => {
+  const router = {
     push: routerPush, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
-  }),
+  }
+  return { ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useRouter: () => router,
   useSearchParams: () => searchParams.value,
   usePathname: () => '/rich-menus/edit',
-}))
+  }
+})
 
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href, ...rest }, children),
 }))
-/*
- * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
- * ここで見たいのは選んだ日時の中身なので、素の <select> に置き換える。
- */
-vi.mock('@/components/shared/select', () => ({
-  default: ({ 'aria-label': label, value, onChange, options }: {
-    'aria-label'?: string
-    value: string
-    onChange: (value: string) => void
-    options: Array<{ value: string; label: string }>
-  }) => React.createElement(
-    'select',
-    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
-    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
-  ),
-}))
-
 const selectedAccount = vi.hoisted(() => ({ id: 'acc-1', name: 'テスト店' }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -114,6 +101,9 @@ vi.mock('@/lib/api', () => ({
       audienceSummary: () => Promise.resolve({ success: true, data: { total: { value: 0, state: 'available', reason: null }, targeted: { value: 0, state: 'available', reason: null }, excluded: { value: 0, state: 'available', reason: null }, effective: { value: 0, state: 'available', reason: null } } }),
       prepublishCheck: () => Promise.resolve({ success: true, data: { selfCheck: { ok: true }, deviceConfirmed: true, deviceConfirmedAt: null, pageCount: 1, maxPages: 20 } }),
       validatePublish: () => Promise.resolve({ success: true, data: { checks: [{ key: 'self', ok: true }, { key: 'line', ok: true }] } }),
+      publishProgress: () => Promise.resolve({ success: true, data: { steps: [], message: null, run: { status: 'done' } } }),
+      publishRuns: () => Promise.resolve({ success: true, data: { runs: [] } }),
+      reconcile: () => Promise.resolve({ success: true, data: { diffs: [] } }),
       imageUrl: (key: string) => `/img/${key}`,
     },
     // N-152/N-156: 編集画面は操作者の役割を読んで staff には集計だけを出す。
@@ -122,7 +112,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 import NewRichMenuPage from './new/create-v8'
-import RichMenuEditPage from './edit/page'
+import RichMenuDetailV8 from '@/v8/rich-menu-edit/detail'
 
 function CurrentRichMenuEdit() {
   window.history.replaceState(null, '', '/rich-menus/edit?' + searchParams.value.toString())
@@ -143,15 +133,9 @@ async function type(input: Element, value: string) {
 }
 
 /** searchParams を差し替えて再描画し、画面内の工程移動を再現する。 */
-async function gotoStep(view: ReturnType<typeof render>, step: string | null) {
-  if (document.documentElement.dataset.theme === 'v8') {
-    const labels: Record<string, string> = { shape: '形と画像', targeting: '誰に出すか', publish: '公開' }
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'リッチメニューを作る手順' })).getByRole('button', { name: `${labels[step ?? 'shape']}に戻る` }))
-    await flush()
-    return
-  }
-  searchParams.value = new URLSearchParams(step ? `id=grp-1&step=${step}` : 'id=grp-1')
-  view.rerender(<RichMenuEditPage />)
+async function gotoStep(_view: ReturnType<typeof render>, step: string | null) {
+  const labels: Record<string, string> = { shape: '形と画像', targeting: '誰に出すか', publish: '公開' }
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'リッチメニューを作る手順' })).getByRole('button', { name: `${labels[step ?? 'shape']}に戻る` }))
   await flush()
 }
 
@@ -180,32 +164,19 @@ async function pickDateTime(label: string, iso: string) {
     (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
   )!)
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  if (document.documentElement.dataset.theme === 'v8') {
-    const timeInput = within(reopened as HTMLElement).getByRole('combobox', { name: '時刻' })
-    await type(timeInput, `${hour}:${minute}`)
-    fireEvent.blur(timeInput)
-  } else {
-    fireEvent.change(reopened.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
-    fireEvent.change(reopened.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
-  }
+  const timeInput = within(reopened as HTMLElement).getByRole('combobox', { name: '時刻' })
+  await type(timeInput, `${hour}:${minute}`)
+  fireEvent.blur(timeInput)
   fireEvent.click([...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
   await flush()
 }
 
 async function fillPublishSchedule() {
-  if (document.documentElement.dataset.theme === 'v8') {
-    fireEvent.click(screen.getByRole('radio', { name: /日時を決めて公開する/ }))
-    await flush()
-    await pickDateTime('公開を始める日時', '2026-10-01T10:00')
-    fireEvent.click(screen.getAllByRole('button', { name: '見直す' })[1])
-    await flush()
-    return
-  }
-  const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
-  // [0] いますぐ出す / [1] 日時を決めて出す / [2] 期間を決める
-  fireEvent.click(radios[1])
+  fireEvent.click(screen.getByRole('radio', { name: /日時を決めて公開する/ }))
   await flush()
-  await pickDateTime('出しはじめ', '2026-10-01T10:00')
+  await pickDateTime('公開を始める日時', '2026-10-01T10:00')
+  fireEvent.click(screen.getAllByRole('button', { name: '見直す' })[1])
+  await flush()
 }
 
 /** 試験ごとに空で始めるための localStorage 代替。 */
@@ -1051,41 +1022,52 @@ describe('R204 日時・期間の注記（自動表示を断定しない）', ()
  * 失敗時は窓を開いたまま理由を出す。
  */
 describe('複製の確認窓 (R232)', () => {
+  beforeEach(() => {
+    document.documentElement.dataset.theme = 'v8'
+    clearToastsForTest()
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: { ...GROUP, status: 'published' } }))
+  })
+  afterEach(() => { delete document.documentElement.dataset.theme; clearToastsForTest() })
   test('成功すると窓が閉じ、コピーの編集画面へ移る', async () => {
     searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    render(<><RichMenuDetailV8 groupId="grp-1" /><ToastHost /></>)
     await flush()
-    await screen.findByDisplayValue('メインメニュー')
+    await screen.findByRole('heading', { name: 'メインメニュー' })
 
-    fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
     await flush()
-    expect(screen.getByRole('button', { name: '下書きとして複製する' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitem', { name: '複製する' }))
+    await flush()
+    expect(within(screen.getByRole('dialog', { name: /複製しますか/ })).getByRole('button', { name: '複製する' })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '下書きとして複製する' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: /複製しますか/ })).getByRole('button', { name: '複製する' }))
     await flush()
 
     expect(richMenuDuplicate).toHaveBeenCalledTimes(1)
-    expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=copy-1')
+    expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=copy-1&step=shape')
     // 窓は閉じている。残ると「コピーをさらに複製する？」に見える。
-    expect(screen.queryByRole('button', { name: '下書きとして複製する' })).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /複製しますか/ })).toBeNull())
     expect(screen.getByText(/下書きを複製しました/)).toBeTruthy()
   })
 
   test('失敗したときは窓が開いたまま理由を出し、遷移しない', async () => {
     richMenuDuplicate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'copy failed' }))
     searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    render(<><RichMenuDetailV8 groupId="grp-1" /><ToastHost /></>)
     await flush()
-    await screen.findByDisplayValue('メインメニュー')
+    await screen.findByRole('heading', { name: 'メインメニュー' })
 
-    fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'そのほかの操作' }))
     await flush()
-    fireEvent.click(screen.getByRole('button', { name: '下書きとして複製する' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '複製する' }))
+    await flush()
+    fireEvent.click(within(screen.getByRole('dialog', { name: /複製しますか/ })).getByRole('button', { name: '複製する' }))
     await flush()
 
     expect(richMenuDuplicate).toHaveBeenCalledTimes(1)
     expect(routerPush).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: '下書きとして複製する' })).toBeTruthy()
-    expect(screen.getByText('copy failed')).toBeTruthy()
+    expect(within(screen.getByRole('dialog', { name: /複製しますか/ })).getByRole('button', { name: '複製する' })).toBeTruthy()
+    expect(screen.getByText('リッチメニューを複製できませんでした。もう一度お試しください。')).toBeTruthy()
+    expect(screen.queryByText('copy failed')).toBeNull()
   })
 })
