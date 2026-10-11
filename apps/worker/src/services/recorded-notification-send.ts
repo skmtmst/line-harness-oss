@@ -12,6 +12,13 @@ export async function sendRecordedNotification(db:D1Database,input:{
   payloadHash:await hashOutboundPayload(input.payload),lineAccountId:input.lineAccountId,retryInProgress:false,now});
  if(reservation.kind==='replay')return;
  if(reservation.kind!=='acquired'&&reservation.kind!=='retry')throw new Error('notification_delivery_held');
+ if(reservation.kind==='retry'&&input.channel==='line'){
+  const original=await db.prepare('SELECT created_at FROM outbound_send_requests WHERE idempotency_key=?').bind(key).first<{created_at:string}>();
+  if(!original||!Number.isFinite(Date.parse(original.created_at))||Date.parse(now)-Date.parse(original.created_at)>=23*3600_000){
+   await failOutboundSend(db,{key,leaseToken:reservation.leaseToken,status:'unknown',code:'LINE_RETRY_KEY_EXPIRED',retryable:false,nextRetryAt:null,now});
+   throw new Error('notification_delivery_held');
+  }
+ }
  let accepted=false;
  try{
   await input.send(key);accepted=true;

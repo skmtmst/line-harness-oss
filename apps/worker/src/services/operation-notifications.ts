@@ -1,3 +1,4 @@
+import {sendRecordedNotification} from './recorded-notification-send.js';
 import { LineClient } from '@line-crm/line-sdk';
 
 import type { Env } from '../index.js';
@@ -7,6 +8,8 @@ type OutboxRow = {
   channel: 'line' | 'email';
   event_kind: 'stopped' | 'restored';
   payload_json: string;
+  attempt_count:number;
+  line_account_id:string|null;
 };
 
 type RecipientRow = { email: string | null; line_user_id: string | null };
@@ -43,10 +46,10 @@ export async function processOperationNotificationOutbox(
 ): Promise<{ sent: number; failed: number }> {
   const now = new Date().toISOString();
   const rows = await env.DB.prepare(
-    `SELECT id, channel, event_kind, payload_json
-       FROM operation_notification_outbox
-      WHERE status IN ('queued', 'failed') AND next_attempt_at <= ?
-      ORDER BY next_attempt_at, id LIMIT ?`,
+    `SELECT o.id, o.channel, o.event_kind, o.payload_json, o.attempt_count, i.line_account_id
+       FROM operation_notification_outbox o JOIN operation_incidents i ON i.id=o.incident_id
+      WHERE o. status IN ('queued', 'failed') AND o.next_attempt_at <= ?
+      ORDER BY o.next_attempt_at, o.id LIMIT ?`,
   ).bind(now, Math.max(1, Math.min(limit, 100))).all<OutboxRow>();
   const recipients = await env.DB.prepare(
     `SELECT email, line_user_id FROM staff_members
@@ -63,27 +66,37 @@ export async function processOperationNotificationOutbox(
     if (Number(claimed.meta?.changes ?? 0) !== 1) continue;
     const text = notificationText(row);
     try {
-      if (row.channel === 'line') {
-        const client = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
-        for (const recipient of recipients.results ?? []) {
-          if (recipient.line_user_id) await client.pushMessage(recipient.line_user_id, [{ type: 'text', text }]);
-        }
-      } else {
-        for (const recipient of recipients.results ?? []) {
-          if (recipient.email) await sendOperationEmail(env, { to: recipient.email, subject: '【musubo】運用状態の重要なお知らせ', body: text });
-        }
+      let payload:Record<string,unknown>={};
+      try{payload=JSON.parse(row.payload_json)}catch{/* safe fallback */}
+      const frozen=Array.isArray(payload.notificationRecipients)?payload.notificationRecipients.filter((v):v is string=>typeof v==='string'):null;
+      const targets=frozen??[...new Set((recipients.results??[]).map(r=>row.channel==='line'?r.line_user_id:r.email).filter((v):v is string=>Boolean(v)))];
+      if(!frozen){
+        await env.DB.prepare("UPDATE operation_notification_outbox SET payload_json=? WHERE id=? AND status='sending' AND attempt_count=?")
+          .bind(JSON.stringify({...payload,notificationRecipients:targets}),row.id,row.attempt_count+1).run();
       }
+      const client=row.channel==='line'?new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN):null;
+      let incomplete=false;
+      for(const recipient of targets){
+        try{
+          await sendRecordedNotification(env.DB,{sourceId:`operation:${row.id}`,channel:row.channel,recipient,
+            lineAccountId:row.line_account_id,payload:text,
+            send:key=>client?client.pushMessage(recipient,[{type:'text',text}],key):
+              sendOperationEmail(env,{to:recipient,subject:'【musubo】運用状態の重要なお知らせ',body:text}),
+          });
+        }catch{incomplete=true;}
+      }
+      if(incomplete)throw new Error('notification_delivery_incomplete');
       await env.DB.prepare(
         `UPDATE operation_notification_outbox
-            SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
-      ).bind(now, now, row.id).run();
+            SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND status='sending' AND attempt_count=?`,
+      ).bind(now, now, row.id,row.attempt_count+1).run();
       sent += 1;
     } catch (error) {
-      const message = error instanceof Error ? error.message.slice(0, 500) : 'notification_failed';
+      const message = 'notification_delivery_incomplete';
       await env.DB.prepare(
         `UPDATE operation_notification_outbox
-            SET status = 'failed', last_error = ?, next_attempt_at = ?, updated_at = ? WHERE id = ?`,
-      ).bind(message, new Date(Date.now() + 5 * 60_000).toISOString(), now, row.id).run();
+            SET status = 'failed', last_error = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status='sending' AND attempt_count=?`,
+      ).bind(message, new Date(Date.now() + 5 * 60_000).toISOString(), now, row.id,row.attempt_count+1).run();
       failed += 1;
     }
   }
