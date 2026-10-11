@@ -113,7 +113,6 @@ describe('共通部品の影響範囲', () => {
       'app/nen/health/health-tab.tsx',
       // ★V8-B 健康日記一覧（mIwA4）の古い health-v8.tsx は描かれなくなった。入口は src/v8/nen-health（ページ送りは型が持つ）。
       // 2026-09-16: 然の会員一覧（★V6 37-1）。20人ずつのページ送り。
-      'app/nen/members/members-tab.tsx',
       'app/nen/pets/pets-tab.tsx',
       // ★V8-B マイペット一覧（wTIej）の古い pets-v8.tsx は描かれなくなった。入口は src/v8/nen-pets（ページ送りは型が持つ）。
       // mainB: リマインダ詳細・登録者の旧本体は描かれなくなった。V8本体の利用先だけを下に残す。

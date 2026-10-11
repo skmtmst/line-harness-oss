@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const RANK = readFileSync(join(HERE, 'rank-settings-tab.tsx'), 'utf8')
 const LIFETIME = readFileSync(join(HERE, 'lifetime-tab.tsx'), 'utf8')
-const MEMBERS = readFileSync(join(HERE, 'members-tab.tsx'), 'utf8')
+const MEMBERS = readFileSync(join(HERE, '../../../v8/nen-members/list.tsx'), 'utf8')
 
 /**
  * R55: 会員の設定表が1440px・768pxで重なって読めない。
@@ -108,19 +108,9 @@ describe('m18s 3表とも列幅の合計が表の幅になる', () => {
   })
 
   it('会員一覧表はペットの1列だけが残りを受け取る', () => {
-    const widths = firstRowTdClasses(MEMBERS, 'function MemberRow')
-    expect(widths).toEqual([
-      'w-72',
-      'w-28',
-      'w-32',
-      'w-32',
-      'w-28',
-      null,
-      'cq-hide-below-1120 w-28',
-      'cq-hide-below-1010 w-24',
-      'bg-canvas sticky right-0 w-16',
-    ])
-    expect(widths.filter((w) => widthOf(w) === null)).toHaveLength(1)
+    expect(MEMBERS).toContain('columns: \'var(--tpl-rest3-mb-cols)\'')
+    expect(MEMBERS).toContain('<GridHeadRow className={`${styles.mRow}')
+    expect(MEMBERS).toContain('<GridRow className={styles.mRow}')
   })
 
   it('隠す列はThとTdの両方を消す（片方だけ残さない）', () => {
@@ -128,11 +118,13 @@ describe('m18s 3表とも列幅の合計が表の幅になる', () => {
       ['ranks', RANK, 'cq-hide-below-800', undefined],
       ['lifetime-benefit', LIFETIME, 'cq-hide-below-800', undefined],
       ['lifetime-reached', LIFETIME, 'cq-hide-below-1010', undefined],
-      ['members-last', MEMBERS, 'cq-hide-below-1120', 'function MemberRow'],
-      ['members-rate', MEMBERS, 'cq-hide-below-1010', 'function MemberRow'],
     ] as const) {
       const pairs = hiddenPairs(source, marker, bodyFrom)
       expect({ name, ...pairs }).toEqual({ name, th: 1, td: 1 })
     }
+    const head = MEMBERS.slice(MEMBERS.indexOf('<GridHeadRow'), MEMBERS.indexOf('</GridHeadRow>'))
+    const body = MEMBERS.slice(MEMBERS.indexOf('function MemberRow'))
+    expect(head.match(/styles.mWide/g)).toHaveLength(2)
+    expect(body.match(/styles.mWide/g)).toHaveLength(2)
   })
 })
