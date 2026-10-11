@@ -7320,8 +7320,8 @@ booking.post('/api/booking/admin/staff/:id/shifts/generate', requireOwnBookingSt
     );
   }
   if (stmts.length === 0) return c.json({ inserted: 0 });
-  await c.env.DB.batch(stmts);
-  return c.json({ inserted: stmts.length });
+  const results = await c.env.DB.batch(stmts);
+  return c.json({ inserted: results.reduce((count, result) => count + Number(result.meta?.changes ?? 0), 0) });
 });
 
 // ---- Bookings (requests) ----
