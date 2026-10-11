@@ -76,6 +76,7 @@ async function postEvent(
   db: SqliteD1,
   account: 'a' | 'b',
   event: Record<string, unknown>,
+  expectScheduled = true,
 ): Promise<void> {
   const waitUntil = vi.fn();
   const response = await webhookApp().request('/webhook', {
@@ -92,7 +93,11 @@ async function postEvent(
     props: {},
   } as unknown as ExecutionContext);
   expect(response.status).toBe(200);
-  await expect(waitUntil.mock.calls[0]?.[0] as Promise<void>).resolves.toBeUndefined();
+  if (expectScheduled) {
+    await expect(waitUntil.mock.calls[0]?.[0] as Promise<void>).resolves.toBeUndefined();
+  } else {
+    expect(waitUntil).not.toHaveBeenCalled();
+  }
 }
 
 const base = (account: 'a' | 'b', eventId: string, timestamp: number) => ({
@@ -125,12 +130,13 @@ async function postUnsend(
   eventId: string,
   messageId: string,
   timestamp: number,
+  expectScheduled = true,
 ): Promise<void> {
   await postEvent(db, account, {
     ...base(account, eventId, timestamp),
     type: 'unsend',
     unsend: { messageId },
-  });
+  }, expectScheduled);
 }
 
 describe('N-024 LINE送信取消', () => {
@@ -229,7 +235,7 @@ describe('N-024 LINE送信取消', () => {
     expect(text).not.toContain('attachment.example');
   });
 
-  it('DBアカウントが未解決から解決済みに変わっても同じdestination墓標へ結び付く', async () => {
+  it('未解決の取消は記録せず、解決後の再配信は同じdestinationで後着messageを伏せる', async () => {
     // 最初のunsendではenv secretに一致するDBアカウントを見つけられない状態にする。
     db.raw.prepare(
       "UPDATE line_accounts SET channel_secret = 'old-secret-a' WHERE id = 'account-a'",
@@ -240,12 +246,19 @@ describe('N-024 LINE送信取消', () => {
       'event-unsend-before-account-resolution',
       'line-message-resolution-change',
       1_800_000_002_000,
+      false,
     );
+    expect(db.raw.prepare('SELECT COUNT(*) AS count FROM line_message_unsends').get()).toEqual({ count: 0 });
+    expect(db.raw.prepare('SELECT COUNT(*) AS count FROM messages_log').get()).toEqual({ count: 0 });
+    expect(autoReply).not.toHaveBeenCalled();
+    expect(mileage).not.toHaveBeenCalled();
 
     // 同じLINE OAがDBアカウントへ解決できるようになったあとmessageが遅れて届く。
     db.raw.prepare(
       "UPDATE line_accounts SET channel_secret = 'secret-a' WHERE id = 'account-a'",
     ).run();
+    await postUnsend(db, 'a', 'event-unsend-before-account-resolution',
+      'line-message-resolution-change', 1_800_000_002_000);
     await postText(
       db,
       'a',
