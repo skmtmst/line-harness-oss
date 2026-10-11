@@ -300,7 +300,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
 export default function MenuPage() {
   return (
-    <RestaurantShell boardId="MJoJR" title="メニュー管理" description="コースと単品、価格、アレルギー、提供時間帯を管理します。">
+    <RestaurantShell headingInset="none" boardId="MJoJR" title="メニュー管理" description="コースと単品、価格、アレルギー、提供時間帯を管理します。">
       {(ctx) => <MenuBoard ctx={ctx} />}
     </RestaurantShell>
   )
