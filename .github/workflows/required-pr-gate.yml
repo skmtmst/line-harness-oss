@@ -752,7 +752,9 @@ jobs:
         run: node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json
       - name: Virtual table selection, keyboard and layout
         if: steps.scope.outputs.run == 'true'
-        run: node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
+        run: |
+          node --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
+          node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
       - name: v7 screens are pixel-identical to the base
         # オーナー決定（V8 へ完全切替）：共通部品が V8 になったので v7 の画素は変わる。比べた結果は残すが止めない。
         continue-on-error: true
