@@ -7,6 +7,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { api, ApiError } from '@/lib/api'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -19,8 +20,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }))
 
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, accounts: [{ id: account.id, name: '本店' }], loading: false }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
@@ -76,6 +78,9 @@ let host: HTMLDivElement
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
+  account.id = 'account-a'
+  window.history.replaceState({}, '', '/automations')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   role.value = 'owner'
   push.mockReset()
   host = document.createElement('div')
@@ -100,6 +105,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
+  vi.restoreAllMocks()
   host.remove()
   vi.unstubAllGlobals()
   delete document.documentElement.dataset.theme
@@ -123,6 +129,78 @@ const buttons = () => [...host.querySelectorAll('button, a')] as HTMLElement[]
 const named = (text: string) => buttons().filter((element) => (element.textContent ?? '').trim() === text)
 
 describe('V8 オートメーションのルール一覧（LWQXd）', () => {
+  async function chooseRowAction(label: string) {
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')!.click() })
+    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((node) => node.textContent?.trim() === label)!
+    await act(async () => { item.click() })
+  }
+
+  it('編集を連打しても下書きは1つだけ作り、店が変わると前の返事で移動しない', async () => {
+    let resolve!: (value: { success: true; data: { id: string } }) => void
+    const edit = vi.spyOn(api.automations, 'createDraftFromAutomation').mockImplementation(() => new Promise((done) => { resolve = done }))
+    await render(<AutomationListV8 />)
+    await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')!.click() })
+    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((node) => node.textContent?.trim() === '編集する')!
+    await act(async () => { item.click(); item.click() })
+    expect(edit).toHaveBeenCalledTimes(1)
+    account.id = 'account-b'
+    await render(<AutomationListV8 />)
+    await act(async () => { resolve({ success: true, data: { id: 'old-draft' } }) })
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [403, 'このルールを編集する権限がありません'],
+    [404, 'ルールが見つかりませんでした'],
+    [409, 'ほかの人の変更と重なりました'],
+    [500, 'サーバー側で編集用の下書きを作れませんでした'],
+  ])('編集の%sでは理由を示し、古い一覧の可能性がある場合だけ読み直す', async (status, message) => {
+    vi.spyOn(api.automations, 'createDraftFromAutomation').mockRejectedValue(new ApiError(Number(status)))
+    const list = vi.spyOn(api.automations, 'list')
+    await render(<AutomationListV8 />)
+    const before = list.mock.calls.length
+    await chooseRowAction('編集する')
+    expect(host.textContent).toContain(message)
+    expect(list.mock.calls.length).toBe(before + ([404, 409].includes(Number(status)) ? 1 : 0))
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('状態の変更が失敗しても読み直し、再試行できる', async () => {
+    const status = vi.spyOn(api.automations, 'setStatus').mockRejectedValueOnce(new ApiError(500)).mockResolvedValue({ success: true })
+    const list = vi.spyOn(api.automations, 'list')
+    await render(<AutomationListV8 />)
+    const before = list.mock.calls.length
+    await chooseRowAction('止める')
+    const confirm = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((node) => node.textContent?.trim() === '止める')!
+    await act(async () => { confirm().click(); confirm().click() })
+    expect(status).toHaveBeenCalledTimes(1)
+    expect(list.mock.calls.length).toBe(before + 1)
+    expect(document.body.textContent).toContain('稼働を切り替えられませんでした')
+    await act(async () => { confirm().click() })
+    expect(status).toHaveBeenCalledTimes(2)
+    expect(status).toHaveBeenLastCalledWith('au-1', 'stopped')
+  })
+
+  it('変更中に店を切り替えると窓を閉じ、新しい店の確認を前の処理のロックで止めない', async () => {
+    let resolve!: (value: { success: true }) => void
+    const status = vi.spyOn(api.automations, 'setStatus').mockImplementationOnce(() => new Promise((done) => { resolve = done })).mockResolvedValue({ success: true })
+    const list = vi.spyOn(api.automations, 'list')
+    await render(<AutomationListV8 />)
+    await chooseRowAction('止める')
+    const confirm = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((node) => node.textContent?.trim() === '止める')!
+    await act(async () => { confirm().click() })
+    expect(status).toHaveBeenCalledTimes(1)
+    account.id = 'account-b'
+    await render(<AutomationListV8 />)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    await chooseRowAction('止める')
+    await act(async () => { confirm().click() })
+    expect(status).toHaveBeenCalledTimes(2)
+    const afterNew = list.mock.calls.length
+    await act(async () => { resolve({ success: true }) })
+    expect(list.mock.calls.length).toBe(afterNew)
+  })
+
   it('V8 のテーマで、タブ・数の帯・行・編集は「…」の中へ入れる', async () => {
     await render(<AutomationListV8 />)
     await waitFor(() => host.textContent?.includes('問い合わせを担当へ知らせる') ?? false, 'ルールの行')
