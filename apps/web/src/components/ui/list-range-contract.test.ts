@@ -35,7 +35,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['コンバージョン', '../../v8/conversions/list.tsx'],
   ['EC連携 取り込みの記録', '../../v8/settings/ec-commerce/screen.tsx'],
   ['EC連携 会員のつき合わせ', '../../app/ec-commerce/identity-candidates/page.tsx'],
-  ['EC連携 定期便', '../../app/ec-commerce/subscriptions-panel.tsx'],
+  ['EC連携 定期便', '../../v8/settings/ec-commerce/subscriptions.tsx'],
   ['予約メニュー', '../../app/booking/menus/page.tsx'],
   ['ウェビナー', '../../v8/webinars/list.tsx'],
   ['運営 監査ログ', '../../v8/ops/audit.tsx'],

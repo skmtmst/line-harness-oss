@@ -4,13 +4,13 @@ import { describe, expect, it } from 'vitest'
 
 const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 const tabs = readFileSync(join(import.meta.dirname, 'ec-tabs.ts'), 'utf8')
-const tabsView = readFileSync(join(import.meta.dirname, 'ec-tabs-view.tsx'), 'utf8')
+const tabsView = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 const identity = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/identity.tsx'), 'utf8')
-const subscriptions = readFileSync(join(import.meta.dirname, 'subscriptions-panel.tsx'), 'utf8')
+const subscriptions = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/subscriptions.tsx'), 'utf8')
 const connector = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/connector.tsx'), 'utf8')
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
-describe('V6 EC integration screens', () => {
+describe('V8 EC integration screens', () => {
   it('connects all four EC tabs to real routes', () => {
     expect(tabs).toContain("{ key: 'events', label: '取り込みの記録' }")
     expect(tabs).toContain("href: '/ec-commerce/identity-candidates'")
@@ -33,11 +33,11 @@ describe('V6 EC integration screens', () => {
      * ここで保つ——定期便も `overview` の成否判定の中に入るので、失敗時は
      * `undefined`(タブに数字を出さない)のままになる。
      */
-    expect(tabsView).toContain('overview.value.data.subscriptions')
+    expect(tabsView).toContain('ov?.subscriptions')
     expect(tabsView).not.toContain('api.ecCommerce.subscriptions')
   })
 
-  it('shows the V6 decision information without inventing unavailable values', () => {
+  it('shows the V8 decision information without inventing unavailable values', () => {
     for (const wording of ['処理完了', '処理中', '送信なし', '失敗']) {
       expect(page).toContain(wording)
     }
@@ -59,7 +59,7 @@ describe('V6 EC integration screens', () => {
       expect(source).toContain("'empty'")
       expect(source).toContain("'loading'")
     }
-    expect(subscriptions).toContain("monthlyAmount === null ? '今月の金額は未取得'")
+    expect(subscriptions).toContain('summary?.monthlyAmount == null')
     expect(connector).toContain("'未取得'")
   })
 
@@ -136,10 +136,10 @@ describe('V6 EC integration screens', () => {
   it('shares one date formatter across the three EC screens (#580)', () => {
     expect(page).toContain("polishFormatDate(value, { style: 'list' })")
     expect(connector).toContain("formatDateTime(date)")
-    expect(subscriptions).toContain("from './ec-datetime'")
+    expect(subscriptions).toContain("polishFormatDate(value, { style: 'list-day', fallback: '—' })")
     expect(page).toContain('function dateTime(')
     expect(connector).not.toContain('function dateTime(')
-    expect(subscriptions).not.toContain('function shortDate(')
+    expect(subscriptions).not.toContain('function formatEcShortDate(')
   })
 
   /*
@@ -166,9 +166,9 @@ describe('V6 EC integration screens', () => {
     expect(page).not.toContain('actionSummary?.pending ?? 0')
   })
 
-  it('filters subscriptions with the shared Tabs and types impact metrics (#580)', () => {
-    expect(subscriptions).toContain("from '@/components/shared/tabs'")
-    expect(subscriptions).toContain('<Tabs items={FILTERS.map(')
+  it('filters subscriptions with the shared FilterChip and types impact metrics (#580)', () => {
+    expect(subscriptions).toContain("from '@/components/shared/filter-chip'")
+    expect(subscriptions).toContain('<FilterChip')
     expect(subscriptions).not.toContain('styles.filterCurrent')
     expect(identity).toContain('impactText(order)')
     expect(identity).toContain('isImpactMetric')

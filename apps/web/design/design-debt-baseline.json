@@ -95,9 +95,6 @@
   "app/ec-commerce/page.tsx": {
     "unresolved-classname": 1
   },
-  "app/ec-commerce/subscriptions-panel.tsx": {
-    "unresolved-classname": 1
-  },
   "app/emergency/control-v8.tsx": {
     "direct-th": 6
   },
