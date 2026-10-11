@@ -1,21 +1,11 @@
-import { useSyncExternalStore, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { CloudOff, FileSearch, List, RotateCw, SearchX } from 'lucide-react'
 import Button from './button'
 import { loadFailureCopy, type PermissionScope } from './api-error-message'
-import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import styles from './target-missing.module.css'
 
-const subscribeTheme = (onChange: () => void) => {
-  if (typeof window.addEventListener !== 'function') return () => {}
-  window.addEventListener(ADMIN_THEME_CHANGED_EVENT, onChange)
-  return () => window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, onChange)
-}
-const readIsV8 = () => document.documentElement?.getAttribute('data-theme') === 'v8'
-/* 書き出し（SSR）は常に v7。ブラウザ側で v8 を読み直す（line-preview と同じ形）。 */
-const readIsV8OnServer = () => false
-
 /**
- * ★V7「開き先がない」（設計ノード `x5cgUH`）。
+ * 開く対象がないときの共通表示。見た目は現在のトークンを使う。
  *
  * 詳細・編集・結果の画面で、開く対象が無いときの1枚。3つの状態を
  * 言い分ける（いまは37画面が赤い字だけ・ピンクの箱・灰色の文だけ・
@@ -88,14 +78,11 @@ export default function TargetMissing({
   accountName,
 }: TargetMissingProps) {
   const Icon = ICONS[kind]
-  /* 文言の v8 切り替え用。条件分岐の外で読む（フックの順番を保つ）。 */
-  const v8 = useSyncExternalStore(subscribeTheme, readIsV8, readIsV8OnServer)
   /*
    * RqO7O：v8 の絵の失敗の題は「読み込めませんでした」。共通の文（ListState・失敗の言い分け）と、
    * 画面が渡す「〇〇を表示できませんでした」を、v8 では「〇〇を読み込めませんでした」で出す。
-   * v7（x5cgUH）は今のまま。
    */
-  const shownTitle = v8 && kind === 'error' ? title.replace(/表示できませんでした$/, '読み込めませんでした') : title
+  const shownTitle = kind === 'error' ? title.replace(/表示できませんでした$/, '読み込めませんでした') : title
   const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
   // 権限の案内を残し、権限変更後にも同じ口から読み直せる。
   // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
@@ -115,7 +102,7 @@ export default function TargetMissing({
       </Button>
     )
   } else if (showRetry) {
-    /* RqO7O：v8 の絵は「もう一度試す」。v7（x5cgUH）は読み込むのまま。 */
+    /* RqO7O：v8 の絵は「もう一度試す」。 */
     /* 読み上げ名は見えている文字と同じにする（別の名前を付けると、声で操作する人が呼べない）。 */
     action = (
       <Button type="button" variant="secondary" onClick={retry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">

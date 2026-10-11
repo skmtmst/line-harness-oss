@@ -8,9 +8,6 @@
  * 吹き出し・カードなど中身の改修は各画面側で別途行う。
  */
 
-.frame {
-  display: block;
-}
 
 /*
  * 電話枠なしの平らなカード（If9Mh お客様にはこう届きます）。
@@ -24,16 +21,6 @@
 .flatEmpty { margin: 0; color: var(--color-ink-faint); font-size: 12px; line-height: 1.5; }
 }
 
-/*
- * TSX 側の Tailwind クラス（rounded-card）が utilities 層にいるので、
- * V8 の上書きは層なしに置いて勝たせる（globals の骨格と同じやり方）。
- * テーマ切り替えの一瞬に v7 の枠が見える間だけ効く（描き分けは部品側）。
- */
-[data-theme='v8'] .frame {
-  border: 1px solid var(--color-board-line);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-board);
-}
 
 /* ------------------------------------------------------------------
  * ★V8（夕15・cfVyj / specs/line-preview-real-phone.md）：本物のスマホ。
