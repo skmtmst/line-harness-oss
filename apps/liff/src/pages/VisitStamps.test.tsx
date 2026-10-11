@@ -170,3 +170,12 @@ it('カードを開いた時点で倍率と初回ボーナスを知らせる', a
   expect(await screen.findByText('初回の来店は2個追加')).toBeTruthy();
   expect(screen.getByText('週末：2倍（日・土曜日）')).toBeTruthy();
 });
+
+it('B-241: 紙のカードの履歴取得失敗を新規申請とせず、もう一度で確認待ちに戻る', async () => {
+  fx.paperRequests.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ success: true, data: [{ id: 'p', status: 'pending', stamps: 3, createdAt: '2026-10-11T00:00:00Z' }] });
+  render(<VisitStamps />);
+  fireEvent.click(await screen.findByRole('button', { name: '紙のカードを移す' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }));
+  await screen.findByText('確認待ち');
+  expect(fx.requestPaper).not.toHaveBeenCalled();
+});

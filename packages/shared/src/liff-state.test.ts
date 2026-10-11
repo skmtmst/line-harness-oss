@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { mergeLiffStateSearch } from './liff-state.js';
+import { mergeLiffStateLocation, mergeLiffStateSearch } from './liff-state.js';
 
 describe('LIFF callback action parameters', () => {
   test.each([
@@ -22,4 +22,18 @@ describe('LIFF callback action parameters', () => {
     expect(params.get('state')).toBe('oauth-state');
     expect(params.has('liffRedirectUri')).toBe(false);
   });
+});
+
+test.each(['/booking?waitlist=w', '/booking?seat_waitlist=w&action=decline', '/booking/history'])('案内の道と引数を共通で復元する %s', state => {
+  const url = new URL(mergeLiffStateLocation('/', `?liffId=shop&liff.state=${encodeURIComponent(state)}`), 'https://fixture.test');
+  expect(url.pathname).toBe(state.split('?')[0]);
+  expect(url.searchParams.get('liffId')).toBe('shop');
+  for (const [key, value] of new URLSearchParams(state.split('?')[1])) expect(url.searchParams.get(key)).toBe(value);
+});
+test.each(['https://outside.test/booking?waitlist=w', '//outside.test/booking?waitlist=w', '/unknown?waitlist=w'])('外部URLや未知の道は復元しない %s', state => {
+  expect(new URL(mergeLiffStateLocation('/', `?liff.state=${encodeURIComponent(state)}`), 'https://fixture.test').pathname).toBe('/');
+});
+test('明示した入口とOAuth値は道より優先し、既存のhashを保つ', () => {
+  const url = new URL(mergeLiffStateLocation('/', `?page=form&code=oauth&liff.state=${encodeURIComponent('/booking?code=wrong&waitlist=w')}`, '#anchor'), 'https://fixture.test');
+  expect(url.pathname).toBe('/'); expect(url.searchParams.get('page')).toBe('form'); expect(url.searchParams.get('code')).toBe('oauth'); expect(url.hash).toBe('#anchor');
 });
