@@ -44,13 +44,13 @@ describe('例外を投げる API の受け方', () => {
   })
 
   it('2要素認証の確認は opsCall で受け、HTTP エラーも画面へ出す', () => {
-    const page = read('two-factor/page.tsx')
+    const page = read('../../v8/ops/two-factor.tsx')
     expect(page).toContain('opsCall(api.staff.confirmTwoFactorSetup')
     expect(page).not.toContain('await api.staff.confirmTwoFactorSetup')
   })
 
   it('ダッシュボードは失敗時にセクションを読み込み中のまま残さない', () => {
-    const page = read('dashboard/page.tsx')
+    const page = read('../../v8/ops/dashboard.tsx')
     expect(page).toContain('!data && error')
     expect(page).toContain('ダッシュボードを表示できませんでした')
     // ダイアログも「読み込んでいます」のままにしない。

@@ -9,7 +9,8 @@ import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregister
 import { formatDateTime } from '@/lib/format'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
-import { formatYen } from '@/components/ops/ops-charts'
+import { formatYen, formatBytes } from '@/components/ops/ops-charts'
+import { contractDetail, minutesLabel, revenueDetail } from '@/app/ops/dashboard/format'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
@@ -125,9 +126,9 @@ export default function OpsDashboardV8() {
         <div className={parts.stack}>
           {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
           <div className={`${parts.kpis} ${kpiStyles.strip}`}>
-            <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? `契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）` : emptyValue('unknown')} loading={loading} />
-            <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data ? `決済失敗 ${data.alerts.pastDue} 社` : emptyValue('unknown')} loading={loading} />
-            <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data ? `期限 3日以内 ${data.alerts.trialEndingSoon}` : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? <span title={contractDetail(k.active, k.byPlan, k.filledByListPriceCount)}>{`契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）`}</span> : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data && k ? <span title={revenueDetail(k.revenueDelta, k.refundsThisMonth)}>{`決済失敗 ${data.alerts.pastDue} 社`}</span> : emptyValue('unknown')} loading={loading} />
+            <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data && k ? <span title={`新規 ${k.newInPeriod}件・新規トライアル ${k.newTrialsInPeriod}件・解約 ${k.churnInPeriod}件・解約率 ${k.churnRate.toFixed(1)}%`}>{`期限 3日以内 ${data.alerts.trialEndingSoon}`}</span> : emptyValue('unknown')} loading={loading} />
             <KpiCard presentation="cell" icon={<Sparkles size={13} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : emptyValue('unknown')} loading={loading} />
           </div>
 
@@ -182,16 +183,16 @@ export default function OpsDashboardV8() {
                     <div key={row.tenantId} className={parts.miniRow}>
                       <Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`} className={`${parts.grow} ${parts.link}`} title={row.tenantName}>{row.tenantName}</Link>
                       <span className={`${parts.fixed} ${styles.colPlan}`}>{row.planLabel}</span>
-                      <span className={`${parts.num} ${styles.colRate}`}>{usagePercent(row.messages, row.limits.messages)}</span>
-                      <span className={`${parts.num} ${styles.colRate}`}>{usagePercent(row.bannerUnits, row.limits.images)}</span>
-                      <span className={`${parts.num} ${styles.colMedia}`}>{usagePercent(row.mediaBytes, row.limits.mediaBytes)}</span>
+                      <span className={`${parts.num} ${styles.colRate}`} title={`${row.messages.toLocaleString('ja-JP')} / ${row.limits.messages?.toLocaleString('ja-JP') ?? '—'}`}>{usagePercent(row.messages, row.limits.messages)}</span>
+                      <span className={`${parts.num} ${styles.colRate}`} title={`${row.bannerUnits} / ${row.limits.images ?? '—'}`}>{usagePercent(row.bannerUnits, row.limits.images)}</span>
+                      <span className={`${parts.num} ${styles.colMedia}`} title={`${formatBytes(row.mediaBytes)} / ${row.limits.mediaBytes === null ? '—' : formatBytes(row.limits.mediaBytes)}`}>{usagePercent(row.mediaBytes, row.limits.mediaBytes)}</span>
                     </div>
                   ))}
                 </div>
               )}
             </section>
             <section aria-label="お問い合わせ（チケット）" className={`${parts.panel} ${styles.tickets}`}>
-              <h3 className={parts.panelTitle}>お問い合わせ（チケット）</h3>
+              <h3 className={parts.panelTitle} title={data ? `解決済み ${data.tickets.closedInPeriod}件・初回返信 ${minutesLabel(data.tickets.avgFirstReplyMinutes)}` : undefined}>お問い合わせ（チケット）</h3>
               {data ? (
                 <>
                   <KpiBand density="compact">
@@ -208,13 +209,13 @@ export default function OpsDashboardV8() {
           <div className={parts.row}>
             <section aria-label="プラン別の契約" className={parts.panel}>
               <h3 className={parts.panelTitle}>プラン別の契約</h3>
-              {data ? <p className={parts.line}>{planShareLine(data.planShare.rows)}</p> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
+              {data ? <p className={parts.line} title={data.planShare.rows.map(row => `${row.label} ${row.percent}%`).join('・')}>{planShareLine(data.planShare.rows)}</p> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
             </section>
             <section aria-label="契約者専用LINEに未登録の権限者" className={parts.panel}>
               <h3 className={parts.panelTitle}>契約者専用LINEに未登録の権限者</h3>
               {data ? (
                 <div className={styles.lineRow}>
-                  <p className={parts.line}>{lineUnregisteredLine(data.lineRegistration.unregisteredCount, unregistered)}</p>
+                  <p className={parts.line} title={`契約者専用LINEの登録 ${data.lineRegistration.registered}人 / ${data.lineRegistration.total}人`}>{lineUnregisteredLine(data.lineRegistration.unregisteredCount, unregistered)}</p>
                   {data.lineRegistration.unregisteredCount > 0 ? (
                     <button type="button" className={parts.textLink} onClick={() => void openUnregistered()}>
                       {`未登録の${data.lineRegistration.unregisteredCount} 人を見る`}
