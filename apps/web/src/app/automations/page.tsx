@@ -1,5 +1,7 @@
 'use client'
 
+import { useActionError } from '@/lib/use-action-error'
+
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
@@ -333,7 +335,7 @@ function AutomationsV7Page() {
   const [working, setWorking] = useState(false)
   /** 編集・複製で画面を抜ける最中の行。連打で2回呼ばないための表示用。 */
   const [rowBusyId, setRowBusyId] = useState<string | null>(null)
-  const [actionError, setActionError] = useState('')
+  const { error: actionError, setError: setActionError } = useActionError(selectedAccountId ?? '')
   const [automaticRuns, setAutomaticRuns] = useState<number | null>(null)
   const [failedRuns, setFailedRuns] = useState<number | null>(null)
   const [estimatedHoursSaved, setEstimatedHoursSaved] = useState<number | null>(null)
@@ -461,7 +463,7 @@ function AutomationsV7Page() {
       router.push(`/automations/drafts?id=${encodeURIComponent(res.data.id)}`)
     } catch (caught) {
       if (selectedAccountIdRef.current === accountId) {
-        setError(describeAutomationEditFailure(caught))
+        setActionError(describeAutomationEditFailure(caught))
         if (caught instanceof ApiError && (caught.status === 404 || caught.status === 409)) {
           void loadAutomations()
         }
