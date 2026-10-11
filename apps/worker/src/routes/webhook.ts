@@ -353,7 +353,8 @@ async function handleStoppedTenantEvent(
 
   if (event.type === 'unfollow') {
     const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
-    await updateFriendFollowStatus(db, userId, false, lineAccountId);
+    const applied = await updateFriendFollowStatus(db, userId, false, lineAccountId, toJstString(new Date(event.timestamp)));
+    if (applied === false) return;
     await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
       friendId: friend?.id,
       eventType: 'friend_unfollow',
@@ -366,7 +367,7 @@ async function handleStoppedTenantEvent(
   if (!friend) return;
 
   if (event.type === 'follow') {
-    await updateFriendFollowStatus(db, userId, true, lineAccountId);
+    await updateFriendFollowStatus(db, userId, true, lineAccountId, toJstString(new Date(event.timestamp)));
     await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
       friendId: friend.id,
       eventType: 'friend_follow',
@@ -510,10 +511,11 @@ async function handleEvent(
       friend = execution ? await execution.step('friend',async()=>{ return upsertFriend(execution?.mutationDb('friend') ?? db, {
         lineUserId: userId,
         lineAccountId,
+        followOccurredAt: toJstString(new Date(event.timestamp)),
         displayName: profile?.displayName ?? null,
         pictureUrl: profile?.pictureUrl ?? null,
         statusMessage: profile?.statusMessage ?? null,
-      }); }) : await upsertFriend(db,{lineUserId:userId,lineAccountId,displayName:profile?.displayName ?? null,pictureUrl:profile?.pictureUrl ?? null,statusMessage:profile?.statusMessage ?? null});
+      }); }) : await upsertFriend(db,{lineUserId:userId,lineAccountId,followOccurredAt:toJstString(new Date(event.timestamp)),displayName:profile?.displayName ?? null,pictureUrl:profile?.pictureUrl ?? null,statusMessage:profile?.statusMessage ?? null});
     } catch (err) {
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。friend 行なしではフォロー処理を
@@ -526,6 +528,7 @@ async function handleEvent(
       });
       return;
     }
+    if (friend.is_following === 0 || (friend.last_followed_at && Date.parse(friend.last_followed_at) > event.timestamp)) return;
     const friendKind = (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time';
 
     // V6台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
@@ -1219,7 +1222,8 @@ async function handleEvent(
     if (!userId) return;
 
     const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
-    await updateFriendFollowStatus(db, userId, false, lineAccountId);
+    const applied = await updateFriendFollowStatus(db, userId, false, lineAccountId, toJstString(new Date(event.timestamp)));
+    if (applied === false) return;
     await replay('recordWebhookAnalyticsEvent:2',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:2') ?? db, lineAccountId, event, {
       friendId: friend?.id,
       eventType: 'friend_unfollow',

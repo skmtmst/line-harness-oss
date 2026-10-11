@@ -148,6 +148,26 @@ describe('N-024 LINE送信取消', () => {
     vi.clearAllMocks();
   });
 
+  it('IN-C01: 新しい解除のあとに古い追加が届いてもブロックを戻さない', async () => {
+    lineClient.getProfile.mockResolvedValue({displayName:'人工ユーザー'});
+    await postEvent(db,'a',{...base('a','new-unfollow',1_800_000_002_000),type:'unfollow'});
+    await postEvent(db,'a',{...base('a','old-follow',1_800_000_001_000),type:'follow',replyToken:'fake'});
+    expect(db.raw.prepare("SELECT is_following FROM friends WHERE id='friend-a'").get()).toEqual({is_following:0});
+  });
+  it('IN-C01: 新しい追加のあとに古い解除が届いても解除しない', async () => {
+    lineClient.getProfile.mockResolvedValue({displayName:'人工ユーザー'});
+    await postEvent(db,'a',{...base('a','new-follow',1_800_000_002_000),type:'follow',replyToken:'fake'});
+    await postEvent(db,'a',{...base('a','old-unfollow',1_800_000_001_000),type:'unfollow'});
+    expect(db.raw.prepare("SELECT is_following FROM friends WHERE id='friend-a'").get()).toEqual({is_following:1});
+  });
+
+  it('IN-C01: 未登録でも新しい解除を覚え、旧追加で戻さない',async()=>{
+    db.raw.prepare("DELETE FROM friends WHERE id='friend-a'").run();
+    await postEvent(db,'a',{...base('a','unknown-unfollow',1_800_000_002_000),type:'unfollow'});
+    await postEvent(db,'a',{...base('a','unknown-old-follow',1_800_000_001_000),type:'follow',replyToken:'fake'});
+    expect(db.raw.prepare("SELECT is_following,last_unfollowed_at FROM friends WHERE line_user_id='U-a'").get()).toMatchObject({is_following:0,last_unfollowed_at:'2027-01-15T17:00:02.000+09:00'});
+  });
+
   it.each(['text', 'sticker'])('R-IN01: %s の保存直後に落ちても再配達で未完工程だけ続ける', async (kind) => {
     const originalBatch = db.db.batch.bind(db.db);
     let interrupted = false;
