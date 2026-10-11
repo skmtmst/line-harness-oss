@@ -1,8 +1,10 @@
+import SeatBookingBlock from '../components/SeatBookingBlock.js';
+import { restaurantBookingApi } from '../lib/api.js';
 import FormReception, { choiceReceptionLabel } from '../components/FormReception.js';
 import { TextInput, ChoiceInput, FieldLabel, FieldCount } from '../components/forms/controls.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import liff from '@line/liff';
+import liff from '../lib/liff-runtime.js';
 import {
   PREFECTURES,
   collectInputs,
@@ -116,8 +118,9 @@ function OtherTextInput({
 }
 
 export default function Form() {
-  const { id } = useParams<{ id: string }>();
+  const route = useParams<{ id: string }>();
   const [search] = useSearchParams();
+  const id = route.id ?? search.get('id') ?? undefined;
   /**
    * P（試し回答）：管理画面の試しURLに付く合言葉。あるときは下書きを試す。
    * 試しの回答は集計に入らず、回答後の動作も動かない。
@@ -356,9 +359,11 @@ export default function Form() {
     const made: Array<{ startsAt: string; status: string }> = [];
     setBooked([]);
     for (const { block, picked } of targets) {
-      const slot = picked as { menuId: string; staffId: string; startsAt: string };
+      const slot = picked!;
       try {
-        const res = await api.createRequest(
+        const res = slot.kind === 'seats'
+          ? (await restaurantBookingApi.formBooking({formId:id!,blockId:block.id,submissionKey:key})).data
+          : await api.createRequest(
           { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt },
           `${key}:booking:${block.id}`,
         );
@@ -661,20 +666,6 @@ export default function Form() {
             </div>
           )}
 
-          {/* 送る最後のページだけ、個人情報の取り扱いの一行。 */}
-          {isLast && <PrivacyNote />}
-        </div>
-      </div>
-
-      <BottomBar>
-        <Button variant="primary"
-          type="button"
-          onClick={() => (isLast ? submit() : goNext())}
-          disabled={sending || Object.values(uploading).some(Boolean)}
-          style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
-        >
-          {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
-        </Button>
         {trail.length > 0 && (
           <Button variant="text"
             type="button"
@@ -683,6 +674,21 @@ export default function Form() {
             ← {options.prevLabel || '前のページへ'}
           </Button>
         )}
+          {/* 送る最後のページだけ、個人情報の取り扱いの一行。 */}
+          {isLast && <PrivacyNote />}
+        </div>
+      </div>
+
+      <BottomBar appearance="form">
+        <Button variant="primary"
+          type="button"
+          onClick={() => (isLast ? submit() : goNext())}
+          disabled={sending || Object.values(uploading).some(Boolean)}
+          style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
+        >
+          {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+        </Button>
+
       </BottomBar>
 
       {confirming && (
@@ -853,7 +859,11 @@ function AddressFields({
  * 日にち→時刻の順に空き枠から選ぶ。選んだ枠は回答に入れ、送信後に
  * 予約の受け口で確保する（枠の再確認と重なり防止はそちらが担う）。
  */
-export function BookingSlotPicker({
+export function BookingSlotPicker(props: {block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void}) {
+  return props.block.booking?.kind==='seats' ? <SeatBookingBlock {...props} /> : <PeopleBookingSlotPicker {...props} />;
+}
+
+function PeopleBookingSlotPicker({
   block,
   value,
   onChange,
@@ -1117,7 +1127,7 @@ function BlockView({
   return (
     <div className="flex flex-col gap-2">
       {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
-      <FieldLabel id={labelId} htmlFor={singleControl ? fieldId : undefined} required={block.required}>
+      <FieldLabel size="form" id={labelId} htmlFor={singleControl ? fieldId : undefined} required={block.required}>
         {block.label}
       </FieldLabel>
       {block.description && (

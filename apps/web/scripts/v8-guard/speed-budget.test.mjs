@@ -112,6 +112,8 @@ test('速度だけ参考にし、必須レイアウトと生outcomeの警告を�
     assert.equal(step.env.V8_SPEED_PROFILE, 'ci')
   }
   const report = guard.steps.find(s => s.run?.includes('speed-report.mjs'))
+  assert.match(guard.steps.find(s => s.id === 'speed_budget').if, /!cancelled\(\)/, '画面の崩れで速度測定まで消さない')
+  assert.match(guard.steps.find(s => s.run?.includes('speed-budget.test.mjs')).if, /!cancelled\(\)/)
   assert.match(report.if, /!cancelled\(\)/)
   assert.match(report.env.SPEED_BUDGET_OUTCOME, /speed_budget.outcome/)
   assert.match(report.env.STRESS_SPEED_OUTCOME, /stress_speed.outcome/)

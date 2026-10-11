@@ -1,6 +1,7 @@
 /** LIFF と管理画面の見本で共有する入力の形。通信・送信は呼ぶ側が持つ。 */
 import { useEffect, useState, useRef, forwardRef, type InputHTMLAttributes, type ReactNode, type LabelHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes, type Ref } from 'react'
 import { PREFECTURES, FORM_DOCUMENT_SCAN_NOTE, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
+import Button from '../ui/Button'
 import styles from './controls.module.css'
 
 /** 欄名と必要度の表示。札を読み上げ名へ混ぜず、欄との結び付きを保つ。 */
@@ -8,8 +9,8 @@ export function FieldMark({ required = false }: { required?: boolean }) {
   return <span aria-hidden="true" className={required ? styles.required : styles.optional}>{required ? '必須' : '任意'}</span>
 }
 
-export function FieldLabel({ required = false, children, ...props }: LabelHTMLAttributes<HTMLLabelElement> & { required?: boolean }) {
-  return <div className={styles.label}><label {...props}>{children}</label><FieldMark required={required} /></div>
+export function FieldLabel({ required = false, children, size, ...props }: LabelHTMLAttributes<HTMLLabelElement> & { required?: boolean; size?: 'form' }) {
+  return <div className={`${styles.label} ${size === 'form' ? styles.formLabel : ''}`}><label {...props}>{children}</label><FieldMark required={required} /></div>
 }
 
 export function FieldCount({ value, max, night = false }: { value: string; max: number; night?: boolean }) {
@@ -264,4 +265,27 @@ export function LiffFieldLabel({label,children,required=false,optional=!required
  const text=label ?? children
  const shown=typeof text==='string'?text.replace(/\s*[（(](任意|必須)[）)]/g,'').replace(/\s*[*＊]$/,''):text
  return <span className={styles.labelRow}><Tag {...props} className={[styles.label,className].filter(Boolean).join(' ')}>{shown}</Tag>{required?<RequiredMark/>:optional?<OptionalMark/>:null}</span>
+}
+
+/** 日付のネイティブ選択は共通の入力部品だけが描く。 */
+export function HiddenDateInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { ref?: Ref<HTMLInputElement> }) {
+  return <TextInput {...props} appearance="hidden" type="date" />
+}
+
+/** 空き時刻の選択。読み上げと選択状態を共通ボタンへ渡す。 */
+export function RestaurantTimeChoices({ options, value, onChange }: {
+  options: { value: string; label: string; accessibleLabel: string; available: boolean }[];
+  value: string | null;
+  onChange: (value: string) => void;
+}) {
+  return <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="時刻">{options.map(option =>
+    <Button variant="restaurant-time" key={option.value} role="radio" aria-checked={option.value === value}
+      aria-label={option.accessibleLabel} selected={option.value === value} disabled={!option.available}
+      onClick={() => onChange(option.value)}>{option.label}</Button>
+  )}</div>
+}
+
+/** LIFFの欄に結び付く失敗。再試行の操作は呼ぶ側に残す。 */
+export function FieldError({ children, tone = 'danger' }: { children: ReactNode; tone?: 'danger' | 'inherit' }) {
+  return <p role="alert" className={tone === 'danger' ? 'text-[13px] leading-5 text-danger' : undefined}>{children}</p>
 }

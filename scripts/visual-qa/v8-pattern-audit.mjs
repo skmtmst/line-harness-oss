@@ -208,6 +208,14 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] })
       const line = lineAt(content, m.index)
       const raw = lines[line - 1] ?? ''
       const text = raw.trim().slice(0, 180)
+      // LIFFは管理画面とは別の正の手順を持つ。名前だけでは許可せず、import先を照合する。
+      if (signal.id === 'old-stepper' && m[1] === 'Stepper' && rel.startsWith('apps/liff/')) {
+        const imported = content.match(/import\s+Stepper\s+from\s+['"]([^'"]+)['"]/)
+        if (imported && imported[1].startsWith('.')) {
+          const source = resolve('/', dirname(rel), imported[1]).slice(1).replace(/\.js$/, '.tsx')
+          if (p.ownerFiles.some(re => re.test(source))) continue
+        }
+      }
       // 閲覧帯の外側に残すのは位置だけ。形を持つCSSは引き続き拾う。
       if (signal.id === 'own-band' && rel.endsWith('.css')) {
         const rule = cssRules(content).find((r) => m.index >= r.index && m.index < r.bodyIndex + r.body.length)

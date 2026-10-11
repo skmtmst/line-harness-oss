@@ -32,6 +32,7 @@ vi.mock('@/lib/api', () => {
 })
 
 import MenuVersionHistory from './menu-version-history'
+import { ApiError } from '@/lib/api'
 
 afterEach(() => {
   cleanup()
@@ -134,4 +135,17 @@ describe('版の履歴の引き出し', () => {
     const revertButton = screen.getByText('この版に戻す').closest('button')
     expect(revertButton?.disabled).toBe(true)
   })
+})
+
+test('版を戻す409の理由は一覧の取得成功で消えない', async () => {
+  const list = vi.fn(async () => ({versions: VERSIONS}))
+  fixture.listMenuVersions = list
+  fixture.revertMenuVersion = async () => {throw new ApiError(409,'fixture conflict')}
+  renderHistory()
+  await screen.findByText('第1版')
+  fireEvent.click(screen.getByText('第1版'))
+  fireEvent.click(screen.getByText('この版に戻す'))
+  fireEvent.click(screen.getByText('新しい版を作る'))
+  await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(screen.getByText('ほかの人が先に保存しました。最新の版を読み直してから、もう一度お試しください。')).toBeTruthy())
 })

@@ -1,6 +1,6 @@
 import Button from './Button.js';
 import { useEffect, useState } from 'react';
-import liff from '@line/liff';
+import liff from '../../lib/liff-runtime.js';
 import { api } from '../../lib/api.js';
 import { logFailure } from '../../lib/user-message.js';
 import Icon from './Icon.js';

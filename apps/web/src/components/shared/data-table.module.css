@@ -557,7 +557,8 @@ html[data-theme='v8'] .frame [data-list-name-cell] { min-width: var(--tpl-list-n
 html[data-theme='v8'] .actionCell > :is(button, a) { min-width: var(--row-action-width, max-content); }
 
 /* 表に実際に残る幅で、補助列を畳む。名前と操作を潰して収めない。 */
-html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) { container-type: inline-size; container-name: v8-list-table; }
+/* inline-size のコンテナは子の幅で広がらない。窓の flex-start 内でも幅を保つ。 */
+html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) { width: 100%; min-width: 0; container-type: inline-size; container-name: v8-list-table; }
 @container v8-list-table (max-width: 1100px) { html[data-theme='v8'] .frame[data-shared-part='list-table'] .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
 html[data-theme='v8'] .actionCell { flex: none; min-width: max-content; }
 html[data-theme='v8'] .actionCell :is(button, a):not([data-row-menu]) { min-width: var(--row-action-width, max-content); }

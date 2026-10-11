@@ -625,11 +625,15 @@ export const visitStampsApi = {
 
 /** 飲食店の席予約。既存get/postと同じくliffIdと本人のIDトークンを送る。 */
 export const restaurantBookingApi = {
+  courses: (storeId:string)=>get<{success:true;timezone?:string;data:import('@line-crm/shared').RestaurantCustomerCourse[]}>(`/api/liff/restaurant/courses?${new URLSearchParams({storeId})}`),
+  referrals: (storeId:string,date:string,guestCount:number,startsAt?:string,courseId?:string|null)=>get<{success:true;data:import('@line-crm/shared').RestaurantReferralCandidate[]}>(`/api/liff/restaurant/referrals?${new URLSearchParams({storeId,date,guestCount:String(guestCount),...(startsAt ? {startsAt}: {}),...(courseId ? {courseId}: {})})}`),
+  referral: (body:{storeId:string;targetStoreId:string;date:string;startsAt:string;guestCount:number;courseId?:string|null})=>post<{success:true;data:{bookingUrl:string}}>('/api/liff/restaurant/referrals',body),
+  formBooking: (body:{formId:string;blockId:string;submissionKey:string})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>('/api/liff/restaurant/form-booking',body),
   link: (token:string)=>get<{success:true;data:{id:string;name:string;timezone:string}}>(`/api/liff/restaurant/link/${encodeURIComponent(token)}`),
-  availability: (storeId:string,date:string,guestCount:number)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerAvailability}>(`/api/liff/restaurant/availability?${new URLSearchParams({storeId,date,guestCount:String(guestCount)})}`),
+  availability: (storeId:string,date:string,guestCount:number,courseId?:string|null)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerAvailability}>(`/api/liff/restaurant/availability?${new URLSearchParams({storeId,date,guestCount:String(guestCount),...(courseId ? {courseId}: {})})}`),
   hold: (body:import('@line-crm/shared').RestaurantCustomerHoldInput)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>('/api/liff/restaurant/holds',body),
   mine: (storeId:string)=>get<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking[]}>(`/api/liff/restaurant/reservations?${new URLSearchParams({storeId})}`),
-  confirm: (id:string,expectedVersion:number,details:import('@line-crm/shared').RestaurantCustomerDetails={})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/confirm`,{...details,expectedVersion}),
+  confirm: (id:string,expectedVersion:number,details:import('@line-crm/shared').RestaurantCustomerDetails & {referralId?:string}={})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/confirm`,{...details,expectedVersion}),
   cancel: (id:string,expectedVersion:number)=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/cancel`,{expectedVersion}),
-  reschedule: (id:string,body:{expectedVersion:number;startsAt:string;guestCount:number})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/reschedule`,body),
+  reschedule: (id:string,body:{expectedVersion:number;startsAt:string;guestCount:number;courseId?:string|null})=>post<{success:true;data:import('@line-crm/shared').RestaurantCustomerBooking}>(`/api/liff/restaurant/reservations/${encodeURIComponent(id)}/reschedule`,body),
 };
