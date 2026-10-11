@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FormLayout } from '@line-crm/shared';
 import Form from './Form.js';
@@ -202,3 +202,23 @@ describe('予約を入れる', () => {
     ).toBeTruthy();
   });
 });
+
+it('XL-01 仲間: 予約付き回答の送信中に前のページへ戻ったら、古い予約応答では完了しない', async()=>{
+  const multi=layout();multi.sections.push({id:'s2',name:'確かめる',blocks:[]})
+  setup()
+  cleanup()
+  getForm.mockResolvedValue({id:'f1',name:'人工アンケート',description:'',layout:multi,isActive:true})
+  render(<MemoryRouter initialEntries={['/forms/f1']}><Routes><Route path="/forms/:id" element={<Form/>}/></Routes></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button',{name:'13:00'}))
+  fireEvent.click(screen.getByRole('button',{name:'次へ'}))
+  submitForm.mockResolvedValue({status:200,body:{success:true,data:{}}})
+  let resolve!: (value:{booking_id:string;status:string})=>void
+  const pending=new Promise<{booking_id:string;status:string}>(r=>{resolve=r})
+  createRequest.mockReturnValue(pending)
+  fireEvent.click(screen.getByRole('button',{name:'送信する'}))
+  await waitFor(()=>expect(createRequest).toHaveBeenCalledOnce())
+  fireEvent.click(screen.getByRole('button',{name:/前のページへ/}))
+  await act(async()=>{resolve({booking_id:'old',status:'requested'});await pending})
+  expect(screen.queryByText('ご回答ありがとうございました')).toBeNull()
+  expect(screen.getByRole('button',{name:'次へ'})).toBeTruthy()
+})
