@@ -504,9 +504,6 @@
 
 
 /* B-178：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
-[data-theme='v8'] .frame[data-table-presentation='template-list'] {
-  --tpl-list-row-h: var(--tpl-tl-row-h);
-}
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr {
   height: var(--tpl-list-head-h);
 }
@@ -536,9 +533,9 @@
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr { min-height: var(--tpl-list-head-h); }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--tpl-list-row-h); }
 
-/* 寸法を渡した列型は、その口の値を使う。省略時は一覧の骨組み。 */
+/* 列型の見出しは指定の口を保つ。一覧の行は共通60、一般表は指定の口を使う。 */
 [data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--table-head-height, var(--tpl-list-head-h)); min-height: var(--table-head-height, var(--tpl-list-head-h)); }
-[data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--table-row-height, var(--tpl-list-row-h)); min-height: var(--table-row-height, var(--tpl-list-row-h)); }
+[data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); }
 .row[data-highlighted] {
   background: var(--color-accent-soft);
 }

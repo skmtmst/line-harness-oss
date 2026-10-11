@@ -223,8 +223,9 @@
 <a id="table"></a>
 ## table 表
 
-- **役目**：一覧の行を見出し40・行56・左右16・線は黒7%で並べる
+- **役目**：表を見出し40・左右24・線は黒7%で並べる
 - **持ち主（コード）**：`apps/web/src/components/shared/table.tsx`・`apps/web/src/components/shared/table.module.css`・`apps/web/src/components/shared/grid-table.tsx`・`apps/web/src/components/shared/grid-table.module.css`・`apps/web/src/components/shared/data-table.module.css`・`apps/web/src/components/shared/table-presentation.module.css`（部品 `DataTable`・`TableHeadRow`・`Th`・`Tr`・`Td`・`SortTh`・`GridTable`・`GridHeadRow`・`GridRow`・`GridCell`）
+  - 行高の対応（§6.5-3・2026-10-11 B-243③訂正）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧、`ListSkeleton`、Pen JpOg0「表の行」は **60**（`--tpl-list-row-h`）。カード内など一般の `DataTable`・`GridTable`・`TableSkeleton` は **56**（`--polish-table-row`）。会員の節目一覧は個別の絵 zQ5vY の行60を一覧の変数で読む。
   - 読む変数：`--color-table-head`・`--color-hairline`
 - **持ち主（Pen）**：`ASVsl`「表の見出し」・`JpOg0`「表の行」・`TBCUY`「横に送れる表」
 - **見つけ方（コード）**：

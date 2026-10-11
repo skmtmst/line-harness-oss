@@ -28,6 +28,8 @@ export const RULE_VALUES = {
   '--tpl-section-title-size': '15px', '--tpl-section-title-weight': '700',
   '--tpl-field-label-size': '12px', '--tpl-field-label-weight': '500',
   '--tpl-card-pad': '16px', '--tpl-notice-pad': '12px 16px', '--tpl-thead-pad-side': '24px',
+  '--tpl-list-row-h': '60px', '--tpl-tl-row-h': '60px', '--tpl-mb-life-row-h': '60px',
+  '--polish-table-row': '56px',
 }
 
 export function verifyRuleValues(css, expected = RULE_VALUES) {
