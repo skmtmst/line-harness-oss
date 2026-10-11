@@ -19,7 +19,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock() }))
-vi.mock('@/components/events/event-form', () => ({ default: () => <div>フォーム</div> }))
+vi.mock('@/v8/events/edit-form', () => ({ default: () => <div>フォーム</div> }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {

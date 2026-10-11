@@ -17,7 +17,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
-import EventForm from '@/components/events/event-form'
+import EventForm from '@/v8/events/edit-form'
 import { useBookingRequests } from './booking-requests'
 
 const NEXT_LIFECYCLE: Record<EventLifecycleStatus, Array<{ to: EventLifecycleStatus; label: string; needsReason: boolean }>> = {

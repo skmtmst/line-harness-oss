@@ -44,7 +44,7 @@ vi.hoisted(() => {
 })
 
 import EventWizard from './event-wizard'
-import EventForm from './event-form'
+import EventForm from '@/v8/events/edit-form'
 
 let host: HTMLDivElement
 let root: Root

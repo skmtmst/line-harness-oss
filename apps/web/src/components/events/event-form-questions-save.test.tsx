@@ -65,7 +65,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import EventForm, { toEventDraft } from './event-form'
+import EventForm, { toEventDraft } from '@/v8/events/edit-form'
 
 const QUESTION = { id: 'q1', label: 'アレルギーはありますか', type: 'text' as const, required: true, options: null }
 

@@ -218,7 +218,6 @@ shared-button-importer components/chats/inbox-filter-panel.tsx
 shared-button-importer components/chats/saved-view-dialog.tsx
 shared-button-importer components/chats/template-folder-select.tsx
 shared-button-importer components/dashboard/qr-dialog.tsx
-shared-button-importer components/events/event-form.tsx
 shared-button-importer components/events/event-questions-editor.tsx
 shared-button-importer components/events/event-wizard.tsx
 shared-button-importer components/feature-disabled-gate.tsx
@@ -570,6 +569,7 @@ shared-button-importer v8/events/change-review.tsx
 shared-button-importer v8/events/bookings.tsx
 shared-button-importer v8/events/booking-records.tsx
 shared-button-importer v8/form-responses/responses.tsx
+shared-button-importer v8/events/edit-form.tsx
 shared-button-importer v8/events/list.tsx
 shared-button-importer v8/contents/list.tsx
 shared-button-importer v8/contents/media-detail-dialog.tsx

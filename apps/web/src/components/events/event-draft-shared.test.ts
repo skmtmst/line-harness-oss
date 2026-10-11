@@ -16,7 +16,7 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const FORM = read('event-form.tsx')
+const FORM = read('..', '..', 'v8', 'events', 'edit-form.tsx')
 const WIZARD = read('event-wizard.tsx')
 const LIST_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
 const BOOKINGS_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')

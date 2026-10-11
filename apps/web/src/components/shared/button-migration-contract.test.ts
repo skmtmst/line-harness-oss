@@ -97,7 +97,8 @@ describe('標準ボタンの第1段階移行', () => {
   })
 
   it('リンク先と主要な操作ハンドラを維持する', () => {
-    const all = Object.values(sources).join('\n')
+    // 成果地点は旧の移行対象から外れ、現役V8を使う。行き先の検査は続ける。
+    const all = [...Object.values(sources), readFileSync(join(SRC, 'app/conversions/page.tsx'), 'utf8')].join('\n')
     for (const href of [
       '/tags/new',
       '/tags/fields/new',

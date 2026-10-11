@@ -14,7 +14,7 @@ function withoutComments(src: string): string {
 }
 
 const MIGRATED = [
-  'components/events/event-form.tsx',
+  'v8/events/edit-form.tsx',
   'components/events/event-wizard.tsx',
   'components/rich-menus/apply-to-tag-modal.tsx',
 ]
@@ -32,7 +32,7 @@ describe('V6 確認窓への移行（4本目）', () => {
 })
 
 describe('イベント編集の予約枠', () => {
-  const src = read('components/events/event-form.tsx')
+  const src = read('v8/events/edit-form.tsx')
 
   it('枠の削除は二度押しを止め、失敗を窓に出す', () => {
     expect(src).toContain('async function deleteSlot()')

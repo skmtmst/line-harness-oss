@@ -11,8 +11,8 @@ import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, typ
 import ImageUploader from '@/components/shared/image-uploader'
 import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
-import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
-import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
+import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from '@/components/events/bulk-slot-generator'
+import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from '@/components/events/jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -23,7 +23,6 @@ import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import Checkbox from '@/components/shared/checkbox'
 import { Field, TextInput } from '@/components/shared/form-controls'
-import HelpTip from '@/components/shared/help-tip'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 import DateField from '@/components/shared/date-field'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -42,18 +41,18 @@ import {
   deadlineOptionsWithSaved,
   deadlineSelectValue,
   parseDeadlineSelect,
-} from './event-draft-shared'
-import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
+} from '@/components/events/event-draft-shared'
+import { formatDateTime, formatDay, formatTime } from '@/lib/format'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 
 type Tab = 'overview' | 'slots' | 'publish'
 
-const TABS: Array<{ key: Tab; label: string; saveLabel: string; sub: string }> = [
-  { key: 'overview', label: '1. 概要', saveLabel: '概要を保存する', sub: 'イベント名・場所・詳細を入力' },
-  { key: 'slots', label: '2. 予約枠', saveLabel: '', sub: '友だちが選べる日時を追加' },
-  { key: 'publish', label: '3. 公開設定', saveLabel: '公開設定を保存する', sub: '承認制・リマインダ・公開' },
+const TABS: Array<{ key: Tab; label: string; saveLabel: string }> = [
+  { key: 'overview', label: '1. 概要', saveLabel: '概要を保存する' },
+  { key: 'slots', label: '2. 予約枠', saveLabel: '' },
+  { key: 'publish', label: '3. 公開設定', saveLabel: '公開設定を保存する' },
 ]
 
 const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT
@@ -560,9 +559,7 @@ function SlotsTab({
 
   if (!eventId) {
     return (
-      <div className="text-center py-8 text-ink-faint text-sm">
-        まず「概要」タブで保存してから予約枠を追加してください。
-      </div>
+      <ListState kind="empty" title="まず「概要」タブで保存してから予約枠を追加してください。" />
     )
   }
 

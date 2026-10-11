@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
  * 「次の方へ案内」も申込者の画面にある。3つの画面の説明を自動にそろえる。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
-const FORM = readFileSync(join(HERE, 'event-form.tsx'), 'utf8')
+const FORM = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'edit-form.tsx'), 'utf8')
 const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
 const BOOKINGS = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')
 const ROUTES = readFileSync(join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'events.ts'), 'utf8')

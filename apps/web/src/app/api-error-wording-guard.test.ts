@@ -104,7 +104,7 @@ const BASELINE: Record<string, number> = {
   'app/templates/page.tsx': 1,
   'app/updates/page.tsx': 1,
   'app/webhooks/webhook-runtime.spec.ts': 1,
-  'components/events/event-form.tsx': 5,
+  'v8/events/edit-form.tsx': 5,
   'components/events/event-wizard.tsx': 5,
   'components/friend-fields/edit-tag-page-v4.tsx': 1,
   'components/friend-fields/field-list.tsx': 1,

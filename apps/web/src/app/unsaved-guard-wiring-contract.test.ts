@@ -99,7 +99,7 @@ const GUARDED = [
   'app/webinars/edit/page.tsx',
   'app/webinars/new/page.tsx',
   'components/broadcasts/broadcast-form.tsx',
-  'components/events/event-form.tsx',
+  'v8/events/edit-form.tsx',
   'components/events/event-wizard.tsx',
   'components/friend-fields/support-mark-editor.tsx',
   'components/reminders/reminder-publish-flow.tsx',
