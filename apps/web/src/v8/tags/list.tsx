@@ -105,7 +105,7 @@ export default function TagsList({
   ) : null
 
   return (
-    <PageFrame skeleton kind="list" boardId={boardId}>
+    <PageFrame heightMode="content" skeleton kind="list" boardId={boardId}>
       <PageHeading
         headingSize="regular"
         title="タグ"

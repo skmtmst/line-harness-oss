@@ -18,9 +18,7 @@
   color: var(--color-action);
 }
 
-/* タブの段（I1E7Bt「タブの段」：左右24・字の下12・高さ約31・下に線）。
-   共通のタブは字の下12＋線で 35 になるので、この段だけ 31 に詰める。
-   入口の折り返しの決まり（data-tabs-row）より強くするため .tabs を重ねる。 */
+/* タブの段。高さ・文字・下線は共通の Tabs（B-180：36）に任せる。 */
 .tabs {
   padding: 0 var(--tpl-head-pad-side);
   border-bottom: 1px solid var(--color-hairline);
@@ -29,12 +27,10 @@
 
 /* 線は段（板の端から端）に引く。タブの線は消して、選んだタブの下線だけ段の線に重ねる。 */
 .tabs.tabs > :global(nav) {
-  height: var(--tpl-tag-tabs-h);
   border-bottom: 0;
 }
 
 .tabs.tabs > :global(nav) button {
-  padding-bottom: var(--tpl-tag-tabs-pad-bottom);
   margin-bottom: -1px;
 }
 

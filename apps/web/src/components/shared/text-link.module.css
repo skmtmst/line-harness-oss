@@ -50,6 +50,6 @@
 }
 
 /* B-152②：役割ごとの文字の段。 */
-[data-theme='v8'] .label { font-weight: var(--polish-weight-body); }
+[data-theme='v8'] .label { font-weight: var(--polish-weight-label); }
 
 @layer components { .root[data-tone='action']{color:var(--color-accent-deep);} }

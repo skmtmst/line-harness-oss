@@ -78,7 +78,7 @@ describe('V8 タグ タグの一覧', () => {
     await render(<TagsList fixture={fixture} />)
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
     // 左にフォルダの列があるので表にフォルダ列は置かない（2026-10-07 オーナー）。
-    expect(heads).toEqual(['タグ', '状態', '人数', '付け方', '連動', '使っている所', '操作'])
+    expect(heads).toEqual(['タグ', '人数', '付け方', '連動', '使っている所', '操作'])
     expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     for (const label of ['タグ', '友だち情報欄', '対応マーク', '保存した検索']) {
       expect(screen.getAllByRole('tab', { name: label }).length).toBeGreaterThan(0)
@@ -86,6 +86,12 @@ describe('V8 タグ タグの一覧', () => {
     expect(container.querySelector('[data-design-node="I1E7Bt"]')).not.toBeNull()
     expect(screen.getByText('EC顧客連携済み')).toBeTruthy()
     expect(container.querySelector('[data-list-name]')?.textContent).not.toContain('登録')
+  })
+
+  it('空の状態列を外しても、名前が重なったタグの注意は出す', async () => {
+    await render(<TagsList fixture={{ ...fixture, items: fixture.items.map((tag, index) => index === 0 ? { ...tag, cleanupReasons: ['duplicate_name' as const] } : tag) }} />)
+    expect(screen.getByRole('columnheader', { name: '状態' })).toBeTruthy()
+    expect(screen.getByText('名前が重なっている')).toBeTruthy()
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。

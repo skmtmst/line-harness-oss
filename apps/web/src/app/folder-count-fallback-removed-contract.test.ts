@@ -2,6 +2,7 @@ import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
@@ -15,6 +16,21 @@ const TEMPLATES = read('templates', 'page.tsx')
 const CONTENTS = read('contents', 'page.tsx')
 const VARS = read('contents', 'vars', 'page.tsx')
 const RICHMENUS = read('rich-menus', 'page.tsx')
+
+/** 子の作るボタンの > / /> で切らず、共通欄の属性だけを見る。 */
+function managedPanel(source: string): string {
+  const file = ts.createSourceFile('screen.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let attributes = ''
+  function visit(node: ts.Node) {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(file) === 'ManagedFolderPanel') {
+      attributes = node.attributes.properties.map(property => property.getText(file)).join('\n')
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(file)
+  return attributes
+}
 
 /**
  * フォルダ件数の `??` フォールバック（現在ページの行だけを数える）が
@@ -33,7 +49,7 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
   it('reminders: reminders.filter(...).length でフォルダ件数を数えていない', () => {
     expect(REMINDERS).not.toMatch(/reminders\.filter\(.*folderId.*\)\.length/)
     // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す（B-136）。
-    const panel = REMINDERS.match(/<ManagedFolderPanel[\s\S]*?>/)?.[0] ?? ''
+    const panel = managedPanel(REMINDERS)
     expect(panel).toContain('kind="reminder"')
     expect(panel).not.toContain('countOf=')
     // 型に無い itemCount を独自キャストで足していた拡張型を消した(#631)。
@@ -55,7 +71,7 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => !r\.folderId\)\.length/)
     // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す。
     // 画面で数え直す countOf を渡していないことを見る（B-136）。
-    const panel = AUTO_REPLIES.match(/<ManagedFolderPanel[\s\S]*?\/>/)?.[0] ?? ''
+    const panel = managedPanel(AUTO_REPLIES)
     expect(panel).toContain('kind="auto_reply"')
     expect(panel).not.toContain('countOf=')
     expect(panel).toContain('unfiledCount={unfiledCount}')

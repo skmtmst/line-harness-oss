@@ -136,7 +136,9 @@
   position: absolute;
   inset: calc((var(--tpl-icon-btn-row) - var(--tpl-icon-btn-row-hit)) / 2);
 }
-[data-theme='v8'] .button[data-variant='plain']:not(:focus-visible) { outline-color: transparent; background: transparent; }
+[data-theme='v8'] .button[data-variant='plain'] { box-shadow: none; background: transparent; }
+[data-theme='v8'] .button[data-variant='plain']:not(:focus-visible) { outline-color: transparent; }
+[data-theme='v8'] .button[data-variant='plain']:hover:not(:disabled) { background: var(--polish-hover); }
 }
 
 /* B-152・仕上げ7 */

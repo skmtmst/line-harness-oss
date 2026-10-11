@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { DashboardFriendTrendPoint } from '@/lib/api'
 import SegmentedControl from '@/components/shared/segmented'
-import { BarChart, toBarChartItems, barChartTicks } from '@/components/shared/bar-chart'
+import { BarChart, BarChartLegend, toBarChartItems, type BarChartLegendItem } from '@/components/shared/bar-chart'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { STATE_TEXT } from '@/components/shared/not-connected'
@@ -27,6 +27,7 @@ export function trendRangeNote(trend: DashboardFriendTrendPoint[]): string {
 }
 
 type View = 'chart' | 'table'
+const LEGEND: BarChartLegendItem[] = [{ label: '登録', tone: 'added' }, { label: 'ブロック', tone: 'removed' }]
 
 /**
  * 友だち数の推移のグラフ（WQmep 段A）。
@@ -35,10 +36,6 @@ type View = 'chart' | 'table'
  */
 export function FriendTrend({ trend, loading }: { trend: DashboardFriendTrendPoint[]; loading: boolean }) {
   const [view, setView] = useState<View>('chart')
-  const max = Math.max(1, ...trend.flatMap((day) => [day.added, day.blocked]))
-  const ticks = barChartTicks(max)
-  const top = ticks[ticks.length - 1] || 1
-  const pct = (value: number) => `${(Math.max(0, value) / top) * 100}%`
   return (
     <>
       <div className={styles.trendTools}>
@@ -49,7 +46,7 @@ export function FriendTrend({ trend, loading }: { trend: DashboardFriendTrendPoi
           onChange={setView}
           options={[{ value: 'chart', label: 'グラフ' }, { value: 'table', label: '表' }]}
         />
-
+        {view === 'chart' ? <BarChartLegend items={LEGEND} layout="dashboard" /> : null}
       </div>
       {view === 'table' ? (
         <div className={styles.trendTable}><FriendTrendTable trend={trend} loading={loading} /></div>
@@ -58,7 +55,16 @@ export function FriendTrend({ trend, loading }: { trend: DashboardFriendTrendPoi
           <span className="sr-only">{STATE_TEXT.loading}</span>
         </DelayedSkeleton>
       ) : (
-        <BarChart items={toBarChartItems(trend.map(day=>({date:day.date, added:day.added, removed:day.blocked})), {formatTitle:date=>`${trendDay(date).jp}（${trendDay(date).week}）`})} label="日ごとの登録とブロック" legend={[{label:'登録',tone:'added'},{label:'ブロック',tone:'removed'}]} />
+        <BarChart
+          layout="dashboard"
+          showLegend={false}
+          items={toBarChartItems(trend.map(day => ({ date: day.date, added: day.added, removed: day.blocked })), {
+            formatTitle: date => `${trendDay(date).jp}（${trendDay(date).week}）`,
+            formatAxisLabel: date => `${trendDay(date).md}（${trendDay(date).week}）`,
+          })}
+          label="日ごとの登録とブロック"
+          legend={LEGEND}
+        />
       )}
     </>
   )

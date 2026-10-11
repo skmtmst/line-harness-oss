@@ -166,6 +166,24 @@
   white-space: nowrap;
 }
 
+/* 固定版の短い日別グラフ。既定の分析グラフの寸法は保つ。 */
+.chart[data-layout='dashboard'] { height: var(--tpl-db-chart-h); flex-shrink: 0; gap: 0; }
+.chart[data-layout='dashboard'] .plot { height: var(--tpl-db-chart-plot-h); margin-top: var(--tpl-db-chart-top); padding-left: var(--tpl-db-chart-axis); padding-right: var(--tpl-db-chart-right); }
+.chart[data-layout='dashboard'] .gridline { left: var(--tpl-db-chart-axis); right: var(--tpl-db-chart-right); }
+.chart[data-layout='dashboard'] .tick { left: calc(var(--tpl-db-chart-tick-left) - var(--tpl-db-chart-axis)); width: auto; top: var(--tpl-db-chart-tick-shift); text-align: left; font-family: var(--font-inter), Inter, sans-serif; line-height: var(--tpl-db-small-lh); }
+.chart[data-layout='dashboard'] .dayButton { flex: 0 0 auto; height: var(--tpl-db-chart-plot-h); }
+.chart[data-layout='dashboard'] .bars { gap: var(--tpl-db-chart-bar-gap); padding: 0; }
+.chart[data-layout='dashboard'] .bar { width: var(--tpl-db-chart-bar-w); max-width: var(--tpl-db-chart-bar-w); min-height: 1px; border-radius: var(--tpl-db-chart-bar-r); }
+.chart[data-layout='dashboard'] .addedBar { background: var(--tpl-db-chart-bar-soft); }
+.chart[data-layout='dashboard'] .dashboardRemovedBar { background: var(--color-control-border); }
+.chart[data-layout='dashboard'] .column[data-latest] .addedBar { background: var(--color-accent-deep); }
+.chart[data-layout='dashboard'] .axisLabel { align-self: center; width: var(--tpl-db-chart-day-w); padding-top: var(--tpl-db-chart-label-gap); font-family: var(--font-inter), Inter, sans-serif; line-height: var(--tpl-db-small-lh); }
+.chart[data-layout='dashboard'] .column[data-latest] .axisLabel { color: var(--color-ink); font-weight: 600; }
+.legend[data-layout='dashboard'] { justify-content: flex-start; gap: var(--tpl-db-legend-gap); padding: 0; margin: 0; list-style: none; font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); }
+.legend[data-layout='dashboard'] .legendItem { gap: var(--polish-space-row); }
+.legend[data-layout='dashboard'] .swatch { width: var(--tpl-db-swatch); height: var(--tpl-db-swatch); border-radius: var(--tpl-db-swatch-r); }
+.legend[data-layout='dashboard'] .swatchRemoved { background: var(--color-control-border); }
+
 /*
  * ★V8 G3 はみ出し直し（parity 1004-0513：目盛り 58＞24 など 104 件）。
  * 狭い列で中央寄せの字が隣の列へはみ出すと、後に描かれる隣の列の棒の

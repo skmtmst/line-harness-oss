@@ -67,11 +67,10 @@ describe('ダッシュボード編集の入口', () => {
     expect(canEditDashboardLayout('viewer')).toBe(false)
   })
 
-  it('板の頭のボタン・数のマスの「…」・?edit=1 の窓の3か所とも同じ判定で出し入れする（配信を作るの判定と混ぜない）', () => {
+  it('板の頭の編集ボタンと?edit=1 の窓を同じ判定で出し入れする（配信を作るの判定と混ぜない）', () => {
     const src = readFileSync(join(__dirname, 'dashboard.tsx'), 'utf8')
-    expect(src).toMatch(/\.\.\.\(canEditLayout \? \[\{ id: 'edit', label: 'ダッシュボード編集'/)
     expect(src).toMatch(/\{canEditLayout \? <Button type="button" onClick=\{d\.openEditor\}>/)
     expect(src).toMatch(/overlays=\{d\.editorOpen && canEditLayout \? <DashboardEditor/)
-    expect(src.match(/onClick=\{d\.openEditor\}|onSelect: d\.openEditor/g)).toHaveLength(2)
+    expect(src.match(/onClick=\{d\.openEditor\}|onSelect: d\.openEditor/g)).toHaveLength(1)
   })
 })

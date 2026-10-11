@@ -351,7 +351,7 @@ const V8_MEASURE = [
   { id: 'x4FeKG', file: 'shared/activity-item.module.css', cls: 'marker', skipText: true },
   { id: 'EsjP2', file: 'shared/activity-item.module.css', cls: 'row', textCls: 'title' },
   { id: 'CugIm', file: 'shared/section-header.module.css', cls: 'root', textCls: 'title' },
-  { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: 'card', textCls: 'title' },
+  { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: ['card', 'checked'], textCls: 'title' },
   { id: 'dtJVi', file: 'shared/segmented.module.css', cls: 'root', textCls: ['item', 'selected'] },
   { id: 'RfHCo', file: 'shared/otp-input.module.css', cls: 'group', node: '桁の並び', skipText: true },
   { id: 'prbOC', file: 'shared/delete-button.module.css', cls: 'tile', skipText: true },
@@ -388,7 +388,7 @@ function splitSelectorGroups(css) {
 }
 
 /** v8 での実効値：素の規定（base）＋ v8 上書き（後勝ち）。cls は合成可（同じ要素に付く複数クラス）。 */
-function v8EffectiveBody(css, cls) {
+export function v8EffectiveBody(css, cls) {
   const flat = splitSelectorGroups(css)
   return (Array.isArray(cls) ? cls : [cls])
     .flatMap((c) => [ruleBody(flat, c), v8ScopedBody(flat, c)])

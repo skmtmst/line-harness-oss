@@ -42,6 +42,8 @@
 /* B-149：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
 :global([data-theme='v8']) .folders + .main { border-left: 0; }
 :global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
+:global([data-theme='v8']) .toolbar[data-toolbar-spacing='section'] { padding-block: var(--polish-space-card); }
+:global([data-theme='v8']) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global([data-theme='v8']) .content { min-width: 0; }
 :global([data-theme='v8']) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
@@ -95,6 +97,16 @@
 :global([data-theme='v8']) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px var(--tpl-fx4-footer-inset); } /* 採用 A-1 浮いた下の帯（オーナー 2026-10-04）。左右は絵の下の帯（left 12）に合わせる */
 :global([data-theme='v8']) .detailSummary { width: 320px; padding: var(--polish-space-card) var(--polish-space-section); border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
 :global([data-theme='v8']) .detailContent { padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
+/* 実行の記録（N43uVX）：本文と補助欄は型が組み、短い板は中身で終わる。 */
+:global([data-theme='v8']) [data-template-layout='record-detail'] > .heading { padding-top: var(--polish-space-section); }
+:global([data-theme='v8']) [data-template-layout='record-detail'] > .split { border-top: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) [data-template-layout='record-detail'] .detailContent { padding: var(--polish-space-section); padding-bottom: 0; gap: var(--polish-space-card); }
+:global([data-theme='v8']) [data-template-layout='record-detail'] .detailSummary { order: 2; width: var(--tpl-fm2-rd-side-w); padding: var(--polish-space-section); padding-bottom: 0; border-right: 0; border-left: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-card); align-self: flex-start; }
+@container v8-page (max-width: 1099px) {
+  :global([data-theme='v8']) [data-template-layout='record-detail'] > .split { flex-direction: column; }
+  :global([data-theme='v8']) [data-template-layout='record-detail'] .detailContent { align-self: stretch; }
+  :global([data-theme='v8']) [data-template-layout='record-detail'] .detailSummary { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
+}
 :global([data-theme='v8']) .inbox { display: flex; flex: 1; min-height: 0; min-width: 0; }
 :global([data-theme='v8']) .inboxList { width: var(--tpl-inbox-list-width); flex-shrink: 0; border-right: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .conversation { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-table-head); }
@@ -140,8 +152,13 @@
 /* 横並びの段も数の帯と同じ等分の格子（隙間0）。flex の配分だと線の太さ分ずれる。高さは中身（並ぶマスは同じ高さ）。 */
 :global([data-theme='v8']) .dashboardColumns { min-height: 200px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 :global([data-theme='v8']) .dashboardColumns .dashboardCell { padding-inline: 20px; }
+:global([data-theme='v8']) .dashboardColumns[data-layout='overview'] { min-height: var(--tpl-db-columns-min-h); }
+:global([data-theme='v8']) .dashboardColumns[data-layout='overview'] .dashboardCell { padding-inline: var(--polish-space-section); }
 :global([data-theme='v8']) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: var(--polish-space-field); }
-:global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: var(--polish-space-card) var(--polish-space-card); display: flex; flex-direction: column; gap: var(--polish-space-row); }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--polish-space-row); }
+:global([data-theme='v8']) .dashboardAsideSection { display: flex; flex-direction: column; gap: var(--polish-space-field); padding: var(--polish-space-card) var(--polish-space-section); }
+:global([data-theme='v8']) .dashboardAsideSection + .dashboardAsideSection { border-top: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardRow[data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: 0; }
 
 /* 入力側と各段は中身の高さを保つ。 */
 :global([data-theme='v8']) [data-page-template='create'] > .heading .headingText { flex: 1 1 auto; }
@@ -166,6 +183,8 @@
 
 /* 保存の帯は短い画面でも見える。本文だけを縦に送り、帯を追い出さない。 */
 :global([data-theme='v8']) .frame[data-has-footer] { height: calc(100dvh - 74px); min-height: 0; }
+:global([data-theme='v8']) .frame[data-frame-height='content'] { height: auto; min-height: 0; max-height: calc(100dvh - 74px); }
+:global([data-theme='v8']) .frame[data-frame-height='content']:not([data-has-footer]) { max-height: none; }
 :global([data-theme='v8']) .frame[data-has-footer] > .split,
 :global([data-theme='v8']) .frame[data-has-footer] > .settings { min-height: 0; overflow-y: auto; }
 :global([data-theme='v8']) .frame[data-has-footer] > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }

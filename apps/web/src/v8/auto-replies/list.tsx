@@ -56,7 +56,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { compareEvaluationOrder, movePriorityUpdates } from './order';
 import QuickCreateV8 from './quick-create'
@@ -944,6 +944,12 @@ export default function AutoRepliesListV8() {
 
   const folderPanel = (
     <ManagedFolderPanel
+      createAction={canEdit ? <CreateRuleButton
+        full
+        disabled={false}
+        menuOpen={createMenuOpen}
+        onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
+      /> : undefined}
       kind="auto_reply"
       folders={folders}
       onChanged={loadFolders}
@@ -1364,12 +1370,10 @@ export default function AutoRepliesListV8() {
   )
 
   /* ページ送りは型の pagination 枠へ（余白は型）。 */
-  const listPager = pageCount > 1 ? (
+  const listPager = ready ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, sortedItems.length)} / {formatNumber(sortedItems.length)} 件
-      </span>
-      <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
+      <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage}
+        summary={paginationSummary(sortedItems.length, (safePage - 1) * pageSize + 1, Math.min(safePage * pageSize, sortedItems.length))} />
     </ListPagePagination>
   ) : null
 
@@ -1523,11 +1527,11 @@ export default function AutoRepliesListV8() {
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
-      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}</>}
+      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}{kpis.map((kpi) => kpi.help).filter(Boolean).join(" ")}</>}
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {!canEdit && (
@@ -1536,7 +1540,7 @@ export default function AutoRepliesListV8() {
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} help={kpi.help} helpLabel={kpi.helpLabel} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? () => { setConflictOnly(true); setPage(1) } : undefined} retryLabel="重なりを見る →" />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? () => { setConflictOnly(true); setPage(1) } : undefined} retryLabel="重なりを見る →" />
           ))}
         </KpiBand>
       </>}
@@ -1711,14 +1715,6 @@ export default function AutoRepliesListV8() {
       </>}
 
       folders={<>
-          {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-          {!canEdit && <span className={styles.viewerCreateSpace} aria-hidden="true" />}
-          {canEdit && <CreateRuleButton
-            full
-            disabled={false}
-            menuOpen={createMenuOpen}
-            onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
-          />}
           <ActionMenu
             open={createMenuOpen}
             onClose={() => setCreateMenuOpen(false)}

@@ -8,6 +8,7 @@ import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
 import { assess, assessAgainstBase, record, measurePage, validateAllowances } from './layout-defects.mjs'
+import scanPanelBlank from './panel-blank-browser.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
 const cases = {
   'control-overlap': '<div data-list-row style="display:flex"><button style="width:100px;height:36px">コピー</button><button style="width:36px;height:36px;margin-left:-30px">…</button></div>',
@@ -50,6 +51,21 @@ test('実物の表CSS：窓内のコンテナ幅を壊すと取消が押せず�
     await page.setContent(html(css))
     assert.equal(await page.locator('.frame').evaluate(el => el.getBoundingClientRect().width), 560)
     assert.equal(await hit(), true, '実物CSSで取消の中央を押せる')
+  } finally { await browser.close() }
+})
+test('入れ子のカードの余白は合算せず、カード自身の大きな余りは検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    const card = height => `<section data-design-part="card" style="background:white;padding:24px;${height}"><p style="margin:0;height:200px">内容</p></section>`
+    const markup = inner => shell(`<div style="background:white;padding:24px"><section data-design-part="card" style="background:white;padding:24px">${inner}</section></div><footer style="margin-top:900px">続き</footer>`)
+    await page.setContent(markup(card('')))
+    assert.deepEqual(await page.evaluate(scanPanelBlank), [])
+    await page.setContent(markup(card('height:360px')))
+    const failures = await page.evaluate(scanPanelBlank)
+    assert.equal(failures.length, 1)
+    assert.equal(failures[0].measure.gap, 136)
+
   } finally { await browser.close() }
 })
 test('種類ごとに実物を壊し、検出・終了コード1・修復後0を確認する', async () => {

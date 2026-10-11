@@ -120,5 +120,5 @@ it('統括のフォルダは色の保存に失敗しても窓を残し、再試�
   cleanup()
   render(<HqBroadcastList />)
   await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' })
-  expect((document.querySelector('nav [data-folder-dot]') as HTMLElement).style.backgroundColor).toBe('#ec4899')
+  expect((document.querySelector('nav svg.lucide-folder') as SVGElement).style.color).toBe('#ec4899')
 })

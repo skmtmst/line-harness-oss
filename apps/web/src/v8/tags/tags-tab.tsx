@@ -29,7 +29,7 @@ import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-er
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
@@ -661,6 +661,8 @@ export default function TagsTab({
     </>
   )
 
+  const hasStatusColumn = liveOrder.shown.some(tag => tag.status === 'archived' || tag.cleanupReasons?.includes('duplicate_name'))
+
   const table = status === 'forbidden' ? (
     <ListState kind="error" title="タグを見る権限がありません" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。"  />
   ) : status === 'error' ? (
@@ -684,7 +686,7 @@ export default function TagsTab({
         <thead>
           <TableHeadRow>
             <Th className={styles.colName}>タグ</Th>
-            <Th>状態</Th>
+            {hasStatusColumn ? <Th>状態</Th> : null}
             <Th className={styles.colCount}>人数</Th>
             <Th className={styles.colSource}>付け方</Th>
             <Th className={styles.colLink}>連動</Th>
@@ -736,10 +738,10 @@ export default function TagsTab({
 
                   </ContextMenu>
                 </Td>
-                <Td>{tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
+                {hasStatusColumn ? <Td>{tag.status === 'archived' ? <StatusBadge size="annotation" dot={false}>保管済み</StatusBadge> : null}
                       {tag.cleanupReasons?.includes('duplicate_name') ? (
                         <StatusBadge size="annotation" tone="warning" dot={false} title="正規化した名前がほかのタグと重なっています。整理候補です。">名前が重なっている</StatusBadge>
-                      ) : null}</Td>
+                      ) : null}</Td> : null}
                 {/* 人数は、そのタグで絞った友だち一覧へのリンク。 */}
                 <Td className={styles.colCount}>
                   <Link prefetch={false} href={`/friends?tag=${encodeURIComponent(tag.id)}`} className={styles.countLink} title={`「${tag.name}」が付いている友だちを見る`}>
@@ -772,12 +774,8 @@ export default function TagsTab({
 
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}
       <ListPager>
-        <span className={styles.pagerCount}>
-          {`${filtered.length} 件中 ${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filtered.length)} 件`}
-        </span>
-        {pages > 1 ? (
-          <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り" />
-        ) : null}
+        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り"
+          summary={paginationSummary(filtered.length, (currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, filtered.length))} />
       </ListPager>
     </DelayedSkeleton>
   )
