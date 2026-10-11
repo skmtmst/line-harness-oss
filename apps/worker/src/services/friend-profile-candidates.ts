@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import type {
   MergedPersonJsonValue,
   MergedPersonProfileSelectionInput,
@@ -110,11 +111,11 @@ async function profileCandidateId(
 async function friendRows(db: D1Database, friendIds: string[]): Promise<FriendValueRow[]> {
   const ids = [...new Set(friendIds.filter(Boolean))];
   if (ids.length === 0) return [];
-  const placeholders = ids.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(ids).sql;
   const result = await db.prepare(
     `SELECT id, display_name, real_name, system_display_name, status_message, metadata
        FROM friends WHERE id IN (${placeholders}) ORDER BY id`,
-  ).bind(...ids).all<FriendValueRow>();
+  ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<FriendValueRow>();
   return result.results;
 }
 
@@ -150,9 +151,9 @@ export async function getFriendProfileCandidates(
     ? await db.prepare(
       `SELECT t.id, t.name, t.color, ft.friend_id
          FROM friend_tags ft JOIN tags t ON t.id = ft.tag_id
-        WHERE ft.friend_id IN (${ids.map(() => '?').join(', ')})
+        WHERE ft.friend_id IN (${sqlIdSet(ids).sql})
         ORDER BY t.name, t.id, ft.friend_id`,
-    ).bind(...ids).all<TagRow>()
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<TagRow>()
     : { results: [] as TagRow[] };
   const tagMap = new Map<string, FriendTagCandidate>();
   for (const row of tags.results) {

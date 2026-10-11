@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 
 /**
@@ -71,10 +72,10 @@ export async function getFolders(
     // Account-owned rows are never public. Only tag/webinar/template legacy rows have
     // the unassigned policy; other existing folder kinds keep their old list.
     const ids = accountId ? scope.allowedAccountIds.filter((id) => id === accountId) : scope.allowedAccountIds;
-    const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
+    const own = ids.length ? `account_id IN (${sqlIdSet(ids).sql})` : "0";
     const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar', 'template', 'automation', 'common_action', 'webhook', 'conversion', 'affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule'))";
     const result = await db.prepare(`SELECT * FROM folders WHERE (${own} OR ${legacy})${kind ? " AND kind = ?" : ""}
-      ORDER BY kind ASC, display_order ASC, name ASC`).bind(...ids, ...(kind ? [kind] : [])).all<Folder>();
+      ORDER BY kind ASC, display_order ASC, name ASC`).bind(...(ids.length ? sqlIdSet(ids).binds : []), ...(kind ? [kind] : [])).all<Folder>();
     return result.results;
   }
   if (kind === 'webinar' && accountId) {
@@ -330,8 +331,8 @@ export async function getFolderItemCounts(
       ['incoming_webhooks', 'outgoing_webhooks'].map(async table => {
         if (!scope.allowedAccountIds.length) return [] as { folder_id: string | null; item_count: number }[];
         const rows = await db.prepare(`SELECT folder_id, COUNT(*) AS item_count FROM ${table}
-          WHERE deleted_at IS NULL AND line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})
-          GROUP BY folder_id`).bind(...scope.allowedAccountIds).all<{ folder_id: string | null; item_count: number }>();
+          WHERE deleted_at IS NULL AND line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})
+          GROUP BY folder_id`).bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<{ folder_id: string | null; item_count: number }>();
         return rows.results;
       }),
     );
@@ -345,13 +346,13 @@ export async function getFolderItemCounts(
   if (kind === 'event') {
     // 複数アカウント向けは sentinel ではなく account_ids を読む。EXISTS で重複を数えない。
     const ids = scope.allowedAccountIds;
-    const slots = ids.map(() => '?').join(',');
+    const slots = sqlIdSet(ids).sql;
     const visible = ids.length ? `((target_type = 'single' AND line_account_id IN (${slots}))
       OR (target_type = 'multi-account-dedup' AND EXISTS (
         SELECT 1 FROM json_each(events.account_ids) WHERE value IN (${slots})
       )))` : '0';
     const { results } = await db.prepare(`SELECT folder_id, COUNT(*) AS item_count FROM events
-      WHERE deleted_at IS NULL AND ${visible} GROUP BY folder_id`).bind(...ids, ...ids)
+      WHERE deleted_at IS NULL AND ${visible} GROUP BY folder_id`).bind(...(ids.length ? sqlIdSet(ids).binds : []), ...(ids.length ? sqlIdSet(ids).binds : []))
       .all<{ folder_id: string | null; item_count: number }>();
     return {
       byFolderId: Object.fromEntries(results.filter(row => row.folder_id !== null).map(row => [row.folder_id, Number(row.item_count)])),
@@ -365,16 +366,16 @@ export async function getFolderItemCounts(
   if (!target) return undefined;
   const { table, accountColumn, listFilter } = target;
   const accountSql = scope.allowedAccountIds.length > 0
-    ? `${accountColumn} IN (${scope.allowedAccountIds.map(() => '?').join(',')})`
+    ? `${accountColumn} IN (${sqlIdSet(scope.allowedAccountIds).sql})`
     : null;
   let scopeSql: string;
   let bindings: string[];
   if (accountSql && scope.canSeeUnassigned) {
     scopeSql = `(${accountSql} OR ${accountColumn} IS NULL)`;
-    bindings = scope.allowedAccountIds;
+    bindings = sqlIdSet(scope.allowedAccountIds).binds;
   } else if (accountSql) {
     scopeSql = accountSql;
-    bindings = scope.allowedAccountIds;
+    bindings = sqlIdSet(scope.allowedAccountIds).binds;
   } else {
     scopeSql = scope.canSeeUnassigned ? `${accountColumn} IS NULL` : '1 = 0';
     bindings = [];

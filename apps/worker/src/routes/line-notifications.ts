@@ -1,3 +1,5 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient, type Message } from '@line-crm/line-sdk';
@@ -520,10 +522,9 @@ lineNotifications.get(
     }
     const denied = await requireAccount(c, lineAccountId);
     if (denied) return denied;
-    const date = /^\d{4}-\d{2}-\d{2}$/;
     const from = c.req.query('from')?.trim();
     const to = c.req.query('to')?.trim();
-    if ((from && !date.test(from)) || (to && !date.test(to)) || (from && to && from > to)) {
+    if ((from && !isExistingCalendarDate(from)) || (to && !isExistingCalendarDate(to)) || (from && to && from > to)) {
       return c.json({ success: false, error: '集計期間が正しくありません' }, 400);
     }
     const items = await listNotificationMetrics(c.env.DB, { lineAccountId, from, to });
@@ -1001,12 +1002,12 @@ lineNotifications.post(
     if (!Array.isArray(template) || template.length === 0) {
       return c.json({ success: false, code: 'incomplete_draft', error: '試し送りする前にLINEで送る内容を設定してください' }, 409);
     }
-    const placeholders = friendIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(friendIds).sql;
     const recipients = await c.env.DB.prepare(`
       SELECT id, line_user_id FROM friends
        WHERE line_account_id = ? AND id IN (${placeholders})
          AND is_following = 1 AND line_user_id IS NOT NULL AND line_user_id != ''
-    `).bind(lineAccountId, ...friendIds).all<{ id: string; line_user_id: string }>();
+    `).bind(lineAccountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string }>();
     const recipientById = new Map(recipients.results.map((row) => [row.id, row.line_user_id]));
     const missing = friendIds.filter((id) => !recipientById.has(id));
     if (missing.length > 0) {

@@ -107,6 +107,8 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   const [hoursVersion, setHoursVersion] = useState(0)
   const [hoursDraft, setHoursDraft] = useState<Hours | null>(null)
   const [hoursError, setHoursError] = useState('')
+  const [channelsError,setChannelsError]=useState(false)
+  const [channelsRetry,setChannelsRetry]=useState(0)
   const [channels, setChannels] = useState<RestaurantChannel[]>([])
 
   useEffect(() => {
@@ -138,9 +140,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
     if (!selectedAccountId || !storeId) return
     void fetchApi<{ success: true; data: RestaurantChannel[] }>(
       `/api/restaurant-test/channels?account_id=${encodeURIComponent(selectedAccountId)}&storeId=${encodeURIComponent(storeId)}`,
-    ).then((res) => { if (current) setChannels(Array.isArray(res.data) ? res.data : []) }).catch(() => { if (current) setChannels([]) })
+    ).then((res) => { if (current) {if(!Array.isArray(res.data))throw new Error('invalid_channels');setChannels(res.data);setChannelsError(false)} }).catch(() => { if (current) setChannelsError(true) })
     return () => { current = false }
-  }, [selectedAccountId, storeId])
+  }, [selectedAccountId, storeId,channelsRetry])
 
   const rows = useMemo(() => (dayRows ?? []).slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at)), [dayRows])
   const reservations = useMemo(
@@ -337,6 +339,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
 
   return (
     <SaveErrorScope errors={saveErrors}><>
+      {channelsError?<ListState kind="error" title="予約媒体を読み込めませんでした" onRetry={()=>setChannelsRetry(n=>n+1)}/>:null}
       {loadError ? (
         <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
       ) : null}

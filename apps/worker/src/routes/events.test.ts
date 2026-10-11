@@ -729,7 +729,9 @@ function makeEventDb(state: {
           }
           // IDEA-07: 一覧に添える通知予定。booking_id IN (...) の行だけ返す。
           if (sql.includes('FROM event_booking_reminders')) {
-            const ids = new Set(bound as string[]);
+            const ids = new Set(sql.includes('json_each(?)')
+              ? JSON.parse(bound[0] as string) as string[]
+              : bound as string[]);
             const rows = (state.reminders ?? [])
               .filter((r) => ids.has(String(r.booking_id)))
               .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));

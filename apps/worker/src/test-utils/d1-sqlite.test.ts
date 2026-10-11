@@ -162,3 +162,9 @@ describe('createTestD1 のbatch', () => {
     } finally { raw.close(); }
   });
 });
+
+test('SCALE-03 D1と同じ100変数上限を全SQL試験で見張る', () => {
+ const f=createTestD1();
+ try {expect(()=>f.db.prepare('SELECT 1').bind(...Array(101).fill('synthetic'))).toThrow('D1 bind limit exceeded');}
+ finally{f.raw.close();}
+});

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { dbTableExists, jstNow } from './utils.js';
 
 /**
@@ -366,9 +367,9 @@ function accountWhere(accountIds: Array<string | null>, column: string): { sql: 
   const allowNull = accountIds.includes(null);
   if (ids.length === 0 && !allowNull) return { sql: '1 = 0', binds: [] };
   const parts: string[] = [];
-  if (ids.length) parts.push(`${column} IN (${ids.map(() => '?').join(',')})`);
+  if (ids.length) parts.push(`${column} IN (${sqlIdSet(ids).sql})`);
   if (allowNull) parts.push(`${column} IS NULL`);
-  return { sql: `(${parts.join(' OR ')})`, binds: ids };
+  return { sql: `(${parts.join(' OR ')})`, binds: ids.length ? sqlIdSet(ids).binds : [] };
 }
 
 export async function listNenMembers(

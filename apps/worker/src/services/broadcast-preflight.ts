@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { INSIGHT_MIN_AUDIENCE } from '@line-crm/db';
 import { buildSegmentWhere, type SegmentCondition } from './segment-query.js';
 
@@ -73,8 +74,8 @@ export async function previewAudience(
   if (input.targetType === 'multi-account-dedup') {
     const ids = input.accountIds ?? [];
     if (ids.length === 0) return emptyAudiencePreview();
-    where.push(`f.line_account_id IN (${ids.map(() => '?').join(',')})`);
-    binds.push(...ids);
+    where.push(`f.line_account_id IN (${sqlIdSet(ids).sql})`);
+    binds.push(...sqlIdSet(ids).binds);
   } else if (input.lineAccountId) {
     where.push('f.line_account_id = ?');
     binds.push(input.lineAccountId);
@@ -193,8 +194,8 @@ export async function countAudience(
   if (input.targetType === 'multi-account-dedup') {
     const ids = input.accountIds ?? [];
     if (ids.length === 0) return { total: 0, hiddenExcluded: 0 };
-    where.push(`f.line_account_id IN (${ids.map(() => '?').join(',')})`);
-    binds.push(...ids);
+    where.push(`f.line_account_id IN (${sqlIdSet(ids).sql})`);
+    binds.push(...sqlIdSet(ids).binds);
   } else if (input.lineAccountId) {
     where.push('f.line_account_id = ?');
     binds.push(input.lineAccountId);

@@ -59,10 +59,11 @@ function makeScenarioDb(rows: ScenarioRow[]) {
         async all<_T>() {
           calls.push({ sql, binds: bound });
           if (/SELECT s\.\*, COUNT\(ss\.id\)/i.test(sql)) {
-            const [lineAccountId, limit, offset] = bound as [string, number, number];
+            const [accountScope, limit, offset] = bound as [string, number, number];
+            const allowed = accountScope.startsWith('[') ? JSON.parse(accountScope) as string[] : [accountScope];
             const includeGlobal = /line_account_id IS NULL/i.test(sql);
             const filtered = rows.filter((r) =>
-              r.line_account_id === lineAccountId || (includeGlobal && r.line_account_id == null));
+              allowed.includes(r.line_account_id ?? '') || (includeGlobal && r.line_account_id == null));
             return { results: filtered.slice(offset, offset + limit) };
           }
           return { results: [] };
@@ -70,11 +71,12 @@ function makeScenarioDb(rows: ScenarioRow[]) {
         async first<_T>() {
           calls.push({ sql, binds: bound });
           if (/COUNT\(\*\) AS total FROM scenarios/i.test(sql)) {
-            const [lineAccountId] = bound as [string];
+            const [accountScope] = bound as [string];
+            const allowed = accountScope.startsWith('[') ? JSON.parse(accountScope) as string[] : [accountScope];
             const includeGlobal = /line_account_id IS NULL/i.test(sql);
             return {
               total: rows.filter((r) =>
-                r.line_account_id === lineAccountId || (includeGlobal && r.line_account_id == null)).length,
+                allowed.includes(r.line_account_id ?? '') || (includeGlobal && r.line_account_id == null)).length,
             } as _T;
           }
           return null;
@@ -165,7 +167,7 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     const countCalls = calls.filter((c) => /FROM friend_scenarios/i.test(c.sql));
     expect(countCalls).toHaveLength(1);
     expect(countCalls[0].sql).toMatch(/f\.line_account_id IN/);
-    expect(countCalls[0].binds).toEqual(expect.arrayContaining(['acc-1']));
+    expect(countCalls[0].binds).toEqual(expect.arrayContaining([JSON.stringify(['acc-1'])]));
   });
 
   test('lineAccountId が無くても可視範囲をDB側で絞ってページ化する', async () => {
@@ -180,7 +182,7 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     expect(body.data.items.map((d) => d.id)).toEqual(['s-x']);
     const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
     expect(listCall?.sql).toMatch(/s\.line_account_id IN/);
-    expect(listCall?.binds).toEqual(['acc-1', 50, 0]);
+    expect(listCall?.binds).toEqual([JSON.stringify(['acc-1']), 50, 0]);
   });
 
   test('returns empty array when filter matches nothing and no globals exist', async () => {

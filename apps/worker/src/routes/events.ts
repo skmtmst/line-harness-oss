@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { EventApplicationPreview } from '@line-crm/shared';
 // Event booking feature HTTP routes.
@@ -2602,43 +2603,33 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
         return finalize(409, { error: 'slot_full' });
       }
     }
-    await c.env.DB
-      .prepare(
-        `INSERT INTO event_bookings
+    // 新行の確保と旧行の取消は D1 の原子的 batch にする。
+    // 席数と旧行の状態も INSERT 内で再確認し、並走する変更に負けたら何も作らない。
+    const moved = await c.env.DB.batch([
+      c.env.DB.prepare(`INSERT INTO event_bookings
            (id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
             requested_at, identity_key, party_size, answer_snapshot_json,
             event_version_id, event_snapshot_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        newId, account_id, event.id, target.id, friend.id, current.status,
-        current.customer_note, nowIso, current.identity_key, current.party_size,
-        current.answer_snapshot_json,
-        event.current_published_version_id, bookingSnapshotJson,
-      )
-      .run();
-    if (target.capacity != null) {
-      const usedSeats = await getEventOccurrenceUsedSeats(c.env.DB, target.id);
-      if (usedSeats > target.capacity) {
-        await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
-        return finalize(409, { error: 'slot_full' });
-      }
-    }
-
-    // 旧予約の取消（条件付き）。並走する取消・変更に負けたら新行を巻き戻す。
-    // cancelled_by は CHECK 制約の範囲で 'friend'（本人の操作）。
-    // 変更であることは event_change_logs の booking_change に残す。
-    const cancelled = await c.env.DB
-      .prepare(
-        `UPDATE event_bookings
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE EXISTS (SELECT 1 FROM event_bookings WHERE id = ? AND status IN ('requested','confirmed'))
+            AND (? IS NULL OR
+              COALESCE((SELECT SUM(party_size) FROM event_bookings WHERE slot_id = ? AND status IN ('requested','confirmed')), 0)
+              + COALESCE((SELECT SUM(party_size) FROM event_waitlist WHERE slot_id = ? AND status IN ('offered','accepted')), 0)
+              + ? <= ?)`)
+        .bind(newId, account_id, event.id, target.id, friend.id, current.status,
+          current.customer_note, nowIso, current.identity_key, current.party_size,
+          current.answer_snapshot_json, event.current_published_version_id, bookingSnapshotJson,
+          current.id, target.capacity, target.id, target.id, current.party_size, target.capacity),
+      c.env.DB.prepare(`UPDATE event_bookings
             SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
-          WHERE id = ? AND status IN ('requested', 'confirmed')`,
-      )
-      .bind(nowIso, nowIso, current.id)
-      .run();
-    if ((cancelled.meta?.changes ?? 0) === 0) {
-      await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
-      return finalize(409, { error: 'invalid_state' });
+          WHERE id = ? AND status IN ('requested', 'confirmed')
+            AND EXISTS (SELECT 1 FROM event_bookings WHERE id = ?)`)
+        .bind(nowIso, nowIso, current.id, newId),
+    ]);
+    if ((moved[0].meta?.changes ?? 0) === 0) {
+      const latest = await c.env.DB.prepare('SELECT status FROM event_bookings WHERE id = ?')
+        .bind(current.id).first<{ status: string }>();
+      return finalize(409, { error: latest && ['requested','confirmed'].includes(latest.status) ? 'slot_full' : 'invalid_state' });
     }
 
     // 旧回の未送信予定を止める。送信権の貸出中は新旧とも巻き戻して 409。
@@ -2655,15 +2646,15 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
       });
     } catch (error) {
       if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
-        await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
-        await c.env.DB
-          .prepare(
+        await c.env.DB.batch([
+          c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId),
+          c.env.DB.prepare(
             `UPDATE event_bookings
                 SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
               WHERE id = ? AND status = 'cancelled'`,
           )
-          .bind(current.status, nowIso, current.id)
-          .run();
+          .bind(current.status, nowIso, current.id),
+        ]);
         return finalize(409, { error: 'send_in_flight_retry' });
       }
       throw error;
@@ -3597,10 +3588,10 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
       .prepare(
         `SELECT booking_id, kind, scheduled_at, sent_at, status
            FROM event_booking_reminders
-          WHERE booking_id IN (${bookingIds.map(() => '?').join(',')})
+          WHERE booking_id IN (${sqlIdSet(bookingIds).sql})
           ORDER BY scheduled_at ASC`,
       )
-      .bind(...bookingIds)
+      .bind(...(bookingIds.length ? sqlIdSet(bookingIds).binds : []))
       .all<{
         booking_id: string;
         kind: string;

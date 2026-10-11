@@ -12,7 +12,7 @@ import {
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { resolveLineToken } from './line-token.js';
-import { classifyLineOutboundFailure } from './outbound-idempotency.js';
+import { reserveOutboundSend, hashOutboundPayload, completeOutboundSendStatement, classifyLineOutboundFailure } from './outbound-idempotency.js';
 import { buildChatMessage, ChatAttachmentError } from './chat-attachments.js';
 import type { Message } from '@line-crm/line-sdk';
 import { renderChatMessageContent } from './manual-send-interpolation.js';
@@ -158,8 +158,19 @@ async function dispatchOne(
   const { LineClient } = await import('@line-crm/line-sdk');
   const lineClient = new LineClient(target.accessToken);
 
+  const reservation = await reserveOutboundSend(env.DB, {
+    key:row.idempotency_key,channel:'line',resourceId:`scheduled-chat:${row.id}`,
+    payloadHash:await hashOutboundPayload(JSON.stringify(message)),lineAccountId:row.line_account_id,
+    retryInProgress:true,now:nowIso,
+  });
+  if (reservation.kind !== 'acquired' && reservation.kind !== 'retry' && reservation.kind !== 'replay') {
+    await markScheduledChatSendFailed(env.DB, {id:row.id,leaseToken:row.lease_token!,
+      errorCode:reservation.kind === 'unknown' ? reservation.code : 'LINE_DELIVERY_UNKNOWN',
+      error:'届いたか分からないため確認が必要です',retryable:false,now:nowIso});
+    return;
+  }
   try {
-    await lineClient.pushMessage(target.friend.line_user_id, [message], row.idempotency_key);
+    if (reservation.kind !== 'replay') await lineClient.pushMessage(target.friend.line_user_id, [message], row.idempotency_key);
   } catch (error) {
     const failure = classifyLineOutboundFailure(error, nowIso);
     // unknown(送達可否が分からない)は自動再送すると二重送信になり得るため
@@ -217,6 +228,9 @@ async function dispatchOne(
     return;
   }
 
+  await env.DB.batch([completeOutboundSendStatement(env.DB, {
+    key:row.idempotency_key,responseId:messageId,now:nowIso,
+  })]);
   await markScheduledChatSendSent(env.DB, {
     id: row.id,
     leaseToken: row.lease_token!,

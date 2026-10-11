@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow, nextVersionToken } from './utils.js';
 
 /**
@@ -251,8 +252,8 @@ export async function resolveAnnouncementAudience(
     where.push(`(${parts.join(' OR ')})`);
   } else if (input.audienceKind === 'tenants') {
     if (input.tenantIds.length === 0) return [];
-    where.push(`t.id IN (${input.tenantIds.map(() => '?').join(',')})`);
-    binds.push(...input.tenantIds);
+    where.push(`t.id IN (${sqlIdSet(input.tenantIds).sql})`);
+    binds.push(...(input.tenantIds.length ? sqlIdSet(input.tenantIds).binds : []));
   }
   const { results } = await db
     .prepare(`SELECT sm.id AS staff_id, sm.name AS staff_name, sm.email AS staff_email, t.id AS tenant_id, t.name AS tenant_name,

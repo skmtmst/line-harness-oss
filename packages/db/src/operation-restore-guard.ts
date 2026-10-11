@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import type {
   OperationCapability,
   OperationIncident,
@@ -185,7 +186,7 @@ async function getDefinitionsByIds(
 ): Promise<Map<string, DefinitionRow>> {
   const found = new Map<string, DefinitionRow>();
   if (ids.length === 0) return found;
-  const placeholders = ids.map(() => '?').join(',');
+  const placeholders = sqlIdSet(ids).sql;
   let sql: string;
   switch (capability) {
     case 'broadcast_dispatch':
@@ -212,7 +213,7 @@ async function getDefinitionsByIds(
     default:
       return found;
   }
-  const result = await db.prepare(sql).bind(...ids).all<DefinitionRow>();
+  const result = await db.prepare(sql).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<DefinitionRow>();
   for (const row of result.results ?? []) found.set(row.id, row);
   return found;
 }

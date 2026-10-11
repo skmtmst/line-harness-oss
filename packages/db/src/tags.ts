@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { enqueueMileageEvent } from './mileage.js';
 import { recordConversionSourceEvent } from './conversion-event-sources.js';
@@ -951,7 +952,7 @@ export async function reorderTags(db: D1Database, ids: string[], scope?: { allow
   if (ids.length < 2) return;
 
   const allowed = scope?.allowedAccountIds ?? [];
-  const where = scope ? `WHERE (${allowed.length ? `t.line_account_id IN (${allowed.map(() => '?').join(',')})` : '0'} OR ${scope.canSeeUnassigned ? 't.line_account_id IS NULL' : '0'})` : '';
+  const where = scope ? `WHERE (${allowed.length ? `t.line_account_id IN (${sqlIdSet(allowed).sql})` : '0'} OR ${scope.canSeeUnassigned ? 't.line_account_id IS NULL' : '0'})` : '';
   const current = await db
     .prepare(
       `SELECT t.id
@@ -961,7 +962,7 @@ export async function reorderTags(db: D1Database, ids: string[], scope?: { allow
         GROUP BY t.id
         ORDER BY t.display_order ASC, COUNT(ft.friend_id) DESC, t.name ASC`,
     )
-    .bind(...allowed)
+    .bind(...(allowed.length ? sqlIdSet(allowed).binds : []))
     .all<{ id: string }>();
 
   const existing = new Set(current.results.map((tag) => tag.id));
@@ -992,7 +993,7 @@ export async function deleteTag(db: D1Database, id: string): Promise<void> {
 
 export async function getTagGroups(db: D1Database, scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean }): Promise<TagGroup[]> {
   const ids = scope?.allowedAccountIds ?? [];
-  const own = ids.length ? `account_id IN (${ids.map(() => "?").join(",")})` : "0";
+  const own = ids.length ? `account_id IN (${sqlIdSet(ids).sql})` : "0";
   const condition = `(${own} OR ${scope?.canSeeUnassigned !== false ? "account_id IS NULL" : "0"})`;
   const result = await db
     .prepare(
@@ -1000,7 +1001,7 @@ export async function getTagGroups(db: D1Database, scope?: { allowedAccountIds: 
          FROM folders WHERE kind = 'tag' AND ${condition}
         ORDER BY display_order ASC, name ASC`,
     )
-    .bind(...ids)
+    .bind(...(ids.length ? sqlIdSet(ids).binds : []))
     .all<TagGroup>();
   return result.results;
 }

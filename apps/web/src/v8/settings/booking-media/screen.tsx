@@ -182,6 +182,8 @@ export default function BookingMediaPage() {
   /* キャンセルで席が空いたときの「もう開けてよい」と、知らせる相手（店ごと）。 */
   const [noticeSaved, setNoticeSaved] = useState<NoticeSettings | null>(null)
   const [notice, setNotice] = useState<NoticeSettings | null>(null)
+  const [membersError,setMembersError]=useState(false)
+  const [membersRetry,setMembersRetry]=useState(0)
   const [members, setMembers] = useState<RestaurantMembership[]>([])
   const [picking, setPicking] = useState<Pick<NoticeSettings, 'recipientMode' | 'membershipIds'> | null>(null)
   const [pickError, setPickError] = useState('')
@@ -213,7 +215,7 @@ export default function BookingMediaPage() {
       const [links, channelRows] = await Promise.all([
         restaurantTestApi.mediaLinks(selectedAccountId, storeId),
         fetchApi<{ success: true; data: ChannelState[] }>(`/api/restaurant-test/channels?account_id=${encodeURIComponent(selectedAccountId)}&storeId=${encodeURIComponent(storeId)}`)
-          .then((res) => res.data).catch(() => [] as ChannelState[]),
+          .then((res) => res.data),
       ])
       const next = links.data.map((row) => ({
         code: row.code,
@@ -258,10 +260,10 @@ export default function BookingMediaPage() {
     let current = true
     if (!selectedAccountId || !storeId) return
     void restaurantTestApi.snapshot(selectedAccountId, { limit: 1, offset: 0 })
-      .then((res) => { if (current) setMembers(res.data.memberships.filter((m) => m.status === 'active' && (m.store_id === null || m.store_id === storeId))) })
-      .catch(() => { if (current) setMembers([]) })
+      .then((res) => { if (current) {setMembersError(false);setMembers(res.data.memberships.filter((m) => m.status === 'active' && (m.store_id === null || m.store_id === storeId)));} })
+      .catch(() => { if (current) setMembersError(true) })
     return () => { current = false }
-  }, [selectedAccountId, storeId])
+  }, [selectedAccountId, storeId,membersRetry])
 
   /* 貼り付け用の URL は管理者だけが出せる口（POST）。担当者には案内だけ。 */
   useEffect(() => {
@@ -388,7 +390,7 @@ export default function BookingMediaPage() {
 
 
   let table
-  if (loadError && !saved) table = <ListState kind="error" error={loadError} onRetry={() => void load()} />
+  if (loadError && !saved) table = <ListState kind="error" title="媒体を読み込めませんでした" error={loadError} onRetry={() => void load()} />
   else if (!saved) table = <ListState kind="loading" />
   else if (rows.length === 0) table = <p className={styles.text}>媒体がまだありません。右上の［媒体を足す］から足せます。</p>
   else {
@@ -450,6 +452,7 @@ export default function BookingMediaPage() {
 
   return (
     <SaveErrorScope errors={saveErrors}><>
+      {membersError?<ListState kind="error" title="知らせるスタッフを読み込めませんでした" onRetry={()=>setMembersRetry(n=>n+1)}/>:null}
       <PageFrame kind="settings" boardId="aSmph" hasFooter={canManage}>
         <PageHeading
           headingSize="compact"

@@ -10,7 +10,7 @@ import IconButton from './icon-button'
 import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 import { useFormInputDirty } from './form-input-dirty'
-import { useOverlayDiscard } from './overlay-discard'
+import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { useStepMotion } from './use-step-motion'
 import { dialogWidth } from './destination-policy'
 
@@ -257,7 +257,7 @@ export default function Dialog({
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
       onChangeCapture={formInput.onChangeCapture}
       onInputCapture={formInput.onChangeCapture}
-      onClickCapture={formInput.onClickCapture}
+      onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
       role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
       aria-modal={modal || undefined}
@@ -308,12 +308,7 @@ export default function Dialog({
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
-      <div className={styles.footer} onClickCapture={(event) => {
-        const button = (event.target as Element).closest?.('button')
-        if (isDirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
-          event.preventDefault(); event.stopPropagation(); discard.requestClose()
-        }
-      }}>
+      <div className={styles.footer}>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま

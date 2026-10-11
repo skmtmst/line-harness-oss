@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
+import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
   findConditionDraftIssue,
@@ -1323,7 +1324,7 @@ export function FriendPlanDialog({
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-ink-faint">いまの状態</dt>
               <dd className="text-ink">
-                {plan.subscription
+                {plan.subscription?.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : plan.subscription
                   ? FRIEND_PLAN_STATUS[plan.subscription.status] ?? plan.subscription.status
                   : 'まだ開始していません'}
               </dd>
@@ -1338,7 +1339,7 @@ export function FriendPlanDialog({
               <div className="flex flex-wrap justify-between gap-2">
                 <dt className="text-ink-faint">止まっている理由</dt>
                 <dd className="text-ink">
-                  {plan.subscription.pauseReason === 'delivery_failed'
+                  {plan.subscription.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : plan.subscription.pauseReason === 'delivery_failed'
                     ? '配信失敗'
                     : plan.subscription.pauseReason === 'after_send'
                       ? 'この通を送ったあと止める設定'
@@ -1358,6 +1359,7 @@ export function FriendPlanDialog({
             </div>
           </dl>
 
+          {plan.subscription?.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedNotice action={<Button href={`/chats?friend=${encodeURIComponent(plan.friendId)}`}>トークの送信記録を確認</Button>} /> : null}
           {plan.start.state === 'blocked' ? (
             <Notice tone="warn">
               <p className="font-semibold">いまはこの友だちへ配信されません</p>

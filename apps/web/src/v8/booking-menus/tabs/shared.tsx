@@ -12,6 +12,7 @@ import {
 import { type BookingMenu, type BookingSettings } from '@/lib/api'
 import styles from '../settings.module.css'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
 
 export type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -102,7 +103,7 @@ export function StateCard({ icon, title, description, action }: {
 
 export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
-    <div className={styles.skeletonRows} aria-label="読み込み中" role="status">
+    <DelayedSkeleton loading skeleton={<div className={styles.skeletonRows} aria-label="読み込み中" role="status">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className={styles.skeletonRow}>
           <span className={styles.skeletonDot} />
@@ -110,7 +111,7 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
           <span className={`${styles.skeletonBar} ${styles.skeletonBarShort}`} />
         </div>
       ))}
-    </div>
+    </div>} />
   )
 }
 

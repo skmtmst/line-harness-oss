@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 // U: イベントの状態・変更確認・開催回変更の土台。
 //
 // v6-29 §10（開催変更・中止）・§11-2（イベント状態）と確定文書 U の決めごと。
@@ -585,7 +586,7 @@ export async function applyEventChange(
     slotId: string;
   }> = [];
   if (changedSlotIds.size > 0 || venueTouched) {
-    const placeholders = [...changedSlotIds].map(() => '?').join(',');
+    const placeholders = sqlIdSet([...changedSlotIds]).sql;
     const targetRows = venueTouched
       ? await db
         .prepare(
@@ -604,7 +605,7 @@ export async function applyEventChange(
             WHERE b.event_id = ? AND b.status = 'confirmed'
               AND b.slot_id IN (${placeholders})`,
         )
-        .bind(params.eventId, ...changedSlotIds)
+        .bind(params.eventId, ...sqlIdSet([...changedSlotIds]).binds)
         .all<{ booking_id: string; friend_id: string; slot_id: string; line_user_id: string }>();
     notifyTargets = (targetRows.results ?? [])
       .filter((r) => r.line_user_id)

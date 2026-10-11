@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   processAutomationRun,
   resolveCommonActionVersion,
@@ -103,18 +104,18 @@ export async function listAutomationDefinitions(
   if (lineAccountIds.length === 0) {
     return { items: [], total: 0, summary: emptySummary, freshness: 'available' };
   }
-  const placeholders = lineAccountIds.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(lineAccountIds).sql;
   // 集計はページ送りに依らず対象アカウント全体で数える（一覧のKPIと一致させる）。
   const [totalRow, statusRows, runTotals] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS count FROM automation_definitions d
         WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}`,
-    ).bind(...lineAccountIds).first<{ count: number }>(),
+    ).bind(...(lineAccountIds.length ? sqlIdSet(lineAccountIds).binds : [])).first<{ count: number }>(),
     db.prepare(
       `SELECT d.status AS status, COUNT(*) AS count FROM automation_definitions d
         WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}
         GROUP BY d.status`,
-    ).bind(...lineAccountIds).all<{ status: string; count: number }>(),
+    ).bind(...(lineAccountIds.length ? sqlIdSet(lineAccountIds).binds : [])).all<{ status: string; count: number }>(),
     db.prepare(
       `SELECT COUNT(*) AS executions,
               SUM(CASE WHEN r.status IN ('partial', 'failed') THEN 1 ELSE 0 END) AS failures
@@ -123,7 +124,7 @@ export async function listAutomationDefinitions(
         WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}
           AND r.is_test = 0 AND r.status IN ('success', 'partial', 'failed')
           AND datetime(r.created_at) >= datetime('now', '-30 days')`,
-    ).bind(...lineAccountIds).first<{ executions: number; failures: number | null }>(),
+    ).bind(...(lineAccountIds.length ? sqlIdSet(lineAccountIds).binds : [])).first<{ executions: number; failures: number | null }>(),
   ]);
   const limit = paging?.limit === undefined ? null
     : Math.max(1, Math.min(Math.floor(paging.limit), 200));
@@ -154,7 +155,7 @@ export async function listAutomationDefinitions(
         AND v.automation_id = d.id
       WHERE d.line_account_id IN (${placeholders}) ${paging?.includeArchived ? '' : "AND d.status <> 'archived'"}
       ORDER BY d.priority DESC, d.updated_at DESC, d.id DESC${limit === null ? '' : ' LIMIT ? OFFSET ?'}`,
-  ).bind(...lineAccountIds, ...(limit === null ? [] : [limit, offset])).all<DefinitionListRow>();
+  ).bind(...(lineAccountIds.length ? sqlIdSet(lineAccountIds).binds : []), ...(limit === null ? [] : [limit, offset])).all<DefinitionListRow>();
   const items = (result.results ?? []).map((row): AutomationDefinitionSummary => ({
     id: row.id,
     folderId: row.folder_id ?? null,

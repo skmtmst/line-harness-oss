@@ -31,6 +31,7 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
 import Notice from '@/components/shared/notice'
+import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 
 /*
  * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
@@ -70,6 +71,7 @@ function csvCell(value: unknown): string {
 
 /** 購読の状態の札（絵：途中・送信中・止まっている・送れずに止まった・読み終えた）。 */
 function subscriptionState(sub: Subscription): { label: string; tone: StatusBadgeTone } {
+  if (sub.pauseReason === 'delivery_unconfirmed') return { label: '要確認', tone: 'warning' }
   if (sub.status === 'completed') return { label: '読み終えた', tone: 'info' }
   if (sub.status === 'delivering') return { label: '送信中', tone: 'success' }
   if (sub.status === 'paused') {
@@ -81,6 +83,7 @@ function subscriptionState(sub: Subscription): { label: string; tone: StatusBadg
 }
 
 function nextLabel(sub: Subscription): string {
+  if (sub.pauseReason === 'delivery_unconfirmed') return '—（要確認）'
   if (sub.status === 'completed') return '—'
   if (sub.status === 'paused') return '—（止めている）'
   return sub.nextDeliveryAt ? formatDateTime(sub.nextDeliveryAt) : emptyValue('unknown')
@@ -531,6 +534,9 @@ export default function ScenarioResultsV8() {
                 </button>
               ) : null}
             </div>
+            {runs?.subscriptions.some(sub => sub.pauseReason === 'delivery_unconfirmed') ? (
+              <DeliveryUnconfirmedNotice action={<Button href="/chats">トークの送信記録を確認</Button>} />
+            ) : null}
             {opError && !moveTarget ? <NoteBar tone="warn">{opError}</NoteBar> : null}
             <div className={styles.tools}>
               {/* 状態の絞り込みはサーバーへ渡して全件へ掛ける（SCENARIO-12）。 */}
@@ -624,12 +630,12 @@ export default function ScenarioResultsV8() {
                       disabled: opBusy !== null,
                       onSelect: () => void openMoveDialog(sub),
                     })
-                    const showMenu = canEdit && (sub.status === 'active' || sub.status === 'paused')
+                    const showMenu = canEdit && sub.pauseReason !== 'delivery_unconfirmed' && (sub.status === 'active' || sub.status === 'paused')
                     return (
                       <div key={sub.id} className={styles.row} role="row">
                         <span className={styles.colName} role="cell" title={sub.friendName}>{sub.friendName}</span>
-                        <span className={styles.colState} role="cell">
-                          <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>
+                        <span className={styles.colState} role="cell" title={sub.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : undefined}>
+                          {sub.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}
                         </span>
                         <span className={styles.colNow} role="cell">{`${sub.currentStepOrder} 通目まで`}</span>
                         <span className={styles.colNext} role="cell">{nextLabel(sub)}</span>

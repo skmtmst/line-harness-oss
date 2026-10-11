@@ -225,3 +225,16 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
     expect(screen.getByRole('button', { name: /カルーセル/ })).toBeTruthy()
   })
 })
+
+it('B-241：見本の取得失敗を見本なしとして消さず、同じ窓で読み直す',async()=>{
+ role.value='owner'
+ listTemplates.mockResolvedValue({success:true,data:[used]})
+ fetchApi.mockReset().mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({success:true,data:[]})
+ await renderList()
+ fireEvent.click(screen.getAllByRole('button',{name:/テンプレートを作る/})[0])
+ const error=await screen.findByText('見本を読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await act(async()=>{})
+ expect(fetchApi).toHaveBeenCalledTimes(2)
+ expect(screen.queryByText('見本を読み込めませんでした')).toBeNull()
+})
