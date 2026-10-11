@@ -121,6 +121,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [bookingStaffError,setBookingStaffError]=useState(false)
+  const [referencesError,setReferencesError]=useState(false)
   const savedSnapshot = useRef<string | null>(null)
   /** 読み込んだ時点の編集の版(#723)。読み込みと保存成功のときだけ入れ替える。 */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
@@ -290,12 +291,13 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           api.reminders.list(accountFilter),
           api.templates.list(undefined, selectedAccountId ?? undefined),
         ])
+        if(!tagRes.success || !ffRes.success || !scenarioRes.success || !reminderRes.success || !templateRes.success){setReferencesError(true);throw new Error('references unavailable')}
         setRefs({
-          tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
-          friendFields: ffRes.success ? ffRes.data.map((f) => ({ id: f.id, name: f.name, ecIsMaster: f.ecIsMaster })) : [],
-          scenarios: scenarioRes.success ? scenarioRes.data.map((s) => ({ id: s.id, name: s.name })) : [],
-          reminders: reminderRes.success ? reminderRes.data.map((r) => ({ id: r.id, name: r.name })) : [],
-          templates: templateRes.success ? templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType })) : [],
+          tags: tagRes.data.map((t) => ({ id: t.id, name: t.name })),
+          friendFields: ffRes.data.map((f) => ({ id: f.id, name: f.name, ecIsMaster: f.ecIsMaster })),
+          scenarios: scenarioRes.data.map((s) => ({ id: s.id, name: s.name })),
+          reminders: reminderRes.data.map((r) => ({ id: r.id, name: r.name })),
+          templates: templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType })),
           bookingMenus: [],
           bookingMenuStaff: {},
         })
@@ -914,6 +916,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
         {host?.notice}
+        {referencesError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>{setReferencesError(false);setError('');setReloadKey(value=>value+1)}}/>:null}
         {bookingStaffError?<ListState kind="error" title="予約の担当を読み込めませんでした" onRetry={()=>setBookingStaffError(false)}/>:null}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}

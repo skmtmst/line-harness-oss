@@ -68,7 +68,7 @@ import FormEditV8 from './edit'
 import { EMPTY_REFS } from '@/components/forms/form-refs'
 import type { FormHostContent } from './host'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
-import { ApiError } from '@/lib/api'
+import { ApiError,api } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -420,4 +420,12 @@ it('B-241：予約の担当候補が読めないとき、空にせず入力を�
  await waitFor(()=>expect(screen.queryByText('予約の担当を読み込めませんでした')).toBeNull())
  expect(menuStaff).toHaveBeenCalledTimes(2)
  expect(screen.getByDisplayValue('今日のご来店の目的は？')).toBeTruthy()
+})
+
+it('B-241：参照候補success:falseは空の候補で編集を進めない',async()=>{
+ const spy=vi.spyOn(api.scenarios,'list').mockResolvedValue({success:false,error:'fixture failure'})
+ await render('id=form-1')
+ await waitFor(()=>expect(spy).toHaveBeenCalled())
+ expect(await screen.findByText(/^(フォーム|候補)を読み込めませんでした$/)).toBeTruthy()
+ spy.mockRestore()
 })
