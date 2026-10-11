@@ -393,10 +393,10 @@ async function syncManagedTags(
   const uniqueManaged = [...new Set(managed)];
   let currentIds = prefetchedCurrentIds;
   if (!currentIds) {
-    const placeholders = uniqueManaged.map(() => '?').join(',');
+    const placeholders = sqlIdSet(uniqueManaged).sql;
     const current = await db.prepare(
       `SELECT tag_id FROM friend_tags WHERE friend_id = ? AND tag_id IN (${placeholders})`,
-    ).bind(friendId, ...uniqueManaged).all<{ tag_id: string }>();
+    ).bind(friendId, ...(uniqueManaged.length ? sqlIdSet(uniqueManaged).binds : [])).all<{ tag_id: string }>();
     currentIds = new Set(current.results.map((row) => row.tag_id));
   }
   let added = 0;

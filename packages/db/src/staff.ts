@@ -196,10 +196,10 @@ export async function getStaffNameMap(
   )];
   const names = new Map<string, string>();
   if (unique.length === 0) return names;
-  const placeholders = unique.map(() => '?').join(',');
+  const placeholders = sqlIdSet(unique).sql;
   const rows = await db
     .prepare(`SELECT id, name FROM staff_members WHERE id IN (${placeholders})`)
-    .bind(...unique)
+    .bind(...(unique.length ? sqlIdSet(unique).binds : []))
     .all<{ id: string; name: string }>();
   for (const row of rows.results ?? []) names.set(row.id, row.name);
   return names;

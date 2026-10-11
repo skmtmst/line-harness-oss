@@ -200,8 +200,8 @@ async function countInboxSavedViewMatches(
     const clauses: string[] = [];
     if (conditions.assignees.includes('unassigned')) clauses.push('c.operator_id IS NULL');
     if (named.length > 0) {
-      clauses.push(`c.operator_id IN (${named.map(() => '?').join(', ')})`);
-      bindings.push(...named);
+      clauses.push(`c.operator_id IN (${sqlIdSet(named).sql})`);
+      bindings.push(...(named.length ? sqlIdSet(named).binds : []));
     }
     where.push(`(${clauses.join(' OR ')})`);
   }
@@ -288,8 +288,8 @@ async function countInboxSavedViewMatches(
     const clauses: string[] = [];
     if (conditions.assignees.includes('unassigned')) clauses.push('t.assigned_staff_id IS NULL');
     if (named.length > 0) {
-      clauses.push(`t.assigned_staff_id IN (${named.map(() => '?').join(', ')})`);
-      emailBindings.push(...named);
+      clauses.push(`t.assigned_staff_id IN (${sqlIdSet(named).sql})`);
+      emailBindings.push(...(named.length ? sqlIdSet(named).binds : []));
     }
     emailWhere.push(`(${clauses.join(' OR ')})`);
   }

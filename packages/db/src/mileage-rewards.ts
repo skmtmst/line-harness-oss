@@ -524,13 +524,13 @@ export async function getMileageRewardRedemptionCounts(
    * 「交換できる」と出して上限で止める食い違いを出さない。
    */
   const limitKeys = await collectBeneficiaryKeysForLimit(db, input.friendId, friend.user_id, beneficiaryKey);
-  const limitPlaceholders = limitKeys.map(() => '?').join(', ');
+  const limitPlaceholders = sqlIdSet(limitKeys).sql;
   const rows = await db.prepare(
     `SELECT reward_id, reward_version_id, COUNT(*) AS count
        FROM mileage_redemptions
       WHERE line_account_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'
       GROUP BY reward_id, reward_version_id`,
-  ).bind(input.lineAccountId, ...limitKeys).all<{
+  ).bind(input.lineAccountId, ...(limitKeys.length ? sqlIdSet(limitKeys).binds : [])).all<{
     reward_id: string;
     reward_version_id: string;
     count: number;
@@ -1071,7 +1071,7 @@ export async function reserveMileageRewardRedemption(
   if (version.perFriendLimit) {
     limitKeys = await collectBeneficiaryKeysForLimit(db, input.friendId, friend.user_id, beneficiaryKey);
   }
-  const limitPlaceholders = limitKeys.map(() => '?').join(', ');
+  const limitPlaceholders = sqlIdSet(limitKeys).sql;
   const wallet = await db.prepare(
     `SELECT beneficiary_key, beneficiary_user_id, beneficiary_friend_id, available, version
        FROM mileage_wallets WHERE program_id = ? AND beneficiary_key = ?`,
@@ -1093,7 +1093,7 @@ export async function reserveMileageRewardRedemption(
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
         WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
-    ).bind(reward.id, ...limitKeys).first<{ count: number }>();
+    ).bind(reward.id, ...(limitKeys.length ? sqlIdSet(limitKeys).binds : [])).first<{ count: number }>();
     if ((count?.count ?? 0) >= version.perFriendLimit) {
       throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
     }
@@ -1203,7 +1203,7 @@ export async function reserveMileageRewardRedemption(
         reward.programId, input.idempotencyKey,
         code?.id ?? null, code?.id ?? null,
         version.stockLimit, version.id, version.stockLimit,
-        version.perFriendLimit, reward.id, ...limitKeys, version.perFriendLimit,
+        version.perFriendLimit, reward.id, ...sqlIdSet(limitKeys).binds, version.perFriendLimit,
       ),
       db.prepare(
         `INSERT INTO mileage_ledger
@@ -1285,7 +1285,7 @@ export async function reserveMileageRewardRedemption(
       const currentCount = await db.prepare(
         `SELECT COUNT(*) AS count FROM mileage_redemptions
           WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
-      ).bind(reward.id, ...limitKeys).first<{ count: number }>();
+      ).bind(reward.id, ...(limitKeys.length ? sqlIdSet(limitKeys).binds : [])).first<{ count: number }>();
       if ((currentCount?.count ?? 0) >= version.perFriendLimit) {
         throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
       }
@@ -1321,7 +1321,7 @@ export async function reserveMileageRewardRedemption(
     const currentCount = await db.prepare(
       `SELECT COUNT(*) AS count FROM mileage_redemptions
         WHERE reward_id = ? AND beneficiary_key IN (${limitPlaceholders}) AND status != 'refunded'`,
-    ).bind(reward.id, ...limitKeys).first<{ count: number }>();
+    ).bind(reward.id, ...(limitKeys.length ? sqlIdSet(limitKeys).binds : [])).first<{ count: number }>();
     if ((currentCount?.count ?? 0) >= version.perFriendLimit) {
       throw new MileageRewardError('friend_limit_reached', 'この使い道は交換上限に達しています', 409);
     }
@@ -1575,13 +1575,13 @@ async function verifyRefundWrites(
     `SELECT status FROM mileage_reward_codes WHERE id = ? AND redemption_id = ?`,
   ).bind(current.rewardCodeId, current.id).first<{ status: string }>();
   if (!code || code.status !== 'reserved') return;
-  const placeholders = allocations.map(() => '?').join(',');
+  const placeholders = sqlIdSet(allocations.map(allocation => allocation.grant_lot_id)).sql;
   const currentLots = allocations.length > 0
     ? await db.prepare(
       `SELECT ledger_entry_id, remaining_amount FROM mileage_grant_lots
         WHERE ledger_entry_id IN (${placeholders}) AND beneficiary_key = ?
           AND status IN ('available', 'exhausted')`,
-    ).bind(...allocations.map((allocation) => allocation.grant_lot_id), current.beneficiaryKey)
+    ).bind(...sqlIdSet(allocations.map(allocation => allocation.grant_lot_id)).binds, current.beneficiaryKey)
       .all<{ ledger_entry_id: string; remaining_amount: number }>()
     : { results: [] as Array<{ ledger_entry_id: string; remaining_amount: number }> };
   const remainingByLot = new Map(

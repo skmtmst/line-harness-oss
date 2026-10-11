@@ -271,12 +271,12 @@ export async function getRemindersByIds(
 ): Promise<Array<{ id: string; line_account_id: string | null }>> {
   if (ids.length === 0) return [];
   const unique = [...new Set(ids)];
-  const placeholders = unique.map(() => '?').join(',');
+  const placeholders = sqlIdSet(unique).sql;
   const result = await db
     .prepare(
       `SELECT id, line_account_id FROM reminders WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
     )
-    .bind(...unique)
+    .bind(...(unique.length ? sqlIdSet(unique).binds : []))
     .all<{ id: string; line_account_id: string | null }>();
   return result.results;
 }
@@ -1440,9 +1440,9 @@ async function selectV6LegacyIds(
   const conditions = v6BaseConditions(matcher, bindings);
   conditions.push(`fr.friend_id = ?`);
   bindings.push(matcher.friendId);
-  const placeholders = matcher.targetDates.map(() => '?').join(',');
+  const placeholders = sqlIdSet(matcher.targetDates).sql;
   conditions.push(`fr.target_date IN (${placeholders})`);
-  bindings.push(...matcher.targetDates);
+  bindings.push(...(matcher.targetDates.length ? sqlIdSet(matcher.targetDates).binds : []));
   // 同時刻の別予約・手動登録を巻き込まない。source を持つ行 (別予約の現行行や
   // 手動で作り直した行) は source 連動側でだけ触り、ここでは見ない。
   // 移行前のきっかけ登録は source_kind が 'manual' のまま残っているため、

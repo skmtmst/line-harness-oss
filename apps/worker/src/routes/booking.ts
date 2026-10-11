@@ -4201,10 +4201,10 @@ async function getTodaySeatReservations(
         .prepare(
           `SELECT reservation_id, kind, late_minutes, marked_by_name, marked_at
              FROM rt_seat_visit_marks
-            WHERE store_id = ? AND undone_at IS NULL AND reservation_id IN (${list.map(() => '?').join(',')})
+            WHERE store_id = ? AND undone_at IS NULL AND reservation_id IN (${sqlIdSet(list.map(reservation => reservation.id)).sql})
             ORDER BY marked_at DESC`,
         )
-        .bind(store.id, ...list.map((reservation) => reservation.id))
+        .bind(store.id, ...sqlIdSet(list.map(reservation => reservation.id)).binds)
         .all<{
           reservation_id: string;
           kind: string;
@@ -4322,10 +4322,10 @@ booking.get('/api/booking/admin/today', async (c) => {
       .prepare(
         `SELECT booking_id, kind, late_minutes, marked_by_name, marked_at
            FROM booking_visit_marks
-          WHERE line_account_id = ? AND booking_id IN (${bookings.map(() => '?').join(',')})
+          WHERE line_account_id = ? AND booking_id IN (${sqlIdSet(bookings.map(booking => booking.id)).sql})
           ORDER BY marked_at DESC`,
       )
-      .bind(accountId, ...bookings.map((booking) => booking.id))
+      .bind(accountId, ...sqlIdSet(bookings.map(booking => booking.id)).binds)
       .all<{
         booking_id: string;
         kind: string;

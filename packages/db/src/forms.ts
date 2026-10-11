@@ -1374,7 +1374,7 @@ export async function getFormSubmissionAnalytics(
 
   let dateAnsweredUniqueFriends = 0;
   if (normalizedDateFields.length > 0) {
-    const placeholders = normalizedDateFields.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(normalizedDateFields.map(field => field.key)).sql;
     const row = await db.prepare(
       `SELECT COUNT(DISTINCT fs.friend_id) AS unique_friends
          FROM form_submissions fs
@@ -1386,7 +1386,7 @@ export async function getFormSubmissionAnalytics(
           AND answer.key IN (${placeholders})
           AND answer.value IS NOT NULL
           AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
-    ).bind(formId, lineAccountId, ...normalizedDateFields.map((field) => field.key))
+    ).bind(formId, lineAccountId, ...sqlIdSet(normalizedDateFields.map(field => field.key)).binds)
       .first<{ unique_friends: number }>();
     dateAnsweredUniqueFriends = Number(row?.unique_friends ?? 0);
   }

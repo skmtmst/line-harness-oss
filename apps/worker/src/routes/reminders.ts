@@ -222,10 +222,10 @@ async function loadReminderListSummaries(
     .prepare(
       `SELECT reminder_version_id, offset_minutes, offset_days, send_at_time
          FROM reminder_version_steps
-        WHERE reminder_version_id IN (${versionIds.map(() => '?').join(',')})
+        WHERE reminder_version_id IN (${sqlIdSet(versionIds).sql})
         ORDER BY position, stable_step_id`,
     )
-    .bind(...versionIds)
+    .bind(...(versionIds.length ? sqlIdSet(versionIds).binds : []))
     .all<ReminderVersionStepSummaryRow>();
   const stepsByVersion = new Map<string, ReminderVersionStepSummaryRow[]>();
   for (const step of steps.results) {

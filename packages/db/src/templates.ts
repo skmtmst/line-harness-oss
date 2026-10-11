@@ -953,8 +953,8 @@ export async function getTemplatesWithUsageCount(
     if (filter.folderIds.length === 0) {
       filters.push('1 = 0');
     } else {
-      filters.push(`folder_id IN (${filter.folderIds.map(() => '?').join(',')})`);
-      values.push(...filter.folderIds);
+      filters.push(`folder_id IN (${sqlIdSet(filter.folderIds).sql})`);
+      values.push(...(filter.folderIds.length ? sqlIdSet(filter.folderIds).binds : []));
     }
   }
   if (filter?.quick === 'reservation' || filter?.quick === 'ec') {

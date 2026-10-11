@@ -16,7 +16,7 @@ test('店舗範囲のSQLはIDごとの変数を展開しない', () => {
         if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
           && node.expression.name.text === 'map') {
           const receiver = node.expression.expression.getText(source);
-          const scoped = /(?:^|\.)(?:allowedAccountIds|allowedLineAccountIds|accountIds|lineAccountIds|visibleAccountIds|visibleActiveIds)$/.test(receiver)
+          const scoped = /(?:^|\.)(?:allowedAccountIds|allowedLineAccountIds|accountIds|lineAccountIds|visibleAccountIds|visibleActiveIds|accountTagIds)$/.test(receiver)
             || /(?:^|\.)(?:scope|visibleScope)\.ids$/.test(receiver)
             || (name === 'nen-tag-sync.ts' && receiver === 'assignedIds');
           const callback = node.arguments[0];
