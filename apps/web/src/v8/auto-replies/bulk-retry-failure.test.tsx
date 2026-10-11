@@ -24,3 +24,18 @@ it('OPS-C02 auto reply ordinary failure is presented as no retryable work',async
  expect(f.retry).toHaveBeenCalledWith('run-synthetic');
  expect(host.textContent).toContain('1 件をもう一度実行できませんでした');expect(host.textContent).not.toContain('もう一度実行できる処理はありませんでした。');
 });
+
+it('B-248: 送達不明は要確認と確認方法を表示し、canRetryが残っていても再実行しない', async()=>{
+ const response = await f.runs();
+ response.data.items[0].errorCode = 'delayed_delivery_unknown';
+ f.runs.mockResolvedValue(response);
+ await act(async()=>root.render(<Runs/>));
+ expect(host.textContent).toContain('要確認');
+ expect(host.textContent).toContain('届いたか確認できないため');
+ expect(host.textContent).toContain('相手に到着を確認');
+ expect([...host.querySelectorAll('button')].some(x=>x.textContent?.includes('失敗した処理をもう一度'))).toBe(false);
+ const menu=host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]');
+ if(menu) await act(async()=>menu.click());
+ expect(host.textContent).not.toContain('もう一度実行');
+ expect(f.retry).not.toHaveBeenCalled();
+});

@@ -2599,6 +2599,8 @@ export interface AutoReplyRun extends ExecutionRunListItem {
   inputPreview: string | null;
   matchedKeyword: string | null;
   versionNumber: number | null;
+  /** 送達不明を通常の失敗と区別する台帳の理由。 */
+  errorCode?: string | null;
   domainStatus: AutoReplyEvaluationStatus;
   replyStatus: "not_attempted" | "accepted" | "failed";
   actionSummary: Record<string, number>;

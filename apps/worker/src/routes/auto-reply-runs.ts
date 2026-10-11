@@ -50,6 +50,7 @@ interface AutoReplyRun {
   inputPreview: string | null;
   matchedKeyword: string | null;
   versionNumber: number | null;
+  errorCode: string | null;
   domainStatus: AutoReplyEvaluationStatus;
   replyStatus: 'not_attempted' | 'accepted' | 'failed';
   actionSummary: Record<string, number>;
@@ -187,7 +188,7 @@ function serializeRun(
     // 返信の失敗だけ・成功・処理中・見送り（選択ルールの見送り表示を含む）には出さない。
     // ただし途中で止まった再実行（actions_running のまま失敗行が残り、
     // 確保済みの行が無い）は再実行の入口が通るのでボタンを出す。
-    canRetry: row.has_failed_action_run === 1 && (
+    canRetry: row.error_code !== 'delayed_delivery_unknown' && row.has_failed_action_run === 1 && (
       RETRYABLE_DOMAIN_STATUSES.has(domainStatus)
       || (row.status === 'actions_running' && row.has_inflight_action_run === 0)
     ),
@@ -199,6 +200,7 @@ function serializeRun(
     inputPreview: canViewInput ? row.input_preview_masked : null,
     matchedKeyword: row.matched_keyword,
     versionNumber: row.version_number,
+    errorCode: row.error_code,
     domainStatus,
     replyStatus: row.reply_status,
     actionSummary: parseActionSummary(row.action_summary),

@@ -41,6 +41,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select';
 import Notice from '@/components/shared/notice'
+import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 
 /*
  * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
@@ -72,7 +73,12 @@ export function statusView(status: string): { label: string; tone: StatusBadgeTo
     ?? { label: '確認中', tone: 'neutral' }
 }
 
+export function isDeliveryUnconfirmed(run: AutoReplyRun): boolean {
+  return run.errorCode === 'delayed_delivery_unknown'
+}
+
 export function actionLabel(run: AutoReplyRun): string {
+  if (isDeliveryUnconfirmed(run)) return DELIVERY_UNCONFIRMED_REASON
   const summary = run.actionSummary
   const parts: string[] = []
   if (run.replyStatus === 'accepted') parts.push('返信')
@@ -94,7 +100,7 @@ function csvFor(items: AutoReplyRun[]): string {
       item.accountLabel ?? emptyValue('unknown'),
       item.inputPreview ?? emptyValue('unknown'),
       item.triggerLabel,
-      statusView(item.status).label,
+      isDeliveryUnconfirmed(item) ? '要確認' : statusView(item.status).label,
       actionLabel(item),
       item.durationMs === null ? emptyValue('unknown') : `${item.durationMs}ms`,
     ]),
@@ -247,7 +253,7 @@ export default function AutoReplyRunsV8() {
   }
 
   const retryRun = async (item: AutoReplyRun) => {
-    if (!item.canRetry || retryingId !== null || retryingAll) return
+    if (isDeliveryUnconfirmed(item) || !item.canRetry || retryingId !== null || retryingAll) return
     setRetryingId(item.id)
     setActionMessage('')
     try {
@@ -273,7 +279,7 @@ export default function AutoReplyRunsV8() {
 
   /* 「失敗した処理をもう一度」：今のページでやり直せる失敗を順に実行する。 */
   const retryAllFailed = async () => {
-    const targets = items.filter((item) => item.canRetry && matchesFilter(item, 'failed'))
+    const targets = items.filter((item) => !isDeliveryUnconfirmed(item) && item.canRetry && matchesFilter(item, 'failed'))
     if (targets.length === 0 || retryingAll || retryingId !== null) return
     setRetryingAll(true)
     setActionMessage('')
@@ -355,7 +361,7 @@ export default function AutoReplyRunsV8() {
   }
 
   const failedCount = data?.summary.errors ?? 0
-  const retryableFailed = items.filter((item) => item.canRetry && matchesFilter(item, 'failed')).length
+  const retryableFailed = items.filter((item) => !isDeliveryUnconfirmed(item) && item.canRetry && matchesFilter(item, 'failed')).length
   const query = search.trim().toLowerCase()
   const visibleItems = items.filter((item) => {
     if (!matchesFilter(item, filter)) return false
@@ -390,7 +396,7 @@ export default function AutoReplyRunsV8() {
         href: `/chats?friend=${encodeURIComponent(item.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
-    if (canManage && item.canRetry) {
+    if (canManage && !isDeliveryUnconfirmed(item) && item.canRetry) {
       list.push({
         id: 'retry',
         label: 'もう一度実行',
@@ -438,15 +444,16 @@ export default function AutoReplyRunsV8() {
         <KpiCard presentation="band" icon={null} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
           detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : emptyValue('unknown')}件`} />
         <KpiCard presentation="band" icon={null} title="失敗した処理" value={data ? failedCount : null} unit="件"
-          detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を開始してからの合計です'} />
+          detail={failedCount > 0 ? '理由と送信記録を確認してください' : '記録を開始してからの合計です'} />
         <KpiCard presentation="band" icon={null} title="平均で返すまで"
           value={data?.summary.averageResponseMs == null ? null : Number((data.summary.averageResponseMs / 1000).toFixed(1))} unit="秒"
           detail={`最後に動いた ${data ? formatTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
       </KpiBand>
       </div>
 
+      {items.some(isDeliveryUnconfirmed) ? <DeliveryUnconfirmedNotice action={<Button href="/chats">トークの送信記録を確認</Button>} /> : null}
       {failedCount > 0 ? (
-        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>{canManage ? (
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>{canManage && retryableFailed > 0 ? (
             <Button
               variant="primary"
               onClick={() => void retryAllFailed()}
@@ -456,7 +463,7 @@ export default function AutoReplyRunsV8() {
             >
               <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null} </>} >止まった行の理由を見て、もう一度実行できます。返信が届いているかは「行ったこと」に出ます。</Notice>
+          ) : null} </>} >止まった行の理由を確認してください。「要確認」の行は届いたか分からないため、送り直しません。</Notice>
       ) : null}
 
       <section className={styles.card} aria-label="実行の記録">
@@ -522,7 +529,7 @@ export default function AutoReplyRunsV8() {
               {visibleItems.map((item) => {
                 const view = statusView(item.status)
                 const failed = matchesFilter(item, 'failed')
-                const done = failed && item.detail ? item.detail : actionLabel(item)
+                const done = isDeliveryUnconfirmed(item) ? DELIVERY_UNCONFIRMED_REASON : failed && item.detail ? item.detail : actionLabel(item)
                 const name = item.friendName ?? '削除済みの友だち'
                 const menuItems = rowMenuItems(item)
                 return (
@@ -541,7 +548,7 @@ export default function AutoReplyRunsV8() {
                     <Td className={styles.colInput}>
                       <span className={styles.input} title={`${quoted(item.inputPreview)}（きっかけ：${item.triggerLabel}）`}>{quoted(item.inputPreview)}</span>
                     </Td>
-                    <Td className={styles.colResult}><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>
+                    <Td className={styles.colResult}>{isDeliveryUnconfirmed(item) ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>}</Td>
                     <Td className={styles.colDone}><span className={styles.done} title={done}>{done}</span></Td>
                     <Td className={styles.colTime}>
                       <span className={styles.time}>{item.durationMs === null ? emptyValue('unknown') : `${(item.durationMs / 1000).toFixed(1)}秒`}</span>

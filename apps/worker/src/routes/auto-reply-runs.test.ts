@@ -147,11 +147,12 @@ describe('GET /api/auto-reply-runs', () => {
     mocks.listAutoReplyEvaluationRuns.mockResolvedValueOnce({ ...original, items: [{
       ...original.items[0], status, error_code, skip_reason,
       candidate_result: 'won', candidate_reason_codes: '["keyword_matched"]',
-      has_failed_action_run: 0,
+      has_failed_action_run: error_code ? 1 : 0,
     }] });
     const response = await app().request('/api/auto-reply-runs', {}, { DB: db } as Env['Bindings']);
-    const json = await response.json() as { data: {items: Array<{status:string;detail:string;canRetry:boolean}>} };
+    const json = await response.json() as { data: {items: Array<{status:string;detail:string;canRetry:boolean;errorCode:string|null}>} };
     expect(json.data.items[0].status).toBe(status === 'failed' ? 'permanent_failed' : 'skipped');
+    expect(json.data.items[0].errorCode).toBe(error_code);
     expect(json.data.items[0].detail).toContain(expected);
     expect(json.data.items[0].canRetry).toBe(false);
   });
