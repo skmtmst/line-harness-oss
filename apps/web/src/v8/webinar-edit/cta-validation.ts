@@ -23,4 +23,3 @@ export function cardFieldProblems(card: WebinarCtaCard, time: string, durationSe
       : !url ? 'https:// から始まる URL を入れてください' : !/^https:\/\//.test(url) ? 'URL は https:// で始めてください（http は使えません）' : null,
   }
 }
-

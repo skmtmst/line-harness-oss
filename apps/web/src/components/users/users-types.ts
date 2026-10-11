@@ -17,4 +17,3 @@ export interface UserRowData {
   lastActivityAt: string
   isDuplicate: boolean
 }
-

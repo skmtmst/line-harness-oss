@@ -96,4 +96,3 @@ export function emergencySafetyTransition(event: EmergencySafetyEvent): {
     message: { tone: 'danger', text: '最新の状態を読み直せませんでした。時間をおいてもう一度読み直してください。' },
   }
 }
-

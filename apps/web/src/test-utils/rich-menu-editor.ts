@@ -45,4 +45,3 @@ export async function pickDateTime(label: string, iso: string) {
   fireEvent.click([...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
   await flush()
 }
-
