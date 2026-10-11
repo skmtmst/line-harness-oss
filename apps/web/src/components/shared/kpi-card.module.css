@@ -9,30 +9,6 @@
   display: none;
 }
 
-.cardV6 {
-  justify-content: flex-start;
-  min-height: 106px;
-  gap: 5px;
-  padding: 16px;
-}
-
-/*
- * ★V7 の友だち一覧の詰めた形（zZMNG。高さ100・間4・余白14/16）。
- * v8 では数のマスの実寸（下の cardV6 指定）がこれより強い指定で
- * 上書きするので、このクラスは v7 にだけ効く。
- */
-.cardV6Tight {
-  min-height: 100px;
-  gap: 4px;
-  padding: 14px 16px;
-}
-
-.cardBroadcast {
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 18px;
-}
-
 .head {
   position: relative;
   display: flex;
@@ -54,16 +30,6 @@
 
 .retry:focus-visible {
   outline: revert;
-}
-
-.labelV6 {
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-}
-
-.labelBroadcast {
-  color: var(--color-ink-faint);
-  font-size: var(--text-body);
 }
 
 .labelSkeleton {
@@ -133,17 +99,6 @@
 
 .detail {
   /* 補足の行の高さは1行ぶんにそろえる。空でも潰さない。 */
-}
-
-.detailV6 {
-  font-weight: 500;
-}
-
-/* ★V7：補足は状態ではないので緑にしない（緑は「正常」の意味だけに使う）。以前は accent-deep。 */
-.detailNotice {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 500;
 }
 
 .skeleton {

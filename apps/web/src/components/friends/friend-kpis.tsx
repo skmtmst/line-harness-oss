@@ -112,7 +112,7 @@ export default function FriendKpis() {
       <KpiBand gridClassName="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {cards.map((card) => (
           // 数の帯は1本にまとめる（Pp3nS）。
-          <KpiCard key={card.title} {...card} loading={loading} variant="v6" presentation="band" />
+          <KpiCard key={card.title} {...card} loading={loading} presentation="band" />
         ))}
       </KpiBand>
     </div>
