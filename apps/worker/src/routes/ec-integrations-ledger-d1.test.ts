@@ -1,3 +1,4 @@
+import { processDueEcRetries } from '../services/ec-retry.js';
 /*
  * N-328 / N-330 (#943): ECイベントからの顧客通知送信を、実D1で共通送信台帳
  * (notification_instances / notification_deliveries /
@@ -286,4 +287,14 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
     expect(deliveries()[0]).toMatchObject({ status: 'provider_accepted', attempts: 0 });
     expect(attemptRows()).toHaveLength(0);
   });
+});
+it('R-EC02: 注文保存が一度失敗してもcronだけで注文と明細を補う',async()=>{
+ sqlite.exec("CREATE TEMP TRIGGER fail_order BEFORE INSERT ON ec_orders BEGIN SELECT RAISE(ABORT,'sqlite artificial order failure'); END");
+ expect((await post(baseEvent({event_id:'read-model-recovery'}))).status).toBe(503);
+ expect(sqlite.prepare('SELECT COUNT(*) AS n FROM ec_orders').get()).toEqual({n:0});
+ sqlite.exec('DROP TRIGGER fail_order');
+ expect((await processDueEcRetries(db,{now:'2030-01-01T00:00:00Z'})).processed).toBe(1);
+ expect(sqlite.prepare('SELECT order_number FROM ec_orders').all()).toEqual([{order_number:'NEN-1001'}]);
+ expect(sqlite.prepare('SELECT product_name FROM ec_order_lines').all()).toEqual([{product_name:'鹿肉ミンチ'}]);
+ expect(sqlite.prepare("SELECT status FROM ec_events WHERE external_event_id='read-model-recovery'").get()).toEqual({status:'processed'});
 });
