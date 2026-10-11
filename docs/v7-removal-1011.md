@@ -2001,3 +2001,13 @@
 
 - 予約の期間/状態/ページ送り、取消の確認と在庫を戻す案内、版を付けた取消/復活、固定の客単価を使わない集計、LINE異常、承認の前後、取り込みアドレスの発行/コピー/再発行、使用中LINEの選択不可、名簿と権限の区別、取得失敗の読み直しを保持した。コピーは現役の共通部品の処理を確認する。
 - 関係50/50件合格（`/tmp/v7rm2-restaurantconsole-source1.json`、収集失敗0）、web型検査（`/tmp/v7rm2-restaurantconsole-source-type1.log`）/差分検査合格。試験削除0件（累計3件）。現役V8の内容/配置/CSSは変更なし。次は未使用の飲食V8写しと店舗追加。共通/CSS/CI・全体検査・画像比較は未完了。
+
+### 飲食：未使用の承認/集計/LINEフォローの写し（除去完了）
+
+|旧ファイル|削除前の試験の読者|扱い|
+|---|---|---|
+|restaurant-test/v8/approvals.tsx|価格反映の失敗/開始待ち2件、本番0|同じ2件を現在の承認へ移し、成功は現在のトーストで確認|
+|restaurant-test/v8/dashboard.tsx|直接の試験0、本番0|現在のダッシュボード/店舗集計に固定済み。旧写しを除去|
+|restaurant-test/v8/line-followup.tsx・line-followup.module.css|印/取得と保存/本送信の停止3件、本番0|同じ契約を現役のフォローへ移し、旧写しを除去|
+
+- 関係18/18件合格（`/tmp/v7rm2-restaurantcopiesa3.json`、収集失敗0）、web型検査（`/tmp/v7rm2-restaurantcopiesa-type2.log`）/差分検査合格。試験削除0件（累計3件）。現役V8の内容/配置/CSSは変更なし。次は店舗追加/残りの飲食の写し。共通/CSS/CI・全体検査・画像比較は未完了。
