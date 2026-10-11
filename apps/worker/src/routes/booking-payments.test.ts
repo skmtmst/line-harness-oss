@@ -108,6 +108,33 @@ describe('予約の支払いの共通口', () => {
     await expect(response.json()).resolves.toMatchObject({ data: { holdMinutes: 10 } });
   });
 
+  it.each([10, 30])('REM3-04 新しい支払い設定には指定した%d分を保存しDBの既定に任せない', async (holdMinutes) => {
+    seedBooking();
+    const instance = app();
+    const current = await instance.request('/api/booking/admin/payment-config?account_id=account-a', {}, env());
+    const defaults = await current.json() as { data: { mode: string; provider: string; holdMinutes: number } };
+    expect(defaults.data.holdMinutes).toBe(10);
+    const saved = await instance.request('/api/booking/admin/payment-config?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...defaults.data, holdMinutes }),
+    }, env());
+    expect(saved.status).toBe(200);
+    expect(sqlite.prepare('SELECT hold_minutes FROM booking_payment_configs WHERE line_account_id = ?').get('account-a'))
+      .toEqual({ hold_minutes: holdMinutes });
+    const reloaded = await instance.request('/api/booking/admin/payment-config?account_id=account-a', {}, env());
+    await expect(reloaded.json()).resolves.toMatchObject({ data: { holdMinutes } });
+  });
+
+  it('REM3-04 時間を省略した新規設定は保存せずDBの30分へ戻さない', async () => {
+    seedBooking();
+    const response = await app().request('/api/booking/admin/payment-config?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'none', provider: 'none' }),
+    }, env());
+    expect(response.status).toBe(400);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM booking_payment_configs').get()).toEqual({ n: 0 });
+  });
+
   it('何も決めていない店はお支払いなしで鍵も入っていない', async () => {
     seedBooking();
     const response = await app().request(
