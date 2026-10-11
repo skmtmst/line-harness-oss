@@ -186,3 +186,10 @@ html[data-theme='v8'] .field:not([data-density]):not([data-spacing]) > .labelRow
 [data-theme='v8'] .field[data-field-content-gap] .labelRow {
   margin-bottom: 0;
 }
+
+/* 固定絵のラベル行18。B-244の11px札も行の高さを押し広げない。 */
+html[data-theme='v8'] .field .label { line-height: var(--tpl-field-label-lh); }
+html[data-theme='v8'] :is(.required, .optional) {
+  font-size: var(--polish-text-note);
+  line-height: var(--tpl-field-badge-lh);
+}
