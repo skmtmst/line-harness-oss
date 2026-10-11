@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 const TARGETS = [
-  'affiliates/tabs.tsx',
+  '../v8/affiliates/affiliators.tsx',
+  '../v8/affiliates/offers.tsx',
+  '../v8/affiliates/approvals.tsx',
   'booking/menus/page.tsx',
   '../v8/friend-add-publish/publish.tsx',
   '../components/friends/friend-list-table.tsx',
@@ -49,7 +51,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       expect(errors.length, `${target} の取得失敗表示が検査から消えています`).toBeGreaterThan(0)
 
       for (const errorState of errors) {
-        expect(errorState, `${target} の取得失敗`).toMatch(/onRetry=|action=\{(?:<>)?<Button(?:[^>]*?) onClick=/)
+        expect(errorState, `${target} の取得失敗`).toMatch(/onRetry=|action=\{(?:<>)?<Button(?:[^>]*?) onClick=|action=\{<RetryButton onRetry=/)
       }
     }
   })

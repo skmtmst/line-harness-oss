@@ -6,10 +6,6 @@
     "unresolved-classname": 1,
     "direct-th": 8
   },
-  "app/affiliates/tabs.tsx": {
-    "arbitrary-value": 9,
-    "direct-th": 20
-  },
   "app/affiliates/v8-affiliates-tab.tsx": {
     "direct-th": 7
   },

@@ -465,31 +465,6 @@
     "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
   },
   {
-    "file": "app/affiliates/tabs.tsx",
-    "selector": "className=\"bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3\"",
-    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
-  },
-  {
-    "file": "app/affiliates/tabs.tsx",
-    "selector": "className=\"bg-canvas rounded-card border-hairline border\"",
-    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
-  },
-  {
-    "file": "app/affiliates/tabs.tsx",
-    "selector": "className=\"bg-canvas rounded-card border-hairline overflow-x-auto border\"",
-    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
-  },
-  {
-    "file": "app/affiliates/tabs.tsx",
-    "selector": "className=\"rounded-card border-hairline bg-canvas border p-4\"",
-    "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
-  },
-  {
-    "file": "app/affiliates/tabs.tsx",
-    "selector": "className=\"bg-canvas rounded-card border-hairline mt-3 flex flex-wrap items-center gap-3 border p-3\"",
-    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
-  },
-  {
     "file": "app/broadcasts/detail/broadcast-recipients.tsx",
     "selector": "className=\"bg-canvas rounded-card border-hairline border p-5\"",
     "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"

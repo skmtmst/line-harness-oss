@@ -173,7 +173,6 @@ const EXEMPTIONS: Record<string, string> = {
   'v8/restaurant/google/google.tsx':
     '編集を持たないGoogleの外枠。タブ・店舗の切替を共通の未保存確認へ委ね、現在の編集画面自身の番兵が止める。URLの試験で確認→続ける/破棄の動きを守る',
   'components/shared/entity-picker.tsx': '選ぶ窓の候補は仮選択で、選ぶを押したときだけ親へ渡す。閉じる操作は仮選択を破棄し、親の保存前の値を変えない。',
-  'app/affiliates/tabs.tsx': '一覧の作成窓は共通Dialogが入力を守り、作成済みの結果だけdirty=falseで閉じる。',
   'components/chats/friend-info-sidebar.tsx':
     '受信箱の右の欄（B-26 その場で直す）。対応状況・担当・タグは押した瞬間に保存し、メモは書くのをやめて1秒で保存する。保存待ちの入力を溜めないので番兵の対象外（失敗は知らせで戻してもう一度試す）',
   'components/hq/account-menu.tsx':

@@ -7,12 +7,15 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React, { useState } from 'react'
 
+const update = vi.hoisted(() => vi.fn(async () => ({ success: true, data: {} })))
+
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...await importOriginal<typeof import('@/lib/api')>(),
   api: {
     conversionApprovals: { list: async () => ({ success: true, data: { items: [], cursor: null } }) },
     affiliates: {
+      update,
       reportV2: async () => ({ success: true, data: null }),
       links: async () => ({ success: true, data: [] }),
       journeys: async () => ({ success: true, data: { items: [], cursor: null } }),
@@ -66,6 +69,19 @@ function Opener() {
 }
 
 describe('成果引き出しは共通の窓の動きをする', () => {
+  test('報酬率の範囲外は送信せず、0%へ直したら保存できる', async () => {
+    update.mockClear()
+    render(<AffiliateDrawerV8 affiliate={{ ...row, rewardMode: 'rate', commissionRate: 10 }} accountId="acc-1" readonly={false} startInEdit linkBaseUrl="https://example.invalid" onClose={() => {}} onChanged={() => {}} onStopRequest={() => {}} />)
+    const rate = await screen.findByLabelText('報酬の割合（%）')
+    fireEvent.change(rate, { target: { value: '101' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '取り決めを保存する' })) })
+    expect(await screen.findByText('報酬率は0から100の間で入力してください')).toBeTruthy()
+    expect(update).not.toHaveBeenCalled()
+    fireEvent.change(rate, { target: { value: '0' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '取り決めを保存する' })) })
+    expect(update).toHaveBeenCalledWith('a1', expect.objectContaining({ commissionRate: 0 }))
+  })
+
   test('Escapeで閉じる', async () => {
     render(<Opener />)
     fireEvent.click(screen.getByRole('button', { name: '詳細を開く' }))

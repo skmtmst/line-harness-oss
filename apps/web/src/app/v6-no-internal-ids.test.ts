@@ -24,7 +24,8 @@ import { describe, expect, it } from 'vitest'
  */
 
 const SCREENS = [
-  { node: 'n5VVTb / jwrbf', path: 'affiliates/tabs.tsx' },
+  { node: 'OylSV', path: '../v8/affiliates/approvals.tsx' },
+  { node: 'tnTn9', path: '../v8/affiliates/drawer.tsx' },
   { node: 'n5VVTb / jwrbf', path: 'conversions/page.tsx' },
   { node: 'voJtX', path: 'contents/page.tsx' },
   { node: 'voJtX', path: 'contents/media-detail-dialog.tsx' },
@@ -127,56 +128,56 @@ describe('V6の画面に内部IDとDBの語を出さない', () => {
 
 describe('成果承認 n5VVTb の友だち列', () => {
   const CELL = between(
-    read('affiliates/tabs.tsx'),
-    '{pagedItems.map((item) => {',
-    '{item.affiliateName',
+    read('../v8/affiliates/approvals.tsx'),
+    '<Td className={styles.colName}>',
+    '<Td className={styles.colApAffiliate}>',
   )
 
   it('名前だけを出し、内部IDを添えない', () => {
-    expect(CELL).toContain('{personNameText(item.friendName)}')
+    expect(CELL).toContain('{personName(item.friendName)}')
     expect(CELL).not.toContain('item.friendId')
     expect(CELL).not.toContain('不明')
   })
 })
 
 describe('紹介者 jwrbf の内訳', () => {
-  const TABS = read('affiliates/tabs.tsx')
+  const TABS = read('../v8/affiliates/drawer.tsx')
 
   it('集計カードの見出しに表名を出さない', () => {
-    const CARDS = between(TABS, '{/* v2 summary cards */}', '{/* Per-offer breakdown */}')
-    expect(CARDS).toContain('{CLICK_SUMMARY_LABEL}')
+    const CARDS = between(TABS, 'title="今月の成果"', '</KpiBand>')
+    expect(CARDS).toContain('value={report?.conversions}')
     expect(CARDS).not.toContain('ref_tracking')
   })
 
   it('重複の見出しと札に列名もIDも出さない', () => {
-    const DUP = between(TABS, '{/* Duplicate flags */}', '{/* CV by point */}')
-    expect(DUP).toContain('{duplicateFlagHeading(report.duplicateFlags.length)}')
-    expect(DUP).toContain('{duplicateFriendNameText(f.friendId, journeys)}')
+    const DUP = between(TABS, '{report.duplicateFlags.length > 0', 'const friends =')
+    expect(DUP).toContain('同じ友だちの重複')
+    expect(DUP).toContain('成果承認で中身を確かめてください')
     expect(DUP).not.toMatch(/identity_key/i)
     expect(DUP).not.toContain('f.friendId.slice')
   })
 
   it('リンク別クリックの列見出しを運用者の言葉にする', () => {
-    const HEAD = between(TABS, '{/* Links table */}', '</thead>')
-    expect(HEAD).toContain('<th className="pb-1 pr-4">{LINK_CODE_HEADING}</th>')
+    const HEAD = between(TABS, 'links.map((link)', '<section className={styles.section} aria-label="認めるのを待っている成果">')
+    expect(HEAD).toContain('クリック ${formatNumber(link.click_count)}')
     expect(HEAD).not.toContain('>ref_code<')
   })
 
   it('帰属ジャーニーの列見出しと友だち名を運用者の言葉にする', () => {
-    const HEAD = between(TABS, '<th className="pb-1 pr-4">友だち</th>', '</thead>')
-    expect(HEAD).toContain('<th className="pb-1 pr-4">{LINK_CODE_HEADING}</th>')
+    const HEAD = between(TABS, 'const friends =', 'const payment =')
+    expect(HEAD).toContain('・リンク ')
     expect(HEAD).not.toContain('>ref_code<')
 
-    const ROW = between(TABS, '{journeys.map((j) => {', '{formatDate(j.addedAt)}')
-    expect(ROW).toContain('{personNameText(j.displayName)}')
+    const ROW = between(TABS, '{journeys.map((journey)', '</section>')
+    expect(ROW).toContain('{personName(journey.displayName)}')
     expect(ROW).not.toContain('不明')
   })
 
   it('重複のしるしの吹き出しに列名を出さない', () => {
-    const FLAG = between(TABS, '{needsReview ? (', '</td>')
+    const FLAG = between(read('../v8/affiliates/approvals.tsx'), '<Td className={styles.colApCheck}>', '</Td>')
     // IDEA-16: 理由は approvalReviewReasons が運用者の言葉で組み立てる。
     // metadata のキー名（orderNumber/ecEventId）や列名は出さない。
-    expect(FLAG).toContain('title={reviewReasons.join')
+    expect(FLAG).toContain('title={reasons.join')
     expect(FLAG).not.toMatch(/identity_key|order_number|ec_event_id/i)
   })
 })

@@ -1579,7 +1579,7 @@ function PreviewStep({ rule, definition, routeNames, runTest, onTestConditions, 
         <dl>{flowSteps.map((item) => <div key={item.key}><dt>{item.title}</dt><dd>{item.detail}</dd></div>)}</dl>
         <Field label="再追加・ブロック解除のとき"><ul>{readdLines.map((line) => <li key={line}>{line}</li>)}</ul></Field>
         <Field label="過去28日の該当"><span>{matchedLast28Days === null ? '未取得' : `${formatNumber(matchedLast28Days)}人`}</span></Field>
-        {metricsError ? <Notice tone="danger" message="該当数を取得できませんでした。" action={<Button type="button" onClick={() => setMetricsAttempt((current) => current + 1)}>再試行</Button>} /> : null}
+        {metricsError ? <Notice tone="danger" message="該当数を読み込めませんでした。" action={<Button type="button" onClick={() => setMetricsAttempt((current) => current + 1)}>再試行</Button>} /> : null}
       </Dialog>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="テストする（送らずに判定）">
         <div className={styles.cardHead}>

@@ -44,7 +44,6 @@ function collect(dir: string, found: string[] = []): string[] {
  */
 const KNOWN_FILES: string[] = [
   'app/affiliates/affiliate-display.ts',
-  'app/affiliates/tabs.tsx',
   'app/form-submissions/responses/response-summary.ts',
   'app/getting-started/getting-started-view.ts',
   'app/health/page.tsx',

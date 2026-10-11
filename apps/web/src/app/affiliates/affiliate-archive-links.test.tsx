@@ -12,7 +12,10 @@ const fixture = vi.hoisted(() => ({
   approvalsImpl: null as null | ((params: unknown) => Promise<unknown>),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
     affiliates: {
       archiveImpact: async () => ({
@@ -31,7 +34,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 const { AffiliateArchiveDialog } = await import('@/v8/affiliates/dialogs')
-const { ApprovalQueue } = await import('./tabs')
+const { ApprovalQueue } = await import('@/test-utils/affiliate-tabs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
