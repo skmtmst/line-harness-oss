@@ -123,6 +123,16 @@ const MAINB_V8_SCREENS = [
   ['/friend-add-settings', '@/v8/friend-add/list', 'v8/friend-add/list.tsx', '<ListPage'],
   ['/scenarios/mode', '@/v8/scenarios/create', 'v8/scenarios/create.tsx', '<CreatePage'],
   ['/scenarios/first-step', '@/v8/scenario-first-step/first-step', 'v8/scenario-first-step/first-step.tsx', '<CreatePage'],
+  ['/events', '@/v8/events/list', 'v8/events/list.tsx', '<ListPage'],
+  ['/events/bookings', '@/v8/events/bookings', 'v8/events/bookings.tsx', '<DetailPage'],
+  ['/events/edit', '@/v8/events/edit', 'v8/events/edit.tsx', '<DetailPage'],
+  ['/webinars/new', '@/v8/webinar-edit/new', 'v8/webinar-edit/new.tsx', '<CreatePage'],
+  ['/webinars/edit', '@/v8/webinar-edit/edit', 'v8/webinar-edit/edit.tsx', '<CreatePage'],
+  ['/emergency', '@/v8/settings/emergency/screen', 'v8/settings/emergency/screen.tsx', '<SbSettingsScreen'],
+  ['/automations', '@/v8/automations/list', 'v8/automations/list.tsx', '<ListPage'],
+  ['/automations/new', '@/v8/automations/create/create', 'v8/automations/create/create.tsx', '<CreatePage'],
+  ['/nen-campaigns', '@/v8/nen-campaigns/list', 'v8/nen-campaigns/list.tsx', '<ListPage'],
+  ['/staff', '@/v8/settings/staff/staff', 'v8/settings/staff/staff.tsx', '<PageFrame'],
 ] as const;
 const migratedRoutes = new Set<string>(MAINB_V8_SCREENS.map(([route]) => route));
 
@@ -220,14 +230,18 @@ describe('画面の骨格が設計と一致する', () => {
 
   it.each(MAINB_V8_SCREENS)('%s の入口はV8本体を描く', (route, module, file, template) => {
     const entry = readFileSync(join(APP, route, 'page.tsx'), 'utf8');
-    const imported = [...entry.matchAll(/import (\w+) from ['"]([^'"]+)['"]/g)]
-      .find((match) => match[2] === module);
+    if (entry.includes(`export { default } from '${module}'`)) {
+      expect(entry).not.toContain('useAdminTheme');
+      return;
+    }
+    const imported = [...entry.matchAll(/import\s+(?:\{\s*(\w+)(?:\s+as\s+(\w+))?[^}]*\}|(\w+))\s+from ['"]([^'"]+)['"]/g)]
+      .find((match) => match[4] === module);
     expect(imported, `${route} が ${module} を読む`).toBeDefined();
-    expect(entry).toContain(`<${imported![1]}`);
+    expect(entry).toContain(`<${imported![2] ?? imported![1] ?? imported![3]}`);
   });
 
   it.each(MAINB_V8_SCREENS)('%s のV8本体は共通の型を使う', (_route, _module, file, template) => {
-    const body = readFileSync(join(SRC, file), 'utf8');
+    const body = readUiSource(join(SRC, file), 'utf8');
     expect(body).toContain(template);
   });
 

@@ -12,8 +12,8 @@ vi.mock('@/lib/api', () => ({
 }))
 
 import { api } from '@/lib/api'
-import { WeekdaySelect } from './weekday-select'
-import { FriendMultiSelect } from './friend-multi-select'
+import { WeekdaySelect } from '@/v8/automations/create/weekday-select'
+import { FriendMultiSelect } from '@/v8/automations/create/friend-multi-select'
 
 const mockList = api.friends.list as unknown as ReturnType<typeof vi.fn>
 
@@ -25,6 +25,7 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   mockList.mockReset()
 })
 
@@ -35,6 +36,7 @@ afterEach(async () => {
   root = null
   container = null
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
 })
 
 async function mount(node: React.ReactElement): Promise<HTMLDivElement> {
@@ -94,7 +96,7 @@ describe('対象の友だちの複数選択（R22）', () => {
     const el = await mount(
       <FriendMultiSelect accountId="account-1" selectedIds={['a', 'b']} names={{ a: '山田 花子', b: '佐藤 美咲' }} onChange={onChange} />,
     )
-    expect(el.textContent).toContain('対象の友だち（2人）')
+    expect(el.textContent).toContain('対象の友だち（2 人）')
     expect(el.textContent).toContain('山田 花子')
     const remove = el.querySelector('button[aria-label="山田 花子を外す"]')
     if (!remove) throw new Error('外すボタンが見つかりません')
@@ -104,32 +106,36 @@ describe('対象の友だちの複数選択（R22）', () => {
 
   it('名前で探して候補から足せる（読み込み中・正常）', async () => {
     const onChange = vi.fn()
-    let resolveList!: (value: { success: true; data: { items: Array<{ id: string; displayName: string }> } }) => void
+    let resolveList!: (value: { success: true; data: { items: Array<{ id: string; displayName: string }>; total: number } }) => void
     mockList.mockImplementationOnce(
       () => new Promise((resolve) => { resolveList = resolve }),
     )
     const el = await mount(
       <FriendMultiSelect accountId="account-1" selectedIds={[]} names={{}} onChange={onChange} />,
     )
-    const input = el.querySelector('input[aria-label="友だちを名前で探す"]')
+    await click(el.querySelector('button[aria-haspopup="dialog"]')!)
+    const input = document.querySelector('input[type="search"]')
     if (!(input instanceof HTMLInputElement)) throw new Error('検索欄が見つかりません')
     // 待ちは偽の時計で進める（本物の時間を待たない）。250ms の待ちは打った瞬間から数えるので、打つ前に替える。
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await typeText(input, 'やま')
     // 250ms の待ちの間は読み込み中。
+    await act(async () => { await vi.advanceTimersByTimeAsync(650) })
     await act(async () => { await vi.advanceTimersByTimeAsync(300) })
     vi.useRealTimers()
     // まだ返事が無いので読み込み中のまま。
-    expect(el.textContent).toContain('探しています…')
+    expect(document.body.textContent).toContain('友だちを探しています…')
     await act(async () => {
-      resolveList({ success: true, data: { items: [{ id: 'friend-1', displayName: '山田 花子' }] } })
+      resolveList({ success: true, data: { items: [{ id: 'friend-1', displayName: '山田 花子' }], total: 1 } })
     })
-    expect(el.textContent).toContain('山田 花子')
-    const add = Array.from(el.querySelectorAll('button')).find((button) => button.textContent === '追加する')
+    expect(document.body.textContent).toContain('山田 花子')
+    await click(document.querySelector('input[type="checkbox"][aria-label="山田 花子"]')!)
+    expect(onChange).not.toHaveBeenCalled()
+    const add = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'この 1件にする')
     if (!add) throw new Error('追加ボタンが見つかりません')
     await click(add)
     expect(onChange).toHaveBeenCalledWith(['friend-1'], { 'friend-1': '山田 花子' })
-    expect(mockList).toHaveBeenCalledWith({ accountId: 'account-1', search: 'やま', limit: 20 })
+    expect(mockList).toHaveBeenCalledWith({ accountId: 'account-1', search: 'やま', limit: 20, offset: '0', includeTags: false })
   })
 
   it('探せないときは失敗だけを出し、候補は出さない', async () => {
@@ -138,13 +144,16 @@ describe('対象の友だちの複数選択（R22）', () => {
     const el = await mount(
       <FriendMultiSelect accountId="account-1" selectedIds={[]} names={{}} onChange={onChange} />,
     )
-    const input = el.querySelector('input[aria-label="友だちを名前で探す"]')
+    await click(el.querySelector('button[aria-haspopup="dialog"]')!)
+    const input = document.querySelector('input[type="search"]')
     if (!(input instanceof HTMLInputElement)) throw new Error('検索欄が見つかりません')
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await typeText(input, 'やま')
-    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(650) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
     vi.useRealTimers()
-    expect(el.textContent).toContain('探せませんでした')
+    expect(document.body.textContent).toContain('友だちを読み込めませんでした。')
+    expect(document.querySelector('input[type="checkbox"][aria-label="山田 花子"]')).toBeNull()
     expect(onChange).not.toHaveBeenCalled()
   })
 
@@ -152,9 +161,9 @@ describe('対象の友だちの複数選択（R22）', () => {
     const el = await mount(
       <FriendMultiSelect accountId={null} selectedIds={[]} names={{}} onChange={vi.fn()} />,
     )
-    const input = el.querySelector('input[aria-label="友だちを名前で探す"]')
-    if (!(input instanceof HTMLInputElement)) throw new Error('検索欄が見つかりません')
-    expect(input.disabled).toBe(true)
+    const open = el.querySelector('button[aria-haspopup="dialog"]')
+    if (!(open instanceof HTMLButtonElement)) throw new Error('選ぶ欄が見つかりません')
+    expect(open.disabled).toBe(true)
     expect(mockList).not.toHaveBeenCalled()
   })
 })

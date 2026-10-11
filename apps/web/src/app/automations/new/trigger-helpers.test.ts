@@ -5,7 +5,7 @@ import {
   normalizeFriendIds,
   normalizeWeekdays,
   weekdayNames,
-} from './trigger-helpers'
+} from '@/v8/automations/create/trigger-helpers'
 
 /*
  * R21: "1,3," は [1,3] になり、0（日曜）は足さない。

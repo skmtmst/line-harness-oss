@@ -22,7 +22,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["app/affiliates/list-v8.css", ".af-list-tableWrap", "一覧表を切り取る枠。表の外側に影を重ねない。"],
   ["app/affiliates/list-v8.css", ".af-list-stateWrap", "一覧表の空・待機状態。表の枠と同じ形を保つ。"],
   ["app/auto-replies/publish/publish.css", ".arp-stickyBar", "保存の追従帯。浮く帯の影を使い、カードの影を重ねない。"],
-  ["app/automations/new/new-automation.module.css", ".summaryBar", "現在の設定を示す数の帯。カードの影を付けない。"],
   ["app/friend-add-settings/friend-add-rule-editor.css", ".friend-add-editor-dialog", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["app/hq/readonly-v8.css", "[data-theme='v8'] .v8-ro-hq-page .v8-ro-hq-tiles[data-ro-kpis] [data-design-version]", "閲覧のみの数の帯。数値のまとまりで、内容のカードではない。"],
   ["app/mileage/earning-rules/new/v8-create-form.module.css", ".choice", "獲得方法を選ぶ入力。選択枠で区別する。"],
