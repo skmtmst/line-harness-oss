@@ -21,3 +21,4 @@
 |OPSDASH-F01|本物FriendAddLinkで拒否が基本URLだけになり、試験失敗|経路の失敗と再読込を共通表示、未取得は経路選択を止める|QR窓の自前読込にも同類1、AST点検へ継続|実カードの取得拒否→同じ口で再取得→空成功|
 |REM3-01|本物FloorEditor+MapのAPI実名fields.tablesで欄エラー欠落、試験失敗|共通の保存エラーを座席図に結び付け、赤枠・説明・焦点の口を渡す|saveFloor呼出は1編集部品、店内の共通利用へ適用|実図の卓移動→400→tables理由とaria-invalid・describedby・入力保持|
 |REM3-06|実スタッフ新規・編集で登録メディア選択ボタンなし、両試験失敗|ImageUploaderのonMediaPickを共通MediaPickerDialogへ接続、公開URLを保存|現行の予約スタッフImageUploader2箇所を両方修正|実新規・編集の共通メディア選択→保存payloadに選択URL|
+|DP-02|地図全613板の写し検査で消えたsAnyyのHTML/TSV欠落、試験失敗|sAnyy除外、板数612。別名aRvrhの既存QX56l写しへTSV口も補完|全地図検査の追加欠落1（aRvrh別名）も修正|外部html置場がある時は全板のHTML・TSVを確認、無い環境だけskip|
