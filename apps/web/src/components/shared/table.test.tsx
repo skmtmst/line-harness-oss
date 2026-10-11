@@ -165,7 +165,7 @@ describe('★V7の足し分', () => {
   it('失敗の行は必ず読み直すボタンを出す', () => {
     let calls = 0
     const { rerender } = renderTable(<TableStateRow colSpan={2} kind="error" />)
-    expect(screen.getByText('表示できませんでした')).not.toBeNull()
+    expect(screen.getByText('読み込めませんでした')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).not.toBeNull()
 
     rerender(

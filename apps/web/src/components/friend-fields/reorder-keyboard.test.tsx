@@ -11,6 +11,7 @@
  * account-context だけ。見た目（ドラッグの挙動）は変えていない。
  */
 import React, { act } from 'react'
+import { screen } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -101,7 +102,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, ...rest }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -113,7 +114,7 @@ vi.mock('@/contexts/account-context', () => ({
 import TagsPageV4 from './tags-page-v4'
 import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
-import SavedSearchList from './saved-search-list'
+import SavedSearchList from '@/v8/tags/searches-tab'
 
 let host: HTMLDivElement
 let root: Root
@@ -171,6 +172,18 @@ function grip(name: string): HTMLButtonElement {
   const el = host.querySelector(`button[aria-label="${name}を並び替え。上下キーで移動"]`)
   if (!el) throw new Error(`「${name}」の並び替えつまみが見つかりません`)
   return el as HTMLButtonElement
+}
+
+async function keyboardActivate(element: HTMLElement) {
+  await act(async () => {
+    element.focus()
+    const key = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    element.dispatchEvent(key)
+    // happy-dom does not perform the browser's native Enter activation.
+    if (!key.defaultPrevented) element.click()
+    element.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }))
+    await new Promise(resolve => setTimeout(resolve, 0))
+  })
 }
 
 async function press(element: Element, key: 'ArrowUp' | 'ArrowDown') {
@@ -249,9 +262,10 @@ describe('N-049 キーボードだけで並び替えられる', () => {
     expect(calls.supportMarksUpdate).not.toHaveBeenCalled()
   })
 
-  it('保存した検索: ↑で1つ上へ動き、新しい並びを reorder API へ1回で送る', async () => {
-    await render(React.createElement(SavedSearchList, { accountId: 'a1' }))
-    await press(grip('検索B'), 'ArrowUp')
+  it('保存した検索: キーボードで上へ動かし、新しい並びを reorder API へ1回で送る', async () => {
+    await render(React.createElement(SavedSearchList, { accountId: 'a1', canEdit: true }))
+    await keyboardActivate(screen.getByRole('button', { name: '保存した検索「検索B」の操作' }))
+    await keyboardActivate(screen.getByRole('menuitem', { name: '上へ動かす' }))
     expect(calls.savedSearchesReorder).toHaveBeenCalledTimes(1)
     expect(calls.savedSearchesReorder).toHaveBeenCalledWith('a1', ['s2', 's1', 's3'])
     expect(calls.savedSearchesUpdate).not.toHaveBeenCalled()

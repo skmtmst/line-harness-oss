@@ -108,21 +108,21 @@ describe('RefreshCover（★V7 `sTJsh` §2 前の表示を残す）', () => {
       return <RefreshCover refreshing={refreshing}><div>行</div></RefreshCover>
     }
     await act(async () => { root.render(<Probe refreshing={true} />) })
-    expect(host.querySelector('.v7-refresh-dim')).toBeNull()
+    expect(host.querySelector('[role="status"]')).toBeNull()
     await tick(250)
     await act(async () => { root.render(<Probe refreshing={false} />) })
     expect(host.querySelector('.v7-refresh-dim')).toBeNull()
-    expect(host.querySelector('.v7-refresh-line')).toBeNull()
+    expect(host.querySelector('[aria-busy="true"]')).toBeNull()
   })
 
-  it('遅い読み直しでは 0.55 に薄め、上に線の帯を出す', async () => {
+  it('遅い読み直しでは行を残したまま更新中を出す', async () => {
     function Probe({ refreshing }: { refreshing: boolean }) {
       return <RefreshCover refreshing={refreshing}><div>行</div></RefreshCover>
     }
     await act(async () => { root.render(<Probe refreshing={true} />) })
     await tick(350)
-    expect(host.querySelector('.v7-refresh-dim')).not.toBeNull()
-    expect(host.querySelector('.v7-refresh-line')).not.toBeNull()
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('更新中')
+    expect(host.querySelector('[aria-busy="true"]')?.textContent).toBe('行')
     // 応答が来たらすぐ元に戻す（最低表示時間は無い）。
     await act(async () => { root.render(<Probe refreshing={false} />) })
     expect(host.querySelector('.v7-refresh-dim')).toBeNull()
