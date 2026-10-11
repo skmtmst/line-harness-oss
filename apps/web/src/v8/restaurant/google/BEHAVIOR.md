@@ -8,7 +8,8 @@
 - `?tab=reviews&view=draft&id=<口コミ>`：返信を作る。id が無いときは一覧。
 - `?tab=posts&view=new&kind=standard|event|offer`：投稿を作る（kind 既定は standard）。`view=edit&id=`：直す。`view=confirm&id=`：公開前の確認。
 - `?tab=profile&view=confirm&id=<変更案>`：現役の V8 外枠と共通部品で変更の確認を出す。複数の変更案はカンマ区切りで1件ずつ確認して送る。
-- `?tab=profile&view=hours|history|edit`：営業時間の変更・変更履歴・プロフィールの編集。旧入口を移行中。
+- `?tab=profile&view=history&result=all|applied|pending|failed`：現役の V8 の変更履歴。種類・結果・期間・検索で絞り、CSVで出力し、変更案のある行から確認画面を開く。
+- `?tab=profile&view=hours|edit`：営業時間の変更・プロフィールの編集。旧入口を移行中。
 - `?google=connected|reconnected|select_location|error:*`：Google からの戻り。1回だけ帯に出して URL から消す。
 
 ## 呼ぶ口（今の画面と同じ `restaurantGoogleApi`）
@@ -18,6 +19,7 @@
 - パフォーマンス：`performance(7|28|90)`（既定28日）。
 - プロフィール：`profile`・`syncProfile`・`proposeHours`（今日を休みにする・今日は早く閉める → 変更の確認へ）。
 - 変更確認：`change`・`sendChange`・`cancelChange`。確認チェック・送信の権限と環境を守る。競合は最新値を示して停止。送信結果不明は再取得して確認を外し、再送時の照合を案内する。同時の連打は1回に制限する。
+- 変更履歴：`history`（表示20件・CSV100件ずつ最大25ページ）。検索は300ms待って取得し、古い応答を捨てる。絞り込みで先頭へ戻す。失敗は再試行でき、途中で失敗したCSVを保存しない。
 - 設定：`connectStart`（Google の認可画面へ）・`selectLocation`・`disconnect`（確認の小窓）。
 
 ## 送れない設定・権限

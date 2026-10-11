@@ -23,7 +23,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * ★V8 Googleビジネス プロフィール（`JUTGz`）。
  * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
  * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
- * ?tab=profile&view=hours|confirm|history|edit へ移る。確認は現役の V8、ほかは移行中。
+ * ?tab=profile&view=hours|confirm|history|edit へ移る。確認・履歴は現役の V8、ほかは移行中。
  */
 
 function addressText(a: GoogleProfileAddress | null | undefined): string {

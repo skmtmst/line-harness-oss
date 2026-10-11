@@ -19,6 +19,7 @@ import { PostEditor, PostConfirm, PostsBoard, type MediaUploadHelpers } from './
 import PerformanceBoard from './performance'
 import ProfileBoard from './profile'
 import { ChangeConfirmScreen } from './profile-confirm'
+import { HistoryScreen } from './profile-history'
 import SettingsBoard from './settings'
 import styles from './google.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
@@ -31,7 +32,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  *
  * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
  * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
- * 変更の確認は共通の V8 部品で出す。営業時間・履歴・編集は旧入口を移行中。動きは BEHAVIOR.md。
+ * 変更の確認・履歴は共通の V8 部品で出す。営業時間・編集は旧入口を移行中。動きは BEHAVIOR.md。
  */
 
 export type { MediaUploadHelpers } from './posts'
@@ -185,6 +186,8 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           <PerformanceBoard accountId={accountId} />
         ) : tab === 'profile' && view === 'confirm' && id ? (
           <ChangeConfirmScreen key={`${accountId}-${id}`} accountId={accountId} ids={id.split(',').filter(Boolean)} go={go} />
+        ) : tab === 'profile' && view === 'history' ? (
+          <HistoryScreen key={`${accountId}-${searchParams.get('result') ?? ''}`} accountId={accountId} initialResult={(['all', 'applied', 'pending', 'failed'] as const).find((value) => value === searchParams.get('result'))} go={go} />
         ) : tab === 'profile' ? (
           <ProfileBoard accountId={accountId} go={go} />
         ) : tab === 'settings' ? (
