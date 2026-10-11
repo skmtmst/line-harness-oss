@@ -39,7 +39,7 @@ F-6の人・席のキャンセル待ちを対象。イベントの待ちとは�
 - UI2-C02/C03: `/tmp/revfixc-ui2-red.log` 5 failed / 4 unhandled、修正後5 passed / unhandled 0。URLとSDKのfixtureの初期不備を直した後のログ。
 
 - NORMAL3: `/tmp/revfixc-normal3-red.log` 元Worker入口から7 failed、共通化後同じ7件がpass。元moduleをimportし、APIだけを人工データへ置換。
-- 削除対象を読む試験: deployed-liffの3件をapps/liffのsalon-regressionへ移動（質問・期限・入力保持と同じ冪等鍵）。tap-actions.integrationの7件は共通入口のURL関数へ変更。entryのサロン2件は実際の共通画面を操作する形へ変更。12件の検証内容を維持。
+- 削除対象を読む試験: deployed-liffの3件をapps/liffのsalon-regressionへ移動（質問・期限・入力保持と同じ冪等鍵）。tap-actions.integrationの7件は共通入口のURL関数へ変更。entryのサロン2件は実際の共通画面を操作する形へ変更。12件の検証内容を維持。さらにpendec2-rulesのCSS経路検査1件を共通CSSへ移し、合計13件を移設/更新。
 - Workerの入口wrapperとLIFF単体は同じBooking・BookingHistory・共通部品を読む。SDKをmain.tsから渡し、店と本人の文脈はsetLiffContextで保持。
 
 - REM3-03: `/tmp/revfixc-rem303-red.log` 1 failed / 1 passed。修正後2 passed。支払いの有無は予約作成応答のpaymentで判明するため、その後の手順帯を5段にする。事前の公開メニューには支払い方式の欄がないため、事前から5段にするには公開APIの欄が必要（今回追加しない）。
@@ -54,3 +54,5 @@ F-6の人・席のキャンセル待ちを対象。イベントの待ちとは�
 - 仲間: 通知URL2種（人・席）、見送り引数1種、登録シート2種（人・席）、現役restaurantはLIFFと共通部品1か所。元の人の登録も共通化により現役へ接続した。
 
 - B-241仲間: `/tmp/revfixc-b241-sibling-red.log` 3 failed / 15 passed。修正後、登録後の既存API再試行を加え20 passed。ASTは正しい失敗状態と成功時リセットを区別する負例・正例6件＋全ソース1件、root test:scriptsでCI実行。
+
+- 全件検索で旧CSS参照は席入口・スタンプ入口・pendec2-rulesの3か所にもあった。全試験の実入口3件失敗とV8検査のENOENTを再現し、共通CSSへ接続。外側の幅/中央寄せ/素のボタン枠も実ブラウザで1 failed→1 passed、保持に必要なresetだけ共通CSSに移した（旧の色・影は移さない）。
