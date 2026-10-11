@@ -170,7 +170,7 @@ function EventsCreateV8Inner() {
         eventId = created.id
         saved = created
       } else {
-        saved = await eventsApi.updateEvent(selectedAccountId, eventId, payload, saved!.version)
+        saved = await eventsApi.updateEvent(selectedAccountId, eventId, payload, saved!.version ?? 1)
       }
       createdRef.current = { accountId: selectedAccountId, event: saved! }
       stage = 'slots'
