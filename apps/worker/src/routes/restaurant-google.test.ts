@@ -644,91 +644,70 @@ describe('Googleビジネス：口コミ', () => {
     const run = vi.fn(async () => ({ response: 'お客様、このたびはご来店ありがとうございます。' }));
     env.AI = { run } as unknown as Ai;
     useStaffRole('staff');
-    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: { mode: 'new' }, token: 'staff-session' });
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {}, token: 'staff-session' });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ draft: 'お客様、このたびはご来店ありがとうございます。', aiGenerated: true, mode: 'new' });
+    expect(await response.json()).toMatchObject({ draft: 'お客様、このたびはご来店ありがとうございます。', aiGenerated: true });
     const payload = JSON.stringify(run.mock.calls[0]);
     expect(payload).toContain('季節の定食');
     expect(payload).not.toContain('Aki');
     expect(testDb.raw.prepare('SELECT reply_status, reply_draft_ai_generated FROM rt_google_reviews WHERE review_name = ?').get(`${LOCATION}/reviews/r1`)).toEqual({ reply_status: 'draft', reply_draft_ai_generated: 1 });
   });
 
-  it('短くする：画面で直した文章を元に書き直す。元の文章が無ければ 400', async () => {
+  /** OpenAI の文章生成APIの返事を真似る。 */
+  function openAiHandler(body: unknown, status = 200): (url: string, init?: RequestInit) => Response {
+    return (url) => (url.startsWith('https://api.openai.com/') ? jsonResponse(body, status) : jsonResponse({}, 404));
+  }
+
+  it('AI下書き：鍵があるときは文章の上手な方（OpenAI）で書く', async () => {
     await seedReviews();
-    const run = vi.fn(async () => ({ response: 'ご来店ありがとうございます。またお待ちしております。' }));
+    env.OPENAI_API_KEY = 'sk-test';
+    const run = vi.fn(async () => ({ response: 'こちらは使われない文章です。' }));
     env.AI = { run } as unknown as Ai;
-    const id = reviewIdOf('r1');
-    // 保存前の画面の文章がそのまま書き換えの元になる。
-    const baseText = 'このたびはご来店いただき、またうれしいお言葉まで頂戴し、心より御礼申し上げます。季節の定食は毎月内容を変えてご用意しておりますので、またのご来店をお待ちしております。';
-    const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'shorter', baseText } });
+    googleHandler = openAiHandler({ choices: [{ message: { content: '  この度はご来店いただき、誠にありがとうございました。  ' } }] });
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ mode: 'shorter' });
-    const payload = JSON.stringify(run.mock.calls[0]);
-    expect(payload).toContain('元の返信文（これを書き直す）');
-    expect(payload).toContain('大きく短く書き直');
-    expect(payload).toContain(`元の返信文（${baseText.length}文字）より必ず短くする`);
-    const empty = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'polite', baseText: '   ' } });
-    expect(empty.status).toBe(400);
-    expect(await empty.json()).toMatchObject({ code: 'draft_required' });
+    expect(await response.json()).toMatchObject({ draft: 'この度はご来店いただき、誠にありがとうございました。', aiGenerated: true });
+    expect(run).not.toHaveBeenCalled();
+    const sent = googleCalls.find((item) => item.url.startsWith('https://api.openai.com/'));
+    expect(sent).toBeDefined();
+    const sentBody = JSON.parse(String(sent?.init?.body)) as Record<string, unknown>;
+    // gpt-5 系は max_tokens と temperature を受け付けない。
+    expect(sentBody).toMatchObject({ model: 'gpt-5-mini', max_completion_tokens: 3000 });
+    expect(sentBody).not.toHaveProperty('max_tokens');
+    expect(sentBody).not.toHaveProperty('temperature');
+    expect(JSON.stringify(sentBody)).toContain('季節の定食');
+    expect(JSON.stringify(sentBody)).not.toContain('Aki');
   });
 
-  it('短くする：1回目が足りなければ作り直し、変化が大きい方を採用する', async () => {
+  it('AI下書き：OpenAI が失敗しても Workers AI に切り替えて下書きを作る', async () => {
     await seedReviews();
-    const baseText = 'あ'.repeat(130);
-    // 1回目は100字（元の77%）で足りず、厳しめの作り直しで70字まで短くなる。
-    const run = vi
-      .fn()
-      .mockResolvedValueOnce({ response: 'い'.repeat(100) })
-      .mockResolvedValueOnce({ response: 'う'.repeat(70) });
+    env.OPENAI_API_KEY = 'sk-test';
+    const run = vi.fn(async () => ({ response: '切り替え後の下書きです。' }));
     env.AI = { run } as unknown as Ai;
-    const id = reviewIdOf('r1');
-    const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'shorter', baseText } });
+    googleHandler = openAiHandler({ error: { message: 'too many requests' } }, 429);
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });
     expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledTimes(2);
-    expect(await response.json()).toMatchObject({ draft: 'う'.repeat(70) });
-    expect(testDb.raw.prepare('SELECT reply_draft FROM rt_google_reviews WHERE id = ?').get(id)).toEqual({ reply_draft: 'う'.repeat(70) });
+    expect(await response.json()).toMatchObject({ draft: '切り替え後の下書きです。', aiGenerated: true });
+    expect(run).toHaveBeenCalledTimes(1);
   });
 
-  it('書き換え：作り直しても十分に変わらなければ保存せず、やり直しを促す', async () => {
+  it('AI下書き：Workers AI が無く OpenAI も失敗したときは 502', async () => {
     await seedReviews();
-    const id = reviewIdOf('r1');
-    const draftOf = () => (testDb.raw.prepare('SELECT reply_draft, reply_status FROM rt_google_reviews WHERE id = ?').get(id) as { reply_draft: string | null; reply_status: string });
-    const before = draftOf();
-
-    const cases: Array<{ mode: 'shorter' | 'polite'; base: string; first: string; second: string | null }> = [
-      // 目安（65字）から遠い緩い縮み。作り直しも悪化（120字）なので保存しない。
-      { mode: 'shorter', base: 'あ'.repeat(130), first: 'い'.repeat(100), second: 'う'.repeat(120) },
-      // 短くするのに元と同じ長さのまま。
-      { mode: 'shorter', base: 'あ'.repeat(40), first: 'い'.repeat(40), second: 'う'.repeat(40) },
-      // 元が短い（目安の下限40字）ため、ほぼ無変化（1字減）でも目安の壁を超えず素通りしてしまっていた不具合の再現。
-      { mode: 'shorter', base: 'あ'.repeat(40), first: 'い'.repeat(39), second: 'う'.repeat(38) },
-      // 丁寧にするのに元より長くなっていない。
-      { mode: 'polite', base: 'あ'.repeat(400), first: 'い'.repeat(400), second: 'う'.repeat(400) },
-      // 元が長い（目安の上限4096字）ため、ほぼ無変化（1字増）でも目安の壁を超えず素通りしてしまっていた不具合の再現。
-      { mode: 'polite', base: 'あ'.repeat(4090), first: 'い'.repeat(4091), second: 'う'.repeat(4092) },
-      // 作り直し自体が失敗したときも、不十分な1回目を保存しない。
-      { mode: 'shorter', base: 'あ'.repeat(130), first: 'い'.repeat(100), second: null },
-    ];
-
-    for (const item of cases) {
-      const run = vi.fn();
-      run.mockResolvedValueOnce({ response: item.first });
-      if (item.second === null) run.mockRejectedValueOnce(new Error('ai down'));
-      else run.mockResolvedValueOnce({ response: item.second });
-      env.AI = { run } as unknown as Ai;
-      const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: item.mode, baseText: item.base } });
-      expect(response.status).toBe(502);
-      expect(await response.json()).toMatchObject({ code: 'rewrite_failed' });
-      expect(run).toHaveBeenCalledTimes(2);
-      // 不十分な文章は下書きに残さない。
-      expect(draftOf()).toEqual(before);
-    }
+    env.OPENAI_API_KEY = 'sk-test';
+    googleHandler = openAiHandler({ error: { message: 'bad key' } }, 401);
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });
+    expect(response.status).toBe(502);
+    expect(await response.json()).toMatchObject({ code: 'ai_failed' });
   });
 
   it('AI下書き：AI が無い環境は 503、返信済みの口コミは 409', async () => {
     await seedReviews();
+    // どちらの生成先も無い環境。
+    expect(env.AI).toBeUndefined();
+    expect(env.OPENAI_API_KEY).toBeUndefined();
     const unavailable = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });
     expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toMatchObject({ code: 'ai_unavailable' });
     env.AI = { run: vi.fn(async () => ({ response: 'x' })) } as unknown as Ai;
     const replied = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r3')}/draft/generate?account_id=account-2`, { body: {} });
     expect(replied.status).toBe(409);

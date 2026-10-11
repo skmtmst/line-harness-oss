@@ -26,8 +26,6 @@ import {
   GoogleBusinessError,
   buildAuthorizeUrl,
   buildReplyDraftPrompt,
-  replyDraftRewriteChangeScore,
-  replyDraftRewriteFellShort,
   codeChallengeFor,
   createCodeVerifier,
   exchangeAuthorizationCode,
@@ -45,6 +43,7 @@ import {
   type GoogleReview,
   type RequestOptions,
 } from '../services/google-business.js';
+import { DEFAULT_OPENAI_TEXT_MODEL, OpenAITextError, generateOpenAIText } from '../services/openai-text.js';
 
 export const restaurantGoogle = new Hono<Env>();
 
@@ -567,7 +566,7 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
     },
     writeEnabled: writeEnabled(c.env),
     oauthConfigured: Boolean(oauthClient(c)),
-    aiAvailable: Boolean(c.env.AI),
+    aiAvailable: Boolean(c.env.AI || c.env.OPENAI_API_KEY),
     permissions: await googlePermissions(c),
   });
 });
@@ -1074,7 +1073,32 @@ export async function runGoogleAi(c: Context<Env>, prompt: { system: string; use
   }
 }
 
-restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', inputJsonBoundary({"mode":["string"],"baseText":["string"]}), async (c) => {
+/**
+ * 口コミ返信の下書きを作る。
+ * OPENAI_API_KEY がある環境では OpenAI を使い、失敗したときだけ Workers AI へ落とす。
+ * どちらも無い環境では呼び出し側が 503 を返す。
+ */
+export async function runReplyDraftAi(c: Context<Env>, prompt: { system: string; user: string }): Promise<string> {
+  if (c.env.OPENAI_API_KEY) {
+    try {
+      return await generateOpenAIText({
+        apiKey: c.env.OPENAI_API_KEY,
+        model: c.env.GOOGLE_BUSINESS_TEXT_MODEL || DEFAULT_OPENAI_TEXT_MODEL,
+        system: prompt.system,
+        user: prompt.user,
+        maxOutputTokens: 3000,
+        timeoutMs: AI_TIMEOUT_MS,
+      });
+    } catch (error) {
+      // 鍵やモデルの設定ちがい・混雑・時間切れで画面が止まらないよう、Workers AI で作り直す。
+      console.error('[restaurant-google] OpenAI draft failed', { code: error instanceof OpenAITextError ? error.kind : 'unknown' });
+      if (!c.env.AI) throw error instanceof OpenAITextError && error.kind === 'timeout' ? new GoogleAiTimeout() : error;
+    }
+  }
+  return runGoogleAi(c, prompt, { temperature: 0.5, maxTokens: 1500 });
+}
+
+restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await reviewFor(c, store.id, c.req.param('id'));
@@ -1082,50 +1106,27 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
   if (row.reply_status === 'published' || row.reply_status === 'replied' || row.reply_status === 'pending_confirm') {
     return fail(c, 409, 'この口コミにはすでに返信があります', { code: 'already_replied' });
   }
-  if (!c.env.AI) return fail(c, 503, 'AI下書きはこの環境では使えません', { code: 'ai_unavailable' });
-  const body = await c.req.json<{ mode?: string; baseText?: string }>().catch(() => ({}) as { mode?: string; baseText?: string });
-  const mode = body.mode === 'shorter' || body.mode === 'polite' ? body.mode : 'new';
-  // 「短くする」「丁寧にする」は、保存前に画面で直した文章を元にする。
-  // 画面から送られてこなかったときだけ、保存済みの下書きを使う。
-  const base = (typeof body.baseText === 'string' ? body.baseText.slice(0, 4096) : (row.reply_draft ?? '')).trim();
-  if (mode !== 'new' && !base) return fail(c, 400, '先に下書きを作るか、返信文を入力してください', { code: 'draft_required' }, ["mode","baseText"]);
+  if (!c.env.AI && !c.env.OPENAI_API_KEY) return fail(c, 503, 'AI下書きはこの環境では使えません', { code: 'ai_unavailable' });
   const connection = await connectionFor(c, store.id);
   const storeTitle = connection?.location_title ?? store.name;
-  const generateOnce = async (strict: boolean) => {
-    const prompt = buildReplyDraftPrompt({
-      storeTitle,
-      starRating: row.star_rating,
-      comment: row.comment,
-      mode,
-      previousDraft: base,
-      strict,
-    });
-    return runGoogleAi(c, prompt, { temperature: mode === 'new' ? 0.4 : 0.3, maxTokens: 600 });
-  };
   let text = '';
   try {
-    text = await generateOnce(false);
-    // 1回目で目に見えて変わらなかったときだけ、条件を厳しくして作り直す。
-    // 2回のうち変化が大きい方を採用する。
-    if (replyDraftRewriteFellShort(mode, base, text)) {
-      const retried = await generateOnce(true).catch(() => '');
-      if (retried && replyDraftRewriteChangeScore(mode, base, retried) > replyDraftRewriteChangeScore(mode, base, text)) {
-        text = retried;
-      }
-      // 作り直しても元から十分に変わらなかった（無変化・逆方向・目安から遠い）結果は
-      // 書き換えの失敗として扱い、下書きには保存しない。画面は既存のエラー表示で
-      // やり直しを促す。不十分な文章を成功として保存しないため。
-      if (replyDraftRewriteFellShort(mode, base, text)) {
-        console.error('[restaurant-google] AI rewrite fell short', { mode, baseLength: base.length, resultLength: text.trim().length });
-        return fail(c, 502, '元の文章から十分に書き換えられませんでした。もう一度お試しください', { code: 'rewrite_failed' });
-      }
-    }
+    text = await runReplyDraftAi(c, buildReplyDraftPrompt({ storeTitle, starRating: row.star_rating, comment: row.comment }));
   } catch (error) {
-    console.error('[restaurant-google] AI draft failed', { code: error instanceof GoogleAiTimeout ? 'timeout' : 'provider_failure' });
-    return fail(c, error instanceof GoogleAiTimeout ? 504 : 502, 'AIの下書き作成に失敗しました。もう一度お試しください', { code: error instanceof GoogleAiTimeout ? 'ai_timeout' : 'ai_failed' });
+    const timedOut = error instanceof GoogleAiTimeout || (error instanceof OpenAITextError && error.kind === 'timeout');
+    console.error('[restaurant-google] AI draft failed', { code: timedOut ? 'timeout' : 'provider_failure' });
+    return fail(c, timedOut ? 504 : 502, 'AIの下書き作成に失敗しました。もう一度お試しください', { code: timedOut ? 'ai_timeout' : 'ai_failed' });
   }
   const validated = validateReplyText(text);
-  if (!validated.ok) return fail(c, 502, 'AIの下書きが空でした。もう一度お試しください', { code: 'ai_empty' });
+  if (!validated.ok) {
+    const tooLong = validated.reason === 'too_long';
+    return fail(
+      c,
+      502,
+      tooLong ? 'AIの下書きが長すぎました。もう一度お試しください' : 'AIの下書きが空でした。もう一度お試しください',
+      { code: tooLong ? 'ai_too_long' : 'ai_empty' },
+    );
+  }
   const generatedAt = nowIso();
   await dbFor(c.env, store.id)
     .prepare(
@@ -1133,7 +1134,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
     )
     .bind(validated.text, generatedAt, generatedAt, row.id)
     .run();
-  return c.json({ success: true, draft: validated.text, aiGenerated: true, generatedAt, mode });
+  return c.json({ success: true, draft: validated.text, aiGenerated: true, generatedAt });
 });
 
 restaurantGoogle.put('/api/restaurant-test/google/reviews/:id/draft', inputJsonBoundary({"replyDraft":["string"]}), async (c) => {

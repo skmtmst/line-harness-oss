@@ -332,6 +332,8 @@ export type Env = {
     GOOGLE_BUSINESS_WRITE_ENABLED?: string;
     /** 口コミ返信の下書きに使う Workers AI のモデル。未設定なら OPS_SUPPORT_AI_MODEL → 既定値。 */
     GOOGLE_BUSINESS_AI_MODEL?: string;
+    /** 口コミ返信の下書きに使う OpenAI のモデル。未設定なら既定値。OPENAI_API_KEY が無い環境では Workers AI を使う。 */
+    GOOGLE_BUSINESS_TEXT_MODEL?: string;
     /** Google Sheets連携(#838)：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
     GOOGLE_SHEETS_OAUTH_CLIENT_ID?: string;
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
