@@ -915,7 +915,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * 開けたら手順はどれでも選べる（①で作った後と同じ）。開けなければ理由を出し、新しく作る道は残す。
    */
   const resumeIdRef = useRef<string | null>(
-    host || typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('id'),
+    host || editGroupId || typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('id'),
   )
   useEffect(() => {
     const id = resumeIdRef.current

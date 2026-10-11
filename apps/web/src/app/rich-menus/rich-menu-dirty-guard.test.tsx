@@ -121,6 +121,11 @@ vi.mock('@/lib/api', () => ({
 import NewRichMenuPage from './new/create-v8'
 import RichMenuEditPage from './edit/page'
 
+function CurrentRichMenuEdit() {
+  window.history.replaceState(null, '', '/rich-menus/edit?' + searchParams.value.toString())
+  return <NewRichMenuPage editGroupId={searchParams.value.get('id') ?? undefined} />
+}
+
 async function flush() {
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
@@ -276,25 +281,27 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
 })
 
 describe('リッチメニュー編集の未保存ガード (N-162)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   test('読み込み直後は変更なしなので一覧リンクを押しても確認は出ない', async () => {
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     await screen.findByDisplayValue('メインメニュー')
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
   })
 
   test('変更後に一覧リンクを押すと確認が出る', async () => {
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     const nameInput = await screen.findByDisplayValue('メインメニュー')
     await type(nameInput, 'メインメニュー改')
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
 
     expect(screen.getByText('保存していない変更があります')).toBeTruthy()
@@ -302,34 +309,34 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
   })
 
   test('保存し終わると警告は出なくなる', async () => {
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     const nameInput = await screen.findByDisplayValue('メインメニュー')
     await type(nameInput, 'メインメニュー改')
     // 保存（update→再読込で署名が更新される）
-    fireEvent.click(screen.getByText('下書きを保存する'))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await act(async () => { await Promise.resolve() })
     await flush()
 
     expect(richMenuUpdate).toHaveBeenCalled()
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
   })
 
   test('step=targeting でも離脱確認が出る（どの段階でも窓は届く）', async () => {
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     // 出し分けをONにしてdirty化（2つ目の audience radio が「条件に当てはまる友だちだけ」）
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
     const radios = document.querySelectorAll<HTMLInputElement>('input[name="audience"]')
     fireEvent.click(radios[1])
     await flush()
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
 
     expect(screen.getByText('保存していない変更があります')).toBeTruthy()
@@ -337,8 +344,8 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
   })
 
   test('ステップ移動は同一画面の段階移動なので確認を出さない', async () => {
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     const nameInput = await screen.findByDisplayValue('メインメニュー')
@@ -348,7 +355,11 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
     fireEvent.click(stepButton!.closest('button')!)
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
-    expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=grp-1&step=targeting')
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(screen.getByRole('radio', { name: /条件に当てはまる友だちだけ/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /形と画像/ }))
+    await flush()
+    expect(screen.getByDisplayValue('メインメニュー改')).toBeTruthy()
   })
 })
 
