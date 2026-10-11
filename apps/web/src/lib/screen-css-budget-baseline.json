@@ -329,11 +329,6 @@
     "height": 12,
     "font": 28
   },
-  "app/templates/detail/detail-v8.module.css": {
-    "spacing": 32,
-    "height": 5,
-    "font": 23
-  },
   "app/webhooks/apitokens-v8.module.css": {
     "spacing": 16,
     "height": 1,

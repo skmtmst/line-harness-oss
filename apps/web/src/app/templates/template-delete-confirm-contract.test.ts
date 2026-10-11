@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { templateDeleteDescription } from './template-delete-message'
+import { templateDeleteDescription } from '@/v8/template-detail/model'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
