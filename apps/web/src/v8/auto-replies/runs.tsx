@@ -279,6 +279,7 @@ export default function AutoReplyRunsV8() {
     setActionMessage('')
     let retried = 0
     let denied = false
+    let failed = 0
     for (const item of targets) {
       try {
         const response = await api.autoReplies.retryRun(item.id)
@@ -286,6 +287,7 @@ export default function AutoReplyRunsV8() {
         retried += 1
       } catch (e) {
         if (e instanceof ApiError && e.status === 403) denied = true
+        if (!(e instanceof ApiError && e.status === 409)) failed += 1
         /* 409（もう動いている・済み）などは飛ばして次へ。 */
       }
     }
@@ -295,7 +297,9 @@ export default function AutoReplyRunsV8() {
       return
     }
     setActionMessage(
-      retried > 0
+      failed > 0
+        ? `${retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : ''}${failed} 件をもう一度実行できませんでした。時間を置いてお試しください。`
+        : retried > 0
         ? `失敗した処理を${retried} 件もう一度実行しました。`
         : 'もう一度実行できる処理はありませんでした。',
     )

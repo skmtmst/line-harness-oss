@@ -324,7 +324,10 @@ function FriendAddRunsInner() {
       if (await retryOne(item)) retried += 1
     }
     setRetrying(null)
-    setMessage(retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : 'もう一度実行できる処理はありませんでした。')
+    const failed = failedItems.length - retried
+    setMessage(failed > 0
+      ? `${retried > 0 ? `失敗した処理を${retried} 件もう一度実行しました。` : ''}${failed} 件をもう一度実行できませんでした。時間を置いてお試しください。`
+      : `失敗した処理を${retried} 件もう一度実行しました。`)
     await load()
   }
 
