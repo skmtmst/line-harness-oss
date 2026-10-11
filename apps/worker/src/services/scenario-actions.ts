@@ -437,9 +437,9 @@ async function executeAction(
 ): Promise<boolean> {
   const config = JSON.parse(action.config_json) as unknown
   const accountId = options.accountId ?? null
-  const numericEffectKey = options.sourceEventId
-    ? JSON.stringify([options.sourceEventId, action.id])
-    : action.repeat_on_refire === 0 ? `once:${action.fires_key ?? action.id}` : undefined
+  const numericEffectKey = action.repeat_on_refire === 0
+    ? `once:${action.fires_key ?? action.id}`
+    : options.sourceEventId ? JSON.stringify([options.sourceEventId, action.id]) : undefined
 
   switch (action.action_type) {
     case 'tag': {
