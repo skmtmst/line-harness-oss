@@ -282,8 +282,9 @@
 
 [data-theme='v8'] .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
-/* B-152・仕上げ2 */
-[data-theme='v8'] .button, .button.inline.text { font-weight: var(--polish-weight-body); }
+/* B-152②：ボタン文字は太字の例外。文字だけの操作は本文の太さを保つ。 */
+[data-theme='v8'] .button { font-weight: var(--tpl-button-weight); }
+[data-theme='v8'] .button.inline.text { font-weight: var(--polish-weight-body); }
 
 /* B-152・仕上げ7 */
 [data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }

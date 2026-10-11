@@ -3135,6 +3135,7 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   --color-badge-info-bg: #2563eb1a; --color-badge-info: #1d4ed8;
   --tpl-folder-create-h: 36px;
   --tpl-folder-create-pad: 0 16px;
+  --tpl-button-weight: 600;
   --tpl-button-h: 36px;
   --tpl-button-pad-side: 16px;
   --tpl-dialog-width: 560px;
