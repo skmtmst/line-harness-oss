@@ -16,6 +16,8 @@ import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import styles from './two-factor-ops.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import Card from '@/components/shared/card'
+import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
@@ -116,14 +118,13 @@ export default function OpsTwoFactorV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page}>
-      <section className={styles.card} data-design-node="tOPeY" aria-labelledby="ops-two-factor-title">
-        <PageHeading title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" help={<> パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。</>} />
+      <Card variant="form" gap="normal" className={styles.card} data-design-node="tOPeY" aria-labelledby="ops-two-factor-title">
+        <PageHeading inset="none" title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" help={<> パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。</>} />
 
         {missingChallenge ? (
           <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Link href="/ops/login" onClick={clearTwoFactorChallenge}>ログインに戻る</Link>} />
         ) : error ? <Notice tone="danger" id="ops-two-factor-error" message={error} /> : null}
-        <div className={styles.field}>
-          <p id="ops-two-factor-code-label" className={styles.label}>認証コード（6桁）</p>
+        <Field density="input" optional={false} label={<span id="ops-two-factor-code-label">認証コード（6桁）</span>}>
           <SaveErrorField names={["typedCode","code"]} key={attempt}><OtpInput
             key={attempt}
             value={typedCode}
@@ -137,7 +138,7 @@ export default function OpsTwoFactorV8() {
             disabled={missingChallenge || succeeded}
             autoFocus
           /></SaveErrorField>
-        </div>
+        </Field>
         <Button
           variant="primary"
           className={styles.submit}
@@ -149,7 +150,7 @@ export default function OpsTwoFactorV8() {
           <LogIn aria-hidden="true" className={styles.icon} />ログイン
         </Button>
 
-      </section>
+      </Card>
     </main></SaveErrorScope>
   )
 }
