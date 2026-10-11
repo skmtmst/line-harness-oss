@@ -45,6 +45,7 @@
 /* B-149：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
 :global([data-theme='v8']) .folders + .main { border-left: 0; }
 :global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
+:global([data-theme='v8']) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
 :global([data-theme='v8']) .content { min-width: 0; }
 :global([data-theme='v8']) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
@@ -248,7 +249,7 @@
   height: var(--tpl-folder-create-space-col-h);
 }
 /* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（apLqS フォルダの列：間2＋14＋2） */
-:global([data-theme='v8']) .folders > :global(a) + * , :global([data-theme='v8']) .folders > :global(button) + * { margin-top: 16px; }
+:global([data-theme='v8']) .folders > :global(a) + * , :global([data-theme='v8']) .folders > :global(button) + * { margin-top: var(--polish-space-row); }
 /* ★V8 作る型の頭の並び（q1xNMz）：題（右に操作）→ 説明 → 手順。 */
 :global([data-theme='v8']) [data-page-template='create'] .heading > .headingText { display: contents; }
 :global([data-theme='v8']) [data-page-template='create'] .heading > .headingText > .titleRow { flex: 1 1 0; order: 1; }

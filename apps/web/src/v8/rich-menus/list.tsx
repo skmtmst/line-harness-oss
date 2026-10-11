@@ -832,7 +832,7 @@ export default function RichMenusListV8() {
       onChanged={loadFolders}
       canManage={canEdit}
       itemLabel="メニュー"
-      createAction={createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
+      createAction={createButton}
       activeId={folderFilter}
       onSelect={(id) => {
         setFolderFilter(id)
