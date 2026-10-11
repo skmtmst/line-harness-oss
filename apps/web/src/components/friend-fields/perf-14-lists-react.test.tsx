@@ -36,6 +36,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
       friendFields: {
         ...actual.api.friendFields,
         list: async () => ({
@@ -87,7 +88,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a1', selectedAccount: { id: 'a1', name: '店舗A' } }),
 }))
 
-import FriendFieldList from './field-list'
+import FriendFieldList from '@/v8/tags/fields-tab'
 import SavedSearchList from './saved-search-list'
 
 let host: HTMLDivElement
@@ -128,19 +129,19 @@ describe('PERF-14: 一覧は補助取得を待たない', () => {
   it('友だち情報欄: 集計がまだ返っていなくても一覧は出る', async () => {
     const stats = deferred<unknown>()
     calls.fieldsStats.mockReturnValue(stats.promise)
-    await render(React.createElement(FriendFieldList, { accountId: 'a1' }))
+    await render(React.createElement(FriendFieldList, { canEdit: true, accountId: 'a1' }))
     // 集計は未着だが、一覧の行はもう見えている。
     expect(host.textContent).toContain('項目A')
     expect(host.textContent).not.toContain('読み込めませんでした')
     // あとから届いた集計はカードへ入る。
     stats.resolve({ success: true, data: { total: 1, inUse: 1, registeredFriends: 5, formLinks: null, updatedThisMonth: 2 } })
     await flush()
-    expect(host.textContent).toContain('使用中 1件')
+    expect(host.textContent).toContain('使っている 1 件')
   })
 
   it('友だち情報欄: 集計が失敗しても一覧は残り、カードは理由を添える', async () => {
     calls.fieldsStats.mockRejectedValue(new Error('stats down'))
-    await render(React.createElement(FriendFieldList, { accountId: 'a1' }))
+    await render(React.createElement(FriendFieldList, { canEdit: true, accountId: 'a1' }))
     expect(host.textContent).toContain('項目A')
     expect(host.textContent).toContain('読み込めませんでした')
     // 一覧の行が消えてエラー表示に差し替わっていない。

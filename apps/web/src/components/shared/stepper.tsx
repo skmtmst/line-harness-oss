@@ -20,4 +20,3 @@ export interface StepperStep {
   /** anchor の代わりに押したときの動き。済み・要修正の段だけに付ける。 */
   onSelect?: () => void
 }
-

@@ -55,7 +55,6 @@ const KNOWN_FILES: string[] = [
   'app/settings/feature-settings-v8.tsx',
   'app/updates/page.tsx',
   'components/chats/friend-info-sidebar.tsx',
-  'components/friend-fields/field-list.tsx',
   'components/scenarios/scenario-dialogs.tsx',
   'components/shared/list-kpis.tsx',
   'components/staff/login-audit.tsx',

@@ -90,7 +90,6 @@ const BASELINE: Record<string, number> = {
   'app/webhooks/webhook-runtime.spec.ts': 1,
   'v8/events/edit-form.tsx': 5,
   'components/friend-fields/edit-tag-page-v4.tsx': 1,
-  'components/friend-fields/field-list.tsx': 1,
   'components/friend-fields/new-tag-page-v4.tsx': 1,
   'components/friend-fields/saved-search-list.tsx': 2,
   'components/friend-fields/tag-csv-import-dialog.tsx': 2,

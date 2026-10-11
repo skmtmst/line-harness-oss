@@ -23,7 +23,7 @@ const readWeb = (relative: string) =>
 
 const MARK_LIST = read('mark-list.tsx')
 const SAVED_LIST = read('saved-search-list.tsx')
-const FIELD_LIST = read('field-list.tsx')
+const FIELD_LIST = readWeb('src/v8/tags/fields-tab.tsx') + read('field-list.tsx')
 const TAG_EDITOR = read('tag-editor-v4.tsx')
 const CSV_DIALOG = read('tag-csv-import-dialog.tsx')
 const EDIT_PAGE = readWeb('src/app/tags/searches/edit/page.tsx')

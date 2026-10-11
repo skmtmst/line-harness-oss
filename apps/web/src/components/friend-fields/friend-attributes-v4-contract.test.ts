@@ -83,18 +83,20 @@ describe('タグ V4 contract', () => {
 
   it('情報欄と対応マークもPC画面で横スクロールを要求しない', () => {
     const sources = [
-      read('components/friend-fields/field-list.tsx'),
+      (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')),
       read('components/friend-fields/mark-list.tsx'),
     ]
     for (const source of sources) {
-      expect(source).toContain('table-fixed')
+      if (source.includes('<DataTable')) {
+        expect(read('v8/tags/list.module.css')).toContain('table-layout: fixed')
+      } else expect(source).toContain('table-fixed')
       expect(source).not.toMatch(/min-w-\[/)
       expect(source).not.toContain('overflow-x-auto')
     }
   })
 
   it('友だち情報欄はV8でも確認・実行・応答逆転の守りを保つ', () => {
-    const list = read('components/friend-fields/field-list.tsx')
+    const list = (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx'))
     const create = read('app/tags/fields/new/page.tsx')
     const migrate = read('app/tags/fields/migrate/page.tsx')
     expect(list).toContain('/tags/fields/migrate?id=')
@@ -126,32 +128,31 @@ describe('タグ V4 contract', () => {
   })
 
   it('友だち情報欄の読込失敗を空状態や作成導線と混ぜない', () => {
-    const source = read('components/friend-fields/field-list.tsx')
-    const empty = source.indexOf('まだ友だち情報欄がありません')
+    const source = (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx'))
+    const empty = source.indexOf('まだ項目はありません')
     expect(empty).toBeGreaterThan(-1)
     expect(source.slice(0, empty).lastIndexOf("status === 'error'")).toBeGreaterThan(-1)
     /*
       #1014 ATTR-22: 「＋ 項目を作る」はタブ行の右に1個だけ。
-      一覧部品は作成ボタンを持たない。
+      現役V8は左のフォルダ列・狭い幅の同じ作る入口を使う。
       #1014 ATTR-02: 操作の失敗は読み込みの失敗（error）とは別の
       actionError に載せる。再読込で消えて「成功に見える」を防ぐ。
     */
-    const tabsPage = read('components/friend-fields/tags-page-v4.tsx')
-    expect(tabsPage).toContain('href="/tags/fields/new"')
-    expect(source).not.toContain('href="/tags/fields/new"')
-    expect(source).toContain('status === \'ready\' && actionError')
+    expect(source).toContain("href: '/tags/fields/new'")
+    expect(source).toContain('<FolderPanel')
+    expect(source).toContain('{actionError ? (')
     expect(source).toContain('onRetry={() => void load()}')
     expect(source).toContain("setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')")
     expect(source).toContain('setItems([])')
   })
 
   it('使用人数を取得できない項目を0人として削除しない', () => {
-    const source = read('components/friend-fields/field-list.tsx')
+    const source = (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx'))
     expect(source).toContain('function knownUsageCount(field: FriendField)')
     expect(source).toContain('function fieldDeletionBlockedReason(field: FriendField)')
     expect(source).toContain('使用人数を確認できないため削除できません。再読み込みしてください。')
-    expect(source).toContain('disabled={fieldDeletionBlockedReason(field) !== null}')
-    expect(source).toContain('const blockedReason = fieldDeletionBlockedReason(field)')
+    expect(source).toContain('disabled: blocked !== null')
+    expect(source).toContain('const blocked = fieldDeletionBlockedReason(field)')
     expect(source).not.toContain('disabled={(field.usageCount ?? 0) > 0}')
   })
 
@@ -160,7 +161,7 @@ describe('タグ V4 contract', () => {
       read('components/friend-fields/tags-page-v4.tsx'),
       read('components/friend-fields/tag-editor-v4.tsx'),
       read('components/friend-fields/edit-tag-page-v4.tsx'),
-      read('components/friend-fields/field-list.tsx'),
+      (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')),
       read('components/friend-fields/mark-list.tsx'),
       read('components/friend-fields/saved-search-list.tsx'),
     ]

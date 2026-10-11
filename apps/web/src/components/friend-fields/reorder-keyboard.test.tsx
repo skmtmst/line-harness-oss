@@ -37,6 +37,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
       tags: {
         ...actual.api.tags,
         list: async () => ({ success: true, data: [] }),
@@ -112,7 +113,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import TagsPageV4 from './tags-page-v4'
-import FriendFieldList from './field-list'
+import FriendFieldList from '@/v8/tags/fields-tab'
 import SupportMarkList from './mark-list'
 import SavedSearchList from '@/v8/tags/searches-tab'
 
@@ -247,7 +248,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
     途中失敗の半端な順位と、共有マークへの複製を防ぐ。
   */
   it('友だち情報欄: ↑で1つ上へ動き、新しい並びを reorder API へ1回で送る', async () => {
-    await render(React.createElement(FriendFieldList, { accountId: 'a1' }))
+    await render(React.createElement(FriendFieldList, { canEdit: true, accountId: 'a1' }))
     await press(grip('項目B'), 'ArrowUp')
     expect(calls.friendFieldsReorder).toHaveBeenCalledTimes(1)
     expect(calls.friendFieldsReorder).toHaveBeenCalledWith('a1', ['ff-2', 'ff-1', 'ff-3'])
@@ -299,7 +300,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
 
   it('保存に失敗したら元の並びへ戻し、失敗を残したまま再読込しない（#1014 ATTR-02）', async () => {
     calls.friendFieldsReorder.mockResolvedValueOnce({ success: false, error: 'conflict' })
-    await render(React.createElement(FriendFieldList, { accountId: 'a1' }))
+    await render(React.createElement(FriendFieldList, { canEdit: true, accountId: 'a1' }))
     await press(grip('項目B'), 'ArrowUp')
     // 失敗のあとも項目Bは元の位置（2番目）のまま表示されている。
     // 狭幅カードと表で同じ項目が2度出るため、表の側だけを見る。

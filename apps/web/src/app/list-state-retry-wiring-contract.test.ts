@@ -21,7 +21,7 @@ const TARGETS = [
   '../v8/scenarios/results.tsx',
   '../v8/tags/mark-editor.tsx',
   '../components/broadcasts/segment-preset-controls.tsx',
-  '../components/friend-fields/field-list.tsx',
+  '../v8/tags/fields-tab.tsx',
   '../components/friend-fields/mark-list.tsx',
   '../components/friend-fields/tags-page-v4.tsx',
   '../components/friends/bulk-run-dialog.tsx',

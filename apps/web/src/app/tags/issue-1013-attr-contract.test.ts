@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 const root = resolve(process.cwd(), 'src')
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
-const FIELD_LIST = read('components/friend-fields/field-list.tsx')
+const FIELD_LIST = read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')
 const MARK_LIST = read('components/friend-fields/mark-list.tsx')
 const MARK_EDITOR = read('components/friend-fields/support-mark-editor.tsx')
 const SEARCH_LIST = read('components/friend-fields/saved-search-list.tsx')
