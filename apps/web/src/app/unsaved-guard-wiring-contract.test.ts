@@ -267,8 +267,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8-B 広告連携（qSTVR）。費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/inflow-links/site-script-v8.tsx':
     '★V8-B サイトスクリプト（XjOte）。サイトの追加・編集の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
-  'app/restaurant-test/v8/tables.tsx':
-    '★V8-B の座席・卓管理（BERxg）。restaurant-console.tsx（UNTRIAGED）と同じ画面のV8版。卓の追加・変更は保存ボタン確定式で下書きを持たず、番兵の要否は元の画面と一緒に決める',
   /* ★V8 の新しい画面（src/v8）。古い画面ファイルの理由をそのまま写した（2026-10-06）。 */
   'v8/broadcasts/list.tsx':
     '★V8 の一斉配信一覧（l5V9a）。一覧と絞り込みが中心。フォルダ・並び替え・保存した検索など一覧上の操作は押した直後に即時保存し、配信の作成は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',

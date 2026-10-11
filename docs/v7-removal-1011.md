@@ -2048,3 +2048,9 @@
 
 - `restaurant-test/v8/reservations.tsx` 939行/専用CSS・`reservation-phone.tsx` 421行は本番の読者0、直接読む動作/読み取り試験0。旧の未保存/ボタンの横断契約だけが読んでいたため、現役の見張り先を残して旧の利用先を除去。現在の変更/押さえの解除/電話予約/不足入力/閲覧のみ/期間と取消・復活の試験は保持した。
 - 関係36/36件合格（`/tmp/v7rm2-restaurantreservationcopy1.json`、収集失敗0）、web型検査（`/tmp/v7rm2-restaurantreservationcopy-type1.log`）/差分検査合格。試験削除0件（累計3件）。現役V8の内容/配置/CSSは変更なし。次は卓/Googleと最後の旧外枠。共通/CSS/CI・全体検査・画像比較は未完了。
+
+### 飲食：未使用の卓の写し（除去完了）
+
+- `restaurant-test/v8/tables.tsx` 260行/専用CSSの本番の読者0。直接読む8件を現役へ移した。数/詳細/自動配席/結合線と卓の選択、変更/停止の確認/再開、数値の座標と結合グループ、配置の保存と失敗を保持。旧の未保存/ボタンの利用先も除去。
+- 旧の列順を入れ替える配置2件は採用済みの座席図（`restaurant-fusion-contract.md` §座席図）に従い、現在の共通座席図を実際にドラッグして、階の版を付けて保存→再取得した座標、保存失敗の入力保持/保存済みの座標が変わらないことへ更新。動きの試験は同じ2件を残す。現役の内容/配置/CSSは変更なし。
+- 関係41/41件合格（`/tmp/v7rm2-restauranttablecopy2.json`、収集失敗0）、web型検査（`/tmp/v7rm2-restauranttablecopy-type2.log`）/差分検査合格。試験削除0件（累計3件）。次はGoogleと最後の旧外枠。共通/CSS/CI・全体検査・画像比較は未完了。
