@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 import { processQueuedBroadcasts, processBroadcastSend } from './broadcast.js';
-import { reopenFailedClaims } from '@line-crm/db';
+import { reopenFailedClaims, updateBroadcastStatus, beginBroadcastRetryAttempt } from '@line-crm/db';
 import { prepareHqBroadcast, dispatchHqBroadcast } from './hq-broadcasts.js';
 
 const sends = vi.hoisted(() => [] as string[]);
@@ -78,4 +78,21 @@ it('複数アカウントの重複除外配信も、再開時に元の当選者�
     await processMultiAccountDedupBroadcast(f.db,{...args,dedup_progress:progress},()=>({async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never));
   }
   expect(new Set(sends).size).toBe(600); expect(sends).toContain('Uf555'); expect(sends).not.toContain('Uadded');
+});
+
+it('重複除外の完了後の再試行でも最初の宛先だけを選ぶ', async () => {
+  const f = fixture();
+  f.raw.exec(`DELETE FROM broadcasts; INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('a','店','c','fake','fake'); UPDATE friends SET line_account_id='a'; INSERT INTO broadcasts(id,title,message_type,message_content,target_type,account_ids,dedup_priority,status,track_links) VALUES('b','試験','text','案内','multi-account-dedup','["a"]','["a"]','sending',0)`);
+  const { processMultiAccountDedupBroadcast } = await import('./dedup-broadcast.js');
+  const args = { id:'b',account_ids:'["a"]',dedup_priority:'["a"]',target_tag_id:'t',message_type:'text',message_content:'案内' };
+  await processMultiAccountDedupBroadcast(f.db,args,()=>({async multicast(){throw Object.assign(new Error('LINE API error: 429 Too Many Requests'),{status:429});}} as never));
+  await updateBroadcastStatus(f.db,'b','sent');
+  f.raw.exec("DELETE FROM friend_tags WHERE friend_id='f155'");
+  insertFriend(f.raw,'added',{line_account_id:'a'}); f.raw.exec("INSERT INTO friend_tags VALUES('added','t',datetime('now'))");
+  const {lock_version} = f.raw.prepare("SELECT lock_version FROM broadcasts WHERE id='b'").get() as {lock_version:number};
+  await beginBroadcastRetryAttempt(f.db,{id:'b',expectedVersion:lock_version});
+  await reopenFailedClaims(f.db,'b',2);
+  const {dedup_progress} = f.raw.prepare("SELECT dedup_progress FROM broadcasts WHERE id='b'").get() as {dedup_progress:string};
+  await processMultiAccountDedupBroadcast(f.db,{...args,send_attempt_no:2,dedup_progress},()=>({async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never));
+  expect(sends).toHaveLength(160); expect(sends).toContain('Uf155'); expect(sends).not.toContain('Uadded');
 });

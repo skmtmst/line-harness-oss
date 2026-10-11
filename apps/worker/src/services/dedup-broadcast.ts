@@ -687,12 +687,8 @@ export async function processMultiAccountDedupBroadcast(
     await updateBroadcastLineRequestId(db, broadcast.id, null, unit);
   }
 
-  // dedup_progress の clear は意図的にここでは行わない。caller (processQueuedBroadcastBatches
-  // など) が updateBroadcastStatus(broadcast.id, 'sent', ...) を呼ぶときに同一 UPDATE で
-  // clear される設計 (db/broadcasts.ts: updateBroadcastStatus 参照)。
-  // この関数の return 後・status='sent' 確定前に Worker crash した場合は dedup_progress
-  // が残ったままで status='sending', batch_offset=-1 になり、recoverStalledBroadcasts が
-  // 再投入して resume → 完走済みアカは batchOffset >= recipients.length で skip → 重複なし。
+  // 完了後も開始時の宛先・既送IDを保持し、失敗した相手の再試行に使う。
+  // status='sent' は回復対象外。送信完了の前に落ちても同じ snapshot で再開する。
   //
   // complete=false (timeExceeded) のときは caller が status='sent' にせず batch_offset=0 に
   // 戻し、次の cron tick が getQueuedBroadcasts で拾って残りを送る (= 分割送信)。

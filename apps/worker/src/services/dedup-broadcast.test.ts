@@ -597,9 +597,9 @@ describe('processMultiAccountDedupBroadcast', () => {
     expect(updates.failed_account_ids).toBeNull();
   });
 
-  it('persists progress per batch and clears dedup_progress at end', async () => {
+  it('persists the audience and progress per batch', async () => {
     // 1 アカ × 1 batch (1 recipient) — 各 multicast 後に progress UPDATE が走り
-    // 完走後に dedup_progress=NULL の clear が走ることを確認する。
+    // 再送にも使う宛先と既送IDが残ることを確認する。
     const { db, progressUpdates } = makeSendDb({
       selectedCounts: [{ line_account_id: 'acc1', cnt: 1 }],
       rankedRows: [{ friend_id: 'f1', line_user_id: 'u1', line_account_id: 'acc1' }],
@@ -633,9 +633,7 @@ describe('processMultiAccountDedupBroadcast', () => {
     // ident_key は test fixture で friend_id をデフォルトに使っている (withIdentKey 参照)
     expect(lastProgress.sentIdentKeys).toEqual(['f1']);
     expect(progressUpdates[progressUpdates.length - 1].successCount).toBe(1);
-    // 最終的に dedup_progress=NULL に戻されている
-    // dedup_progress の clear は updateBroadcastStatus 側で行われる設計に変更したため
-    // ここでは検証しない。caller の send パスに対する別テストでカバー。
+    expect(lastProgress.audience.perAccount[0].recipients).toHaveLength(1);
   });
 
   it('resumes from saved dedup_progress: skips already-sent batches', async () => {
