@@ -15,6 +15,7 @@ import SeatWaitlistDialog from './waitlist'
 import SegmentedControl from '@/components/shared/segmented'
 import {notifyToast} from '@/components/shared/toast'
 import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -113,6 +114,8 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   const storeId = store?.id || ''
   const tables = useMemo(() => data.tables.filter((t) => !store || t.store_id === store.id), [data.tables, store])
   const menuItems = useMemo(() => data.menuItems.filter((m) => !store || m.store_id === store.id), [data.menuItems, store])
+  const [dayError, setDayError] = useState<unknown>(null)
+  const [dayRetry, setDayRetry] = useState(0)
   const [todayRows, setTodayRows] = useState<RestaurantReservation[] | null>(null)
   /* その日（今日の見方は選んだ日・ほかの見方は今日）の臨時休業・貸切。日の読み出しの口に入っている。 */
   const [dayClosures, setDayClosures] = useState<{ day: string; closures: RestaurantClosure[] } | null>(null)
@@ -126,18 +129,22 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   useEffect(() => {
     let current = true
     setTodayRows(null)
+    setDayError(null)
+    setDayClosures(null)
     if (view !== 'today' || !storeId || !accountId) return
     const load = () => restaurantTestApi.reservationsDay(accountId, storeId, toYmd(day))
       .then((res) => {
         if (!current) return
-        setTodayRows(Array.isArray(res.data?.reservations) ? res.data.reservations : [])
+        if (res.success === false || !Array.isArray(res.data?.reservations)) throw new Error('読み込めませんでした')
+        setDayError(null)
+        setTodayRows(res.data.reservations)
         setDayClosures({ day: toYmd(day), closures: Array.isArray(res.data?.closures) ? res.data.closures : [] })
       })
-      .catch(() => { if (current) setTodayRows([]) })
+      .catch((error) => { if (current) setDayError(error) })
     void load()
     const timer = setInterval(() => { void load() }, 30_000)
     return () => { current = false; clearInterval(timer) }
-  }, [view, storeId, accountId, day, data.reservations])
+  }, [view, storeId, accountId, day, data.reservations, dayRetry])
 
   /* 今週・今月・一覧では、今日が休業・貸切かを見る（帯だけ。表はそのまま）。 */
   useEffect(() => {
@@ -208,7 +215,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           <TextLink href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</TextLink>
         </div>
       ) : null}
-      {view === 'today' ? (
+      {view === 'today' ? dayError !== null ? <ListState kind="error" title="予約を読み込めませんでした" error={dayError} onRetry={()=>setDayRetry(n=>n+1)}/> : todayRows === null ? <ListState kind="loading"/> : (
         <TodayView
           onView={onView} onReload={()=>void reload()} storeId={storeId} storeName={store?.name}
           rows={rows}
