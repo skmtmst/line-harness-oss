@@ -93,7 +93,7 @@ describe('R180 独自マークの保管（使用0人）', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: '保管する' }))
     })
 
-    const dialog = await screen.findByRole('alertdialog', { name: '対応マーク「独自マーク」を保管しますか？' })
+    const dialog = await screen.findByRole('alertdialog', { name: '「独自マーク」を保管しますか' })
     expect(dialog.textContent).toContain('そのまま保管できます')
     // 置き換え先の選択欄は出ない（0人には要らない）。
     expect(dialog.textContent).not.toContain('置き換え先')

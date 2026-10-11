@@ -191,14 +191,14 @@ describe('m21o タグ一覧のフォルダ欄と件数', () => {
     state.tags = () => new Promise((resolve) => { resolveList = resolve })
     state.groups = async () => ({ success: true, data: [] })
     render(<TagsPageV4 accountId="account-a" />)
-    expect((await screen.findAllByText('読み込んでいます')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByLabelText('読み込んでいます')).length).toBeGreaterThan(0)
     resolveList({ success: true, data: [] })
     expect((await screen.findAllByText('まだタグがありません')).length).toBeGreaterThan(0)
     cleanup()
 
     state.tags = async () => ({ success: false, error: 'boom' })
     render(<TagsPageV4 accountId="account-a" />)
-    expect((await screen.findAllByText('表示できませんでした')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('読み込めませんでした')).length).toBeGreaterThan(0)
     await waitFor(() => {
       expect(screen.queryByText('まだタグがありません')).toBeNull()
     })

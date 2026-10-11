@@ -39,7 +39,7 @@ describe('タグ V4 contract', () => {
     const markList = read('components/friend-fields/mark-list.tsx')
     expect(editor).toContain("mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'")
     expect(editor).toContain('取り消せない操作です')
-    expect(markList).toContain('選んだマークへ置き換えて履歴を残します')
+    expect(markList).toContain('人は下で選んだマークへ置き換え、履歴に残します')
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 

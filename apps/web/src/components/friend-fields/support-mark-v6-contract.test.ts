@@ -52,13 +52,13 @@ describe('V6 対応マーク', () => {
     expect(LIST).toContain('expectedVersion: archiveImpact.expectedVersion')
     expect(LIST).toContain('crypto.randomUUID()')
     expect(LIST).toContain('value={replacementMarkId}')
-    expect(LIST).toContain('履歴を残します')
+    expect(LIST).toContain('履歴に残します')
     expect(LIST).not.toContain('force: mark.friendCount > 0')
   })
 
   it('保管確認は zGZMA の位置と幅で、置換先と対象人数に絞る', () => {
     expect(LIST).toContain('data-design-node="zGZMA"')
-    expect(LIST).toContain('保管後は新しく選べません')
+    expect(LIST).toContain('そのまま保管できます')
     expect(LIST).toContain('{impact.friendCount}人を「{selected.name}」へ置き換えます。')
     /*
       #1014 ATTR-17: 上から310px固定はやめる。390×480では下部の
