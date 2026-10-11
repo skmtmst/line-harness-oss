@@ -1,3 +1,4 @@
+import { FieldError } from '../../components/forms/controls.js';
 import CourseChoice from '../../components/CourseChoice.js';
 import Card from '../../components/ui/Card.js';
 import { useUrlStep } from '../../lib/use-url-step.js';
@@ -433,7 +434,7 @@ export default function SeatReserve() {
             />
             {canRefer && <section className="space-y-3" aria-label="系列店の案内">
               {referrals.length>0 && <h2 className="text-[13px] leading-5 font-bold text-ink">近くの系列店なら空いています</h2>}
-              {referralError && <><p role="alert">空きを読み込めませんでした。</p><Button variant="restaurant-control" disabled={busy} onClick={async()=>{
+              {referralError && <><FieldError tone="inherit">空きを読み込めませんでした。</FieldError><Button variant="restaurant-control" disabled={busy} onClick={async()=>{
                 setBusy(true);setReferralError(false);
                 try{setReferrals((await restaurantBookingApi.referrals(store.id,date,guestCount,fullStartsAt,courseId)).data);setReferralLoaded(true);}catch{setReferralError(true);}finally{setBusy(false);}
               }}>もう一度読み込む</Button></>}

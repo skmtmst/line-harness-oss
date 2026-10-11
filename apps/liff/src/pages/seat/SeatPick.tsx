@@ -1,5 +1,5 @@
 import Icon from '../../components/ui/Icon.js';
-import { TextInput } from '../../components/forms/controls.js';
+import { HiddenDateInput, RestaurantTimeChoices, FieldError } from '../../components/forms/controls.js';
 import Button from '../../components/ui/Button.js';
 import { useRef } from 'react';
 import type { RestaurantCustomerSlot, RestaurantUnavailableReason } from '@line-crm/shared';
@@ -84,14 +84,14 @@ export default function SeatPick({
       <Button variant="restaurant-control" aria-label="人数を増やす" disabled={guestCount>=100} onClick={()=>onGuest(guestCount+1)}>＋</Button>
     </div>
     <Button variant="restaurant-date" type="button" aria-label="日にちを選ぶ" onClick={openOther}>{longDate(date).trim()}</Button>
-    <TextInput appearance="hidden" ref={otherRef} type="date" min={today} value={date} aria-label="ほかの日" tabIndex={-1} onChange={e=>e.target.value&&onDate(e.target.value)} />
+    <HiddenDateInput ref={otherRef} min={today} value={date} aria-label="ほかの日" tabIndex={-1} onChange={e=>e.target.value&&onDate(e.target.value)} />
     {day==='loading'||day===undefined ? <p role="status" className="text-xs text-liff-sub">空きを読み込んでいます…</p>
       : day==='error' ? <p className="text-[13px] leading-5 text-liff-sub">空きを読み込めませんでした。<Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
       : day==='closed'||!day.length ? <p className="text-[13px] leading-5 text-liff-sub">この日は予約を受け付けていません。ほかの日を選んでください。</p>
-      : <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="時刻">{day.map(s=><Button variant="restaurant-time" key={s.startsAt} role="radio" aria-checked={s.startsAt===startsAt} aria-label={`${zonedParts(s.startsAt,timeZone).hm} ${slotLabel(s)}`} selected={s.startsAt===startsAt} disabled={!s.available} onClick={()=>onTime(s.startsAt)}>{zonedParts(s.startsAt,timeZone).hm}</Button>)}</div>}
+      : <RestaurantTimeChoices value={startsAt} onChange={onTime} options={day.map(s => ({ value: s.startsAt, label: zonedParts(s.startsAt, timeZone).hm, accessibleLabel: `${zonedParts(s.startsAt, timeZone).hm} ${slotLabel(s)}`, available: s.available }))} />}
     {Array.isArray(day)&&day.some(s=>!s.available) && <p className="flex items-center gap-3 rounded-(--liff-radius) bg-liff-note px-4 py-3 text-[13px] leading-5 text-liff-sub"><Icon name="info" className="h-4 w-4 shrink-0" />{day.filter(s=>!s.available).map(s=>zonedParts(s.startsAt,timeZone).hm).join('・')} は満席です</p>}
     {note&&<p className="text-xs leading-[18px] text-liff-sub">{note}</p>}
-    {error&&<p role="alert" className="text-[13px] leading-5 text-danger">{error}</p>}
+    {error&&<FieldError>{error}</FieldError>}
   </div>;
 }
 
