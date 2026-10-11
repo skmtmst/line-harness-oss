@@ -32,3 +32,17 @@ test('upload stores account ownership before publishing the URL',async()=>{
  const res=await app.request('/api/images?account_id=a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',mimeType:'image/png'})},{DB:sql.db,IMAGES:bucket} as any);
  expect(res.status).toBe(201);const body:any=await res.json();expect(objects.get(body.data.key).customMetadata).toMatchObject({lineAccountId:'a',tenantId:'ta'});
 });
+
+test('accountless upload from an existing multi-account client stays usable only by its creator',async()=>{
+ sql.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES('a2','A2','ca2','t','s','ta')");
+ const res=await app.request('/api/images',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',mimeType:'image/png'})},{DB:sql.db,IMAGES:bucket} as any);
+ expect(res.status).toBe(201);
+ const {data:{key}}=await res.json() as {data:{key:string}};
+ expect(objects.get(key).customMetadata).toMatchObject({ownerStaffId:'env-owner',tenantId:'ta'});
+ expect((await request(key,'GET')).status).toBe(200);
+ staff={...staff,id:'other-staff'};
+ expect((await request(key)).status).toBe(404);
+ expect(objects.has(key)).toBe(true);
+ staff={...staff,id:'env-owner',tenantId:'tb'};
+ expect((await request(key,'GET')).status).toBe(404);
+});
