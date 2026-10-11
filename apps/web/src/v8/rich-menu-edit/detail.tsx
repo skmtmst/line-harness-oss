@@ -60,10 +60,14 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
   const role = useStaffRole()
   const canOperate = useFeatureAccess('richMenus')
+  const canInspectOperations = role === 'owner' || role === 'admin'
+  const aggregateOnly = role === 'staff' || role === 'viewer'
 
   const [progress, setProgress] = useState<{ steps: ProgressStep[]; message: string | null; failed: boolean; completed: boolean } | null>(null)
   const [progressError, setProgressError] = useState(false)
   const [runs, setRuns] = useState<RichMenuPublishRun[] | null>(null)
+  const [publishedRun, setPublishedRun] = useState<RichMenuPublishRun | null | undefined>(undefined)
+  const [draftDiffers, setDraftDiffers] = useState<boolean | null>(null)
   const [runsError, setRunsError] = useState('')
   const [diffs, setDiffs] = useState<ReconcileDiff[] | null>(null)
   const [checkedAt, setCheckedAt] = useState<Date | null>(null)
@@ -71,7 +75,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const [checkError, setCheckError] = useState('')
   const [fixOpen, setFixOpen] = useState(false)
   const [fixing, setFixing] = useState(false)
-  const [preview, setPreview] = useState<RichMenuTargetPreview | null>(null)
+  const [preview, setPreview] = useState<Pick<RichMenuTargetPreview, 'effective'> | null>(null)
   const [taps, setTaps] = useState<number | null | undefined>(undefined)
 
   const [retryTarget, setRetryTarget] = useState<RichMenuPublishRun | null>(null)
@@ -131,6 +135,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       const res = await api.richMenuGroups.publishRuns(groupId)
       if (!res.success || !res.data || !Array.isArray(res.data.runs)) throw new Error('runs')
       setRuns(res.data.runs)
+      setPublishedRun(res.data.published)
+      setDraftDiffers(res.data.draftDiffersFromPublished ?? null)
       setRunsError('')
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
@@ -162,24 +168,30 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
   useEffect(() => { void loadGroup() }, [loadGroup])
   useEffect(() => {
-    if (loadState !== 'ready') return
+    if (loadState !== 'ready' || !canInspectOperations) return
     void loadProgress()
     void loadRuns()
     void check()
-  }, [loadState, loadProgress, loadRuns, check])
+  }, [loadState, canInspectOperations, loadProgress, loadRuns, check])
   useEffect(() => {
-    if (!group) return
+    if (!group || role === null) return
     let cancelled = false
-    void api.richMenuGroups.previewTargets(group.id).then((res) => { if (!cancelled && res.success) setPreview(res.data) }).catch(() => {})
+    setPreview(null)
+    const request = aggregateOnly ? api.richMenuGroups.audienceSummary(group.id) : api.richMenuGroups.previewTargets(group.id)
+    void request.then((res) => { if (!cancelled && res.success) setPreview(res.data) }).catch(() => {})
     void api.richMenuGroups.tapStats(group.accountId).then((res) => {
       if (cancelled) return
       setTaps(res.success ? res.data.byGroup.find((row) => row.groupId === group.id)?.taps ?? 0 : null)
     }).catch(() => { if (!cancelled) setTaps(null) })
     return () => { cancelled = true }
-  }, [group])
+  }, [group, role, aggregateOnly])
 
   const latestRun = useMemo(() => (runs ?? []).find((run) => run.status !== 'running') ?? null, [runs])
   const latestSucceeded = useMemo(() => (runs ?? []).find((run) => run.status === 'succeeded') ?? null, [runs])
+  const currentPublished = publishedRun === undefined ? latestSucceeded : publishedRun
+  const publishedInfo = currentPublished
+    ? `いま対象に出ている版: 「${currentPublished.version.name ?? '（名前なし）'}」${currentPublished.version.pageCount !== null ? ` ・ ${currentPublished.version.pageCount}ページ` : ''} ・ ${runAudienceText(currentPublished)} ・ ${runStamp(currentPublished.updatedAt)} に公開${draftDiffers === false ? '。編集中の下書きは公開中の版と同じです。' : ''}`
+    : 'いま対象に出ている版はありません（まだ公開に成功していません）。'
 
   const reloadAll = useCallback(async () => {
     await Promise.all([loadGroup(), loadProgress(), loadRuns()])
@@ -239,7 +251,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       const res = await api.richMenuGroups.reconcile(groupId, false)
       if (!res.success) throw new Error(res.error)
       setFixOpen(false)
-      setNotice('LINEとのずれを直しました。')
+      const unapplied = res.data.unapplied ?? []
+      setNotice(`ずれを ${res.data.applied ?? 0} 件修復しました。${unapplied.length > 0 ? `取り込みが必要なずれが ${unapplied.length} 件あります。「LINEにだけあるメニュー」は「外部メニューの取り込み」画面で取り込んでください。` : ''}`)
       await check()
       await loadRuns()
     } catch (saveFailure) {
@@ -306,7 +319,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   if (!group) return <SaveErrorScope errors={saveErrors}><div className={styles.loadingHead}>{backLink}<DetailLoading /></div></SaveErrorScope>
 
   const audience = audienceOf(group)
-  const head = latestSucceeded ? `公開しました・${runStamp(latestSucceeded.updatedAt)}` : '公開中'
+  const head = currentPublished ? `公開しました・${runStamp(currentPublished.updatedAt)}` : '公開中'
   const failed = progress?.failed === true
   const menuItems: ActionMenuItem[] = [
     { id: 'duplicate', label: '複製する', onSelect: () => { setDialogError(''); setDuplicateOpen(true) } },
@@ -340,7 +353,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
             {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
             {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
-            <section className={styles.card} aria-label="公開の進み">
+            {canInspectOperations ? <section className={styles.card} aria-label="公開の進み">
               <h2 className={styles.cardTitle}>公開の進み</h2>
               {progress && !progress.completed && !progress.failed && progress.message ? <p className={styles.cardNote}>{progress.message}</p> : null}
               {progressError ? <p className={styles.cardNote}>公開の進みを読み込めませんでした。</p> : progress === null ? <DetailLoading /> : progress.steps.length === 0 ? <p className={styles.cardNote}>まだ公開の記録はありません。</p> : progress.steps.map((step) => (
@@ -352,13 +365,14 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                   <span className={step.status === 'done' ? styles.stateOk : step.status === 'failed' ? styles.stateNg : styles.stateQuiet}>{progressStatusText(step.status)}</span>
                 </div>
               ))}
-            </section>
+            </section> : null}
 
-            <section className={styles.card} aria-label="公開の履歴とLINEとの照合">
+            {canInspectOperations ? <section className={styles.card} aria-label="公開の履歴とLINEとの照合">
               <div className={styles.cardTitles}>
                 <h2 className={styles.cardTitle}>公開の履歴とLINEとの照合</h2>
-                <p className={styles.cardNote}>管理画面の記録と、LINE上の状態がずれていないかを見ます</p>
+                <p className={styles.cardNote} title={publishedInfo}>管理画面の記録と、LINE上の状態がずれていないかを見ます</p>
               </div>
+              {!runsError && draftDiffers === true ? <Notice tone="warn" message="編集中の下書きは公開中の版と違います。公開すると、この下書きで上書きされます。" /> : null}
               <div className={styles.checkBox}>
                 <div className={styles.checkText}>
                   {checkError ? <span className={styles.errorText}>{checkError}</span>
@@ -384,7 +398,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                 <div className={styles.runList}>
                   {runs.map((run) => (
                     <div key={run.id} className={styles.runRow}>
-                      <span className={styles.runText}>{`${runStamp(run.createdAt)} ${runAudienceText(run)}`}</span>
+                      <span className={styles.runText} title={`${run.version.name ? `「${run.version.name}」 ・ ` : ''}${run.version.pageCount !== null ? `${run.version.pageCount}ページ ・ ` : ''}LINE ID ${run.pages?.length ?? 0}件${run.status === 'failed' && run.lastErrorCode ? ` ・ 失敗理由: ${run.lastErrorCode.slice(0, 80)}` : ''}`}>{`${runStamp(run.createdAt)} ${runAudienceText(run)}`}</span>
                       <span className={styles.runSpacer} />
                       {run.status === 'failed' && canOperate && run.id === latestRun?.id ? (
                         <button type="button" className={styles.linkButton} onClick={() => { setDialogError(''); setRetryTarget(run) }}>失敗だけやり直す</button>
@@ -396,7 +410,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                   ))}
                 </div>
               )}
-            </section>
+            </section> : null}
           </div>
 
           <aside className={styles.aside}>
@@ -428,7 +442,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       <ConfirmDialog
         open={retryTarget !== null}
         title="失敗した公開をやり直しますか？"
-        description="保存された版のまま、失敗した段からやり直します。新しい版は作りません。"
+        description={retryTarget ? `${runStamp(retryTarget.createdAt)} に失敗した公開を、保存された版のままやり直します。対象: ${runAudienceText(retryTarget)}。途中まで作成済みのものは続きから再開し、別の版や別の対象には適用しません。下書きが保存時から変わっている場合は、上書きを避けるため再試行せず止めます。` : ''}
         confirmLabel="やり直す"
         busy={retrying}
         error={dialogError || undefined}
@@ -444,7 +458,9 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         error={dialogError || undefined}
         onConfirm={() => fix()}
         onCancel={() => { if (!fixing) setFixOpen(false) }}
-      />
+      >
+        <ul className={styles.diffList}>{(diffs ?? []).map((diff, index) => <li key={`${diff.kind}-${index}`}>{diff.detail}{diff.fix ? `（${diff.fix.label}）` : ''}</li>)}</ul>
+      </ConfirmDialog>
       <ConfirmDialog
         open={unpublishOpen}
         title={`「${group.name}」をLINEから取り下げますか？`}

@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
-const PUBLISH_HISTORY = readFileSync(join(HERE, 'edit', 'publish-history.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
+const PUBLISH_HISTORY = readFileSync(join(HERE, '../../v8/rich-menu-edit/detail.tsx'), 'utf8')
 const TEST_APPLY = readFileSync(join(HERE, '../../v8/rich-menu-edit/test-apply.tsx'), 'utf8')
 const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const CREATE_FORM = readFileSync(
@@ -52,8 +52,9 @@ describe('作成画面の登録メディア選択', () => {
 /** #900 / N-151: 履歴・失敗だけの再試行・照合 */
 describe('公開履歴・再試行・照合', () => {
   it('編集画面に履歴セクションがあり owner/admin のみ出す', () => {
-    expect(EDIT_PAGE).toContain("import { PublishHistorySection } from './publish-history'")
-    expect(EDIT_PAGE).toContain('canOperate ? <PublishHistorySection')
+    expect(PUBLISH_HISTORY).toContain("const canInspectOperations = role === 'owner' || role === 'admin'")
+    expect(PUBLISH_HISTORY).toContain('canInspectOperations ? <section')
+    expect(PUBLISH_HISTORY).toContain('aria-label="公開の履歴とLINEとの照合"')
   })
 
   it('失敗したrunだけに再試行ボタンを出し、照合は dryRun → 明示修復の順', () => {
@@ -86,8 +87,8 @@ describe('一覧と編集からの複製', () => {
   })
 
   it('編集画面にも複製がある', () => {
-    expect(EDIT_PAGE).toContain("confirmKind === 'duplicate'")
-    expect(EDIT_PAGE).toContain('api.richMenuGroups.duplicate')
+    expect(PUBLISH_HISTORY).toContain('open={duplicateOpen}')
+    expect(PUBLISH_HISTORY).toContain('api.richMenuGroups.duplicate')
   })
 })
 
@@ -96,7 +97,7 @@ describe('staffへの影響人数は合計のみ', () => {
   it('編集画面は staff を読み取り専用にし、集計だけを読む', () => {
     expect(EDIT_PAGE).toContain('audienceSummary')
     expect(EDIT_PAGE).toContain('aggregateOnly')
-    expect(EDIT_PAGE).toContain('readOnly={aggregateOnly}')
+    expect(EDIT_PAGE).toContain('disabled={aggregateOnly}')
   })
 })
 

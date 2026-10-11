@@ -2481,12 +2481,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           ) : (
             <div className={styles.field}>
               <span className={styles.fieldLabel}>どんな人に出すか</span>
+              <fieldset disabled={aggregateOnly} className="contents">
               <ConditionBuilder
                 value={targetingCondition}
                 onChange={setTargetingCondition}
                 label="このメニューを出す相手"
                 showCount={false}
               />
+              </fieldset>
               {editGroupId && !conditionEmpty ? (
                 <p className={styles.fieldHint}>{conditionUnsaved ? `条件 ${conditionCount}件（未保存）` : `保存済み条件 ${conditionCount}件`}</p>
               ) : null}
