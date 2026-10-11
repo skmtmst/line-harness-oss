@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(HERE, 'new', 'page.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const MODAL = readFileSync(
   join(HERE, '..', '..', 'components', 'rich-menus', 'apply-to-tag-modal.tsx'),
   'utf8',

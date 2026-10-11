@@ -584,6 +584,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   const accountId = selectedAccount?.id ?? null
   candidateAccountRef.current = accountId
+  const pendingMediaAccountRef = useRef(accountId)
+  useEffect(() => {
+    if (host || pendingMediaAccountRef.current === accountId) return
+    pendingMediaAccountRef.current = accountId
+    setPendingImages((previous) => {
+      for (const image of previous) if (image?.url) URL.revokeObjectURL(image.url)
+      return []
+    })
+    setMediaPickerOpen(false)
+  }, [accountId, host])
   const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
   const storeCanOperate = useFeatureAccess('richMenus')
   const canOperate = host ? host.canOperate : storeCanOperate

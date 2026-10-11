@@ -36,7 +36,13 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams(''),
 }));
 
-(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+vi.mock('@/app/contents/media-picker-dialog', () => ({
+  default: ({ open, accountId, onSelect }: { open: boolean; accountId: string | null; onSelect: (item: object) => void }) => open
+    ? React.createElement('button', { 'data-media-account': accountId, onClick: () => onSelect({ id: 'media-a', filename: '店Aの画像.png', width: 2500, height: 1686, sizeBytes: 1024 }) }, '登録画像を選ぶ（試験）')
+    : null,
+}))
+
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
 let root: Root
@@ -131,6 +137,24 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     expect(save).toBeTruthy()
     await act(async () => fireEvent.click(save))
     await settle(50)
+    expect(writes).toHaveLength(0)
+  })
+
+  it('作る前の登録画像は店切替で外し、別店の画像として持ち込まない', async () => {
+    window.history.replaceState({}, '', '/rich-menus/new')
+    await act(async () => root.render(<NewRichMenuPage />))
+    await settle(100)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' })))
+    const picker = screen.getByRole('button', { name: '登録画像を選ぶ（試験）' })
+    expect(picker.getAttribute('data-media-account')).toBe('acc-1')
+    await act(async () => fireEvent.click(picker))
+    expect(screen.getByAltText('選択中の画像: 店Aの画像.png')).toBeTruthy()
+    expect(host.textContent).toContain('未保存の変更があります')
+    accountState.id = 'acc-2'
+    await act(async () => root.render(<NewRichMenuPage />))
+    await settle(100)
+    expect(screen.queryByAltText('選択中の画像: 店Aの画像.png')).toBeNull()
+    expect(host.textContent).not.toContain('店Aの画像.png')
     expect(writes).toHaveLength(0)
   })
 });
