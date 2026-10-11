@@ -30,6 +30,7 @@ beforeEach(() => {
     if (options.method && options.method !== 'GET') writes.push({ path, body: JSON.parse(String(options.body ?? '{}')), headers: new Headers(options.headers) });
     if (path === '/api/liff/config') return reply({ success: true, data: { accountName: '予約店' } });
     if (path === '/api/liff/link') return reply({ success: true, data: { userId: 'friend-fixture' } });
+    if (path === '/api/liff/customer-look') return reply({ success: true, data: { settings: { liff_theme: 'night', shop_primary_color: '#885522' }, version: 1 } });
     if (path === '/api/liff/booking/settings') return reply({ liff_theme: 'night', shop_primary_color: '#885522' });
     if (path === '/api/liff/restaurant/link/tok') return reply({ success: true, data: { id: 'st', name: '予約店', timezone: 'Asia/Tokyo' } });
     if (path === '/api/liff/restaurant/courses') return reply({ success: true, timezone: 'Asia/Tokyo', data: [{ id: 'c90', name: '夕食コース', durationMinutes: 90, price: 3000, allergens: [] }] });

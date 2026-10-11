@@ -22,8 +22,8 @@ function app(...parts: string[]): string {
 
 describe('LIFF の決まり (sxNO5)', () => {
   it('主の色は LIFF 専用の濃い緑で、管理画面の緑と変数を分ける', () => {
-    expect((src('index.css') + src('liff-skin.css'))).toContain('@import "./tokens.css"');
-    const css = (src('index.css') + src('liff-skin.css')) + src('tokens.css');
+    expect((src('index.css') + src('components', 'ui', 'liff-skin.css'))).toContain('@import "./tokens.css"');
+    const css = (src('index.css') + src('components', 'ui', 'liff-skin.css')) + src('tokens.css');
     // 板: 主の色は #03873a。LINE の緑 #06c755 はログインボタンだけ。
     expect(css).toContain('--color-liff-primary: #03873a');
     // 管理画面 V8 の緑 (#087a3e) とは変数を分ける。

@@ -11,7 +11,7 @@ const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.ur
 
 describe('押せる所の大きさ', () => {
   it('liff-hit は押せる範囲を 44×44 以上にし、位置の決まっている部品の position を変えない', () => {
-    const css = (read('../index.css') + read('../liff-skin.css'));
+    const css = (read('../index.css') + read('../components/ui/liff-skin.css'));
     expect(css).toMatch(/\.liff-hit::after\s*\{[^}]*width: max\(100%, 44px\);[^}]*height: max\(100%, 44px\);/s);
     expect(css).toContain('.liff-hit:not(.absolute):not(.fixed):not(.sticky)');
   });

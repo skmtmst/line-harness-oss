@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const root = join(HERE, '..', '..');
 const src = (...parts: string[]): string => readFileSync(join(root, ...parts), 'utf8');
-const css = (src('index.css') + src('liff-skin.css'));
+const css = (src('index.css') + src('components', 'ui', 'liff-skin.css'));
 
 /*
  * ★A LIFF の手応え (オーナー決定。V8.pen 修正案 L-1・L-4)。
