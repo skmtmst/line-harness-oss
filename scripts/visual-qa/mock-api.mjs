@@ -328,7 +328,7 @@ const HQ_TEMPLATE_ACCOUNTS_HTN = [
   { id: 'visual-qa-account-prod', name: '然 -NEN- 本店' },
   { id: 'visual-qa-account-store', name: '然 -NEN- 渋谷店' },
   { id: 'visual-qa-account-event-2025', name: '2025年イベント' },
-  { id: 'visual-qa-account', name: '然 -NEN- TEST' },
+  { id: 'visual-qa-account', name: '然-NEN-TEST' },
 ]
 function hqTemplateDefinitionHtn(row) {
   /* 統括のリッチメニュー（作る①〜④ gobhu・egdGx・K0gu1・gQabc）：大きい・6面（予約する・お知らせ・クーポン・会員証・よくある質問・お問い合わせ）。 */
@@ -1286,7 +1286,7 @@ const FEATURES = {
   friend_add_routing: true, multi_store_hierarchy: false,
   friend_fields: true, support_marks: true, saved_searches: true,
   media: true, common_vars: true, analytics: true, site_tracking: true,
-  webinars: false, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
+  webinars: true, events: true, booking: true, visit_stamps: true, affiliates: false, mileage: true,
   ec_commerce: true, line_notifications: true, nen_campaigns: true,
   restaurant_test: true,
 }
