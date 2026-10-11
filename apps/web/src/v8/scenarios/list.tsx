@@ -59,7 +59,7 @@ import InlineEdit from '@/components/shared/inline-edit'
 import { TextField } from '@/components/shared/text-field';
 import { withViewTransition } from '@/components/shared/view-transition';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs';
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario';
@@ -646,8 +646,22 @@ export default function ScenariosListV8() {
     { value: UNFILED, label: 'フォルダ：未分類' },
   ]
 
+  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
+  const createButton = (full: boolean) => !canEdit ? null : (
+    <Button
+      type="button"
+      variant="primary"
+      className={full ? 'v8-folder-create w-full' : undefined}
+      onClick={handleCreate}
+    >
+      <Plus size={15} aria-hidden="true" />
+      シナリオを作る
+    </Button>
+  )
+
   const folderPanel = (
     <ManagedFolderPanel
+      createAction={createButton(true)}
       kind="scenario"
       accountId={selectedAccountId ?? null}
       folders={folders}
@@ -957,6 +971,7 @@ export default function ScenariosListV8() {
                       <div className={styles.menuBox}>
                         <ContextMenu label={`シナリオ「${s.name}」の操作`} items={rowContextItems(s)}>
                           <RowMenu
+                            size="row"
                             label={`シナリオ「${s.name}」の操作`}
                             items={rowMenuItems(s)}
                             open={openMenuId === s.id}
@@ -1007,12 +1022,10 @@ export default function ScenariosListV8() {
     )
 
   /* ページ送りは型の pagination 枠へ。 */
-  const listPager = scenarioList.pageCount > 1 ? (
+  const listPager = scenarioList.loaded && !scenarioList.error ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(scenarioList.page - 1) * scenarioList.limit + 1}〜{Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)} / {formatNumber(scenarioList.total)} 件
-      </span>
-      <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
+      <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage}
+        summary={paginationSummary(scenarioList.total, (scenarioList.page - 1) * scenarioList.limit + 1, Math.min(scenarioList.page * scenarioList.limit, scenarioList.total))} />
     </ListPagePagination>
   ) : null
 
@@ -1067,19 +1080,6 @@ export default function ScenariosListV8() {
     <div data-per-page-select>
       <PageSizeSelect className="w-full" value={perPage} onChange={setPerPage} options={PAGE_SIZE_OPTIONS} label={null} />
     </div>
-  )
-
-  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
-  const createButton = (full: boolean) => !canEdit ? null : (
-    <Button
-      type="button"
-      variant="primary"
-      className={full ? 'v8-folder-create w-full' : undefined}
-      onClick={handleCreate}
-    >
-      <Plus size={15} aria-hidden="true" />
-      シナリオを作る
-    </Button>
   )
 
   const folderSelect = (
@@ -1156,6 +1156,9 @@ export default function ScenariosListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      heightMode="content"
+      toolbarSpacing="section"
+      noticeSpacing="section"
       skeleton
       boardId={narrow ? 'wjfLe' : canEdit ? 'axFrW' : 'X0QrW0'}
       headingSize="regular"
@@ -1315,8 +1318,6 @@ export default function ScenariosListV8() {
       </>}
       folders={<>
         <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
-      {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-        {createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         {folderPanel}
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
