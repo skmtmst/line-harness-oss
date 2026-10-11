@@ -22,7 +22,6 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push?.(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [] }),
 }))

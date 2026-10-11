@@ -22,7 +22,6 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/booking/menus/staff',
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [] }),
 }))

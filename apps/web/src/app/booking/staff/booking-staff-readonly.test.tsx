@@ -5,7 +5,6 @@ const permission = vi.hoisted(() => ({ value: false }))
 vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => permission.value }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a' }) }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()

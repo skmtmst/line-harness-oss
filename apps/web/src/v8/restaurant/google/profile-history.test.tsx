@@ -7,7 +7,6 @@ import { HistoryScreen } from './profile-history'
 
 const mocks = vi.hoisted(() => ({ history: vi.fn() }))
 vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: mocks }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 const entry = { id: 'record-1', changeId: 'change-1', kind: 'profile', summary: '変更した店名', staffName: '担当者', status: 'failed', error: '接続失敗', createdAt: '2026-10-11T00:00:00Z' }
 const data = { changes: [entry], total: 21, page: 1, perPage: 20, counts: { all: 21, hours: 10, profile: 10, review_reply: 1 } }

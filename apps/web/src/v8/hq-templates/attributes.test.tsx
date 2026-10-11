@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({ role: 'owner', list: vi.fn(), get: vi.fn(), cr
 vi.mock('@/lib/staff-role', () => ({ useTenantWideAccess: () => ['owner', 'admin'].includes(mocks.role), useStaffRole: () => mocks.role, canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/friend-attributes' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { context: mocks.context } }))
 vi.mock('@/lib/hq-friend-attributes-api', () => ({ hqFriendAttributesApi: { list: mocks.list, get: mocks.get, create: mocks.create, update: mocks.update, remove: mocks.remove, listStats: mocks.stats, folders: { list: mocks.folders, create: mocks.createFolder, update: mocks.updateFolder }, accounts: mocks.accounts, receivedVersions: mocks.received, preflight: mocks.preflight, distribute: mocks.distribute, result: mocks.result } }))
 vi.mock('./distribution-accounts', () => ({ ALL_ACCOUNTS: 'all', useDistributionFolders: () => ({ folders: [], membership: new Map(), failed: false }), distributionFolderRows: () => [], accountsInFolder: (rows: unknown[]) => rows, DistributionFolderPanel: () => null }))

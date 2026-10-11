@@ -8,7 +8,6 @@ import { HoursEditor, type HoursMode } from './profile-hours'
 const mocks = vi.hoisted(() => ({ profile: vi.fn(), proposeHours: vi.fn(), sendChange: vi.fn(), role: 'owner' }))
 vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: mocks }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mocks.role, canManageRole: (role: string) => role === 'owner' }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 const weekly = Object.fromEntries(['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'].map((day) => [day, [{ open: '11:00', close: '22:00' }]]))
 const data = { store: { name: '対象店舗' }, aiAvailable: true, closed: false, timeZone: 'Asia/Tokyo', today: { date: '2026-10-11', weekday: 'SUNDAY' }, profile: { title: '対象店舗', regularHours: weekly, specialHours: [{ date: '2026-10-12', closed: false, periods: [{ open: '11:00', close: '17:00' }] }] } }

@@ -5,7 +5,6 @@ import { expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ get: vi.fn(), theme: 'v8' }))
 vi.mock('@/lib/api', () => ({ api: { friendStats: { get: mocks.get } } }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a' }) }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => mocks.theme }))
 import FriendKpis from './friend-kpis'
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 it('APIの前月差を表示し、記録なしを0で埋めない', async () => {

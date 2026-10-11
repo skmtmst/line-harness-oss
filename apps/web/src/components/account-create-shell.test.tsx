@@ -14,7 +14,6 @@ vi.mock('next/navigation', () => ({
   usePathname: () => route.pathname,
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {}, prefetch: () => {} }),
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => route.theme }))
 vi.mock('./layout/sidebar', () => ({ default: () => <aside data-test="sidebar" /> }))
 vi.mock('./layout/settings-inner-nav', () => ({
   default: () => <nav data-test="settings-nav" />,

@@ -51,7 +51,6 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({ usePageChrome: () => ({ title: null, crumbs: null, fullWidth: false, settingsNavInline: false }) }))
 vi.mock('@/lib/use-manual-href', () => ({ useManualHref: () => null }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '株式会社 然', iconUrl: null }) }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => fixture.theme }))
 vi.mock('@/lib/api', () => ({
   api: {
     tenants: { me: fixture.tenantsMe },

@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({ profile: vi.fn(), photos: vi.fn(), proposeProf
 vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: mocks }))
 vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), api: { media: { list: mocks.media } } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mocks.role, canManageRole: (role: string) => role === 'owner' }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 const data = { store: { name: '対象店舗' }, closed: false, profile: { title: '前の名前', address: { postalCode: '150-0001', administrativeArea: '東京都', locality: '渋谷区', addressLines: ['1-2-3'] }, phone: '03-0000-0000', websiteUri: 'https://example.com', description: '紹介文' } }
 const media = { id: 'media-1', filename: '追加する写真.jpg', url: 'https://example.com/new.jpg', kind: 'image', lineAccountId: 'account-1' }

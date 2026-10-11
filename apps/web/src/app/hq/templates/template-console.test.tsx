@@ -409,5 +409,3 @@ vi.mock('@/v8/hq-templates/tag-editor', () => ({ default: function TagEditor({ d
   const next = { ...definition, tag: { ...definition.tag, name } }
   return <>{notice ? <p role="status">{notice}</p> : null}<label>ひな形の名前<input value={name} disabled={saving} onChange={e => setName(e.target.value)} /></label><label>説明<textarea disabled={saving} /></label>{error ? <p role="alert">{error}</p> : null}{conflict ? <button onClick={onReloadLatest}>最新の内容を読み込む</button> : null}<button disabled={saving} onClick={onCancel}>キャンセル</button><button disabled={saving || !name.trim()} onClick={() => onSaveDraft(next)}>下書きを保存</button><button disabled={saving || !name.trim()} onClick={() => onSave(next)}>保存する</button></>
 } }))
-
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))

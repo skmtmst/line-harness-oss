@@ -8,7 +8,6 @@ const apply = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=ev-1') }))
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: React.PropsWithChildren<{ href: string }>) => <a href={href} {...rest}>{children}</a> }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('./change-review-model', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./change-review-model')>()
   return { ...actual, useChangeReview: () => ({

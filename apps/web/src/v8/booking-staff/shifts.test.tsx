@@ -57,7 +57,6 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/components/shared/date-field', () => ({ default: (p: { value: string; onChange: (v: string) => void; 'aria-label'?: string }) => <input aria-label={p['aria-label']} value={p.value} onChange={(e) => p.onChange(e.target.value)} /> }))
 
 import StaffShiftsV8, { groupBreaks, shortDay, weekdaySetLabel } from './shifts'

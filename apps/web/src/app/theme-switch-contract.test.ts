@@ -49,11 +49,11 @@ describe('見た目は V8 に固定', () => {
         if (!/\.tsx?$/.test(file) || /\.test\.tsx?$/.test(file)) continue
         const source = ts.createSourceFile(file, readRawSource(file, 'utf8'), ts.ScriptTarget.Latest, true)
         function visit(node: ts.Node) {
-          // コメントは調べない。試験専用の環境変数の読み取りは共通関数だけに置く。
+          // コメントは調べない。環境変数による選択をどこにも戻さない。
           if (ts.isStringLiteral(node) && node.text === 'lh-admin-theme') failures.push(file)
           const envChoice = (ts.isPropertyAccessExpression(node) && node.name.text === 'NEXT_PUBLIC_ADMIN_THEME')
             || (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) && node.argumentExpression.text === 'NEXT_PUBLIC_ADMIN_THEME')
-          if (envChoice && file !== join(src, 'lib/admin-theme-default.ts')) failures.push(file)
+          if (envChoice) failures.push(file)
           if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
             && /^document\.documentElement\.dataset(?:\.theme|\[['"]theme['"]\])$/.test(node.left.getText(source))) failures.push(file)
           if (ts.isCallExpression(node) && node.expression.getText(source) === 'document.documentElement.setAttribute'
