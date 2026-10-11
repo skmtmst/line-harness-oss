@@ -114,7 +114,7 @@ describe('現役V8の公開予約の確認と取消', () => {
   it('取得失敗を空一覧にせず、押し直して取得できる', async () => {
     net.list.mockRejectedValueOnce(new Error('down'))
     const dialog = await openSchedules()
-    await within(dialog).findByText('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+    await within(dialog).findByText('公開予約の一覧を読み込めませんでした。時間をおいて、もう一度お試しください。')
     expect(within(dialog).queryByText(/まだ公開予約はありません/)).toBeNull()
     fireEvent.click(within(dialog).getByRole('button', { name: '再試行' }))
     await within(dialog).findByText('予約中')

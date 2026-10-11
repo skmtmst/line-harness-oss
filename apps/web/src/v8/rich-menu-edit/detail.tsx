@@ -34,8 +34,7 @@ import { notifySaved } from '@/components/shared/toast'
  * 公開中のメニュー：公開の進み・公開の履歴とLINEとの照合・いまの状態を見せ、編集はウィザード（?step=shape）へ。
  * 下書き：見せる物が無いので、そのままウィザードへ送る。
  *
- * 動き（公開の進み・履歴・失敗だけのやり直し・照合と修復・取り下げ・複製）は今の画面
- * （app/rich-menus/edit の PublishProgressSection・PublishHistorySection・一覧の取り下げ）と同じ API・同じ確かめ方。
+ * 公開の進み・履歴・失敗だけのやり直し・照合と修復・取り下げ・複製は、既存のAPIと確認を使う。
  * 受け付ける指定・呼ぶ API は BEHAVIOR.md。
  */
 

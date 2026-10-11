@@ -82,7 +82,6 @@ const BASELINE: Record<string, number> = {
   'app/restaurant-test/stores/new/page.tsx': 2,
   'app/restaurant-test/stores/new/terms-consent.tsx': 1,
   'app/restaurant-test/v8/shell.tsx': 1,
-  'app/rich-menus/edit/page.tsx': 4,
   'app/rich-menus/new/create-v8.tsx': 2,
   'app/scenarios/first-step/page.tsx': 1,
   'app/staff/email-change/page.tsx': 1,

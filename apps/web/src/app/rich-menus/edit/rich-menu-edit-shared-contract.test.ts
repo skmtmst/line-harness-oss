@@ -4,25 +4,25 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * m18s: リッチメニュー編集画面は ★V7 の共通部品で出す。
+ * リッチメニューの現役V8は共通部品で選択と状態を出す。
  * - 「出す相手」「いつ出すか」はラジオカード（素の青丸を直置きしない）
  * - 条件・プレビューの切替は共通チェックボックス（素の四角を直置きしない）
  * - 未設定の行は警告色（失敗の赤にしない）
  * 戻すと赤。
  */
 const here = dirname(fileURLToPath(import.meta.url))
-const page = readFileSync(join(here, 'page.tsx'), 'utf8')
+const page = readFileSync(join(here, '..', 'new', 'create-v8.tsx'), 'utf8')
 const form = readFileSync(
   join(here, '..', '..', '..', 'components', 'rich-menus', 'rich-menu-create-form.tsx'),
   'utf8',
 )
 
-describe('m18s 編集・作成画面は★V7の共通部品で出す', () => {
+describe('現役の編集・作成は共通部品で選ぶ', () => {
   it('出す相手・公開時期はラジオカードで選ぶ', () => {
-    expect(page).toContain('legend="出す相手の選択"')
-    expect(page).toContain('legend="公開時期の選択"')
+    expect(page).toContain('legend="出す相手"')
+    expect(page).toContain('legend="いつ公開するか"')
     expect(page).toContain('name="audience"')
-    expect(page).toContain('name="publish-mode"')
+    expect(page).toContain('name="timing"')
   })
 
   it('素のラジオ・チェックボックスを直置きしない', () => {

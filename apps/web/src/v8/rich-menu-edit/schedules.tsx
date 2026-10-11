@@ -40,7 +40,7 @@ export default function RichMenuSchedules({ groupId, canOperate, restoreMenus }:
       setError('')
     } catch {
       if (request !== generation.current) return
-      setError('予約一覧を取得できませんでした。時間をおいて開き直してください。')
+      setError('公開予約の一覧を読み込めませんでした。時間をおいて、もう一度お試しください。')
     }
   }, [groupId])
   useEffect(() => {

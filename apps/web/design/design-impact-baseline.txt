@@ -148,11 +148,6 @@ shared-button-importer app/restaurant-test/v8/organization.tsx
 shared-button-importer app/restaurant-test/v8/reservation-phone.tsx
 shared-button-importer app/restaurant-test/v8/reservations.tsx
 shared-button-importer app/restaurant-test/v8/tables.tsx
-shared-button-importer app/rich-menus/edit/page.tsx
-shared-button-importer app/rich-menus/edit/prepublish-check-section.tsx
-shared-button-importer app/rich-menus/edit/publish-history.tsx
-shared-button-importer app/rich-menus/edit/publish-progress-section.tsx
-shared-button-importer app/rich-menus/edit/test-apply-section.tsx
 shared-button-importer app/rich-menus/new/create-v8.tsx
 shared-button-importer app/settings/feature-settings-v8.tsx
 shared-button-importer app/settings/file-scan/file-scan-v8.tsx
@@ -631,3 +626,5 @@ shared-button-importer v8/settings/emergency/history-details.tsx
 shared-button-importer test-utils/webinar-notifications.tsx
 shared-button-importer test-utils/webinar-video.tsx
 shared-button-importer v8/events/edit.tsx
+shared-button-importer v8/rich-menu-edit/test-apply.tsx
+shared-button-importer v8/rich-menu-edit/schedules.tsx
