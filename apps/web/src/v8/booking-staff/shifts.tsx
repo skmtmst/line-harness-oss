@@ -31,6 +31,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import { useSaveConflict } from '@/components/shared/save-conflict'
 
 /*
  * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
@@ -354,8 +355,17 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [breakGroups, setBreakGroups] = useState<BreakGroup[]>([])
   const [breaksVersion, setBreaksVersion] = useState('')
   const [breakError, setBreakError] = useState<string | null>(null)
-  const [breakConflict, setBreakConflict] = useState(false)
-  const [dateConflict, setDateConflict] = useState(false)
+  const conflictContext = JSON.stringify([selectedAccountId, staffId])
+  const breakSaveConflict = useSaveConflict({
+    contextKey: conflictContext,
+    fetchLatest: () => selectedAccountId ? bookingApi.getBreaks(selectedAccountId, staffId) : Promise.resolve(null),
+    reload: () => reloadBreaks('weekly'),
+  })
+  const dateSaveConflict = useSaveConflict({
+    contextKey: conflictContext,
+    fetchLatest: () => selectedAccountId ? bookingApi.getBreakDates(selectedAccountId, staffId) : Promise.resolve(null),
+    reload: () => reloadBreaks('dated'),
+  })
   const [savingBreaks, setSavingBreaks] = useState(false)
   const [breaksSavedAt, setBreaksSavedAt] = useState<string | null>(null)
   const [openDaysFor, setOpenDaysFor] = useState<string | null>(null)
@@ -440,8 +450,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       return
     }
     setLoadStatus('loading')
-    setBreakConflict(false)
-    setDateConflict(false)
+    breakSaveConflict.clear()
+    dateSaveConflict.clear()
     setStaffMissing(false)
     setPreviewError(false)
     setRuleError(null)
@@ -656,12 +666,12 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setBreaksVersion(result.version)
       setBreaksSavedAt(new Date().toISOString())
       setOpenDaysFor(null)
-      setBreakConflict(false)
+      breakSaveConflict.clear()
       if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, saveGeneration)
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
       const fieldFailure = saveErrors.capture(error)
-      if (error instanceof ApiError && error.status === 409) setBreakConflict(true)
+      if (error instanceof ApiError && error.status === 409) breakSaveConflict.mark()
       { if (!fieldFailure)
       setBreakError(staffErrorMessage(error, '保存')) }
     } finally {
@@ -684,7 +694,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         setBreakGroups(groupBreaks(latest.breaks))
         setBreaksVersion(latest.version)
         setOpenDaysFor(null)
-        setBreakConflict(false)
+        breakSaveConflict.clear()
         setBreakError(null)
       } else {
         const latest = await bookingApi.getBreakDates(selectedAccountId, staffId)
@@ -692,7 +702,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         setDateRows(latest.breaks.map((item) => ({ key: item.id, id: item.id, date: item.work_date, start: item.start_time, end: item.end_time })))
         setBreakDatesVersion(latest.version)
         setEditingDayRow(null)
-        setDateConflict(false)
+        dateSaveConflict.clear()
         setShiftError(null)
       }
       if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, generation)
@@ -735,14 +745,14 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (saveGeneration !== requestRef.current) return false
       setDateRows(result.breaks.map((item) => ({ key: item.id, id: item.id, date: item.work_date, start: item.start_time, end: item.end_time })))
       setBreakDatesVersion(result.version)
-      setDateConflict(false)
+      dateSaveConflict.clear()
       if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, saveGeneration)
       return saveGeneration === requestRef.current
     } catch (error) {
       if (saveGeneration !== requestRef.current) return false
       const fieldFailure = saveErrors.capture(error);
 
-      if (error instanceof ApiError && error.status === 409) setDateConflict(true)
+      if (error instanceof ApiError && error.status === 409) dateSaveConflict.mark()
       { if (!fieldFailure)
       setShiftError(staffErrorMessage(error, '保存')) }
       return false
@@ -1183,7 +1193,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 </div>
               ) : null}
               {breaksSavedAt ? <p className={styles.savedNote} role="status">保存しました。</p> : null}
-              {breakConflict && canEdit ? <Notice tone="warn" role="alert" message="ほかの人の変更と重なりました。入力は残しています。最新を読み込むと、編集中の休憩を最新の内容に置き換えます。" action={<Button onClick={() => void reloadBreaks('weekly')} disabled={savingBreaks}>最新を読み込んで続ける</Button>} /> : null}
+              {breakSaveConflict.conflict && canEdit ? <Notice tone="warn" role="alert" message="ほかの人の変更と重なりました。入力は残しています。最新を読み込むと、編集中の休憩を最新の内容に置き換えます。" action={<Button onClick={() => void breakSaveConflict.reloadLatest()} disabled={savingBreaks}>最新を読み込んで続ける</Button>} /> : null}
               {breakError ? <p className={layout.fieldError} role="alert">{breakError}</p> : null}
             </fieldset></section>
 
@@ -1282,7 +1292,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                   <Button onClick={() => setDayAddOpen((open) => !open)} aria-expanded={dayAddOpen}><Plus className={styles.btnIcon} aria-hidden="true" />この日を足す</Button>
                 </div>
               ) : null}
-              {dateConflict && canEdit ? <Notice tone="warn" role="alert" message="ほかの人の変更と重なりました。入力は残しています。最新を読み込むと、編集中の日付付き休憩を最新の内容に置き換えます。" action={<Button onClick={() => void reloadBreaks('dated')} disabled={savingShift}>最新を読み込んで続ける</Button>} /> : null}
+              {dateSaveConflict.conflict && canEdit ? <Notice tone="warn" role="alert" message="ほかの人の変更と重なりました。入力は残しています。最新を読み込むと、編集中の日付付き休憩を最新の内容に置き換えます。" action={<Button onClick={() => void dateSaveConflict.reloadLatest()} disabled={savingShift}>最新を読み込んで続ける</Button>} /> : null}
               {shiftError ? <p className={layout.fieldError} role="alert">{shiftError}</p> : null}
             </fieldset></section>
 
