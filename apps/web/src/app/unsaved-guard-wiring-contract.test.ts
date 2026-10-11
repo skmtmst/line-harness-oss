@@ -62,7 +62,6 @@ const GUARDED = [
   'v8/settings/file-scan/screen.tsx',
   'v8/settings/features/screen.tsx',
   'app/staff/new/page.tsx',
-  'app/tags/field-editor-v8.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
   'app/tags/mark-editor-v8.tsx',

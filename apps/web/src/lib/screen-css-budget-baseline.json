@@ -259,11 +259,6 @@
     "height": 7,
     "font": 50
   },
-  "app/tags/field-editor-v8.module.css": {
-    "spacing": 25,
-    "height": 7,
-    "font": 22
-  },
   "app/tags/field-migrate-v8.module.css": {
     "spacing": 25,
     "height": 3,

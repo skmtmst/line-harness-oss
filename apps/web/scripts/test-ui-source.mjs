@@ -40,7 +40,6 @@ export function readUiSource(path, encoding = 'utf8') {
     const routes = {
       'tags/field-migrate-v8.tsx': 'tags/fields/migrate/page.tsx',
       'tags/edit-tag-page-v8.tsx': 'tags/edit/page.tsx',
-      'tags/field-editor-v8.tsx': 'tags/fields/edit/page.tsx',
       'tags/mark-editor-v8.tsx': 'tags/marks/edit/page.tsx',
       'templates/edit-v8.tsx': 'templates/edit/page.tsx',
       'templates/editor-v8.tsx': 'templates/edit/page.tsx',
