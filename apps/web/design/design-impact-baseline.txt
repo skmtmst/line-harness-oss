@@ -53,7 +53,6 @@ shared-button-importer v8/automations/common-action-edit.tsx
 shared-button-importer app/duplicates/duplicates-v8.tsx
 shared-button-importer app/emergency/control-v8.tsx
 shared-button-importer v8/events/preview.tsx
-shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
 shared-button-importer app/friends/friends-nav-v8.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/open/page.tsx

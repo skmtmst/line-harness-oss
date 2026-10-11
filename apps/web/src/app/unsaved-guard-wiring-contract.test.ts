@@ -40,7 +40,6 @@ const GUARDED = [
   'v8/conversions/create.tsx',
   'v8/settings/ec-commerce/connector.tsx',
   'v8/form-edit/edit.tsx',
-  'app/friend-add-settings/friend-add-rule-editor.tsx',
   // 2026-10-07：入口は src/v8 の画面を出すだけ。番兵は画面（operator-edit）が持つ。
   'v8/line-notifications/operator-edit.tsx',
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx',
