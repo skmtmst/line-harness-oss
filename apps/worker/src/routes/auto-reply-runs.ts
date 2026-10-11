@@ -139,7 +139,9 @@ function detail(row: AutoReplyRunListRow, status: AutoReplyEvaluationStatus): st
     } catch {
       candidateReason = null;
     }
-    return SKIP_LABELS[candidateReason ?? row.skip_reason ?? ''] ?? '条件に合わず何もしませんでした';
+    const reason = row.candidate_result === 'skipped'
+      ? candidateReason ?? row.skip_reason : row.skip_reason ?? candidateReason;
+    return SKIP_LABELS[reason ?? ''] ?? '条件に合わず何もしませんでした';
   }
   if (row.error_code === 'delayed_delivery_unknown') return '届いたか分からないため要確認です。自動では送り直しません';
   if (row.status === 'reply_failed') return 'LINEへの返信を受け付けてもらえませんでした';
