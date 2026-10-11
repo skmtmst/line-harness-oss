@@ -1017,7 +1017,7 @@
   --tpl-an-body-pad: 14px 24px 24px; --tpl-an-split-gap: 16px; --tpl-an-side-gap: 12px; --tpl-an-side-w: 320px; --tpl-an-card-pad: var(--polish-space-card); --tpl-an-card-gap: var(--polish-space-row); --tpl-an-routes-gap: 12px; --tpl-an-removed-gap: 10px; --tpl-an-head-gap: 6px;
   /* ★V8 編集・詳細の画面（リッチメニューの編集・テンプレートの詳細・タグの編集）。 */
   --tpl-eds-back-gap: 4px; --tpl-eds-aside-w: 380px; --tpl-eds-aside-pad: var(--polish-space-card); --tpl-eds-aside-gap: 14px;
-  --tpl-eds-content-pad: 24px 28px; --tpl-eds-content-gap: 16px; --tpl-eds-card-pad: var(--polish-space-card); --tpl-eds-card-gap: var(--polish-space-row);
+  --tpl-eds-content-pad: 24px 28px; --tpl-eds-content-gap: 16px; --tpl-eds-card-pad: var(--polish-space-section); --tpl-eds-card-gap: var(--polish-space-row);
   --tpl-eds-card-title-lh: 22px; --tpl-eds-note-lh: 17px; --tpl-eds-head-gap: 8px; --tpl-eds-title-gap: 2px;
   --tpl-eds-band-pad: 12px 16px; --tpl-eds-band-gap: 12px; --tpl-eds-band-title-lh: 19px;
   --tpl-eds-body-pad: 16px; --tpl-eds-body-lh: 22px; --tpl-eds-row-pad: 10px 0; --tpl-eds-row-gap: 12px;
@@ -1336,7 +1336,7 @@
   --tpl-cn-panels-margin: 0 24px; --tpl-cn-panel-gap: 16px; --tpl-cn-panel-pad: var(--polish-space-section); --tpl-cn-panel-inner-gap: var(--polish-space-row); --tpl-cn-panel-ring: inset 0 0 0 1px var(--color-hairline); --tpl-cn-panel-title-lh: 21px; --tpl-cn-panel-text-lh: 20px;
   --tpl-cn-foot-pad: 12px 48px; --tpl-cn-foot-pad-narrow: 12px 24px; --tpl-cn-narrow-notice-after: 3px; --tpl-cn-ro-margin: 12px 24px; --tpl-cn-stats-notice-pad: 0 24px 12px; --tpl-cn-skeleton-h: 12px;
   --tpl-cn-back-lh: 19px; --tpl-cn-conflict-gap: 12px; --tpl-cn-conflict-margin: 0; --tpl-cn-conflict-pad: 12px 16px;
-  --tpl-cn-card-gap: var(--polish-space-row); --tpl-cn-card-pad: var(--polish-space-card); --tpl-cn-card-title-size: var(--polish-text-section); --tpl-cn-card-title-lh: 22px; --tpl-cn-label-lh: 20px; --tpl-cn-field-row-gap: 12px;
+  --tpl-cn-card-gap: var(--polish-space-row); --tpl-cn-card-pad: var(--polish-space-section); --tpl-cn-card-title-size: var(--polish-text-section); --tpl-cn-card-title-lh: 22px; --tpl-cn-label-lh: 20px; --tpl-cn-field-row-gap: 12px;
   --tpl-cn-side-gap: 14px; --tpl-cn-side-card-gap: var(--polish-space-row); --tpl-cn-side-title-lh: 20px; --tpl-cn-side-row-pad: 6px 0; --tpl-cn-list-indent: 18px; --tpl-cn-choice-pad: 12px 10px; --tpl-cn-choice-gap: 4px;
   --tpl-cn-action-pad: 10px 12px; --tpl-cn-action-pick-pad: 0 12px; --tpl-cn-url-pad: 10px 12px; --tpl-cn-steps-pad: 12px 14px; --tpl-cn-step-gap: 10px; --tpl-cn-step-num: 22px; --tpl-cn-compare-cell-pad: 15px 10px; --tpl-cn-compare-head-pad: 14px 10px; --tpl-cn-compare-label-w: 122px; --tpl-cn-compare-gap: -6px; --tpl-cn-compare-lead-margin: -19px 0 0; --tpl-cn-compare-note-margin: 21px 0 -13px; --tpl-cn-compare-note-pad: 12px;
   /* ウェビナーの一覧（UyUMw・uBMuB・jiNg0）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16）。 */
@@ -1604,7 +1604,7 @@
   /* 設定の中のメニュー（設定の板 ihjfd ほか 8 枚）。 */
   --tpl-setnav-w: 200px; --tpl-setnav-divider: inset -1px 0 0 var(--color-hairline); --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: var(--polish-radius-control); --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;
   /* 設定 A（はじめの設定 xuJ7D・LINEアカウント V7vn3・プール管理 u3iab3・ログインユーザー nku0f ほか）。 */
-  --tpl-sa-content-pad: 16px 24px 24px; --tpl-sa-gap: 14px; --tpl-sa-card-pad: var(--polish-space-card); --tpl-sa-card-gap: var(--polish-space-row); --tpl-sa-pair-gap: var(--polish-space-field);
+  --tpl-sa-content-pad: 16px 24px 24px; --tpl-sa-gap: 14px; --tpl-sa-card-pad: var(--polish-space-card); --tpl-sa-card-gap: var(--polish-space-row); --tpl-sa-pair-gap: var(--polish-space-card);
   --tpl-sa-progress-pad: 16px; --tpl-sa-progress-gap: 12px; --tpl-sa-progress-size: 18px; --tpl-sa-bar-h: 8px; --tpl-sa-bar-radius: var(--polish-radius-small);
   --tpl-sa-step-pad: 16px; --tpl-sa-step-gap: 16px; --tpl-sa-mark: 28px; --tpl-sa-mark-line: 1.5px; --tpl-sa-step-text-gap: 2px; --tpl-sa-title-lh: 19px; --tpl-sa-sub-lh: 16px; --tpl-sa-card-title-lh: 20px; --tpl-sa-card-line-lh: 17px;
   --tpl-sa-pool-pad: 18px; --tpl-sa-pool-gap: 10px; --tpl-sa-pool-name-size: var(--polish-text-body); --tpl-sa-pool-name-lh: 22px; --tpl-sa-pool-slug-lh: 16px; --tpl-sa-row-pad: 8px 12px; --tpl-sa-row-gap: 8px; --tpl-sa-row-radius: var(--polish-radius-control); --tpl-sa-url-lh: 15px; --tpl-sa-label-lh: 16px; --tpl-sa-link-lh: 17px; --tpl-sa-member-name-lh: 17px;

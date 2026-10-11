@@ -91,7 +91,7 @@
   list-style: none;
 }
 
-/* 項目：印 14 ＋ 字 13・500。余白 8/10・間 8・角丸 8。 */
+/* 項目：印 16（B-152）＋字13・500。寸法は共通値から読む。 */
 .item {
   display: flex;
   align-items: center;

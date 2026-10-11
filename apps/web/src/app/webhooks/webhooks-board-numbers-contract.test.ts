@@ -27,10 +27,10 @@ function token(name: string): string {
 }
 
 describe("外部連携の板の数字", () => {
-  it("作るの段カードは共通の余白16（四方）", () => {
+  it("作る入力段は共通の余白24（四方）。小さなカードの余白と分ける", () => {
     expect(CREATE).toContain('<Card variant="form"');
     expect(CARD_CSS).toMatch(/\.form \{[^}]*padding: var\(--tpl-cn-card-pad\);/s);
-    expect(token("--tpl-cn-card-pad")).toBe("var(--polish-space-card)");
+    expect(token("--tpl-cn-card-pad")).toBe("var(--polish-space-section)");
   });
 
   it("作るの入力の枠は h36 (NGh7b 枠)", () => {

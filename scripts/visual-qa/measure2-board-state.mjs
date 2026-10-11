@@ -7,6 +7,7 @@ const createTemplate = (kind) => ({
 })
 
 export const BOARD_STATE_PROFILES = {
+  iN6np: { url: '/broadcasts/new?step=message' },
   HfK0O: createTemplate('メッセージ'),
   SDSsr: createTemplate('カルーセル'),
   IY3nx: createTemplate('質問'),

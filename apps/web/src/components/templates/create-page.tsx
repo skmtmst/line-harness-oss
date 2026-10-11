@@ -12,6 +12,8 @@ export interface CreatePageProps extends PageHeadingProps {
   busy?: boolean
   boardId?: string
   standalone?: boolean
+  /** 短い入力は内容の高さ、長い入力は画面内に収めて本文だけを送る。 */
+  heightMode?: 'viewport' | 'content'
   children: ReactNode
   preview?: ReactNode
   /** 狭い板でプレビューを開くボタン・パネルは画面が持つ。 */
@@ -43,8 +45,8 @@ export interface CreatePageProps extends PageHeadingProps {
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ readOnly, dirty, busy, boardId, standalone, children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
-  return <PageFrame kind="create" boardId={boardId} standalone={standalone} hasFooter>
+export function CreatePage({ readOnly, dirty, busy, boardId, standalone, heightMode = 'content', children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+  return <PageFrame kind="create" boardId={boardId} standalone={standalone} heightMode={heightMode} hasFooter>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
     {readOnly ? <ReadOnlyNotice /> : null}
