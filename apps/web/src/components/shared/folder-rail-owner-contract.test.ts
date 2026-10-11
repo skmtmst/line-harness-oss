@@ -77,11 +77,11 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
   })
 
   it('流入経路はCSSで共通幅を使い、追加操作には閲覧権限を適用する', () => {
-    const page = readFileSync(resolve(APP, 'inflow-links/page.tsx'), 'utf8')
-    const css = readFileSync(resolve(APP, 'inflow-links/inflow-list-v8.module.css'), 'utf8')
-    expect(page).toContain('style={FOLDER_RAIL_STYLE}')
-    expect(css).toContain('grid-template-columns: var(--folder-rail-width) minmax(0, 1fr)')
-    expect(page).toContain("onAddFolder={readonly ? undefined : () => setEditingGenre('new')}")
+    const page = readFileSync(resolve(SRC_V8, 'inflow-links/list.tsx'), 'utf8')
+    const css = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
+    expect(page).toContain('folders={<>')
+    expect(css).toContain('width: var(--tpl-folder-width)')
+    expect(page).toContain("onAddFolder={canManageFolders ? () => setEditingGenre('new') : undefined}")
   })
 
   it('V8のイベント一覧はイベント専用のフォルダを取得・作成する', () => {

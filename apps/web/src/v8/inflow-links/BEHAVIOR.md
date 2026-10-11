@@ -1,6 +1,6 @@
 # 流入と計測の一覧（V8）の動き
 
-入口：`app/inflow-links/page.tsx`（V8 で「流入経路」のとき＝`?tab` なし／`?tab=links` だけ `src/v8/inflow-links/list.tsx`。それ以外は今のまま）。
+入口：`app/inflow-links/page.tsx`（`?tab` なし／`?tab=links` は `src/v8/inflow-links/list.tsx`。全経路をV8に固定）。
 絵：一覧 `xbHxg`・1152 `y1ztx`・閲覧のみ `EMUl9`・QR コードの小窓 `GtI4Y`。
 
 ## 受け付ける URL と指定

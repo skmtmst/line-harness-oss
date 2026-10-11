@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = import.meta.dirname
-const PAGE = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
 const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
@@ -18,17 +18,17 @@ describe('V6 機能18の画面契約', () => {
     expect(PAGE).not.toContain("label: '流入経路 24'")
     expect(PAGE).not.toContain("label: '広告連携 3'")
     expect(PAGE).not.toContain("label: '広告とのつなぎ 5'")
-    // 「流入経路」は一覧が数える accountFilteredRows（FolderPanel の
+    // 「流入経路」は一覧が数える accountRows（FolderPanel の
     // 「すべて」と同じ集合）を、読み込めたときだけホストへ渡す。
-    expect(PAGE).toContain('onRouteCountChange?.(routeCountAvailable ? accountFilteredRows.length : null)')
+    expect(PAGE).toContain('onRouteCountChange?.(routeCountAvailable ? accountRows.length : null)')
     // 「広告連携」「広告とのつなぎ」は、広告タブが一覧に使う platforms
     // と同じ集計（総数・動いている数）をホストへ渡す。
-    expect(ADS).toContain('onPlatformCountsChange?.(')
-    expect(ADS).toContain('total: platforms.length')
-    expect(ADS).toContain('platforms.filter((platform) => platform.isActive).length')
+    expect(PAGE).toContain('const connected = res.data.filter((platform) => platform.isActive)')
+    expect(PAGE).toContain('total: connected.length')
+    expect(PAGE).toContain('value={adConnected ? adConnected.total : null}')
     // 取得前・失敗時は数字を出さない（null で件数を付けない）。
-    expect(PAGE).toContain('linksCount !== null')
-    expect(PAGE).toContain('adCounts !== null')
+    expect(HOST).toContain('linksCount !== null')
+    expect(PAGE).toContain('routeCountAvailable ? accountRouteCount : null')
   })
 
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {
@@ -95,3 +95,5 @@ describe('V6 機能18の計測鍵の契約(#514-2)', () => {
     expect(MOCK).toContain('trackingKey')
   })
 })
+
+const HOST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')

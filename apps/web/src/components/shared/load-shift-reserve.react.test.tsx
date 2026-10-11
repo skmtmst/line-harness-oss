@@ -47,9 +47,11 @@ describe('後から出して消す・差し込む物を作らない', () => {
   })
 
   it('流入と計測：未設定の知らせは一覧の列の頭（数の帯の下に差し込まない）', () => {
-    const page = src('app/inflow-links/page.tsx')
+    const page = src('v8/inflow-links/list.tsx')
     const notice = page.indexOf('友だちになっても何も起きない経路が')
-    expect(notice).toBeGreaterThan(page.indexOf('<FolderPanel'))
-    expect(notice).toBeLessThan(page.indexOf('className={styles.tools}'))
+    expect(notice).toBeGreaterThan(-1)
+    expect(page).toMatch(/const wideToolbar = \([\s\S]*?\{notice\}[\s\S]*?<ListToolbar/)
+    expect(page).toContain('toolbar={narrow ? narrowToolbar : wideToolbar}')
+    expect(page).toMatch(/const narrowToolbar = \([\s\S]*?\{notice\}[\s\S]*?<ListToolbarRow/)
   })
 })

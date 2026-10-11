@@ -148,9 +148,6 @@
   "app/inflow-links/ad-integration.tsx": {
     "arbitrary-value": 2
   },
-  "app/inflow-links/page.tsx": {
-    "arbitrary-value": 8
-  },
   "app/layout.tsx": {
     "unresolved-classname": 1
   },

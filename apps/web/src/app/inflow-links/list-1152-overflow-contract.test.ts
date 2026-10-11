@@ -6,13 +6,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const PAGE = readFileSync(resolve(__dirname, "page.tsx"), "utf-8");
+const PAGE = readFileSync(resolve(__dirname, "../../v8/inflow-links/list.tsx"), "utf-8");
 
 describe("inflow-links 一覧の1152幅", () => {
-  it("表は横送りの殻に入れ、最小幅を渡す", () => {
-    expect(PAGE).toContain("styles.tableShell");
-    expect(PAGE).toContain("data-scroll-x");
-    expect(PAGE).toContain("'--scroll-min'");
+  it("表は共通の列の並びで幅の中に収める", () => {
+    expect(PAGE).toContain("<DataTable className={styles.table}>");
+    expect(PAGE).toContain('data-table-layout="columns"');
+    expect(PAGE).not.toContain("data-scroll-x");
+    const css = readFileSync(resolve(__dirname, "../../v8/inflow-links/list.module.css"), "utf8");
+    expect(css).toContain("min-width: 0");
   });
 
   it("列を削らない（10列すべて出す）", () => {
@@ -24,7 +26,7 @@ describe("inflow-links 一覧の1152幅", () => {
       "クリック",
       "最新追加",
       "発行URL",
-      "操作",
+      "状態",
     ]) {
       expect(PAGE, `${head} が無い`).toContain(head);
     }

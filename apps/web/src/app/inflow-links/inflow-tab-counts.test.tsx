@@ -19,7 +19,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(currentParams),
@@ -94,16 +94,7 @@ function baseHandler(routes: unknown[], platforms: unknown[] = []) {
   }
 }
 
-/** タブ行（ScrollableTabs）の各タブの文字だけを集める。本文中の語と混ぜない。 */
-function tabTexts(): string[] {
-  return Array.from(
-    host.querySelectorAll('[data-scrollable-tabs] button, [data-scrollable-tabs] a'),
-  ).map((el) => el.textContent ?? '')
-}
-
-function tabLabel(prefix: string): string | undefined {
-  return tabTexts().find((text) => text.startsWith(prefix))
-}
+function kpiCards(): string[] { return [...host.querySelectorAll('[data-shared-part="kpi-band"] > *')].map(el => el.textContent ?? '') }
 
 async function settle() {
   await act(async () => {
@@ -145,13 +136,13 @@ describe('#980 流入と計測のタブ件数は一覧の集計に連動する',
     })
     await settle()
 
-    expect(tabLabel('流入経路')).toBe('流入経路 2')
+    expect(kpiCards()[0]).toContain('2件')
     // 広告タブはまだ開いていないので、取得前の数字は出さない。
-    expect(tabLabel('広告連携')).toBe('広告連携')
-    expect(tabLabel('広告とのつなぎ')).toBe('広告とのつなぎ')
+    expect(host.querySelector('[data-scrollable-tabs]')).toBeNull()
+    expect(kpiCards()[3]).toContain('0件')
   })
 
-  it('一覧が0件ならタブも0と出る', async () => {
+  it('一覧が0件なら数の帯も0と出る', async () => {
     handler = baseHandler([])
 
     await act(async () => {
@@ -159,7 +150,7 @@ describe('#980 流入と計測のタブ件数は一覧の集計に連動する',
     })
     await settle()
 
-    expect(tabLabel('流入経路')).toBe('流入経路 0')
+    expect(kpiCards()[0]).toContain('0件')
   })
 
   it('取得が終わるまでは件数を出さない', async () => {
@@ -171,10 +162,11 @@ describe('#980 流入と計測のタブ件数は一覧の集計に連動する',
     })
     await settle()
 
-    expect(tabLabel('流入経路')).toBe('流入経路')
+    expect(kpiCards()[0]).toContain('読み込んでいます')
+    expect(kpiCards()[0]).not.toContain('0件')
   })
 
-  it('広告タブの件数は ad-platforms の集計と同じ', async () => {
+  it('広告の接続数と各媒体の状態は ad-platforms の集計と同じ', async () => {
     currentParams = 'tab=ads'
     handler = baseHandler(
       [],
@@ -186,7 +178,9 @@ describe('#980 流入と計測のタブ件数は一覧の集計に連動する',
     })
     await settle()
 
-    expect(tabLabel('広告連携')).toBe('広告連携 3')
-    expect(tabLabel('広告とのつなぎ')).toBe('広告とのつなぎ 2')
+    expect(kpiCards()[1]).toContain('2件')
+    const rows = [...host.querySelectorAll('[aria-label="媒体ごとの接続"] [role="listitem"]')]
+    expect(rows.filter(row => row.textContent?.includes('つないでいる'))).toHaveLength(2)
+    expect(rows.filter(row => row.textContent?.includes('未接続'))).toHaveLength(2)
   })
 })

@@ -3,11 +3,11 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/list.tsx'), 'utf8')
 const NEW = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 
 function band(): string {
-  const at = PAGE.indexOf('aria-label="流入と計測の概要"')
+  const at = PAGE.indexOf('<KpiBand>')
   if (at < 0) return ''
   return PAGE.slice(at, at + 4500)
 }
@@ -22,7 +22,7 @@ function band(): string {
  * 「選択中のフォルダ … 0 リンク」で別に出ている。
  *
  * `sortedRows` はフォルダで絞ったうえ検索文字でも絞った配列。
- * フォルダ列の件数は `accountFilteredRows` から数えており、
+ * フォルダ列の件数は `accountRows` から数えており、
  * **同じ画面の中で数え方が2通りあった。**
  */
 describe('流入と計測の帯は、選択中のフォルダだけを数えない', () => {
@@ -30,15 +30,15 @@ describe('流入と計測の帯は、選択中のフォルダだけを数えな�
     const tiles = band()
     expect(tiles, '帯が見つからない').not.toBe('')
     expect(tiles, '絞り込んだ行数を出している').not.toContain('sortedRows.length')
-    expect(tiles).toContain('routeCountAvailable ? formatNumber(accountRouteCount)')
+    expect(tiles).toContain('routeCountAvailable ? accountRouteCount : null')
   })
 
   it('受付中・停止中も同じ数え方にそろえる（R273）', () => {
-    expect(PAGE).toContain('const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length')
+    expect(PAGE).toContain('const accountRouteCount = summary?.routeTotal ?? accountRows.length')
     // 停止中は行の札で言い分け、測った数に入れない。未登録の外部REFを
     // 「計測済」には数えない（行の routeStatus が見る）。
-    expect(PAGE).toContain("if (row.isActive === false) return 'stopped'")
-    expect(PAGE).toContain("if (row.source === 'orphan') return 'unregistered'")
+    expect(ROWS).toContain("if (row.isActive === false) return 'stopped'")
+    expect(ROWS).toContain("if (row.source === 'orphan') return 'unregistered'")
   })
 
   it('作成確認も公開オフなら停止中だと分かる（R273）', () => {
@@ -47,6 +47,8 @@ describe('流入と計測の帯は、選択中のフォルダだけを数えな�
   })
 
   it('フォルダ列の件数は元のままで、意味が重ならない', () => {
-    expect(PAGE).toContain("accountFilteredRows.filter((row) => row.genre === genre.name).length")
+    expect(PAGE).toContain("accountRows.filter((row) => row.genre === genre.name).length")
   })
 })
+
+const ROWS = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/rows.ts'), 'utf8')

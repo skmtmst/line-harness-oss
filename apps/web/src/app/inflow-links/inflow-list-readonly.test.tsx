@@ -13,7 +13,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
@@ -76,8 +76,8 @@ describe('EMUl9 一覧の閲覧のみ', () => {
     await settle()
     await settle()
 
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
-    expect(host.textContent).not.toContain('＋ 流入リンクを作る')
+    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
+    expect(host.textContent).not.toContain('流入リンクを作る')
     expect(host.querySelector('th [aria-label="表示中の登録済み経路をすべて選ぶ"]')).toBeNull()
     expect(host.textContent).not.toContain('まとめて操作')
   })
@@ -91,6 +91,6 @@ describe('EMUl9 一覧の閲覧のみ', () => {
     await settle()
 
     expect(host.textContent).not.toContain('閲覧のみで見ています')
-    expect(host.textContent).toContain('＋ 流入リンクを作る')
+    expect(host.textContent).toContain('流入リンクを作る')
   })
 })

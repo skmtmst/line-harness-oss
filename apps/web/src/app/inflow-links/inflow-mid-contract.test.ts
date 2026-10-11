@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = import.meta.dirname
-const PAGE = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
 const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')

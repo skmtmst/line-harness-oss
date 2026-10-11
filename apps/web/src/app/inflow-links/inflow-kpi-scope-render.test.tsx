@@ -17,7 +17,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: accountState.id, selectedAccount: null, loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
@@ -152,7 +152,7 @@ async function settle(milliseconds = 320) {
 }
 
 function kpiText(): string {
-  return host.querySelector('[data-design="KPIs"]')?.textContent ?? ''
+  return host.querySelector('[data-shared-part="kpi-band"]')?.textContent ?? ''
 }
 
 /*
@@ -160,14 +160,14 @@ function kpiText(): string {
  * 板 xbHxg の帯は絵どおりの4枚。クリックと平均の追加率の枚は無い。
  */
 function kpiCards(): string[] {
-  const band = host.querySelector('[data-design="KPIs"]')
+  const band = host.querySelector('[data-shared-part="kpi-band"]')
   if (!band) return []
   return Array.from(band.children).map((el) => el.textContent ?? '')
 }
 
 async function openPreset(): Promise<ParentNode> {
   await clickButton(host, 'よく使う絞り込み')
-  const panel = host.querySelector('[role="dialog"][aria-label="よく使う絞り込み"]')
+  const panel = host.querySelector('[role="dialog"][aria-label="よく使う絞り込みと並び順"]')
   expect(panel, 'よく使う絞り込みが開かない').not.toBeNull()
   return panel as unknown as ParentNode
 }
@@ -195,6 +195,7 @@ async function clickButton(scope: ParentNode, text: string) {
 
 describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 Worker の省略形）', () => {
   beforeEach(() => {
+    window.history.replaceState(null, '', '/inflow-links')
     accountState.id = 'acc-1'
     summaryMode = 'full-real'
     stubFetch()
@@ -228,7 +229,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
 
     // 検索で0件になっても帯は全体のまま。
     await setSearch('そんざいしないさーち')
-    expect(host.textContent).toContain('条件に合う流入経路がありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
 
@@ -246,7 +247,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
 
     // フォルダ「SNS」を選んでも帯は全体のまま。
     await clickButton(host, 'よく使う絞り込み')
-    const preset2 = host.querySelector('[role="dialog"][aria-label="よく使う絞り込み"]')
+    const preset2 = host.querySelector('[role="dialog"][aria-label="よく使う絞り込みと並び順"]')
     expect(preset2, 'よく使う絞り込みが開かない').not.toBeNull()
     await clickButton(preset2 as unknown as ParentNode, 'すべて')
     const folder = host.querySelector('aside[aria-label="フォルダ"]')
@@ -268,7 +269,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     expect(kpiText()).toContain('17人')
 
     await setSearch('そんざいしないさーち')
-    expect(host.textContent).toContain('条件に合う流入経路がありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
     expect(kpiText()).toContain('17人')
   })
 
@@ -282,7 +283,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     expect(kpiText()).toContain('17人')
 
     await setSearch('そんざいしないさーち')
-    expect(host.textContent).toContain('条件に合う流入経路がありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
     expect(kpiText()).toContain('17人')
   })
 
@@ -318,7 +319,7 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     expect(kpiText()).toContain('17人')
 
     await setSearch('そんざいしないさーち')
-    expect(host.textContent).toContain('条件に合う流入経路がありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
 
