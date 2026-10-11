@@ -1,3 +1,4 @@
+import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 
 export interface DedupPreviewPerAccount {
@@ -353,6 +354,15 @@ export async function processMultiAccountDedupBroadcast(
   const dedupPriority = (broadcast.dedup_priority ? JSON.parse(broadcast.dedup_priority) : []) as string[];
 
   const progress = parseProgress(broadcast.dedup_progress);
+  if (!progress.audience) {
+    const ledger=await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
+      .bind(broadcast.id).first<{n:number}>();
+    if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:0,known:0,
+      started:progress.sentIdentKeys.length>0 || Number(ledger?.n ?? 0)>0})) {
+      return {totalCount:progress.sentIdentKeys.length,successCount:progress.sentIdentKeys.length,
+        failedAccountIds:[],complete:false,stopped:true};
+    }
+  }
   const preview = progress.audience ?? await computeDedupBroadcastPreview(
     db, accountIds, dedupPriority, broadcast.target_tag_id ?? null,
   );

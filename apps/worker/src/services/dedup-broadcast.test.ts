@@ -679,6 +679,7 @@ describe('processMultiAccountDedupBroadcast', () => {
         // 前回の partial run state: ident_key 'f1' 送信済み (acc1 の u1 配信済), 'f2' 未送信
         dedup_progress: JSON.stringify({
           sentIdentKeys: ['f1'],
+          audience: await computeDedupBroadcastPreview(db,['acc1','acc2'],['acc1','acc2']),
         }),
       },
       factory,
@@ -740,6 +741,7 @@ describe('processMultiAccountDedupBroadcast', () => {
         // 前回 batch1 (f0..f499 = ident_key) だけ完了して死んだ想定。f500 は未送信。
         dedup_progress: JSON.stringify({
           sentIdentKeys: Array.from({ length: 500 }, (_, i) => `f${i}`),
+          audience: await computeDedupBroadcastPreview(db,['acc1'],['acc1']),
         }),
       },
       factory,

@@ -139,3 +139,14 @@ it('タグのその場送信も、受理後に記録ごと消えた相手を送�
   expect(sends).toHaveLength(600);expect(new Set(sends).size).toBe(600);
   expect(f.raw.prepare("SELECT COUNT(*) n FROM broadcast_send_claims WHERE state='unknown'").get()).toEqual({n:500});
 });
+
+it.each([false,true])('重複除外の旧進捗に宛先snapshotが無い場合は保留する（既送キー=%s）', async oldKey => {
+  const f=fixture();
+  f.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('a','店','c','fake','fake'); UPDATE friends SET line_account_id='a'");
+  const progress=JSON.stringify({sentIdentKeys:oldKey?['uid:f000']:[]});
+  f.raw.exec("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,attempt_no,state,error_code) VALUES('b','f000',1,'failed','line_http_429')");
+  const {processMultiAccountDedupBroadcast}=await import('./dedup-broadcast.js');
+  const result=await processMultiAccountDedupBroadcast(f.db,{id:'b',account_ids:'["a"]',dedup_priority:'["a"]',target_tag_id:'t',message_type:'text',message_content:'案内',dedup_progress:progress},()=>({async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never));
+  expect(sends).toHaveLength(0);expect(result.complete).toBe(false);expect(result.stopped).toBe(true);
+  expect(f.raw.prepare("SELECT reason FROM broadcast_lifecycle_events WHERE broadcast_id='b'").get()).toMatchObject({reason:expect.stringContaining('要確認')});
+});
