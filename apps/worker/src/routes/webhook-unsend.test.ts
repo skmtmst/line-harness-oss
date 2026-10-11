@@ -191,6 +191,14 @@ describe('N-024 LINE送信取消', () => {
     expect(db.raw.prepare("SELECT is_following,last_unfollowed_at FROM friends WHERE line_user_id='U-a'").get()).toMatchObject({is_following:0,last_unfollowed_at:'2027-01-15T17:00:02.000+09:00'});
   });
 
+  it('R-IN01: 途中失敗の再配達で担当者の完了/返信時刻を戻さない',async()=>{
+    fire.mockRejectedValueOnce(new Error('fixture late failure'));
+    await postText(db,'a','late-failure','late-message','人工の本文',1_800_000_000_000);
+    db.raw.exec("UPDATE chats SET status='resolved',first_replied_at='operator-reply' WHERE friend_id='friend-a'");
+    await postText(db,'a','late-failure','late-message','人工の本文',1_800_000_000_000);
+    expect(db.raw.prepare("SELECT status,first_replied_at FROM chats WHERE friend_id='friend-a'").get()).toEqual({status:'resolved',first_replied_at:'operator-reply'});
+  });
+
   it.each(['text', 'sticker'])('R-IN01: %s の保存直後に落ちても再配達で未完工程だけ続ける', async (kind) => {
     const originalBatch = db.db.batch.bind(db.db);
     let interrupted = false;

@@ -1538,7 +1538,7 @@ async function handleEvent(
     // (unanswered-inbox CANDIDATES_SQL) が「解決済み後に画像だけ送ってきた
     // 友だち」をバッジ・未対応一覧から永久に落としてしまう。
     if (!nonTextMatched) {
-      await upsertChatOnMessage(db, friend.id, toJstString(new Date(event.timestamp)));
+      await replay('incoming_chat',()=>upsertChatOnMessage(execution?.mutationDb('incoming_chat') ?? db, friend.id, toJstString(new Date(event.timestamp))));
     }
     await replay('recordWebhookAnalyticsEvent:0',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:0') ?? db, lineAccountId, event, {
       friendId: friend.id,
@@ -1666,7 +1666,7 @@ async function handleEvent(
 
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする
     if (!matched) {
-      await upsertChatOnMessage(db, friend.id, toJstString(new Date(event.timestamp)));
+      await replay('incoming_chat',()=>upsertChatOnMessage(execution?.mutationDb('incoming_chat') ?? db, friend.id, toJstString(new Date(event.timestamp))));
     }
 
     // イベントバス発火: message_received
