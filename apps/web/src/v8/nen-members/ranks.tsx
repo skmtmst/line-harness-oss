@@ -363,7 +363,7 @@ export default function RankSettingsV8({
               const isBase = index === drafts.length - 1 && parseYen(row.threshold) === 0
               const label = row.name.trim() || `ランク ${index + 1}`
               return (
-                <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={row.tagName ? `タグ：${row.tagName}・会員 ${formatNumber(row.memberCount)} 人` : undefined}>
+                <div key={row.id ?? `new-${index}`} className={styles.rankRow} title={`タグ：${row.tagName ?? emptyValue('unconfigured')}・会員 ${formatNumber(row.memberCount)} 人`}>
                   <div className={styles.rankColName}>
                     <SaveErrorField names={[`drafts.${index}.name`,"row.name"]}><TextField {...fields.bind(`rank-name-${index}`)} aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} readOnly={readonly} onChange={(event) => update(index, { name: event.target.value })} /></SaveErrorField>
                     <FieldError id={`rank-name-${index}-error`}>{fields.error(`rank-name-${index}`)}</FieldError>

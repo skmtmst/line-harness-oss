@@ -132,7 +132,7 @@ export function MembersKpiBand({
   const petPercent = kpis && kpis.members > 0 ? Math.round(((kpis.petMembers ?? 0) / kpis.members) * 100) : null
   const pending = loading || !kpis
   return (
-    <KpiBand className={styles.band} aria-label="会員の数の帯">
+    <KpiBand className={styles.band} aria-label="会員の数の帯" title={pending ? undefined : `通年の購入 合計 ${yen(kpis.annualTotalYen)}・ライフタイム 合計 ${yen(kpis.lifetimeTotalYen)}・マイル残高 ${formatNumber(kpis.balanceTotal)}・今月使ったマイル ${formatNumber(kpis.usedThisMonth)}`}>
       <KpiCard presentation="band" title="会員" icon={<History size={13} aria-hidden="true" />} value={pending ? null : kpis.members} unit="人" loading={loading} detail={pending ? emptyValue('unknown') : `LINE 連携済み ${formatNumber(kpis.linkedMembers ?? 0)}`} />
       <KpiCard presentation="band" title={topTwoLabel} icon={<CircleHelp size={13} aria-hidden="true" />} value={pending || topTwo.length === 0 ? null : topTwoCount} unit="人" loading={loading} detail={topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : emptyValue('unknown')} />
       <KpiCard presentation="band" title="ペット登録あり" icon={<CircleHelp size={13} aria-hidden="true" />} value={pending ? null : kpis.petMembers ?? 0} unit="人" loading={loading} detail={pending || petPercent === null ? emptyValue('unknown') : `会員の ${petPercent}%`} />

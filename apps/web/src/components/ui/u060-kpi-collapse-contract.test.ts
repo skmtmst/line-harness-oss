@@ -83,7 +83,7 @@ describe('KPI折りたたみの適用（#975 U060）', () => {
     ['app/ec-commerce/page.tsx', 'KpiCollapse'],
     ['v8/settings/emergency/history-details.tsx', 'KpiBand'],
     ['v8/nen-members/members.tsx', 'KpiBand'],
-    ['app/nen/members/lifetime-tab.tsx', 'KpiCollapse'],
+    ['v8/nen-members/members.tsx', 'KpiBand'],
     ['app/nen/pets/pets-tab.tsx', 'KpiCollapse'],
     ['app/nen/health/health-tab.tsx', 'KpiCollapse'],
     ['components/hq/banners/banner-shell.tsx', 'KpiCollapse'],

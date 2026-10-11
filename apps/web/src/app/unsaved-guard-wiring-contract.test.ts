@@ -52,8 +52,6 @@ const GUARDED = [
   'v8/mileage/earning-rules.tsx',
   'v8/nen-campaigns/column-intros.tsx',
   'app/nen-campaigns/page.tsx',
-  'app/nen/members/lifetime-tab.tsx',
-  'app/nen/members/rank-settings-tab.tsx',
   'app/nen/pets/feeding-tab.tsx',
   'app/nen/pets/pets-v8.tsx',
   // ★V8 マイペットのごはんの目安（h7A2F）。下の帯の保存まで画面に残る変更を useUnsavedGuard で守る。
