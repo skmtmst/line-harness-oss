@@ -13,6 +13,7 @@ import { ApiError } from '@/lib/api'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './auth.module.css'
 import { Field } from '@/components/shared/form-controls'
+import Card from '@/components/shared/card'
 import { PageHeading } from '@/components/templates/page-frame'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
@@ -108,8 +109,8 @@ export default function OpsInviteV8() {
           <span className={styles.brandSub}>運営コンソール</span>
         </span>
       </div>
-      <section className={styles.card} aria-labelledby="ops-invite-title">
-        <PageHeading title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" help={<>
+      <Card variant="form" className={styles.card} aria-labelledby="ops-invite-title">
+        <PageHeading inset="none" title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" help={<>
           {check && !check.needsPassword
             ? '運営コンソールに招待されました（有効期限は24時間）。続けると 2要素認証の設定に進みます。'
             : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に2要素認証を設定します。'}
@@ -148,7 +149,7 @@ export default function OpsInviteV8() {
             </Button>
           </form>
         )}
-      </section>
+      </Card>
       <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
     </main>
   )

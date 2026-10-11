@@ -14,6 +14,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { opsCall } from '@/components/ops/ops-ui'
 import styles from './auth.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import Card from '@/components/shared/card'
 import { PageHeading } from '@/components/templates/page-frame'
 import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
@@ -126,8 +127,8 @@ export default function OpsTwoFactorV8() {
           <span className={styles.brandSub}>運営コンソール</span>
         </span>
       </div>
-      <section className={styles.card} aria-labelledby="ops-totp-title">
-        <PageHeading title="2要素認証を設定" titleId="ops-totp-title" titleAs="h1" help={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
+      <Card variant="form" className={styles.card} aria-labelledby="ops-totp-title">
+        <PageHeading inset="none" title="2要素認証を設定" titleId="ops-totp-title" titleAs="h1" help={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
 
         {state === 'loading' ? (
           <ListState permissionScope="hq" kind="loading" title="準備しています" />
@@ -174,7 +175,7 @@ export default function OpsTwoFactorV8() {
             <p className={styles.note}>登録すると安全のため一度ログアウトします。メールとパスワード、次に6桁の数字でログインし直してください。</p>
           </form>
         )}
-      </section>
+      </Card>
       <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
     </main></SaveErrorScope>
   )
