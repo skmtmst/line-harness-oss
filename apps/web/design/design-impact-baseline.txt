@@ -114,7 +114,6 @@ shared-button-importer app/nen/pets/pets-v8.tsx
 shared-button-importer app/no-permission/no-permission-v8.tsx
 shared-button-importer app/ops/announcements/page.tsx
 shared-button-importer app/ops/audit/page.tsx
-shared-button-importer app/ops/invite/page.tsx
 shared-button-importer app/ops/support/page.tsx
 shared-button-importer app/ops/tenants/detail/page.tsx
 shared-button-importer app/ops/tenants/page.tsx

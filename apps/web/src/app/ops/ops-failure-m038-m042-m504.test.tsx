@@ -36,7 +36,7 @@ class MemoryStorage implements Storage {
 
 const src = (...parts: string[]) => readFileSync(join(process.cwd(), 'src', ...parts), 'utf8')
 const ANN = src('app', 'ops', 'announcements', 'page.tsx')
-const INV = src('app', 'ops', 'invite', 'page.tsx')
+const INV = src('v8', 'ops', 'invite.tsx')
 const LOG = src('v8', 'ops', 'login.tsx')
 const TEN = src('app', 'ops', 'tenants', 'page.tsx')
 const TFA = src('v8', 'ops', 'two-factor.tsx')
