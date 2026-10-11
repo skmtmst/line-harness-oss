@@ -106,6 +106,7 @@ import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-cr
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import RichMenuTestApply from '@/v8/rich-menu-edit/test-apply'
+import RichMenuSchedules from '@/v8/rich-menu-edit/schedules'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
@@ -2578,7 +2579,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       <>
         {/* いつ公開するか */}
         <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
-          <SectionHeader title="いつ公開するか" />
+          <SectionHeader title="いつ公開するか" actions={!host && group ? <RichMenuSchedules key={`${accountId}:${group.id}`} groupId={group.id} canOperate={canOperate && !aggregateOnly} restoreMenus={restoreMenus} /> : undefined} />
           <SaveErrorField names={["timing","mode","publishPlan.mode","endEnabled","timingIsScheduled","publishPlan"]}><RadioCardGroup legend="いつ公開するか" className="grid grid-cols-2 gap-3">
             <RadioCard
               name="timing"
