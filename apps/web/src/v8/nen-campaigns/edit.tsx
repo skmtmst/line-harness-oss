@@ -425,7 +425,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       footerActions={canEdit ? (
         <>
           <Button href="/nen-campaigns">キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
+          <Button type="button" variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving} busyLabel="保存しています…"><Save size={15} aria-hidden="true" />配信内容を保存する</Button>
         </>
       ) : <></>} dirty={false}
     >
