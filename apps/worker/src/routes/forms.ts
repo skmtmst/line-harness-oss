@@ -3495,6 +3495,7 @@ async function runFormPostEffects(input: {
     effectRuns.push({
       step: 'legacy_fields',
       run: async () => {
+        if(!parseFormFields(form.fields).some(field=>field.friendFieldId&&submissionData[field.name??field.id??'']!==undefined))return;
         await writeFormDestinationsOnce({ db, friendId, sourceKey: `form-submit:${submission.id}`, blockId: 'legacy',
           stats: destinationWriteResult,
           write: async (ownedDb, stats) => { Object.assign(stats, await writeLegacyFriendFields(ownedDb, form as DbForm, submissionData, friendId)); },
