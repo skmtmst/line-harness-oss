@@ -448,6 +448,7 @@ function CampaignPreviewDrawer(props: NenCampaignsListProps & { canEdit: boolean
   const setting = props.previewCampaignKey ? props.settings.find((item) => item.campaignKey === props.previewCampaignKey) ?? null : null
   return (
     <Drawer
+      width="narrow"
       open={setting !== null}
       title={setting ? `${setting.label}の中身` : '配信の中身'}
       description="お客様ごとの情報は見本に置き換えています。"
@@ -514,6 +515,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   if (!canEdit) {
     return (
       <Drawer
+      width="narrow"
         open={open}
         title="誕生日クーポンの決めごと"
         description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
@@ -531,6 +533,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   }
   return (
     <Drawer
+      width="narrow"
       open={open}
       title="誕生日クーポンの決めごと"
       description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"

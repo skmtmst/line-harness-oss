@@ -314,6 +314,7 @@ export default function RankSettingsTab({
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="ランク設定への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       {/* 行の削除は確認つき（ほかの一覧と同じ形）。外すだけでは消えず、保存で確定する。 */}
       <ConfirmDialog
+        size="medium"
         open={removeTarget !== null}
         title={`「${removeTarget !== null ? drafts[removeTarget]?.name.trim() || `ランク ${removeTarget + 1}` : ''}」を削除しますか？`}
         description="行を外すと、保存したときにこのランクは消えます。保存する前なら下のキャンセルで元に戻せます。"

@@ -3,6 +3,7 @@ import { jstDateOffset } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useState } from 'react'
 import { Activity, Bell, CalendarCheck, PawPrint } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Drawer from '@/components/shared/drawer'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -50,7 +51,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
  * ・道具の段は「ペットを探す」＋よく使う札3つ（気になる変化・今週記録あり・30日記録なし）。
  * ・行末の操作は「…」に集約（30日のまとめ・飼い主を開く）。
- * ・30日のまとめは右から出る引き出し（幅600・幕で暗くする）。
+ * ・30日のまとめは右から出る引き出し（幅540・幕で暗くする）。
  * ・記録の項目は変えられない決まりの表（z2tvtX）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
@@ -483,7 +484,7 @@ function HealthItemsV8() {
 }
 
 /**
- * 30日のまとめ（BVuYh）。一覧の上に右から出る引き出し（幅600・幕で暗くする）。
+ * 30日のまとめ（BVuYh）。一覧の上に右から出る引き出し（幅540・幕で暗くする）。
  * 記録日数・体重・呼吸数・心拍数、体重の30日の棒、記録の表、
  * 印刷・PDF に保存する。「診断や治療の判断は含みません」の注意。
  * PDFボタンがブラウザ印刷（window.print）であることを注記する。
@@ -512,15 +513,7 @@ function SummaryDrawerV8({
 
   return (
     <div data-design-node="BVuYh">
-      <div className={styles.drawerScrim} onClick={onClose} aria-hidden="true" />
-      <div className={styles.drawerPanel} role="dialog" aria-modal="true" aria-label="健康日記 30日のまとめ">
-        <div className={styles.drawerHead}>
-          <div>
-            <h2 className={styles.drawerTitle}>健康日記 30日のまとめ</h2>
-            <p className={styles.drawerSub}>{status === 'loading' ? 'まとめを作っています' : petLine}</p>
-          </div>
-          <button type="button" className={styles.drawerClose} onClick={onClose} aria-label="閉じる">✕</button>
-        </div>
+      <Drawer open width="editor" title="健康日記 30日のまとめ" description={status === 'loading' ? 'まとめを作っています' : petLine} onClose={onClose}>
         {status === 'loading' ? (
           <ListState kind="loading" title="まとめを作っています" />
         ) : status === 'error' || !summary || !s ? (
@@ -597,7 +590,7 @@ function SummaryDrawerV8({
             </div>
           </>
         )}
-      </div>
+      </Drawer>
     </div>
   )
 }

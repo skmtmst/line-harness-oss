@@ -192,5 +192,12 @@ export default function scanOwnerRules() {
       if (left>4 || right>4) add('inset',table,{left:Math.max(0,Math.ceil(left)),right:Math.max(0,Math.ceil(right))},'',sib)
     }
   }
+  // B-243：画面側で共通の幅を上書きしても実寸で止める。
+  for (const panel of document.querySelectorAll('[data-design-part="drawer"]')) {
+    if (!visible(panel) || innerWidth < 540) continue
+    const width = panel.getBoundingClientRect().width
+    const allowed = panel.getAttribute('data-width') === 'composer' ? [Math.min(1160, innerWidth)] : [480, 540]
+    if (!allowed.some(value => Math.abs(width - value) <= 1)) add('drawerwidth', panel, { width, expected: allowed.join('/') })
+  }
   return findings
 }

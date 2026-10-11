@@ -304,16 +304,6 @@
  * 30日のまとめ（BVuYh）。共通の引き出し（幅 660・頭に線）を、絵の幅 600・
  * 頭の線なし・余白 24・間 16 に合わせる（NEN配信の oqSJP と同じやり方）。
  */
-:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) {
-  width: min(var(--tpl-nph-drawer-w), 100%);
-}
-:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) > :global(header) {
-  padding: var(--tpl-nph-drawer-head-pad);
-  border-bottom: 0;
-}
-:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) > :global(div) {
-  padding: var(--tpl-nph-drawer-body-pad);
-}
 .summaryBody {
   display: flex;
   flex-direction: column;

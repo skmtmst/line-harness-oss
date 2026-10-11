@@ -17,8 +17,8 @@ export function scanListSkeleton() {
     }
     for (const row of root.querySelectorAll('[data-shared-part="list-row"], [data-shared-part="list-table"] tbody > tr')) {
       if (visible(row) && !row.querySelector('[colspan]')) coverage.rows++
-      // 固定したv19Ivvの行は52。指定のない一覧は従来の60を守る。
-      const rowHeight = row.closest('[data-table-presentation="template-list"]') ? 52 : 60
+      // B-243・TOK-01：親や一覧の型にかかわらず行56。
+      const rowHeight = 56
       if (visible(row) && !row.querySelector('[colspan]') && !near(row.getBoundingClientRect().height, rowHeight)) fail(`B-178 行${rowHeight}`, row)
     }
     for (const cell of root.querySelectorAll('[data-kpi-strip]:not([data-kpi-density="compact"]) > [data-design-version]')) {

@@ -1144,7 +1144,7 @@
   --tpl-nph-hcol-owner: 110px; --tpl-nph-hcol-last: 96px; --tpl-nph-hcol-count: 80px; --tpl-nph-hcol-weight: 120px; --tpl-nph-hcol-stool: 130px;
   --tpl-nph-bar-gap: 3px; --tpl-nph-bar-w: 8px; --tpl-nph-bar-h: 20px; --tpl-nph-bar-l1: 8px; --tpl-nph-bar-l2: 12px; --tpl-nph-bar-l3: 16px;
   --tpl-nph-icol-name: 90px; --tpl-nph-icol-shape: 130px; --tpl-nph-icol-values: 240px; --tpl-nph-icol-summary: 170px;
-  --tpl-nph-drawer-w: 600px; --tpl-nph-drawer-head-pad: 24px 24px 0; --tpl-nph-drawer-body-pad: 16px 24px 24px; --tpl-nph-drawer-gap: 16px; --tpl-nph-summary-note-pad: 10px 12px; --tpl-nph-stat-lh: 22px;
+  --tpl-nph-drawer-head-pad: 24px 24px 0; --tpl-nph-drawer-body-pad: 16px 24px 24px; --tpl-nph-drawer-gap: 16px; --tpl-nph-summary-note-pad: 10px 12px; --tpl-nph-stat-lh: 22px;
   --tpl-nph-chart-gap: 8px; --tpl-nph-chart-h: 70px; --tpl-nph-chart-l1: 28px; --tpl-nph-chart-l2: 42px; --tpl-nph-chart-l3: 56px;
   --tpl-nph-log-head-pad: 7px 12px; --tpl-nph-log-row-pad: 8px 12px; --tpl-nph-lcol-date: 44px; --tpl-nph-lcol-weight: 64px; --tpl-nph-lcol-stool: 84px; --tpl-nph-lcol-skin: 56px; --tpl-nph-lcol-tear: 48px;
   --tpl-nph-print-pad: 24px; --tpl-nph-print-cell-pad: 4px 6px;
@@ -1347,7 +1347,7 @@
   --tpl-tl-note-lh: 17px; --tpl-tl-band-gap: 10px; --tpl-tl-band-after: 8px; --tpl-tl-band-pad: 10px 14px; --tpl-tl-band-lh: 20px;
   --tpl-tl-search-w: 220px; --tpl-tl-folder-w: 150px; --tpl-tl-narrow-search-w: 200px; --tpl-tl-narrow-row-gap: 8px;
   --tpl-tl-col-select: 48px; --tpl-tl-col-kind: 160px; --tpl-tl-col-publish: 128px; --tpl-tl-col-usage: 112px; --tpl-tl-col-monthly: 104px; --tpl-tl-col-updated: 88px; --tpl-tl-col-menu: 60px; /* 統括のひな形（店と同じ一覧＋配る口・B-34）。 */ --tpl-tl-col-hq-dest: 184px; --tpl-tl-col-hq-distribute: 84px; --tpl-tl-hq-distribute-gap: 16px; --tpl-tl-hq-row-pad-x: 24px; --tpl-tl-hq-actions-gap: 4px;
-  --tpl-tl-row-h: 52px; --tpl-tl-row-pad-block: 11px; --tpl-tl-tab-lh: 16px; --tpl-tl-tab-pad-bottom: 12px; --tpl-tl-badge-pad: 2px 8px; --tpl-tl-badge-lh: 18px; --tpl-tl-kind-radius: var(--polish-radius-small); --tpl-tl-pill-gap: 5px; --tpl-tl-dot: 6px; --tpl-tl-cell-lh: 17px;
+  --tpl-tl-row-h: var(--polish-table-row); --tpl-tl-row-pad-block: 11px; --tpl-tl-tab-lh: 16px; --tpl-tl-tab-pad-bottom: 12px; --tpl-tl-badge-pad: 2px 8px; --tpl-tl-badge-lh: 18px; --tpl-tl-kind-radius: var(--polish-radius-small); --tpl-tl-pill-gap: 5px; --tpl-tl-dot: 6px; --tpl-tl-cell-lh: 17px;
   --tpl-tl-bulk-pad: 10px 24px; --tpl-tl-pager-lh: 21px; --tpl-tl-pager-pad: 10px 20px; --tpl-tl-skeleton-gap: 16px; --tpl-tl-skeleton-pad: 14px 24px; --tpl-tl-skeleton-dot: 32px; --tpl-tl-skeleton-bar: 10px;
   --tpl-tl-state-pad: 28px 24px; --tpl-tl-state-icon: 32px; --tpl-tl-usage-gap: 12px; --tpl-tl-usage-pad: 8px 0; --tpl-tl-usage-kind-w: 96px; --tpl-tl-control-h: 36px; --tpl-tl-ghost-pad: 0 14px; --tpl-tl-usage-more-pad: 6px; --tpl-tl-kind-card-pad: var(--polish-space-card); --tpl-tl-dialog-actions-pad: 14px 24px;
   --tpl-nm-tab-h: 27.5px; --tpl-nm-kpi-label-lh: 18px; --tpl-nm-band-top-line: inset 0 1px 0 var(--color-hairline); --tpl-nm-ro-row-pad: 12px 24px; --tpl-nm-kpi-more: 16px; --tpl-nm-body-pad: 16px 24px 24px; --tpl-nm-rail-w: 300px; --tpl-nm-col-gap: 16px; --tpl-nm-left-gap: 12px; --tpl-nm-adopted-gap: 14px; --tpl-nm-tools-gap: 8px; --tpl-nm-search-w: 240px; --tpl-nm-search-wide-w: 280px; --tpl-nm-seg-pad: 3px; --tpl-nm-seg-item-pad: 4px 12px;
@@ -3157,7 +3157,7 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
 
 /* B-178：一覧の骨組み（v19Ivv）。画面の寸法ではなく部品の値。 */
 [data-theme='v8'] {
-  --tpl-list-row-h: 60px;
+  --tpl-list-row-h: var(--polish-table-row);
   --tpl-list-head-h: 40px;
   --tpl-list-search-w: 240px;
   --tpl-list-search-min: 120px;

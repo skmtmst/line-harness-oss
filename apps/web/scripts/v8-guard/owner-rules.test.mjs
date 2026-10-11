@@ -253,3 +253,15 @@ test('列で組む表も見出しと本文の右端・中央・左余白がそ�
     assert.ok(Math.abs(broken.number.right - broken.bodyNumber.right) > 20, 'text-alignが効かなくなる故障も検出する')
   } finally { await browser.close() }
 })
+
+test('B-243：引き出し600への画面側上書きを検出し、480/540と配信作成1160は通す', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({viewport:{width:1440,height:900}})
+    for (const width of [480,540,600,1160]) {
+      await page.setContent(shell(`<aside data-design-part="drawer" ${width===1160?'data-width="composer"':''} style="width:${width}px;height:300px;background:white">内容</aside>`))
+      const failures = (await page.evaluate(scan)).filter(f=>f.kind==='drawerwidth')
+      assert.equal(failures.length, width===600?1:0)
+    }
+  } finally { await browser.close() }
+})
