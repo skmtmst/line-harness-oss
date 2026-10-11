@@ -24,157 +24,157 @@
 | 板ID | 幅 | route | 前 | 後 | 状態 |
 |---|---:|---|---:|---:|---|
 | SDrMu | 1100 | / | — | 未測定 | 撮影未取得 |
-| Ptr2u | 880 | /webinars/edit | — | 未測定 | 撮影未取得 |
-| A0pDt | 1440 | /auto-replies/edit | 18% | 未測定 | 初回測定済み |
-| A8jzaQ | 1440 | /broadcasts | — | 未測定 | 測定除外 |
-| ADjK8 | 1440 | /friends | 14% | 未測定 | 初回測定済み |
-| ARuZ4 | 1440 | /scenarios/detail | 65% | 未測定 | 初回測定済み |
-| Al4Ek | 1440 | /scenarios/detail | 61% | 未測定 | 初回測定済み |
-| AqDWN | 1440 | /tags/searches/edit | 14% | 未測定 | 初回測定済み |
-| BeNtj | 1440 | /broadcasts/reserved | 33% | 未測定 | 初回測定済み |
-| BxGhV | 1440 | /scenarios | — | 未測定 | 測定除外 |
-| C0lfUP | 1440 | /friend-add-settings | 75% | 未測定 | 初回測定済み |
-| CRtK8 | 1440 | /broadcasts/reserved | — | 未測定 | 測定除外 |
-| CYJ0L | 1440 | /friends | — | 未測定 | 測定除外 |
-| E7iAYs | 1440 | /webinars | 13% | 未測定 | 初回測定済み |
-| F3X1Mo | 1440 | /broadcasts/detail | 11% | 未測定 | 初回測定済み |
-| FU2aU | 1440 | /broadcasts/new | — | 未測定 | 測定除外 |
-| G4GejG | 1440 | /auto-replies | 55% | 未測定 | 初回測定済み |
-| G8i4xP | 1440 | /auto-replies | — | 未測定 | 測定除外 |
-| G9C4Uw | 1152 | /friends/identity-candidates | 5% | 未測定 | 初回測定済み |
-| GobMd | 1440 | /tags/fields/migrate | 18% | 未測定 | 初回測定済み |
-| Guoye | 1440 | /auto-replies/edit | 9% | 未測定 | 初回測定済み |
-| Hn9eE | 1440 | /friends/detail | 24% | 未測定 | 初回測定済み |
-| I1E7Bt | 1440 | /tags | 13% | 未測定 | 初回測定済み |
-| IIesG | 1440 | /auto-replies | 32% | 未測定 | 初回測定済み |
-| IWnYX | 1440 | /tags | 13% | 未測定 | 初回測定済み |
-| Iffil | 1152 | /reminders | 49% | 未測定 | 初回測定済み |
-| IjVpM | 1440 | /tags/folders/new | 12% | 未測定 | 状態未再現・参考値 |
-| JCDRm | 1440 | /friends/detail | 3% | 未測定 | 初回測定済み |
-| K7HWG | 1440 | /auto-replies/edit | 22% | 未測定 | 初回測定済み |
-| L48eY | 1440 | /friends/migrations | 11% | 未測定 | 状態未再現・参考値 |
-| LEwkJ | 1440 | /friend-add-settings | 74% | 未測定 | 初回測定済み |
-| LPOe7 | 1440 | /webinars/new | 13% | 未測定 | 初回測定済み |
-| M0393 | 1440 | /chats | — | 未測定 | 測定除外 |
-| MRhef | 1440 | /friend-add-settings | 77% | 未測定 | 状態未再現・参考値 |
-| MyJP7 | 1440 | /friends | 20% | 未測定 | 初回測定済み |
-| N43uVX | 1440 | /friend-add-settings/runs/detail | 19% | 未測定 | 状態未再現・参考値 |
-| NtCE3 | 1440 | /broadcasts | 25% | 未測定 | 初回測定済み |
-| OPGU2 | 1440 | /scenarios/detail | 60% | 未測定 | 初回測定済み |
-| Omqd4 | 1440 | /webinars | 15% | 未測定 | 初回測定済み |
-| P20kYU | 1152 | /friend-add-settings | 43% | 未測定 | 初回測定済み |
-| P6vbxn | 1440 | /broadcasts | 14% | 未測定 | 初回測定済み |
-| PMLkX | 1440 | /scenarios/detail | 61% | 未測定 | 初回測定済み |
-| Q0Jrk | 1440 | /webinars | 6% | 未測定 | 初回測定済み |
-| Q28Gb | 1440 | /broadcasts/detail | 32% | 未測定 | 初回測定済み |
-| Q5F2QE | 1440 | /friends/detail | — | 未測定 | 測定除外 |
-| Q5lOCc | 1440 | /auto-replies | 37% | 未測定 | 初回測定済み |
-| Qat9s | 1440 | /tags/edit | 8% | 未測定 | 初回測定済み |
-| R83uvQ | - | /scenarios | 0% | 未測定 | 状態未再現・参考値 |
-| REIxB | 1440 | /friend-add-settings/runs | 1% | 未測定 | 初回測定済み |
-| RrYYJ | 1440 | /reminders | — | 未測定 | 測定除外 |
-| RwVo5 | 1440 | /reminders | 0% | 未測定 | 初回測定済み |
-| SXCb3 | 1440 | /friends | — | 未測定 | 測定除外 |
-| SkY9V | 1440 | /reminders | 30% | 未測定 | 初回測定済み |
-| T0nis | 1440 | /reminders/new | 27% | 未測定 | 初回測定済み |
-| T9gblG | 1440 | /friends/migrations | 8% | 未測定 | 初回測定済み |
-| U0aKD | 1440 | /tags | — | 未測定 | 測定除外 |
-| U5rxyH | 1152 | /scenarios/first-step | 8% | 未測定 | 初回測定済み |
-| U8Xm3X | 1440 | /friend-add-settings/publish | 4% | 未測定 | 状態未再現・参考値 |
-| UGrd2 | 1440 | /auto-replies/edit | 16% | 未測定 | 初回測定済み |
-| UyUMw | 1440 | /webinars | 44% | 未測定 | 初回測定済み |
-| V4LjH | 1440 | /auto-replies/edit | — | 未測定 | 撮影未取得 |
-| V6xAo | 1440 | /scenarios/first-step | 6% | 未測定 | 初回測定済み |
-| VE1u5 | 1440 | /reminders/new | 13% | 未測定 | 初回測定済み |
-| VWNaA | 1440 | /webinars | 3% | 未測定 | 初回測定済み |
-| VXZ6T | 1440 | /webinars | 40% | 未測定 | 初回測定済み |
-| VsSyu | 1440 | /reminders | 31% | 未測定 | 初回測定済み |
-| WPrd5 | 1152 | /auto-replies | 40% | 未測定 | 初回測定済み |
+| Ptr2u | 880 | /webinars/edit | — | — | 撮影未取得 |
+| A0pDt | 1440 | /auto-replies/edit | 18% | 18% | 測定済み |
+| A8jzaQ | 1440 | /broadcasts | — | — | 測定除外 |
+| ADjK8 | 1440 | /friends | 14% | 14% | 測定済み |
+| ARuZ4 | 1440 | /scenarios/detail | 65% | 65% | 測定済み |
+| Al4Ek | 1440 | /scenarios/detail | 61% | 61% | 測定済み |
+| AqDWN | 1440 | /tags/searches/edit | 14% | 14% | 測定済み |
+| BeNtj | 1440 | /broadcasts/reserved | 33% | 33% | 窓だけの板・参考値 |
+| BxGhV | 1440 | /scenarios | — | — | 測定除外 |
+| C0lfUP | 1440 | /friend-add-settings | 75% | 82% | 測定済み |
+| CRtK8 | 1440 | /broadcasts/reserved | — | — | 測定除外 |
+| CYJ0L | 1440 | /friends | — | — | 測定除外 |
+| E7iAYs | 1440 | /webinars | 13% | 13% | 測定済み |
+| F3X1Mo | 1440 | /broadcasts/detail | 11% | 11% | 測定済み |
+| FU2aU | 1440 | /broadcasts/new | — | — | 測定除外 |
+| G4GejG | 1440 | /auto-replies | 55% | 55% | 窓だけの板・参考値 |
+| G8i4xP | 1440 | /auto-replies | — | — | 測定除外 |
+| G9C4Uw | 1152 | /friends/identity-candidates | 5% | 5% | 測定済み |
+| GobMd | 1440 | /tags/fields/migrate | 18% | 18% | 測定済み |
+| Guoye | 1440 | /auto-replies/edit | 9% | 9% | 測定済み |
+| Hn9eE | 1440 | /friends/detail | 24% | 24% | 測定済み |
+| I1E7Bt | 1440 | /tags | 13% | 59% | 測定済み |
+| IIesG | 1440 | /auto-replies | 32% | 32% | 測定済み |
+| IWnYX | 1440 | /tags | 13% | 41% | 測定済み |
+| Iffil | 1152 | /reminders | 49% | 49% | 測定済み |
+| IjVpM | 1440 | /tags/folders/new | 12% | 55% | 状態未再現・参考値 |
+| JCDRm | 1440 | /friends/detail | 3% | 3% | 測定済み |
+| K7HWG | 1440 | /auto-replies/edit | 22% | 22% | 測定済み |
+| L48eY | 1440 | /friends/migrations | 11% | 11% | 状態未再現・参考値 |
+| LEwkJ | 1440 | /friend-add-settings | 74% | 74% | 測定済み |
+| LPOe7 | 1440 | /webinars/new | 13% | 13% | 測定済み |
+| M0393 | 1440 | /chats | — | — | 測定除外 |
+| MRhef | 1440 | /friend-add-settings | 77% | 84% | 測定済み |
+| MyJP7 | 1440 | /friends | 20% | 20% | 窓だけの板・参考値 |
+| N43uVX | 1440 | /friend-add-settings/runs/detail | 19% | 19% | 状態未再現・参考値 |
+| NtCE3 | 1440 | /broadcasts | 25% | 25% | 測定済み |
+| OPGU2 | 1440 | /scenarios/detail | 60% | 60% | 窓だけの板・参考値 |
+| Omqd4 | 1440 | /webinars | 15% | 15% | 測定済み |
+| P20kYU | 1152 | /friend-add-settings | 43% | 43% | 測定済み |
+| P6vbxn | 1440 | /broadcasts | 14% | 14% | 窓だけの板・参考値 |
+| PMLkX | 1440 | /scenarios/detail | 61% | 61% | 測定済み |
+| Q0Jrk | 1440 | /webinars | 6% | 6% | 測定済み |
+| Q28Gb | 1440 | /broadcasts/detail | 32% | 32% | 測定済み |
+| Q5F2QE | 1440 | /friends/detail | — | — | 測定除外 |
+| Q5lOCc | 1440 | /auto-replies | 37% | 37% | 測定済み |
+| Qat9s | 1440 | /tags/edit | 8% | 8% | 測定済み |
+| R83uvQ | - | /scenarios | 0% | 0% | 状態未再現・参考値 |
+| REIxB | 1440 | /friend-add-settings/runs | 1% | 1% | 測定済み |
+| RrYYJ | 1440 | /reminders | — | — | 測定除外 |
+| RwVo5 | 1440 | /reminders | 0% | 0% | 測定済み |
+| SXCb3 | 1440 | /friends | — | — | 測定除外 |
+| SkY9V | 1440 | /reminders | 30% | 30% | 測定済み |
+| T0nis | 1440 | /reminders/new | 27% | 27% | 測定済み |
+| T9gblG | 1440 | /friends/migrations | 8% | 8% | 測定済み |
+| U0aKD | 1440 | /tags | — | — | 測定除外 |
+| U5rxyH | 1152 | /scenarios/first-step | 8% | 8% | 測定済み |
+| U8Xm3X | 1440 | /friend-add-settings/publish | 4% | 4% | 状態未再現・参考値 |
+| UGrd2 | 1440 | /auto-replies/edit | 16% | 16% | 測定済み |
+| UyUMw | 1440 | /webinars | 44% | 52% | 測定済み |
+| V4LjH | 1440 | /auto-replies/edit | — | 14% | 測定済み |
+| V6xAo | 1440 | /scenarios/first-step | 6% | 6% | 測定済み |
+| VE1u5 | 1440 | /reminders/new | 13% | 13% | 測定済み |
+| VWNaA | 1440 | /webinars | 3% | 3% | 測定済み |
+| VXZ6T | 1440 | /webinars | 40% | 47% | 測定済み |
+| VsSyu | 1440 | /reminders | 31% | 31% | 測定済み |
+| WPrd5 | 1152 | /auto-replies | 40% | 40% | 測定済み |
 | WQmep | 1440 | / | 29% | 未測定 | 初回測定済み |
-| X0QrW0 | 1440 | /scenarios | 33% | 未測定 | 初回測定済み |
-| X4STXS | 1440 | /scenarios/results | 7% | 未測定 | 初回測定済み |
-| XCUNf | 1440 | /webinars/new | 7% | 未測定 | 状態未再現・参考値 |
-| XJUqs | 1440 | /auto-replies/edit | 6% | 未測定 | 状態未再現・参考値 |
-| Xr6eu | 1440 | /broadcasts | — | 未測定 | 測定除外 |
-| YChR6 | 1440 | /reminders/new | 18% | 未測定 | 初回測定済み |
-| Z0jHp | 1440 | /friends/migrations | 8% | 未測定 | 状態未再現・参考値 |
-| Z2LIUx | 1152 | /auto-replies/edit | 18% | 未測定 | 初回測定済み |
-| Z6Hx5o | 1440 | /broadcasts/new | 0% | 未測定 | 状態未再現・参考値 |
-| a5C1p | 1440 | /reminders | 35% | 未測定 | 初回測定済み |
-| aPeD8 | 1152 | /tags | 17% | 未測定 | 初回測定済み |
-| al47K | 1440 | /friend-add-settings | 7% | 未測定 | 初回測定済み |
-| apLqS | 1440 | /reminders | 36% | 未測定 | 初回測定済み |
-| axFrW | 1440 | /scenarios | 34% | 未測定 | 初回測定済み |
-| bIdqV | 1440 | /broadcasts | — | 未測定 | 測定除外 |
-| cFo2p | 1440 | /friend-add-settings | 74% | 未測定 | 初回測定済み |
-| cdZBf | 1440 | /broadcasts/reserved | 4% | 未測定 | 初回測定済み |
-| cgiGB | 1440 | /broadcasts/detail | 29% | 未測定 | 初回測定済み |
-| d9xoI | 1440 | /tags/new | 5% | 未測定 | 初回測定済み |
-| dK1aE | 1440 | /broadcasts/detail | — | 未測定 | 測定除外 |
-| dnzqC | 1440 | /scenarios/new | 6% | 未測定 | 初回測定済み |
-| e0FD1J | 1440 | /friend-add-settings/publish | 20% | 未測定 | 状態未再現・参考値 |
-| eAQ3t | 1440 | /webinars | — | 未測定 | 測定除外 |
-| eovoG | 1440 | /chats | 25% | 未測定 | 初回測定済み |
-| f63Jza | 1440 | /broadcasts/new | 14% | 未測定 | 状態未再現・参考値 |
-| fcg2D | 1440 | /friends/identity-candidates | 3% | 未測定 | 初回測定済み |
-| fkGUR | 1440 | /tags | 5% | 未測定 | 初回測定済み |
-| h5rm8t | 1440 | /friend-add-settings | 7% | 未測定 | 初回測定済み |
-| h8uNW | 1440 | /friend-add-settings | 10% | 未測定 | 初回測定済み |
-| hjNpJ | 1440 | /reminders/new | 15% | 未測定 | 状態未再現・参考値 |
-| hn6Y8 | 1440 | /friends/identity-candidates | 5% | 未測定 | 初回測定済み |
-| i1nThZ | 1440 | /friend-add-settings | 9% | 未測定 | 初回測定済み |
-| i8F12 | 1440 | /auto-replies | — | 未測定 | 撮影未取得 |
-| iN6np | 1440 | /broadcasts/new | 14% | 未測定 | 初回測定済み |
-| j7PP04 | 1440 | /webinars/new | 16% | 未測定 | 初回測定済み |
-| jiNg0 | 1440 | /webinars | 31% | 未測定 | 初回測定済み |
-| jjFNi | 1152 | /broadcasts | 45% | 未測定 | 初回測定済み |
-| k32cn | 1440 | /reminders/edit | 11% | 未測定 | 初回測定済み |
-| kFz4b | 1440 | /friend-add-settings | — | 未測定 | 測定除外 |
-| kz2B6 | 1440 | /scenarios/detail | 64% | 未測定 | 初回測定済み |
-| l5V9a | 1440 | /broadcasts | 37% | 未測定 | 初回測定済み |
-| loVfW | 1440 | /reminders/detail | 15% | 未測定 | 初回測定済み |
-| ltAaq | 1440 | /reminders/new | 18% | 未測定 | 状態未再現・参考値 |
+| X0QrW0 | 1440 | /scenarios | 33% | 33% | 測定済み |
+| X4STXS | 1440 | /scenarios/results | 7% | 7% | 測定済み |
+| XCUNf | 1440 | /webinars/new | 7% | 7% | 状態未再現・参考値 |
+| XJUqs | 1440 | /auto-replies/edit | 6% | 6% | 状態未再現・参考値 |
+| Xr6eu | 1440 | /broadcasts | — | — | 測定除外 |
+| YChR6 | 1440 | /reminders/new | 18% | 18% | 測定済み |
+| Z0jHp | 1440 | /friends/migrations | 8% | 8% | 状態未再現・参考値 |
+| Z2LIUx | 1152 | /auto-replies/edit | 18% | 18% | 測定済み |
+| Z6Hx5o | 1440 | /broadcasts/new | 0% | 0% | 状態未再現・参考値 |
+| a5C1p | 1440 | /reminders | 35% | 35% | 測定済み |
+| aPeD8 | 1152 | /tags | 17% | 52% | 測定済み |
+| al47K | 1440 | /friend-add-settings | 7% | 7% | 測定済み |
+| apLqS | 1440 | /reminders | 36% | 36% | 測定済み |
+| axFrW | 1440 | /scenarios | 34% | 34% | 測定済み |
+| bIdqV | 1440 | /broadcasts | — | — | 測定除外 |
+| cFo2p | 1440 | /friend-add-settings | 74% | 81% | 測定済み |
+| cdZBf | 1440 | /broadcasts/reserved | 4% | 4% | 測定済み |
+| cgiGB | 1440 | /broadcasts/detail | 29% | 29% | 測定済み |
+| d9xoI | 1440 | /tags/new | 5% | 5% | 測定済み |
+| dK1aE | 1440 | /broadcasts/detail | — | — | 測定除外 |
+| dnzqC | 1440 | /scenarios/new | 6% | 6% | 測定済み |
+| e0FD1J | 1440 | /friend-add-settings/publish | 20% | 20% | 状態未再現・参考値 |
+| eAQ3t | 1440 | /webinars | — | — | 測定除外 |
+| eovoG | 1440 | /chats | 25% | 25% | 測定済み |
+| f63Jza | 1440 | /broadcasts/new | 14% | 14% | 状態未再現・参考値 |
+| fcg2D | 1440 | /friends/identity-candidates | 3% | 3% | 測定済み |
+| fkGUR | 1440 | /tags | 5% | 35% | 測定済み |
+| h5rm8t | 1440 | /friend-add-settings | 7% | 7% | 測定済み |
+| h8uNW | 1440 | /friend-add-settings | 10% | 10% | 測定済み |
+| hjNpJ | 1440 | /reminders/new | 15% | 15% | 状態未再現・参考値 |
+| hn6Y8 | 1440 | /friends/identity-candidates | 5% | 5% | 測定済み |
+| i1nThZ | 1440 | /friend-add-settings | 9% | 9% | 測定済み |
+| i8F12 | 1440 | /auto-replies | — | 31% | 測定済み |
+| iN6np | 1440 | /broadcasts/new | 14% | 14% | 測定済み |
+| j7PP04 | 1440 | /webinars/new | 16% | 16% | 測定済み |
+| jiNg0 | 1440 | /webinars | 31% | 32% | 測定済み |
+| jjFNi | 1152 | /broadcasts | 45% | 45% | 測定済み |
+| k32cn | 1440 | /reminders/edit | 11% | 11% | 測定済み |
+| kFz4b | 1440 | /friend-add-settings | — | — | 測定除外 |
+| kz2B6 | 1440 | /scenarios/detail | 64% | 64% | 測定済み |
+| l5V9a | 1440 | /broadcasts | 37% | 44% | 測定済み |
+| loVfW | 1440 | /reminders/detail | 15% | 15% | 測定済み |
+| ltAaq | 1440 | /reminders/new | 18% | 18% | 状態未再現・参考値 |
 | mcOqK | 1440 | / | — | 未測定 | 測定除外 |
-| nF4ts | 1440 | /friends | 3% | 未測定 | 初回測定済み |
-| nMSiE | 1440 | /scenarios/detail | 73% | 未測定 | 初回測定済み |
-| nWmLg | 1440 | /auto-replies/runs | 2% | 未測定 | 初回測定済み |
-| p15At | 1152 | /friends/identity-candidates | 16% | 未測定 | 初回測定済み |
-| p5YuP | 1440 | /reminders/new | 15% | 未測定 | 初回測定済み |
-| pNiUk | 1440 | /broadcasts/detail | 24% | 未測定 | 初回測定済み |
-| pvimJ | 1440 | /webinars | 5% | 未測定 | 初回測定済み |
-| q5gbcM | 1440 | /tags | 14% | 未測定 | 初回測定済み |
-| r1l0bT | 1152 | /reminders/new | 6% | 未測定 | 初回測定済み |
-| rbAig | 1440 | /reminders/detail | 10% | 未測定 | 初回測定済み |
-| rfhIf | 1440 | /auto-replies/edit | 16% | 未測定 | 初回測定済み |
-| sFwWf | 1440 | /friend-add-settings | — | 未測定 | 撮影未取得 |
-| tPm3e | 1440 | /broadcasts/detail | — | 未測定 | 測定除外 |
-| u8sKN | 1440 | /auto-replies | — | 未測定 | 撮影未取得 |
-| uBMuB | 1152 | /webinars | 38% | 未測定 | 初回測定済み |
-| uE9gf | 1440 | /auto-replies | 35% | 未測定 | 初回測定済み |
-| uNsEy | 1440 | /webinars | 12% | 未測定 | 初回測定済み |
-| ulq9Y | 1440 | /tags/marks/edit | 13% | 未測定 | 初回測定済み |
-| v7GV2 | 1440 | /chats | — | 未測定 | 測定除外 |
-| vKDj5 | 1440 | /tags | 16% | 未測定 | 初回測定済み |
-| w9zY5 | 1440 | /tags/fields/edit | 25% | 未測定 | 初回測定済み |
-| wDzkc | 1440 | /friend-add-settings | 25% | 未測定 | 初回測定済み |
-| wfHIE | 1440 | /broadcasts/detail | — | 未測定 | 測定除外 |
-| wjfLe | 1152 | /scenarios | 38% | 未測定 | 初回測定済み |
-| x6QsVz | 1440 | /friends | 25% | 未測定 | 初回測定済み |
-| xHpkS | 1152 | /friend-add-settings | 38% | 未測定 | 初回測定済み |
-| xn95q | 1440 | /tags/edit | 10% | 未測定 | 初回測定済み |
-| ywJ5H | 1440 | /friends | — | 未測定 | 測定除外 |
-| z2dgw | 1440 | /webinars | 5% | 未測定 | 初回測定済み |
-| Ct7aA | - | /chats | 0% | 未測定 | 部分の板・参考値 |
-| cu3vm | - | /scenarios/new | 5% | 未測定 | 部分の板・参考値 |
-| GBTyR | - | /chats | 25% | 未測定 | 部分の板・参考値 |
-| aZ8li | 1440 | /friends | 3% | 未測定 | 初回測定済み |
-| lwWLu | 1440 | /friends | 3% | 未測定 | 初回測定済み |
-| ENfsi | - | /friends | 17% | 未測定 | 状態未再現・参考値 |
-| fmToi | 1440 | /friends | 4% | 未測定 | 状態未再現・参考値 |
-| y2n1z | 1152 | /friends | 4% | 未測定 | 状態未再現・参考値 |
-| vX3wQ | 1440 | /friends/detail | 6% | 未測定 | 初回測定済み |
-| e5uuD0 | - | /chats | 25% | 未測定 | 状態未再現・参考値 |
-| K1DlHi | - | /friends/detail | 0% | 未測定 | 部分の板・参考値 |
+| nF4ts | 1440 | /friends | 3% | 3% | 測定済み |
+| nMSiE | 1440 | /scenarios/detail | 73% | 73% | 測定済み |
+| nWmLg | 1440 | /auto-replies/runs | 2% | 2% | 測定済み |
+| p15At | 1152 | /friends/identity-candidates | 16% | 16% | 測定済み |
+| p5YuP | 1440 | /reminders/new | 15% | 15% | 測定済み |
+| pNiUk | 1440 | /broadcasts/detail | 24% | 24% | 測定済み |
+| pvimJ | 1440 | /webinars | 5% | 5% | 測定済み |
+| q5gbcM | 1440 | /tags | 14% | 48% | 測定済み |
+| r1l0bT | 1152 | /reminders/new | 6% | 6% | 測定済み |
+| rbAig | 1440 | /reminders/detail | 10% | 10% | 測定済み |
+| rfhIf | 1440 | /auto-replies/edit | 16% | 16% | 測定済み |
+| sFwWf | 1440 | /friend-add-settings | — | — | 撮影未取得 |
+| tPm3e | 1440 | /broadcasts/detail | — | — | 測定除外 |
+| u8sKN | 1440 | /auto-replies | — | 32% | 測定済み |
+| uBMuB | 1152 | /webinars | 38% | 38% | 測定済み |
+| uE9gf | 1440 | /auto-replies | 35% | 35% | 測定済み |
+| uNsEy | 1440 | /webinars | 12% | 12% | 測定済み |
+| ulq9Y | 1440 | /tags/marks/edit | 13% | 13% | 測定済み |
+| v7GV2 | 1440 | /chats | — | — | 測定除外 |
+| vKDj5 | 1440 | /tags | 16% | 47% | 測定済み |
+| w9zY5 | 1440 | /tags/fields/edit | 25% | 25% | 測定済み |
+| wDzkc | 1440 | /friend-add-settings | 25% | 25% | 測定済み |
+| wfHIE | 1440 | /broadcasts/detail | — | — | 測定除外 |
+| wjfLe | 1152 | /scenarios | 38% | 38% | 測定済み |
+| x6QsVz | 1440 | /friends | 25% | 25% | 測定済み |
+| xHpkS | 1152 | /friend-add-settings | 38% | 38% | 測定済み |
+| xn95q | 1440 | /tags/edit | 10% | 10% | 測定済み |
+| ywJ5H | 1440 | /friends | — | — | 測定除外 |
+| z2dgw | 1440 | /webinars | 5% | 5% | 測定済み |
+| Ct7aA | - | /chats | 0% | 0% | 部分の板・参考値 |
+| cu3vm | - | /scenarios/new | 5% | 5% | 部分の板・参考値 |
+| GBTyR | - | /chats | 25% | 25% | 部分の板・参考値 |
+| aZ8li | 1440 | /friends | 3% | 3% | 測定済み |
+| lwWLu | 1440 | /friends | 3% | 3% | 測定済み |
+| ENfsi | - | /friends | 17% | 17% | 状態未再現・参考値 |
+| fmToi | 1440 | /friends | 4% | 4% | 状態未再現・参考値 |
+| y2n1z | 1152 | /friends | 4% | 4% | 状態未再現・参考値 |
+| vX3wQ | 1440 | /friends/detail | 6% | 6% | 測定済み |
+| e5uuD0 | - | /chats | 25% | 25% | 状態未再現・参考値 |
+| K1DlHi | - | /friends/detail | 0% | 0% | 部分の板・参考値 |
 
 ## 原因の分類
 
@@ -201,11 +201,13 @@
 | 板 | 状態 | 次に確認すること |
 |---|---|---|
 | fmToi・y2n1z | 撮影手順待ち | 列のチェックを外す操作を再現。実装済みの表示列変更を撮る。APIが無いとは扱わない |
-| ENfsi・e5uuD0・GBTyr・Ct7aA・cu3vm・K1DlHi | 部分の板／まとめ板 | 全画面と混ぜて候補へ数えない。部分の照合方法を確認 |
+| ENfsi・e5uuD0・GBTyR・Ct7aA・cu3vm・K1DlHi | 部分の板／まとめ板 | 全画面と混ぜて候補へ数えない。部分の照合方法を確認 |
+| BeNtj・G4GejG・MyJP7・OPGU2・P6vbxn | 窓だけの板 | 固定HTMLの幅は480〜640。全画面の左上と比較した参考率なので全画面の候補に数えない。窓を切り出す照合方法は司令塔と確認 |
 | SDrMu・Ptr2u | 撮影未取得 | 道具が受け付けない幅の部分板。幅を1440へ偽装しない |
-| V4LjH | 状態未取得 | 有効化前の確認を完了する。確認の動きを弱めず撮影条件を直す |
-| i8F12・u8sKN | 撮影手順を補正・再測定待ち | フォルダの「…」ではなく「予約変更のお問い合わせ」の操作を指定 |
+| V4LjH | 状態撮影済み | 確認の動きを弱めず窓を取得できた。画像照合は続ける |
+| i8F12・u8sKN | 撮影条件補正済み | 対象行の操作を指定し、窓を撮影できた。画像照合は続ける |
 | sFwWf | 撮影手順待ち | 対象行と部分板の照合条件を確認 |
+| MRhef・LEwkJ・P20kYU・C0lfUP・cFo2p | ページ番号への移動待ち | 絵は番号式、APIと画面はカーソル式。追加機能は作らず、司令塔の仕様判断を待つ |
 | その他 | APIが無い機能はまだ確定していない | 古い板名の「API待ち」だけで判断せず、現行APIを確認 |
 
 ## 絵とオーナーの決まりの食い違い（変更しない）
@@ -216,6 +218,9 @@
 | タグ一覧 | 状態の列なし | B-217確定は「状態は列」。列を消す判断は司令塔 |
 | ダッシュボードのグラフ／表 | 選択が白地 | B-211は全部の切り替えに薄い緑を要求。白へ戻さない |
 | 自動応答の集計期間 | 過去28日 | B-160は過去30日。APIの28日集計を見た目だけ30日と表示しない |
+| P20kYU | 狭い板では数の帯の4つ目の操作が次の行 | B-178の見張りは全マス116固定。帯の下の余白で帳尻を合わせない |
+| cFo2p | 案内窓の題17px | B-180は窓の題18px。既存のstacked指定をどちらへそろえるかは司令塔が判断 |
+| C0lfUP | メニューが行の上へ開く | 共通の行メニューは下に収まるとき下へ開く。自動で逃がす動きを固定位置へ変えない |
 
 ## 検証
 
@@ -226,8 +231,22 @@
 - その他の全試験：1,449ファイル・14,363テスト成功（Worker929ファイル・10,988テストを含む）。ルートのスクリプト試験102ファイル・922テスト成功。最終の関連8ファイル56テスト、補足の表示の動き12テストも成功。
 - 1152/1440/1920の担当10画面＋共通部品6例を実測。開始版と修正後はともにシナリオ一覧の右端10件のみ未許可。対象・件数・実寸を比較し、新規・悪化0。既存10件は消えていないので、見張り全体の完全成功とは扱わない。一覧の骨組みと共通部品の指摘は0。証拠：`~/lh-work/design/v8/overlay/pages-matcha/guards-common-1011/`。
 - 型検査は最終ビルド後に順番に再実行して成功。ビルドとの同時実行で生成型を読めなかった回は採用していない。手順書に再発防止を追記。
-- コミット後の全板再測定はこれから。修正中の代表板の84%などは、クリーンな版の候補に数えていない。
+- 初回案内の一覧修正後：権限・並び替え・確認窓の動き19テスト成功。持ち主の見張りの新規・未許可0。3つの幅の実画面36例は、開始版と同じ既存10件のみで、新しい崩れ0。一覧の骨組みと共通部品の指摘0。
+- 短い板の高さは3つの幅で実測。20行・高さ700の長い一覧でも、最後の行までmain内で送れ、ページ全体を伸ばさないことを確認。証拠：`~/lh-work/design/v8/overlay/pages-matcha/guards-friend-add-1011/`。
+- 一覧修正後の全Web試験：2,130ファイル、12,442テスト成功、ブラウザ終了による1テスト失敗。同じファイルの9テストを単独で再実行し、全部成功した。テストの削除・緩和なし。
+- 一覧修正後のWebビルドと型検査が成功。ビルド後の設計照合も503/503、未許可0。
+- 共通修正のコミットa42138c9eで131板を再測定。128板の画像を作成、3板は未取得。クリーンな版を確認済み。90%以上の板はまだ0枚。
+
+## 初回案内の一覧（作業中）
+
+- 閲覧のみのフォルダ列の作成用空白を既存のreserveCreateSpaceで外し、並び替え不可でも共通つまみが同じ幅を残す。変更する操作は出さない。
+- ListPage／PageFrameに短い板の高さと道具の上下16の選択口、ListToolbarFrameに段を残す選択口を足した。呼び出した一覧だけに適用。他の一覧の既定は変えない。長い内容は今までのmain内で送る。
+- 受け皿を止められない窓は、既定の480幅と既存のボタン間隔の口でそろえる。保存・権限・送信・失敗時の処理は変更しない。
+- 修正中の一覧96%・閲覧のみ97%・受け皿の窓96%は、未コミット版なので候補に数えない。
+- 狭い板P20kYUは4つ目の数のマスが絵では1行高い。B-178見張りは全マス116固定で、余白を水増しして下の表を動かすことはしない。
+- 絵の番号式ページ送りに対し、実装はカーソル式（前へ／次へ、1ページしかないときは非表示）。任意のページへ飛ぶ追加は今回作らない。頁数と移動方式の仕様判断待ち。
+- 次の編集画面wDzkcは、新規作成の絵に対して保存済みの編集を撮っていた。固定版の地図は変えず、撮影用の写しを新規作成へ訂正。開始25%は状態が違う参考値として残す。N43uVXは既存の失敗ありの実行データを明示し、板名だけで未再現と判定されないようにした。
 
 ## 次のタスク
 
-共通部品をコミットし、担当全板を測り直す。その後、友だち追加の配信一覧から機能ごとの直しへ進む。既存のシナリオ右端10件と絵との食い違いは表に残す。
+共通部品をコミットし、担当全板の再測定まで済み。次は友だち追加の配信一覧の空白・並び・窓を直す。既存のシナリオ右端10件と絵との食い違いは表に残す。

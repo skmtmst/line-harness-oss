@@ -172,6 +172,11 @@
     min-height: 0;
     overscroll-behavior: contain;
   }
+
+  /* 短い板は内容の下で止める。長い内容は同じmainの中で送り、外枠は伸ばさない。 */
+  [data-theme="v8"] .main:has(> .content > [data-frame-height='content']) {
+    flex: 0 1 auto;
+  }
 }
 
 /* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの

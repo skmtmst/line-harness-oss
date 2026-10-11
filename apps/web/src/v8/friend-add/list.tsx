@@ -650,7 +650,7 @@ function FriendAddList() {
   ) : null
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
   const toolbar = narrow ? (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       {notice}
       {errorBand}
       <ListToolbarRow>
@@ -783,13 +783,13 @@ function FriendAddList() {
                     title={canReorder ? '上下に動かして並び替え' : reorderReason}
                   >
                     <span className={styles.orderBox}>
-                      {canEdit ? <ReorderHandle
+                      <ReorderHandle
                         label={rule.name}
                         disabledReason={canReorder ? null : reorderReason ?? READONLY_REASON}
                         onMove={(direction) => keyboardMove(rule.id, direction)}
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
-                      </ReorderHandle> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`} />}
+                      </ReorderHandle>
                       <span className={styles.orderNum}>{rule.priority}</span>
                     </span>
                   </Td>
@@ -846,6 +846,8 @@ function FriendAddList() {
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       skeleton
+      heightMode="content"
+      toolbarSpacing="section"
       help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
@@ -896,6 +898,7 @@ function FriendAddList() {
       folders={<>
         <FolderPanel
           createAction={createButton}
+          reserveCreateSpace={canEdit}
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
           onAddFolder={canEdit ? () => { setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setEditingFolder(null); setFolderError(''); setFolderDialogOpen(true) } : undefined}
@@ -915,10 +918,9 @@ function FriendAddList() {
           open={fallbackStop}
           designNode="cFo2p"
           designLayout="stacked"
-          designWidth={600}
           designTop={280}
           footerAlign="start"
-          designFooterGap={84}
+          designFooterGap={18}
           confirmFirst
           titleIcon={false}
           title="「経路が分からなかった人」は止められません"

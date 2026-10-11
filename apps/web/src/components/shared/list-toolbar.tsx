@@ -94,8 +94,8 @@ export default function ListToolbar({
 }
 
 /** 検索の送信・保存条件などを持つ一覧でも、段の見た目を画面に持たせない。 */
-export function ListToolbarFrame({ children, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div {...props} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots">{children}</div>
+export function ListToolbarFrame({ children, layout = 'band', ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked' }) {
+  return <div {...props} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'}>{children}</div>
 }
 
 export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttributes<HTMLElement> & { as?: 'div' | 'form' }) {

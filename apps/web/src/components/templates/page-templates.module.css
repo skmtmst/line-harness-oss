@@ -42,6 +42,7 @@
 /* B-149：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
 :global([data-theme='v8']) .folders + .main { border-left: 0; }
 :global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
+:global([data-theme='v8']) .toolbar[data-toolbar-spacing='section'] { padding-block: var(--polish-space-card); }
 :global([data-theme='v8']) .content { min-width: 0; }
 :global([data-theme='v8']) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
@@ -166,6 +167,7 @@
 
 /* 保存の帯は短い画面でも見える。本文だけを縦に送り、帯を追い出さない。 */
 :global([data-theme='v8']) .frame[data-has-footer] { height: calc(100dvh - 74px); min-height: 0; }
+:global([data-theme='v8']) .frame[data-frame-height='content'] { height: auto; min-height: 0; max-height: calc(100dvh - 74px); }
 :global([data-theme='v8']) .frame[data-has-footer] > .split,
 :global([data-theme='v8']) .frame[data-has-footer] > .settings { min-height: 0; overflow-y: auto; }
 :global([data-theme='v8']) .frame[data-has-footer] > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
