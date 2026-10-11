@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import {afterEach,it,expect,vi} from 'vitest'
-import {render,screen,cleanup} from '@testing-library/react'
+import {render,screen,cleanup,fireEvent} from '@testing-library/react'
 const f=vi.hoisted(()=>({list:vi.fn()}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn()}),useSearchParams:()=>new URLSearchParams('id=s')}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'a',selectedAccount:{name:'人工店'}})}))
@@ -19,4 +19,10 @@ it('B-241：保存済み検索一覧success:falseを重複名なしと見なさ�
  render(<SearchEdit/>)
  expect(await screen.findByText(/読み込めませんでした/)).toBeTruthy()
  expect(screen.queryByDisplayValue('人工検索')).toBeNull()
+ expect(screen.queryByText(/いま0 件/)).toBeNull()
+ f.list.mockResolvedValue({success:true,items:[],summary:{total:24}})
+ fireEvent.click(screen.getByRole('button',{name:/もう一度/}))
+ expect(await screen.findByDisplayValue('人工検索')).toBeTruthy()
+ fireEvent.click(screen.getByRole('button',{name:'共有の説明'}))
+ expect(screen.getByText(/いま24 件/)).toBeTruthy()
 })

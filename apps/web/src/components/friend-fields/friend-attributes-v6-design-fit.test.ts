@@ -160,6 +160,7 @@ describe('XBkiQ 保存した検索の編集', () => {
   it('件数を読めていないときは、数を作らずに上限だけ書く', () => {
     expect(shareField).toContain("savedCount === null")
     expect(shareField).toContain("'保存できるのは50件までです。'")
-    expect(withoutComments(EDIT_PAGE)).toContain('setSavedCount(searches.success ? searches.summary.total : null)')
+    const source = withoutComments(EDIT_PAGE)
+    expect(source.indexOf("if(!searches.success || !tagResult.success)throw")).toBeLessThan(source.indexOf('setSavedCount(searches.summary.total)'))
   })
 })
