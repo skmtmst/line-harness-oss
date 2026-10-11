@@ -234,7 +234,7 @@ describe('POST /webhook — V6分析イベント', () => {
     await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
 
     expect(updateFriendFollowStatus).toHaveBeenCalledWith(
-      baseEnv.DB, 'U-1', false, 'account-main',
+      baseEnv.DB, 'U-1', false, 'account-main', '2026-08-24T12:00:00.000+09:00',
     );
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(baseEnv.DB, {
       lineAccountId: 'account-main',
