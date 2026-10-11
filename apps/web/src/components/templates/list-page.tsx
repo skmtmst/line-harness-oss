@@ -64,8 +64,6 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   heightMode?: 'viewport' | 'content'
   boardId?: string
   layout?: 'event-list'
-  /** 内容の下で白い板が終わる絵。長い一覧は引き続き板の中で送る。 */
-  heightMode?: 'content'
   standalone?: boolean
   tabs?: ReactNode
 }

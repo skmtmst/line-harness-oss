@@ -27,7 +27,6 @@ export default function CopyTextButton({
   'aria-label': ariaLabel,
   disabled = false,
   variant = 'text',
-  icon,
 }: {
   /** クリップボードへ書き込む全文。表示用文字列ではなく取り出したい値。 */
   value?: string
@@ -38,7 +37,6 @@ export default function CopyTextButton({
   disabled?: boolean
   /** コードの下など、本文の操作は共通Buttonの形を使う。行内は文字操作のまま。 */
   variant?: 'text' | 'primary' | 'secondary'
-  icon?: ReactNode
   /** 何をコピーするボタンか。一覧では行の名前を含めて特定できるようにする。 */
   'aria-label': string
 }) {
