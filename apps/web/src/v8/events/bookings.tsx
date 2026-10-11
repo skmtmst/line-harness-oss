@@ -760,6 +760,7 @@ function Bookings({ eventId }: { eventId: string }) {
       </div>
 
       <ConfirmDialog
+        key={`cancel:${operationScope}`}
         open={cancelApplicant !== null}
         destructive
         title={`「${cancelApplicant?.applicant.displayName ?? '友だちは未取得'}」の予約をキャンセルしますか？`}
@@ -776,6 +777,7 @@ function Bookings({ eventId }: { eventId: string }) {
       />
 
       <ConfirmDialog
+        key={`reject:${operationScope}`}
         open={rejectApplicant !== null}
         destructive
         title={`「${rejectApplicant?.displayName ?? '友だちは未取得'}」の申込を断りますか？`}
@@ -801,6 +803,7 @@ function Bookings({ eventId }: { eventId: string }) {
       </ConfirmDialog>
 
       <ConfirmDialog
+        key={`waitlist:${operationScope}`}
         open={waitlistDialog !== null}
         title={
           waitlistDialog?.kind === 'promote'
@@ -882,6 +885,7 @@ function Bookings({ eventId }: { eventId: string }) {
       </ConfirmDialog>
 
       <ConfirmDialog
+        key={`broadcast:${operationScope}`}
         open={broadcastConfirmOpen && broadcastPreview !== null}
         title={`${broadcastPreview?.recipientCount ?? 0} 人に送りますか？`}
         description="この回の申込者へLINEでまとめて送ります。送ったお知らせは取り消せません。"
