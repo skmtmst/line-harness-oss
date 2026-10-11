@@ -28,7 +28,7 @@ import {
   type GooglePostKind,
 } from '@/lib/restaurant-google-api'
 import { errorMessage, formatDateTime } from './google-format'
-import type { ProfileNav } from './google-profile'
+import type { GoogleNav as ProfileNav } from '@/v8/restaurant/google/google'
 
 /**
  * ★V6 Googleビジネス 第3段：投稿（最新情報・イベント・特典）。

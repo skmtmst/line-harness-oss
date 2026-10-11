@@ -117,11 +117,7 @@ describe('共通部品の影響範囲', () => {
       // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
       'app/reminders/list-v8.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
-      'app/restaurant-test/google/google-business.tsx',
-      // Googleビジネス第3段: 投稿一覧（GB-4 MAozg）の表の下にページ送りがある。
-      'app/restaurant-test/google/google-posts.tsx',
-      // Googleビジネス第2段: 変更履歴（GB-17 w7ZTml）の表の下にページ送りがある。
-      'app/restaurant-test/google/google-profile.tsx',
+      // Googleは現役の口コミ・投稿・変更履歴だけがページ送りを持つ。旧本体/写しは除去。
       // #919: 予約台帳が増えても消えないよう、期間・状態の絞り込みと20件ずつのページ送りに寄せた。
       // タグV8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
       // 表の下にページ送りがあり、1ページごとの件数を選べる。
@@ -222,6 +218,7 @@ describe('共通部品の影響範囲', () => {
       // ★V8 Googleビジネスの口コミ・投稿（j0Wcg・Cfed0）。2ページ以上のときだけ表の下にページ送り。
       'v8/restaurant/google/reviews.tsx',
       'v8/restaurant/google/posts.tsx',
+      'v8/restaurant/google/profile-history.tsx',
       // ★V8 予約台帳の一覧（Z3FoM）。src/v8/restaurant に一から書いた。表の下にページ送りを置く。
       'v8/restaurant/reservations/list.tsx',
       // ★V8 ログインユーザー（nku0f）。新しい置き場（src/v8/settings）に書いた。表の下にページ送りを置く。

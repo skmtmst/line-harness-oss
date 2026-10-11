@@ -22,6 +22,7 @@ import ProfileBoard from './profile'
 import { ChangeConfirmScreen } from './profile-confirm'
 import { HistoryScreen } from './profile-history'
 import { ProfileEditScreen } from './profile-edit'
+import { HoursEditor } from './profile-hours'
 import SettingsBoard from './settings'
 import styles from './google.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
@@ -34,7 +35,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  *
  * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
  * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
- * 変更の確認・履歴・編集は共通の V8 部品で出す。営業時間は旧入口を移行中。動きは BEHAVIOR.md。
+ * 営業時間・確認・履歴・編集も共通の V8 部品で出す。動きは BEHAVIOR.md。
  */
 
 export type { MediaUploadHelpers } from './posts'
@@ -195,6 +196,8 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           <HistoryScreen key={`${accountId}-${searchParams.get('result') ?? ''}`} accountId={accountId} initialResult={(['all', 'applied', 'pending', 'failed'] as const).find((value) => value === searchParams.get('result'))} go={go} />
         ) : tab === 'profile' && view === 'edit' ? (
           <ProfileEditScreen key={accountId} accountId={accountId} go={go} />
+        ) : tab === 'profile' && view === 'hours' ? (
+          <HoursEditor key={`${accountId}-${searchParams.get('mode') ?? 'text'}-${searchParams.get('date') ?? ''}`} accountId={accountId} mode={searchParams.get('mode') === 'calendar' ? 'calendar' : searchParams.get('mode') === 'weekly' ? 'weekly' : 'text'} initialDate={searchParams.get('date')} go={go} />
         ) : tab === 'profile' ? (
           <ProfileBoard accountId={accountId} go={go} />
         ) : tab === 'settings' ? (

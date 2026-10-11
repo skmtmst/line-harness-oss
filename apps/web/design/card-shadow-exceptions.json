@@ -520,43 +520,8 @@
     "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
   },
   {
-    "file": "app/restaurant-test/google/google-business.tsx",
-    "selector": "className=\"border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border\"",
-    "reason": "画面全体の外枠。内側の中身のカードにだけ影を付ける。"
-  },
-  {
-    "file": "app/restaurant-test/google/google-business.tsx",
-    "selector": "className=\"border-hairline mb-3 rounded-card border p-4\"",
-    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
     "file": "app/restaurant-test/google/google-posts.tsx",
     "selector": "className=\"border-hairline rounded-card border p-4\"",
-    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
-    "file": "app/restaurant-test/google/google-profile.tsx",
-    "selector": "className=\"border-hairline bg-accent-soft flex flex-col gap-4 rounded-card border p-5\"",
-    "reason": "今日の営業状態の帯。カードではなく状態の通知。"
-  },
-  {
-    "file": "app/restaurant-test/google/google-profile.tsx",
-    "selector": "className=\"border-hairline bg-canvas flex w-full flex-col gap-2 rounded-card border p-4\"",
-    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
-    "file": "app/restaurant-test/google/google-profile.tsx",
-    "selector": "className=\"border-hairline bg-canvas flex min-w-0 flex-col gap-3 rounded-card border p-5\"",
-    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
-    "file": "app/restaurant-test/google/google-profile.tsx",
-    "selector": "className=\"border-hairline overflow-hidden rounded-card border\"",
-    "reason": "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"
-  },
-  {
-    "file": "app/restaurant-test/google/google-profile.tsx",
-    "selector": "className=\"border-hairline bg-canvas flex flex-col gap-3 rounded-card border p-5\"",
     "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
   },
   {

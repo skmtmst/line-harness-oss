@@ -62,7 +62,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
       .finally(() => { if (alive) setLoading(false) })
     restaurantGoogleApi.photos(accountId)
       .then((response) => { if (alive) setPhotos(response.photos) })
-      .catch((err) => { if (alive) { setPhotos([]); setPhotosError(errorMessage(err, '写真を取得できませんでした。')) } })
+      .catch((err) => { if (alive) { setPhotos([]); setPhotosError(errorMessage(err, '写真を読み込めませんでした。')) } })
     return () => { alive = false; pickerRequest.current += 1 }
   }, [accountId])
 

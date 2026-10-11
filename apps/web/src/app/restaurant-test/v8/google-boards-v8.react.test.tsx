@@ -24,6 +24,7 @@ vi.mock('@/v8/restaurant/google/performance',()=>({default:()=> <div>現役の�
 vi.mock('@/v8/restaurant/google/profile',()=>({default:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/profile-confirm',()=>({ChangeConfirmScreen:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/profile-history',()=>({HistoryScreen:()=> <div>現役の子画面</div>}))
+vi.mock('@/v8/restaurant/google/profile-hours',()=>({HoursEditor:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/profile-edit',async()=>{
   const { useUnsavedGuard } = await import('@/lib/use-unsaved-guard')
   const { UnsavedLeaveDialog } = await import('@/lib/unsaved-leave-dialog')
