@@ -130,6 +130,8 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
   const [cutoffEmpty, setCutoffEmpty] = useState(false)
   const [cancelEmpty, setCancelEmpty] = useState(false)
   const inFlightRef = useRef(false)
+  const savedStaff = useRef(new Map<string, boolean>())
+  useEffect(() => { savedStaff.current.clear() }, [accountId])
 
   const initialNoAssign = useMemo(
     () => staff.some((person) => person.is_active && person.is_designation_optional),
@@ -183,6 +185,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
     inFlightRef.current = true
     setSaving(true)
     setSaveError(null)
+    let settingsSaved = false
     try {
       const response = await bookingApi.saveSettings(accountId, {
         expectedVersion: draft.version,
@@ -199,11 +202,14 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         reminderHoursBefore: draft.reminderHoursBefore,
       })
       if (!response.success) throw new Error('booking_settings_save_failed')
+      setDraft(response.data)
+      settingsSaved = true
       /* 「指名なし」の切替は全スタッフの is_designation_optional を揃える。 */
       if (noAssign !== null && noAssign !== initialNoAssign) {
-        const targets = staff.filter((person) => person.is_active && Boolean(person.is_designation_optional) !== noAssign)
+        const targets = staff.filter((person) => person.is_active && (savedStaff.current.get(person.id) ?? Boolean(person.is_designation_optional)) !== noAssign)
         for (const person of targets) {
           await bookingApi.updateStaff(accountId, person.id, { is_designation_optional: noAssign ? 1 : 0 })
+          savedStaff.current.set(person.id, noAssign)
         }
       }
       setDraft(response.data)
@@ -216,7 +222,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
-      setSaveError(bookingRulesErrorMessage(cause, '保存')) }
+      setSaveError(settingsSaved ? `ルールは保存しました。担当の更新を完了できませんでした。もう一度保存すると、残った担当だけ更新します。${bookingRulesErrorMessage(cause, '保存')}` : bookingRulesErrorMessage(cause, '保存')) }
     } finally {
       inFlightRef.current = false
       setSaving(false)

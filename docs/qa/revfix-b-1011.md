@@ -12,3 +12,4 @@
 |REQ-F01|既存の旧版再送を成功とする試験を反転し失敗確認|409後の保存を止め、入力を保って最新版を取得|saveCustomerLookの画面呼出は1箇所|実画面で409→版3から4の読込→入力保持→版4で保存|
 |OPS-C01|実RewardEditorで交換テスト→保存の作成2回を失敗確認|作成済みのIDと版で同じ下書きを更新|createRewardの他2一覧は単独の新規作成。旧app/mileage/rewards/edit/v8-reward-editは入口なしの写し1|作成1回・テストIDと保存ID一致の回帰|
 |UI1-OPS-C01|担当付き実MenuFormの409→担当一覧拒否で選択消失、試験失敗|担当取得成功まで入力を置き換えない|初回読込の同類1も再現して修正。旧app/booking/menus/new/menu-form-v8は入口なし1|競合後入力保持・成功通知なし、初回取得失敗は編集禁止と再読込|
+|UI-N04|実RulesTabで版3を2回送り、担当一部成功も重複更新、2試験失敗|設定保存直後に版を保持、成功した担当も記録|旧app/booking/menus/settings-tabs/rules-tabは不使用の写し1、旧pageのSettingsもV8固定で不使用|再試行の版[3,4]・担当更新[s1,s2,s2]の回帰|
