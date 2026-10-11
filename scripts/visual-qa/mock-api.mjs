@@ -2770,19 +2770,29 @@ const HQ_RUN_SENT = {
 
 /* 作成③の撮影状態。既存APIから5つの吹き出しを戻す。未選択の素材は下書きのまま。 */
 const VISUAL_COMPOSE_BUBBLES = [
-  { id: 'visual-text', type: 'text', content: { text: HQ_RUN_INPUT.messageContent } },
+  { id: 'visual-text', type: 'text', content: { text: '{{name}}さん、いつもありがとうございます。\n定期便のお客さま限定で、秋の新商品を先行でご案内します🍂' } },
   { id: 'visual-sticker', type: 'sticker', content: { state: {
     location: { title: '', address: '', latitude: '', longitude: '' },
     video: { originalContentUrl: '', previewImageUrl: '' },
     audio: { originalContentUrl: '', duration: '' },
     sticker: { packageId: '11537', stickerId: '52002734' },
   } } },
-  { id: 'visual-carousel', type: 'carousel', content: {} },
-  { id: 'visual-audio', type: 'audio', content: {} },
+  { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
+    columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      title, text: '秋のおすすめ商品をご案内します',
+      actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
+    }))),
+  } },
+  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+    location: { title: '', address: '', latitude: '', longitude: '' },
+    video: { originalContentUrl: '', previewImageUrl: '' },
+    audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
+    sticker: { packageId: '', stickerId: '' },
+  } } },
   { id: 'visual-rich', type: 'rich_message', content: {} },
 ]
 const HQ_VISUAL_COMPOSE_DRAFT = { ...HQ_RUN_DRAFT, id: 'hq-visual-compose', input: { ...HQ_RUN_INPUT, messageBubblesJson: JSON.stringify(VISUAL_COMPOSE_BUBBLES) } }
-const HQ_VISUAL_SENT = { ...HQ_RUN_SENT, id: 'hq-visual-sent', status: 'sent' }
+const HQ_VISUAL_SENT = { ...HQ_RUN_SENT, id: 'hq-visual-sent', title: '新商品発売のお知らせ', status: 'sent' }
 const VISUAL_COMPOSE_DRAFT = { ...BROADCASTS[1], id: 'visual-compose', targetType: 'all', messageBubbles: VISUAL_COMPOSE_BUBBLES }
 
 const HQ_BROADCAST_FOLDERS = [
