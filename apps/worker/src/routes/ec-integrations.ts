@@ -624,6 +624,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         `SELECT id, status FROM ec_events WHERE source = ? AND external_event_id = ?`,
       ).bind(source, event.event_id).first<{ id: string; status: string }>();
   if (!row) return c.json({ success: false, error: 'Event ledger failure' }, 500);
+  if (row.status === 'processed' || row.status === 'skipped') {
+    return c.json({ success: true, duplicate: true, status: row.status });
+  }
+
   try {
     await upsertEcEventReadModels(c.env.DB, {
       eventId: row.id,
@@ -673,9 +677,6 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     } catch (followUpError) {
       console.error(`[ec-event] follow-up stop failed event=${event.event_id}`, followUpError);
     }
-  }
-  if (row.status === 'processed' || row.status === 'skipped') {
-    return c.json({ success: true, duplicate: true, status: row.status });
   }
 
   // 受注は運用者へ知らせる。LINEの友だちが見つからなくても受注自体は起きて
