@@ -211,6 +211,8 @@ export interface UpsertFriendInput {
   displayName?: string | null;
   pictureUrl?: string | null;
   statusMessage?: string | null;
+  /** Signed LINE follow occurrence time; guard against older relationship events. */
+  followOccurredAt?: string;
 }
 
 function isMissingFollowLifecycleColumn(error: unknown): boolean {
@@ -230,11 +232,18 @@ export function isFriendLineUserIdConflict(error: unknown): boolean {
   return /unique constraint failed: friends\.line_user_id/i.test(message);
 }
 
+/** Legacy columns without an offset contain JST, as in the schema defaults. */
+function followTimeSql(column:string):string {
+  return `julianday(CASE WHEN substr(${column},-1) IN ('Z','z') OR substr(${column},-6,1) IN ('+','-') OR substr(${column},-5,1) IN ('+','-') THEN ${column}
+    WHEN length(${column})=10 THEN ${column}||'T00:00:00+09:00' ELSE ${column}||'+09:00' END)`;
+}
+
 export async function upsertFriend(
   db: D1Database,
   input: UpsertFriendInput,
 ): Promise<Friend> {
   const now = jstNow();
+  const followAt = input.followOccurredAt ?? now;
   let existing = await getFriendByLineUserIdForAccount(
     db,
     input.lineUserId,
@@ -258,14 +267,14 @@ export async function upsertFriend(
           input.displayName ?? null,
           input.pictureUrl ?? null,
           input.statusMessage ?? null,
-          now,
-          now,
-          now,
+          followAt,
+          followAt,
+          followAt,
           now,
           now,
         ).run();
       } catch (error) {
-        if (!isMissingFollowLifecycleColumn(error)) throw error;
+        if (input.followOccurredAt || !isMissingFollowLifecycleColumn(error)) throw error;
         await db.prepare(
           `INSERT INTO friends
              (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
@@ -310,24 +319,28 @@ export async function upsertFriend(
              ELSE current_follow_started_at
            END,
            last_followed_at = CASE
-             WHEN is_following = 0 THEN ?
+             WHEN ? IS NOT NULL OR is_following = 0 THEN ?
              ELSE COALESCE(last_followed_at, created_at)
            END,
            is_following = 1,
            updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ? AND (? IS NULL OR julianday(?) > MAX(
+         COALESCE(${followTimeSql('last_followed_at')},0), COALESCE(${followTimeSql('last_unfollowed_at')},0)))`,
     ).bind(
       'displayName' in input ? (input.displayName ?? null) : existing.display_name,
       'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
       'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
       input.lineAccountId ?? null,
-      now,
-      now,
+      followAt,
+      input.followOccurredAt ?? null,
+      followAt,
       now,
       existing.id,
+      input.followOccurredAt ?? null,
+      followAt,
     ).run();
   } catch (error) {
-    if (!isMissingFollowLifecycleColumn(error)) throw error;
+    if (input.followOccurredAt || !isMissingFollowLifecycleColumn(error)) throw error;
     // Deployments can briefly run newer Worker code before migration 065 is
     // applied. Preserve the friend-add/OAuth path using the legacy columns;
     // the lifecycle fields are backfilled when the migration is applied.
@@ -355,12 +368,20 @@ export async function updateFriendFollowStatus(
   lineUserId: string,
   isFollowing: boolean,
   lineAccountId: string | null = null,
-): Promise<void> {
-  const now = jstNow();
-  const existing = await getFriendByLineUserIdForAccount(db, lineUserId, lineAccountId);
-  if (!existing) return;
+  occurredAt?: string,
+): Promise<boolean | void> {
+  const now = occurredAt ?? jstNow();
+  let existing = await getFriendByLineUserIdForAccount(db, lineUserId, lineAccountId);
+  if (!existing && !isFollowing && occurredAt) {
+    const inserted = await db.prepare(`INSERT OR IGNORE INTO friends
+      (id,line_user_id,line_account_id,is_following,last_unfollowed_at,created_at,updated_at)
+      VALUES (?,?,?,0,?,?,?)`).bind(crypto.randomUUID(),lineUserId,lineAccountId,now,jstNow(),jstNow()).run();
+    if (Number(inserted.meta?.changes ?? 0) === 1) return true;
+    existing = await getFriendByLineUserIdForAccount(db, lineUserId, lineAccountId);
+  }
+  if (!existing) return false;
   if (isFollowing) {
-    await db
+    const applied = await db
       .prepare(
         `UPDATE friends
             SET first_followed_at = COALESCE(first_followed_at, created_at),
@@ -368,26 +389,29 @@ export async function updateFriendFollowStatus(
                   WHEN is_following = 0 OR current_follow_started_at IS NULL THEN ?
                   ELSE current_follow_started_at
                 END,
-                last_followed_at = CASE WHEN is_following = 0 THEN ? ELSE last_followed_at END,
+                last_followed_at = CASE WHEN ? IS NOT NULL OR is_following = 0 THEN ? ELSE last_followed_at END,
                 is_following = 1, updated_at = ?
-          WHERE id = ?`,
+          WHERE id = ? AND (? IS NULL OR julianday(?) > MAX(
+            COALESCE(${followTimeSql('last_followed_at')},0),COALESCE(${followTimeSql('last_unfollowed_at')},0)))`,
       )
-      .bind(now, now, now, existing.id)
+      .bind(now, occurredAt ?? null, now, now, existing.id, occurredAt ?? null, now)
       .run();
-    return;
+    return Number(applied.meta?.changes ?? 0) === 1;
   }
-  await db
+  const applied = await db
     .prepare(
       `UPDATE friends
           SET is_following = 0,
               current_follow_started_at = NULL,
-              last_unfollowed_at = CASE WHEN is_following = 1 THEN ? ELSE last_unfollowed_at END,
+              last_unfollowed_at = CASE WHEN ? IS NOT NULL OR is_following = 1 THEN ? ELSE last_unfollowed_at END,
               unfollow_count = unfollow_count + CASE WHEN is_following = 1 THEN 1 ELSE 0 END,
               updated_at = ?
-        WHERE id = ?`,
+        WHERE id = ? AND (? IS NULL OR julianday(?) > MAX(
+            COALESCE(${followTimeSql('last_followed_at')},0),COALESCE(${followTimeSql('last_unfollowed_at')},0)))`,
     )
-    .bind(now, now, existing.id)
+    .bind(occurredAt ?? null, now, now, existing.id, occurredAt ?? null, now)
     .run();
+  return Number(applied.meta?.changes ?? 0) === 1;
 }
 
 /** Get merged metadata across all friend records sharing the same user_id (UUID). */

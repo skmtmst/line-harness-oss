@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import {createTestD1} from '../test-utils/d1-sqlite.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { signSupportRelay } from '../services/support-relay.js';
@@ -9,7 +10,8 @@ vi.mock('@line-crm/line-sdk', () => ({
   LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
 }));
 
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async (original) => ({
+  ...await original<typeof import('@line-crm/db')>(),
   getFriendByLineUserIdForAccount: vi.fn(async () => ({
     id: 'friend-1',
     line_user_id: 'U11111111111111111111111111111111',
@@ -25,33 +27,9 @@ import { getFriendByLineUserIdForAccount } from '@line-crm/db';
 import { meetCallback } from './meet-callback.js';
 
 function fakeDb() {
-  const receipts = new Map<string, string>();
-  const db = {
-    prepare(sql: string) {
-      const statement = {
-        params: [] as unknown[],
-        bind(...params: unknown[]) { statement.params = params; return statement; },
-        async first() {
-          if (sql.includes('meet_callback_receipts')) {
-            const hash = receipts.get(String(statement.params[0]));
-            return hash ? { payload_hash: hash } : null;
-          }
-          return null;
-        },
-        async run() {
-          if (sql.includes('INSERT OR IGNORE INTO meet_callback_receipts')) {
-            const [sessionId, hash] = statement.params.map(String);
-            if (receipts.has(sessionId)) return { meta: { changes: 0 } };
-            receipts.set(sessionId, hash);
-            return { meta: { changes: 1 } };
-          }
-          return { meta: { changes: 1 } };
-        },
-      };
-      return statement;
-    },
-  };
-  return db as unknown as D1Database;
+ const f=createTestD1();
+ f.raw.prepare("INSERT INTO friends(id,line_user_id,metadata) VALUES('friend-1','U11111111111111111111111111111111','{}')").run();
+ return f.db;
 }
 
 const payload = {
