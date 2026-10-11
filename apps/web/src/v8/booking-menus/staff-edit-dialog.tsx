@@ -5,6 +5,8 @@ import { Field } from '@/components/shared/form-controls'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
+import {useAccount} from '@/contexts/account-context'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import ImageUploader from '@/components/shared/image-uploader'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
@@ -30,6 +32,8 @@ export function StaffEditModal({
   onSave: (s: Partial<BookingStaff>) => Promise<void>
   onClose: () => void
 }) {
+  const {selectedAccountId} = useAccount()
+  const [mediaOpen, setMediaOpen] = useState(false)
   const saveErrors = useSaveFormErrors()
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
@@ -106,7 +110,7 @@ export function StaffEditModal({
             /></SaveErrorField>
           </Field>
           <ImageUploader
-            mode="url"
+            mode="url" onMediaPick={() => setMediaOpen(true)}
             value={form.profile_image_url ? { mode: 'url', url: form.profile_image_url } : null}
             onChange={(v) => set('profile_image_url', v?.mode === 'url' ? v.url : '')}
             label="プロフィール画像"
@@ -160,7 +164,7 @@ export function StaffEditModal({
           </Field>
           {err && <p className="text-xs text-danger">{err}</p>}
         </div>
-    </Dialog></SaveErrorScope>
+    </Dialog><MediaPickerDialog open={mediaOpen} accountId={selectedAccountId} kind="image" onClose={() => setMediaOpen(false)} onSelect={(item) => { set('profile_image_url', item.url); setMediaOpen(false) }} /></SaveErrorScope>
   )
 }
 

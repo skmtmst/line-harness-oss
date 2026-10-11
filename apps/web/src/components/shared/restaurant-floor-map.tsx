@@ -1,11 +1,11 @@
 'use client'
-import {useRef,type PointerEvent} from 'react'
+import {useRef,type CSSProperties,type PointerEvent} from 'react'
 import {floorBoxInside,floorBoxesOverlap,type RestaurantFloor,type ReservationBoardResource} from '@line-crm/shared'
 import styles from './restaurant-floor-map.module.css'
 type Box={x:number;y:number;width:number;height:number}
 
 /** 店の保存した寸法で描き、図面の編集と予約盤の読み取りで共用する。 */
-export default function RestaurantFloorMap({floor,labels,onSelect,onChange,onFloorChange,canEdit=false,drawing=false}:{floor:RestaurantFloor;labels:ReservationBoardResource[];onSelect:(id:string)=>void;onChange?:(tables:RestaurantFloor['tables'])=>void;onFloorChange?:(floor:RestaurantFloor)=>void;canEdit?:boolean;drawing?:boolean}) {
+export default function RestaurantFloorMap({floor,labels,onSelect,onChange,onFloorChange,canEdit=false,drawing=false,id,invalid,style,'aria-describedby':describedBy}:{floor:RestaurantFloor;labels:ReservationBoardResource[];onSelect:(id:string)=>void;onChange?:(tables:RestaurantFloor['tables'])=>void;onFloorChange?:(floor:RestaurantFloor)=>void;canEdit?:boolean;drawing?:boolean;id?:string;invalid?:boolean;style?:CSSProperties;'aria-describedby'?:string}) {
  const svg=useRef<SVGSVGElement>(null),drag=useRef<{id:string;fixture:boolean;x:number;y:number;ox:number;oy:number}|null>(null)
  const point=(e:{clientX:number;clientY:number})=>{const matrix=svg.current!.getScreenCTM()!;const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());return {x:Math.round(p.x/10)*10,y:Math.round(p.y/10)*10}}
  const move=(id:string,fixture:boolean,x:number,y:number)=>{
@@ -17,7 +17,7 @@ export default function RestaurantFloorMap({floor,labels,onSelect,onChange,onFlo
  }
  const start=(e:PointerEvent<SVGGElement>,id:string,fixture:boolean,t:Box)=>{if(!canEdit||drawing)return;const p=point(e);drag.current={id,fixture,...p,ox:t.x,oy:t.y};e.currentTarget.setPointerCapture(e.pointerId)}
  const groups=[...new Set(floor.tables.map(t=>t.joinGroup).filter(Boolean))]
- return <svg ref={svg} className={styles.map} viewBox={`0 0 ${floor.width} ${floor.height}`} role="group" aria-label={`${floor.name}の座席表`}
+ return <svg id={id} style={style} aria-invalid={invalid||undefined} aria-describedby={describedBy} tabIndex={canEdit?0:undefined} ref={svg} className={styles.map} viewBox={`0 0 ${floor.width} ${floor.height}`} role="group" aria-label={`${floor.name}の座席表`}
  onClick={e=>{if(canEdit&&drawing&&onFloorChange){const p=point(e);if(p.x>=0&&p.y>=0&&p.x<=floor.width&&p.y<=floor.height)onFloorChange({...floor,outline:[...floor.outline,p]})}}}
  onPointerMove={e=>{const d=drag.current;if(!d)return;const p=point(e);move(d.id,d.fixture,d.ox+p.x-d.x,d.oy+p.y-d.y)}} onPointerUp={()=>{drag.current=null}} onPointerCancel={()=>{drag.current=null}}>
  {floor.outline.length>2?<polygon className={styles.outline} points={floor.outline.map(p=>`${p.x},${p.y}`).join(' ')}/>:<rect className={styles.outline} x="1" y="1" width={floor.width-2} height={floor.height-2}/>}

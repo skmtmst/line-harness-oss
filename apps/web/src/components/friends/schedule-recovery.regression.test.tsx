@@ -47,5 +47,8 @@ it('予約失敗後はキャンセル・Escが再び使える', async () => {
   fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
   expect(onClose).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(onClose).toHaveBeenCalledTimes(1)
+  expect((screen.getByRole('textbox', { name: '送るもの' }) as HTMLTextAreaElement).value).toBe('案内')
+  fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
   expect(onClose).toHaveBeenCalledTimes(2)
 })

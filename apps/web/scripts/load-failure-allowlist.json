@@ -1,0 +1,267 @@
+[
+  {
+    "filename": "src/app/affiliates/payment-tab.tsx",
+    "fingerprint": "3316f8937e1a0337",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/affiliates/tabs.tsx",
+    "fingerprint": "314305a1b5e6ddd3",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/affiliates/v8-payment-tab.tsx",
+    "fingerprint": "3316f8937e1a0337",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/automations/new/new-v8.tsx",
+    "fingerprint": "a6c89fc6d75748e6",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/automations/new/page.tsx",
+    "fingerprint": "a6c89fc6d75748e6",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/booking/menus/new/menu-form-v8.tsx",
+    "fingerprint": "5d9c55b0e9255d40",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/booking/menus/new/menu-form-v8.tsx",
+    "fingerprint": "51272aee1b2e2708",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/booking/menus/settings-tabs/hours-tab.tsx",
+    "fingerprint": "88e851608db2ecce",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/booking/staff/new/staff-new-v8.tsx",
+    "fingerprint": "a95ea73a0b2f0421",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/booking/staff/shifts/page.tsx",
+    "fingerprint": "30fe287f6fc75660",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/booking/staff/shifts/staff-detail-v8.tsx",
+    "fingerprint": "234b4c189f12bb57",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/booking/staff/shifts/staff-detail-v8.tsx",
+    "fingerprint": "955be7b2e9b26c48",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/booking/staff/shifts/staff-detail.tsx",
+    "fingerprint": "234b4c189f12bb57",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/emergency/control-v8.tsx",
+    "fingerprint": "6e0c0c665122dfe5",
+    "reason": "空配列は復旧できない追加理由だけ。setFeedback(tone= danger)で復旧失敗を表示し、正常・空として進めない。"
+  },
+  {
+    "filename": "src/app/emergency/page.tsx",
+    "fingerprint": "98df3181dc795de4",
+    "reason": "空配列は復旧できない追加理由だけ。handleOperationFailureで復旧失敗を表示し、正常・空として進めない。"
+  },
+  {
+    "filename": "src/app/form-submissions/edit/page.tsx",
+    "fingerprint": "2b13588ac504ddb9",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/form-submissions/edit/page.tsx",
+    "fingerprint": "32730a127e3f9478",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/form-submissions/edit/page.tsx",
+    "fingerprint": "707ac046b2e918d0",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/form-submissions/edit/page.tsx",
+    "fingerprint": "174082761aac9a9c",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/form-submissions/edit/page.tsx",
+    "fingerprint": "81c59aac2d9f6ada",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/form-submissions/edit/page.tsx",
+    "fingerprint": "c7bcb18e41229201",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/friend-add-settings/friend-add-rule-editor.tsx",
+    "fingerprint": "2f5da09dc2bf41e8",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/friend-add-settings/friend-add-rule-editor.tsx",
+    "fingerprint": "faf65b074ccec437",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/inflow-links/_components/edit-route-modal.tsx",
+    "fingerprint": "94084b258022c39a",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/inflow-links/detail/page.tsx",
+    "fingerprint": "11dbcef76f87b084",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/inflow-links/new/page.tsx",
+    "fingerprint": "2ab6ef6a2aeed7de",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/inflow-links/page.tsx",
+    "fingerprint": "d565496ab311d881",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/inflow-links/page.tsx",
+    "fingerprint": "dfbd8e62c6e47dad",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/inflow-links/page.tsx",
+    "fingerprint": "45b3d6dc9e4cc456",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/inflow-links/page.tsx",
+    "fingerprint": "f2a7e2d3a4d4c4f4",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/line-notifications/page.tsx",
+    "fingerprint": "5bd0ee0cb62e144c",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/restaurant-test/v8/organization.tsx",
+    "fingerprint": "f66e448ff8081ee3",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/tags/search-editor-v8.tsx",
+    "fingerprint": "04a568e53cb7d423",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/tags/search-editor-v8.tsx",
+    "fingerprint": "beb7499f2b4220fa",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/tags/search-editor-v8.tsx",
+    "fingerprint": "a61b6ddc4bdb9720",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/tags/search-editor-v8.tsx",
+    "fingerprint": "747b1d50a0da21f8",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/tags/search-editor-v8.tsx",
+    "fingerprint": "b8f5512011d3230e",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/tags/search-editor-v8.tsx",
+    "fingerprint": "0e752702b20807c3",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/app/webinars/list-v8.tsx",
+    "fingerprint": "735a75917163c88a",
+    "reason": "現行入口はsrc/v8の画面を返す。useAdminThemeは通常実行でv8固定（lib/admin-theme-default.ts）。この旧本文・旧部品の空配列は現行画面へ表示されない。対応するsrc/v8の拒否を人工応答で確認したため、不使用の写しは今回変更しない。"
+  },
+  {
+    "filename": "src/v8/affiliates/drawer.tsx",
+    "fingerprint": "86d49a7c1db3235c",
+    "reason": "links.success=falseならsetError(true)。実HTTP拒否もcatchでerrorとなり、引き出しの失敗表示と再取得へ。"
+  },
+  {
+    "filename": "src/v8/auto-replies/list.tsx",
+    "fingerprint": "2a30bb8763703788",
+    "reason": "templateListAvailable=falseを編集部品へ渡してテンプレート未取得を区別。空テンプレートとして候補を確定しない。"
+  },
+  {
+    "filename": "src/v8/booking-menus/menu-form.tsx",
+    "fingerprint": "5d9c55b0e9255d40",
+    "reason": "allSettledの拒否はmenusStatus/staffStatus/editStatus=errorへ。編集時は担当・割当の全成功後だけfillFrom。実初回・409読込の拒否試験も合格。"
+  },
+  {
+    "filename": "src/v8/booking-menus/menu-form.tsx",
+    "fingerprint": "51272aee1b2e2708",
+    "reason": "allSettledの拒否はmenusStatus/staffStatus/editStatus=errorへ。編集時は担当・割当の全成功後だけfillFrom。実初回・409読込の拒否試験も合格。"
+  },
+  {
+    "filename": "src/v8/booking-staff/shifts.tsx",
+    "fingerprint": "234b4c189f12bb57",
+    "reason": "本人は設定閲覧権限なしでも自分の勤務を読める契約。管理者はsettingsRes失敗をthrowしてerrorへ。本人の未取得分をゼロ件の店舗情報として表示しない。"
+  },
+  {
+    "filename": "src/v8/booking-staff/shifts.tsx",
+    "fingerprint": "c2a3c46fd245afd4",
+    "reason": "本人は設定閲覧権限なしでも自分の勤務を読める契約。管理者はsettingsRes失敗をthrowしてerrorへ。本人の未取得分をゼロ件の店舗情報として表示しない。"
+  },
+  {
+    "filename": "src/v8/forms/list.tsx",
+    "fingerprint": "6e747bcd8a6de6f6",
+    "reason": "複製本体の成功後だけの補助検索。候補を得られなければloadFormsの失敗表示付き再取得へ。複製は再送せず作成済みを保持。"
+  },
+  {
+    "filename": "src/v8/inflow-links/edit-route-dialog.tsx",
+    "fingerprint": "94084b258022c39a",
+    "reason": "現行呼出はlist.tsxのみでpoolMemberNamesを必ず渡す。自前取得の枝は現行画面では実行されない。親候補の取得拒否は追加実画面試験5条件で失敗表示を確認済み。"
+  },
+  {
+    "filename": "src/v8/settings/line-notifications/screen.tsx",
+    "fingerprint": "5bd0ee0cb62e144c",
+    "reason": "definitionsFailedを別に保持し、取得失敗を定義なしとして新規作成しない。必要でない機能はそもそも読まない。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "04a568e53cb7d423",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "beb7499f2b4220fa",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "a61b6ddc4bdb9720",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "747b1d50a0da21f8",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "b8f5512011d3230e",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  }
+]
