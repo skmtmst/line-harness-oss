@@ -346,9 +346,6 @@
   "components/dashboard/shipment-panel.tsx": {
     "arbitrary-value": 2
   },
-  "components/events/event-wizard.tsx": {
-    "unresolved-classname": 8
-  },
   "components/forms/action-editor.tsx": {
     "arbitrary-value": 2
   },

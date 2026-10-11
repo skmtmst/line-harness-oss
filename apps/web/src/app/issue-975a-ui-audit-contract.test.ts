@@ -72,11 +72,11 @@ describe('U055: V8の予約メニューの数値欄は共通部品で単位を�
 
 describe('U056: 長文欄ははじめから3行分の高さ', () => {
   it('イベントの説明と質問の返信は rows=3 以上', () => {
-    const wizard = read('../components/events/event-wizard.tsx')
+    const event = read('../v8/events/edit-form.tsx')
     const editor = read('../components/scenarios/question-editor.tsx')
-    expect(wizard).not.toContain('rows={2}')
+    expect(event).not.toContain('rows={2}')
     expect(editor).not.toContain('rows={2}')
-    expect(wizard).toMatch(/id="ev-desc"[\s\S]*?rows=\{3\}/)
+    expect(event).toMatch(/<TextArea[\s\S]*?rows=\{8\}/)
   })
 })
 
@@ -122,8 +122,10 @@ describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる'
   })
   it('共通アクションの見本選択は内容に合わせて広がる', () => {
     const page = read('common-actions/new/page.tsx')
-    expect(page).toContain('data-example-select')
-    expect(page).toContain('[data-example-select] .min-w-48 { width: auto; max-width: 100%; }')
+    expect(page).toContain('<EntityKindField kind="common_action"label="見本から受け渡す"')
+    const picker = read('../components/shared/entity-picker-sources.tsx')
+    expect(picker).toContain('<EntityPickerField')
+    expect(page).not.toContain('[data-example-select] .min-w-48')
   })
   it('特典の選択は部品が持つ full 指定を使う（Select側は既存のprop）', () => {
     /* 入口は V8 の画面（src/v8/mileage/reward-edit.tsx）を出すだけ。選ぶ欄はそちらにある。 */

@@ -26,6 +26,7 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { EVENT_NAME_MAX_LENGTH, EVENT_DESCRIPTION_MAX_LENGTH, resolveEventMultiAccountIds } from '@/components/events/event-draft-shared'
 
 /*
  * ★V8 イベント予約「イベントを作る」（Pencil `d4adD4`）。
@@ -131,8 +132,8 @@ function EventsCreateV8Inner() {
     }
     const errors: Record<string, string> = {}
     if (!draft.name.trim()) errors['ev-new-name'] = 'イベント名を入れてください'
-    else if (draft.name.length > 255) errors['ev-new-name'] = 'イベント名は255字以内で入力してください'
-    if ((draft.description ?? '').length > 20000) errors['ev-new-desc'] = '詳細は20000字以内で入力してください'
+    else if (draft.name.length > EVENT_NAME_MAX_LENGTH) errors['ev-new-name'] = 'イベント名は255字以内で入力してください'
+    if ((draft.description ?? '').length > EVENT_DESCRIPTION_MAX_LENGTH) errors['ev-new-desc'] = '詳細は20000字以内で入力してください'
     if (draft.venue_url) {
       try {
         const url = new URL(draft.venue_url)
@@ -165,7 +166,7 @@ function EventsCreateV8Inner() {
         name: draft.name.trim(),
         is_published: publish ? 1 : 0,
         questions: qs,
-        account_ids: (draft.target_type ?? 'single') === 'multi-account-dedup' ? [selectedAccountId] : null,
+        account_ids: resolveEventMultiAccountIds(draft, selectedAccountId),
       }
       delete payload.id
       delete payload.version
@@ -268,13 +269,13 @@ function EventsCreateV8Inner() {
         <div className={styles.field}><Field label="イベント名" htmlFor="ev-new-name" required><SaveErrorField names={["name","draft.name"]}><TextField
             id="ev-new-name"
             value={draft.name}
-            maxLength={255}
+            maxLength={EVENT_NAME_MAX_LENGTH}
             placeholder="秋のしつけ教室（第1回）"
             aria-invalid={Boolean(fieldErrors['ev-new-name']) || undefined}
             aria-describedby={fieldErrors['ev-new-name'] ? 'ev-new-name-error' : undefined}
             required
             onBlur={() => {
-              const error = !draft.name.trim() ? 'イベント名を入れてください' : draft.name.length > 255 ? 'イベント名は255字以内で入力してください' : null
+              const error = !draft.name.trim() ? 'イベント名を入れてください' : draft.name.length > EVENT_NAME_MAX_LENGTH ? 'イベント名は255字以内で入力してください' : null
               if (error) setFieldErrors((current) => ({ ...current, 'ev-new-name': error }))
               else clearFieldError('ev-new-name')
             }}
@@ -287,7 +288,7 @@ function EventsCreateV8Inner() {
         <div className={styles.field}><Field label="説明" htmlFor="ev-new-desc"><SaveErrorField names={["description","draft.description"]}><TextField
             id="ev-new-desc"
             value={draft.description ?? ''}
-            maxLength={20000}
+            maxLength={EVENT_DESCRIPTION_MAX_LENGTH}
             placeholder="開催趣旨・注意事項・持ち物など"
             onChange={(event) => update('description', event.target.value || null)}
           /></SaveErrorField></Field></div>

@@ -100,7 +100,7 @@ const GUARDED = [
   'app/webinars/new/page.tsx',
   'components/broadcasts/broadcast-form.tsx',
   'v8/events/edit-form.tsx',
-  'components/events/event-wizard.tsx',
+  'v8/events/create.tsx',
   'components/friend-fields/support-mark-editor.tsx',
   'components/reminders/reminder-publish-flow.tsx',
   /* 2026-10-07：src/v8 に一から書いた画面。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */
