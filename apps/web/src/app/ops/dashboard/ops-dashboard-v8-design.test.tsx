@@ -87,7 +87,15 @@ describe('CyW0E ダッシュボードの絵合わせ', () => {
     await settle()
     const body = text()
     // 頭
-    expect(body).toContain('契約先の売上・使用量・お問い合わせを見て、要対応から片づけます')
+    // 見出し下の説明は共通の「？」から読む。説明の欠落と開閉の動きを検査する。
+    const help = host.querySelector<HTMLButtonElement>('button[aria-label="ダッシュボードの説明"]')!
+    expect(help).toBeTruthy()
+    expect(help.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => { help.click() })
+    expect(help.getAttribute('aria-expanded')).toBe('true')
+    expect(host.querySelector('[role="note"]')?.textContent).toContain('契約先の売上・使用量・お問い合わせを見て、要対応から片づけます')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).not.toContain('のようす')
     // 数の帯の順と内訳
     const order = ['契約中の月額合計', '今月の売上（入金済み）', 'トライアル中', '今月の AI 利用']
