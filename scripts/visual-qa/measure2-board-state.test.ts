@@ -165,6 +165,18 @@ describe('板ごとの撮影条件', () => {
     expect(broadcast.status).toBe('scheduled')
   })
 
+  it('CSVは見本を選んで確認まで撮り、取り込みの本反映を実行しない', () => {
+    const profile = BOARD_STATE_PROFILES.T9gblG
+    expect(profile.click.slice(1)).toEqual(['まず確認だけする'])
+    const sample = JSON.parse(profile.click[0].slice(5))
+    const rows = sample.text.split('\n').slice(1)
+    expect(rows).toHaveLength(3)
+    expect(rows.every((row: string) => /^U[0-9a-f]{32},/.test(row))).toBe(true)
+    expect(profile.api.map((rule: FixtureRow) => rule.match)).toEqual(['POST /api/friends/imports$'])
+    expect(profile.api[0].body.data.status).toBe('previewed')
+    expect(Object.values(profile.api[0].body.data.result.summary).reduce((sum: number, value) => sum + Number(value), 0)).toBe(rows.length)
+  })
+
   it('今日のお店は既存の予約ID・日時・人数と別APIを残して、名前と状態を再現する', () => {
     const rows = Array.from({ length: 7 }, (_, i) => ({ id: `dash-${i}`, customer_name: '見本', source: 'line', status: 'confirmed', table_label: `T${i}`, starts_at: '@TODAY@T17:00:00', ends_at: '@TODAY@T19:00:00', guest_count: 2 }))
     const day = { match: 'GET /api/restaurant-test/reservations/day', body: { success: true, data: { date: '@TODAY@', reservations: rows, closures: [] } } }

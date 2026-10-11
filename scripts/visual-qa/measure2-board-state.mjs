@@ -81,6 +81,7 @@ const hqBroadcasts = BROADCASTS.map(row => {
 const cancellationEvent = event => event === 'ec.subscription.payment_failed' ? 'ec.subscription.cancelled' : event
 
 const captureJst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+const csvSample = ['LINEユーザーID,LINE表示名,本名,システム表示名,登録日', ...[1, 2, 3].map(i => `U${String(i).repeat(32)},撮影の見本${i},,,2026-09-01`)].join('\n')
 const monthDeliveryApi = [0, -1].map(offset => {
   const from = new Date(Date.UTC(captureJst.getUTCFullYear(), captureJst.getUTCMonth() + offset, 1) - 9 * 60 * 60 * 1000).toISOString()
   const to = new Date(Date.UTC(captureJst.getUTCFullYear(), captureJst.getUTCMonth() + offset + 1, 1) - 9 * 60 * 60 * 1000).toISOString()
@@ -95,6 +96,13 @@ const monthDeliveryApi = [0, -1].map(offset => {
 })
 
 export const BOARD_STATE_PROFILES = {
+  apLqS: { url: '/reminders', joinControlText: 'button[title="失敗があるリマインダだけに絞り込みます"]' },
+  T9gblG: { url: '/friends/migrations', click: [
+    `file:${JSON.stringify({ name: 'friends.csv', text: csvSample })}`, 'まず確認だけする',
+  ], api: [{ match: 'POST /api/friends/imports$', body: { success: true, data: {
+    id: 'measure2-preview', status: 'previewed', duplicate: false,
+    result: { summary: { add: 3, update: 0, unchanged: 0, conflict: 0, error: 0 }, rows: [] },
+  } } }] },
   qwIZr: { url: '/restaurant-test/dashboard', transformApi: (rules) => rules.map(rule => {
     if (rule.match !== 'GET /api/restaurant-test/reservations/day') return rule
     const samples = [
@@ -215,6 +223,7 @@ export function applyBoardStateProfiles(map) {
       throw new Error(`${id}: 既存の状態指定と撮影の指定が重なっています`)
     }
     entry.url = profile.url
+    if (profile.joinControlText) entry.state = { ...entry.state, joinControlText: profile.joinControlText }
     if (profile.transformApi) {
       entry.state = { ...entry.state, api: profile.transformApi(Array.isArray(entry.state?.api) ? entry.state.api : entry.state?.api ? [entry.state.api] : []) }
     }
