@@ -824,8 +824,8 @@ export default function HqBroadcastCreate() {
   return (
     <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
       <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
-        <PageHeading title={<>一括配信を作る</>}
-        crumbs={<><p aria-live="polite">{draftLabel}</p></>}
+        <PageHeading title={<>一括配信を作る</>} headingSize="compact"
+        subtitle={<span aria-live="polite">{draftLabel}</span>}
         steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
         actions={<>{/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}<Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button></>} />
         {error ? (

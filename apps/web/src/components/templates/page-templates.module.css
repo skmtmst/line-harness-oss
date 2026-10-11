@@ -285,6 +285,9 @@
 :global([data-theme='v8']) [data-page-template='create'] .heading > .headingText > .titleRow { flex: 1 1 0; order: 1; }
 :global([data-theme='v8']) [data-page-template='create'] .heading > .actions { order: 1; margin-left: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading > .headingText > .description { flex-basis: 100%; order: 3; }
+/* 状態の短い補足も題の下の行。compact の間2を display:contents で失わない。 */
+:global([data-theme='v8']) [data-page-template='create'] .heading > .headingText > .subtitle { flex-basis: 100%; order: 3; }
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-heading-size='compact'] { row-gap: var(--tpl-compact-gap); }
 :global([data-theme='v8']) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
 :global([data-theme='v8']) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-top-gap); }
 
