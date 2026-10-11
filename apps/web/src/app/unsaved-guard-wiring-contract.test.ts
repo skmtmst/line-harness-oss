@@ -56,7 +56,6 @@ const GUARDED = [
   'v8/nen-pets/feeding.tsx',
   'app/reminders/new/new-v8.tsx',
   'app/reminders/new/page.tsx',
-  'app/restaurant-test/google/google-posts.tsx',
   'v8/restaurant/google/profile-edit.tsx',
   'v8/restaurant/google/profile-hours.tsx',
   'app/rich-menus/new/create-v8.tsx',

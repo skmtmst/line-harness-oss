@@ -202,7 +202,6 @@ describe('「API error: 500」を画面に出さない', () => {
   it('点検で見つけた8か所は直したまま', () => {
     for (const file of [
       'v8/restaurant/google/format.ts',
-      'app/restaurant-test/google/google-format.ts',
       'v8/friends/migrations/use-uid-migration.ts',
       'app/accounts/use-uid-migration.ts',
       'v8/hq-broadcasts/create.tsx',

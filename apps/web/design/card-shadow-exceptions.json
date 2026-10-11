@@ -520,11 +520,6 @@
     "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
   },
   {
-    "file": "app/restaurant-test/google/google-posts.tsx",
-    "selector": "className=\"border-hairline rounded-card border p-4\"",
-    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
     "file": "app/scenarios/detail/detail-v8.tsx",
     "selector": "className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}",
     "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"

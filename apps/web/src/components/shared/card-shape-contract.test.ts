@@ -98,7 +98,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["app/affiliates/tabs.tsx", "className=\"bg-canvas rounded-card border-hairline mt-3 flex flex-wrap items-center gap-3 border p-3\"", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["app/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/nen-members/photo-review-detail.tsx", "className=\"mt-4 rounded-card border border-hairline bg-canvas p-4\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
-  ["app/restaurant-test/google/google-posts.tsx", "className=\"border-hairline rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["app/tags/edit-field-page-v8.tsx", "className=\"rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/tags/search-editor-v8.tsx", "className=\"rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/templates/staff-asset-list.tsx", "className=\"bg-canvas border-hairline text-ink-faint col-span-full rounded-card border border-dashed p-12 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],

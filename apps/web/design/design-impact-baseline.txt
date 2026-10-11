@@ -111,7 +111,6 @@ shared-button-importer app/register/sent/page.tsx
 shared-button-importer app/reminders/list-v8.tsx
 shared-button-importer app/reminders/new/new-v8.tsx
 shared-button-importer app/reminders/wizard-v8-ui.tsx
-shared-button-importer app/restaurant-test/google/google-posts.tsx
 shared-button-importer app/rich-menus/new/create-v8.tsx
 shared-button-importer app/settings/feature-settings-v8.tsx
 shared-button-importer app/settings/file-scan/file-scan-v8.tsx
