@@ -54,7 +54,7 @@ const GUARDED = [
   'app/nen-campaigns/columns/new/column-new-v8.tsx',
   'app/nen-campaigns/columns/new/page.tsx',
   'app/nen-campaigns/edit/campaign-editor-v8.tsx',
-  'app/nen-campaigns/edit/page.tsx',
+  'v8/nen-campaigns/column-intros.tsx',
   'app/nen-campaigns/page.tsx',
   'app/nen/members/lifetime-tab.tsx',
   'app/nen/members/members-v8.tsx',

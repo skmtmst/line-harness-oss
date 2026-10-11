@@ -7,7 +7,7 @@ const OVERVIEW = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/li
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const PREVIEW = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/preview.tsx'), 'utf8')
 const NEW_COLUMN = fs.readFileSync(path.join(__dirname, 'columns/new/column-new-v8.tsx'), 'utf8')
-const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const EDIT = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/column-intros.tsx'), 'utf8')
 
 /*
  * ★V6 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム の画面契約。
