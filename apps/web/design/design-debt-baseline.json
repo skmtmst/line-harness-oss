@@ -2,9 +2,6 @@
   "app/accounts/new/page.tsx": {
     "arbitrary-value": 1
   },
-  "app/accounts/page.tsx": {
-    "arbitrary-value": 1
-  },
   "app/accounts/uid-migration-v8.tsx": {
     "unresolved-classname": 1,
     "direct-th": 8
