@@ -15,6 +15,8 @@ function iso(offset:number){return new Date(Date.now()+offset*60000).toISOString
 function reservation(id='r',starts=iso(3000),source='phone') {
  t.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status)
  VALUES(?,'s',?,'友だち','UID',2,?,?,'confirmed')`).run(id,source,starts,new Date(Date.parse(starts)+120*60000).toISOString());
+ // SQLite's trigger clock is real time; match fixture events to the test clock.
+ t.raw.prepare('UPDATE rt_reservation_events SET occurred_at=? WHERE reservation_id=?').run(new Date().toISOString(),id);
  return t.raw.prepare('SELECT * FROM rt_reservation_events WHERE reservation_id=? ORDER BY reservation_version DESC LIMIT 1').get(id) as RestaurantEvent;
 }
 async function activate() {
