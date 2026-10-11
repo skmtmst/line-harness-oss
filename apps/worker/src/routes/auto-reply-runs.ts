@@ -140,6 +140,7 @@ function detail(row: AutoReplyRunListRow, status: AutoReplyEvaluationStatus): st
     }
     return SKIP_LABELS[candidateReason ?? row.skip_reason ?? ''] ?? '条件に合わず何もしませんでした';
   }
+  if (row.error_code === 'delayed_delivery_unknown') return '届いたか分からないため要確認です。自動では送り直しません';
   if (row.status === 'reply_failed') return 'LINEへの返信を受け付けてもらえませんでした';
   if (row.status === 'partial_failed') return '返信または一部の処理だけ完了しました';
   if (row.status === 'failed') return '自動応答を完了できませんでした';

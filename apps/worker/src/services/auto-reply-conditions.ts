@@ -161,7 +161,7 @@ export async function hasAlreadyRepliedOnce(
   if (await hasAutoReplyHitForFriend(db, rule.id, friendId)) return true;
   if (!rule.reply_delay_seconds) return false;
   const row = await db.prepare(`SELECT 1 FROM auto_reply_deliveries d JOIN auto_reply_versions v ON v.id=d.version_id
-    WHERE d.friend_id=? AND v.auto_reply_id=? AND d.status IN ('pending','claimed','accepted') LIMIT 1`).bind(friendId,rule.id).first();
+    WHERE d.friend_id=? AND v.auto_reply_id=? AND (d.status IN ('pending','claimed','accepted') OR d.error_code='delayed_delivery_unknown') LIMIT 1`).bind(friendId,rule.id).first();
   return row != null;
 }
 

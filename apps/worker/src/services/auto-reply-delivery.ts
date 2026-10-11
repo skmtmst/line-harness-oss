@@ -1,3 +1,4 @@
+import { claimDelayedReply, beginDelayedReplyDispatch, finishDelayedReply, recoverDelayedReplies } from './auto-reply-delivery-lease.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import { dispatchLineProxyLocally } from './local-line-proxy.js';
 import { deterministicLogId } from '../routes/line-proxy.js';
@@ -26,6 +27,9 @@ export async function processAutoReplyDeliveries(
   clientForAccount?: (accountId: string | null) => Promise<LineClient>,
 ): Promise<number> {
   const db = env.DB;
+  const started = Date.now();
+  const clock = () => new Date(now.getTime()+Date.now()-started);
+  await recoverDelayedReplies(db,now);
   const due = await db
     .prepare(
       "SELECT * FROM auto_reply_deliveries WHERE status = 'pending' AND due_at <= ? ORDER BY due_at,id LIMIT 50",
@@ -42,21 +46,10 @@ export async function processAutoReplyDeliveries(
     }>();
   let count = 0;
   for (const row of due.results) {
-    const claim = await db
-      .prepare(
-        "UPDATE auto_reply_deliveries SET status = 'claimed' WHERE id = ? AND status = 'pending'",
-      )
-      .bind(row.id)
-      .run();
-    if (Number(claim.meta.changes) !== 1) continue;
-    const finish = async (status: string, error: string | null) => {
-      await db
-        .prepare(
-          'UPDATE auto_reply_deliveries SET status = ?,error_code = ?,completed_at = ? WHERE id = ?',
-        )
-        .bind(status, error, now.toISOString(), row.id)
-        .run();
-    };
+    const leaseToken = await claimDelayedReply(db,row.id,clock());
+    if (!leaseToken) continue;
+    const finish = (status:string,error:string|null) => finishDelayedReply(db,row.id,leaseToken,status,error,clock());
+    let dispatchStarted = false;
     try {
       const friend = await getFriendById(db, row.friend_id);
       const version = await getAutoReplyVersionById(db, row.version_id);
@@ -122,6 +115,8 @@ export async function processAutoReplyDeliveries(
       if (!clientForAccount && !token)
         throw new Error('line_account_unavailable');
       const message = JSON.parse(row.message_json) as Message;
+      if (!await beginDelayedReplyDispatch(db,row.id,leaseToken,clock())) continue;
+      dispatchStarted = true;
       const response = clientForAccount
         ? await (
             await clientForAccount(row.line_account_id)
@@ -136,7 +131,7 @@ export async function processAutoReplyDeliveries(
             'auto_reply_dispatch',
           );
       // 送信成功を先に固定。ログ失敗で送り直さない。
-      await finish('accepted', null);
+      if (!await finish('accepted', null)) continue;
       const payload = messageToLogPayload(message);
       const logId = clientForAccount
         ? await logOutgoingMessage(db, {
@@ -181,13 +176,13 @@ export async function processAutoReplyDeliveries(
         .bind(row.id)
         .first<{ status: string }>();
       if (state?.status === 'accepted') continue;
-      await finish('failed', 'delayed_reply_failed');
+      await finish('failed', dispatchStarted ? 'delayed_delivery_unknown' : 'delayed_reply_failed');
       await markAutoReplyEvaluationFinished(db, {
         evaluationId: row.evaluation_id,
         actionSummary: JSON.parse(row.action_summary),
-        status: 'reply_failed',
+        status: dispatchStarted ? 'failed' : 'reply_failed',
         replyStatus: 'failed',
-        errorCode: 'delayed_reply_failed',
+        errorCode: dispatchStarted ? 'delayed_delivery_unknown' : 'delayed_reply_failed',
       });
     }
   }

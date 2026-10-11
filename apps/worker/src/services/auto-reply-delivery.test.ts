@@ -61,3 +61,30 @@ it('配信待ちのあとにアカウントを止めた場合も送らない',as
  test.raw.exec("UPDATE line_accounts SET is_active=0 WHERE id='a'");
  const client=vi.fn();expect(await processAutoReplyDeliveries({DB:test.db} as Env['Bindings'],now,client)).toBe(0);expect(client).not.toHaveBeenCalled();
 });
+
+describe('SEND-S03: 中断した遅延応答の回収',()=>{
+ async function interrupted(dispatched:boolean){
+  const {createBroadcastRetryKey}=await import('./broadcast-retry-key.js');
+  const key=await createBroadcastRetryKey('auto-reply-delivery-lease','d');
+  test.raw.exec("UPDATE auto_reply_deliveries SET status='claimed'");
+  test.raw.prepare(`INSERT INTO outbound_send_requests
+    (idempotency_key,channel,resource_id,payload_hash,status,failure_code,lease_token,lease_expires_at,created_at,updated_at)
+    VALUES(?,'line','auto-reply-delivery:d','fake','in_progress',?,'lost','2026-10-06T23:59:00Z','2026-10-06T23:58:00Z','2026-10-06T23:58:00Z')`).run(key,dispatched?null:'DELAYED_REPLY_NOT_DISPATCHED');
+ }
+ it('送信前に消えたclaimは期限後に回収し、1回だけ送る',async()=>{
+  await interrupted(false); const pushMessageWithRequestId=vi.fn().mockResolvedValue({requestId:'fake'});
+  expect(await processAutoReplyDeliveries({DB:test.db} as Env['Bindings'],now,async()=>({pushMessageWithRequestId}) as never)).toBe(1);
+  expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+ });
+ it('送信を始めたあとに消えたclaimは要確認にし、自動再送しない',async()=>{
+  await interrupted(true);const client=vi.fn();await processAutoReplyDeliveries({DB:test.db} as Env['Bindings'],now,client);
+  expect(client).not.toHaveBeenCalled();
+  expect(test.raw.prepare('SELECT status,error_code FROM auto_reply_deliveries').get()).toEqual({status:'failed',error_code:'delayed_delivery_unknown'});
+  expect(mocks.finish).toHaveBeenCalledWith(test.db,expect.objectContaining({status:'failed',errorCode:'delayed_delivery_unknown'}));
+ });
+ it('旧い期限無しclaimも黙って残さず、要確認にする',async()=>{
+  test.raw.exec("UPDATE auto_reply_deliveries SET status='claimed',due_at='2026-10-06T00:00:00Z',created_at='2026-10-06T00:00:00Z'");
+  await processAutoReplyDeliveries({DB:test.db} as Env['Bindings'],now,vi.fn());
+  expect(test.raw.prepare('SELECT status,error_code FROM auto_reply_deliveries').get()).toEqual({status:'failed',error_code:'delayed_delivery_unknown'});
+ });
+});
