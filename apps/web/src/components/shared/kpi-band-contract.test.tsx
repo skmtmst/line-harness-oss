@@ -74,13 +74,15 @@ describe('数の帯（Pp3nS）', () => {
     expect(knowledge).toContain('<KpiBand')
   })
 
-  it('帯の題は絵どおり13px/500/1.5（Pp3nS）', () => {
+  it('帯の題は10-11固定の絵どおり12px/500/18px', () => {
     const css = read('kpi-card.module.css')
     const label = css.match(/\[data-theme='v8'\] \.label \{[^}]*\}/s)
     expect(label, '帯の題がありません').toBeTruthy()
-    expect(label![0]).toMatch(/font-size:\s*13px/)
+    expect(label![0]).toMatch(/font-size:\s*var\(--text-caption\)/)
+    const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
+    expect(globals).toMatch(/--text-caption:\s*12px/)
     expect(label![0]).toMatch(/font-weight:\s*500/)
-    expect(label![0]).toMatch(/line-height:\s*1\.5/)
+    expect(label![0]).toMatch(/line-height:\s*18px/)
   })
 
   it('印なしの帯（data-kpi-strip）もv8では横一列・隙間0', () => {

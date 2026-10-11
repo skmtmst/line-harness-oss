@@ -37,7 +37,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/account-switch-menu.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/action-menu.module.css", ".menu", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/check-card.module.css", ".card", "複数選択の入力欄。枠は選択状態を示す。"],
-  ["components/shared/check-card.module.css", "[data-theme='v8'] .card", "複数選択の入力欄。枠は選択状態を示す。"],
   ["components/shared/command-palette.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/data-table.module.css", "[data-theme='v8'] .frame[data-table-presentation='account-list'], [data-theme='v8'] .frame[data-table-presentation='account-handover']", "アカウント一覧と乗り換えの表の枠。影を重ねない。"],
   ["components/shared/file-drop.module.css", ".zone", "ファイルを落とす入力欄。内容のカードではない。"],
