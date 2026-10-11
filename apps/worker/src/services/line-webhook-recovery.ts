@@ -33,6 +33,59 @@ export async function lineWebhookRecoveryView(db: D1Database, row: LineWebhookEv
   return null;
 }
 
+/** Read-only eligibility: a retry needs saved inputs and unfinished recoverable work. */
+export async function lineWebhookCanRetry(db: D1Database, row: LineWebhookEventRow): Promise<boolean> {
+  if (row.status !== 'failed') return false;
+  const ref = refFor(row);
+  const root = await getWorkflowStep(db, { ...ref, stepKey: '__run' });
+  if (!root || !['pending', 'failed'].includes(root.status) || root.attempt_count >= root.max_attempts) return false;
+  if (row.line_account_id) {
+    const active = await db.prepare(`SELECT 1 FROM line_accounts la LEFT JOIN tenants t ON t.id=la.tenant_id
+      WHERE la.id=? AND la.is_active=1 AND la.archived_at IS NULL AND (t.status IS NULL OR t.status='active')`)
+      .bind(row.line_account_id).first();
+    if (!active) return false;
+  }
+  const step = (key: string) => getWorkflowStep(db, { ...ref, stepKey: key });
+  let keys: string[] = [];
+  if (row.event_type === 'message' || row.event_type === 'postback') {
+    const messageEvent = row.event_type === 'message';
+    const checkpoint = messageEvent ? 'incoming_message' : 'incoming_postback_log';
+    const saved = await step(checkpoint);
+    const recorded = messageEvent ? value<{ id: string; isUnsent: boolean; inserted: boolean }>(saved) : null;
+    let id = messageEvent ? (recorded?.isUnsent || recorded?.inserted === false ? null : recorded?.id) : value<string>(saved);
+    if (!id && !(recorded?.isUnsent || recorded?.inserted === false)) {
+      const sql = await step(`${checkpoint}:sql:0`);
+      const results = value<Array<{ meta: { changes: number } }>>(sql);
+      const plan = sql?.input_json ? JSON.parse(sql.input_json) as Array<{ sql: string; args: unknown[] }> : [];
+      if (results?.[0]?.meta.changes === 1 && plan.length === 1 && /^INSERT(?: OR IGNORE)? INTO messages_log\s*\(id, friend_id, direction, message_type, content,/i.test(plan[0]!.sql.trim()) && typeof plan[0]!.args[0] === 'string') id = plan[0]!.args[0];
+    }
+    if (!id) return false;
+    const message = await db.prepare(`SELECT m.message_type,m.line_event_at FROM messages_log m JOIN friends f ON f.id=m.friend_id
+      WHERE m.id=? AND m.direction='incoming' AND m.unsent_at IS NULL AND m.line_account_id IS ? AND f.line_account_id IS ?`)
+      .bind(id, row.line_account_id, row.line_account_id).first<{ message_type: string; line_event_at: string | null }>();
+    if (!message) return false;
+    if (!messageEvent && !value<{ plain: boolean }>(await step('postback_context'))?.plain) return false;
+    keys = messageEvent ? [`awardActivityMileage:${message.message_type === 'text' ? 0 : 1}`] : [];
+    if (message.line_event_at && (message.message_type === 'text' || !messageEvent)) keys.push('event:scoring');
+    const replyKnown = value(await step('auto_reply')) || value<{ configured: boolean }>(await step('reply_policy'))?.configured === false;
+    if (replyKnown && message.line_event_at) keys.push(messageEvent ? (message.message_type === 'text' ? 'fireEvent:0' : 'recordWebhookAnalyticsEvent:0') : 'fireEvent:1');
+  } else if (row.event_type === 'follow' || row.event_type === 'unfollow') {
+    const saved = row.event_type === 'follow' ? value<{ id: string }>(await step('friend')) : value<{ friendId: string | null; applied: boolean }>(await step('unfollow_relationship'));
+    if (!saved || ('applied' in saved && saved.applied === false)) return false;
+    const friendId = 'id' in saved ? saved.id : saved.friendId;
+    if (friendId) {
+      const friend = await getFriendById(db, friendId);
+      if (!friend || friend.line_account_id !== row.line_account_id) return false;
+    }
+    keys = row.event_type === 'follow' ? ['awardActivityMileage:2'] : ['recordWebhookAnalyticsEvent:2', ...(friendId ? ['fireEvent:3'] : [])];
+  }
+  for (const key of keys) {
+    const saved = await step(key);
+    if (!saved || (['pending', 'failed'].includes(saved.status) && saved.attempt_count < saved.max_attempts)) return true;
+  }
+  return false;
+}
+
 /** Rebuild only from an exact checkpoint-to-domain reference, never by matching text/time. */
 export async function retryLineWebhookEvent(env: Env['Bindings'], row: LineWebhookEventRow): Promise<LineRecoveryResult> {
   const db = env.DB, ref = refFor(row), rootRef = { ...ref, stepKey: '__run' };

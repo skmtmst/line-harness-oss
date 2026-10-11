@@ -9,7 +9,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
-import { lineWebhookRecoveryView, retryLineWebhookEvent } from '../services/line-webhook-recovery.js';
+import { lineWebhookCanRetry, lineWebhookRecoveryView, retryLineWebhookEvent } from '../services/line-webhook-recovery.js';
 
 const ALLOWED_STATUSES = new Set<LineWebhookEventStatus>([
   'received',
@@ -32,19 +32,23 @@ lineWebhookEvents.get(
     try {
       const db = dbFor(c.env);
       const scope = await getVisibleLineAccountScope(db, c.get('staff'));
+      const accountId = c.req.query('account_id');
+      if (accountId && !scope.allowedAccountIds.includes(accountId)) return c.json({ success: false, error: '対象のアカウントが見つかりません' }, 404);
       const data = await listLineWebhookEvents(db, {
         status: rawStatus as LineWebhookEventStatus | undefined,
-        lineAccountIds: scope.allowedAccountIds,
-        includeUnassigned: scope.canSeeUnassigned,
+        lineAccountIds: accountId ? [accountId] : scope.allowedAccountIds,
+        includeUnassigned: !accountId && scope.canSeeUnassigned,
       });
       const visible = [];
       for (const item of data) {
-        const recovery = await lineWebhookRecoveryView(db, {
+        const row = {
           webhook_event_id: item.webhookEventId, line_account_id: item.lineAccountId, event_type: item.eventType,
           status: item.status, attempts: item.attempts, last_error: item.lastError,
           received_at: item.receivedAt, updated_at: item.updatedAt,
-        });
-        visible.push({ ...item, recoveryStatus: recovery?.status ?? null,
+        };
+        const recovery = await lineWebhookRecoveryView(db, row);
+        const canRetry = !recovery && await lineWebhookCanRetry(db, row);
+        visible.push({ ...item, canRetry, recoveryStatus: recovery?.status ?? null,
           recoveryLabel: recovery?.status === 'needs_review' ? '要確認' : null,
           recoveryReasonCode: recovery?.reasonCode ?? null, recoveryReason: recovery?.reason ?? null });
       }

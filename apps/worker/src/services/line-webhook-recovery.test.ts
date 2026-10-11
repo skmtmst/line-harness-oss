@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { getLineWebhookEvent } from '@line-crm/db';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../index.js';
-import { retryLineWebhookEvent, processDueLineWebhookRetries } from './line-webhook-recovery.js';
+import { lineWebhookCanRetry, retryLineWebhookEvent, processDueLineWebhookRetries } from './line-webhook-recovery.js';
 
 const wire = vi.hoisted(() => ({replyMessage:vi.fn(),replyMessageWithRequestId:vi.fn(),pushMessage:vi.fn(),getProfile:vi.fn(),linkRichMenuToUser:vi.fn()}));
 vi.mock('@line-crm/line-sdk', async () => ({
@@ -42,8 +42,10 @@ it('score and the first tag survive a later SQL failure; only the second tag res
   expect((await getLineWebhookEvent(item.db,'event'))?.status).toBe('failed');
   expect(item.raw.prepare('SELECT SUM(score_change) AS n FROM friend_scores').get()).toEqual({n:5});
   expect(item.raw.prepare('SELECT tag_id FROM friend_tags').all()).toEqual([{tag_id:'one'}]);
+  expect(await lineWebhookCanRetry(item.db,(await getLineWebhookEvent(item.db,'event'))!)).toBe(true);
   item.raw.exec("DROP TRIGGER fail_second; CREATE TRIGGER final_lost BEFORE UPDATE ON line_webhook_events WHEN NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'sqlite final fixture');END");
   expect((await retry()).status).toBe('failed');
+  expect(await lineWebhookCanRetry(item.db,(await getLineWebhookEvent(item.db,'event'))!)).toBe(false);
   item.raw.exec('DROP TRIGGER final_lost');
   expect((await retry()).status).toBe('succeeded');
   await processDueLineWebhookRetries(env());await retry();
@@ -68,6 +70,7 @@ it('a missing reply key blocks a legacy reply even while later safe tags recover
 
 it('a legacy event with no checkpoint is held durably, without reading other accounts or sending',async()=>{
   item.raw.exec("INSERT INTO line_webhook_events(webhook_event_id,line_account_id,event_type,status) VALUES('legacy','a','message','failed')");
+  expect(await lineWebhookCanRetry(item.db,(await getLineWebhookEvent(item.db,'legacy'))!)).toBe(false);
   expect(await retry('legacy')).toMatchObject({status:'needs_review',reasonCode:'input_unavailable'});
   expect(item.raw.prepare("SELECT status,error_code FROM workflow_steps WHERE subject_id='legacy'").get()).toEqual({status:'unknown',error_code:'input_unavailable'});
   expect(wire.pushMessage).not.toHaveBeenCalled();
@@ -110,4 +113,21 @@ it('scoring recovers independently even when a crash before reply evaluation lea
   expect(item.raw.prepare('SELECT SUM(score_change) AS n FROM friend_scores').get()).toEqual({n:5});
   expect(wire.replyMessage).not.toHaveBeenCalled();expect(wire.pushMessage).not.toHaveBeenCalled();
   expect(fetch).not.toHaveBeenCalled();
+});
+
+it('retry visibility follows saved inputs, account ownership and stopped/uncertain state',async()=>{
+  automation([{type:'add_tag',params:{tagId:'two'}}]);
+  item.raw.exec("CREATE TRIGGER fail_second BEFORE INSERT ON friend_tags WHEN NEW.tag_id='two' BEGIN SELECT RAISE(ABORT,'fixture');END");
+  await receive();
+  const row=(await getLineWebhookEvent(item.db,'event'))!;
+  expect(await lineWebhookCanRetry(item.db,row)).toBe(true);
+  item.raw.exec("UPDATE tenants SET status='suspended' WHERE id='tenant'");
+  expect(await lineWebhookCanRetry(item.db,row)).toBe(false);
+  item.raw.exec("UPDATE tenants SET status='active' WHERE id='tenant'; UPDATE friends SET line_account_id=NULL WHERE id='friend'");
+  expect(await lineWebhookCanRetry(item.db,row)).toBe(false);
+  item.raw.exec("UPDATE friends SET line_account_id='a' WHERE id='friend'; UPDATE messages_log SET unsent_at='2026-10-12T00:00:00' WHERE direction='incoming'");
+  expect(await lineWebhookCanRetry(item.db,row)).toBe(false);
+  item.raw.exec("UPDATE messages_log SET unsent_at=NULL; UPDATE workflow_steps SET status='unknown' WHERE subject_id='event' AND step_key='__run'");
+  expect(await lineWebhookCanRetry(item.db,row)).toBe(false);
+  expect(wire.replyMessage).not.toHaveBeenCalled();expect(wire.pushMessage).not.toHaveBeenCalled();
 });

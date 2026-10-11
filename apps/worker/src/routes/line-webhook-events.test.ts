@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   scope: vi.fn(),
   retry: vi.fn(),
   view: vi.fn(),
+  canRetry: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
@@ -20,7 +21,7 @@ vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: mocks.scope,
 }));
 
-vi.mock('../services/line-webhook-recovery.js', () => ({ retryLineWebhookEvent: mocks.retry, lineWebhookRecoveryView: mocks.view }));
+vi.mock('../services/line-webhook-recovery.js', () => ({ retryLineWebhookEvent: mocks.retry, lineWebhookRecoveryView: mocks.view, lineWebhookCanRetry: mocks.canRetry }));
 
 import { lineWebhookEvents } from './line-webhook-events.js';
 
@@ -45,6 +46,7 @@ function app(role: AuthenticatedStaff['role']) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.view.mockResolvedValue(null);
+  mocks.canRetry.mockResolvedValue(false);
   mocks.retry.mockResolvedValue({status:'needs_review',reasonCode:'input_unavailable',reason:'必要な入力が残っていません'});
   mocks.scope.mockResolvedValue({
     accounts: [], ids: ['account-1'], allowedAccountIds: ['account-1'], canSeeUnassigned: true,
@@ -183,4 +185,26 @@ describe('LINE Webhook台帳API', () => {
     expect(response.status).toBe(404);
     expect(mocks.retry).not.toHaveBeenCalled();
   });
+});
+
+
+test('selected account filters before limiting and rejects an invisible account',async()=>{
+  const env={DB:{} as D1Database} as Env['Bindings'];
+  const allowed=await app('owner').request('/api/line-webhook-events?status=failed&account_id=account-1',{},env);
+  expect(allowed.status).toBe(200);
+  expect(mocks.list).toHaveBeenCalledWith(expect.anything(),{status:'failed',lineAccountIds:['account-1'],includeUnassigned:false});
+  mocks.list.mockClear();
+  expect((await app('owner').request('/api/line-webhook-events?account_id=invisible',{},env)).status).toBe(404);
+  expect(mocks.list).not.toHaveBeenCalled();
+});
+
+test('retry eligibility is explicit and needs-review always suppresses it',async()=>{
+  mocks.list.mockResolvedValue([{webhookEventId:'safe',lineAccountId:'account-1',eventType:'message',status:'failed',attempts:1,lastError:'db_error',receivedAt:'2026-10-12T00:09:00',updatedAt:'2026-10-12T00:10:00'}]);
+  mocks.canRetry.mockResolvedValue(true);
+  const env={DB:{} as D1Database} as Env['Bindings'];
+  const response=await app('owner').request('/api/line-webhook-events?status=failed',{},env);
+  expect((await response.json() as {data:Array<{canRetry:boolean}>}).data[0]?.canRetry).toBe(true);
+  mocks.view.mockResolvedValue({status:'needs_review',reasonCode:'delivery_unknown',reason:'送達不明'});
+  const review=await app('owner').request('/api/line-webhook-events?status=failed',{},env);
+  expect((await review.json() as {data:Array<{canRetry:boolean}>}).data[0]?.canRetry).toBe(false);
 });
