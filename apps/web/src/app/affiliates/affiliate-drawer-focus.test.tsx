@@ -7,8 +7,11 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React, { useState } from 'react'
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   api: {
+    conversionApprovals: { list: async () => ({ success: true, data: { items: [], cursor: null } }) },
     affiliates: {
       reportV2: async () => ({ success: true, data: null }),
       links: async () => ({ success: true, data: [] }),
@@ -24,7 +27,7 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-const { default: AffiliateDrawerV8 } = await import('./v8-drawer')
+const { default: AffiliateDrawerV8 } = await import('@/v8/affiliates/drawer')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -50,7 +53,7 @@ function Opener() {
         <AffiliateDrawerV8
           affiliate={row}
           accountId="acc-1"
-          canEdit={false}
+          readonly
           startInEdit={false}
           linkBaseUrl="https://example.invalid"
           onClose={() => setOpen(false)}

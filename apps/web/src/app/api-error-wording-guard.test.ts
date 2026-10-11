@@ -51,9 +51,6 @@ function collect(dir: string, found: Record<string, number> = {}): Record<string
 const BASELINE: Record<string, number> = {
   'app/affiliates/payment-tab.tsx': 4,
   'app/affiliates/tabs.tsx': 9,
-  'app/affiliates/v8-approvals-tab.tsx': 3,
-  'app/affiliates/v8-payment-tab.tsx': 2,
-  'app/affiliates/v8-report-tab.tsx': 1,
   'app/analytics/page.tsx': 1,
   'app/analytics/reports/new/page.tsx': 1,
   'app/auto-replies/edit/page.tsx': 1,
