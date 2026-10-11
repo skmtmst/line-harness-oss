@@ -11,7 +11,12 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 
 import { ApiError } from '@/lib/api'
-import InventoryV8 from './inventory'
+import InventoryV8 from '@/v8/restaurant/inventory/inventory'
+vi.mock('next/navigation',async()=> (await import('@/test-utils/navigation-mock')).navigationMock({pathname:'/restaurant-test/inventory'}))
+vi.mock('@/components/shell/page-chrome',async()=> (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner',canManageRole:()=>true}))
+const fetchApi=vi.hoisted(()=>vi.fn())
+vi.mock('@/lib/api',async(load)=>({...await load<typeof import('@/lib/api')>(),fetchApi}))
 
 const store = { id: 'store-1', organization_id: 'org-1', name: '渋谷店', code: 'SHIBUYA', area: null, capacity: 26, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'unconfigured', line_account_id: 'account-1', line_account_name: '渋谷' }
 const tables = [
@@ -32,6 +37,7 @@ const data = {
 }
 
 beforeEach(() => {
+  fetchApi.mockResolvedValue({success:true,data:[{id:'hp',name:'Hot Pepper',receiveMethod:'email_forward',status:'receiving'}]})
   fixture.snapshot.mockResolvedValue({ data })
   fixture.inventoryDay.mockImplementation(async () => {
     const result = await fixture.snapshot()
@@ -60,17 +66,17 @@ describe('Y8SjT2 予約枠・在庫のV8', () => {
     await screen.findByText('席と枠の配分（卓とつながる）')
     const board = document.querySelector('[data-design-node="Y8SjT2"]')!
     expect(board.textContent).toContain('1つの時間帯の総数 10席')
-    expect(board.textContent).toContain('個室Bは停止中のため除く')
+    expect(board.textContent).toContain('個室B は停止中のため除く')
     expect(board.textContent).toContain('時間帯ごとの在庫')
     expect(board.textContent).toContain('個室A')
-    expect(board.textContent).toContain('配分を保存')
+    expect(board.textContent).toContain('開ける時間と配分を保存')
   })
 
   it('行を押すとその時間帯の箱が出て保存が今の口へ届く', async () => {
     render(<InventoryV8 />)
     await screen.findByText('席と枠の配分（卓とつながる）')
     fireEvent.click(await screen.findByRole('button', { name: '17:00' }))
-    expect(screen.getByText('行を押したときと：17:00の配分だけ直す')).not.toBeNull()
+    expect(screen.getByText('行を押したとき：17:00 の配分だけ直す')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'この時間帯だけ保存' }))
     await waitFor(() => expect(fixture.updateInventory).toHaveBeenCalledWith('account-1', 's1', expect.objectContaining({ otaCapacity: 3 })))
   })
@@ -87,37 +93,40 @@ describe('Y8SjT2 予約枠・在庫のV8', () => {
     })
     render(<InventoryV8 />)
     await screen.findByText('席と枠の配分（卓とつながる）')
-    fireEvent.click(await screen.findByRole('button', { name: '閉じる知らせを確認する' }))
+    fireEvent.click(await screen.findByRole('button', { name: '媒体の受付を閉じる' }))
     expect(document.querySelector('[data-design-node="Yyw6i"]')).not.toBeNull()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Hot Pepperを閉じた' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Hot Pepper .*を閉じた/ }))
     fireEvent.click(screen.getByRole('button', { name: '閉じたものを記録する' }))
-    expect(screen.queryByRole('button', { name: '閉じる知らせを確認する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '媒体の受付を閉じる' })).toBeNull()
   })
 
   it('競合（409）のとき黄色の帯と比べる窓が出る', async () => {
     fixture.saveInventoryAllocation.mockRejectedValueOnce(new ApiError(409, '競合しました', 'conflict'))
     render(<InventoryV8 />)
     await screen.findByText('席と枠の配分（卓とつながる）')
-    await waitFor(()=>expect(screen.getByRole('button',{name:'配分を保存'}).hasAttribute('disabled')).toBe(false))
-    fireEvent.click(screen.getByRole('button', { name: '配分を保存' }))
-    await screen.findByText('ほかの担当者が先に保存しました')
-    fireEvent.click(screen.getByRole('button', { name: '違いを比べる' }))
-    expect(screen.getByText('保存しようとした配分と最新の配分')).not.toBeNull()
+    await waitFor(()=>expect(screen.getByRole('button',{name:'開ける時間と配分を保存'}).hasAttribute('disabled')).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: '開ける時間と配分を保存' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('予約枠・在庫を保存しました')
+    fireEvent.click(screen.getByRole('button', { name: /比べてから保存/ }))
+    expect(screen.getByRole('dialog', { name: '保存しようとした内容と最新の内容' })).not.toBeNull()
   })
 })
 
 it('週の営業時間を保存し、その版を使って30分刻みの枠を作る', async () => {
+  fixture.saveOpeningHours.mockImplementation(async()=>{fixture.openingHours.mockResolvedValue({data:{storeId:'store-1',hours:Array.from({length:7},(_,weekday)=>({weekday,periods:[]})),version:2,updatedBy:null,updatedAt:null}});return {success:true,data:{version:2}}})
   render(<InventoryV8 />)
-  await screen.findByRole('button',{name:'営業時間を保存'})
-  await waitFor(()=>expect(screen.getByRole('button',{name:'営業時間を保存'}).hasAttribute('disabled')).toBe(false))
-  fireEvent.click(screen.getByRole('button',{name:'営業時間を保存'}))
+  await screen.findByRole('button',{name:/開ける時間と配分を保存/})
+  await waitFor(()=>expect(screen.getByRole('button',{name:/開ける時間と配分を保存/}).hasAttribute('disabled')).toBe(false))
+  fireEvent.click(screen.getByRole('button',{name:/開ける時間と配分を保存/}))
   await waitFor(()=>expect(fixture.saveOpeningHours).toHaveBeenCalledWith('account-1',expect.objectContaining({expectedVersion:1,hours:expect.any(Array)})))
-  fireEvent.click(screen.getByRole('button',{name:'この日の枠を自動作成'}))
+  await waitFor(()=>expect(screen.getByRole('button',{name:'時間帯ごとの在庫のその他操作'}).hasAttribute('disabled')).toBe(false))
+  fireEvent.click(screen.getByRole('button',{name:'時間帯ごとの在庫のその他操作'}))
+  fireEvent.click(screen.getByRole('menuitem',{name:'この日の枠を作る'}))
   await waitFor(()=>expect(fixture.generateInventory).toHaveBeenCalledWith('account-1',expect.objectContaining({expectedHoursVersion:2})))
 })
 it('全時間帯の配分は各枠の版を添えて一回で保存する', async () => {
   render(<InventoryV8 />)
-  await waitFor(()=>expect(screen.getByRole('button',{name:'配分を保存'}).hasAttribute('disabled')).toBe(false))
-  fireEvent.click(screen.getByRole('button',{name:'配分を保存'}))
+  await waitFor(()=>expect(screen.getByRole('button',{name:'開ける時間と配分を保存'}).hasAttribute('disabled')).toBe(false))
+  fireEvent.click(screen.getByRole('button',{name:'開ける時間と配分を保存'}))
   await waitFor(()=>expect(fixture.saveInventoryAllocation).toHaveBeenCalledWith('account-1',expect.objectContaining({slots:[{id:'s1',expectedVersion:1},{id:'s2',expectedVersion:1}]})))
 })
