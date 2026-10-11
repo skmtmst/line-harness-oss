@@ -674,6 +674,7 @@ async function initAffiliate(): Promise<void> {
     liffId: LIFF_ID,
     lineUserId: profile.userId,
     lineAccessToken: accessToken,
+    idToken: liff.getIDToken() ?? undefined,
   });
 }
 
