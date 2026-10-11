@@ -245,8 +245,8 @@
 [data-theme='v8'] .invalid .trigger { outline-color: var(--color-danger); }
 [data-theme='v8'] .chevron { flex-basis: var(--polish-icon-control); }
 }
-/* B-192: 表示件数は文字と矢印の幅を保つ。96では「20 件表示」が切れる。 */
-[data-theme='v8'] .pageSize { width: 100px; min-width: 100px; flex-shrink: 0; }
+/* B-192：左右12・間8・矢印16を含め、件数の文字を省略しない幅を共通で確保する。 */
+[data-theme='v8'] .pageSize { width: var(--tpl-select-page-size); min-width: var(--tpl-select-page-size); flex-shrink: 0; }
 
 /*
  * ★V8「枠なしの並び替え」（x6QsVz：枠なし文字＋上下矢印）。
