@@ -1661,7 +1661,7 @@ autoReplies.post('/api/auto-replies/:id/publish', requireDeliveryAccess('autoRep
 // 届いたメッセージへ応答していた。動かすのは isActive: true の明示指定か、
 // 保存後の再開・公開操作だけにする。
 // F7: isActive: true の指定があっても、作る前に既存の有効ルールと当てる。
-// 当たれば有効化せず停止中で作り、理由を社内メモへ残す（応答にも返す）。
+// 当たれば有効化せず下書きで作り、理由を社内メモへ残す（応答にも返す）。
 // 当たらなければ要求どおりすぐ有効にする。
 autoReplies.post('/api/auto-replies', requireDeliveryAccess('autoReplies'), inputJsonBoundary({"keyword":["string"],"matchType":["string"],"responseType":["string"],"responseContent":["string"],"templateId":["null","string"],"lineAccountId":["null","string"],"respondToAll":["boolean"],"name":["null","string"],"keywordMatchMode":["string"],"normalizeKeywords":["boolean"],"folderId":["null","string"]}), async (c) => {
   try {
@@ -1775,9 +1775,10 @@ autoReplies.post('/api/auto-replies', requireDeliveryAccess('autoReplies'), inpu
     }
 
     // F7: 有効で作る要求があれば、作る前に既存の有効ルールと当てる。
-    // 当たれば有効化せず停止中で作り、理由を社内メモへ残す。
+    // 当たれば有効化せず下書きで作り、理由を社内メモへ残す。
     // 当たらなければ要求どおりすぐ有効にする。
     // 停止指定・省略は従来どおり停止のまま（AUTOREPLY-08）。
+    let blockedDraftSettings: AutoReplyDraftSettings | null = null;
     let activationBlocked = false;
     let activationBlockedReason: string | null = null;
     // m26c R570: 確認キーがあれば再送を同じ行へ復帰させる。
@@ -1831,24 +1832,24 @@ autoReplies.post('/api/auto-replies', requireDeliveryAccess('autoReplies'), inpu
         activationBlockedReason = preConflicts.map((item) => item.reason).join(' ');
         createInput.isActive = false;
         const names = [...new Set(preConflicts.map((item) => item.name))].join('／');
-        const reasonHead = `競合のため停止中で作成（${names}と重なります）。有効にする前に競合を確認してください。`;
+        const reasonHead = `競合のため下書きで作成（${names}と重なります）。有効にする前に競合を確認してください。`;
         const userMemo = createInput.internalMemo ?? null;
         const merged = userMemo ? `${reasonHead}\n${userMemo}` : reasonHead;
         // 社内メモは1000文字まで。理由を優先して残す。
         createInput.internalMemo = [...merged].length > 1000
           ? [...merged].slice(0, 1000).join('')
           : merged;
+        blockedDraftSettings = { ...createSettings, internalMemo: createInput.internalMemo };
       }
     }
     let item: DbAutoReply;
     try {
-      const created = await createAutoReply(
-        c.env.DB,
-        createInput,
-        ruleKey
-          ? { key: ruleKey, fingerprint: autoReplyRuleCreateFingerprint(createInput) }
-          : undefined,
-      );
+      const idempotency = ruleKey
+        ? { key: ruleKey, fingerprint: autoReplyRuleCreateFingerprint(createInput) }
+        : undefined;
+      const created = blockedDraftSettings
+        ? await createAutoReplyWithDraftVersion(c.env.DB, blockedDraftSettings, idempotency)
+        : await createAutoReply(c.env.DB, createInput, idempotency);
       item = created.rule;
     } catch (err) {
       const mapped = idempotencyErrorResponse(err);
