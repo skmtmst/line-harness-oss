@@ -22,7 +22,12 @@ import {
   type InstagramPageScan,
   instagramLongToken,
   instagramCanPublish,
+  instagramUrlCode,
+  instagramUrlCount,
+  instagramUrlDetail,
+  instagramUrlScopes,
   INSTAGRAM_PUBLISH_SCOPE,
+  INSTAGRAM_SCOPES,
   encryptInstagramCredential,
   decryptInstagramCredential,
   verifyInstagramSignature,
@@ -161,8 +166,7 @@ instagram.post(
       // pages_manage_metadata は求めない。ページのWebhook購読にしか使わない権限で、
       // その口（instagramWebhook）は審査待ちのため止めてある。Meta のアプリ側でも
       // Instagram API のユースケースに並ばないため、求めると認可画面で弾かれる。
-      scope:
-        'pages_show_list,pages_read_engagement,instagram_basic,instagram_manage_messages,instagram_content_publish',
+      scope: INSTAGRAM_SCOPES.join(','),
     }).toString();
     return c.json({
       success: true,
@@ -176,14 +180,69 @@ instagram.post(
 /**
  * 認可が終わったあとに戻る画面。利用者が見るのは「設定 › SNS連携」だけなので、
  * 成否をクエリで伝えてそこへ戻す（restaurant-google.ts の折り返しと同じ形）。
+ *
+ * 失敗したときは、画面に出す文言を変えないまま、手がかりだけをクエリへ添える。
+ * サーバー記録は閲覧の権限が無くて読めない場合があり、そのときは原因が全く分からなく
+ * なってしまうため、戻り先のURLそのものに失敗の種別が残るようにしておく。
+ * 添えるのは次の4つ。画面側は `instagram` の値だけを見るので、見た目は変わらない。
+ *
+ * - `instagram_code` … こちらで決めた失敗の種類名
+ * - `instagram_detail` … 要求の宛先と、Meta の応答の種別名・番号
+ * - `instagram_scopes` … 利用者が許可した権限の名前
+ * - `instagram_pages` … 見つかった Facebook ページの件数（`総数/Instagram有り/合鍵有り`）
+ *
+ * 値は `instagramDiagnostic` で一度だけ安全な形へ絞ってから渡す。URLは利用者に見える
+ * 場所なので、固定の識別子・許可一覧に載る名前・検査した整数しか置かない
+ * （理由は `services/instagram.ts` の `instagramUrlDetail` に書いた）。
  */
-function snsReturnUrl(c: Context<Env>, result: 'connected' | 'failed'): string {
+function snsReturnUrl(
+  c: Context<Env>,
+  result: 'connected' | 'failed',
+  diagnostic?: InstagramDiagnostic,
+): string {
   const base = (c.env.ADMIN_PUBLIC_URL ?? '').replace(/\/+$/, '');
   const url = new URL(
     `${base || new URL(c.req.url).origin}${INSTAGRAM_RETURN_PATH}`,
   );
   url.searchParams.set('instagram', result);
+  if (result === 'failed' && diagnostic) {
+    url.searchParams.set('instagram_code', diagnostic.code);
+    if (diagnostic.detail)
+      url.searchParams.set('instagram_detail', diagnostic.detail);
+    if (diagnostic.scopes)
+      url.searchParams.set('instagram_scopes', diagnostic.scopes);
+    url.searchParams.set('instagram_pages', diagnostic.pages);
+  }
   return url.toString();
+}
+type InstagramDiagnostic = {
+  code: string;
+  detail: string | null;
+  scopes: string | null;
+  pages: string;
+};
+/**
+ * 失敗の手がかりを、サーバー記録と戻り先URLのどちらへ出しても安全な形に絞る。
+ *
+ * 絞り込みはここ1か所だけで行い、記録とURLは同じ値を使う。
+ * `detail` と `scopes` は Meta の応答由来なので、`instagramUrl*` が通した部分
+ * （固定の識別子・許可一覧に載る名前・整数）しか残らない。
+ */
+function instagramDiagnostic(failure: {
+  code: string;
+  detail: string | null;
+  grantedScopes: string | null;
+  pages: InstagramPageScan;
+}): InstagramDiagnostic {
+  const p = failure.pages;
+  return {
+    code: instagramUrlCode(failure.code),
+    detail: instagramUrlDetail(failure.detail),
+    scopes: instagramUrlScopes(failure.grantedScopes),
+    pages: [p.total, p.withInstagram, p.withToken]
+      .map(instagramUrlCount)
+      .join('/'),
+  };
 }
 const INSTAGRAM_RETURN_PATH = '/settings/sns';
 /**
@@ -310,14 +369,17 @@ instagram.get(
       return c.redirect(snsReturnUrl(c, 'connected'));
     } catch (e) {
       // 失敗の中身は画面に出さない（文言は「つなげませんでした」のまま）。
-      // ただし理由が分からないと直せないので、秘密値を含まない手がかりだけ記録に残す。
+      // ただし理由が分からないと直せないので、安全な形に絞った手がかりを記録と戻り先URLへ残す。
+      const diagnostic = instagramDiagnostic({
+        code: e instanceof InstagramError ? e.code : 'instagram_failed',
+        detail: e instanceof InstagramError ? (e.detail ?? null) : null,
+        grantedScopes,
+        pages: scan,
+      });
       console.error(
         JSON.stringify({
           event: 'instagram_oauth_callback_failed',
-          code: e instanceof InstagramError ? e.code : 'instagram_failed',
-          detail: e instanceof InstagramError ? (e.detail ?? null) : null,
-          grantedScopes,
-          pages: scan,
+          ...diagnostic,
         }),
       );
       // 使い切りの state は必ず捨てて、やり直せる状態に戻す。
@@ -327,7 +389,7 @@ instagram.get(
         )
           .bind(hash)
           .run();
-      return c.redirect(snsReturnUrl(c, 'failed'));
+      return c.redirect(snsReturnUrl(c, 'failed', diagnostic));
     }
   },
 );
