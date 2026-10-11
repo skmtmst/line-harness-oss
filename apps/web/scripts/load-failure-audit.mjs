@@ -41,12 +41,12 @@ export function auditLoadFailures(source,filename='screen.tsx') {
  return rows
 }
 export function auditScreenLoads(root){const files=[];const scan=dir=>{for(const e of fs.readdirSync(path.join(root,dir),{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())scan(p);else if(/\.[tj]sx?$/.test(p)&&! /\.(test|spec)\.|fixture/.test(p))files.push(p)}};scan('src/v8');scan('src/app');return files.sort().flatMap(file=>auditLoadFailures(fs.readFileSync(path.join(root,file),'utf8'),file))}
-export function unapprovedLoadFailures(rows,allowlist){
+export function unapprovedLoadFailures(rows,allowlist,reviewed=[]){
  const used=new Map()
  return rows.filter(row=>{
-  if(row.disposition!=='unchecked')return false
-  const key=row.filename+':'+row.fingerprint
-  const allowance=allowlist.find(a=>a.filename===row.filename&&a.fingerprint===row.fingerprint&&a.reason?.trim())
+  const key=row.filename+':'+row.fingerprint+':'+row.disposition
+  const candidates=row.disposition==='unchecked'?allowlist:reviewed
+  const allowance=candidates.find(a=>a.filename===row.filename&&a.fingerprint===row.fingerprint&&a.reason?.trim()&&(row.disposition==='unchecked'||a.disposition===row.disposition))
   const count=(used.get(key)||0)+1;used.set(key,count)
   return !allowance||count>(allowance.count??1)
  })
