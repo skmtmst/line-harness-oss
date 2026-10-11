@@ -74,3 +74,6 @@
   color: var(--color-danger);
 }
 }
+
+/* 固定した競合の帯：題13/700・19、説明12・17。帯の高さは内容で決める。 */
+[data-theme='v8'] .title { font-weight: var(--polish-weight-title); }

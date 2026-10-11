@@ -4,13 +4,7 @@
  */
 
 /* ---------- 外枠 ---------- */
-/* タブの段は絵の高さ（28.5）。共通のタブは下に余白が多く、数の帯が下がる。下線もこの高さの下端に置く。 */
-:global([data-theme='v8']) nav.tabs {
-  height: var(--tpl-mb-tabs-h);
-}
-:global([data-theme='v8']) nav.tabs > span {
-  height: 100%;
-}
+/* タブの高さ・下線は共通 Tabs が持つ（B-180）。 */
 .band {
   border-block: 1px solid var(--color-hairline);
 }
@@ -132,7 +126,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--tpl-mb-field-gap);
+  gap: var(--space-8);
   min-width: 0;
 }
 .ruleLabel {
@@ -172,6 +166,10 @@
   color: var(--color-ink-secondary);
   font-size: var(--tpl-mb-text-12);
   line-height: var(--tpl-mb-lh-17);
+}
+.rankHeadRow .rankColThreshold,
+.rankHeadRow .rankColRate {
+  padding-left: var(--tpl-mb-gap-xs);
 }
 .rankRow {
   padding: var(--tpl-mb-rank-row-pad);
@@ -426,7 +424,7 @@
 .listBody {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-mb-gap);
+  gap: var(--space-16);
   padding: var(--tpl-mb-body-pad);
 }
 .toolbar {
@@ -580,26 +578,7 @@
   container-type: inline-size;
 }
 
-.mRow {
-  display: grid;
-  grid-template-columns: var(--tpl-rest3-mb-cols);
-  align-items: center;
-  column-gap: var(--tpl-rest3-mb-gap);
-  min-height: var(--tpl-rest3-mb-row-h);
-  padding: var(--tpl-rest3-mb-row-pad);
-  box-shadow: var(--tpl-rsa-line-bottom);
-}
-
-.mHead {
-  min-height: var(--tpl-rest3-mb-head-h);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-mb-text-11);
-  font-weight: 600;
-  line-height: var(--tpl-mb-lh-16);
-  white-space: nowrap;
-}
-
+/* 行と見出しの見た目は GridTable。画面側は補助列の畳み方と省略だけを持つ。 */
 .mHead > span {
   overflow: hidden;
   text-overflow: ellipsis;
