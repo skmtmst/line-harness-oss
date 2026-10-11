@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { HQ_MENU_SECTIONS } from '@/lib/menu'
 
 const sidebar = readFileSync(new URL('../../components/layout/sidebar.tsx', import.meta.url), 'utf8')
-const sharedTemplatePage = readFileSync(new URL('./hq-template-page.tsx', import.meta.url), 'utf8')
+const sharedTemplatePage = readFileSync(new URL('./form-submissions/page.tsx', import.meta.url), 'utf8')
 const formSubmissions = readFileSync(new URL('./form-submissions/page.tsx', import.meta.url), 'utf8')
 const friendAttributes = readFileSync(new URL('./friend-attributes/page.tsx', import.meta.url), 'utf8')
 const richMenus = readFileSync(new URL('./rich-menus/page.tsx', import.meta.url), 'utf8')
@@ -35,7 +35,7 @@ describe('統括の「まだ使えません」画面の整理', () => {
   })
 
   it('直接URLはV8のひな形画面へ通す', () => {
-    expect(sharedTemplatePage).toContain('<TemplateConsole type={type}')
+    expect(sharedTemplatePage).toContain('<HqTemplatesV8 type=\"form\"')
     expect(sharedTemplatePage).not.toContain('TargetMissing')
   })
   it('各入口はV8の機能画面を使う', () => {

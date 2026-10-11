@@ -195,8 +195,6 @@ const EXEMPTIONS: Record<string, string> = {
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
   'app/booking/bookings/new/page.tsx':
     'dirty管理なし（コメント中の「未保存」記述のみ）',
-  'app/hq/templates/template-console.tsx':
-    '多段ウィザード＋sessionStorage下書き。段の途中離脱の扱いは別途検討',
   'app/line-notifications/page.tsx':
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/scenarios/mode/page.tsx':

@@ -61,7 +61,6 @@ const BASELINE: Record<string, number> = {
   'app/chats/page.tsx': 1,
   'v8/automations/common-action-edit.tsx': 1,
   'app/hq/banners/project/page.tsx': 6,
-  'app/hq/templates/template-console.tsx': 1,
   'app/hq/templates/template-definition-editor.tsx': 3,
   'app/login/two-factor/setup/page.tsx': 1,
   'app/login/two-factor/two-factor-error.ts': 1,

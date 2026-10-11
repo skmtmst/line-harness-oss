@@ -9,7 +9,7 @@ const shell = readFileSync(new URL('../../components/app-shell.tsx', import.meta
 const sidebar = readFileSync(new URL('../../components/layout/sidebar.tsx', import.meta.url), 'utf8')
 const topBar = readFileSync(new URL('../../components/shell/app-top-bar.tsx', import.meta.url), 'utf8')
 const templatePage = readFileSync(new URL('./templates/page.tsx', import.meta.url), 'utf8')
-const sharedTemplatePage = readFileSync(new URL('./hq-template-page.tsx', import.meta.url), 'utf8')
+const sharedTemplatePage = readFileSync(new URL('./form-submissions/page.tsx', import.meta.url), 'utf8')
 
 describe('統括コンソール', () => {
   it('既存のLINEアカウント一覧APIだけでアカウント一覧を作る', () => {
@@ -95,7 +95,7 @@ describe('統括コンソール', () => {
     expect(sidebar).toContain('href="/hq/settings"')
     expect(sidebar).toContain('<SidebarAccountMenu hq={isHq}')
     expect(templatePage).toContain('HqTemplatesV8')
-    expect(sharedTemplatePage).toContain('<TemplateConsole type={type}')
+    expect(sharedTemplatePage).toContain('<HqTemplatesV8 type=\"form\"')
   })
 
   it('アカウントを開く既存導線は残り、選択後に識別子なしで遷移する', () => {

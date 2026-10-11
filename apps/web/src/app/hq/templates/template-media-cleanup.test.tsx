@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import TemplateConsole from './template-console'
+import TemplateConsole from '@/test-utils/hq-template-console'
 import type { TemplateDefinition } from '@/lib/hq-templates-api'
 
 const calls = vi.hoisted(() => ({ uploadImage: vi.fn(), deleteImage: vi.fn(), context: vi.fn(), list: vi.fn(), accounts: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), result: vi.fn() }))
