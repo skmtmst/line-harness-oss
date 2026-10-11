@@ -1,3 +1,4 @@
+import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -2204,9 +2205,9 @@ forms.post('/api/forms/:id/partial', inputJsonBoundary({"data":["object"]}), asy
     if (new TextEncoder().encode(mergedJson).byteLength > PARTIAL_MERGED_MAX_BYTES) {
       return c.json({ success: false, error: '送信内容が大きすぎます' }, 413);
     }
-    await c.env.DB.prepare(
-      'UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?',
-    ).bind(mergedJson, jstNow(), friend.id).run();
+    if (!await patchFriendMetadata(c.env.DB, friend.id, filtered, { maxBytes: PARTIAL_MERGED_MAX_BYTES })) {
+      return c.json({ success: false, error: '送信内容が大きすぎます' }, 413);
+    }
 
     return c.json({ success: true });
   } catch (err) {
@@ -3377,12 +3378,7 @@ async function runFormPostEffects(input: {
       run: async () => {
         const friend = await getFriendById(db, friendId);
         if (!friend) return;
-        const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
-        const merged = { ...existing, ...submissionData };
-        await db
-          .prepare(`UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?`)
-          .bind(JSON.stringify(merged), now, friendId)
-          .run();
+        if (!await patchFriendMetadata(db, friendId, submissionData)) throw new Error('friend_metadata_unavailable');
       },
     });
   }

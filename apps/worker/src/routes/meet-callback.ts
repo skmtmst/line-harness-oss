@@ -1,3 +1,4 @@
+import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
@@ -141,9 +142,7 @@ app.post('/api/meet-callback', async (c) => {
 
   // Save to friend metadata
   try {
-    const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
     const updated = {
-      ...existing,
       meet_hearing: {
         session_id: body.session_id,
         status: body.status,
@@ -153,9 +152,7 @@ app.post('/api/meet-callback', async (c) => {
         completed_at: body.completed_at,
       },
     };
-    await c.env.DB.prepare('UPDATE friends SET metadata = ?, updated_at = datetime(\'now\') WHERE id = ?')
-      .bind(JSON.stringify(updated), friend.id)
-      .run();
+    if (!await patchFriendMetadata(c.env.DB, friend.id, updated)) throw new Error('friend_metadata_unavailable');
   } catch (e) {
     console.error('Failed to save meet hearing to metadata:', e);
   }

@@ -1,3 +1,4 @@
+import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { hydrateDocumentAnswers } from '../services/form-documents.js';
@@ -1469,11 +1470,8 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
     // 指定なしは従来どおり無条件更新（既存互換）。
     const expectedUpdatedAt = c.req.query('expectedUpdatedAt')?.trim() || null;
     if (expectedUpdatedAt) {
-      const applied = await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ? AND updated_at = ?')
-        .bind(JSON.stringify(merged), now, friendId, expectedUpdatedAt)
-        .run();
-      if ((applied.meta?.changes ?? 0) === 0) {
+      const applied = await patchFriendMetadata(db, friendId, body, { deleteNull: true, expectedUpdatedAt });
+      if (!applied) {
         const current = await getFriendById(db, friendId);
         if (!current) {
           return c.json({ success: false, error: 'Friend not found' }, 404);
@@ -1486,10 +1484,7 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
         }, 409);
       }
     } else {
-      await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
-        .bind(JSON.stringify(merged), now, friendId)
-        .run();
+      await patchFriendMetadata(db, friendId, body, { deleteNull: true });
     }
 
     const updated = await getFriendById(db, friendId);

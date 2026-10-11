@@ -1,3 +1,4 @@
+import { patchFriendMetadata } from './friend-metadata.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
 
@@ -762,11 +763,6 @@ async function executeAction(
 
     case 'set_metadata': {
       if (!friendId) break;
-      const existing = await db
-        .prepare('SELECT metadata FROM friends WHERE id = ?')
-        .bind(friendId)
-        .first<{ metadata: string }>();
-      const current = JSON.parse(existing?.metadata || '{}') as Record<string, unknown>;
       // {{message}} を受信メッセージ内容に置換してからパース
       // JSON文字列内に埋め込むため、JSON仕様に準拠して全制御文字をエスケープ
       const escapeForJsonString = (s: string): string =>
@@ -781,11 +777,7 @@ async function executeAction(
       const raw = (action.params.data || '{}')
         .replace(/\{\{message\}\}/g, escapeForJsonString(messageText));
       const patch = JSON.parse(raw) as Record<string, unknown>;
-      const merged = { ...current, ...patch };
-      await db
-        .prepare('UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?')
-        .bind(JSON.stringify(merged), jstNow(), friendId)
-        .run();
+      if (!await patchFriendMetadata(db, friendId, patch)) throw new Error('friend_metadata_unavailable');
       break;
     }
 
