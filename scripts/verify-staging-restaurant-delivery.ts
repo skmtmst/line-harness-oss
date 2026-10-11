@@ -59,15 +59,47 @@ const HISTORY_FIELDS = [
 ] as const;
 const MENU_ITEM_FIELDS = ['store.id', 'items'] as const;
 
+/**
+ * 題の型は画面ごとに違う。絵が頁の題と副題を描き分けているため、1つの値で
+ * 3画面をまとめて測ると副題の2枚が必ず落ちる（検証環境の実行 38143831111）。
+ *
+ * - 注文一覧（板 kDQHr）は頁の題 22/700/32。
+ * - 注文履歴（板 OzHLO）と品切れ一括（板 h7OeT）は副題 18/700/27。
+ *   `delivery.tsx` の `VIEW_HEAD` が `titleSize: 'sub'` を渡し、
+ *   `components/templates/page-frame.tsx` が `--tpl-title-size: 18px`
+ *   `--tpl-title-lh: 27px` を頭の中だけに流す。
+ *
+ * 正本の順位は 使いやすさ → 絵 → 決まりの板 → 共通部品 なので（同ファイルの覚書）、
+ * 期待値は絵に合わせる。画面の見た目は変えない。
+ */
+export const TITLE_PAGE = { size: '22px', weight: '700', lh: '32px' } as const;
+export const TITLE_SUB = { size: '18px', weight: '700', lh: '27px' } as const;
+
 /** 承認版v02の3画面。題は `delivery.tsx` の `PAGE_META` と同じ。 */
 const SCREENS = [
-  { view: 'orders', search: '', title: 'デリバリー受注' },
-  { view: 'history', search: '?view=history', title: '注文履歴・売上' },
-  { view: 'sold-out', search: '?view=sold-out', title: '品切れ一括設定' },
+  { view: 'orders', search: '', title: 'デリバリー受注', type: TITLE_PAGE },
+  { view: 'history', search: '?view=history', title: '注文履歴・売上', type: TITLE_SUB },
+  { view: 'sold-out', search: '?view=sold-out', title: '品切れ一括設定', type: TITLE_SUB },
 ] as const;
 
-const SCREEN_PATH = '/restaurant-test/delivery';
+export const SCREEN_PATH = '/restaurant-test/delivery';
 const CRASH_TITLE = '画面を表示できませんでした';
+
+/**
+ * 題か、入口の門か、失敗の1枚のどれかが出るまで待つ目印。
+ *
+ * 数え切りの待ちだけだと、水分け（hydration）が遅いだけの画面を
+ * 「題が無い」と読み違える。`delivery.tsx` は `useSearchParams` を
+ * `Suspense` の中で呼ぶので、配った HTML には題が入っていない。
+ */
+const SETTLED_SELECTOR = [
+  '[data-template-region="heading"] h1',
+  '[data-template-region="heading"] h2',
+  '[data-list-state="error"]',
+  '[data-list-state="forbidden"]',
+  '[data-feature-disabled]',
+  '[data-design="Empty"]',
+].join(', ');
 
 type VerificationTarget = ReturnType<typeof readVerificationTarget>;
 type QueryD1 = ReturnType<typeof createD1Query>;
@@ -82,17 +114,40 @@ export type DeliveryGates = {
   storesLinkedToLineAccount: number;
 };
 
+/** 題の型。大きさ・太さ・行の高さの3つだけを見る。 */
+export type TitleType = { size: string; weight: string; lh: string };
+
 export type ScreenReport = {
   view: string;
   title: string | null;
+  /** 絵どおりの題の文字。理由に「何を待っていたか」を出すために持つ。 */
+  expectedTitle: string;
+  /** 実際に読めた題の型。題が無ければ null。 */
+  observedType: TitleType | null;
+  /** その画面の絵が決めている題の型。 */
+  expectedType: TitleType;
   titlePasses: boolean;
   landedOnLogin: boolean;
+  /** 実際に着いた道。`/login` 以外へ移った場合もこれで分かる。 */
+  landedPath: string;
   crashed: boolean;
   /** 画面の中に出た「表示できませんでした」の1枚。題が正しくても取得に失敗していれば入る。 */
   loadFailures: string[];
+  /** 入口の門で止まっていた場合の印。止まっていなければ null。 */
+  gate: string | null;
   pageErrors: number;
   blockedWriteRequests: number;
 };
+
+/** 長い文字は理由の行が読めなくなるので、失敗の1枚と同じ40文字で切る。 */
+function short(text: string): string {
+  return text.trim().replace(/\s+/g, ' ').slice(0, 40);
+}
+
+/** 題の型を `18px/700/27px` の形で1行にする。 */
+export function formatTitleType(type: TitleType): string {
+  return `${type.size}/${type.weight}/${type.lh}`;
+}
 
 /**
  * 1画面の不合格の理由を並べる。空なら合格。
@@ -101,15 +156,56 @@ export type ScreenReport = {
  * 画面からの取得が CORS や合言葉で落ちると、題はそのままで中身だけが
  * 「注文を表示できませんでした」に変わる（`delivery.tsx` / `history.tsx` /
  * `bulk.tsx` の `ListState kind="error"`）。未捕捉の例外も同じく不合格にする。
+ *
+ * 理由には**実際に読めた値**を必ず添える。値の無い `title` だけを返していた
+ * ため、検証環境の実行 38143831111 では「題が違う」ことしか分からず、
+ * Claude と Codex の往復が1回まるごと無駄になった。
+ *
+ * 入口の門（店舗未選択など）で止まった場合は、門の印だけを返す。門は中身を
+ * そのまま差し替えるので、題や失敗の1枚を一緒に並べても画面側の話にならない。
  */
 export function screenFailures(report: ScreenReport): string[] {
   const reasons: string[] = [];
   if (report.landedOnLogin) reasons.push('login');
   if (report.crashed) reasons.push('crash');
-  if (!report.titlePasses) reasons.push('title');
-  for (const failure of report.loadFailures) reasons.push(`load-failure(${failure})`);
+  if (report.gate) {
+    reasons.push(`gate(${report.gate})`);
+  } else {
+    if (report.title === null) {
+      reasons.push(`title(none, want=${short(report.expectedTitle)})`);
+    } else if (report.title !== report.expectedTitle) {
+      reasons.push(`title(${short(report.title)}, want=${short(report.expectedTitle)})`);
+    }
+    if (report.title !== null && report.observedType
+      && formatTitleType(report.observedType) !== formatTitleType(report.expectedType)) {
+      reasons.push(
+        `title-type(${formatTitleType(report.observedType)}, want=${formatTitleType(report.expectedType)})`,
+      );
+    }
+    for (const failure of report.loadFailures) reasons.push(`load-failure(${failure})`);
+  }
+  if (!report.landedOnLogin && report.landedPath !== SCREEN_PATH) {
+    reasons.push(`redirect(${short(report.landedPath)})`);
+  }
   if (report.pageErrors !== 0) reasons.push(`page-error(${report.pageErrors})`);
   return reasons;
+}
+
+/** 門だけで止まったとき、検証環境で次に整える設定を1つ返す。 */
+export function nextStepForGate(gate: string): string {
+  if (gate === 'feature-off') {
+    return '検証環境の担当者のテナントに飲食店の機能パックを付け、NEXT_PUBLIC_RESTAURANT_TEST_ENABLED を有効にして配備する';
+  }
+  if (gate === 'store-unselected') {
+    return '一時セッションの担当者の可視範囲に、店舗（rt_stores.line_account_id）が紐付いたLINEアカウントを含め、/api/line-accounts に出るようにする';
+  }
+  if (gate === 'store-checking') {
+    return '検証環境の /api/line-accounts が一時セッションの合言葉で応答しているかを確かめる（店舗の確認中のまま止まっている）';
+  }
+  if (gate === 'account-list') {
+    return '検証環境の /api/line-accounts が失敗している原因（合言葉・CORS・権限）を調べて直す';
+  }
+  return '入口の門で止まった理由を検証環境の設定から調べる';
 }
 
 function required(name: string, value: string | undefined): string {
@@ -326,6 +422,39 @@ export const READ_TITLE_SOURCE = `(() => {
   };
 })()`;
 
+/**
+ * 入口の門で止まっていないか見る。
+ *
+ * 門（`app/layout.tsx` の `AppShell` が包む `FeatureDisabledGate` /
+ * `StoreSelectionGate`）は中身をそのまま差し替えるので、題は出ないのに
+ * 失敗の1枚も出ない。そのまま測ると「題が無い」だけが残り、画面の作りが
+ * 悪いのか検証環境の設定が足りないのかが分からない。
+ */
+export const READ_GATE_SOURCE = `(() => {
+  const root = document.querySelector('main') || document.body;
+  const off = Array.from(root.querySelectorAll('[data-feature-disabled]'))
+    .find((el) => el.getBoundingClientRect().height > 1
+      && getComputedStyle(el).visibility !== 'hidden');
+  if (off) return 'feature-off';
+  const checking = Array.from(root.querySelectorAll('[role="status"][aria-label="店舗を確認中"]'))
+    .find((el) => el.getBoundingClientRect().height > 1
+      && getComputedStyle(el).visibility !== 'hidden');
+  if (checking) return 'store-checking';
+  const empty = Array.from(root.querySelectorAll('[data-design="Empty"]'))
+    .find((el) => el.getBoundingClientRect().height > 1
+      && getComputedStyle(el).visibility !== 'hidden'
+      && ((el.querySelector('h1, h2') || {}).textContent || '')
+        .trim().replace(/\\s+/g, ' ') === '店舗が選ばれていません');
+  if (empty) return 'store-unselected';
+  const failed = Array.from(root.querySelectorAll('[data-list-state="error"]'))
+    .find((el) => el.getBoundingClientRect().height > 1
+      && getComputedStyle(el).visibility !== 'hidden'
+      && ((el.querySelector('h1, h2, h3') || {}).textContent || '')
+        .trim().replace(/\\s+/g, ' ') === 'アカウント一覧を読み込めませんでした');
+  if (failed) return 'account-list';
+  return null;
+})()`;
+
 /** 字が出そろうのを待つ。これも同じ理由で文字列で渡す。 */
 export const FONTS_READY_SOURCE = 'document.fonts.ready.then(() => true)';
 
@@ -362,6 +491,14 @@ async function inspectScreens(
           try { sessionStorage.setItem('lh_admin_session_fallback', token) } catch { /* 画面側で再取得される */ }
           // 未選択のとき先頭へフォールバックしないので、見る店舗を明示する。
           try {
+            // 「もう一度だけ前回の選択を捨てる」印を先に立てる。これが無いと
+            // AuthGuard が認証確認の直後に `clearSelectionAfterAuthentication`
+            // で下の店舗選択を消し、3画面とも店舗未選択の門で止まる。
+            // 正本は localStorage で、確認用スクリプトが置く sessionStorage の
+            // 印も残存扱いにされる（apps/web/src/lib/hq-navigation.ts の注記）
+            // ので両方へ置く。
+            localStorage.setItem('lh_auth_selection_cleared', '1');
+            sessionStorage.setItem('lh_auth_selection_cleared', '1');
             localStorage.setItem('lh_selected_account', accountId);
             localStorage.setItem('lh-admin-theme', 'v8');
           } catch { /* 既定のまま進む */ }
@@ -370,16 +507,27 @@ async function inspectScreens(
       );
       try {
         await page.goto(`${admin.adminUrl}${SCREEN_PATH}${screen.search}`, { waitUntil: 'load' });
-        await page.waitForTimeout(4000);
+        // 題・門・失敗の1枚のどれかが出るまで待つ。出なければそのまま測って理由に残す。
+        await page.waitForSelector(SETTLED_SELECTOR, { timeout: 20_000 }).catch(() => null);
+        await page.waitForTimeout(1500);
         await page.evaluate<boolean>(FONTS_READY_SOURCE);
         const title = await page.evaluate<TitleInfo | null>(READ_TITLE_SOURCE);
         const loadFailures = await page.evaluate<string[]>(READ_FAILURE_STATES_SOURCE);
-        const landedOnLogin = new URL(page.url()).pathname.startsWith('/login');
+        const gate = await page.evaluate<string | null>(READ_GATE_SOURCE);
+        const landedPath = new URL(page.url()).pathname;
+        const landedOnLogin = landedPath.startsWith('/login');
         reports.push({
           view: screen.view,
           title: title?.text ?? null,
+          expectedTitle: screen.title,
+          observedType: title ? { size: title.size, weight: title.weight, lh: title.lh } : null,
+          expectedType: screen.type,
           titlePasses: title?.text === screen.title
-            && title.size === '22px' && title.weight === '700' && title.lh === '32px',
+            && title.size === screen.type.size
+            && title.weight === screen.type.weight
+            && title.lh === screen.type.lh,
+          landedPath,
+          gate,
           landedOnLogin,
           crashed: title?.text === CRASH_TITLE,
           loadFailures,
@@ -446,6 +594,8 @@ async function main(): Promise<void> {
   const cleanupFailures: string[] = [];
   let report: Record<string, unknown> | null = null;
   let verificationError: unknown = null;
+  /** 入口の門だけで止まった場合。画面の作りの不合格とは分けて出す。 */
+  let blockedByGates: { view: string; gate: string }[] | null = null;
 
   try {
     await query(
@@ -485,14 +635,23 @@ async function main(): Promise<void> {
       .map((screen) => ({ screen, reasons: screenFailures(screen) }))
       .filter(({ reasons }) => reasons.length !== 0);
     if (brokenScreens.length !== 0) {
-      throw new Error(
-        `Staging delivery screens failed: ${brokenScreens.map(
-          ({ screen, reasons }) => `${screen.view}[${reasons.join(',')}]`,
-        ).join(', ')}`,
-      );
+      // 門だけなら検証環境の設定が足りないだけ。画面の作りの不合格として投げない。
+      const gateOnly = brokenScreens
+        .every(({ reasons }) => reasons.every((reason) => reason.startsWith('gate(')));
+      if (!gateOnly) {
+        throw new Error(
+          `Staging delivery screens failed: ${brokenScreens.map(
+            ({ screen, reasons }) => `${screen.view}[${reasons.join(',')}]`,
+          ).join(', ')}`,
+        );
+      }
+      blockedByGates = brokenScreens.map(({ screen }) => ({
+        view: screen.view,
+        gate: screen.gate ?? '',
+      }));
     }
 
-    report = {
+    report = blockedByGates ? null : {
       environment: 'staging',
       status: 'verified',
       endpoints: {
@@ -516,7 +675,10 @@ async function main(): Promise<void> {
       screens: screens.map((screen) => ({
         view: screen.view,
         title: screen.title,
+        // 絵のどちらの型で出ているかを残す。頁の題は 22/700/32、副題は 18/700/27。
+        titleType: screen.observedType ? formatTitleType(screen.observedType) : null,
         titlePasses: screen.titlePasses,
+        landedPath: screen.landedPath,
         landedOnLogin: screen.landedOnLogin,
         crashed: screen.crashed,
         loadFailures: screen.loadFailures.length,
@@ -548,6 +710,23 @@ async function main(): Promise<void> {
     throw new Error(`Staging cleanup incomplete: stages=${cleanupFailures.join(',') || 'none'}, leftovers=${leftoverCount}`);
   }
   if (verificationError) throw verificationError;
+  if (blockedByGates) {
+    // 一時セッションは作って消した。後片付けの確認が済んだここで出す。
+    const gates = await readGates(query, restaurantTestEnabled);
+    console.log(JSON.stringify({
+      environment: 'staging',
+      status: 'blocked',
+      reason: '入口の門で止まったため、3画面の実表示を測れませんでした',
+      screens: blockedByGates,
+      gates,
+      nextStep: nextStepForGate(blockedByGates[0]?.gate ?? ''),
+      temporarySessionCreated: true,
+      temporarySessionDeleted: true,
+      writeRequestsSent: 0,
+    }));
+    process.exitCode = 1;
+    return;
+  }
   console.log(JSON.stringify({ ...report, temporarySessionDeleted: true }));
 }
 
