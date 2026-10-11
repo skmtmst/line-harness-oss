@@ -80,6 +80,11 @@ function isRedirectResponse(response: Response): boolean {
  * そのため「自由な文章ではない項目」という理由だけで通さず、
  * `type` は上の一覧に載る名前だけ、`code` と `subcode` は整数だけに限る。
  * `status` はこちらが受け取った応答の番号で、Meta の本文には由来しない。
+ *
+ * エラー本文の形は口によって2通りある。Graph は `error` の中に入れ子で返すが、
+ * 認可コードの引き換え（`api.instagram.com/oauth/access_token`）は
+ * `error_type` / `code` / `error_message` を素のまま返す。後者を読み落とすと
+ * この口の失敗で状態番号しか残らず、原因が分からなくなるため両方読む。
  */
 async function metaErrorDetail(response: Response): Promise<string | undefined> {
   try {
@@ -89,9 +94,16 @@ async function metaErrorDetail(response: Response): Promise<string | undefined> 
         code?: unknown;
         error_subcode?: unknown;
       };
+      error_type?: unknown;
+      code?: unknown;
     };
-    const e = body?.error;
-    if (!e) return undefined;
+    const e = body?.error ?? {
+      type: body?.error_type,
+      code: body?.code,
+      error_subcode: undefined,
+    };
+    if (!body || (!body.error && e.type === undefined && e.code === undefined))
+      return undefined;
     const type =
       typeof e.type === 'string' && e.type !== ''
         ? META_ERROR_TYPES.has(e.type)
@@ -320,6 +332,41 @@ export async function instagramGraph<T>(
   return response.json() as Promise<T>;
 }
 /**
+ * 認可コードの引き換えで返る中身。
+ *
+ * 手引きの例では `permissions` はカンマ区切りの文字列だが、実際には一覧（配列）で返ることが
+ * あり、名前が `scopes` になっている場合もある。どちらで来ても読めるようにしておく。
+ */
+type InstagramShortTokenBody = {
+  access_token?: string;
+  user_id?: string | number;
+  permissions?: unknown;
+  scopes?: unknown;
+};
+/**
+ * 許可された権限の名前を取り出す。
+ *
+ * カンマ区切りの文字列でも一覧でも読む。ここで読み落とすと、実際には許可されていても
+ * 「同時投稿の許可が無い」と判定して接続が必ず失敗するため、形の違いで落とさない。
+ * 中身の正しさ（知っている権限名かどうか）は、記録とURLへ出す直前に
+ * `instagramUrlScopes` が別途絞るので、ここでは空でない文字列だけに限る。
+ */
+function instagramGrantedScopes(body: InstagramShortTokenBody): string[] {
+  const raw = body.permissions ?? body.scopes;
+  const list = Array.isArray(raw)
+    ? raw
+    : typeof raw === 'string'
+      ? raw.split(',')
+      : [];
+  const scopes: string[] = [];
+  for (const s of list) {
+    if (typeof s !== 'string') continue;
+    const name = s.trim();
+    if (name !== '' && !scopes.includes(name)) scopes.push(name);
+  }
+  return scopes;
+}
+/**
  * 認可コードを短期の合鍵へ引き換える。
  *
  * 入口は `api.instagram.com/oauth/access_token`（版を付けない）で、
@@ -339,15 +386,8 @@ export async function instagramShortToken(
   scopes: string[];
 }> {
   const r = await instagramGraph<{
-    data?: Array<{
-      access_token?: string;
-      user_id?: string | number;
-      permissions?: string;
-    }>;
-    access_token?: string;
-    user_id?: string | number;
-    permissions?: string;
-  }>(
+    data?: Array<InstagramShortTokenBody>;
+  } & InstagramShortTokenBody>(
     config,
     'oauth/access_token',
     null,
@@ -366,13 +406,15 @@ export async function instagramShortToken(
   if (typeof d.access_token !== 'string' || d.access_token === '')
     throw new InstagramError('invalid_meta_token');
   const userId = String(d.user_id ?? '');
+  const scopes = instagramGrantedScopes(d);
   return {
     token: d.access_token,
     userId: /^\d{1,24}$/.test(userId) ? userId : '',
-    scopes:
-      typeof d.permissions === 'string'
-        ? d.permissions.split(',').filter((s) => s !== '')
-        : [],
+    // 許可名が1つも読めなかったときは、こちらが認可画面で求めた許可を使う。
+    // 利用者が許可を押して認可コードが返ってきている以上、「読めない＝許可されていない」
+    // とは言い切れない。ここで空のままにすると、実際には許可されていても接続が必ず失敗し、
+    // 画面からは理由が分からないまま直す手段も無くなる。
+    scopes: scopes.length ? scopes : [...INSTAGRAM_SCOPES],
   };
 }
 /** 長期（60日）の合鍵とその期限。 */

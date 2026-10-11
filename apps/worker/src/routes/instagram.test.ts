@@ -129,6 +129,10 @@ async function connect() {
   expect(url.searchParams.get('scope')).toContain(
     'instagram_business_content_publish',
   );
+  // 前につないだことのあるアカウントだと、Instagram は許可の一覧を出さず短い確認だけで
+  // 戻すことがある。そのとき後から足した許可は渡されず接続が必ず失敗するため、
+  // 毎回ログインと許可の一覧からやり直させる。
+  expect(url.searchParams.get('force_reauth')).toBe('true');
   const state = url.searchParams.get('state')!;
   const callback = await req(
     '/api/instagram/oauth/callback?' +
@@ -310,6 +314,102 @@ it('同時投稿の許可を外されたまま戻ってきたら保存しない'
   expect(
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
   ).toEqual({ n: 0 });
+});
+it('引き換えの失敗が素の形で返っても、種別と番号だけを手がかりに残す', async () => {
+  const synthetic = 'ZZtest_only_not_a_secretZZ';
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string, init?: RequestInit) => {
+      // 認可コードの引き換えの口だけは、Graph の入れ子ではなく素の形でエラーを返す。
+      if (new URL(String(url)).pathname.endsWith('/oauth/access_token'))
+        return Response.json(
+          {
+            error_type: 'OAuthException',
+            code: 400,
+            error_message: `secret=${synthetic}`,
+          },
+          { status: 400 },
+        );
+      return original(url, init);
+    }),
+  );
+  const logged: string[] = [];
+  const spy = vi
+    .spyOn(console, 'error')
+    .mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+  let back: URL;
+  try {
+    back = await callback({ code: 'mock_code' });
+  } finally {
+    spy.mockRestore();
+  }
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  expect(back.searchParams.get('instagram_code')).toBe('meta_request_failed');
+  // 入れ子の形しか読めないと `status=400` だけが残り、原因が分からなくなる。
+  expect(back.searchParams.get('instagram_detail')).toBe(
+    'POST api/oauth/access_token status=400 type=OAuthException code=400',
+  );
+  // 上流の自由文（`error_message`）は記録にも戻り先URLにも出さない。
+  const returned = `${back}\n${decodeURIComponent(String(back))}`;
+  expect(logged.join('\n')).not.toContain(synthetic);
+  expect(returned).not.toContain(synthetic);
+});
+it('許可名が一覧（配列）で返っても読み取り、接続できる', async () => {
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string, init?: RequestInit) => {
+      // 手引きの例はカンマ区切りの文字列だが、実際には一覧で返ることがある。
+      if (new URL(String(url)).pathname.endsWith('/oauth/access_token'))
+        return Response.json({
+          data: [
+            {
+              access_token: 'short_mock',
+              user_id: '20',
+              permissions: [
+                'instagram_business_basic',
+                'instagram_business_content_publish',
+              ],
+            },
+          ],
+        });
+      return original(url, init);
+    }),
+  );
+  const back = await callback({ code: 'mock_code' });
+  expect(back.searchParams.get('instagram')).toBe('connected');
+  expect(
+    db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
+  ).toEqual({ n: 1 });
+});
+it('許可名がどこにも入っていなければ、要求した許可で接続する', async () => {
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string, init?: RequestInit) => {
+      // 項目名が変わった・項目自体が無い場合。利用者は許可を押して認可コードが
+      // 返っているので、読めないことを「許可されていない」と決めつけない。
+      // ここを空のままにすると、実際には許可されていても接続が必ず失敗し、
+      // 画面からは理由も分からないまま直す手段が無くなる。
+      if (new URL(String(url)).pathname.endsWith('/oauth/access_token'))
+        return Response.json({
+          data: [{ access_token: 'short_mock', user_id: '20' }],
+        });
+      return original(url, init);
+    }),
+  );
+  const back = await callback({ code: 'mock_code' });
+  expect(back.searchParams.get('instagram')).toBe('connected');
+  expect(
+    db.raw
+      .prepare('SELECT scopes FROM instagram_connections LIMIT 1')
+      .get() as { scopes: string },
+  ).toEqual({
+    scopes: 'instagram_business_basic,instagram_business_content_publish',
+  });
 });
 it('認可画面で断られたときはMetaへ問い合わせず、やり直しへ回す', async () => {
   const before = vi.mocked(fetch).mock.calls.length;
