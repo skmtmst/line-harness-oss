@@ -14,7 +14,9 @@ const FrameContext = createContext(false)
 export function ListToolbarLeading({ children, leading }: { children: ReactNode; leading: ReactNode }) {
   // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
   const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? Children.toArray(children.props.children) : null
-  const needsFrame = nodes && !nodes.some(node => isValidElement(node) && (node.type === ListToolbar || node.type === ListToolbarFrame))
+  const containsLayout = (items: ReactNode[]): boolean => items.some(node => isValidElement<{ children?: ReactNode }>(node)
+    && (node.type === ListToolbar || node.type === ListToolbarFrame || node.type === Fragment && containsLayout(Children.toArray(node.props.children))))
+  const needsFrame = nodes && nodes.some(node => isValidElement(node) && node.type === ListToolbarRow) && !containsLayout(nodes)
   const tools = needsFrame ? <ListToolbarFrame>{nodes.map((node, index) => isValidElement(node) && node.type === ListToolbarRow
     ? node : <ListToolbarRow key={isValidElement(node) ? node.key ?? index : index}>{node}</ListToolbarRow>)}</ListToolbarFrame> : children
   return <LeadingContext.Provider value={leading}>{tools}</LeadingContext.Provider>

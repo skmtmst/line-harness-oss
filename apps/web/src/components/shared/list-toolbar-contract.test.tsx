@@ -65,6 +65,15 @@ describe('B-178 共通の道具の段の操作', () => {
     expect(submit).toHaveBeenCalledOnce()
   })
 
+  it('入れ子の断片に既存の道具の型があれば二重に包まず、作る操作を保つ', () => {
+    const { container } = render(<ListToolbarLeading leading={<button>流入リンクを作る</button>}><><>
+      <ListToolbar search={{ placeholder: '流入元を探す', value: '', onChange: vi.fn() }} />
+    </></></ListToolbarLeading>)
+    expect(container.querySelectorAll('[data-toolbar-layout="band"]')).toHaveLength(1)
+    expect(container.querySelector('[data-toolbar-layout="slots"]')).toBeNull()
+    expect(screen.getAllByRole('button', { name: '流入リンクを作る' })).toHaveLength(1)
+  })
+
   it('フォームを共通の段へ移しても検索の送信と条件操作を保つ', () => {
     const submit = vi.fn((event: React.FormEvent) => event.preventDefault()), filter = vi.fn()
     render(<ListToolbarFrame><ListToolbarRow as="form" onSubmit={submit}>
