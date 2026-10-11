@@ -23,7 +23,7 @@ import {
   type ShapeFilter,
 } from '@/lib/hq-banners'
 import BannerSideNav, { type BannerChrome } from './banner-side-nav-v8'
-import ImageDetailModal from './image-detail-modal'
+import { BannerImageDetailV8 } from '@/v8/hq-banners/image-detail'
 import ImageTile from './image-tile'
 import UploadTargetDialog from './upload-target-dialog'
 
@@ -160,8 +160,10 @@ export default function LibrarySection({
       if (!res.success) throw new Error(res.error)
       replaceImage(res.data.image)
       onChanged()
+      return true
     } catch (caught) {
       setModalError(modalFailureMessage(caught, 'アカウントへの受け渡し'))
+      return false
     } finally {
       setModalBusy(false)
     }
@@ -176,8 +178,10 @@ export default function LibrarySection({
       setImages((prev) => prev.filter((i) => i.id !== image.id))
       setOpenImage(null)
       onChanged()
+      return true
     } catch (caught) {
       setModalError(modalFailureMessage(caught, '一覧からの削除'))
+      return false
     } finally {
       setModalBusy(false)
     }
@@ -326,11 +330,11 @@ export default function LibrarySection({
       />
 
       {openImage ? (
-        <ImageDetailModal
+        <BannerImageDetailV8
           image={openImage}
           presets={presets}
           accounts={accounts}
-          projectName={projects[openImage.projectId]?.name ?? 'プロジェクト'}
+          canManage
           busy={modalBusy}
           error={modalError}
           onClose={() => {
