@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import Select from './select'
+import { SELECT_MENU_ROW_STRIDE } from './select-menu'
 
 beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -40,7 +41,7 @@ describe('候補の多い Select', () => {
       await act(async () => { fireEvent.click(view.getByRole('button', { name: 'タグ' })) })
       const panel = document.querySelector<HTMLElement>('[data-menu-portal]')!
       await act(async () => {
-        panel.scrollTop = 38 * 1000
+        panel.scrollTop = SELECT_MENU_ROW_STRIDE * 1000
         panel.dispatchEvent(new Event('scroll'))
         await new Promise((done) => requestAnimationFrame(() => done(null)))
       })
