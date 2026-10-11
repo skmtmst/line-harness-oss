@@ -61,7 +61,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const role = useStaffRole()
   const canOperate = useFeatureAccess('richMenus')
 
-  const [progress, setProgress] = useState<{ steps: ProgressStep[]; message: string | null; failed: boolean } | null>(null)
+  const [progress, setProgress] = useState<{ steps: ProgressStep[]; message: string | null; failed: boolean; completed: boolean } | null>(null)
   const [progressError, setProgressError] = useState(false)
   const [runs, setRuns] = useState<RichMenuPublishRun[] | null>(null)
   const [runsError, setRunsError] = useState('')
@@ -115,7 +115,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     try {
       const res = await api.richMenuGroups.publishProgress(groupId)
       if (!res.success || !res.data || !Array.isArray(res.data.steps)) throw new Error('progress')
-      setProgress({ steps: res.data.steps, message: res.data.message, failed: res.data.run?.status === 'failed' })
+      setProgress({ steps: res.data.steps, message: res.data.message, failed: res.data.run?.status === 'failed', completed: res.data.run?.status === 'succeeded' || res.data.run?.status === 'done' })
       setProgressError(false)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
@@ -317,7 +317,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
           <div className={styles.content}>
             {failed ? (
               <Notice tone="danger" heading={<> 公開が途中で止まりました </>} action={<> {canOperate ? <Button variant="primary" onClick={() => void republish()} busy={republishing} busyLabel="公開しています…"><RefreshCw size={14} aria-hidden="true" />もう一度公開する</Button> : null} </>} >{progress?.message ?? 'それまでの段を元に戻し、前のメニューのままにしました。もう一度公開できます。'}</Notice>
-            ) : progress ? (
+            ) : progress?.completed ? (
               <div className={styles.doneBand} role="status">
                 <CircleCheck size={18} aria-hidden="true" className={styles.doneIcon} />
                 <div className={styles.bandText}>
@@ -337,6 +337,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
             <section className={styles.card} aria-label="公開の進み">
               <h2 className={styles.cardTitle}>公開の進み</h2>
+              {progress && !progress.completed && !progress.failed && progress.message ? <p className={styles.cardNote}>{progress.message}</p> : null}
               {progressError ? <p className={styles.cardNote}>公開の進みを読み込めませんでした。</p> : progress === null ? <DetailLoading /> : progress.steps.length === 0 ? <p className={styles.cardNote}>まだ公開の記録はありません。</p> : progress.steps.map((step) => (
                 <div key={step.key} className={styles.stepRow}>
                   {step.status === 'done' ? <CircleCheck size={18} aria-hidden="true" className={styles.stepOk} />

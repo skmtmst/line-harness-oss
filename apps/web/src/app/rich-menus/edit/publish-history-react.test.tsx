@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import RichMenuDetailV8 from '@/v8/rich-menu-edit/detail'
 
 /**
  * 公開履歴セクションの「応答の形がずれていたとき」の試験(#1056)。
@@ -17,23 +18,29 @@ const net = vi.hoisted(() => ({
   publishRunsResult: undefined as unknown,
 }))
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } }) },
       richMenuGroups: {
         ...actual.api.richMenuGroups,
         publishRuns: async () => net.publishRunsResult,
+        get: async () => ({ success: true, data: { id: 'menu-1', name: 'メニュー', accountId: 'account-1', status: 'published', isDefaultForAll: true, targetingEnabled: false } }),
+        publishProgress: async () => ({ success: true, data: { steps: [], run: null, message: null } }),
+        previewTargets: async () => ({ success: true, data: null }),
+        tapStats: async () => ({ success: true, data: { byArea: [] } }),
         // K-2: 開いた時の照合は読むだけ。ずれなしで返す。
         reconcile: async () => ({ success: true, data: { dryRun: true, diffs: [] } }),
       },
     },
   }
 })
-
-const { PublishHistorySection } = await import('./publish-history')
 
 // act(...) を使う環境だと React に伝える(伝えないと警告が出続ける)。
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -49,6 +56,7 @@ async function flush() {
 }
 
 beforeEach(async () => {
+  document.documentElement.dataset.theme = 'v8'
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -59,6 +67,7 @@ afterEach(async () => {
     root.unmount()
   })
   container.remove()
+  delete document.documentElement.dataset.theme
 })
 
 describe('公開履歴の読み込み（応答の形ずれ）', () => {
@@ -66,11 +75,11 @@ describe('公開履歴の読み込み（応答の形ずれ）', () => {
     net.publishRunsResult = { success: true, data: {} }
 
     await act(async () => {
-      root.render(<PublishHistorySection groupId="menu-1" />)
+      root.render(<RichMenuDetailV8 groupId="menu-1" />)
     })
     await flush()
 
-    expect(container.textContent).toContain('公開履歴を読み込めませんでした。')
+    expect(container.textContent).toContain('公開の履歴を読み込めませんでした。')
   })
 
   it('通常の形の応答では履歴を表示する', async () => {
@@ -84,7 +93,7 @@ describe('公開履歴の読み込み（応答の形ずれ）', () => {
     }
 
     await act(async () => {
-      root.render(<PublishHistorySection groupId="menu-1" />)
+      root.render(<RichMenuDetailV8 groupId="menu-1" />)
     })
     await flush()
 
