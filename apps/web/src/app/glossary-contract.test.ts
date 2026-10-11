@@ -110,7 +110,7 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     'app/mileage/page.tsx',
     'v8/nen-campaigns/list.tsx',
     'app/nen-members/photo-review-v8.tsx',
-    'app/restaurant-test/v8/google.tsx',
+    'v8/restaurant/google/reviews.tsx',
     'app/visual-qa/v8-parts/page.tsx',
     'components/broadcasts/segment-preset-controls.tsx',
     'components/inflow-links/site-script-v8.tsx',
