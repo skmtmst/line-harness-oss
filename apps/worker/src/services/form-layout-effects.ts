@@ -1,4 +1,5 @@
 import { applyTapExtras } from './tap-extras.js';
+import { runScenarioOp } from './scenario-actions.js';
 import { researchGateProblem, runResearchAnswerAction, validateResearchActionScope } from './research-forms.js';
 import type { Env } from '../index.js';
 /**
@@ -35,7 +36,6 @@ import {
   countChoiceUsage,
   countFormSubmissionsByFriend,
   enrollFriendInReminder,
-  enrollFriendInScenario,
   getFriendFieldById,
   getFixedFriendField,
   getMessageTemplateById,
@@ -797,7 +797,7 @@ export async function runFormAction(
           .run();
         return;
       }
-      await enrollFriendInScenario(db, friendId, action.scenarioId);
+      await runScenarioOp(db, friendId, '', { op: 'start', scenarioId: action.scenarioId }, input.idempotencyPrefix ? `${input.idempotencyPrefix}:${pushSuffix ?? actionIndex}` : undefined);
       return;
 
     case 'reminder': {

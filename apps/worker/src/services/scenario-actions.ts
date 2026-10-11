@@ -479,7 +479,7 @@ async function executeAction(
         )
         return false
       }
-      await runScenarioOp(db, friendId, action.scenario_id, c)
+      await runScenarioOp(db, friendId, action.scenario_id, c, options.sourceEventId)
       return true
     }
 
@@ -599,6 +599,7 @@ export async function runScenarioOp(
   friendId: string,
   currentScenarioId: string,
   c: ScenarioActionConfig,
+  sourceEventId?: string,
 ): Promise<void> {
   const now = jstNow()
 
@@ -633,16 +634,13 @@ export async function runScenarioOp(
       .bind(friendId, c.scenarioId)
       .first<{ scenario_id: string }>()
     previousScenarioId = running?.scenario_id ?? null
-    if (previousScenarioId) {
-      await db
-        .prepare(
-          `UPDATE friend_scenarios SET status = 'paused', updated_at = ?
-            WHERE friend_id = ? AND scenario_id = ? AND status IN ('active','delivering')`,
-        )
-        .bind(now, friendId, previousScenarioId)
-        .run()
-    }
   }
+
+  // 元の購読を止めるのは、移動先への登録が成功した後だけ。
+  const pausePrevious = previousScenarioId ? [db.prepare(
+    `UPDATE friend_scenarios SET status='paused', updated_at=?
+      WHERE friend_id=? AND scenario_id=? AND status IN ('active','delivering')`,
+  ).bind(now, friendId, previousScenarioId)] : []
 
   // 読み終えた行が残っていると部分UNIQUE索引には触れないが、
   // 「最初から」を選んだときに読了済の行が邪魔をする。先に消す。
@@ -661,25 +659,32 @@ export async function runScenarioOp(
       .bind(friendId, c.scenarioId)
       .first<{ id: string }>()
     if (paused) {
-      await db
-        .prepare(
-          `UPDATE friend_scenarios
-              SET status = 'active', previous_scenario_id = COALESCE(?, previous_scenario_id), updated_at = ?
-            WHERE id = ?`,
-        )
-        .bind(previousScenarioId, now, paused.id)
-        .run()
+      const available = await db.prepare(`SELECT 1 FROM scenarios WHERE id=? AND is_active=1 AND current_published_version_id IS NOT NULL`)
+        .bind(c.scenarioId).first()
+      if (!available) throw new Error('移動先のシナリオを開始できませんでした。元のシナリオは継続しています')
+      await db.batch([
+        db.prepare(`UPDATE friend_scenarios SET status='active', previous_scenario_id=COALESCE(?,previous_scenario_id), updated_at=? WHERE id=? AND status='paused'`)
+          .bind(previousScenarioId, now, paused.id),
+        ...pausePrevious,
+      ])
       return
     }
   }
 
-  const enrolled = await enrollFriendInScenario(db, friendId, c.scenarioId)
-  if (enrolled && previousScenarioId) {
-    await db
-      .prepare(`UPDATE friend_scenarios SET previous_scenario_id = ? WHERE id = ?`)
-      .bind(previousScenarioId, enrolled.id)
-      .run()
+  const enrollmentId = sourceEventId ? `scenario-action:${JSON.stringify([friendId, sourceEventId, c.scenarioId])}` : undefined
+  const enrolled = await enrollFriendInScenario(db, friendId, c.scenarioId, enrollmentId, { replacingScenarioId: previousScenarioId })
+  if (!enrolled) {
+    // 元々稼働中の同じ購読は重複開始。新しい移動とは扱わない。
+    const active = await db.prepare(`SELECT 1 FROM friend_scenarios WHERE friend_id=? AND scenario_id=? AND status IN ('active','delivering')`)
+      .bind(friendId, c.scenarioId).first()
+    if (active && !previousScenarioId) return
+    throw new Error('移動先のシナリオを開始できませんでした。元のシナリオは継続しています')
   }
+  if (previousScenarioId) await db.batch([
+    db.prepare(`UPDATE friend_scenarios SET previous_scenario_id=COALESCE(?,previous_scenario_id) WHERE id=?`)
+      .bind(previousScenarioId, enrolled.id),
+    ...pausePrevious,
+  ])
 }
 
 /**
