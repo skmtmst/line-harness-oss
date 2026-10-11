@@ -30,7 +30,6 @@ const GUARDED = [
   'v8/auto-replies/quick-create.tsx',
   'app/inflow-links/ad-event-mappings.tsx',
   'app/settings/feature-settings-v8.tsx',
-  'components/ops/knowledge-editor.tsx',
   'app/affiliate-offers/new-offer-v8.tsx',
   'app/affiliates/new-affiliate-v8.tsx',
   'app/analytics/reports/new/page.tsx',

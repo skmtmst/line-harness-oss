@@ -70,8 +70,10 @@ describe('数の帯（Pp3nS）', () => {
   it('折りたたみ（KpiCollapse）とナレッジ一覧も帯として出す', () => {
     const collapse = readFileSync(join(HERE, '..', 'ui', 'kpi-collapse.tsx'), 'utf8')
     expect(collapse).toContain('data-kpi-presentation="band"')
-    const knowledge = readFileSync(join(HERE, '..', 'ops', 'knowledge-list.tsx'), 'utf8')
-    expect(knowledge).toContain('<KpiBand')
+    const knowledge = readFileSync(join(HERE, '..', '..', 'v8', 'ops', 'knowledge.tsx'), 'utf8')
+    expect(knowledge).toContain('parts.kpis')
+    expect(knowledge).toContain('kpiStyles.strip')
+    expect(knowledge).toContain('presentation="cell"')
   })
 
   it('帯の題は絵どおり13px/500/1.5（Pp3nS）', () => {

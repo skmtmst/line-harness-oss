@@ -1,11 +1,11 @@
 'use client'
 import Link from '@/components/shared/list-navigation'
 import { ArrowLeft, Check } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
-import { KNOWLEDGE_KINDS, knowledgeTime } from '@/components/ops/knowledge-format'
+import { KNOWLEDGE_KINDS, knowledgeTime, knowledgeArticleKind } from '@/components/ops/knowledge-format'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
@@ -31,8 +31,10 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * - 承認済み：保存すると承認待ちに戻る。一覧から行っていた「無効にする」もここに置く
  * 保存してから承認する（承認に失敗しても、勝手に有効にはならない）。
  */
-export default function KnowledgeArticleV8({ article: initial, onClose, onSaved }: {
+export default function KnowledgeArticleV8({ article: initial, onClose, onSaved, ticket, fullPage = true }: {
   article: OpsKnowledgeArticle
+  fullPage?: boolean
+  ticket?: { label: string; resolved: boolean; stageLabel: string } | null
   onClose: () => void
   onSaved: () => void
 }) {
@@ -50,6 +52,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
     ? article.reviewState === 'pending' && article.evidence.length >= 2
     : (article.reviewState === 'pending' || article.reviewState === 'needs_review'))
   const canApprove = eligible && Boolean(form.question.trim()) && Boolean(form.answer.trim())
+  const ticketBlocked = Boolean(ticket && !ticket.resolved)
 
   const input = () => ({ ...form, keywords: keywords.split(/[、,\n]/).map((v) => v.trim()).filter(Boolean) })
   const change = <K extends keyof OpsKnowledgeInput>(key: K, value: OpsKnowledgeInput[K]) => {
@@ -63,7 +66,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
   fields.define('answer', '答え', () => (eligible && !form.answer.trim() ? '答えを入力してください' : null))
 
   const save = async (approve = false) => {
-    if (approve && (!readChecked || !eligible)) return
+    if (busy || (approve && (!readChecked || !eligible || ticketBlocked))) return
     const value = input()
     if (fields.submit().length > 0) { setError(''); return }
     setBusy(true); setError('')
@@ -92,30 +95,25 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
     () => JSON.stringify(form) !== JSON.stringify({ title: initial.title, question: initial.question, answer: initial.answer, kind: initial.kind, keywords: initial.keywords }) || keywords !== initial.keywords.join(', '),
     [form, keywords, initial],
   )
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
-  const close = () => { if (busy) return; if (dirty) setClosing(true); else onClose() }
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: fullPage && dirty, busy })
+  const close = () => { if (busy) return; if (fullPage && dirty) setClosing(true); else onClose() }
   const ticketLabel = article.ticketNo == null ? '番号未取得' : `#${article.ticketNo}`
 
   return (
-    <div data-design-node="R5ckwJ">
-      <OpsHead
-        title={form.title || 'ナレッジの記事'}
-        description={`${editing ? '承認済み' : '承認待ち'}・${ticketLabel} の解決から自動で下書き`}
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
-        actions={(
-          <>
-            <Button onClick={close} disabled={busy}>キャンセル</Button>
-            {editing ? (
-              <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
-            ) : (
-              <Button variant="primary" disabled={busy || !canApprove} onClick={() => { setError(''); setApproving(true) }}><Check aria-hidden="true" />保存して承認</Button>
-            )}
-          </>
+    <KnowledgeSurface fullPage={fullPage} editing={editing} busy={busy} onCancel={close} actions={(
+      <>
+        <Button onClick={close} disabled={busy}>キャンセル</Button>
+        {editing ? (
+          <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
+        ) : (
+          <Button variant="primary" disabled={busy || !canApprove} onClick={() => { setError(''); setApproving(true) }}><Check aria-hidden="true" />保存して承認</Button>
         )}
-      />
+      </>
+    )} title={form.title || 'ナレッジの記事'} description={`${editing ? '承認済み' : '承認待ち'}・${ticketLabel} の解決から自動で下書き`}>
+      {/* 現役の全画面と、問い合わせから開く共通の窓で同じ保存・承認を使う。 */}
       {error && !approving ? <Notice tone="danger" >{error}</Notice> : null}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-      <div className={styles.article}>
+      <div className={fullPage ? styles.article : parts.stack}>
         <section className={styles.fields} aria-label="記事の中身">
           <div className={styles.field}><Field label="題名" htmlFor="ka-title"><SaveErrorField names={["title","form.title"]}><TextField {...fields.bind('title')} id="ka-title" invalid={fields.invalid('title')} aria-describedby={fields.invalid('title') ? 'ka-title-error' : undefined} value={form.title} maxLength={120} disabled={busy} onChange={(e) => change('title', e.target.value)} /></SaveErrorField>
 <FieldError id="ka-title-error">{fields.error('title')}</FieldError></Field></div>
@@ -136,7 +134,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
           {editing ? (
             <Notice tone="info">変更を保存すると承認待ちに戻ります。再承認するまで、この記事は AI の返信に使われません。</Notice>
           ) : (
-            <section className={parts.panel} aria-label="解決の根拠">
+            <section className={parts.panel} aria-label="解決の根拠" title={`元の問い合わせ：${article.ticketNo == null ? '番号未取得' : `#MB-${String(article.ticketNo).padStart(4, '0')}`}${article.sourceSubject ? ` ${article.sourceSubject}` : ''}・${knowledgeArticleKind(article.articleKind).label}`}>
               <h3 className={parts.panelTitle}>解決の根拠</h3>
               {article.evidence.filter((e) => e.role !== 'condition').length === 0 ? (
                 <p className={styles.evidence}>{`${ticketLabel} の解決から自動で下書きにしました`}</p>
@@ -187,7 +185,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
           footer={(
             <div className={styles.dialogActions}>
               <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
-              <Button variant="primary" disabled={busy || !canApprove || !readChecked} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}>保存して承認</Button>
+              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}>保存して承認</Button>
             </div>
           )}
         >
@@ -196,11 +194,20 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved 
             <SaveErrorField names={["readChecked","read_checked"]}><Checkbox checked={readChecked} disabled={busy || !eligible} onCheckedChange={setReadChecked}>
               本文と手順を読み、いまの作りと合っていることを確かめました
             </Checkbox></SaveErrorField>
+            {ticket ? <Checkbox checked={ticket.resolved} disabled onCheckedChange={() => {}}>元の問い合わせ {ticket.label} が「解決」になっている</Checkbox> : null}
+            {ticketBlocked ? <Notice tone="danger">元の問い合わせ {ticket?.label} がまだ「{ticket?.stageLabel}」です。解決にしてから承認できます。</Notice> : null}
             <Notice tone="info">承認すると、AIの返事の下書きにこの記事が使われます。保存だけ通って承認に失敗したときは、下書きのまま残ります。</Notice>
           </div>
         </Dialog>
       )}
       <UnsavedLeaveDialog open={closing || leaveTarget !== null} onConfirm={closing ? onClose : confirmLeave} onCancel={closing ? () => setClosing(false) : cancelLeave} />
-    </div>
+    </KnowledgeSurface>
   )
+}
+
+function KnowledgeSurface({ fullPage, editing, busy, onCancel, actions, title, description, children }: {
+  fullPage: boolean; editing: boolean; busy: boolean; onCancel: () => void; actions: ReactNode; title: string; description: string; children: ReactNode
+}) {
+  if (!fullPage) return <Dialog open title={editing ? '記事を直す' : '下書きの内容を確認'} designNode={editing ? 'ZAOc7' : 'DHdsw'} busy={busy} onCancel={onCancel} footer={actions}>{children}</Dialog>
+  return <div data-design-node="R5ckwJ"><OpsHead title={title} description={description} environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)} actions={actions} />{children}</div>
 }
