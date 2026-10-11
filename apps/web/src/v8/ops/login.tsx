@@ -134,7 +134,7 @@ export default function OpsLoginV8() {
         <PageHeading inset="none" title="ログイン" titleId="ops-login-title" titleAs="h1" help={<> 運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</>} />
         <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
           {error ? <Notice tone="danger" message={error} /> : null}
-          <div className={styles.field}><Field label="メールアドレス" htmlFor="ops-login-email"><SaveErrorField names={["email"]}><TextField
+          <div className={styles.field}><Field label="メールアドレス" htmlFor="ops-login-email" required><SaveErrorField names={["email"]}><TextField
               id="ops-login-email"
               type="email"
               value={email}
@@ -146,7 +146,7 @@ export default function OpsLoginV8() {
               placeholder="you@example.com"
             /></SaveErrorField>
 {emailMessage ? <p id="ops-login-email-error" className={styles.error}>{emailMessage}</p> : null}</Field></div>
-          <div className={styles.field}><Field label={<>パスワード</>} htmlFor="ops-login-password"><PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" /></Field></div>
+          <div className={styles.field}><Field label={<>パスワード</>} htmlFor="ops-login-password" required><PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" /></Field></div>
           <Button type="submit" variant="primary" disabled={busy !== null} className={styles.wide} busy={busy === 'password'} busyLabel="ログインしています…">
             <LogIn aria-hidden="true" />ログイン
           </Button>
