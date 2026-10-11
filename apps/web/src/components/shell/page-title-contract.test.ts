@@ -119,7 +119,7 @@ describe('画面名は上部バーだけが持つ', () => {
     const cleaned: Array<[string, string]> = [
       ['health/page.tsx', 'BAN検知ダッシュボード'],
       ['templates/detail/page.tsx', 'テンプレートの詳細'],
-      ['nen-campaigns/edit/campaign-editor-v8.tsx', 'NEN配信を編集する'],
+      ['../v8/nen-campaigns/edit.tsx', 'NEN配信を編集する'],
       ['../v8/scenario-detail/detail.tsx', 'シナリオ詳細'],
       ['webinars/edit/page.tsx', 'ウェビナー編集'],
     ]

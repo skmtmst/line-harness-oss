@@ -5,10 +5,10 @@
 写し元：`app/nen-campaigns/nen-campaigns-v8.tsx`・`nen-overview.tsx`・`edit/campaign-editor-v8.tsx`・`columns/new/column-new-v8.tsx`。
 
 ## 入口
-- `app/nen-campaigns/page.tsx`：`theme === 'v8'` のときだけ `list.tsx`。取得・保存は page.tsx が持ったまま（props で受け取る）。
-- `app/nen-campaigns/edit/page.tsx`：`?key=` があり `theme === 'v8'` のときだけ `edit.tsx`。`?key=` が無い紹介文の一覧は今のまま。
+- `app/nen-campaigns/page.tsx`：常に `list.tsx`。取得・保存は page.tsx が持ったまま（props で受け取る）。
+- `app/nen-campaigns/edit/page.tsx`：`?key=` があれば `edit.tsx`、無ければ共通の詳細画面を使う `column-intros.tsx`。
 - `app/nen-campaigns/columns/new/page.tsx`：`theme === 'v8'` のときだけ `column-new.tsx`。
-- v7 の画面・v7 の試験は触らない。
+- 旧側の動作試験は現役へ移し、読者が無くなった旧の写しから削除する（2026-10-11）。
 
 ## 受け付ける URL と指定
 - `/nen-campaigns`（自動配信）、`?tab=columns`（コラム）、`?tab=paused`（停止中）、`?tab=history`（送った履歴）。タブを替えると URL も替わる（page.tsx）。
@@ -38,9 +38,9 @@
 ## 配信を直す（edit.tsx）
 - 読み込み：`settings`（その key）・`forms.list`・`overview`（配信待ちの数）・`getTestRecipientLoginUsers`。
 - 節：配信フロー（きっかけ→日数と時刻→この配信→フォームに答えた→N マイル）・いつ送りますか（きっかけからの日数・送る時刻・届かない日＝なし）・送るもの（届く形は画像の有無で決まる・本文・差し込み）・押されたあとにすること（回答フォーム・回答後のマイル）。
-- 日数・時刻・フォーム・マイルは選ぶ欄（いまの値が候補に無くても入れて出す）。誕生日は「3日前 10:00」固定で、選べない箱で見せる。
+- 日数・時刻・フォーム・マイルは選ぶ欄（いまの値が候補に無くても入れて出す）。マイルの「ほかの数を入れる」から1〜1,000,000の任意の整数を共通の窓で指定できる。非公開のフォームは理由つきで選べない。誕生日は「3日前 10:00」固定で、選べない箱で見せる。
 - 差し込みの道具は本文の右上「差し込む」で開く。残りの字数は 300字を切ったときだけ、超えたら赤字。
-- 保存：`updateSetting`（版 `expectedUpdatedAt` つき）。409 は最新を読み直して入力は残す。フォームが使えない・マイルが範囲外・本文が長すぎるときは保存しない。
+- 保存：`updateSetting`（版 `expectedUpdatedAt` つき）。409 は入力を残し、比較で最新を取り、明示的に読み直すときだけ入力を置き換える。フォームが使えない・マイルが範囲外・本文が長すぎるときは保存しない。
 - 自分にテストを送る：名前で探す（Enter）→ 送る相手（2人以上なら下で選ぶ）→「テストを送る」。下書きの中身で送る。
 - 下の帯：キャンセル・配信内容を保存する（中央）。左は短い状態（動いています／配信待ち N通は前の中身のまま／停止中）。
 

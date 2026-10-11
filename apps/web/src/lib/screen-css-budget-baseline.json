@@ -164,11 +164,6 @@
     "height": 4,
     "font": 13
   },
-  "app/nen-campaigns/edit/campaign-editor-v8.module.css": {
-    "spacing": 30,
-    "height": 8,
-    "font": 20
-  },
   "app/nen-members/photo-review-v8.module.css": {
     "spacing": 59,
     "height": 28,
