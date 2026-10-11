@@ -218,8 +218,6 @@ const EXEMPTIONS: Record<string, string> = {
     '支払いCSV出力の確認窓（Vの本人確認入力を含む）。保存する編集画面ではなく番兵の対象外',
   'app/affiliates/new/page.tsx':
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
-  'app/automations/new/page.tsx':
-    'サーバーへ下書き保存する多段ウィザード。段またぎ・店ごとの退避があり離脱の扱いは別途検討',
   'app/automations/new/new-v8.tsx':
     'new/page.tsx と同じ画面の★V8版（M4torY・tJqST・J1VA8）。サーバーへ下書き保存する多段入力で、離脱の扱いは元の画面と一緒に決めるため同じ扱い',
   'app/accounts/new/page.tsx':

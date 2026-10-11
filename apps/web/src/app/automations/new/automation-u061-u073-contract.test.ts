@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/automations/create/create.tsx', import.meta.url), 'utf8')
 
 /**
  * #975 U061: 10件の開始イベントを最初から並べない。
