@@ -66,7 +66,11 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: TemplateAssetEditor } = await import('./template-asset-editor')
+const { default: TemplateRichEditor } = await import('@/v8/template-edit/rich')
+const { default: TemplateAssetEditorV8 } = await import('@/v8/template-edit/asset')
+function TemplateAssetEditor({ kind }: { kind: 'rich_message' | 'coupon' | 'research' }) {
+  return kind === 'rich_message' ? <TemplateRichEditor /> : <TemplateAssetEditorV8 kind={kind} />
+}
 
 let host: HTMLDivElement
 let root: Root
