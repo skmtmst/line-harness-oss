@@ -34,6 +34,7 @@ vi.mock('../services/event-bus.js', () => ({
 
 const { webhook } = await import('./webhook.js');
 const { chats } = await import('./chats.js');
+const {lineWebhookEvents}=await import('./line-webhook-events.js');
 
 const owner: AuthenticatedStaff = {
   id: 'owner-1',
@@ -146,6 +147,19 @@ describe('N-024 LINE送信取消', () => {
   afterEach(() => {
     db.raw.close();
     vi.clearAllMocks();
+  });
+
+  it('IN-C02: 200応答後の失敗を本文なしの内部retryでは回復できない（承認待ち）',async()=>{
+    mileage.mockRejectedValueOnce(new Error('fixture interruption after acknowledgement'));
+    await postText(db,'a','missing-payload','missing-payload-message','人工の本文',1_800_000_000_000);
+    const recovery=new Hono<Env>();recovery.use('*',async(c,next)=>{c.set('staff',owner);await next()});recovery.route('/',lineWebhookEvents);
+    const response=await recovery.request('/api/line-webhook-events/missing-payload/retry',{method:'POST'},{DB:db.db} as Env['Bindings']);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({success:false,code:'WEBHOOK_PAYLOAD_UNAVAILABLE'});
+    expect(db.raw.prepare("SELECT status FROM line_webhook_events WHERE webhook_event_id='missing-payload'").get()).toEqual({status:'failed'});
+    const checkpoints=JSON.stringify(db.raw.prepare("SELECT input_json FROM workflow_steps WHERE subject_id='missing-payload' AND step_key='__run'").all());
+    expect(checkpoints).not.toContain('人工の本文');
+    expect(checkpoints).not.toContain('reply-missing-payload');
   });
 
   it('IN-C01: 新しい解除のあとに古い追加が届いてもブロックを戻さない', async () => {
