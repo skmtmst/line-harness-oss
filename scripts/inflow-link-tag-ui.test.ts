@@ -42,7 +42,8 @@ describe('inflow link tag auto-assignment UI wiring', () => {
       expect(rule, cell).toContain('white-space: nowrap');
     }
     expect(page).not.toContain('title={r.refCode}')
-    expect(page).toContain('CopyTextButton value={referralUrl(r.refCode)}');
+    expect(page).toContain("label: 'URLをコピー'");
+    expect(page).toContain('<CopyTextButton role="menuitem" value={referralUrl(row.refCode)}');
     expect(v8List).toContain('<FolderDotName');
     expect(page).not.toContain('min-w-[1180px]');
     expect(page).not.toContain('font-mono text-blue-600 break-all');
