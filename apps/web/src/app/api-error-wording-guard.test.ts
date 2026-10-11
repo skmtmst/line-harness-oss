@@ -64,7 +64,7 @@ const BASELINE: Record<string, number> = {
   'app/booking/menus/staff/page.tsx': 1,
   'app/booking/staff/staff-edit-dialog.tsx': 1,
   'app/chats/page.tsx': 1,
-  'app/common-actions/edit/page.tsx': 1,
+  'v8/automations/common-action-edit.tsx': 1,
   'app/hq/account-browser-v8.tsx': 2,
   'app/hq/account-settings-dialogs.tsx': 2,
   'app/hq/banners/project/page.tsx': 6,

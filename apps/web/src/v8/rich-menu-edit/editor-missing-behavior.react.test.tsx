@@ -72,6 +72,16 @@ async function openUnpublish() {
 }
 
 describe('現役V8へ残す旧編集の動き', () => {
+  it.each(['wizard', 'detail'] as const)('%sは取得の403を権限の案内にし、保存は出さず一覧へ戻れる', async page => {
+    const { ApiError } = await import('@/lib/api')
+    net.get.mockRejectedValue(new ApiError(403, 'API error: 403'))
+    await act(async () => { root.render(page === 'wizard' ? <RichMenuCreateV8 editGroupId="g1" /> : <RichMenuDetailV8 groupId="g1" />) })
+    expect(await screen.findByText('この操作の権限がありません。オーナーか管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'リッチメニュー一覧へ戻る' }).getAttribute('href')).toBe('/rich-menus')
+    expect(screen.queryByRole('button', { name: /下書きを保存/ })).toBeNull()
+    expect(container.textContent).not.toContain('API error: 403')
+    expect(net.update).not.toHaveBeenCalled()
+  })
   it('出す順番は1番始まりで案内し、変えた順番を0番始まりで保存する', async () => {
     const dialog = await openPriority()
     const input = within(dialog).getByRole('textbox', { name: '出す順番' }) as HTMLInputElement

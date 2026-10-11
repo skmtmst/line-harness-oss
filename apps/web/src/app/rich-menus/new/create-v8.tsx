@@ -1,4 +1,6 @@
 'use client'
+
+import ListState from '@/components/shared/list-state'
 import Toggle from '@/components/shared/toggle';
 
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -517,7 +519,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* 直すときは、すでに下書きがあるので全部の手順へ戻れる。 */
   const [maxStepIndex, setMaxStepIndex] = useState(editGroupId || host?.initial ? STEP_KEYS.length - 1 : 0)
   /* 直すとき：下書きを読み込めたか（読み込むまで中身を出さない）。 */
-  const [editLoad, setEditLoad] = useState<'idle' | 'loading' | 'ready' | 'missing' | 'error'>(editGroupId ? 'loading' : 'idle')
+  const [editLoad, setEditLoad] = useState<'idle' | 'loading' | 'ready' | 'missing' | 'forbidden' | 'error'>(editGroupId ? 'loading' : 'idle')
 
   /* 作った下書き。手順①の「次へ」で create → get で埋まる。 */
   const [group, setGroup] = useState<Group | null>(null)
@@ -803,7 +805,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       setEditLoad('ready')
     } catch (caught) {
       saveErrors.capture(caught)
-      setEditLoad(caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
+      setEditLoad(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
     }
     // hydrate は state の setter だけを使う。
   }, [editGroupId, saveErrors])
@@ -1852,6 +1854,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   }
 
   if (editGroupId && editLoad !== 'ready') {
+    if (editLoad === 'forbidden') {
+      return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden"
+        permissionScope="store"
+        action={<Button href="/rich-menus">リッチメニュー一覧へ戻る</Button>} /></SaveErrorScope>
+    }
     if (editLoad === 'missing') {
       return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このリッチメニューは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/rich-menus" backLabel="リッチメニュー一覧へ戻る" /></SaveErrorScope>
     }

@@ -16,6 +16,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TargetMissing from '@/components/shared/target-missing'
+import ListState from '@/components/shared/list-state'
 import { richMenuError, richMenuErrorAll, unpublishWarningText } from '@/v8/rich-menus/errors';
 import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model';
 import styles from './detail.module.css'
@@ -54,7 +55,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const samePageUrl = useSamePageUrl()
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'リッチメニュー', href: '/rich-menus' }])
   const [group, setGroup] = useState<Group | null>(null)
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'forbidden' | 'error'>('loading')
   usePageTitle(group?.name ?? 'リッチメニュー')
 
   const role = useStaffRole()
@@ -108,7 +109,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setLoadState(caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
+      setLoadState(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
     }
   }
   }, [groupId, samePageUrl, saveErrors]);
@@ -308,6 +309,11 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     }
   }
 
+  if (loadState === 'forbidden') {
+    return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden"
+      permissionScope="store"
+      action={<Button href="/rich-menus">リッチメニュー一覧へ戻る</Button>} /></SaveErrorScope>
+  }
   if (loadState === 'missing') {
     return <SaveErrorScope errors={saveErrors}><TargetMissing kind="not-found" title="このリッチメニューは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/rich-menus" backLabel="リッチメニュー一覧へ戻る" /></SaveErrorScope>
   }
