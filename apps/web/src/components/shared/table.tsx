@@ -264,14 +264,16 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
 }
 
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, className }: {
+export function NameCell({ name, folder, annotation, className }: {
   name: ReactNode
+  /** 名前の横の状態札。名前やリンクの中には入れない。 */
+  annotation?: ReactNode
   folder?: FolderDotFolder | null
   className?: string
 }) {
   return (
     <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}><FolderDotName folder={folder}>{name}</FolderDotName></div>
+      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation}>{name}</FolderDotName></div>
     </td>
   )
 }

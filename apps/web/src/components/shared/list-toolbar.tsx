@@ -147,7 +147,7 @@ export function ListToolbarSort(props: ListToolbarSortProps) {
   return <span data-list-sort><Select {...props} label="並び" aria-label="並び" /></span>
 }
 
-/** B-205：札の集まりだけを状態の選ぶ欄へ畳む。日付・複数条件は元の操作を保つ。 */
+/** B-191/192/205：入らない札と狭い列だけを選ぶ欄へ畳む。 */
 function compactFilterGroups(node: ReactNode): ReactNode {
   const children = Children.toArray(node)
   if (children.length > 1 && children.every(child => isValidElement(child) && child.type === FilterChip))
@@ -161,8 +161,30 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
   const selected = chips.map((child,index) => child.props.selected ? index : -1).filter(index => index >= 0)
   const allIndex = chips.findIndex(child => /^すべて(?:$|\s|[\d（(])/.test(text(child.props.children)))
   const current = selected.length > 1 ? 'multiple' : selected.length === 1 ? String(selected[0]) : allIndex >= 0 ? String(allIndex) : 'all'
-  return <span className={styles.filterChoices}>
-    <span className={styles.filterWide}>{children}</span>
+  const choicesRef = useRef<HTMLSpanElement>(null)
+  const naturalWidth = useRef(0)
+  const [collapsed, setCollapsed] = useState(false)
+  useLayoutEffect(() => {
+    const choices = choicesRef.current
+    const toolbar = choices?.closest<HTMLElement>('[data-toolbar-layout]:not([data-toolbar-layout="slots-row"])') ?? choices?.closest<HTMLElement>('[data-list-toolbar]')
+    if (!choices || !toolbar || !window.ResizeObserver) return
+    const measure = () => {
+      const wide = choices.querySelector<HTMLElement>('[data-filter-wide]')!
+      if (!choices.hasAttribute('data-collapsed')) naturalWidth.current = wide.scrollWidth
+      if (!naturalWidth.current) return
+      const tools = [...toolbar.querySelectorAll<HTMLElement>('[data-toolbar-tools]')].flatMap(group => [...group.children] as HTMLElement[])
+      const currentWidth = tools.reduce((sum, tool) => sum + tool.getBoundingClientRect().width, 0)
+      const gap = parseFloat(getComputedStyle(toolbar).columnGap) || 0
+      const required = currentWidth - choices.getBoundingClientRect().width + naturalWidth.current + gap * Math.max(0, tools.length - 1)
+      setCollapsed(required > toolbar.clientWidth)
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(toolbar)
+    measure()
+    return () => observer.disconnect()
+  }, [children])
+  return <span ref={choicesRef} className={styles.filterChoices} data-collapsed={collapsed || undefined}>
+    <span data-filter-wide className={styles.filterWide}>{children}</span>
     <span className={styles.filterNarrow}><Select label={label} aria-label={label} value={current}
       options={[...(allIndex >= 0 ? [] : [{ value: 'all', label: 'すべて', disabled: selected.length > 1 }]), ...(selected.length > 1 ? [{ value: 'multiple', label: `${selected.length}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
       onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span>

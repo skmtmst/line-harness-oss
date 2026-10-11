@@ -281,7 +281,7 @@ describe('folderCreateResult', () => {
 })
 
 
-describe('左の列・選ぶ欄・閉じた欄・表でフォルダの丸をそろえる', () => {
+describe('左の列のフォルダと、選ぶ欄・閉じた欄・表の丸で色をそろえる', () => {
   it.each([null, undefined, '', '#123456'])('色 %s のフォルダは名前からの色か保存色を全箇所へ出す', async (color) => {
     const folder = { id: 'folder-test', name: 'テスト', color }
     function ColorHost() {
@@ -294,7 +294,10 @@ describe('左の列・選ぶ欄・閉じた欄・表でフォルダの丸をそ�
     }
     render(<ColorHost />)
     const readDot = (element: Element) => element.querySelector<HTMLElement>('[data-folder-dot]')!
-    const rail = readDot(screen.getByRole('navigation'))
+    const railIcon = screen.getByRole('navigation').querySelector<SVGElement>('.lucide-folder')!
+    const rail = document.createElement('span')
+    rail.style.backgroundColor = railIcon.style.color
+    expect(railIcon.getAttribute('fill')).toBe('currentColor')
     const row = readDot(screen.getByTestId('table-name'))
     expect(rail.style.backgroundColor).toBe(row.style.backgroundColor)
     if (!color) {

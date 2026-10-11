@@ -254,7 +254,7 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
     await click(container.querySelector<HTMLButtonElement>('button[aria-label="表示件数"]') ?? undefined)
     await click(byText('50件表示'))
     expect(container.querySelectorAll('tbody tr')).toHaveLength(21)
-    expect(container.querySelector('button[aria-label="次のページ"]')).toBeNull()
+    expect(container.querySelector('button[aria-label="次のページ"]')?.hasAttribute('disabled')).toBe(true)
   })
 
   it('旧URLの紹介者や送り元を失わず成果とアフィリエイトへ送る', async () => {

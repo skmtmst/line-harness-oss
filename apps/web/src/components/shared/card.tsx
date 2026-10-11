@@ -15,7 +15,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
    */
   spacing?: 'settings' | 'integration' | 'preview' | 'normal' | 'roomy' | 'tight' | 'controls'
   overflow?: 'visible' | 'hidden'
-  padding?: 'none' | 'compact' | 'default' | 'roomy' | 'spacious'
+  /** rows は各行が端の余白を持つ一覧。外側に同じ余白を重ねない。 */
+  padding?: 'none' | 'rows' | 'compact' | 'default' | 'roomy' | 'spacious'
   corner?: 'card' | 'segment' | 'control'
   /** 板ごとの余白はトークンで渡す（例 'var(--tpl-...)'）。枠の描画はこの部品が持つ。 */
   contentPadding?: string

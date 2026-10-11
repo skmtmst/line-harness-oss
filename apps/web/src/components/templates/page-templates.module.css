@@ -393,3 +393,7 @@
 @media (max-width:1023px) {
   :global([data-theme='v8']) .frame[data-template-layout='customer-look'] .settingsNav { display: none; }
 }
+
+:global([data-theme='v8']) .frame[data-height-mode='content'] { min-height: 0; }
+/* 設定の本文が下の24を持つ。外枠で同じ余白を重ねない。 */
+:global([data-theme='v8']) .frame[data-height-mode='content'][data-page-template='settings']:not(:has([data-shared-part='sticky-bar'])) { padding-bottom: 0; }

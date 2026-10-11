@@ -244,3 +244,6 @@
 
 /* 運営の板も固定絵の外側24を共通の外枠が持つ。 */
 [data-theme='v8'] .content[data-content-layout='ops'] { padding: var(--polish-space-section); }
+
+/* 固定絵が内容の下で終わる板。送りは main 内に保つ。 */
+[data-theme='v8'] .main:has([data-height-mode='content']) { flex: 0 1 auto; }

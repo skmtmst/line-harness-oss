@@ -68,11 +68,12 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     expect(icon.style.color).toBe(color)
   })
 
-  it.each(['キャンペーン', 'すべて', '未分類'])('作ったフォルダ「%s」は名前に関係なく、そのフォルダの色の丸を出す', async (label) => {
+  it.each(['キャンペーン', 'すべて', '未分類'])('作ったフォルダ「%s」は名前に関係なく、そのフォルダの色のアイコンを出す', async (label) => {
     const { button } = await render({ id: 'folder', kind: 'folder', label, count: 3, color: 'rebeccapurple', icon: callerIcon })
-    const dot = button.querySelector('[data-folder-dot]') as HTMLElement
-    expect(dot.style.backgroundColor).toBe('rebeccapurple')
-    expect(dot.getAttribute('aria-label')).toBe(`フォルダ：${label}`)
+    const icon = button.querySelector('.v8-only svg') as SVGElement
+    expect(icon.classList.contains('lucide-folder')).toBe(true)
+    expect(icon.style.color).toBe('rebeccapurple')
+    expect(icon.getAttribute('fill')).toBe('currentColor')
     expect(button.querySelector('.v8-only [data-caller-icon]')).toBeNull()
   })
 

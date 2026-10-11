@@ -214,7 +214,10 @@ describe('来店スタンプ（管理画面）', () => {
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 20 })
     expect(await screen.findByText('2 件中 1〜2 件')).toBeTruthy()
-    expect(screen.queryByRole('navigation', { name: '記録のページ送り' })).toBeNull()
+    expect(screen.getByRole('navigation', { name: '記録のページ送り' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '1ページ目へ' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
   })
 
   it('閲覧のみは記録タブでも手入力欄を出さず、移行タブで承認・却下を隠す', async () => {

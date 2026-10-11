@@ -534,3 +534,6 @@ html[data-theme='v8'] .actionCell :is(button, a):not([data-row-menu]) { min-widt
 
 /* 既存の細いGridTableの判定も同じ器を使う。名前を置き換えない。 */
 html[data-theme='v8'] .frame[data-grid-table] { container-name: v8-list-table shared-grid-table; }
+
+/* 固定V8：名前の横に置く札を同じ1行にそろえる。 */
+html[data-theme='v8'] [data-list-name-cell] .name { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }

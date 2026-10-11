@@ -57,6 +57,7 @@ export interface ListPageBodyProps {
   overlays?: ReactNode
 }
 export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
+  heightMode?: 'viewport' | 'content'
   boardId?: string
   layout?: 'event-list'
   standalone?: boolean
@@ -93,8 +94,8 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = 'ã
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, layout, standalone, tabs, title, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
-  return <PageFrame kind="list" boardId={boardId} layout={layout} standalone={standalone} skeleton={body.skeleton}>
+export function ListPage({ boardId, heightMode, layout, standalone, tabs, title, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
+  return <PageFrame kind="list" heightMode={heightMode} boardId={boardId} layout={layout} standalone={standalone} skeleton={body.skeleton}>
     <PageHeading {...{ title, help, identity, actions, crumbs, steps, headingSize }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...body} />

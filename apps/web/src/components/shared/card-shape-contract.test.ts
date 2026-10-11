@@ -88,7 +88,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/scenarios/results.module.css", ".stepList", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/scenarios/results.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/settings/accounts/accounts.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
-  ["v8/settings/getting-started/getting-started.module.css", ".steps", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/templates/question-new.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["app/accounts/migration.tsx", "className=\"bg-canvas rounded-card border-hairline border\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["app/affiliates/action-dialogs.tsx", "className=\"flex w-full flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],

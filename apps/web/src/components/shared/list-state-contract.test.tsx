@@ -68,11 +68,12 @@ describe('一覧の状態とページ送り', () => {
     expect(html).not.toContain('作る')
   })
 
-  it('送る先が1ページしか無いとき、ページ送りを描かない', () => {
-    // 画面ごとに `{pageCount > 1 && …}` と書くと、書き忘れた画面だけ
-    // 出たままになる。**部品の側で決める。**
-    expect(renderToStaticMarkup(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)).toBe('')
-    expect(renderToStaticMarkup(<Pagination page={1} pageCount={0} onPageChange={vi.fn()} />)).toBe('')
+  it('固定V8は1ページでも現在地を見せ、前後へ進む操作を止める', () => {
+    const html = renderToStaticMarkup(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)
+    expect(html).toContain('aria-current="page"')
+    expect(html).toContain('aria-label="前のページ"')
+    expect(html).toContain('aria-label="次のページ"')
+    expect(html.match(/disabled=""/g)).toHaveLength(2)
     expect(renderToStaticMarkup(<Pagination page={1} pageCount={2} onPageChange={vi.fn()} />)).toContain('次へ')
   })
 
