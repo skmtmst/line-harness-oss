@@ -37,6 +37,7 @@ const staffMe = vi.hoisted(() => vi.fn())
 const formsGet = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
 const formsPublish = vi.hoisted(() => vi.fn())
+const menuStaff = vi.hoisted(()=>vi.fn(async()=>({staff:[]})))
 const emptyList = vi.hoisted(() => async () => ({ success: true, data: [] as never[] }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -47,7 +48,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     bookingApi: {
       ...actual.bookingApi,
       listMenus: vi.fn(async () => ({ menus: [{ id: 'bm-1', name: 'トリミング（小型犬）', duration_minutes: 60, is_active: 1 }] })),
-      listMenuStaff: vi.fn(async () => ({ staff: [] })),
+      listMenuStaff: menuStaff,
     },
     api: {
       ...actual.api,
@@ -408,4 +409,15 @@ describe('参考の文字の保存と読み直し', () => {
     expect(formsUpdate).not.toHaveBeenCalled()
     expect(formsGet).not.toHaveBeenCalled()
   })
+})
+
+it('B-241：予約の担当候補が読めないとき、空にせず入力を保持してやり直す',async()=>{
+ menuStaff.mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({staff:[]})
+ await render('id=form-1')
+ const error=await screen.findByText('予約の担当を読み込めませんでした')
+ expect(formsUpdate).not.toHaveBeenCalled()
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText('予約の担当を読み込めませんでした')).toBeNull())
+ expect(menuStaff).toHaveBeenCalledTimes(2)
+ expect(screen.getByDisplayValue('今日のご来店の目的は？')).toBeTruthy()
 })

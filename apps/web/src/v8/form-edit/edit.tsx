@@ -120,6 +120,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [formLoaded, setFormLoaded] = useState(Boolean(host))
   const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [bookingStaffError,setBookingStaffError]=useState(false)
   const savedSnapshot = useRef<string | null>(null)
   /** 読み込んだ時点の編集の版(#723)。読み込みと保存成功のときだけ入れ替える。 */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
@@ -332,7 +333,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
-    if (hostRef.current || !selectedAccountId) return
+    if (hostRef.current || !selectedAccountId || bookingStaffError) return
     const menuIds = new Set<string>()
     for (const section of layout.sections) {
       for (const b of section.blocks) {
@@ -343,27 +344,21 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (missing.length === 0) return
     let cancelled = false
     void (async () => {
-      const entries = await Promise.all(
-        missing.map(async (menuId) => {
-          try {
-            const res = await bookingApi.listMenuStaff(selectedAccountId, menuId)
-            return [menuId, res.staff.map((s) => ({ id: s.id, name: s.display_name }))] as const
-          } catch (saveFailure) {
-            saveErrors.capture(saveFailure);
-
-            return [menuId, []] as const
-          }
-        }),
-      );
-
-      if (cancelled)
- return
-      setRefs((prev) => ({ ...prev, bookingMenuStaff: { ...(prev.bookingMenuStaff ?? {}), ...Object.fromEntries(entries) } }))
+      try {
+        const entries = await Promise.all(missing.map(async(menuId)=>{
+          const res=await bookingApi.listMenuStaff(selectedAccountId,menuId)
+          return [menuId,res.staff.map(s=>({id:s.id,name:s.display_name}))] as const
+        }))
+        if(cancelled)return
+        setRefs(prev=>({...prev,bookingMenuStaff:{...(prev.bookingMenuStaff??{}),...Object.fromEntries(entries)}}))
+      }catch{
+        if(!cancelled)setBookingStaffError(true)
+      }
     })()
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId, layout, refs.bookingMenuStaff, saveErrors])
+  }, [selectedAccountId, layout, refs.bookingMenuStaff,bookingStaffError])
 
   /* ---------------- ページとブロック ---------------- */
 
@@ -919,6 +914,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
         {host?.notice}
+        {bookingStaffError?<ListState kind="error" title="予約の担当を読み込めませんでした" onRetry={()=>setBookingStaffError(false)}/>:null}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
         {loading || !formLoaded ? (
