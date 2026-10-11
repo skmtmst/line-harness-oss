@@ -31,6 +31,31 @@ const META_ERROR_TYPES = new Set([
 /** 一覧に無い種別名・検査を通らない値の置き換え先。固定の文言。 */
 const OTHER = 'other';
 /**
+ * `fetch` 自体が失敗したとき（応答が返らなかったとき）の呼び名。
+ *
+ * - `TimeoutError` … `AbortSignal.timeout` の時間切れ。Meta が遅い／通信が出られない。
+ * - `TypeError` … つなげなかった（名前が引けない・接続できない・許していない転送を受けた）。
+ * - `AbortError` … 途中で打ち切られた。
+ *
+ * この呼び名も `Error` の `name` という**応答側の値ではない**が、投げられる中身は
+ * 実行環境や上流の都合で変わるため、`error.type` と同じく許可一覧で絞る。
+ * 自由文である `message` は読まない。
+ */
+const FETCH_ERROR_NAMES = new Set([
+  'TimeoutError',
+  'TypeError',
+  'AbortError',
+  'DOMException',
+  'Error',
+]);
+/** 投げられた失敗から呼び名だけを取り出す。一覧に無ければ `other`。 */
+function fetchErrorName(e: unknown): string {
+  const name = (e as { name?: unknown } | null)?.name;
+  return typeof name === 'string' && FETCH_ERROR_NAMES.has(name)
+    ? name
+    : OTHER;
+}
+/**
  * Meta のエラー本文から、原因調べに使う安全な項目だけを短く取り出す。
  *
  * `error.message` は Meta が書く自由な文章で、要求に渡した値（合鍵・アプリシークレット・
@@ -82,8 +107,9 @@ async function metaErrorDetail(response: Response): Promise<string | undefined> 
  * `metaErrorDetail` で絞ったあとの値を、URLへ出す直前にもう一度ここで確かめることで、
  * 取り出し側の作りが将来変わっても、Meta の応答の中身がURLへ出ない状態を保つ。
  *
- * 通すのは次の4つだけ。
+ * 通すのは次の5つだけ。
  * - 要求の種別と宛先（`GET v21.0/me/accounts` など。こちらのコードが決める形のみ）
+ * - `fetch` … 応答が返らなかったときの呼び名（`FETCH_ERROR_NAMES` の一覧のみ）
  * - `status` … 3桁の数字
  * - `type` … 上の一覧に載る名前（載っていなければ `other`）
  * - `code` / `subcode` … 数字
@@ -98,6 +124,11 @@ export function instagramUrlDetail(
       detail,
     );
   if (step) parts.push(`${step[1]} ${step[2]}/${step[3]}`);
+  const fetchError = /(?:^| )fetch=([A-Za-z]{1,40})(?= |$)/.exec(detail);
+  if (fetchError)
+    parts.push(
+      `fetch=${FETCH_ERROR_NAMES.has(fetchError[1]) ? fetchError[1] : OTHER}`,
+    );
   const status = /(?:^| )status=([0-9]{3})(?= |$)/.exec(detail);
   if (status) parts.push(`status=${status[1]}`);
   const type = /(?:^| )type=([A-Za-z]{1,40})(?= |$)/.exec(detail);
@@ -215,8 +246,14 @@ export async function instagramGraph<T>(
       redirect: 'error',
       signal: AbortSignal.timeout(15000),
     });
-  } catch {
-    throw new InstagramError('meta_unavailable');
+  } catch (e) {
+    // 応答が返らなかった場合。どの要求で止まったかと呼び名だけを残す。
+    // これが無いと「つながらなかった」ことしか分からず、時間切れと接続不可を見分けられない。
+    throw new InstagramError(
+      'meta_unavailable',
+      502,
+      `${method} ${config.version}/${path} fetch=${fetchErrorName(e)}`,
+    );
   }
   if (!response.ok)
     throw new InstagramError(
