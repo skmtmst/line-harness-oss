@@ -12,7 +12,7 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 
 import { ApiError } from '@/lib/api'
 import InventoryV8 from '@/v8/restaurant/inventory/inventory'
-vi.mock('next/navigation',async()=> (await import('@/test-utils/navigation-mock')).navigationMock({pathname:'/restaurant-test/inventory'}))
+vi.mock('next/navigation',async()=> (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shell/page-chrome',async()=> (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner',canManageRole:()=>true}))
 const fetchApi=vi.hoisted(()=>vi.fn())

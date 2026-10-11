@@ -2043,3 +2043,8 @@
 
 - 既存の枠に不足分を足す操作を現在の時間帯の頭の共通メニューへ移した。営業時間の保存後の新しい版を使い、既存の枠がある状態でも同じ生成APIへ送る。確認表に配置を記録。通常の表/列/CSSは維持。
 - 関係30/30件合格（`/tmp/v7rm2-restaurantinventorycopy3.json`、収集失敗0）、web型検査（`/tmp/v7rm2-restaurantinventorycopy-type1.log`）/差分検査合格。試験削除0件（累計3件）。次は予約/卓/Googleの写し。共通/CSS/CI・全体検査・画像比較は未完了。
+
+### 飲食：未使用の予約台帳/電話予約の写し（除去完了）
+
+- `restaurant-test/v8/reservations.tsx` 939行/専用CSS・`reservation-phone.tsx` 421行は本番の読者0、直接読む動作/読み取り試験0。旧の未保存/ボタンの横断契約だけが読んでいたため、現役の見張り先を残して旧の利用先を除去。現在の変更/押さえの解除/電話予約/不足入力/閲覧のみ/期間と取消・復活の試験は保持した。
+- 関係36/36件合格（`/tmp/v7rm2-restaurantreservationcopy1.json`、収集失敗0）、web型検査（`/tmp/v7rm2-restaurantreservationcopy-type1.log`）/差分検査合格。試験削除0件（累計3件）。現役V8の内容/配置/CSSは変更なし。次は卓/Googleと最後の旧外枠。共通/CSS/CI・全体検査・画像比較は未完了。

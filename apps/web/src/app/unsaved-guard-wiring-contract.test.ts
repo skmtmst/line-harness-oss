@@ -59,8 +59,6 @@ const GUARDED = [
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-posts.tsx',
   'app/restaurant-test/google/google-profile.tsx',
-  'app/restaurant-test/v8/reservation-phone.tsx',
-  'app/restaurant-test/v8/reservations.tsx',
   'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
   // ★V8：入口（app/settings/file-scan/page.tsx）は src/v8 の画面を出すだけ。番兵は画面と同じ場所のフックが持つ。
