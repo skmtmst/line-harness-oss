@@ -283,8 +283,8 @@ export async function getAutoReplyInternalMemos(
        FROM auto_replies ar
        JOIN auto_reply_versions arv
          ON arv.id = COALESCE(ar.current_draft_version_id, ar.current_published_version_id)
-      WHERE ar.id IN (${autoReplyIds.map(() => '?').join(',')})`,
-  ).bind(...autoReplyIds).all<{ auto_reply_id: string; definition_snapshot: string }>();
+      WHERE ar.id IN (${sqlIdSet(autoReplyIds).sql})`,
+  ).bind(...(autoReplyIds.length ? sqlIdSet(autoReplyIds).binds : [])).all<{ auto_reply_id: string; definition_snapshot: string }>();
   for (const row of rows.results ?? []) {
     try {
       const parsed = JSON.parse(row.definition_snapshot) as { internalMemo?: unknown };

@@ -1107,7 +1107,7 @@ export async function insertFormSubmissionRecord(
   const now = jstNow();
   const fileIds = [...new Set(input.fileIds ?? [])];
   if (fileIds.length) {
-    const placeholders = fileIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(fileIds).sql;
     // D1 batch is a transaction: two concurrent answers cannot claim one upload.
     const results = await db.batch([
       db.prepare(`INSERT INTO form_submissions (id, form_id, friend_id, form_version_id, is_test, data, destination_write_status, created_at)
@@ -1119,7 +1119,7 @@ export async function insertFormSubmissionRecord(
           ...fileIds, input.friendId ?? null, input.formId, now, fileIds.length),
       db.prepare(`UPDATE form_submission_files SET submission_id = ? WHERE id IN (${placeholders}) AND submission_id IS NULL
         AND EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
-        .bind(id, ...fileIds, id),
+        .bind(id, ...(fileIds.length ? sqlIdSet(fileIds).binds : []), id),
     ]);
     if (results[0].meta.changes !== 1 || results[1].meta.changes !== fileIds.length) throw new Error('document_attachment_conflict');
     return (await db.prepare('SELECT * FROM form_submissions WHERE id = ?').bind(id).first<FormSubmission>())!;

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { matchesCondition, type SegmentCondition } from './segment-conditions.js';
 
 export type MileageRewardKind =
@@ -994,11 +995,11 @@ export async function collectBeneficiaryKeysForLimit(
     : [];
   const friendIds = [...new Set([friendId, ...coLinked])];
   for (const id of friendIds) keys.add(`friend:${id}`);
-  const placeholders = friendIds.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(friendIds).sql;
   const history = await db.prepare(
     `SELECT DISTINCT user_id FROM friend_identity_links
       WHERE friend_id IN (${placeholders}) AND user_id IS NOT NULL`,
-  ).bind(...friendIds).all<{ user_id: string }>();
+  ).bind(...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ user_id: string }>();
   for (const row of history.results) keys.add(`user:${row.user_id}`);
   return [...keys];
 }

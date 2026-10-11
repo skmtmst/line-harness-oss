@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -1001,12 +1002,12 @@ lineNotifications.post(
     if (!Array.isArray(template) || template.length === 0) {
       return c.json({ success: false, code: 'incomplete_draft', error: '試し送りする前にLINEで送る内容を設定してください' }, 409);
     }
-    const placeholders = friendIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(friendIds).sql;
     const recipients = await c.env.DB.prepare(`
       SELECT id, line_user_id FROM friends
        WHERE line_account_id = ? AND id IN (${placeholders})
          AND is_following = 1 AND line_user_id IS NOT NULL AND line_user_id != ''
-    `).bind(lineAccountId, ...friendIds).all<{ id: string; line_user_id: string }>();
+    `).bind(lineAccountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string }>();
     const recipientById = new Map(recipients.results.map((row) => [row.id, row.line_user_id]));
     const missing = friendIds.filter((id) => !recipientById.has(id));
     if (missing.length > 0) {

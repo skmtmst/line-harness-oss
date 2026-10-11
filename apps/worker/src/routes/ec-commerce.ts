@@ -389,9 +389,9 @@ ecCommerce.get(
         `SELECT id, order_id, external_product_id, product_name, quantity,
                 unit_amount_minor, line_amount_minor, product_url
            FROM ec_order_lines
-          WHERE order_id IN (${orderIds.map(() => '?').join(',')})
+          WHERE order_id IN (${sqlIdSet(orderIds).sql})
           ORDER BY order_id, line_index`,
-      ).bind(...orderIds).all<Record<string, unknown>>()
+      ).bind(...(orderIds.length ? sqlIdSet(orderIds).binds : [])).all<Record<string, unknown>>()
       : { results: [] as Record<string, unknown>[] };
     const linesByOrder = new Map<string, Array<Record<string, unknown>>>();
     for (const line of orderLines.results) {
@@ -1111,10 +1111,10 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
   }
   if (!friendIds.length) return inputError(c, { success: false, error: 'Test recipients are not configured' }, 400, []);
 
-  const placeholders = friendIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(friendIds).sql;
   const friends = await c.env.DB.prepare(
     `SELECT id, line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${placeholders})`,
-  ).bind(body.accountId, ...friendIds).all<{ id: string; line_user_id: string }>();
+  ).bind(body.accountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string }>();
   if (!friends.results.length) return inputError(c, { success: false, error: 'No active test recipients' }, 400, ["accountId"]);
 
   // テスト送信の見出し・前後の文章にも {{var.*}} を書ける。

@@ -1428,10 +1428,10 @@ nenMembers.get(
       `SELECT publication_id, id, placement_type, placement_label, view_count,
               active, created_at, removed_at
          FROM nen_photo_publication_placements
-        WHERE publication_id IN (${publicationIds.map(() => '?').join(',')})
+        WHERE publication_id IN (${sqlIdSet(publicationIds).sql})
           AND line_account_id = ?
         ORDER BY created_at`,
-    ).bind(...publicationIds, accountId).all<Record<string, unknown>>()).results;
+    ).bind(...(publicationIds.length ? sqlIdSet(publicationIds).binds : []), accountId).all<Record<string, unknown>>()).results;
     const placementsByPublication = new Map<string, Array<Record<string, unknown>>>();
     for (const placement of placementRows) {
       const key = String(placement.publication_id);

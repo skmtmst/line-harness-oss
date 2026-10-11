@@ -3169,10 +3169,10 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
       return c.json({ success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' }, { status: 429, headers: { 'Retry-After': '10' } });
     }
 
-    const placeholders = friendIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(friendIds).sql;
     const friends = await c.env.DB.prepare(
       `SELECT id, line_user_id, display_name FROM friends WHERE id IN (${placeholders})`
-    ).bind(...friendIds).all<{ id: string; line_user_id: string; display_name: string | null }>();
+    ).bind(...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string; display_name: string | null }>();
 
     const account = await getLineAccountById(c.env.DB, accountId);
     if (!account) return inputError(c, { success: false, error: 'LINE account not found' }, 400, []);

@@ -179,12 +179,12 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
 
     let scenarioFromFriendAdd = false;
     if (startedScenarioIds.length > 0) {
-      const placeholders = startedScenarioIds.map(() => '?').join(', ');
+      const placeholders = sqlIdSet(startedScenarioIds).sql;
       const hit = await c.env.DB.prepare(
         `SELECT 1 AS hit FROM scenarios
           WHERE line_account_id = ? AND is_active = 1 AND id IN (${placeholders}) LIMIT 1`,
       )
-        .bind(accountId, ...startedScenarioIds)
+        .bind(accountId, ...(startedScenarioIds.length ? sqlIdSet(startedScenarioIds).binds : []))
         .first<{ hit: number }>();
       scenarioFromFriendAdd = hit !== null;
     }

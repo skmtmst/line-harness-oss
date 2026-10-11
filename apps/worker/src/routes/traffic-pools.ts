@@ -89,10 +89,10 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
       return c.json({ success: false, error: 'ids must contain at most 200 traffic pools' }, 400);
     }
 
-    const placeholders = ids.map(() => '?').join(',');
+    const placeholders = sqlIdSet(ids).sql;
     const pools = await c.env.DB.prepare(
       `SELECT id, active_account_id FROM traffic_pools WHERE id IN (${placeholders})`,
-    ).bind(...ids).all<{ id: string; active_account_id: string }>();
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; active_account_id: string }>();
     if (pools.results.length !== ids.length
       || !await canAccessAllLineAccounts(
         c.env.DB,
@@ -113,7 +113,7 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
        JOIN line_accounts la ON la.id = pa.line_account_id
        WHERE pa.pool_id IN (${placeholders})
        ORDER BY pa.pool_id, pa.created_at, pa.id`,
-    ).bind(...ids).all<PoolAccountWithDetails>();
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<PoolAccountWithDetails>();
 
     return c.json({
       success: true,

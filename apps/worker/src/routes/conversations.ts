@@ -147,11 +147,11 @@ conversations.get('/api/conversations', async (c) => {
     const friendIds = results.map((r) => (r as { friend_id: string }).friend_id);
     const tagMap: Record<string, string[]> = {};
     if (friendIds.length > 0) {
-      const placeholders = friendIds.map(() => '?').join(',');
+      const placeholders = sqlIdSet(friendIds).sql;
       const tagRows = await c.env.DB.prepare(
         `SELECT ft.friend_id, t.name FROM friend_tags ft JOIN tags t ON t.id = ft.tag_id WHERE ft.friend_id IN (${placeholders})`,
       )
-        .bind(...friendIds)
+        .bind(...(friendIds.length ? sqlIdSet(friendIds).binds : []))
         .all<{ friend_id: string; name: string }>();
       for (const row of tagRows.results) {
         (tagMap[row.friend_id] ??= []).push(row.name);

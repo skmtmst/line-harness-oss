@@ -918,8 +918,8 @@ export async function snapshotReminderTemplateVersions(
   const ids = [...new Set(templateIds.filter((id): id is string => !!id))];
   if (ids.length === 0) return null;
   const rows = await db.prepare(
-    `SELECT id, published_version FROM templates WHERE id IN (${ids.map(() => '?').join(', ')})`,
-  ).bind(...ids).all<{ id: string; published_version: number }>();
+    `SELECT id, published_version FROM templates WHERE id IN (${sqlIdSet(ids).sql})`,
+  ).bind(...sqlIdSet(ids).binds).all<{ id: string; published_version: number }>();
   const map: Record<string, number> = {};
   for (const row of rows.results ?? []) {
     const version = Number(row.published_version);

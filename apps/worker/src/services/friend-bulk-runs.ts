@@ -427,8 +427,8 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
       const ids = Object.keys(operation.values);
       const rows = await db.prepare(
         `SELECT id, ec_is_master, type, COALESCE(type_v8, type_v6, type) AS resolved_type, options_json, name
-           FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
-      ).bind(...ids).all<{ id: string; ec_is_master: number; resolved_type: string; options_json: string | null; name: string }>();
+           FROM friend_fields WHERE id IN (${sqlIdSet(ids).sql})`,
+      ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; ec_is_master: number; resolved_type: string; options_json: string | null; name: string }>();
       if (rows.results.length !== ids.length) throw new FriendBulkRunError('friend_field_not_found', '友だち情報の項目が見つかりません', 404);
       if (rows.results.some((row) => row.ec_is_master === 1)) {
         throw new FriendBulkRunError(
@@ -759,16 +759,16 @@ async function executeOperation(
       const ids = Object.keys(operation.values);
       const rows = await db.prepare(
         `SELECT field_id, value FROM friend_field_values
-          WHERE friend_id = ? AND field_id IN (${ids.map(() => '?').join(',')})`,
-      ).bind(friend.id, ...ids).all<{ field_id: string; value: string | null }>();
+          WHERE friend_id = ? AND field_id IN (${sqlIdSet(ids).sql})`,
+      ).bind(friend.id, ...(ids.length ? sqlIdSet(ids).binds : [])).all<{ field_id: string; value: string | null }>();
       const before = Object.fromEntries(ids.map((id) => [id, rows.results.find((row) => row.field_id === id)?.value ?? null]));
       if (JSON.stringify(before) === JSON.stringify(operation.values)) return { status: 'skipped', before, after: before };
       // N-042: 書き込みは中央の口へ寄せ、項目定義で検証・正規化する。
       // 作成時に検証済みのはずだが、列車合流前の古い操作が残っていても不正値を書かない。
       const defs = await db.prepare(
         `SELECT id, COALESCE(type_v8, type_v6, type) AS resolved_type, options_json
-           FROM friend_fields WHERE id IN (${ids.map(() => '?').join(',')})`,
-      ).bind(...ids).all<{ id: string; resolved_type: string; options_json: string | null }>();
+           FROM friend_fields WHERE id IN (${sqlIdSet(ids).sql})`,
+      ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; resolved_type: string; options_json: string | null }>();
       const defById = new Map(defs.results.map((row) => [row.id, row]));
       for (const [fieldId, value] of Object.entries(operation.values)) {
         const def = defById.get(fieldId);
@@ -937,19 +937,19 @@ async function executeUndo(
       const ids = after && Array.isArray(after.ids) ? after.ids.filter((id): id is string => typeof id === 'string') : [];
       if (!ids.length) conflict();
       const rows = await db.prepare(
-        `SELECT id, status FROM friend_reminders WHERE id IN (${ids.map(() => '?').join(',')})`,
-      ).bind(...ids).all<{ id: string; status: string }>();
+        `SELECT id, status FROM friend_reminders WHERE id IN (${sqlIdSet(ids).sql})`,
+      ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; status: string }>();
       if (rows.results.length !== ids.length || rows.results.some((row) => row.status !== 'active')) conflict();
-      if (ids.length) await db.prepare(`UPDATE friend_reminders SET status = 'cancelled', updated_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`)
-        .bind(now, ...ids).run();
+      if (ids.length) await db.prepare(`UPDATE friend_reminders SET status = 'cancelled', updated_at = ? WHERE id IN (${sqlIdSet(ids).sql})`)
+        .bind(now, ...(ids.length ? sqlIdSet(ids).binds : [])).run();
       break;
     }
     case 'cancel_reminder': {
       const rows = Array.isArray(before) ? before : [];
       const ids = rows.filter(isRecord).map((row) => row.id).filter((id): id is string => typeof id === 'string');
       const current = ids.length ? await db.prepare(
-        `SELECT id, status FROM friend_reminders WHERE id IN (${ids.map(() => '?').join(',')})`,
-      ).bind(...ids).all<{ id: string; status: string }>() : { results: [] };
+        `SELECT id, status FROM friend_reminders WHERE id IN (${sqlIdSet(ids).sql})`,
+      ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; status: string }>() : { results: [] };
       if (!ids.length || current.results.length !== ids.length
         || current.results.some((row) => row.status !== 'cancelled')) conflict();
       for (const row of rows) if (isRecord(row) && typeof row.id === 'string') {
@@ -964,8 +964,8 @@ async function executeUndo(
       const ids = Object.keys(afterValues);
       const currentRows = await db.prepare(
         `SELECT field_id, value FROM friend_field_values
-          WHERE friend_id = ? AND field_id IN (${ids.map(() => '?').join(',')})`,
-      ).bind(item.friend_id, ...ids).all<{ field_id: string; value: string | null }>();
+          WHERE friend_id = ? AND field_id IN (${sqlIdSet(ids).sql})`,
+      ).bind(item.friend_id, ...(ids.length ? sqlIdSet(ids).binds : [])).all<{ field_id: string; value: string | null }>();
       const current = Object.fromEntries(ids.map((id) => [
         id,
         currentRows.results.find((row) => row.field_id === id)?.value ?? null,

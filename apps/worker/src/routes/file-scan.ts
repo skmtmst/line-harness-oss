@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { purgeUnsafeFormDocuments } from '../services/form-documents.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -203,21 +204,21 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
   const photoIds = [...new Set(items.filter((row) => row.subject_kind === 'photo').map((row) => row.subject_id))];
   const uploaders = new Map<string, string>();
   if (mediaIds.length > 0) {
-    const placeholders = mediaIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(mediaIds).sql;
     const mediaRows = await c.env.DB.prepare(
       `SELECT id, uploaded_by FROM media WHERE id IN (${placeholders})`,
-    ).bind(...mediaIds).all<{ id: string; uploaded_by: string | null }>();
+    ).bind(...(mediaIds.length ? sqlIdSet(mediaIds).binds : [])).all<{ id: string; uploaded_by: string | null }>();
     for (const mediaRow of mediaRows.results ?? []) {
       if (mediaRow.uploaded_by) uploaders.set(`media:${mediaRow.id}`, mediaRow.uploaded_by);
     }
   }
   if (photoIds.length > 0) {
-    const placeholders = photoIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(photoIds).sql;
     const photoRows = await c.env.DB.prepare(
       `SELECT ps.id, f.display_name AS friend_name
          FROM nen_photo_submissions ps LEFT JOIN friends f ON f.id = ps.friend_id
         WHERE ps.id IN (${placeholders})`,
-    ).bind(...photoIds).all<{ id: string; friend_name: string | null }>();
+    ).bind(...(photoIds.length ? sqlIdSet(photoIds).binds : [])).all<{ id: string; friend_name: string | null }>();
     for (const photoRow of photoRows.results ?? []) {
       uploaders.set(`photo:${photoRow.id}`, photoRow.friend_name ?? 'お客さん');
     }

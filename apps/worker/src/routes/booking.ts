@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { peopleBoardEntry } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -3021,8 +3022,8 @@ booking.get('/api/booking/admin/menus/:id/versions', async (c) => {
   const staffNames = new Map<string, string>();
   if (staffIds.length > 0) {
     const staffRows = await c.env.DB.prepare(
-      `SELECT id, display_name FROM staff WHERE id IN (${staffIds.map(() => '?').join(',')})`,
-    ).bind(...staffIds).all<{ id: string; display_name: string }>();
+      `SELECT id, display_name FROM staff WHERE id IN (${sqlIdSet(staffIds).sql})`,
+    ).bind(...(staffIds.length ? sqlIdSet(staffIds).binds : [])).all<{ id: string; display_name: string }>();
     for (const row of staffRows.results ?? []) staffNames.set(row.id, row.display_name);
   }
   return c.json({

@@ -1054,8 +1054,8 @@ async function resolveStoppedByNames(
   if (ids.length === 0) return;
   try {
     const rows = await db.prepare(
-      `SELECT id, name FROM staff_members WHERE id IN (${ids.map(() => '?').join(',')})`,
-    ).bind(...ids).all<{ id: string; name: string }>();
+      `SELECT id, name FROM staff_members WHERE id IN (${sqlIdSet(ids).sql})`,
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; name: string }>();
     const nameById = new Map((rows.results ?? []).map((row) => [row.id, row.name]));
     for (const item of items) {
       item.stoppedByStaffName = item.stoppedByStaffId

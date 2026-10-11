@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { EventApplicationPreview } from '@line-crm/shared';
 // Event booking feature HTTP routes.
@@ -3587,10 +3588,10 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
       .prepare(
         `SELECT booking_id, kind, scheduled_at, sent_at, status
            FROM event_booking_reminders
-          WHERE booking_id IN (${bookingIds.map(() => '?').join(',')})
+          WHERE booking_id IN (${sqlIdSet(bookingIds).sql})
           ORDER BY scheduled_at ASC`,
       )
-      .bind(...bookingIds)
+      .bind(...(bookingIds.length ? sqlIdSet(bookingIds).binds : []))
       .all<{
         booking_id: string;
         kind: string;

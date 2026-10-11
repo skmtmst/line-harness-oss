@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -65,10 +66,10 @@ accountSettings.get('/api/account-settings/test-recipients', async (c) => {
   if (friendIds.length === 0) {
     return c.json({ success: true, data: [] });
   }
-  const placeholders = friendIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(friendIds).sql;
   const friends = await c.env.DB.prepare(
     `SELECT id, display_name, picture_url FROM friends WHERE id IN (${placeholders})`
-  ).bind(...friendIds).all<{ id: string; display_name: string; picture_url: string | null }>();
+  ).bind(...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; display_name: string; picture_url: string | null }>();
 
   return c.json({
     success: true,
@@ -169,10 +170,10 @@ accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'
 
   const uniqueFriendIds = [...new Set(body.friendIds)];
   if (uniqueFriendIds.length > 0) {
-    const placeholders = uniqueFriendIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(uniqueFriendIds).sql;
     const matchingFriends = await c.env.DB.prepare(
       `SELECT id FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`
-    ).bind(body.accountId, ...uniqueFriendIds).all<{ id: string }>();
+    ).bind(body.accountId, ...(uniqueFriendIds.length ? sqlIdSet(uniqueFriendIds).binds : [])).all<{ id: string }>();
     if (matchingFriends.results.length !== uniqueFriendIds.length) {
       return inputError(c, { success: false, error: 'One or more friendIds are invalid for this account' }, 400, ["accountId","friendIds"]);
     }
