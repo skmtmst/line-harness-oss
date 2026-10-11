@@ -35,6 +35,14 @@ describe('SEND-S02: LINE受理と進捗保存の間で中断', () => {
     expect(p.keys[1]).toBe(p.keys[0]);
     expect(f.raw.prepare('SELECT status FROM friend_scenarios').get()).toEqual({status:'completed'});
   });
+  it('再開時に予定時刻が変わっても、同じ実行・友だち・通の鍵を保つ', async () => {
+    const e = await setup(), p = provider();
+    await processStepDeliveries(loseLogWrites(),p.client);
+    f.raw.prepare("UPDATE friend_scenarios SET status='active',next_delivery_at='2026-10-11T00:05:00Z',updated_at='2026-10-10T00:00:00.000' WHERE id=?").run(e.id);
+    vi.setSystemTime(new Date('2026-10-11T00:06:00Z'));
+    await processStepDeliveries(f.db,p.client);
+    expect(p.delivered()).toBe(1); expect(p.keys[1]).toBe(p.keys[0]);
+  });
   it('24時間を越えた中断は要確認として止め、自動再送しない', async () => {
     const e = await setup(), p = provider();
     await processStepDeliveries(loseLogWrites(),p.client);

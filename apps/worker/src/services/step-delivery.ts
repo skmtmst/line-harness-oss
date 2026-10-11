@@ -660,8 +660,9 @@ async function processSingleDelivery(
     const { LineClient: LC } = await import('@line-crm/line-sdk');
     deliveryClient = new LC(account.channel_access_token);
   }
-  // 実行・友だち・固定版の通・予定から同じUUIDを作る。文面はキーへ混ぜない。
-  const sendKey = await createBroadcastRetryKey('scenario-step', fs.id, friend.id, currentStep.id, fs.next_delivery_at ?? fs.started_at);
+  // 実行・友だち・固定版の通・開始時刻から同じUUIDを作る。
+  // 再開で変わる予定時刻や文面をキーへ混ぜない。
+  const sendKey = await createBroadcastRetryKey('scenario-step', fs.id, friend.id, currentStep.id, fs.started_at);
   const previous = await db.prepare(`SELECT status,created_at FROM outbound_send_requests WHERE idempotency_key=?`)
     .bind(sendKey).first<{status:string;created_at:string}>();
   if (previous && previous.status !== 'succeeded'
