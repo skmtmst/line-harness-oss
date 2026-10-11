@@ -67,7 +67,7 @@ import { authMiddleware } from './middleware/auth.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { tenantPublicBoundaryMiddleware } from './middleware/tenant-public-boundary.js';
-import { rateLimitMiddleware } from './middleware/rate-limit.js';
+import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './middleware/rate-limit.js';
 import { businessAuditMiddleware } from './middleware/business-audit.js';
 import { featureEnforcementMiddleware } from './middleware/feature-enforcement.js';
 import { webhook } from './routes/webhook.js';
@@ -513,6 +513,7 @@ app.use('/api/liff/*', tenantPublicBoundaryMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
+app.use('*', authenticatedRateLimitMiddleware);
 app.use('*', timingMark('auth'));
 
 // Tenant boundary — authenticated admin APIs may only select LINE accounts

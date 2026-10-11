@@ -49,3 +49,12 @@ describe('rate-limit IP ceiling (pre-auth token rotation)', () => {
     }
   });
 });
+
+test('SEC-03 forged Bearer sharing a prefix cannot consume another IP bucket',async()=>{
+ const a=app();for(let i=0;i<1000;i++)await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.200',Authorization:'Bearer shared-prefix-16-attacker'}},env);
+ expect((await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.201',Authorization:'Bearer shared-prefix-16-victim'}},env)).status).toBe(200);
+});
+test('unverified credential cannot mint a new IP allowance',async()=>{
+ const a=app();for(let i=0;i<1000;i++)await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.202'}},env);
+ expect((await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.202',Authorization:'Bearer rotated-bogus'}},env)).status).toBe(429);
+});
