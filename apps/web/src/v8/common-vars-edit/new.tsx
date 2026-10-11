@@ -545,7 +545,7 @@ export default function NewCommonVarV8() {
             return (
               <RadioCard
                 key={entry.key}
-                variant="form"
+                variant="card"
                 name="common-var-type"
                 value={entry.key}
                 checked={checked}

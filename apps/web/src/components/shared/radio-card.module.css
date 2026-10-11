@@ -383,6 +383,8 @@ html[data-theme='v8'] .invalid, html[data-theme='v8'] .invalid .radio { border-c
 
 html[data-theme='v8'] .card:is(.compact, .form) > .radio { width: var(--choice-size); height: var(--choice-size); opacity: 1; pointer-events: auto; top: var(--space-16); right: var(--space-16); }
 html[data-theme='v8'] .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }
+/* 印の行がある標準カードは、本文が右上の丸より下に来る。横の余白を重ねない。 */
+html[data-theme='v8'] .card:not(.compact):not(.form):has(> .topIcon) .body { padding-right: 0; }
 /* B-203/229：図と本文が丸より下にある箱は、丸の場所を上で確保する。 */
 html[data-theme='v8'] .card:not(.row)[data-content-placement='below-indicator'] { padding-top: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
 html[data-theme='v8'] .card:not(.row)[data-content-placement='below-indicator'] .body { padding-right: 0; }
