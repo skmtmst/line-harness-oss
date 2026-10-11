@@ -144,7 +144,7 @@
 [data-theme='v8'] .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
 
 /* B-152・仕上げ1：ラベルと欄 */
-[data-theme='v8'] .field { gap: var(--polish-space-field); }
+[data-theme='v8'] .field { gap: var(--polish-space-row); }
 [data-theme='v8'] .labelRow { margin-bottom: 0; }
 
 /* B-152・仕上げ2 */

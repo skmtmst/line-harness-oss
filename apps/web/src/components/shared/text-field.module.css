@@ -84,6 +84,11 @@
 [data-theme='v8'] .field {
   border-color: var(--color-control-border);
   box-shadow: var(--control-shadow);
+  font-size: var(--polish-text-body);
+}
+
+@media (pointer: coarse) {
+  [data-theme='v8'] .field { font-size: var(--text-lead); }
 }
 
 [data-theme='v8'] .invalid {
