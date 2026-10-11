@@ -32,3 +32,10 @@ CREATE INDEX idx_booking_payments_account_paid_instant
 - EXPLAIN QUERY PLANでaccountと期間の式索引が使われることを確認する。実環境のSLOは別途合意し、今回の手元の数を実環境の保証にしない。
 
 REM3-04の補足: アプリの未設定/不正値の既定は10分へ修正した。既に明示保存された時間は変更していない。既存のmigration 558には `hold_minutes DEFAULT 30` がある。DBの既定もそろえるなら、既存migrationを書き換えず、将来の承認済みmigrationで既定変更を検討する。今回は新しいmigrationを作っていない。
+
+
+DB既定変更の中身の案（REM3-04、採番/作成は承認待ち）:
+
+- SQLiteでは列のDEFAULTだけをALTERで変えられないので、`booking_payment_configs_new` を現行の列/制約で作り、`hold_minutes DEFAULT 10` だけを変える。既存データをそのままコピーし、旧表と入れ替える。外部キー・索引・トリガーを事前に確認して保全する。
+- この場合は `-- migration-policy: table-rebuild` を明記した新しいmigrationが必要。既存の558を書き換えない。作成前にオーナーへ番号と表の入れ替え手順を提示する。
+- 既存行の30分が手動指定か旧既定由来かは判別できないため、一律10分への更新を含めない。設定値の変更が必要なら、対象と根拠を提示して別に承認を得る。
