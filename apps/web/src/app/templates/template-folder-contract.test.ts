@@ -11,6 +11,7 @@ const withoutComments = (src: string) =>
   src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const PANEL = read('../../components/shared/folder-panel.tsx')
 const PANEL_CODE = withoutComments(PANEL)
+const ROW_ACTIONS = read('../../components/shared/folder-row-actions.tsx')
 const DIALOG = read('../../components/shared/folder-add-dialog.tsx')
 
 /**
@@ -76,7 +77,8 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
     expect(PANEL).toContain('if (row.onMoveUp)')
     expect(PANEL).toContain('if (row.onDelete)')
     // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。v7 は今までどおり但し書きを出す。
-    expect(PANEL).toContain('note={v8 ? undefined : row.deleteNote}')
+    expect(PANEL_CODE).not.toContain('note={row.deleteNote}')
+    expect(ROW_ACTIONS).toContain('description={deleteFolderDescription(itemLabel, deletingCount)}')
   })
 
   it('名前と色を直す窓は、追加と同じ窓を使う', () => {

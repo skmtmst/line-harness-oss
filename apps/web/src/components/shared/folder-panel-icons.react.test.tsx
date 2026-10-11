@@ -76,10 +76,12 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     expect(button.querySelector('.v8-only [data-caller-icon]')).toBeNull()
   })
 
-  it('v7 の色の丸を引き継ぐ', async () => {
+  it('旧テーマ指定でもすべての印は現役の中立の色に固定する', async () => {
     document.documentElement.dataset.theme = 'v7'
-    const { button } = await render({ id: 'all', kind: 'all', label: 'すべて', count: 1, color: 'red' })
-    expect((button.querySelector('.v7-only') as HTMLElement).style.backgroundColor).toBe('red')
+    const { button, icon } = await render({ id: 'all', kind: 'all', label: 'すべて', count: 1, color: 'red' })
+    expect(icon.classList.contains('lucide-inbox')).toBe(true)
+    expect(icon.style.color).toBe('var(--color-ink)')
+    expect(button.querySelector('.v7-only')).toBeNull()
   })
 })
 
