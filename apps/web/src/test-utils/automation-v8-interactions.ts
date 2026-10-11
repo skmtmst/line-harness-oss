@@ -23,7 +23,8 @@ export async function pickAutomationTag(name: string): Promise<void> {
   await act(async () => { document.querySelector<HTMLButtonElement>('button[id^="v8-tag-"]')!.click() })
   const checkbox = [...document.querySelectorAll<HTMLElement>('[role="checkbox"], input[type="checkbox"]')].find(node => node.getAttribute('aria-label') === name && !node.closest('[data-closing]'))
   if (!checkbox) throw new Error(`タグが見つかりません: ${name}`)
-  await act(async () => { checkbox.click() })
+  const checked = checkbox.getAttribute('aria-checked') === 'true' || (checkbox instanceof HTMLInputElement && checkbox.checked)
+  if (!checked) await act(async () => { checkbox.click() })
   await clickAutomationButton('選ぶ（1件）')
 }
 
@@ -35,4 +36,14 @@ export async function replaceFirstAutomationAction(label: string): Promise<void>
   await clickAutomationButton('削除する')
   await clickAutomationButton('行うことを足す')
   await clickAutomationButton(label)
+}
+
+export async function pickAutomationTestFriend(id: string): Promise<void> {
+  await act(async () => { document.querySelector<HTMLButtonElement>('#v8-test-friend')!.click() })
+  // 友だちの窓は250ms後に読む。画面と同じ検索を待ってから確定する。
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
+  const candidate = [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')].find(input => input.value === id && !input.closest('[data-closing]'))
+  if (!candidate) throw new Error(`友だちが見つかりません: ${id}`)
+  await act(async () => { candidate.click() })
+  await clickAutomationButton('選ぶ')
 }
