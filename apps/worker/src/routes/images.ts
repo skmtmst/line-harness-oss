@@ -120,7 +120,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoun
 });
 
 // 管理画面から原本を読む口も、削除と同じ所有権を確かめる。
-images.get('/api/images/:key', requireRole('owner', 'admin', 'staff'), async (c) => {
+images.get('/api/images/:key', requireRole('owner', 'admin'), async (c) => {
   const key = c.req.param('key');
   if (!await ownedImage(c, key)) return c.json({ success: false, error: 'Image not found' }, 404);
   const object = await c.env.IMAGES.get(key);
