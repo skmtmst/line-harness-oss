@@ -29,6 +29,12 @@
   text-align: center;
 }
 
+.dateCell {
+  color: var(--color-ink-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* ★V7の見出し行（高さ40px・一段沈んだ地）。付けないときは44pxのまま。 */
 .headComfortable {
   height: 40px;

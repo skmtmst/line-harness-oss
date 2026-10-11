@@ -268,6 +268,11 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
   return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
 }
 
+/** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */
+export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>) {
+  return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
+}
+
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
 export function NameCell({ name, folder, annotation, className }: {
   name: ReactNode

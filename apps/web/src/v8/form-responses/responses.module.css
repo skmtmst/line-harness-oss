@@ -193,11 +193,6 @@
 .colState {
   width: var(--tpl-ev-fr-col-state);
 }
-.when {
-  color: var(--color-ink-secondary);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 .who {
   max-width: 100%;
   min-height: 0;

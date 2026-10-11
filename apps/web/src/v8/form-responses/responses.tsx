@@ -23,7 +23,7 @@ import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import TargetMissing from '@/components/shared/target-missing'
-import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, DateCell, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
@@ -577,7 +577,7 @@ function Responses() {
                         aria-selected={isSelected}
                         onClick={() => selectAnswer(item.id)}
                       >
-                        <Td className={styles.when}>{shortWhen(item.createdAt)}</Td>
+                        <DateCell>{shortWhen(item.createdAt)}</DateCell>
                         <NameCell name={
                           <button type="button" className={styles.who} title={item.friendName ?? '不明'} onClick={() => selectAnswer(item.id)}>
                             {item.friendName ?? '不明'}
