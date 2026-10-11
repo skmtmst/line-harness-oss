@@ -38,7 +38,6 @@ function walk(dir: string, out: string[] = []): string[] {
 const NOT_YET_MIGRATED = [
   'auto-replies/edit/page.tsx',
   'auto-replies/page.tsx',
-  'automations/page.tsx',
   'booking/bookings/detail/page.tsx',
   'booking/bookings/page.tsx',
   'booking/menus/staff/page.tsx',

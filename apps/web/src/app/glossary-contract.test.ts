@@ -101,7 +101,6 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     /* 直す途中（2026-10-09 時点で「この30日」「直近30日」が画面に残るファイル）。 */
     const migrating = new Set([
     'app/automations/list-v8.tsx',
-    'app/automations/page.tsx',
     'app/automations/runs-v8.tsx',
     'app/automations/runs/page.tsx',
     'app/automations/templates-v8.tsx',

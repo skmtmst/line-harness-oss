@@ -76,7 +76,7 @@ describe('V8の数の帯とメンバー一覧', () => {
 describe('KPI折りたたみの適用（#975 U060）', () => {
   const targets: Array<[string, string]> = [
     ['v8/conversions/list.tsx', 'KpiBand'],
-    ['app/automations/page.tsx', 'KpiCollapse'],
+    ['v8/automations/shell.tsx', 'KpiBand'],
     ['app/automations/runs/page.tsx', 'KpiCollapse'],
     // app/hq/page.tsx は V8 のホーム（v8/hq/home.tsx・絵どおりの数の帯）を出すだけになったので外した（2026-10-09 V7 削除）。
     ['v8/nen-campaigns/list.tsx', 'KpiBand'],

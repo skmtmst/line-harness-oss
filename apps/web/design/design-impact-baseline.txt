@@ -56,7 +56,6 @@ shared-button-importer app/automations/list-v8.tsx
 shared-button-importer app/automations/new/friend-multi-select.tsx
 shared-button-importer app/automations/new/new-v8.tsx
 shared-button-importer app/automations/new/page.tsx
-shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs-v8.tsx
 shared-button-importer app/automations/runs/page.tsx
 shared-button-importer app/automations/templates-v8.tsx

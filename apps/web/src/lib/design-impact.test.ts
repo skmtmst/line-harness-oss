@@ -77,7 +77,6 @@ describe('共通部品の影響範囲', () => {
       // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
       'app/accounts/uid-migration-v8.tsx',
       // ★V8 自動応答の実行結果（app/auto-replies/runs/runs-v8.tsx）は描かれなくなった。入口は src/v8/auto-replies/runs.tsx（下）。
-      'app/automations/page.tsx',
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
       // 20件ずつのページ送りに寄せた。
       'app/automations/runs/page.tsx',
