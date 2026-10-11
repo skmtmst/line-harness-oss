@@ -72,7 +72,6 @@ const BASELINE: Record<string, number> = {
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx': 1,
   'app/mileage/page.tsx': 2,
   'v8/nen-campaigns/column-intros.tsx': 1,
-  'app/nen-members/photo-review-detail.tsx': 1,
   'app/reminders/new/page.tsx': 1,
   'app/rich-menus/new/create-v8.tsx': 2,
   'app/scenarios/first-step/page.tsx': 1,

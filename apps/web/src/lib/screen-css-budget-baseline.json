@@ -109,11 +109,6 @@
     "height": 6,
     "font": 19
   },
-  "app/nen-members/photo-review-v8.module.css": {
-    "spacing": 59,
-    "height": 28,
-    "font": 38
-  },
   "app/nen/health/health-v8.module.css": {
     "spacing": 28,
     "height": 7,

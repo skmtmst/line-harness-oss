@@ -67,7 +67,7 @@ describe('Issue #637 h1は1画面に1つ', () => {
   it('/nen-members の深い画面（掲載管理・1枚表示）もh1を置かない', () => {
     // トップバーの「投稿」（h1）と並ぶと1画面に h1 が2つになるため h2 へ。
     // 掲載管理の古い photo-publications.tsx はどこからも描かれないので 2026-10-07 に消した。
-    for (const rel of ['app/nen-members/photo-review-detail.tsx']) {
+    for (const rel of ['v8/nen-posts/detail.tsx']) {
       const src = read(rel)
         .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
         .replace(/\/\*[\s\S]*?\*\//g, '')
