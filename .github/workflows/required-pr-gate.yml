@@ -391,6 +391,8 @@ jobs:
           build
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
       - run: node apps/web/scripts/verify-entity-pickers.mjs
+      - name: Reject restored legacy admin appearance
+        run: node apps/web/scripts/verify-v8-only.mjs
       - run: pnpm --filter web typecheck
       - run: pnpm --filter web test
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
