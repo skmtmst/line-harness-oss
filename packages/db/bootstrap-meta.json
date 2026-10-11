@@ -579,5 +579,5 @@
     "634_customer_deletion_retained_references.sql",
     "635_restaurant_delivery_orders.sql"
   ],
-  "migrationCount": 577
+  "migrationCount": 578
 }
