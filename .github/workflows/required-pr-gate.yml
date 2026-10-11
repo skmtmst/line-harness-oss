@@ -678,6 +678,9 @@ jobs:
       - name: Train 17 waitlist failure and inflow mouse regressions
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
+      - name: Booking preview date agrees through settings and preview tabs
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
       - name: No new V8 layout or owner-rule defects (B-191 through B-218)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
@@ -699,8 +702,8 @@ jobs:
       # 道具の対照は speed-budget.mjs の頭に書いた。
       - name: Speed measurement and reference policy controls
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
-        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
-      - name: Speed budget on V8 (10 screens on a real browser)
+        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
+      - name: Common V8 speed checks (11 scenes, five medians)
         id: speed_budget
         # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
         continue-on-error: true
@@ -717,7 +720,7 @@ jobs:
             allow_js=1
             echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
           fi
-          ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+          ALLOW_JS_BASELINE_UPDATE="$allow_js" pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
       - name: Train 17 absolute targets (reference)
         continue-on-error: true
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
