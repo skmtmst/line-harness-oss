@@ -5,14 +5,14 @@ import { RowActions } from '@/components/shared/row-actions'
 import { RowMenu } from '@/components/shared/row-actions'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import StickyBar from '@/components/shared/sticky-bar'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
 import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from '@/components/events/bulk-slot-generator'
-import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from '@/components/events/jst'
+import { jstHHMMToUtcIso, splitBand, utcIsoToJstDate, utcIsoToJstHHMM } from '@/components/events/jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -785,7 +785,7 @@ function SlotsTab({
         destructive
         busy={deletingSlot}
         error={deleteSlotError}
-        onConfirm={() => void deleteSlot()}
+        onConfirm={deleteSlot}
         onCancel={() => {
           if (deletingSlot) return
           setDeleteSlotError('')
@@ -807,7 +807,7 @@ function SlotsTab({
         cancelLabel={bulkPreview && bulkPreview.slots.length === 0 ? '条件を直す' : 'キャンセル'}
         busy={bulkBusy}
         error={bulkError}
-        onConfirm={bulkPreview && bulkPreview.slots.length > 0 ? () => void createBulkSlots() : undefined}
+        onConfirm={bulkPreview && bulkPreview.slots.length > 0 ? createBulkSlots : undefined}
         onCancel={() => {
           if (bulkBusy) return
           setBulkError('')
@@ -835,7 +835,11 @@ function AddSlotDialog({
   const [err, setErr] = useState<string | null>(null)
   // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
 
+  const submitLock = useRef(false)
+
   async function submit() {
+    if (submitLock.current) return
+    submitLock.current = true
     setBusy(true)
     setErr(null)
     try {
@@ -848,6 +852,7 @@ function AddSlotDialog({
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
+      submitLock.current = false
       setBusy(false)
     }
   }
@@ -892,7 +897,11 @@ function EditSlotDialog({
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  const submitLock = useRef(false)
+
   async function submit() {
+    if (submitLock.current) return
+    submitLock.current = true
     setBusy(true)
     setErr(null)
     try {
@@ -908,6 +917,7 @@ function EditSlotDialog({
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
+      submitLock.current = false
       setBusy(false)
     }
   }
@@ -943,6 +953,10 @@ export function BulkSlotDialog({
   const [end, setEnd] = useState(todayJst)
   const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5])
   const [patterns, setPatterns] = useState([{ start: '10:00', end: '11:00' }])
+  const [divideBand, setDivideBand] = useState(false)
+  const [bandStart, setBandStart] = useState('14:00')
+  const [bandEnd, setBandEnd] = useState('17:00')
+  const [slotMinutes, setSlotMinutes] = useState(90)
   const [capacity, setCapacity] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -951,22 +965,29 @@ export function BulkSlotDialog({
     setWeekdays((ws) => (ws.includes(d) ? ws.filter((x) => x !== d) : [...ws, d]))
   }
 
+  const submitLock = useRef(false)
+
   async function submit() {
+    if (submitLock.current) return
+    submitLock.current = true
     setBusy(true)
     setErr(null)
     try {
       const cap = capacity === '' ? null : Number(capacity)
       if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
+      const timePatterns = divideBand ? splitBand(bandStart, bandEnd, slotMinutes) : patterns.filter((pattern) => pattern.start && pattern.end && pattern.start < pattern.end)
+      if (divideBand && timePatterns.length === 0) throw new Error('時間帯と1枠の長さが合いません。長さを短くするか時間帯を広げてください')
       await onSubmit({
         start_date: start,
         end_date: end,
         weekdays,
-        time_patterns: patterns.filter((p) => p.start && p.end && p.start < p.end),
+        time_patterns: timePatterns,
         capacity: cap,
       })
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
+      submitLock.current = false
       setBusy(false)
     }
   }
@@ -980,12 +1001,20 @@ export function BulkSlotDialog({
           variant={weekdays.includes(index) ? 'primary' : 'secondary'} aria-pressed={weekdays.includes(index)} onClick={() => toggleWeekday(index)}>{day}</Button>)}
       </div>
     </Field>
+    <Checkbox checked={divideBand} onCheckedChange={setDivideBand}>時間帯を同じ長さの枠に分ける</Checkbox>
+    {divideBand ? <FormSection id="ev-form-time-band" title="同じ長さの枠">
+      <Field label="時間帯の開始"><TimeField value={bandStart} onChange={setBandStart} aria-label="時間帯の開始" /></Field>
+      <Field label="時間帯の終了"><TimeField value={bandEnd} onChange={setBandEnd} aria-label="時間帯の終了" /></Field>
+      <Field label="1枠の長さ"><Select aria-label="1枠の長さ" value={String(slotMinutes)} onChange={(value) => setSlotMinutes(Number(value))}
+        options={[30, 45, 60, 90, 120].map((minutes) => ({ value: String(minutes), label: `${minutes}分` }))} /></Field>
+    </FormSection> : <>
     {patterns.map((pattern, index) => <FormSection key={index} id={`ev-form-pattern-${index}`} title={`${index + 1}件目の時刻パターン`}
       action={patterns.length > 1 ? <Button variant="danger" aria-label={`${index + 1}件目のパターンを削除`} onClick={() => setPatterns((items) => items.filter((_, position) => position !== index))}>×</Button> : null}>
       <Field label="開始"><TimeField value={pattern.start} aria-label={`${index + 1}件目の開始`} onChange={(value) => setPatterns((items) => items.map((item, position) => position === index ? { ...item, start: value } : item))} /></Field>
       <Field label="終了"><TimeField value={pattern.end} aria-label={`${index + 1}件目の終了`} onChange={(value) => setPatterns((items) => items.map((item, position) => position === index ? { ...item, end: value } : item))} /></Field>
     </FormSection>)}
     <Button onClick={() => setPatterns((items) => [...items, { start: '14:00', end: '15:00' }])}>＋ パターンを追加する</Button>
+    </>}
     <Field label="定員（各枠共通・空欄=無制限）"><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></Field>
   </Dialog>
 }
