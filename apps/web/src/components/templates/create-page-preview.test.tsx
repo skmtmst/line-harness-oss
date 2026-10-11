@@ -4,7 +4,7 @@ import { afterEach, expect, it } from 'vitest'
 import { CreatePage } from './create-page'
 afterEach(cleanup)
 it('畳んだ右欄の見本を共通の入口から確認し、入力を残して閉じる', () => {
-  render(<CreatePage title="作る" hidePreviewWhenNarrow preview={<p>送る本文の見本</p>} footerActions={null}><input aria-label="名前" defaultValue="下書き" /></CreatePage>)
+  render(<CreatePage title="作る" preview={<p>送る本文の見本</p>} footerActions={null}><input aria-label="名前" defaultValue="下書き" /></CreatePage>)
   fireEvent.click(screen.getByRole('button', { name: 'LINEの見え方を確認' }))
   const dialog = screen.getByRole('dialog', { name: 'LINEの見え方' })
   expect(within(dialog).getByText('送る本文の見本')).toBeTruthy()
