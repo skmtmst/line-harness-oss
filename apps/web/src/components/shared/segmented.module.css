@@ -137,6 +137,16 @@
 [data-theme='v8'] .root:is([data-appearance='choices'],[data-appearance='reservation']) .item { min-height: 0; padding: 6px 12px; border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; font-size: var(--text-caption); font-weight: 400; line-height: 17px; }
 [data-theme='v8'] .root:is([data-appearance='choices'],[data-appearance='reservation']) .selected { outline-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 600; }
 [data-theme='v8'] .root:is([data-appearance='choices'],[data-appearance='reservation']) .item:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+/*
+ * デリバリー受注の受付一括停止（★V8 `XCVGd` の時間行 `To5Y0`）。
+ * 離れた枠付きの札4つ。選んだ札だけ薄い緑の面と緑の枠にする。
+ * 文字の太さと角丸は B-152 の共通の段（下の2行）に従う。
+ */
+[data-theme='v8'] .root[data-appearance='intake-stop'] { padding: 0; gap: 8px; background: transparent; }
+[data-theme='v8'] .root[data-appearance='intake-stop'] .item { min-height: var(--tpl-rt-dlv-time-h); padding: var(--tpl-rt-dlv-time-pad); border-radius: var(--radius-segment); background: var(--color-canvas); outline: 1px solid var(--color-choice-border); outline-offset: -1px; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+[data-theme='v8'] .root[data-appearance='intake-stop'] .selected { background: var(--color-accent-soft); outline-color: var(--color-accent); color: var(--color-accent-deep); }
+[data-theme='v8'] .root[data-appearance='intake-stop'] .item:disabled { cursor: not-allowed; opacity: 0.5; }
+[data-theme='v8'] .root[data-appearance='intake-stop'] .item:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 }
 
 [data-theme='v8'] .root[data-size='sticker'] { height: var(--seg-timing-h); max-width: 100%; gap: 0; }

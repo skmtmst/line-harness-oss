@@ -25,6 +25,7 @@ on:
           - migrate
           - verify-operational-path
           - verify-instagram-cross-post
+          - verify-restaurant-delivery
           - restore-booking-hours-20260922
       environment:
         description: どのデータベースに当てるか
@@ -417,6 +418,63 @@ jobs:
             if [ -s "$RUNNER_TEMP/instagram-verification.json" ]; then
               echo '```json'
               tail -n 1 "$RUNNER_TEMP/instagram-verification.json"
+              echo '```'
+            else
+              echo '検証結果を生成できませんでした。'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # デリバリー受注（承認版v02）の確認。未認証では注文一覧・注文履歴・品切れ一括の
+  # 3画面とも /login へ移るので、実表示を確かめるにはログイン済みの状態が要る。
+  # 手元に秘密値を置かず、staging の資格情報を持つここで走らせる。
+  # 読むだけで、作って消すのは自分用の管理セッション1行だけ（15分で切れる）。
+  verify-restaurant-delivery:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.operation == 'verify-restaurant-delivery' &&
+      inputs.environment == 'staging' &&
+      github.repository == 'skmtmst/line-harness-oss' &&
+      github.ref == 'refs/heads/codex/development'
+    environment:
+      name: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: verify-staging-restaurant-delivery
+      cancel-in-progress: false
+    env:
+      VERIFY_ENVIRONMENT: staging
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # 3画面を実ブラウザで開くので、ここだけ Chromium が要る。
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify the delivery reads and the three screens
+        run: |
+          set -o pipefail
+          pnpm tsx scripts/verify-staging-restaurant-delivery.ts \
+            | tee "$RUNNER_TEMP/delivery-verification.json"
+
+      - name: Publish aggregate-only result
+        if: always()
+        run: |
+          {
+            echo '## デリバリー受注の確認（検証環境）'
+            echo
+            if [ -s "$RUNNER_TEMP/delivery-verification.json" ]; then
+              echo '```json'
+              tail -n 1 "$RUNNER_TEMP/delivery-verification.json"
               echo '```'
             else
               echo '検証結果を生成できませんでした。'

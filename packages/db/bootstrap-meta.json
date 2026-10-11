@@ -574,8 +574,10 @@
     "629_restaurant_reservation_events.sql",
     "630_restaurant_confirmations.sql",
     "631_restaurant_scenario_source_jobs.sql",
+    "632_restaurant_store_referrals.sql",
     "633_restaurant_external_links.sql",
-    "634_customer_deletion_retained_references.sql"
+    "634_customer_deletion_retained_references.sql",
+    "635_restaurant_delivery_orders.sql"
   ],
-  "migrationCount": 576
+  "migrationCount": 578
 }

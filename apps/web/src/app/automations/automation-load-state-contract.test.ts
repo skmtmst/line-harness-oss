@@ -72,7 +72,7 @@ describe('V6 オートメーション一覧の状態', () => {
     expect(PAGE).toContain('ほかの人の変更と重なりました')
     expect(PAGE).toContain('サーバー側で編集用の下書きを作れませんでした')
     expect(PAGE).toContain('通信状態を確かめて')
-    expect(PAGE).toContain('setError(describeAutomationEditFailure(caught))')
+    expect(PAGE).toContain('setActionError(describeAutomationEditFailure(caught))')
     // 404・409 は一覧が古い可能性があるので読み直す。
     expect(PAGE).toContain('caught.status === 404 || caught.status === 409')
     expect(PAGE).toContain('void loadAutomations()')

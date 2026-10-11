@@ -86,3 +86,9 @@ input.choiceInput[type='checkbox']:checked, .choice input[type='checkbox']:check
 
 input.choiceInput[type='radio'], .choice input[type='radio'] { width: var(--liff-radio-size, 18px); height: var(--liff-radio-size, 18px); }
 input.choiceInput[type='radio']:checked, .choice input[type='radio']:checked { background: radial-gradient(circle, var(--color-selection-border) calc(var(--liff-radio-dot, 9px) / 2), var(--color-canvas) calc(var(--liff-radio-dot, 9px) / 2)); }
+
+.formLabel { font-size: 15px; line-height: 22px; }
+.days .day { border: 0; outline: 1px solid var(--color-liff-line, var(--color-border)); outline-offset: -0.5px; font-family: Inter, system-ui, sans-serif; line-height: normal; }
+.days .weekday { font-family: "Noto Sans JP", system-ui, sans-serif; line-height: normal; }
+.times .time { min-height: 42px; font-family: Inter, system-ui, sans-serif; font-size: 12px; line-height: normal; font-weight: 500; }
+.times .time[aria-pressed='true'] { font-size: 15px; font-weight: 700; }

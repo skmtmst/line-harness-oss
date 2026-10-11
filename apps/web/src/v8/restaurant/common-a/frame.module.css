@@ -5,9 +5,18 @@
 .body {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-rt-body-gap);
+  gap: var(--rt-body-gap, var(--tpl-rt-body-gap));
   padding: var(--tpl-rt-body-pad);
   min-width: 0;
+}
+
+/*
+ * 絵の中身の上の余白が共通の16と違う板だけ、RestaurantPage の bodyPadTop で替える。
+ * 上の `padding` はひとまとめの指定なので、上だけを後から入れ直す。
+ * 渡さない板には印（data-body-pad-top）が付かないので、今までの16のまま。
+ */
+.body[data-body-pad-top] {
+  padding-top: var(--rt-body-pad-top);
 }
 
 /* 検証環境の帯（CHz31「検証環境の帯」）：薄い金色の地＋緑の札＋右の注意。間12。 */

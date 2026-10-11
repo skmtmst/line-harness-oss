@@ -1,3 +1,4 @@
+import Card from '../../components/ui/Card.js';
 import { TextInput, FieldLabel, FieldCount } from '../../components/forms/controls.js';
 import Button from '../../components/ui/Button.js';
 import { useEffect, useState } from 'react';
@@ -7,7 +8,7 @@ import { LiffInput } from '../../components/forms/controls.js'
 
 
 /**
- * ② 確認 (★V8 km8EG)。お店・日時・人数・お席・お名前・電話の箱、ご要望、取り消しの決まり、仮押さえの残り時間。
+ * ② 確認 (★V8 B3oGt3)。お店・日時・人数・お席・お名前・電話の箱、ご要望、取り消しの決まり、仮押さえの残り時間。
  * 確定のボタンは下の操作の帯 (呼ぶ側) に置く。仮押さえの時間が切れたら onExpired を呼ぶ。
  *
  * ご要望（任意・200字）と電話（任意）は、確定の口へ送る（API-11）。お席は割り当てた卓・空いている卓の種類。
@@ -16,6 +17,7 @@ import { LiffInput } from '../../components/forms/controls.js'
 export default function SeatConfirm({
   timeZone,
   storeName,
+  courseName,
   customerName,
   startsAt,
   endsAt,
@@ -36,6 +38,7 @@ export default function SeatConfirm({
 }: {
   timeZone: string;
   storeName: string;
+  courseName?: string | null;
   customerName: string;
   startsAt: string;
   endsAt: string;
@@ -75,13 +78,24 @@ export default function SeatConfirm({
     ['お店', storeName],
     ['日時', `${longDate(p.date)}${p.hm}〜${stayText(startsAt, endsAt)}`],
     ['人数', `${guestCount}名`],
+    ...(courseName ? [['コース',courseName] as [string,string]] : []),
     ['お席', seat],
     ['お名前', `${customerName} さま`],
   ];
 
   return (
-    <div className="space-y-3.5" data-design-node="km8EG">
-      <h2 className="text-xl font-bold text-ink">{reschedule ? 'この内容に変更します' : 'この内容で予約します'}</h2>
+    <div className="space-y-3.5" data-design-node="B3oGt3">
+      <Card className="space-y-4 p-6">
+        <h2 className="text-[15px] leading-[23px] font-bold text-ink">{reschedule ? 'この内容に変更します' : 'ご予約の内容'}</h2>
+        <div className="space-y-2.5">
+          <p className="text-[13px] leading-5 font-semibold text-ink">{p.date.slice(5).replace('-','/')}（{new Intl.DateTimeFormat('ja-JP',{timeZone,weekday:'short'}).format(new Date(startsAt))}）{p.hm}・{guestCount}名</p>
+          <p className="truncate text-xs leading-[18px] text-liff-sub" title={`コース：${courseName??'席のみ'}（${stayText(startsAt,endsAt)}）`}>コース：{courseName??'席のみ'}（{stayText(startsAt,endsAt)}）</p>
+          <p className="text-xs leading-[18px] text-liff-sub">お席はお店が決めます</p>
+        </div>
+      </Card>
+      <p className="text-[13px] leading-5 text-liff-sub">受け付けたら「受け付けました」と表示します。</p>
+      <details>
+      <summary className="liff-hit cursor-pointer text-xs leading-[18px] text-liff-sub">連絡先・ご要望・予約の決まり</summary>
       <dl className="flex flex-col gap-2.5 rounded-(--liff-radius-lg) bg-canvas p-3.5 outline outline-1 -outline-offset-1 outline-liff-line">
         {rows.map(([k, v]) => (
           <div key={k} className="flex items-start gap-3">
@@ -136,6 +150,7 @@ export default function SeatConfirm({
         <li>{`・${changeRule(startsAt, cancelDeadlineMinutesBefore, timeZone, now)}`}</li>
         <li>{`・${late}`}</li>
       </ul>
+      </details>
       {left !== null && (
         <p className="text-xs leading-[18px] text-liff-wait-ink" role="timer" aria-live="off">
           {left > 0

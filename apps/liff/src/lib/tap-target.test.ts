@@ -11,7 +11,7 @@ const read = (p: string) => readFileSync(fileURLToPath(new URL(p, import.meta.ur
 
 describe('押せる所の大きさ', () => {
   it('liff-hit は押せる範囲を 44×44 以上にし、位置の決まっている部品の position を変えない', () => {
-    const css = read('../index.css');
+    const css = (read('../index.css') + read('../components/ui/liff-skin.css'));
     expect(css).toMatch(/\.liff-hit::after\s*\{[^}]*width: max\(100%, 44px\);[^}]*height: max\(100%, 44px\);/s);
     expect(css).toContain('.liff-hit:not(.absolute):not(.fixed):not(.sticky)');
   });
@@ -22,7 +22,7 @@ describe('押せる所の大きさ', () => {
       ['../components/DateTimePicker.tsx', 'aria-label="前の週"'],
       ['../components/DateTimePicker.tsx', 'aria-label="前の月"'],
       ['../components/HelpTip.tsx', 'aria-label={label}'],
-      ['../pages/seat/SeatPick.tsx', "'5名以上'"],
+      ['../pages/seat/SeatPick.tsx', 'aria-label="人数を増やす"'],
       ['../pages/EventBookings.tsx', 'のイベントを見る`}'],
     ];
     for (const [file, marker] of cases) {
@@ -31,8 +31,8 @@ describe('押せる所の大きさ', () => {
       expect(at, `${file} ${marker}`).toBeGreaterThan(-1);
       // 印の近く（同じ要素の className）に liff-hit がある
       const around = src.slice(Math.max(0, at - 400), at + 400);
-      expect(around, `${file} ${marker}`).toMatch(/<Button variant="(?:icon|arrow|chip)"/);
-      expect(read('../components/ui/Button.tsx')).toMatch(/(?:icon|arrow|chip): `?'liff-hit/);
+      expect(around, `${file} ${marker}`).toMatch(/<Button variant="(?:icon|arrow|chip|restaurant-control)"/);
+      expect(read('../components/ui/Button.tsx')).toContain("'restaurant-control': 'liff-hit");
     }
   });
 

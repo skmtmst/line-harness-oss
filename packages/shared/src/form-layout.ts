@@ -146,6 +146,9 @@ export type FormAction =
  * 予約は「未承認」で入り、店が承認する（すぐ確定は作らない）。
  */
 export interface FormBookingConfig {
+  kind?: 'people' | 'seats';
+  storeId?: string;
+  courseId?: string | null;
   menuId: string;
   staffId?: string | null;
   daysAhead?: number;
@@ -157,6 +160,10 @@ export interface FormBookingConfig {
  * ここでは「どの枠を選んだか」だけを持ち、形だけを検査する。
  */
 export interface FormBookingValue {
+  kind?: 'people' | 'seats';
+  storeId?: string;
+  courseId?: string | null;
+  guestCount?: number;
   menuId: string;
   staffId: string;
   startsAt: string;
@@ -967,6 +974,11 @@ export function isAsciiBlank(value: string): boolean {
 export function normalizeBookingValue(value: unknown): FormBookingValue | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
+  if (v.kind === 'seats') {
+    if (typeof v.storeId !== 'string' || !v.storeId || !Number.isSafeInteger(v.guestCount) || Number(v.guestCount)<1 || Number(v.guestCount)>100 || typeof v.startsAt !== 'string' || !Number.isFinite(Date.parse(v.startsAt)) || (v.courseId!=null && typeof v.courseId!=='string')) return null;
+    return {kind:'seats',storeId:v.storeId,courseId:v.courseId as string|null|undefined,guestCount:Number(v.guestCount),startsAt:v.startsAt,menuId:'',staffId:''};
+  }
+  if (v.kind !== undefined && v.kind !== 'people') return null;
   if (typeof v.menuId !== "string" || v.menuId.trim() === "") return null;
   if (typeof v.staffId !== "string" || v.staffId.trim() === "") return null;
   if (typeof v.startsAt !== "string" || Number.isNaN(Date.parse(v.startsAt))) return null;
@@ -1617,6 +1629,10 @@ export function validateFormBookingReady(layout: FormLayout): string | null {
     for (const block of blocks) {
       if (block.kind !== "input" || block.type !== "booking") continue;
       const at = `「${block.label.trim() || block.name}」`;
+      if (block.booking?.kind === 'seats') {
+        if (!block.booking.storeId) return `${at}のお店が選ばれていません`;
+        continue;
+      }
       if (!block.booking?.menuId) {
         return `${at}の予約メニューが選ばれていません`;
       }

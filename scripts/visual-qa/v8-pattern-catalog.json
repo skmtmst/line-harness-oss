@@ -328,6 +328,7 @@
       },
       "code": {
         "selectorHint": "toolbar|toolBar|controls\\b|filters?Row|searchRow",
+        "canonicalUse": "<ListToolbar(?:Frame|Row|SearchSlot|End|Optional|Sort)?\\b",
         "overrideSelectors": [
           "toolbar"
         ],
@@ -2661,7 +2662,8 @@
             "apps/web/src/components/shared/radio.tsx",
             "apps/web/src/components/shared/check-card.tsx",
             "apps/liff/src/card-surface.css",
-            "apps/liff/src/index.css"
+            "apps/liff/src/index.css",
+            "apps/liff/src/components/ui/liff-skin.css"
           ],
           "components": [
             "Toggle",
@@ -2796,7 +2798,8 @@
         "code": {
           "files": [
             "apps/web/src/components/templates/steps.tsx",
-            "apps/web/src/components/templates/steps.module.css"
+            "apps/web/src/components/templates/steps.module.css",
+            "apps/liff/src/components/ui/Stepper.tsx"
           ],
           "components": [
             "Steps"

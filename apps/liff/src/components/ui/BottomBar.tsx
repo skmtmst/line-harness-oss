@@ -8,7 +8,9 @@ import type { ReactNode } from 'react';
  * 板 (IruGD など) では主ボタンの下端が画面の下から 30px。浮いた 12px は
  * そのままに、帯の中の下の余白を 18px にしてボタンの高さを板に合わせる。
  */
-export default function BottomBar({ children }: { children: ReactNode }) {
+export default function BottomBar({ children, appearance }: { children: ReactNode; appearance?: 'form' | 'restaurant' }) {
+  if (appearance === 'restaurant') return <div className="fixed inset-x-0 bottom-0 bg-canvas" style={{paddingBottom:'max(28px, env(safe-area-inset-bottom))'}}><div className="mx-auto w-full max-w-md space-y-2 px-4 pt-3">{children}</div></div>;
+  if (appearance === 'form') return <div className="fixed inset-x-0 bottom-0 bg-canvas" style={{paddingBottom:'max(30px, env(safe-area-inset-bottom))',boxShadow:'inset 0 1px 0 var(--color-liff-line)'}}><div className="mx-auto w-full max-w-md space-y-2 px-4 pt-3">{children}</div></div>;
   return (
     <div
       className="fixed inset-x-0 bottom-0 px-4"

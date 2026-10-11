@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useActionError } from '@/lib/use-action-error'
 import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
 import VersionCompare from '@/components/shared/version-compare'
@@ -37,11 +38,10 @@ export default function MenuVersionHistory({
   const [comparing, setComparing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [reverting, setReverting] = useState(false)
-  const [revertError, setRevertError] = useState<string | null>(null)
+  const { error: revertError, setError: setRevertError } = useActionError(`${accountId}:${menuId}`)
 
   const load = useCallback(async () => {
     setLoadState('loading')
-    setRevertError(null)
     try {
       const response = await bookingApi.listMenuVersions(accountId, menuId)
       const list = Array.isArray(response.versions) ? response.versions : []
@@ -77,7 +77,7 @@ export default function MenuVersionHistory({
     if (selected == null) return
     setConfirming(false)
     setReverting(true)
-    setRevertError(null)
+    setRevertError('')
     try {
       const response = await bookingApi.revertMenuVersion(accountId, menuId, selected, currentVersion)
       notifyToast(`第${selected}版の中身で新しい版（第${response.version}版）を作りました。`)

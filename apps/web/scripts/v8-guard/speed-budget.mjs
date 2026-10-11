@@ -35,6 +35,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {cpus,loadavg,platform,arch} from 'node:os'
+import {execFileSync} from 'node:child_process'
 import { chromium } from '@playwright/test'
 import { screenReady } from './screen-ready.mjs'
 import { SAMPLE_COUNT, REGRESSION_FACTOR, LONG_TASK_FLOOR_MS, speedPolicy } from './speed-policy.mjs'
@@ -403,6 +405,10 @@ async function buildTarget({ stubDir, baseUrl }) {
       url: (route) => pathToFileURL(join(root, route === '/' ? 'index.html' : `${route.slice(1)}.html`)).href,
     }
   }
+  if (process.env.V8_GUARD_STUB_API === '1') {
+    const { mockFetch } = await import('./mock-local.mjs')
+    return { stub: true, mockFetch, url: (route) => new URL(route, baseUrl).toString() }
+  }
   return { stub: false, url: (route) => new URL(route, baseUrl).toString() }
 }
 
@@ -430,10 +436,10 @@ export async function measureMedian(run) {
   }
 }
 
-function checkpoint(out, measured, error = null, policy = null) {
+function checkpoint(out, measured, error = null, policy = null, environment = null) {
   if (!out) return
   mkdirSync(dirname(out), { recursive: true })
-  writeFileSync(out, `${JSON.stringify({ measured, complete: measured.length === 11 && !error, error, policy }, null, 2)}\n`)
+  writeFileSync(out, `${JSON.stringify({ measured, complete: measured.length === 11 && !error, error, policy, environment }, null, 2)}\n`)
 }
 
 async function main() {
@@ -441,25 +447,30 @@ async function main() {
   const measured = []
   let browser = null
   let policy = null
+  let environment = null
   checkpoint(out, measured)
   try {
   policy = speedPolicy()
   const target = await buildTarget({ stubDir, baseUrl })
   const budget = JSON.parse(readFileSync(BUDGET_PATH, 'utf-8'))
   browser = await chromium.launch()
+  const {mockFingerprint}=await import('../../../../scripts/visual-qa/mock-fingerprint.mjs')
+  const cpu=cpus()
+  environment={platform:platform(),arch:arch(),node:process.version,chromium:browser.version(),cpu:cpu[0]?.model,cpuCount:cpu.length,loadAverage:loadavg(),viewport:[1440,900],cpuThrottleRate:1,transport:target.stub?'route-fixture':'http-api',fixtureFingerprint:mockFingerprint(),worktreeSha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),startedAt:new Date().toISOString()}
   console.log(`測定条件: ${policy.profile}・各${policy.sampleCount}回の中央値・時間倍率${policy.timeFactor}`)
   for (const [name, route] of Object.entries(SPEED_ROUTES)) {
     console.log(`測定開始: ${name}`)
     measured.push(await measureMedian(() => measureScreen(browser, target, name, route)))
-    checkpoint(out, measured, null, policy)
+    checkpoint(out, measured, null, policy, environment)
     console.log(`測定完了: ${name} showMs=${measured.at(-1).showMs}`)
   }
   console.log('測定開始: friends-2000')
   measured.push(await measureMedian(() => measureStress(browser, target)))
-  checkpoint(out, measured, null, policy)
-  return { budget, updateBaseline, out, measured, policy }
+  environment.finishedAt=new Date().toISOString()
+  checkpoint(out, measured, null, policy, environment)
+  return { budget, updateBaseline, out, measured, policy, environment }
   } catch (error) {
-    checkpoint(out, measured, error.message, policy)
+    checkpoint(out, measured, error.message, policy, environment)
     throw error
   } finally {
     await browser?.close()
@@ -469,7 +480,7 @@ async function main() {
 export { expandFriends, judge, parseArgs, targetMisses }
 
 if (isMain) {
-  const { budget, updateBaseline, out, measured, policy } = await main()
+  const { budget, updateBaseline, out, measured, policy, environment } = await main()
 
   if (updateBaseline) {
     const next = {
@@ -490,7 +501,7 @@ if (isMain) {
   }
 
   if (out) {
-    checkpoint(out, measured, null, policy)
+    checkpoint(out, measured, null, policy, environment)
   }
 
   console.log('name showMs lcpMs pressMs longTaskMs jsBytes')

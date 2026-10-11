@@ -642,13 +642,12 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
 
   useEffect(() => { void load() }, [load])
 
-  const generate = async (mode: 'new' | 'shorter' | 'polite') => {
+  const generate = async () => {
     setBusy('generate')
     setActionError('')
     setSaved('')
     try {
-      // 書き換えは、保存前に画面で直した内容をそのまま元にする。
-      const response = await restaurantGoogleApi.generateDraft(accountId, reviewId, mode, text)
+      const response = await restaurantGoogleApi.generateDraft(accountId, reviewId)
       setText(response.draft)
       setAiGenerated(true)
     } catch (err) {
@@ -784,12 +783,12 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
                 <h2 className="text-base font-bold">{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</h2>
                 <StatusBadge tone="neutral">未公開</StatusBadge>
                 <span className="grow" />
-                {data.aiAvailable ? <Button size="field" onClick={() => void generate('new')} disabled={busy !== null} data-gb3-action="generate-draft" busy={busy === 'generate'} busyLabel="作成中…"><Sparkles size={14} />{text ? '作り直す' : 'AIで下書きを作る'}</Button> : null}
+                {data.aiAvailable ? <Button size="field" onClick={() => void generate()} disabled={busy !== null} data-gb3-action="generate-draft" busy={busy === 'generate'} busyLabel="作成中…"><Sparkles size={14} />{text ? '作り直す' : 'AIで下書きを作る'}</Button> : null}
               </div>
               {aiGenerated ? <NoteBar className="mb-3">AIが作成した文章です。事実・表現を確認し、必要に応じて修正してください。</NoteBar> : null}
               <TextArea value={text} onChange={(event) => { setText(event.target.value); setSaved('') }} rows={12} placeholder="返信文を入力するか、AIで下書きを作ります。" aria-label="返信文" invalid={textLength > 4096} />
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {data.aiAvailable ? <><Button size="field" onClick={() => void generate('shorter')} disabled={busy !== null || !text} data-gb3-action="shorten-draft">短くする</Button><Button size="field" onClick={() => void generate('polite')} disabled={busy !== null || !text} data-gb3-action="polish-draft">丁寧にする</Button></> : <span className="text-ink-faint text-xs">この環境ではAI下書きは使えません。</span>}
+                {data.aiAvailable ? null : <span className="text-ink-faint text-xs">この環境ではAI下書きは使えません。</span>}
                 <span className="grow" />
                 <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{formatNumber(textLength)} / 4,096</span>
               </div>

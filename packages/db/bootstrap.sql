@@ -6404,6 +6404,138 @@ CREATE TABLE rt_customer_notice_outbox (
  UNIQUE(reservation_id,customer_version)
 );
 
+CREATE TABLE rt_delivery_dispatches (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  service TEXT NOT NULL CHECK (service IN ('ubereats','demaecan','rocketnow')),
+  action TEXT NOT NULL CHECK (action IN (
+    'accept','reject','ready','handed_over','cancel',
+    'menu_sold_out','menu_resume','intake_stop','intake_resume'
+  )),
+  target_kind TEXT NOT NULL CHECK (target_kind IN ('order','menu_item','service')),
+  target_id TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','succeeded','failed','retryable_failed','exhausted')),
+  -- 失敗は分類済みの符号だけを残す。サービスから返った自由文・本文・例外は保存しない。
+  error_code TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_attempt_at INTEGER,
+  requested_at INTEGER NOT NULL,
+  completed_at INTEGER,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE rt_delivery_events (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  service TEXT NOT NULL CHECK (service IN ('ubereats','demaecan','rocketnow')),
+  external_event_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  external_order_id TEXT,
+  status TEXT NOT NULL DEFAULT 'received'
+    CHECK (status IN ('received','processed','failed','retryable_failed','ignored')),
+  -- 共通形式へ変換する前の本文。再処理に使う。サービスから返った自由文のエラー本文は入れない。
+  payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+  error_code TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  received_at INTEGER NOT NULL,
+  processed_at INTEGER,
+  version INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (service, external_event_id)
+);
+
+CREATE TABLE rt_delivery_menu_items (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT,
+  price INTEGER NOT NULL DEFAULT 0 CHECK (price >= 0),
+  sold_out INTEGER NOT NULL DEFAULT 0 CHECK (sold_out IN (0,1)),
+  sold_out_at INTEGER,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  -- サービスごとの商品ID（{"ubereats":"...","demaecan":"..."}）。未連携は入れない。
+  external_item_ids_json TEXT
+    CHECK (external_item_ids_json IS NULL OR json_valid(external_item_ids_json)),
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE (store_id, name)
+);
+
+CREATE TABLE rt_delivery_order_items (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0),
+  name TEXT NOT NULL,
+  -- 「特製タレ増量（無料）」のような補足行。無ければ NULL。
+  note TEXT,
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  amount INTEGER NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  created_at INTEGER NOT NULL,
+  UNIQUE (order_id, position)
+);
+
+CREATE TABLE rt_delivery_orders (
+  id TEXT PRIMARY KEY,
+  -- 店舗は account_id → rt_stores.line_account_id と統括で引く。組織IDだけで信用しない。
+  account_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  service TEXT NOT NULL CHECK (service IN ('ubereats','demaecan','rocketnow')),
+  -- サービス側の注文ID。再送・重複受信をここで吸収する。
+  external_order_id TEXT NOT NULL,
+  -- 画面に出す注文番号（#UE-1042 など）。桁揃えはサービスごとに違うため文字列で持つ。
+  order_number TEXT NOT NULL,
+  -- 新着 → 調理中 → 準備完了 → 受け渡し済み。キャンセル・拒否は終端。
+  status TEXT NOT NULL DEFAULT 'new'
+    CHECK (status IN ('new','cooking','ready','handed_over','canceled','rejected')),
+  total_amount INTEGER NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
+  currency TEXT NOT NULL DEFAULT 'JPY',
+  item_count INTEGER NOT NULL DEFAULT 0 CHECK (item_count >= 0),
+  -- 受け取り情報（D-2）。「配達（Uber Eats 配達員）」のような表示文をそのまま持つ。
+  pickup_method TEXT,
+  wanted_at INTEGER,
+  customer_note TEXT,
+  -- 急ぎ度はバックエンドだけで判定する。画面には結果と理由だけを出す（判定の仕組み名は出さない）。
+  urgency TEXT NOT NULL DEFAULT 'normal' CHECK (urgency IN ('urgent','normal','watch')),
+  urgency_reason TEXT,
+  urgency_computed_at INTEGER,
+  -- キャンセルは理由と発生元を残す。取り消せない操作なので履歴から消さない。
+  cancel_reason_code TEXT,
+  canceled_by TEXT CHECK (canceled_by IS NULL OR canceled_by IN ('store','customer','service')),
+  received_at INTEGER NOT NULL,
+  accepted_at INTEGER,
+  ready_at INTEGER,
+  handed_over_at INTEGER,
+  canceled_at INTEGER,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE (service, external_order_id)
+);
+
+CREATE TABLE rt_delivery_service_states (
+  account_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  service TEXT NOT NULL CHECK (service IN ('ubereats','demaecan','rocketnow')),
+  connection_status TEXT NOT NULL DEFAULT 'disconnected'
+    CHECK (connection_status IN ('connected','disconnected','error')),
+  intake_status TEXT NOT NULL DEFAULT 'open' CHECK (intake_status IN ('open','stopped')),
+  -- 受付停止の自動再開時刻（30分・60分・90分・本日中）。停止していない間は NULL。
+  stop_until INTEGER,
+  stop_requested_at INTEGER,
+  stop_requested_by TEXT,
+  resumed_at INTEGER,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (store_id, service),
+  CHECK (intake_status = 'stopped' OR stop_until IS NULL)
+);
+
 CREATE TABLE rt_email_digests (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -6874,6 +7006,17 @@ CREATE TABLE rt_reservation_links (
  created_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
 
+CREATE TABLE rt_reservation_referrals (
+ id TEXT PRIMARY KEY,
+ source_store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+ target_store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+ source_reservation_id TEXT REFERENCES rt_reservations(id) ON DELETE SET NULL,
+ source_waitlist_id TEXT REFERENCES rt_seat_waitlist(id) ON DELETE SET NULL,
+ offered_at TEXT NOT NULL DEFAULT(datetime('now')),
+ accepted_at TEXT,
+ CHECK(source_store_id<>target_store_id)
+);
+
 CREATE TABLE rt_reservation_table_links (
  reservation_id TEXT NOT NULL REFERENCES rt_reservations(id) ON DELETE CASCADE,
  table_id TEXT NOT NULL REFERENCES rt_tables(id), PRIMARY KEY(reservation_id,table_id)
@@ -6977,6 +7120,20 @@ CREATE TABLE rt_store_followup_templates (
  approval_id TEXT REFERENCES rt_approval_requests(id)
 );
 
+CREATE TABLE rt_store_group_members (
+ group_id TEXT NOT NULL REFERENCES rt_store_groups(id) ON DELETE CASCADE,
+ store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+ referral_enabled INTEGER NOT NULL DEFAULT 0 CHECK(referral_enabled IN(0,1)),
+ max_distance REAL NOT NULL DEFAULT 5 CHECK(max_distance>=0 AND max_distance<=1000),
+ PRIMARY KEY(group_id,store_id)
+);
+
+CREATE TABLE rt_store_groups (
+ id TEXT PRIMARY KEY,
+ organization_id TEXT NOT NULL REFERENCES rt_organizations(id) ON DELETE CASCADE,
+ name TEXT NOT NULL
+);
+
 CREATE TABLE rt_store_media_links (
  store_id TEXT NOT NULL REFERENCES rt_stores(id), media_id TEXT NOT NULL REFERENCES rt_media(id),
  page_url TEXT, login_url TEXT, close_on_booking INTEGER NOT NULL DEFAULT 0 CHECK(close_on_booking IN (0,1)),
@@ -6996,7 +7153,7 @@ CREATE TABLE rt_stores (
   line_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (line_status IN ('connected', 'warning', 'error', 'unconfigured')),
   google_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (google_status IN ('connected', 'warning', 'error', 'unconfigured')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id), latitude REAL CHECK(latitude IS NULL OR latitude BETWEEN -90 AND 90), longitude REAL CHECK(longitude IS NULL OR longitude BETWEEN -180 AND 180),
   UNIQUE(organization_id, code)
 );
 
@@ -10471,6 +10628,39 @@ CREATE INDEX rt_closures_store_dates ON rt_closures(store_id,start_date,end_date
 
 CREATE INDEX rt_confirmation_reservation ON rt_reservation_confirmations(reservation_id,reservation_version);
 
+CREATE INDEX rt_delivery_dispatches_due
+  ON rt_delivery_dispatches(status, next_attempt_at);
+
+CREATE INDEX rt_delivery_dispatches_target
+  ON rt_delivery_dispatches(target_kind, target_id, requested_at);
+
+CREATE INDEX rt_delivery_events_account
+  ON rt_delivery_events(account_id, received_at);
+
+CREATE INDEX rt_delivery_events_status
+  ON rt_delivery_events(status, received_at);
+
+CREATE INDEX rt_delivery_menu_items_sold_out
+  ON rt_delivery_menu_items(store_id, sold_out, sort_order);
+
+CREATE INDEX rt_delivery_menu_items_store
+  ON rt_delivery_menu_items(store_id, sort_order);
+
+CREATE INDEX rt_delivery_order_items_order
+  ON rt_delivery_order_items(order_id, position);
+
+CREATE INDEX rt_delivery_orders_store_received
+  ON rt_delivery_orders(store_id, received_at);
+
+CREATE INDEX rt_delivery_orders_store_service_received
+  ON rt_delivery_orders(store_id, service, received_at);
+
+CREATE INDEX rt_delivery_orders_store_status
+  ON rt_delivery_orders(store_id, status, received_at);
+
+CREATE INDEX rt_delivery_service_states_due
+  ON rt_delivery_service_states(intake_status, stop_until);
+
 CREATE UNIQUE INDEX rt_departure_one_active ON rt_reservation_departures(reservation_id) WHERE undone_at IS NULL;
 
 CREATE INDEX rt_event_pending ON rt_reservation_event_receipts(status,next_attempt_at);
@@ -11107,6 +11297,14 @@ CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.s
 CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
 CREATE TRIGGER rt_notice_booking_change AFTER UPDATE OF starts_at,ends_at,guest_count,status ON rt_reservations WHEN NEW.starts_at IS NOT OLD.starts_at OR NEW.ends_at IS NOT OLD.ends_at OR NEW.guest_count IS NOT OLD.guest_count OR (NEW.status IN('cancelled','no_show') AND NEW.status IS NOT OLD.status) BEGIN UPDATE rt_customer_notice_outbox SET valid=0 WHERE reservation_id=NEW.id AND sent_at IS NULL; END;
+
+CREATE TRIGGER rt_referral_member_org BEFORE INSERT ON rt_store_group_members
+WHEN NOT EXISTS(SELECT 1 FROM rt_store_groups g JOIN rt_stores s ON s.organization_id=g.organization_id WHERE g.id=NEW.group_id AND s.id=NEW.store_id)
+BEGIN SELECT RAISE(ABORT,'referral_organization_conflict'); END;
+
+CREATE TRIGGER rt_referral_member_org_update BEFORE UPDATE ON rt_store_group_members
+WHEN NOT EXISTS(SELECT 1 FROM rt_store_groups g JOIN rt_stores s ON s.organization_id=g.organization_id WHERE g.id=NEW.group_id AND s.id=NEW.store_id)
+BEGIN SELECT RAISE(ABORT,'referral_organization_conflict'); END;
 
 CREATE TRIGGER rt_reservation_event_insert AFTER INSERT ON rt_reservations WHEN NEW.status IN('confirmed','seated','visited') BEGIN INSERT OR IGNORE INTO rt_reservation_events(id,reservation_id,store_id,event_type,reservation_version,occurred_at,request_id,line_account_id,friend_id,payload_json) SELECT 'rt:'||NEW.id||':'||NEW.customer_version||':restaurant.reservation.created',NEW.id,NEW.store_id,'restaurant.reservation.created',NEW.customer_version,strftime('%Y-%m-%dT%H:%M:%fZ','now'),NEW.id||':'||NEW.customer_version,s.line_account_id, (SELECT id FROM friends WHERE line_account_id=s.line_account_id AND line_user_id=NEW.line_uid), json_object('reservationId',NEW.id,'storeId',NEW.store_id,'startsAt',NEW.starts_at,'endsAt',NEW.ends_at,'status',NEW.status,'guestCount',NEW.guest_count) FROM rt_stores s WHERE s.id=NEW.store_id; END;
 

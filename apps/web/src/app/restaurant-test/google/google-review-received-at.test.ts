@@ -29,10 +29,13 @@ describe('口コミの受信日時', () => {
   })
 })
 
-describe('書き換えボタンの元の文章', () => {
-  it('短くする・丁寧にするは保存前の画面上の文章を送る', () => {
-    expect(page).toContain('restaurantGoogleApi.generateDraft(accountId, reviewId, mode, text)')
-    expect(api).toContain("mode: 'new' | 'shorter' | 'polite', baseText?: string")
-    expect(api).toContain("mode === 'new' ? { mode } : { mode, baseText: baseText ?? '' }")
+describe('AIで下書きを作るボタン', () => {
+  it('押すだけで作る。長さや調子を選ばせる口は持たない', () => {
+    expect(page).toContain('restaurantGoogleApi.generateDraft(accountId, reviewId)')
+    expect(api).toContain('generateDraft: (accountId: string, id: string)')
+    for (const gone of ['shorter', 'polite', 'baseText', '短くする', '丁寧にする']) {
+      expect(api).not.toContain(gone)
+      expect(page).not.toContain(gone)
+    }
   })
 })

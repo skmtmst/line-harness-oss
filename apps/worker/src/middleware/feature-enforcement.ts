@@ -146,6 +146,13 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   // マイペット・健康日記は LINE 側だけで完結する然の機能。投稿（photo_review）と同じ束で止める。
   feature('/api/nen/pets', 'photo_review'),
   feature('/api/nen/health', 'photo_review'),
+  // デリバリー受注の通知受け口。担当者の認証も統括の判定も通らないため、
+  // 機能の入れ/切りでは止めない。route 内でサービスごとの合言葉を照合する。
+  exempt(
+    '/api/restaurant-test/delivery/webhooks',
+    'public',
+    '署名検証する各デリバリーサービスからの通知受信',
+  ),
   feature('/api/restaurant-test', 'restaurant_test'),
   feature('/api/visit-stamps', 'visit_stamps'),
 

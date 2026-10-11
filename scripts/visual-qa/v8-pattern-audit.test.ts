@@ -70,6 +70,24 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('LIFFの正の手順のimportだけを認め、同名の自作と隣の違反は止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/liff/src/pages/seat/reserve.tsx'
+    put(root, 'apps/liff/src/components/ui/Stepper.tsx', 'export default function Stepper() { return null }')
+    const audit = () => run({ code: root, only: ['steps', 'field-error', 'date-time', 'toggle'] })
+    put(root, rel, "import Stepper from '../../components/ui/Stepper.js';\nexport const P = () => <Stepper appearance=\"restaurant\" steps={[]} current={0} />")
+    expect(audit().code.a.steps).toEqual([])
+    put(root, rel, 'function Stepper() { return null }; export const P = () => <Stepper />')
+    expect(audit().code.a.steps.map((h: { signal: string }) => h.signal)).toEqual(['old-stepper'])
+    put(root, rel, "import Stepper from './Stepper.js';\nexport const P = () => <Stepper />")
+    expect(audit().code.a.steps.map((h: { signal: string }) => h.signal)).toEqual(['old-stepper'])
+    put(root, rel, "import Stepper from '../../components/ui/Stepper.js';\nexport const P = () => <><Stepper /><p role=\"alert\">失敗</p><input type=\"date\" /><div role=\"radiogroup\" /></>")
+    const result = audit()
+    expect(result.code.a['field-error'].some((h: { signal: string }) => h.signal === 'raw-alert')).toBe(true)
+    expect(result.code.a['date-time'].some((h: { signal: string }) => h.signal === 'native')).toBe(true)
+    expect(result.code.a.toggle.some((h: { signal: string }) => h.signal === 'switch')).toBe(true)
+  })
+
   it('共通のFieldとFormFieldを認識しても、隣の手書きエラーは止める', () => {
     const { root } = fixture()
     const rel = 'apps/web/src/v8/demo/error.tsx'
