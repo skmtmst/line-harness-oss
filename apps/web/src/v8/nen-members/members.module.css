@@ -502,40 +502,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rankChip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-rest3-mb-dot-gap);
-  height: var(--tpl-mb-chip-h);
-  padding: var(--tpl-mb-chip-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-shell);
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-mb-text-11);
-  font-weight: 500;
-}
-.rankDot {
-  flex-shrink: 0;
-  width: var(--tpl-rest3-mb-dot);
-  height: var(--tpl-rest3-mb-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-.rankChip[data-tone='top'] {
-  background: var(--color-ink);
-  color: var(--color-on-accent);
-}
-.rankChip[data-tone='second'] {
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-}
-.rankChip[data-tone='base'] {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-}
-.rankChip[data-tone='middle'] {
-  color: var(--color-ink-secondary);
-}
 .cellText {
   display: block;
   overflow: hidden;
