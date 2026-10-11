@@ -532,7 +532,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [pendingTabCount, setPendingTabCount] = useState<number | null>(null)
 
   /* 手順③ */
-  const [audience, setAudience] = useState<'all' | 'targeted'>('all')
+  const [audience, setAudience] = useState<'all' | 'targeted' | 'none'>('all')
   const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
   const [targetingPriority, setTargetingPriority] = useState(0)
   const [defaultOpen, setDefaultOpen] = useState(true)
@@ -581,8 +581,10 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /** 登録メディアから選ぶ画像の入れ先（①のタブの順）。 */
   const [imagePickTarget, setImagePickTarget] = useState(0)
   const [done, setDone] = useState<'published' | 'scheduled' | null>(null)
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false)
 
   const accountId = selectedAccount?.id ?? null
+  useEffect(() => { setPublishConfirmOpen(false) }, [accountId, group?.id])
   candidateAccountRef.current = accountId
   const pendingMediaAccountRef = useRef(accountId)
   useEffect(() => {
@@ -880,14 +882,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setChatBarText(g.chatBarText)
     setFolderId(g.folderId ?? '')
     setDefaultOpen(g.defaultOpen)
-    setAudience(g.targetingEnabled ? 'targeted' : 'all')
+    setAudience(g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? 'targeted' : 'none')
     setTargetingCondition(parseStoredCondition(g.targetingCondition))
     setTargetingPriority(g.targetingPriority)
     /*
      * 基準署名は draftSignature と同じ投影で組み立てる（audience の写像・
      * 条件の prune が違うと、保存直後なのに未保存と出る）。
      */
-    const hydratedAudience = g.targetingEnabled ? 'targeted' : 'all'
+    const hydratedAudience = g.targetingEnabled ? 'targeted' : g.isDefaultForAll ? 'all' : host ? 'targeted' : 'none'
     const hydratedCondition = parseStoredCondition(g.targetingCondition)
     setBaselineSignature(
       JSON.stringify({
@@ -1594,7 +1596,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       setNotice(
         audience === 'all'
           ? 'LINEへの登録が終わり、すべての友だちの既定メニューになりました。'
-          : 'LINEへの登録が終わりました。条件に当てはまる人の画面には、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。',
+          : audience === 'none'
+            ? 'LINEへの登録が終わりました。この操作だけでは、友だちの画面は変わりません。出す相手は一覧の「表示先」から操作してください。'
+            : 'LINEへの登録が終わりました。条件に当てはまる人の画面には、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。',
       )
       notifyToast(
         audience === 'all'
@@ -1652,7 +1656,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       void scheduleSubmit(input)
       return
     }
-    await handlePublish()
+    setPublishConfirmOpen(true)
   }
 
   /* ---------- 派生値 ---------- */
@@ -1730,6 +1734,27 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const conditionUnsaved = Boolean(group) && JSON.stringify(audience === 'targeted' ? targetingCondition : null)
     !== JSON.stringify(group?.targetingEnabled ? parseStoredCondition(group.targetingCondition) : null)
   const conditionCount = targetingCondition?.rules.length ?? 0
+  const nowNote = audience === 'all'
+    ? '保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります'
+    : audience === 'none'
+      ? 'LINEへの登録だけで、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください'
+      : conditionEmpty
+        ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください'
+        : '保存するとLINEに登録され、条件に当てはまる人の画面に出来事のタイミングで順次出ます'
+  const publishEffectNote = audience === 'all'
+    ? '個別に指定した人を除く、すべての友だちのトーク画面に出ます。既定のメニューが入れ替わります。'
+    : audience === 'none'
+      ? 'LINEへの登録だけでは、友だちのトーク画面は変わりません。「表示先」で出す相手を決めてください。'
+      : conditionEmpty
+        ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
+        : '条件に当てはまる人の画面は、その人に関係する出来事のタイミングで順次切り替わります。すぐ全員に出るわけではありません。'
+  const publishConfirmNote = audience === 'all'
+    ? '個別に指定した人を除く、すべての友だちの既定メニューになります。'
+    : audience === 'none'
+      ? 'この操作だけでは、友だちのトーク画面には出ません。出すには登録後に一覧の「表示先」から操作してください。'
+      : conditionEmpty
+        ? 'いまの条件では誰にも出ません（今0人）。条件を決めてから出してください。'
+        : '条件に当てはまる人の画面に、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
   /*
    * 面の数：作成前は選んだ面の分けかたの数、作成後は全ページの面の合計。
    * 作成前の面はまだ動きが未設定（0設定済み）なので、分けかたの枚数だけ数える。
@@ -2003,6 +2028,15 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </div>
       </Dialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
+      <ConfirmDialog
+        open={publishConfirmOpen}
+        title="公開の確認"
+        description={publishConfirmNote}
+        confirmLabel="公開する"
+        busy={publishing || saving}
+        onConfirm={() => { setPublishConfirmOpen(false); void handlePublish() }}
+        onCancel={() => setPublishConfirmOpen(false)}
+      />
 
       {/* ★V8 `r8dGXT`「違いを比べる」の窓。最新と入力中の設定の要約を比べる。 */}
       <Dialog
@@ -2423,6 +2457,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   : 'いま既定のメニューはありません。'}
               </span>
             </div>
+          ) : audience === 'none' ? (
+            <p className={styles.cardNote}>このメニューはLINEへの登録だけです。出す相手は一覧の「表示先」で決めてください。</p>
           ) : (
             <div className={styles.field}>
               <span className={styles.fieldLabel}>どんな人に出すか</span>
@@ -2554,7 +2590,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               }}
               title="すぐ公開する"
               icon={<Zap aria-hidden="true" />}
-              note="確認が済んだらすぐLINEに出す"
+              note={<span title={nowNote}>確認が済んだらすぐLINEに出す</span>}
             />
             <RadioCard
               name="timing"
@@ -2563,7 +2599,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onChange={() => updatePublishPlan({ ...publishPlan, mode: endEnabled ? 'period' : 'scheduled' })}
               title="日時を決めて公開する"
               icon={<CalendarClock aria-hidden="true" />}
-              note="キャンペーンの始まりに合わせる"
+              note={<span title="指定した時刻にLINEへ登録する予約です。誰の画面に出るかは「公開すると何が変わるか」で確認してください">キャンペーンの始まりに合わせる</span>}
             />
           </RadioCardGroup></SaveErrorField>
           {timingIsScheduled ? (
@@ -2579,7 +2615,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           {/* 板 `F4gELj`：終わりを決めるは枠の箱。上の行に題とトグル、下の行に「日時 に終わり、［戻す先］に戻す」。オフのときは入力を無効化。 */}
           <div className={styles.endBox}>
             <div className={styles.endHead}>
-              <span className={styles.endTitle}>終わりを決める（任意）</span>
+              <span className={styles.endTitle} title="指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください">終わりを決める（任意）</span>
               <SaveErrorField names={["endEnabled","end_enabled"]}><SettingCheckbox
                 label="終わりを決める"
                 checked={endEnabled}
@@ -2682,12 +2718,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         {/* 板 `F4gELj`：案内の帯は段の外（左の直下）。 */}
         <div className={styles.infoBand}>
             <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
-            <span>
+            <span title={publishEffectNote}>
               {audience === 'all'
                 ? `公開すると、すべての友だちの既定のメニューが入れ替わります。`
-                : conditionEmpty
+                : audience === 'none'
+                  ? 'LINEへの登録だけでは、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください。'
+                  : conditionEmpty
                   ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
-                  : '公開すると、条件に当てはまる人にこのメニューが出ます。'}
+                  : '公開すると、条件に当てはまる人に出来事のタイミングで順次出ます。'}
               {targetPreview?.higherMenus && targetPreview.higherMenus.length > 0 && targetPreview.overlap?.value
                 ? `${targetPreview.higherMenus[0]}の${formatNumber(targetPreview.overlap.value)}人には、いままでどおり上のメニューが出ます。`
                 : ''}

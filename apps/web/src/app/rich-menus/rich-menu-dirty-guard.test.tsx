@@ -806,6 +806,9 @@ describe('公開入力の下書き（localStorage）', () => {
     fireEvent.click(screen.getByRole('button', { name: '公開する' }))
     await flush()
 
+    const dialog = await screen.findByRole('dialog', { name: '公開の確認' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '公開する' }))
+    await flush()
     expect(richMenuPublish).toHaveBeenCalled()
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
   })
@@ -844,17 +847,19 @@ describe('公開入力の下書き（localStorage）', () => {
  * 読めた。
  */
 describe('R204 公開すると何が変わるか（設定に合わせた説明）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   async function renderPublish(group: typeof GROUP) {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
   }
 
   test('全員の既定のときは「すべての友だちの画面に出る」と説明する', async () => {
     await renderPublish({ ...GROUP, isDefaultForAll: true })
-    expect(screen.getByText(/すべての友だちのトーク画面に出ます/)).toBeTruthy()
+    expect(screen.getByTitle(/すべての友だちのトーク画面に出ます/)).toBeTruthy()
     expect(screen.queryByText(/登録だけでは/)).toBeNull()
   })
 
@@ -864,22 +869,29 @@ describe('R204 公開すると何が変わるか（設定に合わせた説明�
       targetingEnabled: true,
       targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
     })
-    expect(screen.getByText(/順次切り替わります/)).toBeTruthy()
-    expect(screen.getByText(/すぐ全員に出るわけではありません/)).toBeTruthy()
+    expect(screen.getByTitle(/順次切り替わります/)).toBeTruthy()
+    expect(screen.getByTitle(/すぐ全員に出るわけではありません/)).toBeTruthy()
     expect(screen.queryByText(/すべての友だちのトーク画面に出ます/)).toBeNull()
   })
 
   test('対象設定なしなら「登録だけでは画面は変わらない」と説明する', async () => {
     await renderPublish(GROUP)
-    expect(screen.getByText(/LINEへの登録だけでは、友だちのトーク画面は変わりません/)).toBeTruthy()
-    expect(screen.getByText(/「表示先」で出す相手を決めてください/)).toBeTruthy()
+    expect(screen.getByTitle(/LINEへの登録だけでは、友だちのトーク画面は変わりません/)).toBeTruthy()
+    expect(screen.getByTitle(/「表示先」で出す相手を決めてください/)).toBeTruthy()
   })
 
   test('公開が終わると、設定に合った完了文が出る', async () => {
     await renderPublish(GROUP)
-    fireEvent.click(screen.getByText('この内容で公開する'))
+    fireEvent.click(screen.getAllByRole('button', { name: '見直す' })[1])
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '公開する' }))
+    await flush()
+    const dialog = await screen.findByRole('dialog', { name: '公開の確認' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '公開する' }))
     await flush()
     expect(richMenuPublish).toHaveBeenCalled()
+    expect(richMenuUpdate).toHaveBeenCalledWith('grp-1', expect.objectContaining({ isDefaultForAll: false, targetingEnabled: false }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '公開の確認' })).toBeNull())
     expect(screen.getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
     // 対象設定なしなのに「全員の画面が変わった」とは言わない
     expect(screen.queryByText(/既定メニューになりました/)).toBeNull()
@@ -891,19 +903,29 @@ describe('R204 公開すると何が変わるか（設定に合わせた説明�
  * 全設定共通の「出ません／友だちに表示を実行」は、全員既定・条件ありと矛盾する。
  */
 describe('R204 公開の確認窓（設定に合わせた説明）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   async function openPublishConfirm(group: typeof GROUP) {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<CurrentRichMenuEdit />)
     await flush()
-    fireEvent.click(screen.getByText('LINE に登録する'))
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
+    fireEvent.click(screen.getAllByRole('button', { name: '見直す' })[1])
     await flush()
+    fireEvent.click(screen.getByRole('button', { name: '公開する' }))
+    await flush()
+    expect(richMenuPublish).not.toHaveBeenCalled()
   }
 
   test('全員の既定なら「個別指定を除く全友だち」と言う', async () => {
     await openPublishConfirm({ ...GROUP, isDefaultForAll: true })
-    expect(screen.getByText(/個別に指定した人を除く/)).toBeTruthy()
-    expect(screen.queryByText(/友だちのトーク画面には出ません/)).toBeNull()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(within(dialog).getByText(/個別に指定した人を除く/)).toBeTruthy()
+    expect(within(dialog).queryByText(/友だちのトーク画面には出ません/)).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '公開の確認' })).toBeNull())
+    expect(richMenuPublish).not.toHaveBeenCalled()
   })
 
   test('条件ありなら「出来事で順次」と言う', async () => {
@@ -912,20 +934,23 @@ describe('R204 公開の確認窓（設定に合わせた説明）', () => {
       targetingEnabled: true,
       targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
     })
-    expect(screen.getByText(/順次出ます/)).toBeTruthy()
-    expect(screen.queryByText(/友だちのトーク画面には出ません/)).toBeNull()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(within(dialog).getByText(/順次出ます/)).toBeTruthy()
+    expect(within(dialog).queryByText(/友だちのトーク画面には出ません/)).toBeNull()
   })
 
   test('条件が空なら「今0人」と言い、直し方も添える', async () => {
     await openPublishConfirm({ ...GROUP, targetingEnabled: true, targetingCondition: null })
-    expect(screen.getByText(/今0人/)).toBeTruthy()
-    expect(screen.queryByText(/すべての友だちの既定メニューになります/)).toBeNull()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(within(dialog).getByText(/今0人/)).toBeTruthy()
+    expect(within(dialog).queryByText(/すべての友だちの既定メニューになります/)).toBeNull()
   })
 
   test('登録のみなら「出ません／表示先で操作」と言う', async () => {
     await openPublishConfirm(GROUP)
-    expect(screen.getByText(/この操作だけでは、友だちのトーク画面には出ません/)).toBeTruthy()
-    expect(screen.getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
+    const dialog = screen.getByRole('dialog', { name: '公開の確認' })
+    expect(within(dialog).getByText(/この操作だけでは、友だちのトーク画面には出ません/)).toBeTruthy()
+    expect(within(dialog).getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
   })
 })
 
@@ -935,17 +960,19 @@ describe('R204 公開の確認窓（設定に合わせた説明）', () => {
  * 条件あり（順次）・条件空（今0人）・登録のみ（登録だけ）と矛盾する。
  */
 describe('R204 「いますぐ出す」の注記（設定に合わせた説明）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   async function renderPublish(group: typeof GROUP) {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
   }
 
   test('全員の既定なら「個別指定を除く全友だちにすぐ出る」と言う', async () => {
     await renderPublish({ ...GROUP, isDefaultForAll: true })
-    expect(screen.getByText('保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります')).toBeTruthy()
+    expect(screen.getByTitle('保存したらすぐ、個別に指定した人を除くすべての友だちの既定メニューになります')).toBeTruthy()
     expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
   })
 
@@ -955,19 +982,19 @@ describe('R204 「いますぐ出す」の注記（設定に合わせた説明�
       targetingEnabled: true,
       targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
     })
-    expect(screen.getByText(/条件に当てはまる人の画面に出来事のタイミングで順次出ます/)).toBeTruthy()
+    expect(screen.getByTitle(/条件に当てはまる人の画面に出来事のタイミングで順次出ます/)).toBeTruthy()
     expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
   })
 
   test('条件が空なら「今0人」と言う', async () => {
     await renderPublish({ ...GROUP, targetingEnabled: true, targetingCondition: null })
-    expect(screen.getByText(/いまの条件では誰にも出ません（今0人）/)).toBeTruthy()
+    expect(screen.getByTitle(/いまの条件では誰にも出ません（今0人）/)).toBeTruthy()
     expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
   })
 
   test('登録のみなら「登録だけでは画面は変わらない」と言う', async () => {
     await renderPublish(GROUP)
-    expect(screen.getByText(/LINEへの登録だけで、友だちの画面は変わりません/)).toBeTruthy()
+    expect(screen.getByTitle(/LINEへの登録だけで、友だちの画面は変わりません/)).toBeTruthy()
     expect(screen.queryByText('保存したらすぐ、条件に当てはまる人のトーク画面に出ます')).toBeNull()
   })
 })
@@ -978,6 +1005,8 @@ describe('R204 「いますぐ出す」の注記（設定に合わせた説明�
  * 期間を万能に安全とも言わない。新API・期間機能の追加はしない。
  */
 describe('R204 日時・期間の注記（自動表示を断定しない）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const SCHEDULED_NEW = '指定した時刻にLINEへ登録する予約です。誰の画面に出るかは「公開すると何が変わるか」で確認してください'
   const PERIOD_NEW = '指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください'
   const SCHEDULED_OLD = 'その時刻になったら自動で出ます。それまでは今のメニューのままです'
@@ -986,15 +1015,15 @@ describe('R204 日時・期間の注記（自動表示を断定しない）', ()
   async function renderPublish(group: typeof GROUP) {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
   }
 
   async function expectReservationNotes(group: typeof GROUP) {
     await renderPublish(group)
-    expect(screen.getByText(SCHEDULED_NEW)).toBeTruthy()
-    expect(screen.getByText(PERIOD_NEW)).toBeTruthy()
+    expect(screen.getByTitle(SCHEDULED_NEW)).toBeTruthy()
+    expect(screen.getByTitle(PERIOD_NEW)).toBeTruthy()
     expect(screen.queryByText(SCHEDULED_OLD)).toBeNull()
     expect(screen.queryByText(PERIOD_OLD)).toBeNull()
   }
