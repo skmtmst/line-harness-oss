@@ -22,7 +22,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: AttributionSection } = await import('./attribution-view')
+const { default: AttributionSection } = await import('@/v8/affiliates/attribution-view')
 
 const VIEW = {
   conversionEventId: 'ev-1',

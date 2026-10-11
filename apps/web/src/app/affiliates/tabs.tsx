@@ -48,8 +48,8 @@ import {
   duplicateFriendNameText,
   personNameText,
 } from './affiliate-display'
-import { AffiliateArchiveDialog } from './action-dialogs'
-import AttributionSection from './attribution-view'
+import { AffiliateArchiveDialog } from '@/v8/affiliates/dialogs'
+import AttributionSection from '@/v8/affiliates/attribution-view'
 import OfferTermsDialog, {
   EMPTY_TERMS,
   OfferTermsFields,
@@ -57,7 +57,7 @@ import OfferTermsDialog, {
   toDateInput,
   type OfferTermsFieldValues,
   type ParsedOfferTerms,
-} from './offer-terms'
+} from '@/v8/affiliates/offer-terms'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Toggle from '@/components/shared/toggle'

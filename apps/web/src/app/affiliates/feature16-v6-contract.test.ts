@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 const TABS = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const NEW_AFFILIATE = readFileSync(new URL('./new-affiliate-v8.tsx', import.meta.url), 'utf8')
-const ACTION_DIALOGS = readFileSync(new URL('./action-dialogs.tsx', import.meta.url), 'utf8')
+const ACTION_DIALOGS = readFileSync(new URL('../../v8/affiliates/dialogs.tsx', import.meta.url), 'utf8')
 
 function section(source: string, start: string, end: string): string {
   const from = source.indexOf(start)
@@ -58,7 +58,7 @@ describe('機能16 V6の確認画面', () => {
     expect(ACTION_DIALOGS).toContain('api.affiliates.archiveImpact')
     expect(ACTION_DIALOGS).toContain('api.affiliates.archive')
     expect(ACTION_DIALOGS).toContain('過去の成果・報酬・支払いの記録は消えません')
-    expect(ACTION_DIALOGS).toContain('確認のため「{target?.name}」と打ってください')
+    expect(ACTION_DIALOGS).toContain("label={`確認のため「${target?.name ?? ''}」と打ってください`}")
   })
 
   it('影響確認は読込・通常・空・失敗を分ける', () => {

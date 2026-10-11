@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAYMENT = readFileSync(new URL('./payment-tab.tsx', import.meta.url), 'utf8')
-const DIALOGS = readFileSync(new URL('./action-dialogs.tsx', import.meta.url), 'utf8')
+const DIALOGS = readFileSync(new URL('../../v8/affiliates/dialogs.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const PAYOUTS = readFileSync(new URL('../../../../worker/src/routes/affiliate-payouts.ts', import.meta.url), 'utf8')
 
@@ -55,7 +55,7 @@ describe('V6 支払いの追記台帳契約', () => {
   })
 
   it('人ごとの内訳は実プレビューを読み、締め期間と登録状態を重ねる', () => {
-    expect(DIALOGS).toContain('data-design-node="GqFTV"')
+    expect(DIALOGS).toContain('designNode="GqFTV"')
     expect(DIALOGS).toContain('api.affiliates.paymentPreview')
     expect(DIALOGS).toContain('api.affiliates.confirmPayment')
     expect(DIALOGS).toContain('periodTo ?? preview.closeDate')

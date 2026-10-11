@@ -30,7 +30,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { AffiliateArchiveDialog } = await import('./action-dialogs')
+const { AffiliateArchiveDialog } = await import('@/v8/affiliates/dialogs')
 const { ApprovalQueue } = await import('./tabs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -78,9 +78,9 @@ describe('R291 停止前の確認は対象の明細を開く', () => {
     expect(links).toHaveLength(3)
     const hrefs = links.map((link) => (link as HTMLAnchorElement).getAttribute('href'))
     // 承認待ちは成果承認タブ＋対象紹介者。成果地点へ迷い込まない。
-    expect(hrefs).toContain('/conversions?tab=approvals&affiliate=aff-a')
+    expect(hrefs).toContain('/affiliates?tab=approvals&affiliate=aff-a')
     // リンクは対象紹介者の内訳。案件一覧へ迷い込まない。
-    expect(hrefs).toContain('/conversions?tab=affiliates&affiliate=aff-a')
+    expect(hrefs).toContain('/affiliates?affiliate=aff-a')
     for (const href of hrefs) {
       expect(href ?? '').not.toBe('/conversions')
     }
@@ -113,5 +113,20 @@ describe('R291 停止前の確認は対象の明細を開く', () => {
     })
     await waitFor(() => expect(screen.queryByText('佐藤')).not.toBeNull())
     expect(screen.queryByText('田中')).not.toBeNull()
+  })
+
+  test('アーカイブは対象者名を説明し、名前が一致するまで確定できない', async () => {
+    const onChanged = vi.fn()
+    render(<AffiliateArchiveDialog target={{ id: 'aff-a', name: '候補A' }} onClose={() => {}} onChanged={onChanged} />)
+    fireEvent.click(await screen.findByRole('radio', { name: /このままアーカイブする/ }))
+    const confirm = screen.getByRole('button', { name: 'アーカイブする' }) as HTMLButtonElement
+    const input = screen.getByRole('textbox', { name: '確認のため「候補A」と打ってください' })
+    expect(confirm.disabled).toBe(true)
+    fireEvent.change(input, { target: { value: '別の人' } })
+    expect(confirm.disabled).toBe(true)
+    fireEvent.change(input, { target: { value: '候補A' } })
+    expect(confirm.disabled).toBe(false)
+    fireEvent.click(confirm)
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1))
   })
 })

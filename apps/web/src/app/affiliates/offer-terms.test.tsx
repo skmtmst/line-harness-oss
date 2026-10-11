@@ -20,8 +20,8 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: OfferTermsDialog } = await import('./offer-terms')
-const { parseOfferTermsInput } = await import('./offer-terms')
+const { default: OfferTermsDialog } = await import('@/v8/affiliates/offer-terms')
+const { parseOfferTermsInput } = await import('@/v8/affiliates/offer-terms')
 
 const OFFER = {
   id: 'off-1',
@@ -106,17 +106,17 @@ describe('OfferTermsDialog', () => {
     mockOk()
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await waitFor(() => {
-      expect(screen.getByText('上限まであと38件')).toBeTruthy()
+      expect(screen.getByText(/^上限まであと38\s*件$/)).toBeTruthy()
     })
   })
 
   test('正常は報酬・期間・上限・受付・残り・履歴を出す', async () => {
     render(<OfferTermsDialog offer={OFFER} onClose={() => {}} />)
     await waitFor(() => {
-      expect(screen.getByText('上限まであと38件')).toBeTruthy()
+      expect(screen.getByText(/^上限まであと38\s*件$/)).toBeTruthy()
     })
     expect(screen.getByText(/リンクを開いてから 30日/)).toBeTruthy()
-    expect(screen.getByText(/この案件で200件/)).toBeTruthy()
+    expect(screen.getByText(/この案件で200\s*件/)).toBeTruthy()
     expect(screen.getByText('2026/10/01〜2026/12/31')).toBeTruthy()
     expect(screen.getByText(/版2/)).toBeTruthy()
     expect(screen.getByText(/版1/)).toBeTruthy()

@@ -18,7 +18,7 @@ import {
   type AffiliateSettlementResume,
 } from '@/lib/api'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
-import { AffiliatePaymentConfirmDialog } from './action-dialogs'
+import { AffiliatePaymentConfirmDialog } from '@/v8/affiliates/dialogs'
 import { formatDay, formatNumber } from '@/lib/format'
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
