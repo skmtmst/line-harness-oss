@@ -252,11 +252,11 @@ export default function HqBroadcastCreate() {
   const replaceActive = (next: Bubble) => setBubbles((items) => items.map((item, index) => (index === Math.min(openBubble, items.length - 1) ? { ...next, id: item.id } : item)))
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   /* 統括で使える共有の素材（どの店にも属さないクーポン・リッチメッセージ）。 */
+  const [assetsError,setAssetsError]=useState(false)
   const [assets, setAssets] = useState<BroadcastMessageAsset[] | null>(null)
   const assetId = String(active.content.assetId ?? '')
   const setAssetId = (next: string) => { const found = (assets ?? []).find((a) => a.id === next); setContent(found ? assetContent(found) : {}) }
   /* 統括のカルーセルのひな形（③ のカルーセル）と、［テンプレートから選ぶ］の窓。 */
-  const [carousels, setCarousels] = useState<HqTemplateListItem[] | null>(null)
   const [carouselError, setCarouselError] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerKind, setPickerKind] = useState<string | undefined>()
@@ -382,21 +382,13 @@ export default function HqBroadcastCreate() {
 
   const needsAssets = bubbles.some((item) => item.kind === 'rich' || item.kind === 'coupon')
   useEffect(() => {
-    if (!needsAssets || assets) return
+    if (!needsAssets || assets || assetsError) return
     let current = true
     void api.broadcastMessageAssets.list()
-      .then((res) => { if (current) setAssets(res.success ? res.data.filter((a) => a.lineAccountId === null && (a.kind === 'coupon' || a.kind === 'rich_message')) : []) })
-      .catch(() => { if (current) setAssets([]) })
+      .then((res) => { if(!res.success)throw new Error(res.error);if (current) setAssets(res.data.filter((a) => a.lineAccountId === null && (a.kind === 'coupon' || a.kind === 'rich_message'))) })
+      .catch(() => { if (current) setAssetsError(true) })
     return () => { current = false }
-  }, [needsAssets, assets])
-
-  const needsCarousels = bubbles.some((item) => item.kind === 'carousel')
-  useEffect(() => {
-    if (!needsCarousels || carousels) return
-    let current = true
-    void hqTemplatesApi.listByKind('carousel').then((list) => { if (current) setCarousels(list) }).catch(() => { if (current) setCarousels([]) })
-    return () => { current = false }
-  }, [needsCarousels, carousels])
+  }, [needsAssets, assets,assetsError])
 
   const chosen = useMemo(() => (stores ?? []).filter((s) => accountIds.includes(s.id)), [stores, accountIds])
   const candidatesRequest = useRef(0)
@@ -423,9 +415,9 @@ export default function HqBroadcastCreate() {
       ])
       if (!current()) return
       if ([...tagLists, ...scenarioLists, ...savedLists].some((res) => !res.success)) throw new Error('candidates')
-      setTagOptions(group(tagLists.map((res) => (res.success ? res.data.map((t) => t.name) : []))))
-      setScenarioOptions(group(scenarioLists.map((res) => (res && res.success ? res.data.map((t) => t.name) : []))))
-      setSavedOptions(group(savedLists.map((res) => (res && res.success ? res.data.map((t) => t.name) : []))))
+      setTagOptions(group(tagLists.map((res) => {if(!res.success)throw new Error(res.error);return res.data.map((t) => t.name)})))
+      setScenarioOptions(group(scenarioLists.map((res) => {if(!res.success)throw new Error(res.error);return res.data.map((t) => t.name)})))
+      setSavedOptions(group(savedLists.map((res) => {if(!res.success)throw new Error(res.error);return res.data.map((t) => t.name)})))
       setTagStatus('ready')
     } catch (saveFailure) {
       if (!current()) return
@@ -771,7 +763,6 @@ export default function HqBroadcastCreate() {
       const definition = hostDefinition(freshDefinition('template') as MessageTemplateDefinition, made.content)
       await hqTemplatesApi.create({ type: 'template', name, definition }, crypto.randomUUID())
       setSaveTplOpen(false)
-      setCarousels(null)
       notifySaved(`テンプレート「${name}」に保存しました`)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught, fields)
@@ -1018,7 +1009,7 @@ export default function HqBroadcastCreate() {
                   onPickTemplate={(index, kind) => { setPickerKind(kind); setOpenBubble(index); setPickerOpen(true) }}
                   onSaveTemplate={(index) => { setOpenBubble(index); setSaveTplName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? '') || title.trim()); setSaveTplError(''); setSaveTplOpen(true) }}
                   onCompose={(index, kind) => { setOpenBubble(index); setCarouselError(''); setComposer(kind === 'carousel' ? 'carousel' : 'rich') }}
-                  extraFields={(index, item) => item.type === 'coupon' ? <SaveErrorField names={["assetId","item.content.assetId","content.assetId","bubbles","asset_id","item.content.asset_id","content.asset_id"]}><EntitySelect aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} size="full" /></SaveErrorField> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
+                  extraFields={(index, item) => assetsError && item.type === 'coupon'?<ListState kind="error" title="クーポンを読み込めませんでした" onRetry={()=>setAssetsError(false)}/>:item.type === 'coupon' ? <SaveErrorField names={["assetId","item.content.assetId","content.assetId","bubbles","asset_id","item.content.asset_id","content.asset_id"]}><EntitySelect aria-label="クーポンを選ぶ" value={String(item.content.assetId ?? '')} onChange={(id) => { const asset = (assets ?? []).find((a) => a.id === id); setBubbles((items) => items.map((current, i) => i === index ? { ...current, content: asset ? assetContent(asset) : {} } : current)) }} options={[{ value: '', label: '選んでください' }, ...(assets ?? []).filter((a) => a.kind === 'coupon').map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name }))]} size="full" /></SaveErrorField> : item.type === 'flex' ? <p>選んだテンプレートのカードをそのまま送ります。</p> : null}
                 />
               </section>
             ) : null}

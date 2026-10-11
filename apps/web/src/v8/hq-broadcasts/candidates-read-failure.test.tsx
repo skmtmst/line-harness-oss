@@ -125,3 +125,23 @@ it('反証: タグ取得失敗は実画面でエラーと再試行を出す',asy
  expect(await screen.findByRole('button',{name:'もう一度読み込む'})).toBeTruthy();expect(screen.getByText(/タグを読み込めませんでした/)).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:'もう一度読み込む'}));await waitFor(()=>expect(screen.queryByRole('button',{name:'もう一度読み込む'})).toBeNull());expect(tagList).toHaveBeenCalledTimes(2);
 });
+
+it('B-241 HQ coupon read failure shows retry instead of no coupons',async()=>{
+ scenarioList.mockResolvedValue({success:true,data:[]});presetList.mockResolvedValue({success:true,data:[]})
+ assets.mockRejectedValueOnce(new Error('人工取得失敗'))
+ render(<HqBroadcastCreate/>);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'人工配信'}})
+ fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店')
+ fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}))
+ fireEvent.click(screen.getByRole('tab',{name:'その他',exact:true}))
+ const error=await screen.findByText('クーポンを読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText('クーポンを読み込めませんでした')).toBeNull())
+})
+it('B-241 HQ carousel choices use the shared picker without an unused background request',async()=>{
+ tpl.listByKind.mockClear();scenarioList.mockResolvedValue({success:true,data:[]});presetList.mockResolvedValue({success:true,data:[]})
+ render(<HqBroadcastCreate/>);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'人工配信'}})
+ fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店')
+ fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}));fireEvent.click(screen.getByRole('tab',{name:'カルーセル',exact:true}))
+ await waitFor(()=>expect(screen.getAllByRole('button',{name:'テンプレートから選ぶ'}).length).toBeGreaterThan(0))
+ expect(tpl.listByKind).not.toHaveBeenCalled()
+})
