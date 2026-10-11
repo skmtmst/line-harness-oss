@@ -250,17 +250,18 @@ function RewardEditorInner() {
     if (!selectedAccountId) throw new Error('account-required')
     const draft = draftOf(form)
     let saved
-    if (rewardId) {
+    const savedId = reward?.id ?? rewardId
+    if (savedId) {
       let expectedVersionId = reward?.currentDraftVersionId
       let expectedRevision = reward?.currentVersion?.revision
       if (!expectedVersionId || expectedRevision == null) {
-        const createdDraft = await api.mileage.createRewardDraft(rewardId, selectedAccountId)
+        const createdDraft = await api.mileage.createRewardDraft(savedId, selectedAccountId)
         if (!createdDraft.success || !createdDraft.data.currentDraftVersionId) throw new Error('failed')
         expectedVersionId = createdDraft.data.currentDraftVersionId
         expectedRevision = createdDraft.data.currentVersion?.revision
       }
       if (expectedRevision == null) throw new Error('failed')
-      saved = await api.mileage.saveRewardDraft(rewardId, selectedAccountId, expectedVersionId, expectedRevision, draft)
+      saved = await api.mileage.saveRewardDraft(savedId, selectedAccountId, expectedVersionId, expectedRevision, draft)
     } else {
       saved = await api.mileage.createReward(selectedAccountId, draft)
     }
