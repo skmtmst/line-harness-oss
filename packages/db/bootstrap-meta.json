@@ -567,9 +567,13 @@
     "622_hq_delivery_templates.sql",
     "623_form_fixed_friend_fields.sql",
     "624_entry_route_coupons.sql",
+    "625_visit_stamp_qr_codes.sql",
     "626_restaurant_floor_layout.sql",
     "627_restaurant_dining_fields.sql",
-    "628_restaurant_delivery_orders.sql"
+    "628_restaurant_departures.sql",
+    "629_restaurant_reservation_events.sql",
+    "633_restaurant_external_links.sql",
+    "634_restaurant_delivery_orders.sql"
   ],
-  "migrationCount": 570
+  "migrationCount": 574
 }

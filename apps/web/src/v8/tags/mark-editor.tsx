@@ -1,33 +1,34 @@
 'use client'
-import { createPageReturnHref } from '@/components/shared/create-page'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { notifySaved } from '@/components/shared/toast'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react'
-import { api, ApiError, describeSaveFailure, type SaveSupportMarkAutomationRule, type SupportMarkArchiveImpact, type SupportMarkAutomationEvent, type SupportMarkAutomationRule, type SupportMarkListItem } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
+import { createPageReturnHref } from '@/components/shared/create-page';
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
+import { notifySaved } from '@/components/shared/toast';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react';
+import { api, ApiError, describeSaveFailure, type SaveSupportMarkAutomationRule, type SupportMarkArchiveImpact, type SupportMarkAutomationEvent, type SupportMarkAutomationRule, type SupportMarkListItem } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
-import { Field } from '@/components/shared/form-controls'
+import { Field } from '@/components/shared/form-controls';
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useCanManageSupportMark } from '@/components/friend-fields/support-mark-permissions'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { useCanManageSupportMark } from '@/components/friend-fields/support-mark-permissions';
 import SupportMarkRulesPanel from '@/components/friend-fields/support-mark-rules-panel'
-import { EVENT_LABELS, eventLabel, inExecutionOrder } from '@/components/friend-fields/support-mark-rules-view'
-import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
-import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list'
+import { EVENT_LABELS, eventLabel, inExecutionOrder } from '@/components/friend-fields/support-mark-rules-view';
+import { AttributeKindGuide, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide';
+import { ArchiveMarkDialog } from '@/components/friend-fields/mark-list';
 import MarkBasicFields from './mark-basic-fields'
 import styles from './create.module.css'
-import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 
 /*
  * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。

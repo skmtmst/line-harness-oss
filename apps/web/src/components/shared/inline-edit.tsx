@@ -19,7 +19,7 @@ export type InlineEditProps = {
 /**
  * その場の書き換え（V8「サクサク感」C②）。押すと入力欄になり、
  * Enter で保存・Esc でやめる。保存中は押せなくなり、失敗したら
- * 元の値に戻して理由を出す。V8 のときだけ開閉の感じが付く。
+ * 下書きを残して理由を出す。V8 のときだけ開閉の感じが付く。
  */
 export default function InlineEdit({ value, label, onSave, placeholder, maxLength, disabled = false }: InlineEditProps) {
   const [editing, setEditing] = useState(false)
@@ -27,6 +27,7 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const savingRef = useRef(false)
 
   useEffect(() => {
     if (editing) inputRef.current?.select()
@@ -52,21 +53,23 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
   }
 
   const save = async () => {
-    if (saving) return
+    if (savingRef.current) return
     if (draft === value) {
       setEditing(false)
       return
     }
+    savingRef.current = true
     setSaving(true)
     setError('')
     try {
-      await onSave(draft)
+      const result = await onSave(draft)
+      if (result === false) throw new Error('save_failed')
       setEditing(false)
     } catch {
-      // 失敗したら元の値に戻して理由を出す（B：裏で保存・表で理由）。
-      setDraft(value)
-      setError('保存できませんでした。状態を読み直してから、もう一度お試しください。')
+      // §6.11.9：失敗後も入力を保ち、Enterで同じ下書きを再試行できる。
+      setError('保存できませんでした。入力は残っています。もう一度お試しください。')
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -96,7 +99,7 @@ export default function InlineEdit({ value, label, onSave, placeholder, maxLengt
         }}
         onBlur={() => {
           // ぶれたらやめる（勝手に保存しない）。
-          if (!saving) cancel()
+          if (!saving && !error) cancel()
         }}
         className={styles.input}
       />

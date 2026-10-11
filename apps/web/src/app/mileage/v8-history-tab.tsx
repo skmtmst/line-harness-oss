@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { CalendarRange, Download, History, Plus, TrendingDown, TrendingUp } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'

@@ -1,27 +1,27 @@
 'use client'
 
-import { jstDate } from '@/lib/jst-datetime'
-import Link from 'next/link'
-import { Inbox, Download, Info, RotateCw } from 'lucide-react'
-import { formatNumber } from '@/lib/format'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { PageFrame } from '@/components/templates/page-frame'
+import { jstDate } from '@/lib/jst-datetime';
+import { Inbox, Download, Info, RotateCw } from 'lucide-react';
+
+import { formatNumber } from '@/lib/format';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { PageFrame } from '@/components/templates/page-frame';
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { loadFailureCopy, isForbidden } from '@/components/shared/api-error-message'
-import { FriendsSectionHead } from '../shared/head'
-import { csvExportLine } from '../list/csv-export'
-import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data'
-import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words'
+import { DataTable, TableHeadRow, Th, Tr, Td, RowNameLink } from '@/components/shared/table';
+import { loadFailureCopy, isForbidden } from '@/components/shared/api-error-message';
+import { FriendsSectionHead } from '../shared/head';
+import { csvExportLine } from '../list/csv-export';
+import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data';
+import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words';
 import styles from './list.module.css'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
 
 /*
  * ★V8 重複検出（Pencil `hn6Y8`、1152 は `G9C4Uw`、状態の見本帳は `SXCb3`）。/friends?tab=duplicates。
@@ -217,9 +217,9 @@ export default function DuplicatesListV8() {
                 return (
                   <Tr key={candidate.id} className={styles.row} data-row-id={candidate.id}>
                     <Td className={styles.td}>
-                      <Link href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
+                      <RowNameLink href={href} className={styles.pair} title={`${candidate.left.label} ↔ ${candidate.right.label}`}>
                         {`${candidate.left.label} ↔ ${candidate.right.label}`}
-                      </Link>
+                      </RowNameLink>
                     </Td>
                     <Td className={styles.td}>
                       <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : `${styles.pill} ${styles.pill_muted}`}>

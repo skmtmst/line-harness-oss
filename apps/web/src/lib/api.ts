@@ -13614,7 +13614,7 @@ export const api = {
       }),
     update: (
       id: string,
-      data: Partial<{ name: string; activeAccountId: string; isActive: boolean }>,
+      data: Partial<{ name: string; activeAccountId: string; isActive: boolean; expectedUpdatedAt: string }>,
     ) =>
       fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`, {
         method: 'PUT',

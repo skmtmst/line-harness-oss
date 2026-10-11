@@ -140,7 +140,7 @@ function ProductSelect({ value, products, onChange }: { value: string; products:
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="nm-field"><span>{label}</span>{children}</label>; }
 function Notice({ children }: { children: React.ReactNode }) { return <div className="nm-notice">{children}</div>; }
-function displayDate(value?: string) { if (!value) return ''; const date = new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}+09:00`); return Number.isFinite(date.getTime()) ? date.toLocaleDateString('ja-JP') : value.slice(0, 10); }
+function displayDate(value?: string | null) { if (!value) return ''; const date = new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}+09:00`); return Number.isFinite(date.getTime()) ? date.toLocaleDateString('ja-JP') : value.slice(0, 10); }
 
 function TabIcon({ tab }: { tab: Tab }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };

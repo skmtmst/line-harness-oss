@@ -3,7 +3,7 @@
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowDown, ArrowUp, Bookmark, CircleDot, Clock3, Coins, Download, Gift, ListOrdered, Plus, Wallet } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { adminSessionHeaders } from '@/lib/admin-session'

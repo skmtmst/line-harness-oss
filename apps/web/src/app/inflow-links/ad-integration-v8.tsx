@@ -1,5 +1,5 @@
 'use client'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import type React from 'react'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { BadgeDollarSign, Megaphone, UserPlus, Wallet } from 'lucide-react'

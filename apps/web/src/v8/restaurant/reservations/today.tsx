@@ -15,7 +15,7 @@ import {useAccount} from '@/contexts/account-context'
 import { useEffect,useMemo,useState } from 'react'
 import type {RestaurantFloor,ReservationAxis} from '@line-crm/shared'
 import KpiCard from '@/components/shared/kpi-card'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
@@ -102,7 +102,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
     }
     return best
   }, [shown])
-  const freeAtPeak = peak < 0 ? [] : columns.filter((table) => table.is_active && !shown.some((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && minutesOf(item.starts_at) <= peak && minutesOf(item.ends_at) > peak))
+  const freeAtPeak = peak < 0 ? [] : columns.filter((table) => table.is_active && !shown.some((item) => !item.departed_at && seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(table.id) && minutesOf(item.starts_at) <= peak && minutesOf(item.ends_at) > peak))
 
   const guests = bookings.reduce((sum, item) => sum + item.guest_count, 0)
   const lineCount = bookings.filter((item) => item.source === 'line').length

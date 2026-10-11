@@ -1,18 +1,19 @@
 'use client'
 
 import SegmentedControl from '@/components/shared/segmented'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { Fragment } from 'react'
-import Link from 'next/link'
-import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from 'lucide-react'
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { Fragment } from 'react';
+import { useState } from 'react';
+import Link from '@/components/shared/list-navigation'
+import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from 'lucide-react';
 import Button from '@/components/shared/button'
-import { formatTime, formatDay } from '@/lib/format'
-import type { FriendDetail } from '@/lib/api'
-import type { FriendDetailState } from './use-friend-detail'
-import { dayHeading, dayKey, matchesTimelineFilter, timelineKey, timelineSourceHref, timelineStatusLabel, timelineTone, timelineTypeLabel, type TimelineFilter } from './timeline'
+import { formatTime, formatDay } from '@/lib/format';
+import type { FriendDetail } from '@/lib/api';
+import type { FriendDetailState } from './use-friend-detail';
+import { dayHeading, dayKey, matchesTimelineFilter, timelineKey, timelineSourceHref, timelineStatusLabel, timelineTone, timelineTypeLabel, type TimelineFilter } from './timeline';
 import styles from './detail.module.css'
 import TextLink from '@/components/shared/text-link'
-import { emptyValue } from '@/components/shared/empty-value'
+import { emptyValue } from '@/components/shared/empty-value';
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 

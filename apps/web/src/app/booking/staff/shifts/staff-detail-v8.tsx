@@ -2,8 +2,8 @@
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   ApiError,

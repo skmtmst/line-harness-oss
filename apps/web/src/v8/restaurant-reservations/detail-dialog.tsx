@@ -1,5 +1,5 @@
 'use client'
-import {ReservationDining,ReservationFacts,ReservationSource} from '@/components/shared/reservation-board'
+import {ReservationDining,ReservationFacts,ReservationSource,ReservationDetailsActions} from '@/components/shared/reservation-board'
 import {seatBoardEntry} from '@line-crm/shared'
 
 /*
@@ -12,7 +12,8 @@ import {seatBoardEntry} from '@line-crm/shared'
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
+import {RowActions} from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
@@ -53,7 +54,8 @@ function historyText(history: History): string {
   return `これまでの来店 ${history.count.toLocaleString('ja-JP')} 回${last ? `・前回 ${last}` : ''}`
 }
 
-export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit, inline = false }: {
+export default function ReservationDetailDialog({ reservation, accountId, tables, courses, busy, canWrite, onClose, onCancel, onRestore, onEdit, onAttendance, inline = false }: {
+  onAttendance?:(id:string,action:'visited'|'depart'|'undo_departure'|'undo_visit')=>void
   inline?: boolean
   reservation: RestaurantReservation | null
   accountId: string
@@ -98,16 +100,16 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
   const course = reservation.course_id ? courses.find((c) => c.id === reservation.course_id) ?? null : null
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
 
+  const attendance=canWrite&&onAttendance&&!inactive&&!reservation.hold_expires_at?<RowActions subjectName={reservation.customer_name} menuItems={reservation.departed_at?[{id:'undo-depart',label:'退店を訂正する',disabled:busy,onSelect:()=>onAttendance(reservation.id,'undo_departure')}]:['visited','seated'].includes(reservation.status)?[{id:'depart',label:'退店にする',disabled:busy,onSelect:()=>onAttendance(reservation.id,'depart')},{id:'undo-visit',label:'来店を取り消す',disabled:busy,onSelect:()=>onAttendance(reservation.id,'undo_visit')}]:[{id:'visit',label:'来店にする',disabled:busy,onSelect:()=>onAttendance(reservation.id,'visited')}]}/>:null
   const dining=<ReservationDining entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)} />
-  if(inline)return <Card surface="inset" contentPadding="16px" layout="vertical" gap="8px">
-    <SectionHeader title="予約の詳細" note={<Button size="inline" onClick={onClose}>閉じる</Button>}/>
+  if(inline)return <Card surface="inset" contentPadding="16px" layout="vertical" gap="10px">
+    <SectionHeader title="予約の詳細" actions={<Button size="inline" variant="text" aria-label="予約の詳細を閉じる" onClick={onClose}><X size={16} aria-hidden="true"/></Button>}/>
     <p className={styles.fact}>{`${mdWeek(new Date(reservation.starts_at))}${hm(reservation.starts_at)}〜${hm(reservation.ends_at)} ・ ${table?.code??'未配席'}`}</p>
     <SectionHeader size="customer" title={`${reservation.customer_name} さま`} note={<ReservationSource value={reservation.source} note={reservation.note}/>}/>
     <ReservationFacts items={[{label:'人数・コース',value:`${reservation.guest_count}名・${reservation.course_name??'席のみ'}${course?.price?` ${polishFormatYen(course.price)}`:''}`},{label:'電話',value:maskPhone(reservation.customer_phone)||'電話未登録'}]}/>
     <ReservationDining dense entry={seatBoardEntry(reservation as unknown as Record<string,unknown>)}/>
-    <ReservationFacts items={[{label:'来店',value:history.state==='ready'?`${history.count}回`:'—'}]}/>
-    <p className={styles.fact}>{historyText(history)}</p>
-    {canWrite?<><Button presentation="restaurant" variant="primary" onClick={()=>onEdit(reservation.id)}>変更する</Button><Button presentation="restaurant" onClick={()=>inactive?onRestore(reservation.id):onCancel(reservation.id)}>{inactive?'予約を有効に戻す':'取り消す'}</Button></>:null}
+    <ReservationFacts items={[{label:'来店',value:<span title={historyText(history)}>{history.state==='ready'?`${history.count}回`:'—'}</span>}]}/>
+    <ReservationDetailsActions>{attendance}{canWrite?<><Button presentation="restaurant" variant="primary" onClick={()=>onEdit(reservation.id)}>変更する</Button><Button presentation="restaurant" onClick={()=>inactive?onRestore(reservation.id):onCancel(reservation.id)}>{inactive?'予約を有効に戻す':'取り消す'}</Button></>:null}</ReservationDetailsActions>
   </Card>
   return (
     <RsDialog
@@ -120,6 +122,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
       onCancel={onClose}
       actions={(
         <>
+          {attendance}
           <Button type="button" onClick={onClose} disabled={busy}>閉じる</Button>
           {canWrite ? (
             inactive ? (

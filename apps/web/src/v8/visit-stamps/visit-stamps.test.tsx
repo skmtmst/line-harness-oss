@@ -30,6 +30,7 @@ vi.mock('next/navigation', async () => {
 })
 vi.mock('@/lib/visit-stamps-api', () => ({
   visitStampsApi: {
+    storefrontQr:vi.fn(async()=>({success:true,data:null})),
     cards: fx.cards, save: fx.save, create: fx.create, paperRequests: fx.paperRequests, reviewPaper: fx.reviewPaper,
     wallet: fx.wallet, grant: fx.grant, reverse: fx.reverse, setPin: fx.setPin, entries: fx.entries, paperPhoto: fx.paperPhoto,
   },

@@ -1,3 +1,4 @@
+import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { hydrateDocumentAnswers } from '../services/form-documents.js';
 import { getFriendSummary } from '@line-crm/db';
@@ -37,7 +38,7 @@ import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { denyReadOnly, requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import { listResponse } from '../lib/list-etag.js';
@@ -54,6 +55,26 @@ import { getSavedSearchMatchPreview } from '../services/saved-search-insights.js
 import { listLimit, listOffset } from './list-pagination.js';
 
 const friends = new Hono<Env>();
+
+// B-215: customer-requested erasure. Unfollow never calls this route.
+friends.delete('/api/friends/:id/data', requireRole('owner', 'admin'), denyReadOnly(), requireIrreversibleConfirmation('delete-friend-data'), async c => {
+  const id = c.req.param('id');
+  try {
+    const journal = await deletionJournal(c.env.DB, 'friend_data', id);
+    if (journal && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [journal.detail.accountId])) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
+    if (journal?.action === 'deleted') return c.json({ success: true, data: { deleted: true, replayed: true } });
+    const friend = await getFriendById(c.env.DB, id);
+    const accountId = friend ? (friend as unknown as { line_account_id: string | null }).line_account_id : null;
+    if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
+    const data = await deleteCustomerData(c.env, { kind: 'friend_data', id, friendId: id, accountId, lineUserId: friend.line_user_id }, c.get('staff')!.id);
+    return c.json({ success: true, data });
+  } catch (error) {
+    if (error instanceof DeletionFailure && error.code === 'deletion_schema_approval_required') return c.json({ success: false, code: error.code, error: '支払・監査の記録を残すため、データ構造の変更承認が必要です。オーナーか管理者に頼んでください。' }, 409);
+    if (error instanceof DeletionFailure) return c.json({ success: false, code: error.code, error: error.status === 409 ? '削除中です。少し待ってから、もう一度お試しください。' : '削除を完了できませんでした。同じ友だちで、もう一度削除してください。' }, error.status);
+    return c.json({ success: false, code: 'deletion_retry_required', error: '削除を完了できませんでした。同じ友だちで、もう一度削除してください。' }, 503);
+  }
+});
+
 
 async function adminAccountScope(c: Context<Env>, alias = '') {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));

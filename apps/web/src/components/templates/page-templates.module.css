@@ -357,3 +357,9 @@
 :global([data-theme='v8']) .dashboardRow[data-row='restaurant'] .dashboardCell{padding:0;gap:0;}
 :global([data-theme='v8']) .dashboardAside[data-aside-size='restaurant']{width:340px;border:0;}
 @container v8-page (max-width:1099px){:global([data-theme='v8']) .dashboardAside[data-aside-size='restaurant']{display:none;}}
+
+/* 飲食の融合板は補足19pxの頭。旧来店画面の24pxの補足を混ぜない。 */
+:global([data-theme='v8']) [data-page-template='restaurant'] .heading[data-heading-inset='none'] { min-height: 0; }
+:global([data-theme='v8']) [data-page-template='restaurant'] .heading[data-heading-inset='none'] .subtitle { line-height: var(--tpl-rs-lh-13); }
+
+:global([data-theme='v8']) [data-page-template='dashboard'][data-template-layout='restaurant'] .heading { padding-bottom: var(--polish-space-field); }

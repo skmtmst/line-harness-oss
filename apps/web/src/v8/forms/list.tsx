@@ -1,24 +1,29 @@
 'use client'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ListToolbar, { ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
-import { useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ListToolbar, { ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Archive, CircleCheck, ClipboardList, FileText, IdCard, Inbox, Percent, Plus, TriangleAlert } from 'lucide-react'
-import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared'
-import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { formatNumber } from '@/lib/format'
-import { runUndoable } from '@/lib/undoable'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Archive, CircleCheck, ClipboardList, FileText, IdCard, Inbox, Percent, Plus, TriangleAlert } from 'lucide-react';
+
+import Link from '@/components/shared/list-navigation'
+import { RowNameLink } from '@/components/shared/table';
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Eye, Link2 } from 'lucide-react';
+import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared';
+import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { formatNumber } from '@/lib/format';
+import { runUndoable } from '@/lib/undoable';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { ListPage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -26,30 +31,30 @@ import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import { FolderDotName } from '@/components/shared/folder-dot';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import InlineEdit from '@/components/shared/inline-edit'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { notifyToast } from '@/components/shared/toast'
-import { loadFailureCopy } from '@/components/shared/api-error-message'
-import { FORM_PAGE_SIZES, SORT_OPTIONS, UNFILED_VALUE, answerSubText, destinationText, formAnswerCount, formAnswerUrl, listQueryString, referenceLabel, sortForms, subLineText, validFilter, validPage, validPageSize, validSort, type Form, type FormFilter, type FormListResponse, type FormSort } from './model'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import { notifyToast } from '@/components/shared/toast';
+import { loadFailureCopy } from '@/components/shared/api-error-message';
+import { FORM_PAGE_SIZES, SORT_OPTIONS, UNFILED_VALUE, answerSubText, destinationText, formAnswerCount, formAnswerUrl, listQueryString, referenceLabel, sortForms, subLineText, validFilter, validPage, validPageSize, validSort, type Form, type FormFilter, type FormListResponse, type FormSort } from './model';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { insertDuplicateAfter, useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { Field } from '@/components/shared/form-controls';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { insertDuplicateAfter, useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -411,8 +416,8 @@ export default function FormsListV8() {
   const activeIndex = reviewMode ? -1 : visibleForms.findIndex((form) => form.id === activeId)
   const active = activeIndex >= 0 ? visibleForms[activeIndex] : null
   const openDetail = useCallback((id: string) => {
-    withViewTransition(() => setActiveId(id))
-  }, [])
+    withViewTransition(() => setActiveId(activeId === id ? null : id))
+  }, [activeId, setActiveId])
   const closeDetail = useCallback(() => {
     withViewTransition(() => setActiveId(null))
   }, [])
@@ -1186,17 +1191,17 @@ export default function FormsListV8() {
               const nameNode = reviewMode ? (
                 <span className={styles.cellTitle} ><TruncatedText value={String(name ?? '')} /></span>
               ) : (
-                <Link
+                <RowNameLink
                   href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}
                   title={`${name}の詳細を見る`}
                   aria-label={`「${name}」の詳細を見る`}
                   className={styles.cellTitleButton}
                 >
                   {name}
-                </Link>
+                </RowNameLink>
               )
               const row = (
-                <Tr highlighted={duplicateFeedback.highlightedId === form.id} key={form.id} data-row-id={form.id} onOpen={reviewMode ? undefined : () => openDetail(form.id)}>
+                <Tr highlighted={duplicateFeedback.highlightedId === form.id} key={form.id} data-row-id={form.id} detailKey={reviewMode ? undefined : "form"} onOpen={reviewMode ? undefined : () => openDetail(form.id)}>
                   <NameCell name={nameNode} folder={folderDotOf(form.folderId)}
                   />
                   {!narrow && (

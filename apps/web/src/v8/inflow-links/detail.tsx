@@ -1,9 +1,11 @@
 'use client'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
+import { RowNameLink } from '@/components/shared/table'
 import CopyTextButton from '@/components/shared/copy-text-button'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useSearchParams } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Info, Pause, Pencil, QrCode } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
@@ -674,9 +676,9 @@ function InflowDetailContent() {
                       </Td>
                       <Td className={styles.colFriend}>
                         <span className={styles.face} aria-hidden="true">{friend.displayName.slice(0, 1)}</span>
-                        <Link className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>
+                        <RowNameLink className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>
                           {friend.displayName}
-                        </Link>
+                        </RowNameLink>
                       </Td>
                       <Td className={styles.colAccount}><span className={styles.cellText} title={accountName}>{accountName}</span></Td>
                       <Td className={styles.colState}>

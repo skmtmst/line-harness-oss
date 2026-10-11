@@ -103,6 +103,7 @@ const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; not
 /* 並びは共有の正本 `AUTOMATION_DRAFT_TRIGGER_OPTIONS` と同じ順を保つ。 */
 const TRIGGER_EVENT_GROUPS: ReadonlyArray<{ id: string; label: string; values: readonly string[] }> = [
   { id: 'people', label: '友だちやお客さんの動き', values: ['friend_add', 'message_received', 'tag_change', 'form_submitted', 'link_clicked', 'calendar_booked'] },
+  {id:'restaurant',label:'飲食の出来事',values:AUTOMATION_DRAFT_TRIGGER_OPTIONS.filter(o=>o.value.startsWith('restaurant.')).map(o=>o.value)},
   { id: 'schedule', label: '決めた時刻・曜日', values: ['datetime', 'daily', 'weekly'] },
   { id: 'ec', label: 'ECの出来事', values: ['ec.order.confirmed'] },
 ]

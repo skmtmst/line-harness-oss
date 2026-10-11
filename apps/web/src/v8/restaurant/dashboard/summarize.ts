@@ -70,6 +70,7 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
 
 /** 予約の状態の札：来店済み・予約中・取消・無断キャンセル。 */
 export function visitState(r: RestaurantReservation): { label: string; tone: 'success' | 'info' | 'neutral' | 'danger' | 'warning' } {
+  if (r.departed_at) return {label:'退店済み',tone:'neutral'}
   if (r.status === 'seated' || r.status === 'visited') return { label: '来店済み', tone: 'success' }
   if (r.status === 'cancelled') return { label: '取消', tone: 'neutral' }
   if (r.status === 'no_show') return { label: '無断キャンセル', tone: 'danger' }

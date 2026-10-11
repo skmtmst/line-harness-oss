@@ -1,7 +1,7 @@
 'use client'
 
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { ListFolderNav } from '@/components/templates'
 import { Building2, CreditCard, LifeBuoy, Users } from 'lucide-react'
 import styles from './settings-nav.module.css'

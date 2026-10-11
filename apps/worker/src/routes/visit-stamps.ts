@@ -1,9 +1,10 @@
+import { issueStampQr, storefrontQr, stampQrStatus, revokeStampQr, redeemStampQr } from '../services/visit-stamp-qr.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { bodyLimit } from 'hono/body-limit';
 import { featureJobCanRun } from '../services/feature-enforcement.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
-import type { VisitStampCardInput, VisitStampPaperInput } from '@line-crm/shared';
+import type { VisitStampCardInput, VisitStampPaperInput, VisitStampQrInput } from '@line-crm/shared';
 import { dbFor } from '../services/db-router.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -12,6 +13,7 @@ import { StampError, stampId, stampCard, readStampCard, saveStampCard, stampWall
   setStampPin, offerStampReward, useStampReward, requestPaperStamps, applyPaperStamps, getStampVisit, reconcileStampVisit, stampCardLocked } from '../services/visit-stamps.js';
 
 export const visitStamps=new Hono<Env>();
+visitStamps.use('/api/visit-stamps/*',async(c,next)=>{c.header('Cache-Control','private, no-store');await next();});
 visitStamps.onError((e,c)=>inputError(c, {success:false,...(e instanceof StampError && (e.status === 400 || e.status === 422) ? {fields:e.fields} : {}),error:e instanceof StampError?e.message:'スタンプの処理を確認できません'},e instanceof StampError?e.status:500));
 const tenant=(c:Context<Env>)=>{const t=c.get('staff')?.tenantId;if(!t)throw new StampError('ログインが必要です',401);return t;};
 async function account(c:Context<Env>,id:unknown) {
@@ -91,8 +93,28 @@ visitStamps.post('/api/visit-stamps/visits/:kind/:id/checkout',requireRole('owne
   if(prior!.amount!==b.amount)throw new StampError('会計済みです。押印の取消後に手動で訂正してください',409);
   await reconcileStampVisit(db,kind,visit.id);return c.json({success:true,data:{visitId:visit.id,amount:b.amount,recorded:true}});
 });
+visitStamps.get('/api/visit-stamps/cards/:id/storefront-qr',async c=>{
+  const a=await account(c,c.req.query('accountId')),db=dbFor(c.env);await stampCard(db,c.req.param('id'),tenant(c));
+  return c.json({success:true,data:await storefrontQr(db,c.req.param('id'),a)});
+});
+visitStamps.post('/api/visit-stamps/cards/:id/storefront-qr',requireRole('owner','admin'),inputJsonBoundary(),async c=>{
+  const b=await body(c),a=await account(c,b.accountId),db=dbFor(c.env);await stampCard(db,c.req.param('id'),tenant(c));
+  return c.json({success:true,data:await issueStampQr(db,c.req.param('id'),a,c.get('staff')!.id,'storefront',b as unknown as VisitStampQrInput)});
+});
+visitStamps.post('/api/visit-stamps/cards/:id/staff-qr',requireRole('owner','admin','staff'),inputJsonBoundary(),async c=>{
+  const b=await body(c),a=await account(c,b.accountId),db=dbFor(c.env);await stampCard(db,c.req.param('id'),tenant(c));
+  return c.json({success:true,data:await issueStampQr(db,c.req.param('id'),a,c.get('staff')!.id,'staff',b as unknown as VisitStampQrInput)});
+});
+visitStamps.get('/api/visit-stamps/staff-qr/:id',requireRole('owner','admin','staff'),async c=>{
+  const a=await account(c,c.req.query('accountId'));
+  return c.json({success:true,data:await stampQrStatus(dbFor(c.env),c.req.param('id'),a,c.get('staff')!.id)});
+});
+visitStamps.delete('/api/visit-stamps/staff-qr/:id',requireRole('owner','admin','staff'),async c=>{
+  const a=await account(c,c.req.query('accountId'));
+  return c.json({success:true,data:await revokeStampQr(dbFor(c.env),c.req.param('id'),a,c.get('staff')!.id)});
+});
 // LIFFはIDトークンの対象チャンネルを指定店舗のlogin_channel_idに固定する。
-async function customer(c:Context<Env>) {
+async function customer(c:Context<Env>,qr=false) {
   const a=stampId(c.req.query('accountId')),db=dbFor(c.env);
   const shop=await db.prepare('SELECT id,tenant_id,login_channel_id FROM line_accounts WHERE id=? AND is_active=1 AND archived_at IS NULL').bind(a).first<{tenant_id:string;login_channel_id:string|null}>();
   const token=c.req.header('Authorization')?.match(/^Bearer (.+)$/)?.[1];
@@ -102,9 +124,19 @@ async function customer(c:Context<Env>) {
   const identity=response.ok?await response.json() as {sub?:string}:null;
   if(!identity?.sub)throw new StampError('LINEの本人確認が必要です',401);
   const friend=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_user_id=? AND is_following=1').bind(a,identity.sub).first<{id:string}>();
-  if(!friend)throw new StampError('友だちの確認が必要です',403);
+  if(!friend)throw new StampError(qr?'友だち追加が必要です':'友だちの確認が必要です',403);
   if(!await featureJobCanRun(db,{accountId:a,featureId:'visit_stamps',job:'visit stamps'}))throw new StampError('来店スタンプは停止中です',403);return {db,a,friendId:friend.id,tenantId:shop.tenant_id};
 }
+visitStamps.post('/api/liff/visit-stamps/qr/redeem',inputJsonBoundary(),async c=>{
+  c.header('Cache-Control','private, no-store');
+  try {
+    const x=await customer(c,true),b=await body(c);
+    return c.json({success:true,data:await redeemStampQr(x.db,x.a,x.friendId,b.token,stampId(b.requestId),typeof b.visitId==='string'?b.visitId:undefined)});
+  } catch(e) {
+    if(e instanceof StampError&&e.message==='友だち追加が必要です')return c.json({success:true,data:{status:'friend_required'}});
+    throw e;
+  }
+});
 visitStamps.get('/api/liff/visit-stamps/cards',async c=>{
   const x=await customer(c),rows=(await x.db.prepare('SELECT card_id FROM visit_stamp_card_accounts WHERE line_account_id=?').bind(x.a).all<{card_id:string}>()).results;
   const data=[];for(const r of rows){const card=await stampCard(x.db,r.card_id,x.tenantId);if(card.active&&!await stampCardLocked(x.db,card.id,x.friendId,x.a))data.push({card:await readStampCard(x.db,card),wallet:await stampWallet(x.db,r.card_id,x.friendId,x.a)});}

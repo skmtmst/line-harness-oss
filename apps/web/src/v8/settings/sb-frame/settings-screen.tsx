@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import styles from './settings-screen.module.css'

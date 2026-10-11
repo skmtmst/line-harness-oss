@@ -61,7 +61,7 @@ function overlaps(day: string, time: string, tableId: string, rows: RestaurantRe
   if (!Number.isFinite(start)) return false
   const end = start + STAY_MINUTES * 60_000
   return rows.some((r) => {
-    if (r.table_id !== tableId || INACTIVE_STATUSES.includes(r.status)) return false
+    if (r.departed_at || r.table_id !== tableId || INACTIVE_STATUSES.includes(r.status)) return false
     if (r.status === 'pending' && r.hold_expires_at && Date.parse(r.hold_expires_at) <= Date.now()) return false
     const s = new Date(r.starts_at).getTime()
     const e = new Date(r.ends_at).getTime()

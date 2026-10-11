@@ -45,6 +45,7 @@ const detail = (definition: unknown = message) => ({ template: { id: 't-1', name
 const listRow = { ...detail().template, kind: 'message', content_summary: '本文', distributed_account_count: 4, distributed_account_names: ['然 -NEN- 本店', '然 -NEN- 渋谷店', '2025年イベント'], distributed_account_more: 1 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/hq/templates')
   window.sessionStorage.clear()
   calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
   calls.list.mockResolvedValue([listRow])

@@ -340,6 +340,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/tenants/boundary-preview',
     'GET /api/tenants/me/company-contact',
     'GET /api/traffic-pools',
+    'GET /api/traffic-pools/:id', // 最新の比較も既存の一覧と同じowner/admin専用。
     'GET /api/traffic-pools/:id/accounts',
     'GET /api/traffic-pools/accounts',
     'GET /api/users',

@@ -1069,6 +1069,7 @@
   --tpl-stamp-expiry-slot-w: 140px;
   --tpl-stamp-expiry-length-w: 120px;
   --tpl-stamp-appearance-gap: 16px;
+  --tpl-e78-qr-zero: 0; --tpl-e78-qr-progress: 4px; --tpl-e78-qr-thumb: 96px; --tpl-e78-qr-count: 44px;
   /* 来店スタンプ（提案 E-7 w4SBbv）。 */ --tpl-e78-body-pad: 4px 24px 24px; --tpl-e78-body-gap: 28px; --tpl-e78-row-gap: 24px; --tpl-e78-card-pad: var(--polish-space-card); --tpl-e78-card-gap: var(--polish-space-row); --tpl-e78-card-gap-s: 12px; --tpl-e78-card-h: 579px; --tpl-e78-radius: var(--polish-radius-card); --tpl-e78-radius-s: var(--polish-radius-small); --tpl-e78-radius-xs: var(--polish-radius-small); --tpl-e78-title-gap: 6px; --tpl-e78-title-size: var(--polish-text-section); --tpl-e78-title-lh: 23px; --tpl-e78-field-gap: var(--polish-space-field); --tpl-e78-pair-gap: var(--polish-space-field); --tpl-e78-label-size: var(--polish-text-support); --tpl-e78-label-lh: 20px; --tpl-e78-name-size: var(--polish-text-body); --tpl-e78-name-lh: 21px; --tpl-e78-sub-size: var(--polish-text-support); --tpl-e78-sub-lh: 18px; --tpl-e78-tiny-size: 10px; --tpl-e78-tiny-lh: 15px; --tpl-e78-reward-pad: 10px 12px; --tpl-e78-chip-w: 56px; --tpl-e78-chip-h: 28px; --tpl-e78-pill: var(--polish-radius-pill); --tpl-e78-preview-pad: 14px; --tpl-e78-slot: 36px; --tpl-e78-slot-gap: 8px; --tpl-e78-slot-line: 1.5px; --tpl-e78-radio-gap: 8px; --tpl-e78-indent: 28px; --tpl-e78-switch-pad: 8px 0; --tpl-e78-section-gap: var(--polish-space-field); --tpl-e78-head-pad: 13px 20px; --tpl-e78-row-pad: 9px 20px; --tpl-e78-col-gap: 16px; --tpl-e78-col-photo: 72px; --tpl-e78-thumb-w: 56px; --tpl-e78-thumb-h: 40px; --tpl-e78-col-stamps: 64px; --tpl-e78-col-date: 110px; --tpl-e78-col-state: 250px; --tpl-e78-side-w: 380px; --tpl-e78-step-gap: 8px; --tpl-e78-step-size: 16px; --tpl-e78-step-lh: 24px; --tpl-e78-col-when: 120px; --tpl-e78-col-count: 150px; --tpl-e78-col-why: 240px; --tpl-e78-col-actor: 200px; --tpl-e78-col-menu: 36px; --tpl-e78-row-h: var(--polish-table-row); --tpl-e78-paper-row-h: var(--polish-table-row); --tpl-e78-edge: 20px; --tpl-e78-photo-max: 480px; --tpl-e78-icon: 14px; --tpl-e78-pin-w: 120px; --tpl-e78-ring: inset 0 0 0 1px var(--color-hairline); --tpl-e78-ring-reward: inset 0 0 0 1.5px var(--color-accent-deep);
   --tpl-fx4-viewer-create-h: 36px; /* 一斉配信の閲覧のみ（NtCE3）：隠した「配信を作る」の場所 */ --tpl-fx4-viewer-add-h: 28px; /* 隠した「フォルダを追加」の場所 */ --tpl-fx4-footer-inset: 12px; /* 型の下の帯の左右（絵の下の帯 left 12） */ --tpl-fx4-bc-col-result-wide: 230px; /* 一斉配信の広い板の結果の列（絵 214＋間16） */
   --tpl-r2-op-sum-gap: 6px; --tpl-r2-op-key-w: 150px; --tpl-r2-op-name-w: 200px; --tpl-r2-op-confirm-row-h: var(--polish-table-row);
@@ -3197,3 +3198,7 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
 }
 
 [data-theme="v8"] {--tpl-board-legend-radius:4px;--tpl-rest1-aside-outer-pad:0;}
+
+[data-theme="v8"] { --tpl-rs-rsv-period-w:152px; --tpl-rs-rsv-status-w:164px; }
+
+[data-theme="v8"] { --tpl-rs-detail-fact-gap:10px; --tpl-rs-detail-fact-min-h:32px; --tpl-rs-detail-fact-pad:6px 0; --tpl-rs-detail-actions-gap:8px; }

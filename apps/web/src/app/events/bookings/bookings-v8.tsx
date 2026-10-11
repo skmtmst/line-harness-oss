@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'

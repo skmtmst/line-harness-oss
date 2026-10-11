@@ -2,14 +2,14 @@
 import Select from '@/components/shared/select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { Automation } from '@line-crm/shared'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 import {
   api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail,
   type AutomationDraftDetail,
 } from '@/lib/api'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'

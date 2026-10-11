@@ -102,6 +102,7 @@ function tabButton(label: string): HTMLButtonElement | undefined {
 }
 
 beforeEach(() => {
+  fetchApi.mockClear()
   role.current = 'owner'
   document.documentElement.dataset.theme = 'v8'
   fetchApi.mockImplementation((async (url: string) => {
@@ -199,4 +200,59 @@ it('住所・予約は一覧とCSVでも同じ読める値にし、壊れた旧�
     expect(content).toContain('以前の保存で内容が失われています')
     expect(content).not.toContain('[object Object]')
   } finally { click.mockRestore(); URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke;globalThis.Blob=previousBlob }
+})
+
+const allButtons = () => [...document.querySelectorAll<HTMLButtonElement>('button')]
+async function rowView() {
+  await act(async () => root.render(<FormResponsesPage />)); await settle()
+  await act(async () => tabButton('1件ずつ見る')!.click()); await settle()
+}
+async function openResponseDelete(fromDetail = false) {
+  const menu = document.querySelector<HTMLButtonElement>(`[aria-label="${fromDetail ? '回答の詳細の操作' : '回答 sub-1 の操作'}"]`)!
+  expect(menu).toBeTruthy()
+  await act(async () => menu.click()); await settle()
+  const remove = allButtons().find(b => b.textContent === '回答を削除する')!
+  await act(async () => remove.click()); await settle()
+}
+it.each(['staff', 'viewer', null])('B-215: %sは回答一覧・詳細に削除の口が無い', async value => {
+  role.current = value
+  await rowView()
+  expect(document.querySelector('[aria-label="回答 sub-1 の操作"]')).toBeNull()
+  expect(document.querySelector('[aria-label="回答の詳細の操作"]')).toBeNull()
+})
+it.each([false, true])('B-215: 回答の%sから確認し、取消は送らない', async detail => {
+  if (!detail) fetchApi.mockImplementation(async (url: string) => ({ success: true, data: url.includes('/submissions') ? {
+    ...submissionsPage, items: [{ ...submissionsPage.items[0], postActions: { state: 'completed', pending: [] } },
+      { ...submissionsPage.items[0], id: 'sub-2', friendName: '別の回答者' }], total: 2,
+  } : formDetail }))
+  await rowView()
+  if (!detail) expect(host.querySelector('[aria-label="回答の詳細：別の回答者"]')).toBeTruthy()
+  await openResponseDelete(detail)
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+  expect(dialog.textContent).toContain('添付した写真・PDF・本人確認書類')
+  const target = submissionsPage.items[0]
+  expect(dialog.textContent).toContain(target.friendName)
+  expect(dialog.textContent).toContain('の回答と添付')
+  await act(async () => allButtons().find(b => b.textContent === 'キャンセル')!.click()); await settle()
+  expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
+})
+it('B-215: 二重押下は1要求。失敗は窓を残してやり直し、成功後は再読込', async () => {
+  let reject!: (error: Error) => void
+  fetchApi.mockImplementation(async (url: string, init?: RequestInit) => {
+    if (init?.method === 'DELETE') return await new Promise((_, fail) => { reject = fail })
+    return { success: true, data: url.includes('/submissions') ? submissionsPage : formDetail }
+  })
+  await rowView(); await openResponseDelete()
+  const confirm = allButtons().find(b => b.textContent?.includes('削除する') && !b.hasAttribute('role'))!
+  await act(async () => { confirm.click(); confirm.click() }); await settle()
+  expect(fetchApi.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
+  await act(async () => reject(new Error('offline'))); await settle()
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeTruthy()
+  expect(document.querySelector('[role="alert"]')).toBeTruthy()
+  fetchApi.mockImplementation(async (url: string, init?: RequestInit) => ({ success: true, data: init?.method === 'DELETE' ? { deleted: true } : url.includes('/submissions') ? { ...submissionsPage, items: [], total: 0 } : formDetail }))
+  await act(async () => allButtons().find(b => b.textContent?.includes('削除する') && !b.hasAttribute('role'))!.click()); await settle()
+  expect(fetchApi).toHaveBeenCalledWith('/api/forms/form-1/submissions/sub-1?account_id=acc-1', expect.objectContaining({ method: 'DELETE', headers: { 'X-Confirm-Irreversible': 'delete-form-response' } }))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
+  expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+  expect(host.querySelector('tbody tr')).toBeNull()
 })

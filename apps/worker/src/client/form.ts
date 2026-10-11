@@ -1,3 +1,4 @@
+import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
 /**
  * LIFF Form Page — Dynamic form renderer for LINE surveys / questionnaires
  *
@@ -19,6 +20,9 @@ import {
   newFormIdempotencyKey,
   toFormIdempotencyKey,
   type FormIdempotencyKey,
+  type FormAvailability,
+  type FormLayout,
+  collectInputs,
 } from '@line-crm/shared';
 import { customerMessage } from './customer-message.js';
 
@@ -52,6 +56,8 @@ interface FormDef {
   fields: FormField[];
   isActive: boolean;
   hideProfile?: boolean;
+  availability?: FormAvailability;
+  layout?: FormLayout;
   hasSubmitWebhook: boolean;
   webhookOrigin: string | null;
   webhookGateId: string | null;
@@ -67,6 +73,7 @@ interface XFollowerSuggestion {
 
 interface FormState {
   formDef: FormDef | null;
+  receptionHtml: string;
   xHarnessBaseUrl: string | null;
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
   friendId: string | null;
@@ -89,6 +96,7 @@ interface FormState {
 
 const state: FormState = {
   formDef: null,
+  receptionHtml: '',
   xHarnessBaseUrl: null,
   profile: null,
   friendId: null,
@@ -129,6 +137,19 @@ function getApp(): HTMLElement {
 }
 
 // ========== Field Rendering ==========
+
+function choiceCapacity(field: FormField, label: string) {
+  const block = state.formDef?.layout && collectInputs(state.formDef.layout).find(b => b.name === field.name);
+  const choice = block?.choices?.find(c => c.label === label);
+  const choices = state.formDef?.availability?.choices[field.name];
+  return choices?.[choice?.id ?? label];
+}
+function disabledChoice(field: FormField, label: string): string {
+  return choiceCapacity(field, label)?.full ? ' disabled' : '';
+}
+function receptionOption(field: FormField, label: string): string {
+  return escapeHtml(label + choiceReceptionLabel(choiceCapacity(field, label)));
+}
 
 function renderField(field: FormField): string {
   const required = field.required ? ' required' : '';
@@ -174,7 +195,7 @@ function renderField(field: FormField): string {
 
     case 'select': {
       const opts = (field.options ?? [])
-        .map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`)
+        .map((o) => `<option value="${escapeHtml(o)}"${disabledChoice(field, o)}>${receptionOption(field, o)}</option>`)
         .join('');
       inputHtml = `<select
         name="${escapeHtml(field.name)}"
@@ -191,8 +212,8 @@ function renderField(field: FormField): string {
         .map(
           (o) =>
             `<label class="radio-label">
-              <input type="radio" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${required} />
-              ${escapeHtml(o)}
+              <input type="radio" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${required}${disabledChoice(field, o)} />
+              ${receptionOption(field, o)}
             </label>`,
         )
         .join('');
@@ -205,8 +226,8 @@ function renderField(field: FormField): string {
         .map(
           (o) =>
             `<label class="checkbox-label">
-              <input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}" />
-              ${escapeHtml(o)}
+              <input type="checkbox" name="${escapeHtml(field.name)}" value="${escapeHtml(o)}"${disabledChoice(field, o)} />
+              ${receptionOption(field, o)}
             </label>`,
         )
         .join('');
@@ -402,6 +423,8 @@ function render(): void {
 
   injectStyles();
   const app = getApp();
+  const receptionHtml = state.receptionHtml;
+  const closed = formDef.availability?.accepting === false;
   const profileHtml = (formDef.hideProfile || !profile?.pictureUrl)
     ? ''
     : `<div class="form-profile">
@@ -425,12 +448,13 @@ function render(): void {
           <h1>${escapeHtml(formDef.name).replace(/\\n|\n/g, '<br>')}</h1>
           ${formDef.description && !formDef.hasSubmitWebhook ? `<p class="form-description">${escapeHtml(formDef.description).replace(/\\n|\n/g, '<br>')}</p>` : ''}
           ${profileHtml}
+          ${receptionHtml}
         </div>
         <!-- Page 1: Survey -->
         <div id="form-page-1">
           <form id="survey-form" class="form-body" novalidate>
             ${surveyFieldsHtml}
-            <button type="submit" class="submit-btn" id="nextBtn">次へ →</button>
+            <button type="submit" class="submit-btn" id="nextBtn"${closed ? ' disabled' : ''}>次へ →</button>
           </form>
         </div>
         <!-- Page 2: X-Link -->
@@ -440,7 +464,7 @@ function render(): void {
           </div>
           <form id="liff-form" class="form-body" novalidate>
             ${xFieldHtml}
-            <button type="submit" class="submit-btn" id="submitBtn">受け取る</button>
+            <button type="submit" class="submit-btn" id="submitBtn"${closed ? ' disabled' : ''}>受け取る</button>
           </form>
         </div>
       </div>
@@ -450,6 +474,7 @@ function render(): void {
     document.getElementById('survey-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
 
+      if (closed) return;
       // Validate survey fields
       for (const field of surveyFields) {
         if (!field.required) continue;
@@ -527,10 +552,11 @@ function render(): void {
           <h1>${escapeHtml(formDef.name).replace(/\\n|\n/g, '<br>')}</h1>
           ${formDef.description && !formDef.hasSubmitWebhook ? `<p class="form-description">${escapeHtml(formDef.description).replace(/\\n|\n/g, '<br>')}</p>` : ''}
           ${profileHtml}
+          ${receptionHtml}
         </div>
         <form id="liff-form" class="form-body" novalidate>
           ${fieldsHtml}
-          <button type="submit" class="submit-btn" id="submitBtn">送信する</button>
+          <button type="submit" class="submit-btn" id="submitBtn"${closed ? ' disabled' : ''}>送信する</button>
         </form>
       </div>
     `;
@@ -814,7 +840,13 @@ function throwOnFormSubmitError(payload: FormSubmitPayload, fallback: string): v
 }
 
 async function submitForm(): Promise<void> {
-  if (state.submitting || !state.formDef) return;
+  if (state.submitting || !state.formDef || state.formDef.availability?.accepting === false) return;
+  // DOMを書き換えて満杯の選択肢を選んでも送信しない。最終判断はAPIで行う。
+  for (const field of state.formDef.fields) {
+    if (!field.options) continue;
+    const selected = Array.from(document.querySelectorAll<HTMLInputElement | HTMLOptionElement>(`[name="${CSS.escape(field.name)}"]:checked, [name="${CSS.escape(field.name)}"] option:checked`));
+    if (selected.some(el => choiceCapacity(field, el.value)?.full)) { showFieldError('受付終了の選択肢があります。選び直してください。'); return; }
+  }
 
   const validationError = validateForm();
   if (validationError) {
@@ -1312,6 +1344,7 @@ export async function initForm(formId: string | null): Promise<void> {
     }
 
     state.formDef = json.data;
+    state.receptionHtml = json.data.availability ? (await import('./form-reception.js')).renderFormReception(json.data.availability) : '';
     // ブラウザ・LINE の上の帯に出る題。フォームの名前（1行目）にする。
     document.title = json.data.name.split(/\\n|\n/)[0] || document.title;
 

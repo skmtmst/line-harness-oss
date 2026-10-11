@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import type { Folder, MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'

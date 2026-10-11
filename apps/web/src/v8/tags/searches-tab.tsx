@@ -1,21 +1,27 @@
 'use client'
 
-import { notifySaved, notifyToast } from '@/components/shared/toast'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { FolderDotName } from '@/components/shared/folder-dot'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react'
-import type { SavedSearch, Tag } from '@line-crm/shared'
-import { api, ApiError, type SavedSearchSummary } from '@/lib/api'
-import { ListPageBody } from '@/components/templates'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { notifySaved, notifyToast } from '@/components/shared/toast';
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { FolderDotName } from '@/components/shared/folder-dot';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Bookmark, CircleDashed, Filter, Lightbulb, MousePointerClick, Send, Users } from 'lucide-react';
+
+import { RowNameLink } from '@/components/shared/table';
+
+
+
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { AlertCircle } from 'lucide-react';
+import type { SavedSearch, Tag } from '@line-crm/shared';
+import { api, ApiError, type SavedSearchSummary } from '@/lib/api';
+import { ListPageBody } from '@/components/templates';
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
-import { withViewTransition } from '@/components/shared/view-transition'
+import { withViewTransition } from '@/components/shared/view-transition';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -24,20 +30,20 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
-import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
-import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
-import { splitConditions } from '@/components/friend-fields/saved-search-list'
-import type { SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
-import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter } from '@/components/friend-fields/saved-search-kpis'
-import { formatDay, formatNumber } from '@/lib/format'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DelayedSkeleton } from '@/components/shared/skeleton';
+import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
+import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils';
+import { splitConditions } from '@/components/friend-fields/saved-search-list';
+import type { SavedSearchConditionLabels } from '@/components/friends/saved-search-utils';
+import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter } from '@/components/friend-fields/saved-search-kpis';
+import { formatDay, formatNumber } from '@/lib/format';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
+import { permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
@@ -113,7 +119,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   /* 行の詳細パネル。URL に ?search=<id> を残す。 */
   const [activeSearchId, setActiveSearchId] = useDetailPanelUrl('search')
-  const openSearchDetail = (id: string) => withViewTransition(() => setActiveSearchId(id))
+  const openSearchDetail = (id: string) => withViewTransition(() => setActiveSearchId(current => current === id ? null : id))
   const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
@@ -365,22 +371,16 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 key={search.id}
                 className={`${styles.row} ${styles.searchRow}`}
                 tabIndex={0}
-                onClick={() => openSearchDetail(search.id)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    openSearchDetail(search.id)
-                  }
-                }} data-row-id={search.id}
+                detailKey="search" onOpen={() => openSearchDetail(search.id)}
+                 data-row-id={search.id}
               >
                 <Td className={styles.searchColName}><FolderDotName>
                   <ContextMenu label={`保存した検索「${search.name}」の操作`} items={searchContextItems(search)}>
                     <div className={styles.nameRow}>
                       {editHref ? (
-                        <Link href={editHref} className={`${styles.name} ${styles.nameLink}`}  onClick={(event) => event.stopPropagation()}>
+                        <RowNameLink href={editHref} className={`${styles.name} ${styles.nameLink}`}  onClick={(event) => event.stopPropagation()}>
                           <TruncatedText value={String(search.name ?? '')} />
-                        </Link>
+                        </RowNameLink>
                       ) : (
                         <span className={styles.name} ><TruncatedText value={String(search.name ?? '')} /></span>
                       )}
@@ -391,7 +391,7 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 <Td>{!search.lineAccountId ? (
                         <StatusBadge tone="warning" size="annotation" dot={false}>対象アカウント未割り当て</StatusBadge>
                       ) : null}</Td>
-                <Td className={styles.searchColCount} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.searchColCount}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
                     {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : emptyValue('unknown')}
                   </span>
@@ -399,14 +399,14 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
                 <Td className={styles.searchColShare}><span className={styles.cellText}>{search.isShared ? '全員' : '自分だけ'}</span></Td>
                 <Td className={styles.searchColUsage}><span className={styles.cellText} title={usage}>{usage}</span></Td>
                 <Td className={styles.searchColUpdated}><span className={styles.cellText} title={updatedText(search)}>{updatedText(search)}</span></Td>
-                <Td className={styles.searchColOpen} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.searchColOpen}>
                   {search.lineAccountId ? (
                     <Button href={`/friends?savedSearch=${search.id}`} aria-label={`「${search.name}」で友だち一覧を開く`}>
                       <Users size={15} aria-hidden="true" />友だち一覧へ
                     </Button>
                   ) : null}
                 </Td>
-                <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
+                <Td className={styles.colMenu}>
                   <span className={styles.menuAnchor}>
                     <RowMenu
                       size="row"

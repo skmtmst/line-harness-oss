@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { Building2, Headset, ReceiptText, Users } from 'lucide-react'
 import './hq-settings-nav-v8.css'
 

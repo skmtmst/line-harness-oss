@@ -133,6 +133,7 @@ export async function fireEvent(
    * 待ち行列に残して定期 drain に任せる（旧行の平文はそのまま送る）。
    */
   credentialKey?: string,
+  options?: { internalOnly?: boolean },
 ): Promise<void> {
   db = execution?.db ?? db;
   let outgoingWebhookLineAccountId = lineAccountId;
@@ -146,12 +147,12 @@ export async function fireEvent(
 
   // Phase 1: fire webhooks, apply scoring rules, and ad conversion postback concurrently.
   const phase1: Promise<unknown>[] = [
-    fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId, execution),
+    ...(options?.internalOnly ? [] : [fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId, execution)]),
     replayStep(execution, 'event:scoring', () => processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken, execution)),
   ];
   const mappedEcSource = (eventType === 'ec.order.confirmed' || eventType === 'ec.order.payment_received')
     && outgoingWebhookLineAccountId && await hasMappedEcConversionSource(db, outgoingWebhookLineAccountId);
-  const adConversion = payload.friendId && !mappedEcSource ? adConversionForEvent(eventType, payload) : null;
+  const adConversion = !options?.internalOnly && payload.friendId && !mappedEcSource ? adConversionForEvent(eventType, payload) : null;
   if (payload.friendId && adConversion) {
     phase1.push(
       sendAdConversions(db, payload.friendId, adConversion.eventName, adConversion.value, {

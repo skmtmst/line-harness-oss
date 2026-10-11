@@ -1,5 +1,5 @@
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import type { LinkProps } from 'next/link'
 import { Check, LoaderCircle, ArrowUpRight } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'

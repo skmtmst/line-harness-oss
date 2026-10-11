@@ -1,53 +1,57 @@
 'use client'
 
 import Toggle from '@/components/shared/toggle'
-import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { notifySaved, notifyToast } from '@/components/shared/toast'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Gift, ImageIcon, Minus, Plus, Stamp } from 'lucide-react'
-import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared'
-import type { VisitStampCard, VisitStampEntryPage, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { DetailColumns } from '@/components/templates/detail-columns'
+import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state';
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
+import { notifySaved, notifyToast } from '@/components/shared/toast';
+import { useSearchParams } from 'next/navigation';
+
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Gift, ImageIcon, Minus, Plus, QrCode, Stamp } from 'lucide-react';
+import { VISIT_STAMP_DEFAULT_COLOR, visitStampDarkInk } from '@line-crm/shared';
+import type { VisitStampCard, VisitStampEntryPage, VisitStampMultiplier, VisitStampReward, VisitStampSettings } from '@line-crm/shared';
+import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { DetailColumns } from '@/components/templates/detail-columns';
+import { StaffQr, StorefrontQr } from './qr'
 import tpl from '@/components/templates/page-templates.module.css'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
 import ColorWell from '@/components/shared/color-well'
 import Combobox from '@/components/shared/combobox'
 import HelpTip from '@/components/shared/help-tip'
-import { FieldError, Field } from '@/components/shared/form-controls'
+import { FieldError, Field } from '@/components/shared/form-controls';
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Radio from '@/components/shared/radio'
-import { RowActions } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions';
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
-import { Tabs } from '@/components/shared/tabs'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
-import { api, describeSaveFailure } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { visitStampsApi } from '@/lib/visit-stamps-api'
-import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display'
-import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs'
+import { Tabs } from '@/components/shared/tabs';
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import { TextArea, TextField } from '@/components/shared/text-field';
+import { SettingCheckbox } from '@/components/shared/checkbox';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { useAccount } from '@/contexts/account-context';
+import { api, describeSaveFailure } from '@/lib/api';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
+import { visitStampsApi } from '@/lib/visit-stamps-api';
+import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display';
+import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs';
 import styles from './visit-stamps.module.css'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TruncatedText from '@/components/shared/truncated-text'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { emptyValue } from '@/components/shared/empty-value'
+import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { emptyValue } from '@/components/shared/empty-value';
 import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ImageFrame from '@/components/shared/image-frame'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
@@ -134,6 +138,7 @@ function VisitStampsScreen() {
     router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
   }
   usePageTitle('来店スタンプ')
+  const [qrOpen,setQrOpen]=useState(false)
   const { selectedAccountId, accounts } = useAccount()
   const role = useStaffRole()
   /* 役割が分かるまでは出す（最後の守りはサーバの 403）。閲覧のみ（viewer）には変える操作を置かない。 */
@@ -142,6 +147,7 @@ function VisitStampsScreen() {
 
   const [cards, setCards] = useState<VisitStampCard[] | null>(null)
   const [loadError, setLoadError] = useState<unknown>(null)
+  useEffect(()=>setQrOpen(false),[selectedAccountId])
   const card = useMemo(() => (cards ?? []).find((c) => selectedAccountId && c.accountIds.includes(selectedAccountId)) ?? (cards ?? [])[0] ?? null, [cards, selectedAccountId])
 
   const [name, setName] = useState('')
@@ -447,6 +453,7 @@ function VisitStampsScreen() {
       <PageHeading
         headingSize="regular"
         title="来店スタンプ"
+        actions={stampable&&selectedAccountId&&card?.accountIds.includes(selectedAccountId)?<Button variant="primary" onClick={()=>setQrOpen(true)}><QrCode size={15} aria-hidden="true"/>QR を出す</Button>:undefined}
         help="お店に来たお客さまへ押すスタンプカードです。マイル（オンラインでの動きにたまるもの）とは別に数えます。決まった数がたまると特典を使えます。特典はお客さまの LINE の画面を店員に見せ、店員が暗証番号を打つと使用済みになります。"
       />
       <div className={tpl.tabs} data-template-region="tabs">
@@ -581,7 +588,7 @@ function VisitStampsScreen() {
                   </div>
                 ) : null}
                 <div className={styles.field}>
-                  <span className={styles.label}>たまる間隔の制限 <HelpTip label="たまる間隔の制限の説明">QRでも店で手入力でも同じ制限です。紙からの移行と取り消しにはかかりません。</HelpTip></span>
+                  <span className={styles.label}>たまる間隔の制限 <HelpTip label="たまる間隔の制限の説明">台帳の来店と手入力にはカードの制限がかかります。店頭のQRは同じ日に1回までです。店員のQR・紙からの移行と取り消しにはかかりません。</HelpTip></span>
                   <div className={styles.radio} role="radiogroup" aria-label="たまる間隔の制限">
                     <SaveErrorField names={["stamp-interval","mode","interval.mode"]}><Radio name="stamp-interval" checked={interval.mode === 'same_day'} disabled={ro} onChange={() => set({ stampInterval: { mode: 'same_day' } })}>同じ日は1回まで（0時で戻る）</Radio></SaveErrorField>
                     <div className={styles.hoursRow}>
@@ -641,6 +648,7 @@ function VisitStampsScreen() {
                 {ro || settings.multipliers.length >= 20 ? null : (
                   <span className={styles.addLine}><Button variant="text" onClick={() => setMultEdit('new')}><Plus size={15} aria-hidden="true" />倍率を足す</Button></span>
                 )}
+                  {card&&selectedAccountId&&card.accountIds.includes(selectedAccountId)?<StorefrontQr key={card.id+":"+card.version+":"+selectedAccountId} card={card} accountId={selectedAccountId} shop={accounts.find(a=>a.id===selectedAccountId)?.displayName??card.name} canManage={canManage}/>:null}
               </section>
             </div>
 
@@ -806,6 +814,7 @@ function VisitStampsScreen() {
         </div>
       ) : null}
 
+      {qrOpen&&card&&selectedAccountId?<StaffQr key={card.id+":"+card.version} card={card} accountId={selectedAccountId} shop={accounts.find(a=>a.id===selectedAccountId)?.displayName??card.name} onClose={()=>setQrOpen(false)}/>:null}
       <RewardDialog open={rewardEdit !== null} reward={rewardEdit === 'new' ? null : rewardEdit} onClose={() => setRewardEdit(null)}
         onSave={(reward) => { set({ rewards: rewardEdit === 'new' ? [...settings.rewards, reward] : settings.rewards.map((r) => (r.id === reward.id ? reward : r)) }); setRewardEdit(null) }} />
       <MultiplierDialog open={multEdit !== null} multiplier={typeof multEdit === 'number' ? settings.multipliers[multEdit] ?? null : null} onClose={() => setMultEdit(null)}

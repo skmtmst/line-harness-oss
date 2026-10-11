@@ -8,6 +8,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { NewAutomationV8 } from '@/v8/automations/create/create'
+import AutomationDefinitionEntry from '@/v8/automations/definition-entry'
 
 /*
   見本から作った下書きの編集面。
@@ -27,8 +28,12 @@ function AutomationDraftPageInner() {
    * 前の下書きの表示と保存先を残さない。`key` で編集器ごと作り直すので、
    * 古い入力・版・保存先がBへ混ざらない。
    */
-  const draftId = useSearchParams().get('id')
+  const params = useSearchParams()
+  const draftId = params.get('id')
+  const automationId = params.get('automationId')
   const theme = useAdminTheme()
+
+  if (!draftId && automationId) return <AutomationDefinitionEntry key={automationId} automationId={automationId} />
 
   /*
    * ★V8 切替（`J1VA8`）。v8 のときだけ src/v8 の画面（ルールを作るの「下書きを仕上げる」の顔）へ。

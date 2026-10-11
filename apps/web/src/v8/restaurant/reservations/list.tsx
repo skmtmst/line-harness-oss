@@ -104,17 +104,17 @@ export default function ListView({ view, rows, total, tables, page, period, stat
         toolbar={      <>
         {view === 'list' ? (
           <>
-            <div className={styles.filterField}>
-              <Field labelSize="compact" label="期間">
-              <SaveErrorField names={["period"]}><Select aria-label="期間" size="full" value={period} onChange={onPeriod} options={[
+            <div className={styles.filterField} data-filter="period">
+              <Field labelSize="compact" labelHidden label="期間">
+              <SaveErrorField names={["period"]}><Select aria-label="期間" label="期間" size="full" value={period} onChange={onPeriod} options={[
                 { value: 'upcoming', label: '今後の予約' },
                 { value: 'all', label: 'すべての期間' },
                 { value: 'past', label: '過去の予約' },
               ]} /></SaveErrorField>
               </Field>
             </div>
-            <div className={styles.filterField}>
-              <Field labelSize="compact" label="状態">
+            <div className={styles.filterField} data-filter="status">
+              <Field labelSize="compact" labelHidden label="状態">
               <SaveErrorField names={["status"]}><Select aria-label="状態" size="full" value={status} onChange={onStatus} options={LEDGER_STATUS_OPTIONS} /></SaveErrorField>
               </Field>
             </div>

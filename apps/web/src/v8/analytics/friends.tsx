@@ -9,7 +9,7 @@ import { BarChart, toBarChartItems } from '@/components/shared/bar-chart'
  * 呼ぶ口・数の出し方は今の画面（app/analytics/page.tsx の FriendsOverviewTab）と同じ。
  */
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import { ArrowLeftRight, CircleHelp, UserMinus, Users } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'

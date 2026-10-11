@@ -45,6 +45,7 @@ const detail = (definition: unknown = message) => ({ template: { id: 't-1', name
 const listRow = { ...detail().template, kind: 'message', content_summary: '本文', distributed_account_count: 4, distributed_account_names: ['然 -NEN- 本店', '然 -NEN- 渋谷店', '2025年イベント'], distributed_account_more: 1 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/hq/templates')
   window.sessionStorage.clear()
   calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
   calls.list.mockResolvedValue([listRow])
@@ -125,7 +126,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
     calls.get.mockResolvedValue(detail({ ...message, template: { ...message.template, messageType, messageContent } }))
     calls.update.mockImplementation(async (_id: string, input: { definition: unknown }) => detail(input.definition))
     render(<HqTemplatesV8 type="template" />)
-    fireEvent.click(await screen.findByRole('button', { name: '予約前日のご案内' }))
+    fireEvent.click((await screen.findByRole('link', { name: '予約前日のご案内' })).closest('tr')!)
     fireEvent.click(await screen.findByRole('button', { name: '編集する' }))
     expect(await screen.findByText('この形は新しく作れません。新しく作るときはカルーセル・リッチメッセージを使ってください。')).toBeTruthy()
     expect(screen.queryByText('形')).toBeNull()
@@ -206,7 +207,7 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
 describe('統括のテンプレートの詳細（pQ4fH）', () => {
   it('名前を押すと詳細。配った先のアカウント名と［このアカウントへ入る］・［配る］を出す', async () => {
     render(<HqTemplatesV8 type="template" />)
-    fireEvent.click(await screen.findByRole('button', { name: '予約前日のご案内' }))
+    fireEvent.click((await screen.findByRole('link', { name: '予約前日のご案内' })).closest('tr')!)
     expect(await screen.findByRole('heading', { name: '配った先' })).toBeTruthy()
     expect(screen.getByText('4 アカウントに配りました。新しい版を配ると、4 アカウントのテンプレートが新しい版になります。')).toBeTruthy()
     expect(screen.getByText('ほか 1 アカウント')).toBeTruthy()
@@ -233,7 +234,7 @@ describe('統括のテンプレートの詳細の版（pQ4fH・API-18）', () =>
     calls.compareVersions.mockResolvedValue({ from: { version: version(1, false, false), definition: { schemaVersion: 1, template: { messageContent: '古い本文' } } }, to: { version: version(3, true, true), definition: { schemaVersion: 1, template: { messageContent: '新しい本文' } } }, changed: true })
     calls.restoreVersion.mockResolvedValue({ ...detail(), template: { ...detail().template, revision: 4 } })
     render(<HqTemplatesV8 type="template" />)
-    fireEvent.click(await screen.findByRole('button', { name: '予約前日のご案内' }))
+    fireEvent.click((await screen.findByRole('link', { name: '予約前日のご案内' })).closest('tr')!)
     expect(await screen.findByText('版3（いまの版）')).toBeTruthy()
     expect(screen.getByText('新しい版を未配布')).toBeTruthy()
     expect(screen.getByText('配っていない変更があります')).toBeTruthy()
@@ -266,7 +267,7 @@ describe('統括の回答フォームの編集（u5MM7：店の回答フォー�
 
   it('名前を押すと店と同じ3つのタブの編集画面。右は「配った先」、［保存する］で統括のひな形を直してアカウントへ配るへ進む', async () => {
     render(<HqTemplatesV8 type="form" />)
-    fireEvent.click(await screen.findByRole('button', { name: '来店アンケート' }))
+    fireEvent.click((await screen.findByRole('link', { name: '来店アンケート' })).closest('tr')!)
     expect(await screen.findByRole('heading', { name: '配った先' })).toBeTruthy()
     expect(screen.getByText('配った先：3 アカウント（本店・渋谷店・イベント）。各アカウントでは回答フォームとして使えます。')).toBeTruthy()
     expect(screen.getByRole('tab', { name: '答え終わったあと' })).toBeTruthy()
@@ -286,7 +287,7 @@ describe('統括の回答フォームの編集（u5MM7：店の回答フォー�
 
   it('［下書きを保存］は保存して一覧へ戻り、配るへは進まない', async () => {
     render(<HqTemplatesV8 type="form" />)
-    fireEvent.click(await screen.findByRole('button', { name: '来店アンケート' }))
+    fireEvent.click((await screen.findByRole('link', { name: '来店アンケート' })).closest('tr')!)
     fireEvent.click(await screen.findByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(calls.update).toHaveBeenCalled())
     expect(screen.queryByRole('checkbox', { name: /然 -NEN- 本店/ })).toBeNull()
@@ -334,7 +335,7 @@ describe('統括のテンプレートを直す（質問・クーポン：店の�
     calls.get.mockResolvedValue({ template: { ...detail().template, name: rowName }, definition })
     calls.update.mockImplementation(async (_id: string, input: { name: string; definition: unknown }) => ({ template: { ...detail().template, name: input.name, revision: 4 }, definition: input.definition }))
     render(<HqTemplatesV8 type="template" />)
-    fireEvent.click(await screen.findByRole('button', { name: rowName }))
+    fireEvent.click((await screen.findByRole('link', { name: rowName })).closest('tr')!)
     fireEvent.click(await screen.findByRole('button', { name: /編集する/ }))
   }
 
@@ -467,12 +468,12 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     expect(screen.queryByRole('dialog', { name: '保存しました。アカウントに配りますか？' })).toBeNull()
     expect(calls.create).toHaveBeenCalledOnce()
   })
-  it('下書きは保存して一覧へ戻る。配布状況が取れなくても未配布にはしない', async () => {
+  it('新規の下書きは保存して一覧へ戻る。配布状況が取れなくても未配布にはしない', async () => {
     await author()
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalledOnce())
     expect(screen.queryByRole('dialog')).toBeNull()
-    cleanup(); calls.create.mockClear()
+    cleanup(); window.history.replaceState(null, '', '/hq/templates'); calls.create.mockClear()
     calls.receivedVersions.mockRejectedValue(new Error('通信失敗'))
     await author()
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -590,9 +591,9 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     expect(within(folderDialog).getByRole('button', { name: 'VIPを外す' })).toBeTruthy()
     expect(within(folderDialog).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     fireEvent.click(within(folderDialog).getByRole('button', { name: 'キャンセル' }))
-    const listName = await screen.findByRole('button', { name: 'VIP', exact: true })
+    const listName = await screen.findByRole('link', { name: 'VIP', exact: true })
     expect(listName.closest('[data-list-name]')?.querySelector('[data-folder-dot]')?.getAttribute('style')).toContain(expectedColor)
-    fireEvent.click(listName)
+    fireEvent.click(listName.closest('tr')!)
     const body = await screen.findByRole('region', { name: '本文' })
     const pill = within(body).getByRole('group', { name: 'タグ「VIP」' })
     expect(pill.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)

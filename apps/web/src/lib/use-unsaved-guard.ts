@@ -28,6 +28,8 @@ export function useUnsavedGuard(options: {
    * true のとき popstate を止めず・確認も出さず、そのまま通す。
    */
   samePage?: (destination: URL) => boolean
+  /** 同じ画面の選び直しを、画面側の確認で扱う Link。通常の離脱には使わない。 */
+  handlesLocalLink?: (destination: URL) => boolean
   /**
    * 「保存せずに移る」が確定したあと・実際に移動する直前に呼ぶ。
    * クエリだけ変わる画面内遷移（コンポーネントがアンマウントされない）でも
@@ -35,13 +37,15 @@ export function useUnsavedGuard(options: {
    */
   onDiscard?: () => void
 }) {
-  const { dirty, busy = false, samePage, onDiscard } = options
+  const { dirty, busy = false, samePage, handlesLocalLink, onDiscard } = options
   const router = useRouter()
   const [leaveTarget, setLeaveTarget] = useState<UnsavedLeaveTarget | null>(null)
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
   const samePageRef = useRef(samePage)
   samePageRef.current = samePage
+  const handlesLocalLinkRef = useRef(handlesLocalLink)
+  handlesLocalLinkRef.current = handlesLocalLink
   const onDiscardRef = useRef(onDiscard)
   onDiscardRef.current = onDiscard
   const allowHistoryLeaveRef = useRef(false)
@@ -80,6 +84,8 @@ export function useUnsavedGuard(options: {
       const destination = new URL(anchor.href, window.location.href)
       const current = new URL(window.location.href)
       if (destination.origin !== current.origin || destination.href === current.href) return
+      // 選び直しの確認を持つ画面は、名前 Link の同一タブ操作をその確認へ渡す。
+      if (destination.pathname === current.pathname && anchor.hasAttribute('data-row-local-open') && handlesLocalLinkRef.current?.(destination)) return
       // パスとクエリが同じで hash だけが変わる移動は画面内の見出しジャンプ。
       // 画面を離れないので確認を出さない（離すと「#見出し」リンクが全部確認になる）。
       if (destination.pathname === current.pathname && destination.search === current.search) return

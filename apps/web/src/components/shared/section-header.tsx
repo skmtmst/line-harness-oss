@@ -14,6 +14,7 @@ export default function SectionHeader({
   description,
   size,
   note,
+  actions,
   help,
   helpLabel,
   href,
@@ -28,6 +29,8 @@ export default function SectionHeader({
   linkTone?: 'action'
   /** 題の右の小さな補足（例「直近30日」） */
   note?: React.ReactNode
+  /** 段の右端の閉じる操作など。補足と分けて右へ寄せる。 */
+  actions?: React.ReactNode
   /** 「？」を押すと出る補足文。helpLabel とセットで渡す */
   help?: React.ReactNode
   /** 「？」の読み上げ名（例「最近の動きの説明」） */
@@ -51,6 +54,7 @@ export default function SectionHeader({
       </h3>)}
       {note ? <span className={styles.note}>{note}</span> : null}
       {help && helpLabel ? <HelpTip label={helpLabel} className={styles.help}>{help}</HelpTip> : null}
+      {actions ? <span className={styles.link}>{actions}</span> : null}
       {href && linkLabel ? (
         <span className={styles.link}>
           <TextLink href={href} tone={linkTone}>{linkLabel}</TextLink>

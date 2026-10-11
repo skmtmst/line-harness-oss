@@ -8,7 +8,7 @@
  * v7 を直す必要が出たら new/page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 
-import Link from 'next/link'
+import Link from '@/components/shared/list-navigation'
 import EventWizard from '@/components/events/event-wizard'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import styles from './events-new-v8.module.css'

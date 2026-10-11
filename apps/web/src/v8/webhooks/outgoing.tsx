@@ -1,11 +1,12 @@
 'use client'
 
 import { useFolderMove } from '@/components/shared/use-folder-move'
+import { RowNameLink } from '@/components/shared/table'
 import { moveOutgoingWebhookToFolder } from '@/lib/move-to-folder'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Bookmark, LayoutTemplate, Pause, Play, Plus, Send } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
@@ -623,7 +624,7 @@ export default function WebhooksOutgoingV8() {
                 const nameNode = (
                   <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}
                     {canManage ? (
-                      <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
+                      <RowNameLink href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></RowNameLink>
                     ) : (
                       <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                     )}
@@ -672,7 +673,7 @@ export default function WebhooksOutgoingV8() {
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。 */}
                       <FolderDotName folder={folderDotFor(folders, item.folderId)}>{folderMove.checkbox(item)}
                         {canManage ? (
-                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></Link>
+                          <RowNameLink href={`/webhooks/edit?id=${item.id}`} className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></RowNameLink>
                         ) : (
                           <span className={styles.name} ><TruncatedText value={String(item.name ?? '')} /></span>
                         )}

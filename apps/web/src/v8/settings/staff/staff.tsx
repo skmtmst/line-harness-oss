@@ -1,58 +1,61 @@
 'use client'
 
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format'
+import { useOverlayFocus } from '@/components/shared/overlay-utils';
+import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
 import SegmentedControl from '@/components/shared/segmented'
-import { useListUrlValue } from '@/components/shared/list-url-state'
-import { notifySaved, notifyToast } from '@/components/shared/toast'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { UserPlus } from 'lucide-react'
-import Link from 'next/link'
-import { useMergedTab } from '@/components/layout/merged-tabs'
+import { useListUrlValue } from '@/components/shared/list-url-state';
+import { notifySaved, notifyToast } from '@/components/shared/toast';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { UserPlus } from 'lucide-react';
+import { Eye, X } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+import { useMergedTab } from '@/components/layout/merged-tabs';
 import LoginAudit from '@/components/staff/login-audit'
 import Button from '@/components/shared/button'
-import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
+import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table';
 import Checkbox from '@/components/shared/checkbox'
-import { Field } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls';
+import { TextField } from '@/components/shared/text-field';
 import Select from '@/components/shared/select'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
-import { Tabs } from '@/components/shared/tabs'
+import { Tabs } from '@/components/shared/tabs';
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
-import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt';
 import NotificationSwitch from '@/components/ui/notification-switch'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { usePageTitle } from '@/components/shell/page-chrome';
+import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
+import { type ActionMenuItem } from '@/components/shared/action-menu';
+import { RowMenu } from '@/components/shared/row-actions';
 import styles from './staff.module.css'
 import StatusBadge from '@/components/shared/status-badge'
-import { useAccount } from '@/contexts/account-context'
-import { ApiError, api, describeSaveFailure, fetchApi, type AccessRoleBundle, type AccessRoleItem, type AccessUserItem, type AccessUserSummary, type AuditEventItem } from '@/lib/api'
-import type { StaffMember } from '@line-crm/shared'
-import { SCOPE_ITEMS, BUNDLE_PRESETS, BROADCAST_EDIT_OPERATION_KEYS, type FeatureAccessLevel, type ScopeLevels } from '@line-crm/shared'
-import { csvCell } from '@/lib/presentation'
-import { qrToDataURL } from '@/lib/qr-image'
-import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
-import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
-import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
-import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
+import { useAccount } from '@/contexts/account-context';
+import { ApiError, api, describeSaveFailure, fetchApi, type AccessRoleBundle, type AccessRoleItem, type AccessUserItem, type AccessUserSummary, type AuditEventItem } from '@/lib/api';
+import type { StaffMember } from '@line-crm/shared';
+import { SCOPE_ITEMS, BUNDLE_PRESETS, BROADCAST_EDIT_OPERATION_KEYS, type FeatureAccessLevel, type ScopeLevels } from '@line-crm/shared';
+import { csvCell } from '@/lib/presentation';
+import { qrToDataURL } from '@/lib/qr-image';
+import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions';
+import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft';
+import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels';
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input';
 import TruncatedText from '@/components/shared/truncated-text'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
-import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { csvFileName } from '@/lib/csv-file-name';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import EditorSurface from '@/components/shared/editor-surface'
 import ListState from '@/components/shared/list-state'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }

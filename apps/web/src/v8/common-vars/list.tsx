@@ -1,24 +1,31 @@
 'use client'
 
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar'
+import { isOwnerOrAdmin } from '@/lib/staff-capability';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+
+import { RowNameLink } from '@/components/shared/table';
+
+
 import SharedStatusPill from '@/components/shared/status-pill'
-import { useListUrlValue } from '@/components/shared/list-url-state'
+import { useListUrlValue } from '@/components/shared/list-url-state';
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react'
-import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
-import { api, ApiError, type CommonVarReplacementCandidate, type CommonVarReplacementImpact } from '@/lib/api'
-import { useAccount } from '@/contexts/account-context'
-import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { clampSearchQuery } from '@/lib/search-query'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
+import { useFeatureAccess } from '@/lib/use-feature-access';
+import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Archive, ArrowRight, Braces, CalendarClock, CalendarX, CircleDashed, FolderCog, Link2, Pause, Plus, TriangleAlert } from 'lucide-react';
+import Link from '@/components/shared/list-navigation'
+
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { ArrowUpDown, Check, Copy, Eye, Lock, X } from 'lucide-react';
+import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared';
+import { api, ApiError, type CommonVarReplacementCandidate, type CommonVarReplacementImpact } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
+import { clampSearchQuery } from '@/lib/search-query';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { ListPage } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -27,32 +34,32 @@ import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from '@/components/shared/managed-folder-panel'
+import ManagedFolderPanel, { managedFolderNavRows, type ManagedFolderControl } from '@/components/shared/managed-folder-panel';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import InlineEdit from '@/components/shared/inline-edit'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import BulkBar from '@/components/shared/bulk-bar'
-import { RowMenu } from '@/components/shared/row-actions'
-import { withViewTransition } from '@/components/shared/view-transition'
+import { RowMenu } from '@/components/shared/row-actions';
+import { withViewTransition } from '@/components/shared/view-transition';
 import Select from '@/components/shared/select'
 import HelpTip from '@/components/shared/help-tip'
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
-import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
-import { formatDay, formatNumber, formatDate as polishFormatDate } from '@/lib/format'
-import { blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model'
+import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
+import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars';
+import { formatDay, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
+import { blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model';
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls'
-import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { Field } from '@/components/shared/form-controls';
+import { emptyValue } from '@/components/shared/empty-value';
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -1200,17 +1207,11 @@ function CommonVarsListInner() {
                     className={styles.rowClick}
                     tabIndex={0}
                     title={updateTitle}
-                    onClick={() => setActiveId(item.id)}
+                    detailKey="row" onOpen={() => setActiveId(activeId === item.id ? null : item.id)}
                     onContextMenuCapture={() => setContextId(item.id)}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget) return
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        setActiveId(item.id)
-                      }
-                    }}
+
                   >
-                    <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.selectCell}>
                       {canWrite ? (
                         <SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
                           checked={selected.has(item.id)}
@@ -1222,14 +1223,14 @@ function CommonVarsListInner() {
                     <NameCell name={
                         <div className={styles.dotLine}>
                           <>
-                            <Link
+                            <RowNameLink
                               href={`/contents/vars/edit?id=${item.id}`}
 
                               className={styles.nameLink}
                               onClick={(event) => event.stopPropagation()}
                             >
                               <TruncatedText value={String(item.name ?? '')} />
-                            </Link>
+                            </RowNameLink>
                           </>
                         </div>
                       } folder={folderDotOf(item)}
@@ -1241,7 +1242,7 @@ function CommonVarsListInner() {
                       <SharedStatusPill tone={badge.tone}>{badge.label}</SharedStatusPill>
                     </Td>
                     {!narrow && (
-                      <Td onClick={(event) => event.stopPropagation()}>
+                      <Td>
                         {item.usageCount === undefined ? (
                           <span className={styles.usageNone} title="使われている場所（未取得）">—（未取得）</span>
                         ) : item.usageCount === 0 ? (
@@ -1257,7 +1258,7 @@ function CommonVarsListInner() {
                         )}
                       </Td>
                     )}
-                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                    <Td className={styles.menuCell}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。
                           閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
                       {canWrite ? <div className={styles.menuBox}>

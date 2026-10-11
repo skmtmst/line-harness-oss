@@ -328,3 +328,21 @@ it('アーカイブの絞り込みと復元は版番号を送り、受付を勝�
   await flush();
   expect(unarchive).toHaveBeenCalledWith('f-old', 'account-a', 7);
 });
+
+
+it('一覧フロー：余白・Enter・Spaceでフォームのパネル、名前は編集、回答件数は別操作', async () => {
+  await mount()
+  const row = host.querySelector<HTMLElement>('tr[data-row-id="f-1"]')!
+  const name = row.querySelector<HTMLAnchorElement>('a[data-row-link]')!
+  expect(new URL(name.href).pathname).toBe('/form-submissions/edit')
+  expect(new URL(new URL(name.href).searchParams.get('returnTo')!, window.location.origin).searchParams.get('form')).toBe('f-1')
+  const count = row.querySelector<HTMLAnchorElement>('a[href*="/responses"]')!
+  expect(new URL(count.href).pathname).toBe('/form-submissions/responses')
+  await act(async () => { fireEvent.click(row) })
+  expect(new URLSearchParams(window.location.search).get('form')).toBe('f-1')
+  expect(screen.getByRole('dialog', { name: '来店アンケート' })).toBeTruthy()
+  await act(async () => { fireEvent.click(row) })
+  expect(new URLSearchParams(window.location.search).has('form')).toBe(false)
+  await act(async () => { fireEvent.keyDown(row, { key: ' ' }) })
+  expect(new URLSearchParams(window.location.search).get('form')).toBe('f-1')
+})
