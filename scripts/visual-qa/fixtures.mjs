@@ -1033,11 +1033,13 @@ export const FORMS = [
 
 /**
  * 機能13 `EMBIK`。一覧の1ページ目と、画面全体18件の集計を同じ応答で返す。
- * 板 `I3L41O`・`GrnO4` の表は上の5行のあとすぐ「18件」なので、一覧の口（with_list_summary）だけ5行にする。
+ * 2026-10-11の指定に合わせ、18件の範囲を実際に返す。最初の5行は固定絵の見本を保つ。
  * 編集画面の選択肢など、ほかの口は `FORMS` の全部のまま。
  */
 export const FORM_LIST = {
-  items: FORMS.slice(0, 5),
+  items: [...FORMS.slice(0, 5), ...Array.from({ length: 13 }, (_, index) => ({
+    ...FORMS[index % 5], id: `form-list-example-${index + 1}`, name: `回答フォーム ${index + 6}`, pendingPostActionCount: 0,
+  }))],
   total: 18,
   page: 1,
   limit: 20,
@@ -1871,8 +1873,8 @@ export const COMMON_VAR_DELETE_IMPACT_CAMPAIGN = {
  */
 export const MEDIA_FOLDERS = [
   { id: 'media-product', name: '01_商品写真', kind: 'media', sortOrder: 0, color: '#2563EB', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'media-banner', name: '02_バナー', kind: 'media', sortOrder: 1, color: '#F3C66B', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'media-video', name: '03_動画', kind: 'media', sortOrder: 2, color: '#7C6BC4', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'media-banner', name: '02_バナー', kind: 'media', sortOrder: 1, color: '#1f9d55', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'media-video', name: '03_動画', kind: 'media', sortOrder: 2, color: '#e07b24', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
 ]
 
 export const MEDIA_QUOTA = {
@@ -1884,20 +1886,20 @@ export const MEDIA_QUOTA = {
   state: 'normal',
 }
 
-const mediaPreview = (color) => `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="678"><rect width="1040" height="678" fill="${color.replace('#', '%23')}"/></svg>`
+const mediaPreview = (color) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="560"><rect width="1040" height="560" fill="${color}"/><svg x="440" y="200" width="160" height="160" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4-4L7 21"/></svg></svg>`)}`
 
 export const MEDIA_ITEMS = [
   {
     id: 'media-autumn-new', lineAccountId: 'visual-qa-account', folderId: 'media-product',
     kind: 'image', filename: '秋の新商品.jpg', mimeType: 'image/jpeg',
     sizeBytes: 1258291, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-19T09:00:00.000Z', usageCount: 3,
+    url: mediaPreview('#c8a27a'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-19T09:00:00.000Z', usageCount: 3,
   },
   {
     id: 'media-banner', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
     kind: 'image', filename: '会員証バナー.png', mimeType: 'image/png',
     sizeBytes: 430080, width: 2500, height: 1686, durationMs: null,
-    url: mediaPreview('#d9efe3'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 1,
+    url: mediaPreview('#9fb3c8'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 1,
   },
   {
     id: 'media-guide-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
@@ -1915,19 +1917,19 @@ export const MEDIA_ITEMS = [
     id: 'media-staff', lineAccountId: 'visual-qa-account', folderId: 'media-product',
     kind: 'image', filename: 'スタッフ紹介.jpg', mimeType: 'image/jpeg',
     sizeBytes: 880640, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#efe5dc'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-15T09:00:00.000Z', usageCount: 1,
+    url: mediaPreview('#d9b8a6'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-15T09:00:00.000Z', usageCount: 1,
   },
   {
     id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
     kind: 'image', filename: '休業のお知らせ.png', mimeType: 'image/png',
     sizeBytes: 317440, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#f1e8e8'), uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-14T09:00:00.000Z', usageCount: 0,
+    url: mediaPreview('#b9c7a5'), uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-14T09:00:00.000Z', usageCount: 0,
   },
   {
     id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: 'media-product',
     kind: 'image', filename: '夏の定番セット.jpg', mimeType: 'image/jpeg',
     sizeBytes: 1468006, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-13T09:00:00.000Z', usageCount: 3,
+    url: mediaPreview('#e2c18f'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-13T09:00:00.000Z', usageCount: 3,
   },
   {
     id: 'media-price-list', lineAccountId: 'visual-qa-account', folderId: null,
@@ -2282,6 +2284,7 @@ export const RICH_MENU_GROUPS = [
   {
     ...RICH_MENU_BASE,
     id: 'rich-menu-target',
+    thumbnailR2Key: 'qa-thumb-normal',
     name: '通常メニュー（会員向け）',
     isDefaultForAll: true,
     targetingPriority: 1,
@@ -2295,6 +2298,7 @@ export const RICH_MENU_GROUPS = [
     /* 編集の見本（RICH_MENU_GROUP_DETAILS の rmg-1 ＝通常メニュー（会員向け）の下書き）と ID を分ける。
      * 同じ ID だと、作る③の「出す順番」が自分と取り違えて、この行を消していた。 */
     id: 'rmg-gold',
+    thumbnailR2Key: 'qa-thumb-gold',
     name: '会員ランク上位',
     /* 板 `rZEGN` の丸：通常・通常・キャンペーン・未分類（上から）。 */
     folderId: 'rich-menu-folder-normal',
@@ -2312,6 +2316,7 @@ export const RICH_MENU_GROUPS = [
   {
     ...RICH_MENU_BASE,
     id: 'rmg-autumn',
+    thumbnailR2Key: 'qa-thumb-autumn',
     name: '秋のキャンペーン',
     size: 'compact',
     status: 'draft',
@@ -2328,6 +2333,7 @@ export const RICH_MENU_GROUPS = [
   {
     ...RICH_MENU_BASE,
     id: 'rmg-2',
+    thumbnailR2Key: 'qa-thumb-guide',
     name: '初回来店ガイド',
     status: 'draft',
     targetingPriority: 3,
@@ -2445,7 +2451,7 @@ export const RICH_MENU_EXTERNAL = {
 export const RICH_MENU_TAP_STATS = {
   from: '2026-08-01',
   to: '2026-08-31',
-  byArea: [],
+  byArea: [{ areaId: 'qa-area-booking', groupId: 'rich-menu-target', label: '予約する', taps: 4210 }],
   byGroup: [
     { groupId: 'rich-menu-target', taps: 12480 },
     { groupId: 'rmg-gold', taps: 3210 },
@@ -4439,7 +4445,7 @@ const autoReplyRun = (id, friendName, occurredAt, inputPreview, status, detail, 
   lineAccountId: 'visual-qa-account',
   occurredAt,
   subject: friendName,
-  accountLabel: '然-NEN- TEST',
+  accountLabel: '然-NEN-TEST',
   triggerLabel: '予約',
   reference: `message-${id}`,
   status,
@@ -6425,14 +6431,15 @@ export const BOOKING_MENU_VERSIONS = [
 export const GETTING_STARTED = {
   accountId: 'visual-qa-account',
   doneCount: 2,
-  total: 5,
+  total: 6,
   allDone: false,
   steps: [
     { key: 'accounts', state: 'done', href: '/accounts', reason: null, webhook: [{ id: 'visual-qa-account', status: 'matched' }] },
-    { key: 'attributes', state: 'done', href: '/tags?tab=tags', reason: null },
+    { key: 'featureSet', state: 'done', href: '/settings', reason: null },
+    { key: 'attributes', state: 'todo', href: '/tags?tab=tags', reason: null },
     { key: 'friendAdd', state: 'stalled', href: '/friend-add-settings', reason: '下書きのルールが1本ありますが、まだ公開していません。公開すると動きはじめます。' },
-    { key: 'scenario', state: 'todo', href: '/scenarios', reason: null },
-    { key: 'firstMessage', state: 'forbidden', href: null, reason: '管理者に頼んでください' },
+    { key: 'scenario', state: 'stalled', href: '/scenarios', reason: null },
+    { key: 'firstMessage', state: 'todo', href: '/chats', reason: null },
   ],
 }
 
@@ -6940,7 +6947,7 @@ const tagSummary = (...ids) => LINE_ACCOUNT_TAGS.filter((tag) => ids.includes(ta
  * 名前を使う66枚を前後で測り、下がった板なし（a7lUk 73→89）。
  */
 export const LINE_ACCOUNTS = [
-  lineAccount('visual-qa-account', '2007123456', '然-NEN- TEST', 2, {
+  lineAccount('visual-qa-account', '2007123456', '然-NEN-TEST', 2, {
     basicId: 'nen-test', isDefault: true, role: '検証用。本番の配信には使わない',
     stats: { friendCount: 231, activeScenarios: 4, messagesThisMonth: 1842, staffCount: 2 },
     tags: tagSummary('tag-test'), connection: { status: 'warn', checkedAt: '2026-09-30T09:00:00.000Z' },

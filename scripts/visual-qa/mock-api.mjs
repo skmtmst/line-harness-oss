@@ -2073,7 +2073,7 @@ const SHAPES = {
   // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
   // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
   '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true } },
-  '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
+  '/api/inbox/unanswered/count': { total: 5, byAccount: [{ accountId: 'visual-qa-account', count: 5 }], oldestWaitMinutes: 12 },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
   /*
@@ -6419,6 +6419,30 @@ const server = createServer((req, res) => {
     res.setHeader('Content-Type', 'image/jpeg')
     res.setHeader('Cache-Control', 'no-store')
     res.writeHead(200).end(jpeg)
+    return
+  }
+
+  // 一覧は配信URLではなく認証付きの内容取得口を読む。同じ見本画像を返す。
+  const mediaContent = /^\/api\/media\/([^/]+)\/content$/.exec(url.pathname)
+  if (method === 'GET' && mediaContent) {
+    const item = MEDIA_ITEMS.find((row) => row.id === mediaContent[1])
+    if (item?.kind === 'image' && item.url.startsWith('data:image/svg+xml,')) {
+      const svg = decodeURIComponent(item.url.slice('data:image/svg+xml,'.length))
+      res.setHeader('Content-Type', 'image/svg+xml')
+      res.setHeader('Cache-Control', 'no-store')
+      res.writeHead(200).end(svg)
+      return
+    }
+  }
+
+  const richThumb = /^\/api\/rich-menu-images\/qa-thumb-(normal|gold|autumn|guide)$/.exec(url.pathname)
+  if (method === 'GET' && richThumb) {
+    const color = { normal: '#9bd4b1', gold: '#e8bf6b', autumn: '#f4d2be', guide: '#cbd9f1' }[richThumb[1]]
+    const compact = richThumb[1] === 'autumn'
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="44"><rect width="64" height="44" fill="${color}"/><path d="M21 0v44M43 0v44${compact ? '' : 'M0 22h64'}" stroke="white" stroke-width="2"/></svg>`
+    res.setHeader('Content-Type', 'image/svg+xml')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(svg)
     return
   }
 
