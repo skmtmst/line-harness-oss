@@ -948,7 +948,6 @@ export default function FormsListV8() {
   const folderPanel = (
     <FolderPanel
       createAction={createButton(true)}
-      reserveCreateSpace={!canEditForms}
       activeId={activeFolderId}
       onSelect={selectFolder}
       onAddFolder={canManageFolders ? () => { closeDetail(); setFolderDialogOpen(true) } : undefined}

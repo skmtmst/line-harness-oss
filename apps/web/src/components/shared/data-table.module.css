@@ -468,14 +468,22 @@
 }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr > th {
   height: var(--tpl-list-head-h); padding-block: 0;
-  padding-inline: var(--tpl-list-cell-side);
+  padding-inline: calc(var(--tpl-list-cell-side) / 2);
 }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) {
   height: var(--tpl-list-row-h);
 }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) > td {
   height: var(--tpl-list-row-h); padding-block: 0;
-  padding-inline: var(--tpl-list-cell-side);
+  padding-inline: calc(var(--tpl-list-cell-side) / 2);
+}
+
+/* 固定した絵の列間16は隣り合うセルの8＋8。表の両端だけ24を持つ。 */
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr:not([data-table-layout='columns']) > :is(th, td):first-child {
+  padding-inline-start: var(--tpl-list-inset);
+}
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr:not([data-table-layout='columns']) > :is(th, td):last-child {
+  padding-inline-end: var(--tpl-list-inset);
 }
 
 /* 列型も同じ行高。縦の余白は行が持ち、セルの高さを二重に足さない。 */
