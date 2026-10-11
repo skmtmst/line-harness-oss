@@ -54,9 +54,14 @@ describe('#639 主要操作の最小高さ 32px', () => {
     expect(readShared('button.module.css')).toMatch(/\.standard\s*\{[^}]*height:\s*36px/s)
   })
 
-  it('画像タイルのお気に入り星は 32px の当たりを持つ', () => {
-    const tile = readFileSync(join(SRC, 'components', 'hq', 'banners', 'image-tile.tsx'), 'utf8')
-    expect(tile).toMatch(/aria-label=\{image\.isFavorite \? 'お気に入りから外す' : 'お気に入りにする'\}[\s\S]*?h-8 w-8/)
+  it('画像タイルのお気に入り星は現役の板の24pxを使う', () => {
+    const list = readFileSync(join(SRC, 'v8', 'hq-banners', 'list.tsx'), 'utf8')
+    const css = readFileSync(join(SRC, 'v8', 'hq-banners', 'list.module.css'), 'utf8')
+    expect(list).toContain("aria-label={image.isFavorite ? 'お気に入りから外す' : 'お気に入りにする'}")
+    expect(css).toMatch(/\.star\s*\{[^}]*width:\s*var\(--tpl-hb-star\)/s)
+    expect(css).toMatch(/\.star\s*\{[^}]*height:\s*var\(--tpl-hb-star\)/s)
+    expect(GLOBALS_CODE).toMatch(/--tpl-hb-star:\s*24px/)
+
   })
 })
 

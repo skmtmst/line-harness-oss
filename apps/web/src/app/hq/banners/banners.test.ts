@@ -11,12 +11,12 @@ const frame = read('../../../v8/hq-banners/frame.tsx')
 const dialog = read('../../../components/shared/dialog.tsx')
 const dialogCss = read('../../../components/shared/dialog.module.css')
 const picker = read('../../../components/shared/hq-account-picker.tsx')
-const projects = read('../../../components/hq/banners/projects-section.tsx')
-const library = read('../../../components/hq/banners/library-section.tsx')
-const shell = read('../../../components/hq/banners/banner-shell.tsx')
+const projects = listPage
+const library = listPage
+const shell = listPage
 /* ★V8 のプロジェクトの中。承認済み ★BG-B `qIp42` に合わせた言葉と見出しの見張りに使う。 */
 const v8Project = read('../../../v8/hq-banners/project.tsx')
-const banners = [listPage, projectPage, panel, modal, projects, library, shell, read('../../../components/hq/banners/image-tile.tsx'), read('../../../components/hq/banners/project-card.tsx')]
+const banners = [listPage, projectPage, panel, modal, projects, library, shell]
 
 /**
  * 統括のバナー生成の画面が、設計と共通ルールから外れていないかを見張る。
