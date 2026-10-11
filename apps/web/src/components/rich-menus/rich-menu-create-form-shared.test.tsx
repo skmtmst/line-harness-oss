@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * m18s: リッチメニュー作成フォームは ★V7 の共通部品で出す。
+ * 統括の例外時のフォームも現役V8の共通部品で出す。
  * 本物のReactで動かして見る。
  * - 「出す相手」はラジオカード（素の青丸を直置きしない）
  * - 「既定メニュー」は共通チェックボックス（素の四角を直置きしない）
@@ -17,7 +17,7 @@ import RichMenuCreateForm, { freshRichMenuCreateValue } from './rich-menu-create
 let host: HTMLDivElement
 let root: Root
 
-describe('m18s 作成フォームは★V7の共通部品で出す', () => {
+describe('例外時のフォームも現役の共通部品で出す', () => {
   beforeEach(() => {
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -63,11 +63,10 @@ describe('m18s 作成フォームは★V7の共通部品で出す', () => {
     expect(setup).toBeTruthy()
     expect(host.textContent).not.toContain('アクションを設定する')
     // 未設定は失敗ではないので赤（text-danger）を使わない
-    const areaSection = Array.from(host.querySelectorAll('section')).find((el) =>
-      el.textContent?.includes('押した面ごとの動き'),
-    )
+    const areaSection = host.querySelector('[aria-label="押した面ごとの動き"]')
     expect(areaSection).toBeTruthy()
-    expect(areaSection!.querySelector('.text-danger')).toBeNull()
-    expect(areaSection!.querySelector('.text-warning')).not.toBeNull()
+    expect(areaSection!.querySelector('[role="alert"]')).toBeNull()
+    expect(areaSection!.querySelector('[data-design-part="notice"]')).not.toBeNull()
+    expect(areaSection!.textContent).toContain('アクションが未設定です')
   })
 })

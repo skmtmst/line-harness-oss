@@ -10,7 +10,7 @@ const PUBLISH_HISTORY = readFileSync(join(HERE, '../../v8/rich-menu-edit/detail.
 const TEST_APPLY = readFileSync(join(HERE, '../../v8/rich-menu-edit/test-apply.tsx'), 'utf8')
 const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const CREATE_FORM = readFileSync(
-  join(HERE, '..', '..', 'components', 'rich-menus', 'rich-menu-create-form.tsx'),
+  join(HERE, '../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',
 )
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')

@@ -242,7 +242,6 @@ shared-button-importer components/reminders/reminder-publish-flow.tsx
 shared-button-importer components/reminders/reminder-v6-ui.tsx
 shared-button-importer components/reminders/test-recipient-guidance.tsx
 shared-button-importer components/rich-menus/apply-to-tag-modal.tsx
-shared-button-importer components/rich-menus/rich-menu-create-form.tsx
 shared-button-importer components/scenarios/action-editor.tsx
 shared-button-importer components/scenarios/carousel-picker.tsx
 shared-button-importer components/scenarios/insert-toolbar.tsx
@@ -628,3 +627,4 @@ shared-button-importer test-utils/webinar-video.tsx
 shared-button-importer v8/events/edit.tsx
 shared-button-importer v8/rich-menu-edit/test-apply.tsx
 shared-button-importer v8/rich-menu-edit/schedules.tsx
+shared-button-importer v8/rich-menu-edit/compatibility-form.tsx

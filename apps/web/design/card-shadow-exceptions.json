@@ -675,16 +675,6 @@
     "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
   },
   {
-    "file": "components/rich-menus/rich-menu-create-form.tsx",
-    "selector": "className=\"border-hairline rounded-card space-y-4 border p-4\"",
-    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
-    "file": "components/rich-menus/rich-menu-create-form.tsx",
-    "selector": "className=\"border-hairline bg-canvas-sunken rounded-card border p-4\"",
-    "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"
-  },
-  {
     "file": "components/scenarios/action-editor.tsx",
     "selector": "className=\"border-hairline rounded-card border\"",
     "reason": "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"

@@ -57,7 +57,7 @@ describe('TemplateDefinitionEditor', () => {
     }
     const onChange = vi.fn()
     render(<TemplateDefinitionEditor type="rich_menu" value={value} disabled={false} tenantId="tenant-a" onChange={onChange} />)
-    expect(screen.getByRole('list', { name: 'リッチメニュー作成の進み方' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '形と画像' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '変更後' } })
     expect(onChange).toHaveBeenCalledWith({
       ...value,

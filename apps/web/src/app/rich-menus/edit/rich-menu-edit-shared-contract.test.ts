@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(join(here, '..', 'new', 'create-v8.tsx'), 'utf8')
 const form = readFileSync(
-  join(here, '..', '..', '..', 'components', 'rich-menus', 'rich-menu-create-form.tsx'),
+  join(here, '../../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',
 )
 
