@@ -14,6 +14,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import { RowMenu } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
 import MediaPreviewOverlay from './media-preview-overlay'
+import MediaThumbnail from '@/components/shared/media-thumbnail'
 import Dialog from '@/components/shared/dialog'
 import { blockedReason, canDelete as canDeleteMedia, checkedAtText, dialogTitle, referenceKindText, referenceNameText, summarizeBulkDeleteResult, usageText } from './media-delete-impact'
 import Pagination from '@/components/shared/pagination'
@@ -1119,7 +1120,7 @@ export default function MediaLibraryListV8() {
   const kpiCards = [
     { key: 'total', title: '登録メディア', icon: Images, value: kpiTotalText === '—' ? null : (overallTotal ?? total), unit: '件', detail: kindBreakdown || '—（未取得）' },
     { key: 'unused', title: 'どこでも使っていない', icon: EyeOff, value: kpis.unusedTotal ?? null, unit: '件', detail: '消してよいか確かめられます' },
-    { key: 'usage', title: '使っている容量', icon: HardDrive, value: null, valueText: quota ? formatMediaSize(quota.usageBytes) : undefined, unit: '', detail: quota && quotaPercent != null ? `上限 ${formatMediaSize(quota.limitBytes)} の ${quotaPercent}%` : '—（未取得）' },
+    { key: 'usage', title: '使っている容量', icon: HardDrive, value: null, valueText: quota ? formatMediaSize(quota.usageBytes).split(' ')[0] : undefined, valueTextWithUnit: true, unit: quota ? formatMediaSize(quota.usageBytes).split(' ')[1] : '', detail: quota && quotaPercent != null ? `上限 ${formatMediaSize(quota.limitBytes)} の ${quotaPercent}%` : '—（未取得）' },
     { key: 'archived', title: 'アーカイブ', icon: Archive, value: kpis.archivedTotal ?? null, unit: '件', detail: '一覧と新規選択から外したもの' },
   ]
 
@@ -1153,7 +1154,7 @@ export default function MediaLibraryListV8() {
   ]
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content"
       skeleton
       boardId="O7hUt7"
       toolbarRowGap="card"
@@ -1173,7 +1174,8 @@ export default function MediaLibraryListV8() {
               icon={<card.icon size={13} aria-hidden="true" />}
               value={card.value}
               valueText={card.valueText}
-              unit={card.value == null ? '' : card.unit}
+              valueTextWithUnit={card.valueTextWithUnit}
+              unit={card.value == null && card.valueText == null ? '' : card.unit}
               detail={card.detail}
             />
           ))}
@@ -1241,6 +1243,7 @@ export default function MediaLibraryListV8() {
             filters={(
               <div role="group" aria-label="種類と使い方で絞り込む" className={styles.chipGroup}>
                 <FilterChip
+                  icon={<Images size={13} aria-hidden="true" />}
                   selected={kinds.size === 1 && kinds.has('image') && !showArchivedOnly}
                   onChange={(selectedValue) => {
                     if (selectedValue) {
@@ -1256,6 +1259,7 @@ export default function MediaLibraryListV8() {
                   {`画像${kpis.kindTotals.image == null ? '' : ` ${formatNumber(kpis.kindTotals.image as number)}`}`}
                 </FilterChip>
                 <FilterChip
+                  icon={<EyeOff size={13} aria-hidden="true" />}
                   selected={showUnusedOnly}
                   onChange={(selectedValue) => {
                     setShowUnusedOnly(selectedValue)
@@ -1799,13 +1803,7 @@ function MediaCardV8({
         aria-label={`${item.filename}のプレビューを見る`}
         className={view === 'grid' ? styles.thumbButton : `${styles.thumbButton} ${styles.thumbNarrow}`}
       >
-        {item.kind === 'image' ? (
-          <MediaThumbV8 src={displaySrc} alt={item.filename} />
-        ) : (
-          <span className={styles.thumbLabel}>
-            {item.kind === 'video' ? '動画' : item.kind === 'audio' ? '音声' : 'ファイル'}
-          </span>
-        )}
+        <MediaThumbnail kind={item.kind} src={displaySrc} alt={item.filename} />
       </button>
 
       <div className={view === 'grid' ? styles.cardBody : styles.rowBody}>
@@ -1924,17 +1922,4 @@ function MediaCardV8({
       </div>
     </div>
   )
-}
-
-/**
- * 一覧の縮小画像。読み込めないとき、ブラウザの壊れた画像の印と
- * ファイル名（代替文字）が枠からはみ出さないよう種類の文字に切り替える。
- */
-function MediaThumbV8({ src, alt }: { src: string; alt: string }) {
-  const [failed, setFailed] = useState(false)
-  if (failed) return <span className={styles.thumbLabel}>画像を表示できません</span>
-  // 静的書き出しのため next/image の最適化は使えない。
-  // 一覧20件の同時取得を避けるため遅延読み込みにする。
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} className={styles.thumbImage} />
 }
