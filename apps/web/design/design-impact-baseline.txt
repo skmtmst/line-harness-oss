@@ -404,6 +404,7 @@ shared-button-importer components/scenarios/scenario-dialogs.tsx
 shared-button-importer components/scenarios/trigger-editor.tsx
 shared-button-importer components/session-lost-notice.tsx
 shared-button-importer components/shared/condition-builder.tsx
+shared-button-importer components/shared/copy-text-button.tsx
 shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/folder-editor-dialog.tsx
 shared-button-importer components/shared/use-folder-move.tsx

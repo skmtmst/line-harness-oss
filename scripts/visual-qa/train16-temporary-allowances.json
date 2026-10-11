@@ -2259,30 +2259,6 @@
       "pattern": "folder-select",
       "signal": "select-folder",
       "text": "<SaveErrorField names={[\"selectedFolder\",\"selected_folder\"]}><Select"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/nen-members/list.tsx\",\"prop:className\",\"<GridHeadRow className={`${styles.mRow} ${styles.mHead}`}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/nen-members/list.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<GridHeadRow className={`${styles.mRow} ${styles.mHead}`}>"
-    },
-    {
-      "match": "[\"b\",\"table\",\"apps/web/src/v8/nen-members/list.tsx\",\"prop:className\",\"<GridRow className={styles.mRow} data-row-id={member.friendId}>\"]",
-      "count": 1,
-      "reason": "列車15にも同じ形の候補があり、入力エラーの囲み・共通部品の置き換えで検出文が変わった。本線との差分でのみ増える既存候補。担当の持ち主への集約を別途確認する。",
-      "owner": "kenta / 持ち主担当",
-      "expires": "2026-10-17",
-      "classification": "inherited-train15",
-      "file": "apps/web/src/v8/nen-members/list.tsx",
-      "pattern": "table",
-      "signal": "prop:className",
-      "text": "<GridRow className={styles.mRow} data-row-id={member.friendId}>"
     }
   ],
   "skeleton": [

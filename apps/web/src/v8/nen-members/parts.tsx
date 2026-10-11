@@ -7,7 +7,7 @@
  */
 import { formatNumber } from '@/lib/format'
 import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
-import styles from './members.module.css'
+import StatusBadge from '@/components/shared/status-badge'
 import { formatDate as polishFormatDate } from '@/lib/format'
 
 
@@ -47,21 +47,9 @@ export function csvLine(values: Array<string | null | undefined>): string {
   return values.map((value) => csvCell(value)).join(',')
 }
 
-/**
- * ランクの印。上から2つを黒・金、いちばん下を緑、間を灰にする（今の画面と同じ決まり）。
- * rankOrder は低い順。
- */
-export function rankTone(rankKey: string | null, rankOrder: string[]): 'top' | 'second' | 'middle' | 'base' | 'unknown' {
-  const index = rankKey ? rankOrder.indexOf(rankKey) : -1
-  if (index < 0) return 'unknown'
-  if (rankOrder.length > 1 && index === rankOrder.length - 1) return 'top'
-  if (rankOrder.length > 2 && index === rankOrder.length - 2) return 'second'
-  if (index === 0) return 'base'
-  return 'middle'
-}
-
-export function RankChip({ rankKey, name, rankOrder }: { rankKey: string | null; name: string; rankOrder: string[] }) {
-  return <span className={styles.rankChip} data-tone={rankTone(rankKey, rankOrder)}><span className={styles.rankDot} aria-hidden="true" />{name}</span>
+/** ランクは状態ではないので、共通の灰色の札で文字だけ示す（B-202・B-240）。 */
+export function RankChip({ name }: { name: string }) {
+  return <StatusBadge tone="neutral" dot={false}>{name}</StatusBadge>
 }
 
 /** ランクの決まりの4つの言葉（API の値は1種類ずつなので、言葉は画面が持つ）。 */

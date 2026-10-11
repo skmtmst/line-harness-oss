@@ -15,6 +15,16 @@ import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './mileage.module.css'
 
+export const MILEAGE_TABLE_LAYOUT = {
+  headHeight: 'var(--tpl-ml-head-h)',
+  rowHeight: 'var(--tpl-ml-row-h)',
+  gap: 'var(--tpl-ml-col-gap)',
+  padding: '0 var(--tpl-list-inset)',
+  numberInset: 'var(--tpl-ml-num-pad-end)',
+  bodyTextSize: 'var(--polish-text-body)',
+  collapseScope: 'page' as const,
+}
+
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 export const MILEAGE_TABS = [
@@ -77,8 +87,8 @@ export function CreateButton({
   full?: boolean
   children: ReactNode
 }) {
-  // 閲覧のみ：押せない作るボタンは置かない。フォルダの列の上（full）は場所だけ空けて並びを絵どおりに保つ。
-  if (readonly) return full ? <span className={styles.viewerCreateSpace} aria-hidden="true" /> : null
+  // 閲覧のみの作成操作は隠す。
+  if (readonly) return null
   return (
     <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href}>
       {children}
@@ -111,6 +121,7 @@ export function MileageFrame({ help, actions, stats, folders, collapsedFolders, 
       : MILEAGE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
+      skeleton
       help={<>{"行動でマイルがたまり、クーポン・特典と交換できます。"}{help}</>}
       boardId={board}
       headingSize="regular"
@@ -118,7 +129,6 @@ export function MileageFrame({ help, actions, stats, folders, collapsedFolders, 
 
       actions={actions}
       tabs={
-        <div className={styles.tabsBox}>
         <Tabs
           /* 件数が読み込まれるとタブの幅が変わるので、下線の位置も測り直す。 */
           key={MILEAGE_TABS.map((item) => counts[item.key] ?? '').join('|')}
@@ -130,7 +140,6 @@ export function MileageFrame({ help, actions, stats, folders, collapsedFolders, 
             current: item.key === tab,
           }))}
         />
-        </div>
       }
       stats={stats ? <>{readonly ? <ViewerBand /> : null}{stats}</> : readonly ? <ViewerBand /> : undefined}
       folders={folders}

@@ -17,6 +17,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
@@ -337,13 +338,14 @@ export default function CreateAffiliateV8() {
         {issuedUrl ? <div><CopyTextButton value={issuedUrl} label="リンクをコピー" aria-label="リンクをコピー" /></div> : null}
       </CreateSummaryCard>
       <CreateSummaryCard title="気をつけること" variant="link" rows={[]}>
-        <p className={styles.sideList}>・紹介コードはあとから変えられません（配ったリンクが動かなくなるため）<br />・報酬を払う人は、振込先の登録が要ります</p>
+        <p className={styles.sideList}>・紹介コードはあとから変えられません（配ったリンクが動かなくなるため）<br />・支払い前に振込先を登録します</p>
       </CreateSummaryCard>
     </div>
   )
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
+      hidePreviewWhenNarrow
       boardId="RaMf3"
       title="アフィリエイターを作る"
       help="登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。"
@@ -376,7 +378,7 @@ export default function CreateAffiliateV8() {
         </Notice>
       ) : null}
 
-      <section className={styles.card} aria-label="だれを登録するか">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="だれを登録するか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>だれを登録するか</h2>
           <p className={styles.cardNote}>会社でも個人でも登録できます</p>
@@ -454,9 +456,9 @@ export default function CreateAffiliateV8() {
               </>
             )}
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="いくら払い、いつ締めるか">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="いくら払い、いつ締めるか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>いくら払い、いつ締めるか</h2>
           <p className={styles.cardNote}>報酬の決め方は、案件ごとの額より先にこの人の決まりが使われます</p>
@@ -486,9 +488,9 @@ export default function CreateAffiliateV8() {
             <SaveErrorField names={["holdDays","hold_days"]}><Select id="af-hold" aria-label="保留期間" size="full" value={holdDays} onChange={(value) => { setHoldDays(value); clearField('hold') }} options={holdOptions} /></SaveErrorField>
           </Field>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="成果が出たときにすること">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="成果が出たときにすること">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>成果が出たときにすること</h2>
           <p className={styles.cardNote}>任意</p>
@@ -507,7 +509,7 @@ export default function CreateAffiliateV8() {
             <p className={styles.switchNoteFaint}>{startTracking ? '登録したらすぐに数え始めます' : 'オフでもリンクは発行されます'}</p>
           </div>
         </div>
-      </section>
+      </Card>
 
       {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}
       {saveNote ? <p className={styles.cardNote} role="status">{saveNote}</p> : null}

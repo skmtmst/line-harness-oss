@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 
 import { Field as SharedField } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
@@ -363,7 +364,7 @@ function RewardEditorInner() {
 
   const preview = (
     <div className={styles.aside}>
-      <section className={styles.sideCard} aria-label="お客さまの画面での見え方">
+      <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-label="お客さまの画面での見え方">
         <h2 className={styles.sideTitle}>お客さまの画面での見え方</h2>
         <p className={styles.sideNote}>LINE のマイルの画面</p>
         <div className={styles.phoneRow}>
@@ -371,8 +372,8 @@ function RewardEditorInner() {
           <span className={styles.phoneMiles}>{Number.isInteger(requiredMiles) && requiredMiles > 0 ? `${formatNumber(requiredMiles)} マイルで交換` : emptyValue('unknown')}</span>
           <span className={styles.phoneSub}>{`${form.benefitExpiresDays.trim() ? `交換後${form.benefitExpiresDays}日間` : '期限なし'}・お一人さま${perFriend}`}</span>
         </div>
-      </section>
-      <section className={styles.sideCard} aria-label="出す前に">
+      </Card>
+      <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-label="出す前に">
         <h2 className={styles.sideTitle}>出す前に</h2>
         <div>
           <Button onClick={() => void testExchange()} disabled={saving || testing} busy={testing} busyLabel="交換テスト中">
@@ -380,7 +381,7 @@ function RewardEditorInner() {
           </Button>
         </div>
         <p className={styles.sideNote}>残高と在庫は動きません。</p>
-      </section>
+      </Card>
     </div>
   )
 
@@ -390,6 +391,7 @@ function RewardEditorInner() {
       title="使い道を作る"
       help="マイルと交換できる特典を決めます。出すと、お客さまの LINE（マイルの画面）に並びます。"
       preview={preview}
+      hidePreviewWhenNarrow
       footerActions={<>
         <Button variant="secondary" href="/mileage?tab=rewards">キャンセル</Button>
         <Button onClick={() => void save(false)} disabled={saving || testing} busy={saving} busyLabel="保存中">
@@ -412,7 +414,7 @@ function RewardEditorInner() {
         <Notice tone="info">いま出している内容はそのままです。保存すると下書きになり、「出す」を押すまでお客様の見え方は変わりません。</Notice>
       ) : null}
 
-      <section className={styles.card} aria-label="基本">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="基本">
         <h2 className={styles.cardTitle}>基本</h2>
         <div className={styles.grid2}>
           <Field label="名前" htmlFor="reward-name" error={touched && !form.name.trim() ? '使い道の名前を入力してください' : undefined}>
@@ -422,9 +424,9 @@ function RewardEditorInner() {
             <SaveErrorField names={["requiredMiles","form.requiredMiles","required_miles","form.required_miles"]}><NumberInput numericText id="reward-miles" inputMode="numeric" value={form.requiredMiles} onChange={(e) => set('requiredMiles', e.target.value)} placeholder="例：500" /></SaveErrorField>
           </Field>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="渡すもの">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="渡すもの">
         <h2 className={styles.cardTitle}>渡すもの</h2>
         <div className={styles.grid2}>
           <SelectField label="交換後に渡すもの" htmlFor="reward-action"
@@ -468,9 +470,9 @@ function RewardEditorInner() {
             options={FAILURE_POLICIES.map((item) => ({ value: item.value, label: item.label }))}
           /></SaveErrorField>
         </SelectField>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="だれが交換できるか">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="だれが交換できるか">
         <h2 className={styles.cardTitle}>だれが交換できるか</h2>
         <SelectField label="交換できる人" htmlFor="reward-audience">
           <SaveErrorField names={["audience"]}><Select
@@ -498,9 +500,9 @@ function RewardEditorInner() {
             <Plus size={13} aria-hidden="true" />条件を足す（タグ・会員ランクなど）
           </button>
         )}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="出す数と期間">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-label="出す数と期間">
         <h2 className={styles.cardTitle}>出す数と期間</h2>
         <div className={styles.grid2}>
           <div className={styles.field}><Field label="出す数" htmlFor="reward-stock"><SaveErrorField names={["stockLimit","form.stockLimit","stock_limit","form.stock_limit"]}><NumberInput numericText id="reward-stock" invalid={Boolean(errorOf(LIMIT_FIELD_ERRORS.stockLimit))} aria-describedby={errorOf(LIMIT_FIELD_ERRORS.stockLimit) ? 'reward-stock-error' : undefined} inputMode="numeric" title="空欄なら限りなし。0 と書くと品切れ（交換できません）" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="制限なし" /></SaveErrorField>
@@ -513,10 +515,10 @@ function RewardEditorInner() {
           <div className={styles.field}><Field label="交換終了" htmlFor="reward-ends"><SaveErrorField names={["endsAt","form.endsAt","ends_at","form.ends_at"]}><DateTimeField id="reward-ends" aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} invalid={Boolean(errorOf('交換終了は交換開始より後にしてください'))} aria-describedby={errorOf('交換終了は交換開始より後にしてください') ? 'reward-ends-error' : undefined} placeholder="期限なし" /></SaveErrorField>
 {errorOf('交換終了は交換開始より後にしてください') ? <p id="reward-ends-error" className={styles.error} role="alert">交換終了は交換開始より後にしてください</p> : null}</Field></div>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-label="そのほか（任意）">
-        <h2 className={styles.cardTitle}>そのほか（任意）</h2>
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="mileage-reward-extra">
+        <h2 className={styles.cardTitle} id="mileage-reward-extra">そのほか <OptionalBadge /></h2>
         <div className={styles.grid2}>
           <Field label="交換後に使える日数" htmlFor="reward-expires" help="空欄なら期限なし" error={errorOf(LIMIT_FIELD_ERRORS.benefitExpiresDays)}>
             <SaveErrorField names={["benefitExpiresDays","form.benefitExpiresDays","benefit_expires_days","form.benefit_expires_days"]}><NumberInput numericText id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" /></SaveErrorField>
@@ -542,7 +544,7 @@ function RewardEditorInner() {
             />
           ))}
         </RadioCardGroup></SaveErrorField>
-      </section>
+      </Card>
 
       <ConfirmDialog
         open={publishOpen}

@@ -30,7 +30,7 @@ import {
 } from './display'
 import AffiliateDrawer from './drawer'
 import { AffiliateArchiveDialog } from './dialogs'
-import { AffiliateFrame, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import { AffiliateToolbar, RetryButton, RowMenu, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import styles from './affiliates.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -291,10 +291,10 @@ export default function ReportTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tableReport}`}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>{view === 'affiliate' ? 'アフィリエイター（いちばん多い案件）' : '案件（紹介した人の数）'}</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>{view === 'affiliate' ? 'アフィリエイター（いちばん多い案件）' : '案件（紹介した人の数）'}</Th>
             <Th className={styles.colRepConv}>成果・売上</Th>
             <Th className={styles.colRepReward}>{false ? '報酬' : '報酬（前の期間より）'}</Th>
             <Th className={styles.colRepOps}><span className={styles.srOnly}>操作</span></Th>
@@ -302,13 +302,13 @@ export default function ReportTab() {
         </thead>
         <tbody>
           {shown.map((row) => (
-            <Tr data-row-id={row.id} key={row.id} className={styles.row} data-table-layout="columns" detailKey="affiliate" onOpen={() => openDrawer(row.id)}>
-              <Td className={styles.colName}><FolderDotName>
+            <Tr data-row-id={row.id} key={row.id} data-table-layout="columns" detailKey="affiliate" onOpen={() => openDrawer(row.id)}>
+              <Td grow><FolderDotName>
                 <span className={styles.stack}>
                   {view === 'affiliate' ? (
-                    <RowNameLink onOpen={() => setDrawerId(row.id)} href={itemHref('affiliate', row.id)} className={styles.rowLink} title={row.name}>{row.name}</RowNameLink>
+                    <RowNameLink onOpen={() => setDrawerId(row.id)} href={itemHref('affiliate', row.id)} title={row.name}>{row.name}</RowNameLink>
                   ) : (
-                    <span className={styles.rowLinkText} ><TruncatedText value={String(row.name ?? '')} /></span>
+                    <span><TruncatedText value={String(row.name ?? '')} /></span>
                   )}
 
                 </span>

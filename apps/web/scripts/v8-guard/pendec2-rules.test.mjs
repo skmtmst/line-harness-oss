@@ -151,3 +151,16 @@ test('実物CSS：差し込み行の項目は8px、印と字は4px。未定義�
     assert.notEqual(await page.locator('.button').evaluate(el=>getComputedStyle(el).columnGap),'4px')
   } finally { await browser.close() }
 })
+
+// 閉じた details は Chrome の高さアニメーションで本文の寸法だけが残る。
+// 見えていない本文は除外し、開いたあとの実際のはみ出しは検出する。
+test('閉じた詳細設定の本文をカードのはみ出しに数えず、開いた時は検査する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(shell(card('<details><summary>詳細設定</summary><div style="height:200px">本文</div></details>', 'height:80px') + '<style>details::details-content { height:0; overflow:clip; content-visibility:visible } details[open]::details-content { height:auto }</style>'))
+    assert.equal((await page.evaluate(scan)).some(f => ['cardspill','cardbottom'].includes(f.kind)), false)
+    await page.locator('summary').click()
+    assert.equal((await page.evaluate(scan)).some(f => f.kind === 'cardspill'), true)
+  } finally { await browser.close() }
+})

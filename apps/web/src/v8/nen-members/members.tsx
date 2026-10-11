@@ -71,7 +71,6 @@ export default function MembersV8({
 
   const tabs = <>
     <Tabs
-      className={styles.tabs}
       label="会員の切り替え"
       items={[
         { label: '会員一覧', count: kpis?.members, current: tab === 'members', onClick: () => onChangeTab('members') },

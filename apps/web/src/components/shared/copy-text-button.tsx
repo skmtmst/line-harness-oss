@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
+import Button from './button'
 import styles from './copy-text-button.module.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 
@@ -25,6 +26,8 @@ export default function CopyTextButton({
   icon,
   'aria-label': ariaLabel,
   disabled = false,
+  variant = 'text',
+  icon,
 }: {
   /** クリップボードへ書き込む全文。表示用文字列ではなく取り出したい値。 */
   value?: string
@@ -33,6 +36,9 @@ export default function CopyTextButton({
   icon?: ReactNode
   role?: 'button' | 'menuitem'
   disabled?: boolean
+  /** コードの下など、本文の操作は共通Buttonの形を使う。行内は文字操作のまま。 */
+  variant?: 'text' | 'primary' | 'secondary'
+  icon?: ReactNode
   /** 何をコピーするボタンか。一覧では行の名前を含めて特定できるようにする。 */
   'aria-label': string
 }) {
@@ -98,6 +104,22 @@ export default function CopyTextButton({
     )
   }
 
+  if (variant !== 'text') {
+    return (
+      <Button
+        variant={variant}
+        role={role}
+        disabled={disabled}
+        onClick={(event) => { event.stopPropagation(); void copy() }}
+        aria-label={ariaLabel}
+        title={state === 'copied' ? 'コピーしました' : label}
+      >
+        {state === 'copied' ? <Check size={14} aria-hidden /> : icon}
+        {state === 'copied' ? 'コピーしました' : label}
+      </Button>
+    )
+  }
+
   /*
    * 表の中の「編集」「削除」と同じく枠なしの文字操作にそろえる。
    * 「コピー」と「コピー済み」で幅が変わると列が揺れるので、
@@ -111,7 +133,7 @@ export default function CopyTextButton({
       onClick={(event) => { event.stopPropagation(); void copy() }}
       aria-label={ariaLabel}
       title={state === 'copied' ? 'コピーしました' : label}
-      style={v8 ? { width: icon ? 'max-content' : 'calc(7em + 20px)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 } : undefined}
+      style={v8 ? { width: 'max-content', minWidth: 'calc(7em + 20px)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, whiteSpace: 'nowrap' } : undefined}
       className={`${styles.button} w-16 shrink-0 cursor-pointer px-1 py-0.5 text-center text-xs ${
         state === 'copied'
           ? 'text-success font-semibold'

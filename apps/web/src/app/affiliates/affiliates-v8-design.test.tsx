@@ -106,10 +106,12 @@ describe('KdFRI アフィリエイタータブの実入口の集計・権限・�
     expect(screen.getByLabelText('よく使う絞り込み')).toBeTruthy()
   })
 
-  test('道具が絵どおり', async () => {
+  test('共通の広い列と畳んだ列で作成先と絞り込みを保つ', async () => {
     render(<AffiliatesPage />)
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /アフィリエイターを作る/ })).toBeTruthy()
+      const creates = screen.getAllByRole('link', { name: /アフィリエイターを作る/ })
+      expect(creates).toHaveLength(2)
+      for (const create of creates) expect(create.getAttribute('href')).toBe('/affiliates/new')
     })
     expect(screen.getByLabelText('名前・紹介コードで探す')).toBeTruthy()
     expect(screen.getByRole('button', { name: /計測中/ })).toBeTruthy()

@@ -169,6 +169,9 @@
   font-weight: var(--tpl-field-label-weight);
 }
 
+/* B-152：ふつうの欄は親の間とラベルの下の余白を二重に足さない。 */
+html[data-theme='v8'] .field:not([data-density]):not([data-spacing]) { gap: var(--polish-space-row); }
+html[data-theme='v8'] .field:not([data-density]):not([data-spacing]) > .labelRow { margin-bottom: 0; }
 /*
  * 題と中身の間（Field の contentGap）。
  * 共通の間は「題の行の下 8（--polish-space-row）＋段の間 6」で 14。絵の間が

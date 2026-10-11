@@ -150,9 +150,12 @@
 }
 
 /* B-218：画面の名前リンクも共通部品が色と1行を所有する。 */
-html[data-theme='v8'] a.rowNameLink {
+html[data-theme='v8'] .rowNameLink {
   display: block; min-width: 0; max-width: 100%; overflow: hidden;
   white-space: nowrap; text-overflow: ellipsis; color: var(--color-ink); font-weight: 700;
 }
 
 html[data-theme='v8'] .headRow[data-table-layout='columns'] { padding-inline: var(--tpl-list-inset); }
+
+html[data-theme='v8'] button.rowNameLink { padding: 0; border: 0; background: none; font: inherit; color: var(--color-ink); font-weight: 700; text-align: left; cursor: pointer; }
+html[data-theme='v8'] button.rowNameLink:hover { text-decoration: underline; }

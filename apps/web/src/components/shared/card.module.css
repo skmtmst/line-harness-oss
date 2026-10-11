@@ -218,7 +218,13 @@
 [data-theme='v8'] .headerRestaurant .title{font-size:15px;line-height:23px;}
 [data-theme='v8'] .headerRestaurant .meta{font-size:14px;line-height:21px;}
 
-/* B-187・208：枠のある箱・縦のまとまりは最低16。部分ごとに余白を持つカードは継続。 */
+/* B-187・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
+/* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
+html[data-theme='v8'] .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']) {
+  border: 0;
+  outline: 1px solid var(--card-edge);
+  outline-offset: -0.5px;
+}
 html[data-theme='v8'] .paddingCompact { padding: var(--space-16); }
 html[data-theme='v8'] .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
 /* B-208 の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
