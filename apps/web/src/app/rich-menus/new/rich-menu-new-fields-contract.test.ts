@@ -36,7 +36,7 @@ describe('m18s 作成画面の上の3欄は重ならない', () => {
   it('狭い欄でも中身がはみ出さない', () => {
     const row = fieldsRow()
     expect(row.match(/<TextInput/g)).toHaveLength(2)
-    expect(row).toContain('<Select')
+    expect(row).toContain('<FolderSelect')
     expect(row).not.toContain('<input')
   })
 })

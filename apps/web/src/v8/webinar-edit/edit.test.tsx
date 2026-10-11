@@ -157,7 +157,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(summary.textContent).toContain('見終わった人へお礼を送信')
     expect(summary.textContent).not.toContain('15分前')
     expect(summary.textContent).not.toContain('翌日10:00に送信')
-    expect(screen.getByText('設定済み').closest('[data-status-pill]')?.getAttribute('data-tone')).toBe('success')
+    expect(screen.getByText('設定済み').closest('[data-design-node="xRvDB"]')?.getAttribute('data-tone')).toBe('success')
   })
 
   it('入口は保存された古いテーマがあっても現役のV8を出す', async () => {

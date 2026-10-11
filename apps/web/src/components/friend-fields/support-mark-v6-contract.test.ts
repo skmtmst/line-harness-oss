@@ -60,19 +60,13 @@ describe('V8 対応マーク', () => {
   })
 
   it('保管確認は fy5dz の位置と幅で、置換先と対象人数に絞る', () => {
-    expect(LIST).toContain('data-design-node="fy5dz"')
+    expect(LIST).toContain('<Dialog open confirmation role="alertdialog" designNode="fy5dz"')
+    expect(LIST).toContain('designWidth={576}')
     expect(LIST).toContain('そのまま保管できます')
     expect(LIST).toContain('{impact.friendCount}人を「{selected.name}」へ置き換えます。')
-    /*
-      #1014 ATTR-17: 上から310px固定はやめる。390×480では下部の
-      「やめる」「置き換えて保管する」が画面外に出て、スクロールでも
-      届かなかった。画面の中に収め、中身が溢れたら内側だけを流す。
-      見出しと操作は常に見える。
-    */
-    expect(LIST).toContain('data-design-part="archive-position"')
-    expect(LIST).toContain('items-center')
-    expect(LIST).toContain('max-h-[calc(100dvh-2rem)]')
-    expect(LIST).toContain('overflow-y-auto')
+    const css = fs.readFileSync(path.join(ROOT, '../shared/dialog.module.css'), 'utf8')
+    expect(css).toContain('max-height: calc(100dvh - 32px)')
+    expect(css).toContain('overflow-y: auto')
     expect(LIST).not.toContain('margin-top: 310px')
   })
 

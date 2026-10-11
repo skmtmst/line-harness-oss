@@ -17,7 +17,7 @@ describe("inflow-links 一覧の1152幅", () => {
     expect(css).toContain("min-width: 0");
   });
 
-  it("列を削らない（10列すべて出す）", () => {
+  it("主要情報と行メニューの発行URL操作を残す", () => {
     for (const head of [
       "流入元名",
       "追加先",
@@ -25,11 +25,12 @@ describe("inflow-links 一覧の1152幅", () => {
       "友だち追加",
       "クリック",
       "最新追加",
-      "発行URL",
       "状態",
     ]) {
       expect(PAGE, `${head} が無い`).toContain(head);
     }
+    expect(PAGE).toContain('label: \'URLをコピー\'');
+    expect(PAGE).toContain('value={referralUrl(row.refCode)}');
   });
 });
 

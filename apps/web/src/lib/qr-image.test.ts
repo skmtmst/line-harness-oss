@@ -23,7 +23,10 @@ describe('QRライブラリの表示時読み込み(PERF-09)', () => {
     const create = fs.readFileSync(path.join(SRC, 'v8/inflow-links/new/create.tsx'), 'utf8')
     expect(create).toContain("router.push(createPageReturnHref('/inflow-links', res.data.id))")
     const dialog = fs.readFileSync(path.join(SRC, 'v8/inflow-links/qr-dialog.tsx'), 'utf8')
-    expect(dialog).toContain('/api/qr?size=320x320')
+    expect(dialog).toContain('<DashboardQrDialog')
+    expect(dialog).toContain('baseLink={referralUrl(route.refCode)}')
+    expect(dialog).toContain('stopped: route.isActive === false')
+    expect(dialog).toContain('api.entryRoutes.qrImage')
     expect(dialog).not.toMatch(/from\s+['"]qrcode['"]/)
   })
   it('QRを出す画面が qrcode を静的に import していない', () => {

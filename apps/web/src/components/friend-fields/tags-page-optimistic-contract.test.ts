@@ -13,7 +13,9 @@ describe('タグ一覧・編集の操作失敗と再取得の契約', () => {
     expect(source).toContain('moveTagToGroup(tag,')
   })
   it('フォルダは省略できる文字と色の印で出し、全文も読める', () => {
-    expect(source).toContain("title={group?.name ?? '未分類'}")
+    const dot = readFileSync(resolve(root, 'components/shared/folder-dot.tsx'), 'utf8')
+    expect(dot).toContain('title={label}')
+    expect(dot).toContain("const label = `フォルダ：${folder?.name ?? '未分類'}`")
     expect(source).toContain('<FolderDotName folder={group}>')
   })
   it('所属フォルダは編集フォームでも変更できる', () => {

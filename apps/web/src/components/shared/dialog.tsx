@@ -105,6 +105,8 @@ export type DialogProps = {
   designNode?: string
   /** ConfirmDialog の構造。重要操作でも説明を赤帯へ入れない。 */
   confirmation?: boolean
+  /** 見た目を変えず、重要操作の読み上げの役割を保つ。 */
+  role?: 'dialog' | 'alertdialog'
   /** 本文を持たない短い確認窓。 */
   compact?: boolean
   /**
@@ -163,6 +165,7 @@ export default function Dialog({
   modal = true,
   designNode,
   confirmation = false,
+  role: suppliedRole,
   compact = false,
   primaryAction = 'confirm',
   footerAlign,
@@ -259,7 +262,7 @@ export default function Dialog({
       onInputCapture={formInput.onChangeCapture}
       onClickCapture={formInput.onClickCapture}
       className={`${styles.panel} ${styles.standardPanel} ${confirmation ? styles.confirmationPanel : ''} ${confirmationSizeClass}`}
-      role={tone === 'destructive' ? 'alertdialog' : 'dialog'}
+      role={suppliedRole ?? (tone === 'destructive' ? 'alertdialog' : 'dialog')}
       aria-modal={modal || undefined}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}

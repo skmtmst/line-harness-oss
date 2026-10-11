@@ -66,7 +66,8 @@ describe('タグ V4 contract', () => {
 
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
     const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
-    expect(source).toContain('...STANDARD_PAGE_SIZES, 30, 40')
+    expect(source).toContain('EXTENDED_PAGE_SIZES as PAGE_SIZES')
+    expect(read('components/shared/page-size-options.ts')).toContain('[10, 20, 30, 40, 50]')
     // 2026-08-26: ページ送りは共通部品 `Pagination`（設計 `Blot6`）へ寄せた。
     // 自前で組むと、高さ38・角丸・現在ページの緑がほかの一覧とずれる。
     expect(source).toContain('<Pagination')

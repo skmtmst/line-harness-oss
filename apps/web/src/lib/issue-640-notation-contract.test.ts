@@ -10,7 +10,7 @@ const AUTO_REPLIES = read('../v8/auto-replies/list.tsx')
 const FRIEND_ADD = read('../v8/friend-add/list.tsx')
 const VARS = readUiSource(new URL('../app/contents/vars/page.tsx', import.meta.url), 'utf8')
 const NEN_OVERVIEW = read('../v8/nen-campaigns/list.tsx')
-const TAGS = read('../v8/tags/tags-tab.tsx') + read('../components/friend-fields/tags-page-v4.tsx') + read('../components/shared/folder-panel.tsx')
+const TAGS = read('../components/shared/folder-dot.tsx') + read('../v8/tags/tags-tab.tsx') + read('../components/friend-fields/tags-page-v4.tsx') + read('../components/shared/folder-panel.tsx')
 const ANALYTICS = readUiSource(new URL('../app/analytics/page.tsx', import.meta.url), 'utf8')
 const ANALYTICS_TIME = read('../app/analytics/analytics-time.ts')
 
@@ -59,7 +59,9 @@ describe('#640 省略表示の全文確認（title）', () => {
     // 欄の幅が列を超えて隣へ重なっていたため。長い名前は省略し、
     // 全文は title で確認できる（#640 の意図は残す）。
     expect(TAGS).not.toContain('<FolderSelect')
-    expect(TAGS).toContain("title={group?.name ?? '未分類'}")
+    expect(TAGS).toContain('<FolderDotName folder={group}>')
+    expect(TAGS).toContain('title={label}')
+    expect(TAGS).toContain("const label = `フォルダ：${folder?.name ?? '未分類'}`")
     expect(TAGS).not.toContain('<select')
     expect(TAGS).toContain('title={row.label}')
     // 使用先セルは共通 Td（余白は部品側）。全文確認の title は残す。

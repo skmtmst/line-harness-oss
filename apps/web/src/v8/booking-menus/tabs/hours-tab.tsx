@@ -436,13 +436,13 @@ export function ResourceRowV8({ accountId, resource, canEdit, onSaved, onDeleted
       <span className={styles.equipType}>{resource.type}</span>
       <span className={styles.equipCap}>{resource.capacity}</span>
       <span className={styles.colMenu}>
-        <RowMenu
+        {canEdit ? <RowMenu
           appearance="plain"
           className={styles.rowMenuButton}
           label={`「${resource.name}」のそのほかの操作`}
           menuLabel={`「${resource.name}」の操作`}
           items={menuItems}
-        />
+        /> : null}
       </span>
       {error ? <Notice tone="danger" className="w-full" >{error}</Notice> : null}
       <ResourceDialog

@@ -1,7 +1,7 @@
 'use client'
 
 
-import type { ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 import { Inbox, Lock } from 'lucide-react'
 import Button from './button'
 import TargetMissing from './target-missing'
@@ -29,8 +29,8 @@ import { DelayedSkeleton, ListSkeleton } from './skeleton'
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
 
 /** 詳細の節だけが空のときは、一覧全体の絵や操作を増やさず1行で知らせる。 */
-export function ListEmptyMessage({ children }: { children: ReactNode }) {
-  return <p className={styles.inlineEmpty}>{children}</p>
+export function ListEmptyMessage({ children, as: Tag = 'p', ...props }: HTMLAttributes<HTMLElement> & { as?: 'p' | 'span'; children: ReactNode }) {
+  return <Tag {...props} className={styles.inlineEmpty}>{children}</Tag>
 }
 /**
  * 空の内訳。`createable` はまだ1件も無い（作る口を出す）、`readonly` は

@@ -84,7 +84,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/broadcasts/broadcast-form.tsx", "className=\"border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/segment-preset-controls.tsx", "className=\"divide-y divide-hairline rounded-card border border-hairline bg-canvas\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["components/forms/block-editor.tsx", "className={`rounded-card border p-4 transition-colors ${ selected ? 'border-accent bg-canvas' : 'border-hairline bg-canvas' }`}", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
-  ["components/friend-fields/mark-list.tsx", "className=\"flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["components/friends/single-friend-actions.tsx", "className=\"bg-canvas rounded-card border-hairline mt-2 border p-3\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["components/scenarios/action-editor.tsx", "className=\"text-ink-faint rounded-card border-hairline border border-dashed py-8 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/scenarios/carousel-picker.tsx", "className=\"border-hairline rounded-card border border-dashed px-4 py-6 text-center\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],

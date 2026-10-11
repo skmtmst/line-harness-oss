@@ -94,7 +94,7 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
         : ''
   const canConfirm = !loading && !saving && Boolean(impact?.canArchive) && (!needsReplacement || Boolean(replacementMarkId))
   return (
-    <Dialog open confirmation designNode="fy5dz" title={`「${mark.name}」を保管しますか`}
+    <Dialog open confirmation role="alertdialog" designNode="fy5dz" title={`「${mark.name}」を保管しますか`}
       description={needsReplacement ? `いま ${friendCount} 人に付いています。保管すると、この ${friendCount} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。'}
       designWidth={576} designHeaderPadding="16px 16px 0" designContentPadding="12px 16px 4px" designFooterPadding="16px"
       onCancel={onCancel} onConfirm={onConfirm} busy={saving} confirmDisabled={!canConfirm}

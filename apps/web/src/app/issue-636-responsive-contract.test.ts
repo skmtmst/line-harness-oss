@@ -34,9 +34,13 @@ describe('04-C-横1: タグ表は1440pxに収まる', () => {
     expect(page).toContain('min-w-[800px]')
   })
 
-  it('狭い幅ではフォルダの列を出して情報を確認できる', () => {
+  it('狭い幅でも名前の色の印から所属フォルダを確認できる', () => {
     expect(page).toContain('<DataTable')
-    expect(page).toContain('{narrow ? <Th className={styles.colFolder}>フォルダ</Th> : null}')
+    expect(page).toContain('<FolderDotName folder={group}>')
+    const dot = read('../components/shared/folder-dot.tsx')
+    expect(dot).toContain("const label = `フォルダ：${folder?.name ?? '未分類'}`")
+    expect(dot).toContain('title={label}')
+    expect(page).not.toContain('<Th className={styles.colFolder}>')
   })
 })
 

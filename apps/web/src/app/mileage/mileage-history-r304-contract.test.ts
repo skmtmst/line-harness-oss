@@ -19,7 +19,8 @@ describe('R304: 日付逆転は日付エラーとして表示し取得しない'
 
   it('開始日・終了日の欄を異常表示し、そばへ理由を出す', () => {
     expect(TAB).toContain('invalid={Boolean(filterError ?? periodError ?? inputRejected)}')
-    expect(TAB).toContain('role="alert"')
+    expect(TAB).toContain('<Notice tone="danger"')
+    expect(readFileSync(join(HERE, '../../components/shared/notice.tsx'), 'utf8')).toContain('role=')
   })
 
   it('口の入力エラー（400）は通信障害と分け、日付エラーとして扱う', () => {
