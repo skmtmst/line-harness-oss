@@ -372,7 +372,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
         </div>
       ))}
 
-      <Button variant="secondary" className="text-ink-secondary rounded-card v7:h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
+      <Button variant="secondary" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
           update({
             ...condition,
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],

@@ -183,7 +183,7 @@ describe('監査 R89: 状態変更の後は集計・カレンダーも更新す�
      })
      render(<BookingsPage />)
      await screen.findAllByRole('button', { name: /今日/ })
-     expect(screen.getAllByText('読み込んでいます').length).toBeGreaterThan(0)
+     expect(screen.getAllByLabelText('読み込んでいます').length).toBeGreaterThan(0)
    })
    it('WEB296：期間の取得失敗から再試行したら、その期間を読み直す', async () => {
      let rangeCalls = 0
