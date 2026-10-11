@@ -1,8 +1,9 @@
+import { useRequestGeneration } from '../../lib/use-request-generation.js';
 import { FieldError } from '../../components/forms/controls.js';
 import CourseChoice from '../../components/CourseChoice.js';
 import Card from '../../components/ui/Card.js';
 import { useUrlStep } from '../../lib/use-url-step.js';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import liff from '../../lib/liff-runtime.js';
 import type { RestaurantCustomerBooking, RestaurantLateArrivalPolicy, RestaurantUnavailableReason } from '@line-crm/shared';
@@ -98,6 +99,10 @@ export default function SeatReserve() {
   // 再実行だけ同じ受付番号を使う。選び直したら新しくする。
   const requestId = useRef<string | null>(null);
   const generation = useRef(0);
+
+  const requestContext = JSON.stringify([token, store?.id, view, target?.id, date, guestCount, startsAt, courseId]);
+  const mutation = useRequestGeneration(requestContext);
+  useLayoutEffect(() => { busyRef.current = false; setBusy(false); }, [requestContext]);
 
   const currentSlots=Array.isArray(days[date]) ? days[date] as import('@line-crm/shared').RestaurantCustomerSlot[] : null;
   const fullStartsAt=currentSlots?.find(s=>!s.available)?.startsAt;
@@ -229,6 +234,7 @@ export default function SeatReserve() {
 
   async function proceed() {
     if (!store || !slot || busyRef.current) return;
+    const requestGeneration = mutation.begin();
     busyRef.current=true;
     setError(null);
     if (target) {
@@ -246,6 +252,7 @@ export default function SeatReserve() {
         requestId: requestId.current,
         courseId,
       });
+      if (!mutation.isCurrent(requestGeneration)) return;
       setHold(r.data);
       setHoldMinutes(
         r.data.holdExpiresAt ? Math.max(1, Math.round((Date.parse(r.data.holdExpiresAt) - Date.now()) / 60000)) : 0,
@@ -253,6 +260,7 @@ export default function SeatReserve() {
       setExpired(false);
       setView('confirm');
     } catch (e) {
+      if (!mutation.isCurrent(requestGeneration)) return;
       logFailure('seat-hold', e);
       setError(seatErrorMessage(e));
       // 届いたか分からない失敗 (通信・500) は、次の押下で同じ受付番号を送って二重にしない。
@@ -264,6 +272,7 @@ export default function SeatReserve() {
         void fetchDay(store, date, guestCount, generation.current);
       }
     } finally {
+      if (!mutation.isCurrent(requestGeneration)) return;
       busyRef.current=false;
       setBusy(false);
     }
@@ -276,6 +285,7 @@ export default function SeatReserve() {
       setError(problem);
       return;
     }
+    const requestGeneration = mutation.begin();
     busyRef.current=true;
     setBusy(true);
     setError(null);
@@ -292,22 +302,28 @@ export default function SeatReserve() {
             customerPhone: normalizePhone(phone) || null,
             ...(params.get('referralId') ? {referralId:params.get('referralId')!} : {}),
           });
+      if (!mutation.isCurrent(requestGeneration)) return;
       setResult({ booking: r.data, changed: !!target });
       setHold(null);
       setTarget(null);
       requestId.current = null;
       setView('done');
     } catch (e) {
+      if (!mutation.isCurrent(requestGeneration)) return;
       logFailure(target ? 'seat-reschedule' : 'seat-confirm', e);
       setError(seatErrorMessage(e));
       if ((e as { body?: { error?: string } }).body?.error === 'hold_expired') setExpired(true);
     } finally {
+      if (!mutation.isCurrent(requestGeneration)) return;
       busyRef.current=false;
       setBusy(false);
     }
   }
 
   function backToPick() {
+    mutation.invalidate();
+    busyRef.current = false;
+    setBusy(false);
     // 仮押さえは返す (ほかのお客さまが選べるように)。失敗しても期限で外れるので止めない。
     if (hold && !expired) {
       restaurantBookingApi.cancel(hold.id, hold.version).catch((e) => logFailure('seat-release', e));
