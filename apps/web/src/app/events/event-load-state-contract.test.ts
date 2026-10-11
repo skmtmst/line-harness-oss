@@ -15,7 +15,7 @@ const EVENTS = readFileSync(join(HERE, '../../v8/events/list.tsx'), 'utf8')
 const BOOKINGS = readFileSync(join(HERE, '../../v8/events/bookings.tsx'), 'utf8')
 const RECORDS = readFileSync(join(HERE, '../../v8/events/booking-records.tsx'), 'utf8')
 const REQUESTS = readFileSync(join(HERE, '../../v8/events/booking-requests.ts'), 'utf8')
-const EDIT = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const EDIT = readFileSync(join(HERE, '../../v8/events/edit.tsx'), 'utf8')
 
 /** 説明の文だけで通ってしまわないよう、判定の前にコメントを落とす。 */
 function code(source: string): string {
@@ -106,7 +106,6 @@ describe('V8 イベント・申込者一覧の状態', () => {
   it('編集画面から申込者一覧へのリンクは申込者画面の読む引数名と揃える', () => {
     // 申込者画面は `id` だけを読む。一覧と作成フォームは `?id=` で正しい。
     expect(code(BOOKINGS)).toContain("useSearchParams().get('id')")
-    expect(code(EDIT)).toContain('/events/bookings?id=${eventId}')
     expect(code(EDIT)).toContain('/events/bookings?id=${id}')
     // `?eventId=` では「イベントを選び直してください」になり、承認待ちへ行けない。
     expect(code(EDIT)).not.toContain('bookings?eventId=')
@@ -133,7 +132,7 @@ describe('V8 イベント・申込者一覧の状態', () => {
     const body = code(EDIT)
     expect(body).toContain('setLoadError')
     expect(body).toContain('setReloadSeq')
-    expect(EDIT).toContain('一部を取得できませんでした。取得できなかった数は「—」で表示しています。')
+    expect(EDIT).toContain('一部を読み込めませんでした。読み込めなかった数は「—」で表示しています。')
     expect(EDIT).toContain('読み直す')
     expect(body).toContain('eventsApi.getBookingSummary(accountId, eventId)')
     expect(body).not.toContain('eventsApi.listBookings(accountId, eventId)')
