@@ -12,7 +12,7 @@ const SCREENS: Array<[string, string]> = [
   ['v8/form-edit/edit.tsx', ''],
   ['app/reminders/new/new-v8.tsx', ''],
   ['v8/reminders/edit.tsx', 'k32cn'],
-  ['app/tags/edit-tag-page-v8.tsx', 'xn95q'],
+  ['v8/tag-edit/edit-form.tsx', 'xn95q'],
   ['v8/tag-edit/edit.tsx', 'xn95q'],
   ['v8/template-edit/message.tsx', 'NCbYn'],
   ['app/auto-replies/edit/wizard-v8.tsx', 'UGrd2'],

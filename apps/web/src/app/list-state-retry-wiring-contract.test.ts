@@ -19,7 +19,7 @@ const TARGETS = [
   'rich-menus/connections/page.tsx',
   // 失敗表示を持つ本体を指定し、別の詳細画面・ダイアログは取り込まない。
   '../v8/scenarios/results.tsx',
-  'tags/mark-editor-v8.tsx',
+  '../v8/tags/mark-editor.tsx',
   '../components/broadcasts/segment-preset-controls.tsx',
   '../components/friend-fields/field-list.tsx',
   '../components/friend-fields/mark-list.tsx',

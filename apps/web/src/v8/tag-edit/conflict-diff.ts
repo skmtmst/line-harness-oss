@@ -14,7 +14,7 @@ function sameJson(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
-/** 最新の版が連動 ON か（tag-editor-v8 の hasStoredLink と同じ見方）。 */
+/** 最新の版が連動 ON か（src/v8/tag-edit/edit-form の hasStoredLink と同じ見方）。 */
 function incomingLinked(tag: Tag): boolean {
   return Boolean(tag.mileageReward || tag.referralMileageReward || tag.mileageMultiplierBps)
 }

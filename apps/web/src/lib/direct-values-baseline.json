@@ -39,11 +39,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "app/tags/mark-editor-v8.tsx": {
-    "color": 6,
-    "radius": 0,
-    "shadow": 0
-  },
   "app/visual-qa/v8-parts/page.tsx": {
     "color": 2,
     "radius": 0,

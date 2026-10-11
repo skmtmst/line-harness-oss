@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
-const read = (name: string) => readFileSync(join(DIR, name), 'utf8')
+const read = (name: string) => readFileSync(join(DIR, '../../v8/tags', name), 'utf8')
 
-const TAB = read('tags-tab-v8.tsx')
-const MARKS = read('marks-v8.tsx')
-const SEARCHES = read('searches-v8.tsx')
-const FIELDS = read('fields-tab-v8.tsx')
+const TAB = read('tags-tab.tsx')
+const MARKS = read('marks-tab.tsx')
+const SEARCHES = read('searches-tab.tsx')
+const FIELDS = read('fields-tab.tsx')
 
 /*
  * UX更新 A/B（タグ・友だち情報の欄のV8画面）。

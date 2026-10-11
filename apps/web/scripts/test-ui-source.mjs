@@ -38,9 +38,6 @@ export function readUiSource(path, encoding = 'utf8') {
   // 現役の分割部品は読み替えない。共通部品・CSS・JSONも元の読み口を保つ。
   if (full.includes('/src/app/') && /(?:^v8-|[-.]v8\.tsx?$)/.test(full.split('/').at(-1))) {
     const routes = {
-      'tags/field-migrate-v8.tsx': 'tags/fields/migrate/page.tsx',
-      'tags/edit-tag-page-v8.tsx': 'tags/edit/page.tsx',
-      'tags/mark-editor-v8.tsx': 'tags/marks/edit/page.tsx',
       'templates/edit-v8.tsx': 'templates/edit/page.tsx',
       'templates/editor-v8.tsx': 'templates/edit/page.tsx',
       'reminders/basics-form-v8.tsx': 'reminders/new/page.tsx',
@@ -48,7 +45,6 @@ export function readUiSource(path, encoding = 'utf8') {
       'affiliate-offers/new-offer-v8.tsx': 'affiliate-offers/new/page.tsx',
       'broadcasts/reserved-v8.tsx': 'broadcasts/reserved/page.tsx',
       'broadcasts/detail-v8.tsx': 'broadcasts/detail/page.tsx',
-      'tags/search-editor-v8.tsx': 'tags/searches/edit/page.tsx',
     }
     if (full.endsWith('/hq/hq-settings-nav-v8.tsx')) return read(resolve(SRC, 'v8/hq/settings-nav.tsx'), 0)
     const relative = full.slice(full.indexOf('/src/app/') + 9)

@@ -9,7 +9,7 @@ const LISTS = [
   'v8/scenarios/list.tsx',
   'app/reminders/list-v8.tsx',
   'v8/auto-replies/list.tsx',
-  'app/tags/tags-tab-v8.tsx',
+  'v8/tags/tags-tab.tsx',
   'v8/broadcasts/list.tsx',
   'v8/templates/list.tsx',
 ]

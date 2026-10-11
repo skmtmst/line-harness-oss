@@ -57,7 +57,7 @@ import Notice from '@/components/shared/notice'
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・フォルダへ移す・フォルダの
  * 追加/直す/並べ替え/削除・保管・CSV・行の詳細パネル・右クリック）は
- * 今の V8 タブ（app/tags/tags-tab-v8.tsx）から写した。数え方・判定は v7 と同じ関数
+ * 現役の V8 タブ（src/v8/tags/tags-tab.tsx）から写した。数え方・判定は共通の同じ関数
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
 

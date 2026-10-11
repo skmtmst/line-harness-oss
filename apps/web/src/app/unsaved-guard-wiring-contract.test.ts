@@ -64,8 +64,7 @@ const GUARDED = [
   'app/staff/new/page.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
-  'app/tags/mark-editor-v8.tsx',
-  'app/tags/search-editor-v8.tsx',
+  'app/tags/marks/edit/page.tsx',
   'app/tags/searches/edit/page.tsx',
   'v8/webhooks/create.tsx',
   'v8/conversions/create.tsx',
@@ -232,20 +231,12 @@ const EXEMPTIONS: Record<string, string> = {
     'app/tags/field-migrate-v8.tsx と同じ項目移行画面を src/v8 に一から書いたもの（GobMd）。事前確認→明示実行の2段階で、途中離脱で失うのは確認状態だけ',
   'v8/tag-edit/edit.tsx':
     'タグの編集（xn95q）を src/v8 に一から書いたもの。元の画面（components/friend-fields/edit-tag-page-v4.tsx・s1 未判定）と同じ扱いで、番兵の要否は元の画面と一緒に決める',
-  'app/tags/field-migrate-v8.tsx':
-    '★V8 の項目移行画面（GobMd）。事前確認→明示実行の2段階で、途中離脱で失うのは確認状態だけ。離脱番兵の v7 同等画面（fields/migrate/page.tsx）と同じ扱い',
   'app/inflow-links/detail/page.tsx':
     '転送先の編集は保存ボタン確定式。下書き・dirty 管理がなく番兵の扱いは別途検討',
   'app/mileage/score-rules/page.tsx':
     '下書き保存式の編集画面。番兵の扱いは別途検討',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
-  'app/tags/tags-tab-v8.tsx':
-    'tags-page-v4.tsx と同じ一覧のV8版。一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
-  'app/tags/searches-v8.tsx':
-    '★V8 の保存した検索一覧。詳細パネルの検索名はその場書き換えでEnter確定の即時保存、削除は確認窓で確定し、画面に残る下書きを持たない',
-  'app/tags/fields-tab-v8.tsx':
-    '★V8 の友だち情報欄一覧。詳細パネルの項目名はその場書き換えでEnter確定の即時保存、削除・フォルダ操作は確認窓か即時保存で確定し、画面に残る下書きを持たない',
   /* ★V8 の新しい画面（src/v8）。古い画面ファイルの理由をそのまま写した（2026-10-06）。 */
   'v8/broadcasts/list.tsx':
     '★V8 の一斉配信一覧（l5V9a）。一覧と絞り込みが中心。フォルダ・並び替え・保存した検索など一覧上の操作は押した直後に即時保存し、配信の作成は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',

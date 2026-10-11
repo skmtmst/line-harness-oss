@@ -49,7 +49,7 @@ import Notice from '@/components/shared/notice'
  * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・保管の確認・行の詳細パネル・右クリック・
- * 名前のその場の直し）は今の V8 タブ（app/tags/marks-v8.tsx）から写した。数え方・判定・
+ * 名前のその場の直し）は現役の V8 タブ（src/v8/tags/marks-tab.tsx）から写した。数え方・判定・
  * 保管の窓は v7 と同じ部品（components/friend-fields/mark-list）を使う。見た目だけを絵に合わせた：
  * 数の帯は共通の帯（板の端から端）、案内は青い帯、道具の段の右端に表示件数、
  * 表は板の端から端（行の右端は必ず「…」）、表の下に安全確認の段。
