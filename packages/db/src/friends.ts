@@ -231,6 +231,12 @@ export function isFriendLineUserIdConflict(error: unknown): boolean {
   return /unique constraint failed: friends\.line_user_id/i.test(message);
 }
 
+/** Legacy columns without an offset contain JST, as in the schema defaults. */
+function followTimeSql(column:string):string {
+  return `julianday(CASE WHEN substr(${column},-1) IN ('Z','z') OR substr(${column},-6,1) IN ('+','-') OR substr(${column},-5,1) IN ('+','-') THEN ${column}
+    WHEN length(${column})=10 THEN ${column}||'T00:00:00+09:00' ELSE ${column}||'+09:00' END)`;
+}
+
 export async function upsertFriend(
   db: D1Database,
   input: UpsertFriendInput,
@@ -318,7 +324,7 @@ export async function upsertFriend(
            is_following = 1,
            updated_at = ?
        WHERE id = ? AND (? IS NULL OR julianday(?) > MAX(
-         COALESCE(julianday(last_followed_at),0), COALESCE(julianday(last_unfollowed_at),0)))`,
+         COALESCE(${followTimeSql('last_followed_at')},0), COALESCE(${followTimeSql('last_unfollowed_at')},0)))`,
     ).bind(
       'displayName' in input ? (input.displayName ?? null) : existing.display_name,
       'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
@@ -385,7 +391,7 @@ export async function updateFriendFollowStatus(
                 last_followed_at = CASE WHEN ? IS NOT NULL OR is_following = 0 THEN ? ELSE last_followed_at END,
                 is_following = 1, updated_at = ?
           WHERE id = ? AND (? IS NULL OR julianday(?) > MAX(
-            COALESCE(julianday(last_followed_at),0),COALESCE(julianday(last_unfollowed_at),0)))`,
+            COALESCE(${followTimeSql('last_followed_at')},0),COALESCE(${followTimeSql('last_unfollowed_at')},0)))`,
       )
       .bind(now, occurredAt ?? null, now, now, existing.id, occurredAt ?? null, now)
       .run();
@@ -400,7 +406,7 @@ export async function updateFriendFollowStatus(
               unfollow_count = unfollow_count + CASE WHEN is_following = 1 THEN 1 ELSE 0 END,
               updated_at = ?
         WHERE id = ? AND (? IS NULL OR julianday(?) > MAX(
-            COALESCE(julianday(last_followed_at),0),COALESCE(julianday(last_unfollowed_at),0)))`,
+            COALESCE(${followTimeSql('last_followed_at')},0),COALESCE(${followTimeSql('last_unfollowed_at')},0)))`,
     )
     .bind(occurredAt ?? null, now, now, existing.id, occurredAt ?? null, now)
     .run();

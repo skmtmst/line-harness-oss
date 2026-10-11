@@ -171,6 +171,19 @@ describe('N-024 LINE送信取消', () => {
     expect(db.raw.prepare("SELECT is_following,last_followed_at FROM friends WHERE line_user_id='U-a'").get()).toEqual({is_following:0,last_followed_at:'2023-11-15T07:13:22.000+09:00'});
   });
 
+  it.each(['2026-10-11T10:00:00.000','2026-10-11T10:00:00.000+09:00','2026-10-11T01:00:00.000Z'])('IN-C01: 旧形式の時刻 %s も日本時間で比較する',async(stamp)=>{
+    db.raw.prepare("UPDATE friends SET last_followed_at=?,last_unfollowed_at=NULL WHERE id='friend-a'").run(stamp);
+    await postEvent(db,'a',{...base('a','legacy-clock',Date.parse('2026-10-11T10:01:00+09:00')),type:'unfollow'});
+    expect(db.raw.prepare("SELECT is_following FROM friends WHERE id='friend-a'").get()).toEqual({is_following:0});
+  });
+
+  it('IN-C01: 初回メッセージで登録した人の後続解除も出来事時刻で判定する',async()=>{
+    db.raw.exec("DELETE FROM friends WHERE id='friend-a'");lineClient.getProfile.mockResolvedValue({displayName:'人工ユーザー'});
+    await postText(db,'a','first-message','first-message-id','人工の本文',1_700_000_002_000);
+    await postEvent(db,'a',{...base('a','first-message-unfollow',1_700_000_003_000),type:'unfollow'});
+    expect(db.raw.prepare("SELECT is_following,last_followed_at FROM friends WHERE line_user_id='U-a'").get()).toEqual({is_following:0,last_followed_at:'2023-11-15T07:13:22.000+09:00'});
+  });
+
   it('IN-C01: 新しい解除のあとに古い追加が届いてもブロックを戻さない', async () => {
     lineClient.getProfile.mockResolvedValue({displayName:'人工ユーザー'});
     await postEvent(db,'a',{...base('a','new-unfollow',1_800_000_002_000),type:'unfollow'});

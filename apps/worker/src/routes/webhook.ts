@@ -365,7 +365,7 @@ async function handleStoppedTenantEvent(
     return;
   }
 
-  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,event.type==='follow'?toJstString(new Date(event.timestamp)):undefined);
+  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,toJstString(new Date(event.timestamp)));
   if (!friend) return;
 
   if (event.type === 'follow') {
@@ -451,7 +451,7 @@ async function handleNoticeLinkCode(
   const userId = event.source.type === 'user' ? event.source.userId : undefined;
   if (!userId) return false;
   const { tryLinkStaffByCode } = await import('../services/platform-announcements.js');
-  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
+  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,toJstString(new Date(event.timestamp)));
   if (!friend) return false;
   return tryLinkStaffByCode(env, {
     lineAccountId,
@@ -530,7 +530,7 @@ async function handleEvent(
       });
       return;
     }
-    if (friend.is_following === 0 || (friend.last_followed_at && Date.parse(friend.last_followed_at) > event.timestamp)) return;
+    if (friend.is_following === 0 || (friend.last_followed_at && Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(friend.last_followed_at)?friend.last_followed_at:`${friend.last_followed_at}${friend.last_followed_at.length===10?'T00:00:00':''}+09:00`) > event.timestamp)) return;
     const friendKind = (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time';
 
     // V6台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
@@ -1247,7 +1247,7 @@ async function handleEvent(
     const userId = event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
+    const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,toJstString(new Date(event.timestamp)));
     if (!friend) return;
 
     let rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
@@ -1439,7 +1439,7 @@ async function handleEvent(
   if (event.type === 'message' && event.message.type !== 'text') {
     const userId = event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
-    const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
+    const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,toJstString(new Date(event.timestamp)));
     if (!friend) return;
 
     const msg = event.message as {
@@ -1554,7 +1554,7 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
+    const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,toJstString(new Date(event.timestamp)));
     if (!friend) return;
 
     const incomingText = textMessage.text;
