@@ -225,3 +225,6 @@ html[data-theme='v8'] .vertical { gap: max(var(--space-16), var(--card-content-g
 
 /* B-208：余白の口を持たない既存の箱にも、枠から16を確保する。表の器は平らなまま。 */
 html[data-theme='v8'] .card[data-card-padding='none'][data-card-variant='default']:not([data-card-unframed]):not([data-spacing]):not([data-card-spacing]):not(:has([data-shared-part='list-table'], table)) { padding: var(--space-16); }
+
+/* 失敗した処理の箱。形と余白はCardのまま、状態だけ共通の赤。 */
+html[data-theme='v8'] .card[data-card-surface='danger'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-danger-bg); }

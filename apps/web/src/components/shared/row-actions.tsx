@@ -179,7 +179,7 @@ export function RowMenu({
       {appearance === 'plain' ? (
         <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} data-row-menu="" />
       ) : (
-        <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} data-row-menu="">
+        <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} variant="plain" data-row-menu="">
           <MoreHorizontal size={size === 'row' ? 14 : 16} aria-hidden="true" />
         </IconButton>
       )}

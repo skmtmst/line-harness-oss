@@ -206,7 +206,11 @@ describe('フォルダの配布口を出す範囲（G-7）', () => {
     const onDistributeFolder = vi.fn()
     await render({ rows: [ROWS[1]], folderContents: [ROWS[0], ROWS[1]], onDistributeFolder,
       folders: [{ id: 'f-1', name: '別種類だけ', revision: 1 }, { id: 'f-empty', name: '空', revision: 1 }] })
-    expect(buttons().some((button) => button.getAttribute('aria-label') === 'フォルダ「すべて」の操作')).toBe(false)
+    const all = buttons().find((button) => button.getAttribute('aria-label') === 'フォルダ「すべて」の操作')!
+    await act(async () => all.click())
+    expect([...document.querySelectorAll('[role="menuitem"]')].some(item => item.textContent === 'このフォルダを配る')).toBe(false)
+    expect([...document.querySelectorAll('[role="menuitem"]')].some(item => item.textContent === 'フォルダを追加')).toBe(true)
+    await act(async () => all.click())
     const unfiled = buttons().find((button) => button.getAttribute('aria-label') === 'フォルダ「未分類」の操作')!
     expect(unfiled).toBeTruthy()
     await act(async () => unfiled.click())

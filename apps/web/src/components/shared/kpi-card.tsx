@@ -32,6 +32,8 @@ export type KpiCardProps = {
    * null だけでなく undefined・NaN も「—」にする。呼び出し側が
    * `x?.y` をそのまま渡しても画面ごと落ちない。**0 は 0 のまま出す。**
    */
+  /** B-145：数の帯に『…』を置かず、数から既存の内訳を開く。 */
+  valueAction?: { label: string; expanded: boolean; onClick: () => void }
   value: number | null | undefined
   unit: string
   /** 数字と単位を続けて出す板用。既定の間隔は変えない。 */
@@ -114,6 +116,7 @@ export default function KpiCard({
   delta,
   menu,
   value,
+  valueAction,
   unit,
   unitSpacing = 'normal',
   signed = false,
@@ -161,6 +164,11 @@ export default function KpiCard({
   const numberText = textIsNumber ? valueText : undefined
   const tip = help ?? description
   const hasTip = tip !== undefined && tip !== null
+
+  const numberAndUnit = <>
+    <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
+    {numberText !== undefined || statusText ? null : <span className={styles.unit}>{unit}</span>}
+  </>
 
   return (
     <div
@@ -219,8 +227,10 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
-          {numberText !== undefined || statusText ? null : <span className={styles.unit}>{unit}</span>}
+          {valueAction ? (
+            <button type="button" className={styles.valueAction} aria-label={valueAction.label} aria-expanded={valueAction.expanded} onClick={valueAction.onClick}>{numberAndUnit}</button>
+          ) : numberAndUnit}
+
         </p>
       )}
 

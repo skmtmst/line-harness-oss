@@ -156,13 +156,46 @@ function compactFilterGroups(node: ReactNode): ReactNode {
     ? cloneElement(child, {}, compactFilterGroups(child.props.children)) : child)
 }
 export function ResponsiveFilterChips({ children, label = '状態' }: { children: ReactNode; label?: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const unfoldedWidth = useRef(0)
+  const [collapsed, setCollapsed] = useState(false)
+  useLayoutEffect(() => {
+    const choices = ref.current
+    const toolbar = choices?.closest<HTMLElement>('[data-toolbar-layout="band"], [data-toolbar-layout="slots"], [data-toolbar-layout="stacked"], [data-toolbar-layout="slots-stacked"]')
+    if (!choices || !toolbar || !window.ResizeObserver || toolbar.dataset.toolbarLayout?.includes('stacked')) return
+    const flatten = (element: HTMLElement): HTMLElement[] => getComputedStyle(element).display === 'contents'
+      ? [...element.children].flatMap(child => flatten(child as HTMLElement)) : [element]
+    const measure = () => {
+      if (document.documentElement.dataset.theme !== 'v8') return
+      const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
+      if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
+      choices.dataset.filterWidth = String(unfoldedWidth.current)
+      const tools = [...toolbar.children].flatMap(child => flatten(child as HTMLElement)).filter(tool =>
+        getComputedStyle(tool).display !== 'none' && getComputedStyle(tool).flexGrow === '0'
+        && !tool.matches('[data-shared-part="notice"], :has(> [data-shared-part="notice"])'))
+      const required = tools.reduce((sum, tool) => {
+        let width = tool.getBoundingClientRect().width
+        for (const group of tool.matches('[data-filter-width]') ? [tool] : [...tool.querySelectorAll<HTMLElement>('[data-filter-width]')]) {
+          width += Math.max(0, Number(group.dataset.filterWidth) - group.getBoundingClientRect().width)
+        }
+        return sum + width
+      }, 0)
+      const css = getComputedStyle(toolbar)
+      const available = toolbar.clientWidth - parseFloat(css.paddingLeft || '0') - parseFloat(css.paddingRight || '0')
+      setCollapsed(required + (parseFloat(css.columnGap) || 0) * Math.max(0, tools.length - 1) > available + 1)
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(toolbar); observer.observe(choices)
+    measure()
+    return () => observer.disconnect()
+  }, [children])
   const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
   const text = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? text(child.props.children) : String(child)).join('')
   const selected = chips.map((child,index) => child.props.selected ? index : -1).filter(index => index >= 0)
   const allIndex = chips.findIndex(child => /^すべて(?:$|\s|[\d（(])/.test(text(child.props.children)))
   const current = selected.length > 1 ? 'multiple' : selected.length === 1 ? String(selected[0]) : allIndex >= 0 ? String(allIndex) : 'all'
-  return <span className={styles.filterChoices}>
-    <span className={styles.filterWide}>{children}</span>
+  return <span ref={ref} className={styles.filterChoices} data-filter-collapsed={collapsed || undefined}>
+    <span className={styles.filterWide} data-filter-chips>{children}</span>
     <span className={styles.filterNarrow}><Select label={label} aria-label={label} value={current}
       options={[...(allIndex >= 0 ? [] : [{ value: 'all', label: 'すべて', disabled: selected.length > 1 }]), ...(selected.length > 1 ? [{ value: 'multiple', label: `${selected.length}件の条件`, disabled: true }] : []), ...chips.map((child,index) => ({ value: String(index), label: text(child.props.children), disabled: child.props.disabled }))]}
       onChange={next => { if (next === 'all') { if (selected.length === 1) chips[selected[0]].props.onChange(false) } else { const chip = chips[Number(next)]; chip?.props.onChange(!chip.props.selected) } }} /></span>

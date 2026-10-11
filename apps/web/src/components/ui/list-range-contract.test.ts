@@ -82,10 +82,10 @@ describe('ListRange 統一（監査6 #667）', () => {
     expect(source).toContain('(cursorPage - 1) * perPage + items.length')
   })
 
-  it('ページ送りは1ページしかないとき隠す（友だち追加時の配信）', () => {
+  it('B-231：単一ページもカーソル式の共通ページ送りを使う', () => {
     const source = read('../../v8/friend-add/list.tsx')
-    // 以前は1ページでも「前へ 1 次へ」が常に出ていた。
-    expect(source).toContain('canPrev || data.nextCursor')
+    expect(source).toContain('<CursorPagination')
+    expect(source).toContain('hasNext={Boolean(data.nextCursor)}')
     expect(source).not.toContain('aria-current="page">{cursorPage}')
   })
 })

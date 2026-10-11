@@ -43,6 +43,7 @@
 :global([data-theme='v8']) .folders + .main { border-left: 0; }
 :global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global([data-theme='v8']) .toolbar[data-toolbar-spacing='section'] { padding-block: var(--polish-space-card); }
+:global([data-theme='v8']) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global([data-theme='v8']) .content { min-width: 0; }
 :global([data-theme='v8']) .content[data-content-inset] { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-page-pad-block); }
 :global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }

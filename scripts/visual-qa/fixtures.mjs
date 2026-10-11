@@ -33,9 +33,9 @@ export const FOLDER_COUNTS = [
  * 画面の `/api/tag-groups` が返すのは下の `TAG_GROUPS`（★V8 の絵の3つ）。
  */
 const TAG_GROUPS_ALL = [
-  { id: 'g-vip', name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
-  { id: 'g-pet', name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
-  { id: 'g-member', name: '会員', sortOrder: 2, color: '#10B981', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+  { id: 'g-vip', name: 'VIP', sortOrder: 0, color: '#2563EB', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+  { id: 'g-pet', name: 'ペット', sortOrder: 1, color: '#16A34A', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
+  { id: 'g-member', name: '会員', sortOrder: 2, color: '#D97706', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
   { id: 'g-health', name: '健康', sortOrder: 3, color: '#0EA5E9', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
   { id: 'g-purchase', name: '購入', sortOrder: 4, color: '#3B82F6', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
   { id: 'g-inquiry-follow', name: 'お問い合わせフォロー', sortOrder: 5, color: '#7C3AED', createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
@@ -4438,7 +4438,7 @@ const autoReplyRun = (id, friendName, occurredAt, inputPreview, status, detail, 
   lineAccountId: 'visual-qa-account',
   occurredAt,
   subject: friendName,
-  accountLabel: '然-NEN- TEST',
+  accountLabel: '然-NEN-TEST',
   triggerLabel: '予約',
   reference: `message-${id}`,
   status,
@@ -6939,7 +6939,7 @@ const tagSummary = (...ids) => LINE_ACCOUNT_TAGS.filter((tag) => ids.includes(ta
  * 名前を使う66枚を前後で測り、下がった板なし（a7lUk 73→89）。
  */
 export const LINE_ACCOUNTS = [
-  lineAccount('visual-qa-account', '2007123456', '然-NEN- TEST', 2, {
+  lineAccount('visual-qa-account', '2007123456', '然-NEN-TEST', 2, {
     basicId: 'nen-test', isDefault: true, role: '検証用。本番の配信には使わない',
     stats: { friendCount: 231, activeScenarios: 4, messagesThisMonth: 1842, staffCount: 2 },
     tags: tagSummary('tag-test'), connection: { status: 'warn', checkedAt: '2026-09-30T09:00:00.000Z' },

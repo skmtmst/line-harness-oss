@@ -26,7 +26,7 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   /** 'tight' | 'normal' | 'loose' は決まった段。それ以外はトークン（例 'var(--tpl-...)'）を中の間として渡す。 */
   gap?: 'tight' | 'normal' | 'loose' | (string & {})
   /** 内側の線で寸法を保つカード（inset）・薄い面（muted）・NEN の設定の枠（bordered）。指定した面だけに適用。 */
-  surface?: 'standard' | 'inset' | 'muted' | 'bordered'
+  surface?: 'standard' | 'inset' | 'muted' | 'bordered' | 'danger'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -80,7 +80,7 @@ export default function Card({
       data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
-      style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding, '--card-content-gap': gapValue } as CSSProperties : style} {...props}>
+      style={contentPadding || gapValue ? { ...style, '--card-content-padding': contentPadding ?? '0px', '--card-content-gap': gapValue ?? '0px' } as CSSProperties : style} {...props}>
       {children}
     </section>
   )

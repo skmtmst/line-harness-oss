@@ -929,9 +929,9 @@ const FRIEND_ADD_RULE_OPTIONS = {
   ],
   tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }, { id: 'tag-member', name: 'NEN会員' }],
   folders: [
-    { id: 'friend-add-folder-store', name: '店頭' },
-    { id: 'friend-add-folder-ads', name: '広告' },
-    { id: 'friend-add-folder-referral', name: '紹介' },
+    { id: 'friend-add-folder-store', name: '店頭', color: '#2563EB' },
+    { id: 'friend-add-folder-ads', name: '広告', color: '#16A34A' },
+    { id: 'friend-add-folder-referral', name: '紹介', color: '#D97706' },
   ],
 }
 
@@ -2073,7 +2073,7 @@ const SHAPES = {
   // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
   // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
   '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true } },
-  '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
+  '/api/inbox/unanswered/count': { total: 5, byAccount: [{ accountId: 'visual-qa-account', accountName: '然-NEN-TEST', count: 5 }], oldestWaitMinutes: 9110 },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
   /*

@@ -336,3 +336,7 @@
 [data-theme='v8'] .strip[data-restaurant-fusion] .detail { padding-left: 0; }
 
 [data-theme='v8'] .strip[data-restaurant-fusion='dashboard'] { margin: 13px 24px 0; }
+
+/* 数を押して内訳を開く口。数字と単位の配置は通常の数と同じ。 */
+.valueAction { min-height: 0; display: inline-flex; align-items: inherit; gap: inherit; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.valueAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; border-radius: var(--radius-control); }

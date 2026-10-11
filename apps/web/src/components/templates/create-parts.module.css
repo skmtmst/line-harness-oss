@@ -75,6 +75,7 @@
 .summary[data-variant='record'] .rows { gap: var(--tpl-fm2-rd-box-gap); }
 .summary[data-variant='record'] .row { border: 0; box-shadow: var(--shadow-row-line); }
 .summary[data-variant='record'] .row:last-child { box-shadow: none; }
+.summary[data-variant='record'] .rowValue { font-weight: 700; }
 
 /* 箱の外の淡い案内。 */
 .note {
