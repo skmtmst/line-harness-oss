@@ -35,7 +35,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
+import { FolderDotName, folderDisplayColor, type FolderDotFolder } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -1114,6 +1114,7 @@ export default function TemplatesListV8() {
               {duplicateFeedback.order(shownItems, templates).map((t, saveFieldIndex) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
+                const folder = folderDotOf(t)
                 const excerpt = excerptOf(t)
                 return (
                   <Tr
@@ -1143,10 +1144,10 @@ export default function TemplatesListV8() {
                             </RowNameLink>
                           </>
                         </div>
-                      } folder={folderDotOf(t)}
+                      } folder={folder}
                     />
                     <Td>
-                      <TagPill name={isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)} color={folderDotOf(t)?.color} />
+                      <TagPill name={isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}`} />
                     </Td>
                     <Td>
                       <StatusBadge tone={publish.tone === 'live' ? 'success' : publish.tone === 'changes' ? 'warning' : 'neutral'}>
