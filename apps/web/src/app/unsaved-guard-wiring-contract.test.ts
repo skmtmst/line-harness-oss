@@ -59,6 +59,7 @@ const GUARDED = [
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-posts.tsx',
   'app/restaurant-test/google/google-profile.tsx',
+  'v8/restaurant/google/profile-edit.tsx',
   'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
   // ★V8：入口（app/settings/file-scan/page.tsx）は src/v8 の画面を出すだけ。番兵は画面と同じ場所のフックが持つ。
@@ -185,6 +186,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/restaurant/google/google.tsx':
+    '編集を持たないGoogleの外枠。タブ・店舗の切替を共通の未保存確認へ委ね、現在の編集画面自身の番兵が止める。URLの試験で確認→続ける/破棄の動きを守る',
   'components/shared/entity-picker.tsx': '選ぶ窓の候補は仮選択で、選ぶを押したときだけ親へ渡す。閉じる操作は仮選択を破棄し、親の保存前の値を変えない。',
   'app/affiliates/tabs.tsx': '一覧の作成窓は共通Dialogが入力を守り、作成済みの結果だけdirty=falseで閉じる。',
   'components/chats/friend-info-sidebar.tsx':
