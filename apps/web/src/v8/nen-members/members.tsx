@@ -116,7 +116,7 @@ export default function MembersV8({
  * 数の帯。白い板の左右いっぱいに4つ（★V8 の共通部品 KpiBand）。
  * 「○○以上」は上から2ランク（描いた板は ゴールド以上＝プラチナとゴールド）。
  */
-function MembersKpiBand({
+export function MembersKpiBand({
   kpis,
   ranks,
   loading,

@@ -302,7 +302,7 @@ export default function RankSettingsV8({
   const conflictAt = conflict?.latest.rules ? shortTime(conflict.latest.rules.updatedAt) : null
   useEffect(() => {
     onTopBand(conflict ? (
-      <div className={styles.conflictSlot}>
+      <div className={styles.conflictSlot} title={conflict?.latest.rules ? shortDateTime(conflict.latest.rules.updatedAt) : undefined}>
         <SaveConflictBand title={conflictAt ? `ほかの人が ${conflictAt} にランク設定を保存しました` : 'ほかの人がランク設定を保存しました'} description="このまま保存すると、ほかの人の変更が消えます" onCompare={() => setComparing(true)} onReload={reloadLatest} />
       </div>
     ) : null)

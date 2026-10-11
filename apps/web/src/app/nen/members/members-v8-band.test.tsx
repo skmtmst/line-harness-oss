@@ -6,7 +6,7 @@
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { MembersKpiBand } from './members-v8'
+import { MembersKpiBand } from '@/v8/nen-members/members'
 
 afterEach(cleanup)
 
