@@ -1063,9 +1063,13 @@ export default function ScenariosListV8() {
 
   const savedBox = (
     <div className={styles.savedBox}>
-      <Bookmark size={14} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["savedFilter","saved_filter"]}><Select
         aria-label="よく使う絞り込み"
+        size="full"
+        icon={<Bookmark aria-hidden="true" />}
+        valueAlign="start"
+        showChevron={false}
+        iconOnly={narrow}
         value={savedFilter}
         onChange={(value) => {
           setSavedFilter(value)
@@ -1115,7 +1119,7 @@ export default function ScenariosListV8() {
       </ListToolbarRow>
       <ListToolbarRow>
         {filterChips}
-        <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
+        {savedBox}
       </ListToolbarRow>
       {filteredCount}
     </ListToolbarFrame>

@@ -23,7 +23,7 @@ describe('押した感じ（V8 のボタン・絵ボタン）', () => {
     expect(globals).toContain('--card-shadow: 0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
     expect(globals).toContain('--color-primary-border: #06612f')
     expect(globals).toContain('--radius-primary-action: 8px')
-    expect(buttonCss).toMatch(/\[data-theme='v8'\] \.primary \{[^}]*border: 1px solid var\(--color-primary-border\);[^}]*border-radius: var\(--radius-primary-action\);[^}]*box-shadow: var\(--shadow-primary-action\)/s)
+    expect(buttonCss).toMatch(/\[data-theme='v8'\] \.primary \{[^}]*border: 0;[^}]*outline: 1px solid var\(--color-primary-border\);[^}]*outline-offset: -1px;[^}]*border-radius: var\(--radius-primary-action\);[^}]*box-shadow: var\(--shadow-primary-action\)/s)
   })
 
   it('押す暗さは乗せる暗さ（0.92）より暗い', () => {

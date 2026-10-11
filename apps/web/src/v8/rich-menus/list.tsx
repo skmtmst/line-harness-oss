@@ -941,7 +941,7 @@ export default function RichMenusListV8() {
         search={{
           placeholder: 'メニュー名・ボタン名',
           label: 'メニュー名・ボタン名で探す',
-          width: 200,
+          width: 240,
           value: query,
           onChange: (value) => {
             setQuery(clampSearchQuery(value))

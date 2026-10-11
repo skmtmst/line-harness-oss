@@ -1207,7 +1207,7 @@ export default function AutoRepliesListV8() {
                     >
                       {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
                       <div className={styles.countMain}>{r.hits?.period ?? emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>累計 {r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回</div>
+                      <div className={styles.countSub}>{`累計 ${r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回`}</div>
                     </Td>
                   )}
                   <Td>
@@ -1223,7 +1223,7 @@ export default function AutoRepliesListV8() {
                             setPage(1)
                           }}
                         >
-                          <span>重なり {conflicts}</span>
+                          <span>{`重なり ${conflicts}`}</span>
                         </button>
                       )}
                     {!r.isActive && r.stopReason && (

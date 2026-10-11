@@ -138,7 +138,7 @@ export function InboxSection({ onSummaryChange }: {
       ) : !summary || summary.total === 0 ? (
         <p className={styles.empty}>返信を待っている問い合わせはありません。</p>
       ) : (
-        <><DataTable aria-label="対応が必要な受信" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-db-inbox-row-h)', gap: 'var(--tpl-db-col-gap)', padding: '0 var(--tpl-db-inbox-gap)', bodyTextSize: 'var(--text-body)' }}>
+        <><DataTable aria-label="対応が必要な受信" columnLayout={{ headHeight: 'var(--tpl-list-head-h)', rowHeight: 'var(--tpl-list-row-h)', rowGap: 'var(--polish-space-field)', gap: 'var(--tpl-db-col-gap)', padding: '0 var(--tpl-db-inbox-gap)', bodyTextSize: 'var(--text-body)' }}>
           <thead>
           <TableHeadRow data-table-layout="columns">
             <Th className={styles.colName}>お名前</Th>

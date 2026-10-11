@@ -374,6 +374,7 @@
 - **役目**：数が決まっていて少ない選択（種類・並び・期間・件数・役割など7個まで）だけ
 - **持ち主（コード）**：`apps/web/src/components/shared/select.tsx`・`apps/web/src/components/shared/select.module.css`・`apps/web/src/components/shared/select-menu.tsx`・`apps/web/src/components/shared/select-menu.module.css`・`apps/web/src/components/shared/menu-portal.tsx`（部品 `Select`・`SelectMenu`）
   - 読む変数：`--color-control-border`・`--radius-control`
+  - 既存の栞付き絞り込み（axFrW／wjfLe）は `icon`・`valueAlign="start"`・`showChevron={false}`、狭い段は `iconOnly`。画面側でボタンの余白・矢印・値を上書きしない。
 - **持ち主（Pen）**：`wMMk6`「選ぶ欄」・`StFE7`「選ぶ欄/開いた」
   - 部品の板の html に書き出されていない ID：`StFE7`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：

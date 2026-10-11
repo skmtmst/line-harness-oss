@@ -150,7 +150,7 @@ export default function ReorderHandle({
       data-reorder-handle=""
       aria-label={ariaLabel ?? `${label}を並び替え。上下キーで移動`}
       title={title ?? 'ドラッグまたは上下キーで並び替え'}
-      className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && INLINE_CLASS, className].filter(Boolean).join(' ')}
+      className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && `${INLINE_CLASS} ${styles.inlineGrip}`, className].filter(Boolean).join(' ')}
     >
       {glyph}
     </button>
