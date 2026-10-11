@@ -2,7 +2,7 @@
 /*
  * 運営ログインの V8（板 D9JALJ・src/v8/ops/login.tsx）。
  * 絵（2026-10 版）どおり、ログインの下に「または」の区切りと LINE でログイン。
- * パスワードを忘れた方への入口と招待の案内はカードの下。v7 はそのまま。
+ * パスワードを忘れた方への入口と招待の案内はカードの下。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -42,9 +42,12 @@ describe('運営ログインのV8（D9JALJ）', () => {
     expect(host.textContent).toContain('LINE でログイン')
   })
 
-  it('v7は「または」のまま', async () => {
+  it('旧テーマの指定が残っていてもV8とLINEログインの口を出す', async () => {
+    document.documentElement.dataset.theme = 'v7'
     await render()
-    expect(host.querySelector('[data-design-node="InTGF"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="D9JALJ"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="InTGF"]')).toBeNull()
     expect(host.textContent).toContain('または')
+    expect(host.textContent).toContain('LINE でログイン')
   })
 })

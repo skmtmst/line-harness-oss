@@ -13,7 +13,7 @@ const SRC = path.join(__dirname, '..')
 const QR_PAGES = [
   'components/dashboard/qr-dialog.tsx',
   'components/hq/notice-line-register-dialog.tsx',
-  'app/ops/two-factor/page.tsx',
+  'v8/ops/two-factor.tsx',
   'v8/settings/staff/staff.tsx',
   'app/login/two-factor/setup/page.tsx',
 ]
