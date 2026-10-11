@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({
   listBookings: vi.fn(),
+  getBookingSummary: vi.fn(),
   getEvent: vi.fn(),
   updateBooking: vi.fn(),
   decideBooking: vi.fn(),
@@ -61,6 +62,7 @@ const mountedRoots: Root[] = []
 beforeEach(() => {
   Object.values(apiMocks).forEach((mock) => mock.mockReset())
   apiMocks.listBookings.mockResolvedValue({ items: [], total: 0 })
+  apiMocks.getBookingSummary.mockImplementation((accountId: string) => Promise.resolve({ requested: accountId === 'account-a' ? 7 : 0, confirmed: 2, cancelled: 0, totalCapacity: 10 }))
   document.documentElement.dataset.theme = 'v8'
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   accountMock.selectedAccountId = 'account-a'

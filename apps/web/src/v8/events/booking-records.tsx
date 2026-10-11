@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { eventsApi, type EventBookingItem } from '@/lib/api'
+import { eventsApi, type EventBookingItem, type EventBookingSummary } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { parseEventQuestions } from '@/components/events/event-questions-editor'
 import Button from '@/components/shared/button'
@@ -13,6 +13,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { EventRosterTable, EventRosterRow } from '@/components/shared/event-roster'
 import { useBookingRequests } from './booking-requests'
+import { describeBookingCapacity } from './attention'
 import styles from './bookings.module.css'
 
 const PAGE_SIZE = 20
@@ -37,8 +38,36 @@ type Props = { accountId: string; eventId: string; occurrenceId: string; questio
 export default function BookingRecords(props: Props) {
   const [open, setOpen] = useState(false)
   return <Disclosure title="申込記録・回答・通知予定" hint="参加済・取消を含む記録" onToggle={setOpen}>
-    {open ? <>{props.children}<Records key={JSON.stringify([props.accountId, props.eventId, props.occurrenceId])} {...props} /></> : null}
+    {open ? <><RecordSummary key={JSON.stringify([props.accountId, props.eventId])} accountId={props.accountId} eventId={props.eventId} revision={props.revision} />{props.children}<Records key={JSON.stringify([props.accountId, props.eventId, props.occurrenceId])} {...props} /></> : null}
   </Disclosure>
+}
+
+function RecordSummary({ accountId, eventId, revision }: Pick<Props, 'accountId' | 'eventId' | 'revision'>) {
+  const [summary, setSummary] = useState<EventBookingSummary | null>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [retry, setRetry] = useState(0)
+  const requests = useBookingRequests(JSON.stringify([accountId, eventId, revision, retry]))
+  useEffect(() => {
+    const request = requests.start('summary', true)
+    if (!request) return
+    setSummary(null)
+    setStatus('loading')
+    void eventsApi.getBookingSummary(accountId, eventId).then((data) => {
+      if (!request.isCurrent()) return
+      if (!data || !Number.isFinite(data.requested) || !Number.isFinite(data.confirmed)) throw new Error('malformed_summary')
+      setSummary(data)
+      setStatus('ready')
+    }).catch(() => { if (request.isCurrent()) setStatus('error') }).finally(() => { request.finish() })
+  }, [accountId, eventId, requests])
+  if (status === 'loading') return <ListState kind="loading" />
+  if (status === 'error' || !summary) return <ListState kind="error" description="全開催回の件数を読み込めませんでした。予約の記録は消えていません。"
+    action={<Button onClick={() => setRetry((value) => value + 1)}>件数を読み直す</Button>} />
+  const activeSeats = summary.activeSeats ?? (summary.confirmedSeats ?? summary.confirmed) + (summary.requestedSeats ?? summary.requested) + (summary.offeredSeats ?? 0)
+  return <>
+    <p>{`全開催回：承認待ち ${summary.requested}件・確定 ${summary.confirmed}件・拒否 ${summary.rejected ?? '—'}件・キャンセル ${summary.cancelled ?? '—'}件・期限切れ ${summary.expired ?? '—'}件・参加済 ${summary.attended ?? '—'}件・無断 ${summary.noShow ?? '—'}件`}</p>
+    <p>{describeBookingCapacity(activeSeats, summary.totalCapacity ?? null)}</p>
+    <p>{summary.requested > 0 ? `対応が必要：${summary.requested}件を確認してください` : '確認待ちはありません'}。{summary.cancelled > 0 ? '空いた枠を確認してください' : 'キャンセルはありません'}。</p>
+  </>
 }
 
 function Records({ accountId, eventId, occurrenceId, questionsJson, revision, renderActions }: Props) {
@@ -86,7 +115,8 @@ function Records({ accountId, eventId, occurrenceId, questionsJson, revision, re
             return <EventRosterRow key={booking.id}>
               <span role="cell" className={styles.person}>
                 <span className={styles.personName} title={booking.friend_display_name ?? booking.friend_name ?? '友だちは未取得'}>{booking.friend_display_name ?? booking.friend_name ?? '友だちは未取得'}</span>
-                {booking.line_account_name ? <span className={styles.personSub}>{booking.line_account_name}</span> : null}
+                <span className={styles.personSub}>{booking.line_account_name ?? 'アカウントは未取得'}</span>
+                <span className={styles.personSub}>{booking.is_first_time == null ? '来店情報は未接続' : booking.is_first_time === 1 ? 'はじめての方です' : '来店履歴があります'}</span>
                 {answers.length ? <dl>{answers.map(([id, answer]) => <div key={id}><dt>{labels.get(id) ?? id}</dt><dd>{Array.isArray(answer) ? answer.join('、') : String(answer)}</dd></div>)}</dl> : null}
                 {booking.customer_note ? <span>備考：{booking.customer_note}</span> : null}
                 {booking.companion_note ? <span>同行者：{booking.companion_note}</span> : null}

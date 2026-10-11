@@ -19,7 +19,7 @@ const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 const FORM = read('event-form.tsx')
 const WIZARD = read('event-wizard.tsx')
 const LIST_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
-const BOOKINGS_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'bookings', 'page.tsx'), 'utf8')
+const BOOKINGS_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'edit', 'page.tsx'), 'utf8')
 
 /**
@@ -95,7 +95,7 @@ describe('イベント作成・編集の共有契約(#740)', () => {
 
   it('KPI の札は1部品に統合され、旧重複定義は残らない', () => {
     expect(LIST_PAGE).toContain(`from '@/components/shared/kpi-card'`)
-    expect(BOOKINGS_PAGE).toContain(`from '@/components/events/event-kpi'`)
+    expect(BOOKINGS_PAGE).toContain(`from '@/components/shared/kpi-card'`)
     expect(LIST_PAGE).not.toMatch(/function Kpi\(/)
     expect(BOOKINGS_PAGE).not.toMatch(/function EventKpi\(/)
   })

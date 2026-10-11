@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FORM = readFileSync(join(HERE, 'event-form.tsx'), 'utf8')
 const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
-const BOOKINGS = readFileSync(join(HERE, '..', '..', 'app', 'events', 'bookings', 'page.tsx'), 'utf8')
+const BOOKINGS = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')
 const ROUTES = readFileSync(join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'events.ts'), 'utf8')
 
 describe('R83 キャンセル待ちの説明は自動案内にそろえる', () => {
@@ -26,7 +26,7 @@ describe('R83 キャンセル待ちの説明は自動案内にそろえる', () 
 
   it('一覧の帯と申込者の画面も自動の案内として読める', () => {
     expect(LIST).toContain('キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。')
-    expect(BOOKINGS).toContain('取り消しが出たら順に案内します')
+    expect(BOOKINGS).toContain('空きが出たら先頭の方へ期限つきの案内を送ります')
   })
 
   it('裏側は取消で自動案内の仕事を積む', () => {

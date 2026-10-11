@@ -98,7 +98,6 @@ describe('共通部品の影響範囲', () => {
       'app/ec-commerce/subscriptions-panel.tsx',
       // 2026-09-04: イベント一覧も自前のページ送りをやめて共通へ寄せた。
       // 取れていないときに「1 / 1」と出て、1ページぶんは取れたように見えていた。
-      'app/events/bookings/page.tsx',
       // 統括の入口は src/v8/hq/home.tsx に統一した。旧一覧は利用先に数えない。
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
@@ -254,6 +253,7 @@ describe('共通部品の影響範囲', () => {
       'v8/form-responses/responses.tsx',
       // ★V8 イベント予約の一覧（e2ekFu）。新しい置き場（src/v8）に一から書いた。
       'v8/events/list.tsx',
+      'v8/events/booking-records.tsx',
       // ★V8 登録メディア一覧（O7hUt7）と、写した差し替えの窓（候補のページ送り）。
       'v8/contents/list.tsx',
       'v8/contents/media-replacement-dialog.tsx',

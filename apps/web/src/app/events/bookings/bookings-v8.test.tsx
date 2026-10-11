@@ -13,6 +13,7 @@ import { fireEvent } from '@testing-library/react'
 
 const getEvent = vi.hoisted(() => vi.fn())
 const listBookings = vi.hoisted(() => vi.fn())
+const getBookingSummary = vi.hoisted(() => vi.fn())
 const listOccurrenceSelector = vi.hoisted(() => vi.fn())
 const getOccurrenceApplicants = vi.hoisted(() => vi.fn())
 const decideBooking = vi.hoisted(() => vi.fn())
@@ -38,6 +39,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       ...actual.eventsApi,
       getEvent,
       listBookings,
+      getBookingSummary,
       listOccurrenceSelector,
       getOccurrenceApplicants,
       decideBooking,
@@ -152,6 +154,7 @@ beforeEach(() => {
   root = createRoot(host)
   getEvent.mockReset()
   listBookings.mockReset().mockResolvedValue({ items: [], total: 0 })
+  getBookingSummary.mockReset().mockResolvedValue({ requested: 0, confirmed: 1, cancelled: 0, totalCapacity: 20 })
   listOccurrenceSelector.mockReset()
   getOccurrenceApplicants.mockReset()
   decideBooking.mockReset()
@@ -199,6 +202,59 @@ async function prepareMessage(value: string) {
 }
 
 describe('V8-B 申込者（Mu8qW）', () => {
+  it('全回の件数は読み込み失敗を0にせず、件数だけを再取得する', async () => {
+    getBookingSummary.mockRejectedValueOnce(new Error('offline'))
+    await renderV8()
+    const details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    expect(details.textContent).toContain('全開催回の件数を読み込めませんでした')
+    expect(details.textContent).not.toContain('全開催回：承認待ち 0件')
+    await act(async () => { [...details.querySelectorAll('button')].find((button) => button.textContent === '件数を読み直す')!.click() })
+    await flush()
+    expect(getBookingSummary).toHaveBeenCalledTimes(2)
+    expect(listBookings).toHaveBeenCalledTimes(1)
+    expect(details.textContent).toContain('全開催回：承認待ち 0件・確定 1件')
+  })
+
+  it('記録の状態切替は1ページ目へ戻り、全回の集計と開催回の申込者を取り直さない', async () => {
+    listBookings.mockResolvedValue({ items: [{ id: 'r1', friend_id: 'f1', friend_display_name: '記録の人', status: 'confirmed' }], total: 21 })
+    await renderV8()
+    const details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    await act(async () => { details.querySelector<HTMLButtonElement>('[aria-label="次のページ"]')!.click() })
+    await flush()
+    expect(listBookings).toHaveBeenLastCalledWith('acc-1', 'e1', expect.objectContaining({ page: 2 }))
+    await act(async () => { details.querySelector<HTMLButtonElement>('button[aria-label="申込記録の状態"]')!.click() })
+    await flush()
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((element) => element.textContent?.trim() === '無断')!
+    await act(async () => { option.querySelector('button')!.click() })
+    await flush()
+    expect(listBookings).toHaveBeenLastCalledWith('acc-1', 'e1', { status: 'no_show', slot_id: 'slot-1', page: 1, limit: 20 })
+    expect(getBookingSummary).toHaveBeenCalledTimes(1)
+    expect(getEvent).toHaveBeenCalledTimes(1)
+    expect(getOccurrenceApplicants).toHaveBeenCalledTimes(1)
+  })
+
+  it('店の切替前の全回集計が遅れて届いても、新しい店へ件数を混ぜない', async () => {
+    const old = deferred<unknown>()
+    getBookingSummary.mockReturnValueOnce(old.promise).mockResolvedValue({ requested: 3, confirmed: 4, cancelled: 0, totalCapacity: 20 })
+    await renderV8()
+    let details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    account.id = 'acc-2'
+    await renderV8()
+    details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    await act(async () => { old.resolve({ requested: 97, confirmed: 1, totalCapacity: 20 }) })
+    await flush()
+    expect(details.textContent).toContain('全開催回：承認待ち 3件・確定 4件')
+    expect(details.textContent).not.toContain('承認待ち 97件')
+  })
+
   it('受付前は確定の人数で数え、記録済みの人数を二度引かない', async () => {
     await renderV8()
     const summary = host.querySelector('[aria-label="当日の受付"]')!

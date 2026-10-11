@@ -107,9 +107,6 @@
   "app/emergency/control-v8.tsx": {
     "direct-th": 6
   },
-  "app/events/bookings/page.tsx": {
-    "direct-th": 6
-  },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
   },
