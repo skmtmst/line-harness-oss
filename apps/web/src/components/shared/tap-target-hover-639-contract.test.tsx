@@ -114,7 +114,7 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
     // 見張りはホバー変化の有無（意図は変えない）。
     expect(readApp('inflow-links/_components/create-genre-modal.tsx')).toContain('bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90')
     // ★V7 C5: 流入リンク編集窓は共通 Dialog＋Button primary へ寄せた。ホバー変化は共通 Button が持つ。
-    expect(readApp('inflow-links/_components/edit-route-modal.tsx')).toContain('variant="primary"')
+    expect(readApp('../v8/inflow-links/edit-route-dialog.tsx')).toContain('variant="primary"')
     expect(readApp('../v8/settings/pools/pools.tsx')).toContain('variant="primary"')
     // 白地の枠付き口は沈み色へ、淡色ピルは brightness で応答する。
     // V8 移行 ①: 白地の枠付き口は共通 Button secondary へ。沈み色は部品が持つ。

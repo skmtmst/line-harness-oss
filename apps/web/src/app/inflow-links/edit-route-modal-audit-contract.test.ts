@@ -4,13 +4,15 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const MODAL = readFileSync(join(HERE, '_components', 'edit-route-modal.tsx'), 'utf8')
+const MODAL = readFileSync(join(HERE, '../../v8/inflow-links/edit-route-dialog.tsx'), 'utf8')
 
 describe('流入リンク編集窓の監査対応（R270・R271）', () => {
   it('R270: フォルダ空欄でも保存できる（作成と同じく任意）', () => {
     expect(MODAL).toContain(
-      'const saveDisabled = submitting || !form.name.trim() || !form.refCode.trim()',
+      'const saveDisabled = submitting',
     )
+    expect(MODAL).toContain("if (!form.name.trim()) errors['route-name']")
+    expect(MODAL).toContain('if (!validateFields()) return')
     expect(MODAL, 'フォルダが必須のまま').not.toMatch(/saveDisabled = [^\n]*form\.genre/)
   })
 

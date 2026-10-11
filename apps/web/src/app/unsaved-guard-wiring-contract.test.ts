@@ -371,8 +371,6 @@ const UNTRIAGED: Record<string, string> = {
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   /* ★V7: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
   // 統括の入口はV8の再exportだけ。v8/hq/support.tsx の番兵を上の契約で点検する。
-  'app/inflow-links/_components/edit-route-modal.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'v8/inflow-links/edit-route-dialog.tsx':
     's3: 上の edit-route-modal.tsx の ★V8 の写し（src/v8/inflow-links/list.tsx から開く）。元と一緒に決める',
   // お問い合わせの入口はV8だけを読む。現役の返信下書き/起票の扱いは上で点検する。

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/rows.ts'), 'utf8')
 const DETAIL = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/detail.tsx'), 'utf8')
-const PANEL = fs.readFileSync(path.join(__dirname, '_components/ref-orders.tsx'), 'utf8')
+const PANEL = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/ref-orders.tsx'), 'utf8')
 
 /**
  * IDEA-18「流入と計測」: 経路→友だち→注文・返金を同じ条件で結び、

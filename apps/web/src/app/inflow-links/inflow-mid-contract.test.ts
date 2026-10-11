@@ -10,7 +10,7 @@ const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf
 // 削除の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
 // 削除の窓は詳細の画面（detail/page.tsx）の中にある。古い _components/inflow-delete-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
 const DELETE_DIALOG = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
-const MODAL = readFileSync(join(ROOT, '_components', 'edit-route-modal.tsx'), 'utf8')
+const MODAL = readFileSync(join(ROOT, '../../v8/inflow-links/edit-route-dialog.tsx'), 'utf8')
 const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
 const LIFF = readFileSync(join(ROOT, '..', '..', '..', '..', 'worker', 'src', 'routes', 'liff.ts'), 'utf8')
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
