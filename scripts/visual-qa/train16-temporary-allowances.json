@@ -60,20 +60,6 @@
       "expires": "2026-10-17"
     },
     {
-      "match": "固定値不一致: 表の見出し（B-178） padding src/components/shared/table.module.css [data-theme='v8'] .headRow[data-table-layout='columns'] padding\n    設計 html/components-NbomF.html ASVsl 表の見出し（B-178） = 0px 24px\n    実際 13px 20px",
-      "count": 1,
-      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
-      "owner": "pendec",
-      "expires": "2026-10-17"
-    },
-    {
-      "match": "固定値不一致: ラジオ/オン outline-width src/components/shared/radio.module.css [data-theme='v8'] .input:checked outline-width\n    設計 html/components-ZBjxY.html y4YQSB 丸 = 1.5px\n    実際 5px",
-      "count": 1,
-      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
-      "owner": "pendec",
-      "expires": "2026-10-17"
-    },
-    {
       "match": "固定値不一致: 選ぶカード/オン B-203 background-color src/components/shared/radio-card.module.css .card.checked background\n    設計 html/components-NbomF.html fNPdg = #f1f8f3\n    実際 #e8f8ee",
       "count": 1,
       "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
