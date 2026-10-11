@@ -394,7 +394,7 @@ export function v8EffectiveBody(css, cls) {
 
 /** 固定HTMLの色・選択状態の照合。同じ要素の合成クラスとv8上書きだけを読む。 */
 export function frozenSelectorBody(css, selector) {
-  const clean = s => s.trim().replace(/^(?:html)?\[data-theme=["']?v8["']?\]\s*/, '').replace(/["']/g, '')
+  const clean = s => s.trim().replace(/^(?:html)?\[data-theme=["']?v8["']?\]\s+/, '').replace(/["']/g, '')
   const wanted = clean(selector)
   const classes = [...wanted.matchAll(/\.([\w-]+)/g)].map(m => m[1])
   const rest = wanted.replace(/\.[\w-]+/g, '')

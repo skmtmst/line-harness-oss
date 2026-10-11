@@ -58,10 +58,10 @@ describe('未利用の部品のトークン照合', () => {
 
 describe('固定HTMLとV8の選択状態の照合', () => {
   it('html上のV8指定を読み、親のある別状態と別テーマは読み込まない', () => {
-    const css = '.selected{color:black}html[data-theme="v8"] .selected{color:green}.parent html[data-theme="v8"] .selected{color:red}html[data-theme="v7"] .selected{color:blue}html .selected{color:purple}'
+    const css = '.selected{color:black}html[data-theme="v8"] .selected{color:green}.parent html[data-theme="v8"] .selected{color:red}html[data-theme="v7"] .selected{color:blue}html .selected{color:purple}html[data-theme="v8"].selected{color:orange}'
     const body = frozenSelectorBody(css, '[data-theme="v8"] .selected')
     expect(body).toContain('color:green')
-    expect(body).not.toMatch(/red|blue|purple/)
+    expect(body).not.toMatch(/red|blue|purple|orange/)
   })
 
   it('合成した状態のV8指定をCSSの順番で読み、通常状態には混ぜない', () => {
