@@ -82,10 +82,16 @@ let instagramFailStatus: number | null;
 let imageStore: Map<string, Uint8Array>;
 let cfImagesEnabled: boolean;
 
-/** META_* は instagramConfig の必須条件（v形式のバージョン・base64で32バイトの鍵・httpsのredirect）を満たす値にする。 */
+/**
+ * instagramConfig の必須条件（v形式のバージョン・base64で32バイトの鍵・httpsのredirect）を
+ * 満たす値にする。接続に使うのは Instagram アプリ側の `INSTAGRAM_*`、Webhook の署名照合に
+ * 使うのが Facebook アプリ側の `META_APP_*` で、番号は互いに別。
+ */
 const META_ENV = {
   META_APP_ID: '100',
   META_APP_SECRET: 'secret_mock',
+  INSTAGRAM_APP_ID: '200',
+  INSTAGRAM_APP_SECRET: 'ig_secret_mock',
   META_REDIRECT_URI: 'https://worker.example.test/api/instagram/oauth/callback',
   META_GRAPH_API_VERSION: 'v24.0',
   META_TOKEN_ENCRYPTION_KEY: btoa('x'.repeat(32)),
@@ -162,7 +168,10 @@ async function seedInstagramConnection(options: { scopes?: string; expiresAt?: s
       options.expiresAt ?? '2099-01-01T00:00:00.000Z',
       options.dataAccessExpiresAt === undefined ? '2099-01-01T00:00:00.000Z' : options.dataAccessExpiresAt,
       '2026-09-23T00:00:00.000Z', 'owner-1',
-      options.scopes ?? 'instagram_basic,instagram_content_publish,pages_show_list',
+      // Instagram直接ログインで保存される許可名。Facebookページ方式の
+      // `instagram_basic` / `pages_show_list` は使わない。
+      options.scopes ??
+        'instagram_business_basic,instagram_business_content_publish',
     );
 }
 
@@ -229,7 +238,8 @@ beforeEach(async () => {
     // instagramGraph は URL オブジェクトを渡してくるので、文字列に正規化してから見分ける。
     vi.fn(async (input: string | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.startsWith('https://graph.facebook.com/')) {
+      // Instagram直接ログイン方式の投稿は graph.instagram.com へ出る。
+      if (url.startsWith('https://graph.instagram.com/')) {
         instagramCalls.push({ url, init });
         const path = new URL(url).pathname;
         if (path.endsWith('/media')) {
@@ -519,7 +529,7 @@ describe('取り込み（sync）', () => {
 
 /**
  * Instagram 同時投稿（611・★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。
- * 本物のMetaへはつながず、graph.facebook.com への呼び出しはすべてモックで受ける。
+ * 本物のInstagramへはつながず、graph.instagram.com への呼び出しはすべてモックで受ける。
  */
 describe('Instagram 同時投稿', () => {
   const instagramBody = { ...standardBody, mediaId: 'media-ig', instagram: { enabled: true, caption: null } };
@@ -626,7 +636,7 @@ describe('Instagram 同時投稿', () => {
   });
 
   it('投稿の許可が無い接続は instagram_publish_not_granted で失敗に落とす', async () => {
-    await seedInstagramConnection({ scopes: 'instagram_basic,pages_show_list' });
+    await seedInstagramConnection({ scopes: 'instagram_business_basic' });
     const r = await publishWithInstagram();
     expect((await instagramOf(r.id)).instagram.error).toBe('instagram_publish_not_granted');
     expect(instagramCalls).toHaveLength(0);

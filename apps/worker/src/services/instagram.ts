@@ -1,6 +1,5 @@
 import { encryptCredential, decryptCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
-import type { InstagramOAuthPage } from '@line-crm/shared';
 import { detectImageMeta } from '../lib/image-validator.js';
 export class InstagramError extends Error {
   constructor(
@@ -135,7 +134,7 @@ export function instagramUrlDetail(
   if (typeof detail !== 'string' || detail.length > 200) return null;
   const parts: string[] = [];
   const step =
-    /^(GET|POST|DELETE) (v[0-9]{1,3}\.[0-9]{1,3})\/(me\/accounts|oauth\/access_token|debug_token|[0-9]{1,24}(?:\/[a-z_]{1,24})?)(?= |$)/.exec(
+    /^(GET|POST|DELETE) (v[0-9]{1,3}\.[0-9]{1,3}|api|graph)\/(me(?:\/[a-z_]{1,24})?|oauth\/access_token|access_token|refresh_access_token|[0-9]{1,24}(?:\/[a-z_]{1,24})?)(?= |$)/.exec(
       detail,
     );
   if (step) parts.push(`${step[1]} ${step[2]}/${step[3]}`);
@@ -171,8 +170,9 @@ export function instagramUrlCode(code: string | null | undefined): string {
 /**
  * 許可された権限の名前を戻り先URLへ載せてよい形だけに絞る。
  *
- * 名前は Meta の応答（`debug_token` の `scopes`）由来なので、こちらが要求した権限の
- * 一覧に載っている名前だけを通す。形で見分けるやり方は使わない（`META_ERROR_TYPES` と同じ理由）。
+ * 名前は Instagram の応答（合鍵の引き換えで返る `permissions`）由来なので、
+ * 知っている権限名の一覧に載っている名前だけを通す。形で見分けるやり方は使わない
+ * （`META_ERROR_TYPES` と同じ理由）。
  * 一覧に無い名前は中身を出さず、`other2` のように件数だけを添える。
  */
 export function instagramUrlScopes(
@@ -183,19 +183,17 @@ export function instagramUrlScopes(
   let others = 0;
   for (const s of scopes.split(',')) {
     if (s === '') continue;
-    if ((INSTAGRAM_SCOPES as readonly string[]).includes(s)) {
+    if ((INSTAGRAM_KNOWN_SCOPES as readonly string[]).includes(s)) {
       if (!known.includes(s)) known.push(s);
     } else others++;
   }
   if (others) known.push(`${OTHER}${others}`);
   return known.length ? known.join(',') : null;
 }
-/** 件数は整数だけを通す。整数でなければ `-1` にして、数え損ねたことが分かるようにする。 */
-export function instagramUrlCount(n: unknown): number {
-  return Number.isInteger(n) && (n as number) >= 0 ? (n as number) : -1;
-}
 export type InstagramConfig = {
+  /** Instagram アプリID。Facebook アプリIDとは別の番号で、Instagram のログイン設定にある。 */
   appId: string;
+  /** Instagram アプリシークレット。 */
   appSecret: string;
   redirectUri: string;
   version: string;
@@ -203,8 +201,8 @@ export type InstagramConfig = {
 };
 export function instagramConfig(env: Env['Bindings']): InstagramConfig | null {
   const {
-    META_APP_ID: appId,
-    META_APP_SECRET: appSecret,
+    INSTAGRAM_APP_ID: appId,
+    INSTAGRAM_APP_SECRET: appSecret,
     META_REDIRECT_URI: redirectUri,
     META_GRAPH_API_VERSION: version,
     META_TOKEN_ENCRYPTION_KEY: encryptionKey,
@@ -245,15 +243,38 @@ export async function instagramHash(s: string): Promise<string> {
     b.toString(16).padStart(2, '0'),
   ).join('');
 }
+/**
+ * 要求の宛先。Instagram直接ログイン方式では入口を3つ使い分ける。
+ *
+ * - `graph` … `graph.instagram.com/<版>/<path>`（プロフィール・投稿・同時投稿）
+ * - `graph_root` … `graph.instagram.com/<path>`（長期の合鍵への交換と更新。版を付けない）
+ * - `api_root` … `api.instagram.com/<path>`（認可コードの引き換え。版を付けない）
+ */
+export type InstagramHost = 'graph' | 'graph_root' | 'api_root';
 export async function instagramGraph<T>(
   config: InstagramConfig,
   path: string,
   token: string | null,
   query: Record<string, string> = {},
   method = 'GET',
+  host: InstagramHost = 'graph',
 ): Promise<T> {
-  const url = new URL(`https://graph.facebook.com/${config.version}/${path}`);
-  for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
+  const origin =
+    host === 'api_root'
+      ? 'https://api.instagram.com'
+      : 'https://graph.instagram.com';
+  const url = new URL(
+    `${origin}/${host === 'graph' ? `${config.version}/` : ''}${path}`,
+  );
+  // 手がかりに出す宛先。こちらが書いた固定の文字列だけで、秘密値も上流の値も含まない。
+  const step = `${method} ${
+    host === 'graph' ? config.version : host === 'api_root' ? 'api' : 'graph'
+  }/${path}`;
+  // 認可コードの引き換えだけは、アプリシークレットと認可コードをURLへ載せないため本文で送る。
+  const body =
+    host === 'api_root' && method === 'POST' ? new URLSearchParams(query) : null;
+  if (!body)
+    for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v);
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   let response: Response;
@@ -261,6 +282,7 @@ export async function instagramGraph<T>(
     response = await fetch(url, {
       method,
       headers,
+      body,
       // Workers の実行環境は転送の扱いに `follow` と `manual` しか受け付けず、
       // `error` を渡すと**通信する前に** TypeError で弾かれる（転送が起きたかに関係ない）。
       // そのため Meta への要求が1本も出ず、接続が必ず失敗していた。
@@ -275,7 +297,7 @@ export async function instagramGraph<T>(
     throw new InstagramError(
       'meta_unavailable',
       502,
-      `${method} ${config.version}/${path} fetch=${fetchErrorName(e)}`,
+      `${step} fetch=${fetchErrorName(e)}`,
     );
   }
   // 転送応答は追わない。追えば合鍵・アプリシークレット・認可コードを
@@ -285,7 +307,7 @@ export async function instagramGraph<T>(
     throw new InstagramError(
       'meta_request_failed',
       502,
-      `${method} ${config.version}/${path} redirect=${response.status}`,
+      `${step} redirect=${response.status}`,
     );
   if (!response.ok)
     throw new InstagramError(
@@ -293,136 +315,145 @@ export async function instagramGraph<T>(
         ? 'meta_authorization_failed'
         : 'meta_request_failed',
       502,
-      `${method} ${config.version}/${path} ${await metaErrorDetail(response)}`,
+      `${step} ${await metaErrorDetail(response)}`,
     );
   return response.json() as Promise<T>;
 }
-export type InstagramPage = InstagramOAuthPage & { token: string };
-/** 原因調べ用の数えだけを受け取る入れもの。ページ名やIDなどの中身は入れない。 */
-export type InstagramPageScan = {
-  /** me/accounts が返したページの数 */
-  total: number;
-  /** そのうち Instagram のビジネスアカウントがつながっていた数 */
-  withInstagram: number;
-  /** そのうちページの合鍵も一緒に返ってきた数 */
-  withToken: number;
-};
-export async function instagramPages(
+/**
+ * 認可コードを短期の合鍵へ引き換える。
+ *
+ * 入口は `api.instagram.com/oauth/access_token`（版を付けない）で、
+ * アプリシークレットと認可コードをURLへ載せないため本文で送る。
+ * 応答は `data` の1件目に合鍵・Instagram の利用者ID・許可された権限が入る。
+ * Facebook ページを一切見ないので、ページがつながっていない
+ * プロアカウントでもそのまま接続できる。
+ */
+export async function instagramShortToken(
   config: InstagramConfig,
-  userToken: string,
-  scan?: InstagramPageScan,
-): Promise<InstagramPage[]> {
-  const pages: InstagramPage[] = [];
-  let after: string | undefined;
-  for (let n = 0; n < 20; n++) {
-    const r = await instagramGraph<{
-      data: Array<{
-        id: string;
-        name: string;
-        access_token: string;
-        instagram_business_account?: { id: string };
-      }>;
-      paging?: { cursors?: { after?: string }; next?: string };
-    }>(config, 'me/accounts', userToken, {
-      fields: 'id,name,access_token,instagram_business_account',
-      limit: '100',
-      ...(after ? { after } : {}),
-    });
-    for (const p of r.data ?? []) {
-      if (scan) {
-        scan.total++;
-        if (/^\d+$/.test(p.instagram_business_account?.id ?? ''))
-          scan.withInstagram++;
-        if (p.access_token) scan.withToken++;
-      }
-      if (
-        /^\d+$/.test(p.id) &&
-        /^\d+$/.test(p.instagram_business_account?.id ?? '') &&
-        p.access_token
-      )
-        pages.push({
-          pageId: p.id,
-          pageName: p.name,
-          instagramId: p.instagram_business_account!.id,
-          token: p.access_token,
-        });
-    }
-    if (!r.paging?.next) return pages;
-    if (!r.paging.cursors?.after || r.paging.cursors.after === after)
-      throw new InstagramError('meta_pagination_failed');
-    after = r.paging.cursors.after;
-  }
-  throw new InstagramError('too_many_meta_pages');
-}
-export async function instagramLongToken(
-  config: InstagramConfig,
-  token: string,
+  code: string,
 ): Promise<{
   token: string;
-  expiresAt: string;
-  dataAccessExpiresAt: string | null;
-  /** 利用者が実際に許可した範囲。instagram_content_publish が無ければ同時投稿はできない。 */
+  /** 投稿に使う Instagram の利用者ID。形がおかしければ空文字にしてプロフィール側で拾う。 */
+  userId: string;
+  /** 利用者が実際に許可した範囲。公開に必要な許可が無ければ同時投稿はできない。 */
   scopes: string[];
 }> {
-  const r = await instagramGraph<{ access_token: string; expires_in?: number }>(
+  const r = await instagramGraph<{
+    data?: Array<{
+      access_token?: string;
+      user_id?: string | number;
+      permissions?: string;
+    }>;
+    access_token?: string;
+    user_id?: string | number;
+    permissions?: string;
+  }>(
     config,
     'oauth/access_token',
     null,
     {
-      grant_type: 'fb_exchange_token',
       client_id: config.appId,
       client_secret: config.appSecret,
-      fb_exchange_token: token,
+      grant_type: 'authorization_code',
+      redirect_uri: config.redirectUri,
+      code,
     },
+    'POST',
+    'api_root',
   );
-  if (!r.access_token) throw new InstagramError('invalid_meta_token');
-  const debug = await instagramGraph<{
-    data: {
-      is_valid: boolean;
-      app_id: string;
-      expires_at?: number;
-      data_access_expires_at?: number;
-      scopes?: string[];
-    };
-  }>(config, 'debug_token', `${config.appId}|${config.appSecret}`, {
-    input_token: r.access_token,
-  });
-  if (!debug.data?.is_valid || String(debug.data.app_id) !== config.appId)
+  // 応答の形が「1件の配列」から「素の物」へ変わっても読めるようにしておく。
+  const d = Array.isArray(r.data) ? (r.data[0] ?? {}) : r;
+  if (typeof d.access_token !== 'string' || d.access_token === '')
     throw new InstagramError('invalid_meta_token');
-  const expires =
-    debug.data.expires_at ||
-    (r.expires_in ? Math.floor(Date.now() / 1000) + r.expires_in : 0);
-  if (
-    !expires ||
-    expires <= Date.now() / 1000 ||
-    (debug.data.data_access_expires_at &&
-      debug.data.data_access_expires_at <= Date.now() / 1000)
-  )
+  const userId = String(d.user_id ?? '');
+  return {
+    token: d.access_token,
+    userId: /^\d{1,24}$/.test(userId) ? userId : '',
+    scopes:
+      typeof d.permissions === 'string'
+        ? d.permissions.split(',').filter((s) => s !== '')
+        : [],
+  };
+}
+/** 長期（60日）の合鍵とその期限。 */
+export type InstagramLongToken = {
+  token: string;
+  expiresAt: string;
+  /**
+   * Instagram直接ログインには合鍵の期限とは別枠の「データ参照の期限」が無いため常に null。
+   * 画面と期限切れの判定は null を許す作りのままで動く。
+   */
+  dataAccessExpiresAt: null;
+};
+async function instagramTokenExchange(
+  config: InstagramConfig,
+  path: 'access_token' | 'refresh_access_token',
+  query: Record<string, string>,
+): Promise<InstagramLongToken> {
+  const r = await instagramGraph<{
+    access_token?: string;
+    expires_in?: number;
+  }>(config, path, null, query, 'GET', 'graph_root');
+  if (typeof r.access_token !== 'string' || r.access_token === '')
+    throw new InstagramError('invalid_meta_token');
+  const expires = r.expires_in
+    ? Math.floor(Date.now() / 1000) + r.expires_in
+    : 0;
+  if (!expires || expires <= Date.now() / 1000)
     throw new InstagramError('meta_token_expired', 409);
   return {
     token: r.access_token,
     expiresAt: new Date(expires * 1000).toISOString(),
-    dataAccessExpiresAt: debug.data.data_access_expires_at
-      ? new Date(debug.data.data_access_expires_at * 1000).toISOString()
-      : null,
-    scopes: Array.isArray(debug.data.scopes)
-      ? debug.data.scopes.filter((s) => typeof s === 'string' && s !== '')
-      : [],
+    dataAccessExpiresAt: null,
   };
+}
+/** 短期の合鍵を長期（60日）の合鍵へ交換する。サーバー側でしか呼べない。 */
+export async function instagramLongToken(
+  config: InstagramConfig,
+  token: string,
+): Promise<InstagramLongToken> {
+  return instagramTokenExchange(config, 'access_token', {
+    grant_type: 'ig_exchange_token',
+    client_secret: config.appSecret,
+    access_token: token,
+  });
+}
+/**
+ * 長期の合鍵の期限を延ばす。発行から24時間以上たっていて、まだ切れていないものだけ。
+ * 60日間延ばさなかった合鍵は切れてしまい、延ばせない（再接続が必要）。
+ */
+export async function instagramRefreshToken(
+  config: InstagramConfig,
+  token: string,
+): Promise<InstagramLongToken> {
+  return instagramTokenExchange(config, 'refresh_access_token', {
+    grant_type: 'ig_refresh_token',
+    access_token: token,
+  });
 }
 /**
  * 接続のときに要求する権限の一覧（認可画面へ渡す順そのまま）。
- * 戻り先URLへ載せてよい権限名の許可一覧も、この定義を正本として使う。
+ *
+ * Instagram直接ログイン方式の権限名で、Facebook ページ向けの `pages_*` は使わない。
+ * 用途に入っていない権限を混ぜると認可画面そのものが断られるため、
+ * 同時投稿に必要な2つだけを要求する。
  */
 export const INSTAGRAM_SCOPES = [
-  'pages_show_list',
-  'pages_read_engagement',
-  'instagram_basic',
-  'instagram_manage_messages',
-  'instagram_content_publish',
+  'instagram_business_basic',
+  'instagram_business_content_publish',
+] as const;
+/**
+ * 戻り先URLへ載せてよい権限名の許可一覧。
+ * 要求していない権限が付いて返ってきたときも名前で分かるように、
+ * この方式で使われる権限名をまとめて載せる。
+ */
+export const INSTAGRAM_KNOWN_SCOPES = [
+  ...INSTAGRAM_SCOPES,
+  'instagram_business_manage_messages',
+  'instagram_business_manage_comments',
 ] as const;
 /** 同時投稿に必要な許可。足りない接続は画面で「認可が切れています」にして再接続へ誘導する。 */
-export const INSTAGRAM_PUBLISH_SCOPE = 'instagram_content_publish';
+export const INSTAGRAM_PUBLISH_SCOPE = 'instagram_business_content_publish';
 export function instagramCanPublish(scopes: string): boolean {
   return scopes.split(',').includes(INSTAGRAM_PUBLISH_SCOPE);
 }
