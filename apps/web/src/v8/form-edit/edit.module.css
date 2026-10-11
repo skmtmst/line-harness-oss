@@ -23,13 +23,6 @@
 
 /* ---------- 段（カード） ---------- */
 
-.card {
-  display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); min-width: 0;
-  padding: var(--tpl-fe-card-pad); border-radius: var(--tpl-fe-card-radius);
-   background: var(--color-canvas);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-}
 .cardHead { display: flex; align-items: flex-start; gap: var(--tpl-fe-row-gap); }
 .cardHeadText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); }
 .cardTitle { margin: 0; font-size: var(--tpl-fe-title-size); font-weight: 700; line-height: var(--tpl-fe-title-lh); color: var(--color-ink); }

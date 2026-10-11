@@ -787,6 +787,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     : dirty || (publishedContentRevision !== null && contentRevision !== null && publishedContentRevision !== contentRevision)
       ? '下書き・公開中の版と違うところがあります'
       : '公開中の版と同じです'
+  const saveStatus = host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
+    ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
+    : dirty ? '保存していない変更があります' : undefined
 
   const savedSide: ConflictSide | null = (() => {
     if (!savedSnapshot.current) return null
@@ -900,11 +903,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}
       title={name || 'フォーム名未設定'}
-
+      help="回答フォームの内容・回答後の動作・受付条件を設定します。"
+      stepsSpacing="compact"
       steps={(
         <div className={styles.tabs}>
-          {/* 型は説明をタブの下へ置くので、絵どおり題の下・タブの上に出すためここに置く。 */}
-          <p className={styles.status}>{statusLine}</p>
           <Tabs label="編集する内容" items={TAB_ITEMS.map((t) => ({ label: t.label, current: editTab === t.key, errorCount: tabErrors[t.key], onClick: () => changeTab(t.key) }))} />
         </div>
       )}
@@ -912,9 +914,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
-      status={host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
-        ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
-        : dirty ? '保存していない変更があります' : undefined} dirty={false}
+      status={<><span>{statusLine}</span>{saveStatus ? <> · {saveStatus}</> : null}</>} dirty={false}
     >
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
