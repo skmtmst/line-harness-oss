@@ -24,3 +24,5 @@
 |DP-02|地図全613板の写し検査で消えたsAnyyのHTML/TSV欠落、試験失敗|sAnyy除外、板数612。別名aRvrhの既存QX56l写しへTSV口も補完|全地図検査の追加欠落1（aRvrh別名）も修正|外部html置場がある時は全板のHTML・TSVを確認、無い環境だけskip|
 |DC-UI-05|V8実SkeletonRowsが即時、共通ListStateは300msで試験失敗|共通のタブ骨組みをDelayedSkeletonへ統一、二重の待ちを除去|タブ4種類（ルール・時間・休業日・担当）と時間内1、settingsの遅延import8口。rgで他のV8タブは共通ListState/DelayedSkeleton経由|実共通部品をfake時計で0ms/299ms/300ms確認|
 |DC-UI-03|実共通窓・引き出しの本文内cancelで確認を飛ばし、両試験失敗|本文も含めた共通captureへ統合、入れ子の窓は除外|全116取消口（footer95・body11・RsDialog本文actions10）をAST一覧化、確認を飛ばすbody21口を共通で保護|実Dialog/Drawer×取消・×・Esc・背景の8経路と入力保持、計12試験|
+
+OP-R05追加：実ChannelsBoardの手動取り込みをUTCで再現（10時が10Zになり試験失敗）。JST共通変換に直し、UTC/JST両方で01Zを確認。日別取得の型検査で指摘された冗長なsuccess=false判定も削除（fetchApiは拒否で失敗を返す）。

@@ -135,7 +135,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     const load = () => restaurantTestApi.reservationsDay(accountId, storeId, toYmd(day))
       .then((res) => {
         if (!current) return
-        if (res.success === false || !Array.isArray(res.data?.reservations)) throw new Error('読み込めませんでした')
+        if (!Array.isArray(res.data?.reservations)) throw new Error('読み込めませんでした')
         setDayError(null)
         setTodayRows(res.data.reservations)
         setDayClosures({ day: toYmd(day), closures: Array.isArray(res.data?.closures) ? res.data.closures : [] })
