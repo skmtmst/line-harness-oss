@@ -8,6 +8,8 @@ import { chromium } from '@playwright/test'
 import { assess, record, measurePage, validateAllowances } from './layout-defects.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
 const cases = {
+  'control-overlap': '<div data-list-row style="display:flex"><button style="width:100px;height:36px">コピー</button><button style="width:36px;height:36px;margin-left:-30px">…</button></div>',
+  'control-blocked': '<div data-list-row style="position:relative"><button style="width:80px;height:36px">…</button><span style="position:absolute;left:20px;top:0;width:36px;height:36px;background:#fff"></span></div>',
   wrap: '<span style="display:block;width:50px">短い名前の折り返し</span>',
   squash: '<button style="width:24px;word-break:break-all">20件表示</button>',
   clip: '<div style="overflow:hidden;width:100px"><span style="white-space:nowrap">横にはみ出した短い文字列です</span></div>',
@@ -19,6 +21,8 @@ const cases = {
   blank: '<section style="width:300px;height:300px;border:1px solid"><p>中身</p></section><footer style="margin-top:900px">画面の続き</footer>',
 }
 const repairs = {
+  'control-overlap': cases['control-overlap'].replace('margin-left:-30px', 'margin-left:16px'),
+  'control-blocked': cases['control-blocked'].replace('left:20px', 'left:120px'),
   wrap: cases.wrap.replace('width:50px','width:300px;white-space:nowrap'),
   squash: cases.squash.replace('width:24px;word-break:break-all','width:100px;white-space:nowrap'),
   clip: cases.clip.replace('overflow:hidden;width:100px','overflow:visible;width:500px'),
@@ -29,6 +33,23 @@ const repairs = {
   'blank-horizontal': cases['blank-horizontal'].replace('width:240px','width:1000px').replace('height:320px','height:auto'),
   'blank-kpi': cases['blank-kpi'].replaceAll('min-height:160px','min-height:0'),
 }
+test('実物の表CSS：窓内のコンテナ幅を壊すと取消が押せず、修復後は押せる', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const css = readFileSync(new URL('../../src/components/shared/data-table.module.css', import.meta.url), 'utf8')
+    const html = style => `<html data-theme="v8"><style>${style}</style><body><div style="display:flex;flex-direction:column;align-items:flex-start;width:560px"><div class="frame" data-shared-part="list-table"><table class="table"><tbody><tr><td><button>取り消す</button></td></tr></tbody></table></div></div></body></html>`
+    const hit = () => page.locator('button').evaluate(el => {
+      const r = el.getBoundingClientRect()
+      return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
+    })
+    await page.setContent(html(css.replace('width: 100%; min-width: 0; container-type: inline-size;', 'container-type: inline-size;')))
+    assert.equal(await hit(), false, '幅の指定を外すと子の操作が隠れる')
+    await page.setContent(html(css))
+    assert.equal(await page.locator('.frame').evaluate(el => el.getBoundingClientRect().width), 560)
+    assert.equal(await hit(), true, '実物CSSで取消の中央を押せる')
+  } finally { await browser.close() }
+})
 test('種類ごとに実物を壊し、検出・終了コード1・修復後0を確認する', async () => {
   const browser = await chromium.launch()
   const dir = mkdtempSync(join(tmpdir(),'v8-defects-'))

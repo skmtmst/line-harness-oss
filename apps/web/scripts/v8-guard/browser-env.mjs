@@ -39,6 +39,11 @@ export async function openPage(browser, { baseUrl, route, width, theme, stable =
     ...(stable ? { reducedMotion: 'reduce' } : {}),
   })
   try {
+    if (process.env.V8_GUARD_STUB_API === '1') {
+      const { stubApi } = await import('./speed-budget.mjs')
+      const { mockFetch } = await import('./mock-local.mjs')
+      await stubApi(page, mockFetch)
+    }
     if (onPageError) page.on('pageerror', onPageError)
     if (stable) await page.clock.setFixedTime(new Date('2026-10-01T05:00:00Z'))
     await page.addInitScript(([session, t]) => {

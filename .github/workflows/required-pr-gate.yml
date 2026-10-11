@@ -671,6 +671,9 @@ jobs:
       - name: Broken fixtures must fail the V8 layout guard
         if: steps.scope.outputs.run == 'true'
         run: node --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs
+      - name: Train 17 waitlist failure and inflow mouse regressions
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
       - name: No new V8 layout or owner-rule defects (B-191 through B-218)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json
@@ -691,13 +694,14 @@ jobs:
       # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
       # 道具の対照は speed-budget.mjs の頭に書いた。
       - name: Speed measurement and reference policy controls
-        if: steps.scope.outputs.run == 'true'
-        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
       - name: Speed budget on V8 (10 screens on a real browser)
         id: speed_budget
         # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
         continue-on-error: true
-        if: steps.scope.outputs.run == 'true'
+        # 画面の必須検査が落ちても、速度は別に測って原因を分ける。
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         env:
           V8_SPEED_PROFILE: ci
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -710,6 +714,10 @@ jobs:
             echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
           fi
           ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+      - name: Train 17 absolute targets (reference)
+        continue-on-error: true
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json
       - name: 2000 friends meet absolute speed targets (reference)
         id: stress_speed
         # 速度だけ参考。測れなかったときも失敗を残し、次の工程で警告する。
