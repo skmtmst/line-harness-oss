@@ -233,7 +233,7 @@ const EXEMPTIONS: Record<string, string> = {
     'タグの編集（xn95q）を src/v8 に一から書いたもの。元の画面（components/friend-fields/edit-tag-page-v4.tsx・s1 未判定）と同じ扱いで、番兵の要否は元の画面と一緒に決める',
   'app/inflow-links/detail/page.tsx':
     '転送先の編集は保存ボタン確定式。下書き・dirty 管理がなく番兵の扱いは別途検討',
-  'app/mileage/score-rules/page.tsx':
+  'v8/mileage/score-rules.tsx':
     '下書き保存式の編集画面。番兵の扱いは別途検討',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
