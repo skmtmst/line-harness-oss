@@ -491,6 +491,14 @@ async function inspectScreens(
           try { sessionStorage.setItem('lh_admin_session_fallback', token) } catch { /* 画面側で再取得される */ }
           // 未選択のとき先頭へフォールバックしないので、見る店舗を明示する。
           try {
+            // 「もう一度だけ前回の選択を捨てる」印を先に立てる。これが無いと
+            // AuthGuard が認証確認の直後に `clearSelectionAfterAuthentication`
+            // で下の店舗選択を消し、3画面とも店舗未選択の門で止まる。
+            // 正本は localStorage で、確認用スクリプトが置く sessionStorage の
+            // 印も残存扱いにされる（apps/web/src/lib/hq-navigation.ts の注記）
+            // ので両方へ置く。
+            localStorage.setItem('lh_auth_selection_cleared', '1');
+            sessionStorage.setItem('lh_auth_selection_cleared', '1');
             localStorage.setItem('lh_selected_account', accountId);
             localStorage.setItem('lh-admin-theme', 'v8');
           } catch { /* 既定のまま進む */ }
