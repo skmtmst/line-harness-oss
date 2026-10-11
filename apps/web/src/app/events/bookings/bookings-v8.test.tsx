@@ -21,6 +21,7 @@ const promoteOccurrenceWaitlist = vi.hoisted(() => vi.fn())
 const previewOccurrenceBroadcast = vi.hoisted(() => vi.fn())
 const downloadOccurrenceApplicantsCsv = vi.hoisted(() => vi.fn())
 const broadcastsSend = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'acc-1' }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -56,7 +57,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
-    selectedAccountId: 'acc-1',
+    selectedAccountId: account.id,
     accounts: [{ id: 'acc-1', role: 'owner' }],
   }),
 }))
@@ -139,6 +140,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  account.id = 'acc-1'
   document.documentElement.dataset.theme = 'v8'
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
@@ -148,6 +150,7 @@ beforeEach(() => {
   listOccurrenceSelector.mockReset()
   getOccurrenceApplicants.mockReset()
   decideBooking.mockReset()
+  updateBooking.mockReset()
   broadcastsSend.mockReset()
   previewOccurrenceBroadcast.mockReset()
   getEvent.mockResolvedValue({ id: 'e1', name: '秋のしつけ教室', venue_name: '渋谷ベース 3F', is_published: 1, version: 3 })
@@ -173,6 +176,20 @@ async function flush() {
 async function renderV8() {
   await act(async () => { root.render(<BookingsV8 />) })
   await flush()
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail })
+  return { promise, resolve, reject }
+}
+
+async function prepareMessage(value: string) {
+  const input = document.querySelector<HTMLInputElement>('#ev-bk-message')!
+  await act(async () => { fireEvent.change(input, { target: { value } }) })
+  const send = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === '送る')!
+  return send
 }
 
 describe('V8-B 申込者（Mu8qW）', () => {
@@ -229,5 +246,110 @@ describe('V8-B 申込者（Mu8qW）', () => {
     expect(v8css.replace(/box-shadow:\s*var\(--card-shadow\)/g, '')).not.toMatch(/box-shadow\s*:/)
     expect(v8tsx).toContain('boardId="Mu8qW"')
     expect(v8tsx).not.toContain('準備中')
+  })
+
+  it('前の店の遅いイベント名は切替後の名前を置き換えない', async () => {
+    const old = deferred<unknown>()
+    getEvent.mockReturnValueOnce(old.promise)
+    await renderV8()
+    account.id = 'acc-2'
+    getEvent.mockResolvedValue({ id: 'e1', name: 'Bの相談会' })
+    await renderV8()
+    old.resolve({ id: 'e1', name: '古いAの相談会' })
+    await flush()
+    expect(document.body.textContent).toContain('Bの相談会')
+    expect(document.body.textContent).not.toContain('古いAの相談会')
+  })
+
+  it('一度の描画中に対象確認を二重押ししても要求は一度だけ', async () => {
+    const pending = deferred<{ broadcastId: string; recipientCount: number }>()
+    previewOccurrenceBroadcast.mockReturnValue(pending.promise)
+    await renderV8()
+    const send = await prepareMessage('ご案内します')
+    await act(async () => { send.click(); send.click() })
+    expect(previewOccurrenceBroadcast).toHaveBeenCalledTimes(1)
+    pending.resolve({ broadcastId: 'bc-1', recipientCount: 5 })
+    await flush()
+    const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+    expect(dialog.textContent).toContain('5 人に送りますか')
+  })
+
+  it('店を切り替えて戻っても、古い送信対象が新しい確認を置き換えない', async () => {
+    const old = deferred<{ broadcastId: string; recipientCount: number }>()
+    previewOccurrenceBroadcast.mockReturnValueOnce(old.promise)
+    await renderV8()
+    const send = await prepareMessage('Aへ案内')
+    await act(async () => { send.click() })
+    account.id = 'acc-2'
+    await renderV8()
+    account.id = 'acc-1'
+    await renderV8()
+    previewOccurrenceBroadcast.mockResolvedValueOnce({ broadcastId: 'fresh', recipientCount: 2 })
+    const fresh = await prepareMessage('新しいAへ案内')
+    await act(async () => { fresh.click() })
+    old.resolve({ broadcastId: 'old', recipientCount: 97 })
+    await flush()
+    expect(document.body.textContent).toContain('2 人に送りますか')
+    expect(document.body.textContent).not.toContain('97 人に送りますか')
+    expect(broadcastsSend).not.toHaveBeenCalled()
+  })
+
+  it('前の店の送信完了は切替後の未保存の文を消さない', async () => {
+    const old = deferred<unknown>()
+    previewOccurrenceBroadcast.mockResolvedValue({ broadcastId: 'bc-1', recipientCount: 2 })
+    broadcastsSend.mockReturnValueOnce(old.promise)
+    await renderV8()
+    await act(async () => { (await prepareMessage('Aへ案内')).click() })
+    const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+    const confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === '送る')!
+    await act(async () => { confirm.click(); confirm.click() })
+    expect(broadcastsSend).toHaveBeenCalledTimes(1)
+    account.id = 'acc-2'
+    await renderV8()
+    await prepareMessage('Bの未保存の案内')
+    old.resolve({ success: true })
+    await flush()
+    expect(document.querySelector<HTMLInputElement>('#ev-bk-message')!.value).toBe('Bの未保存の案内')
+  })
+
+  it('参加印の二重押しは一度だけ送り、戻った後の再操作は古い応答で終わらない', async () => {
+    const old = deferred<unknown>()
+    const fresh = deferred<unknown>()
+    updateBooking.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise)
+    const mark = () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === '参加済')!
+    await renderV8()
+    await act(async () => { const button = mark(); button.click(); button.click() })
+    expect(updateBooking).toHaveBeenCalledTimes(1)
+    account.id = 'acc-2'
+    await renderV8()
+    account.id = 'acc-1'
+    await renderV8()
+    expect(mark().disabled).toBe(false)
+    await act(async () => { mark().click() })
+    expect(updateBooking).toHaveBeenCalledTimes(2)
+    old.resolve({ ok: true })
+    await flush()
+    expect(mark().disabled).toBe(true)
+    fresh.resolve({ ok: true })
+    await flush()
+    expect(mark().disabled).toBe(false)
+  })
+
+  it('別の行の参加印は並行更新でき、成功の再読込で他方の失敗を消さない', async () => {
+    const payload = applicantsPayload()
+    payload.applicants[0].status = 'confirmed'
+    getOccurrenceApplicants.mockResolvedValue(payload)
+    const first = deferred<unknown>()
+    const second = deferred<unknown>()
+    updateBooking.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    await renderV8()
+    const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')].filter((button) => button.textContent?.trim() === '参加済')
+    await act(async () => { buttons[0].click(); buttons[1].click() })
+    expect(updateBooking).toHaveBeenCalledTimes(2)
+    second.reject(new Error('down'))
+    await flush()
+    first.resolve({ ok: true })
+    await flush()
+    expect(document.body.textContent).toContain('来場・不参加の記録を変えられませんでした')
   })
 })

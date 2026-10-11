@@ -1,7 +1,7 @@
 'use client'
 import { CalendarClock, Users, Armchair, CalendarX, Inbox, Check, Download, Send } from 'lucide-react'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -25,6 +25,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { EventRosterCard, EventRosterTable, EventRosterRow, EventRosterActions, EventAttendanceSummary } from '@/components/shared/event-roster'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
+import { useBookingRequests } from './booking-requests'
 
 /*
  * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
@@ -122,25 +123,65 @@ function Bookings({ eventId }: { eventId: string }) {
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastError, setBroadcastError] = useState('')
-  const requestRef = useRef(0)
 
   usePageTitle(event?.name ? `${event.name} の申込者` : 'イベントの申込者')
 
   const scope = JSON.stringify([selectedAccountId, eventId])
+  const requests = useBookingRequests(scope)
+  const operationScope = JSON.stringify([selectedAccountId, eventId, selectedOccurrenceId])
+  const operations = useBookingRequests(operationScope)
+  const [renderedScope, setRenderedScope] = useState(scope)
+  if (renderedScope !== scope) {
+    setRenderedScope(scope)
+    setEvent(null)
+    setSlots([])
+    setSelectedOccurrenceId('')
+    setEventStatus('loading')
+    setSlotsStatus('loading')
+  }
+  const [renderedOperationScope, setRenderedOperationScope] = useState(operationScope)
+  if (renderedOperationScope !== operationScope) {
+    setRenderedOperationScope(operationScope)
+    setApplicants(null)
+    setApplicantsStatus('loading')
+    setActionError('')
+    setBusy(false)
+    setMarking(new Set())
+    setCsvBusy(false)
+    setCancelApplicant(null)
+    setCancelling(false)
+    setCancelError('')
+    setRejectApplicant(null)
+    setRejectReason('')
+    setRejectError('')
+    setWaitlistDialog(null)
+    setWaitlistReason('')
+    setWaitlistBusy(false)
+    setWaitlistError('')
+    setBroadcastMessage('')
+    setBroadcastPreview(null)
+    setBroadcastConfirmOpen(false)
+    setBroadcastBusy(false)
+    setBroadcastError('')
+  }
 
   const refreshEvent = useCallback(async () => {
     if (!selectedAccountId) return
+    const request = requests.start('event', true)
+    if (!request) return
     setEventStatus('loading')
     try {
       const detail = await eventsApi.getEvent(selectedAccountId, eventId)
+      if (!request.isCurrent()) return
       setEvent(detail)
       setEventStatus('ready')
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       saveErrors.capture(saveFailure)
       setEvent(null)
       setEventStatus('error')
-    }
-  }, [selectedAccountId, eventId, saveErrors]);
+    } finally { request.finish() }
+  }, [selectedAccountId, eventId, saveErrors, requests]);
 
 
   const refreshSlots = useCallback(async () => {
@@ -150,39 +191,44 @@ function Bookings({ eventId }: { eventId: string }) {
       setSelectedOccurrenceId('')
       return
     }
+    const request = requests.start('slots', true)
+    if (!request) return
     try {
       const res = await eventsApi.listOccurrenceSelector(selectedAccountId, eventId)
+      if (!request.isCurrent()) return
+      if (!Array.isArray(res?.items)) throw new Error('malformed_slots')
       setSlots(res.items)
       setSlotsStatus('ready')
       setSelectedOccurrenceId((current) => current || res.items[0]?.id || '')
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       saveErrors.capture(saveFailure)
       setSlots([])
       setSlotsStatus('error')
-    }
-  }, [selectedAccountId, eventId, saveErrors]);
+    } finally { request.finish() }
+  }, [selectedAccountId, eventId, saveErrors, requests]);
 
 
   const refreshApplicants = useCallback(async () => {
     if (!selectedAccountId || !selectedOccurrenceId) return
-    const requestId = ++requestRef.current
-    const startedScope = scope
+    const request = operations.start('applicants', true)
+    if (!request) return
     setApplicantsStatus('loading')
-    setActionError('')
     try {
       const data = await eventsApi.getOccurrenceApplicants(selectedAccountId, selectedOccurrenceId)
-      if (requestId !== requestRef.current || scope !== startedScope) return
+      if (!request.isCurrent()) return
+      if (!Array.isArray(data?.applicants) || !data.occurrence) throw new Error('malformed_applicants')
       setApplicants(data)
       setBroadcastPreview(null)
       setBroadcastConfirmOpen(false)
       setApplicantsStatus('ready')
     } catch (saveFailure) {
-      if (requestId !== requestRef.current || scope !== startedScope) return
+      if (!request.isCurrent()) return
       saveErrors.capture(saveFailure)
       setApplicants(null)
       setApplicantsStatus('error')
-    }
-  }, [selectedAccountId, selectedOccurrenceId, scope, saveErrors])
+    } finally { request.finish() }
+  }, [selectedAccountId, selectedOccurrenceId, saveErrors, operations])
 
   useEffect(() => {
     void refreshEvent()
@@ -236,9 +282,13 @@ function Bookings({ eventId }: { eventId: string }) {
 
   async function decide(applicant: EventOccurrenceApplicant, action: 'confirm' | 'reject') {
     if (!selectedAccountId || busy) return
+    const request = operations.start('decide')
+    if (!request) return
     setBusy(true)
+    setActionError('')
     try {
       await eventsApi.decideBooking(selectedAccountId, eventId, applicant.id, action, action === 'reject' ? rejectReason.trim() || undefined : undefined)
+      if (!request.isCurrent()) return
       if (action === 'reject') {
         setRejectApplicant(null)
         setRejectReason('')
@@ -246,6 +296,7 @@ function Bookings({ eventId }: { eventId: string }) {
       }
       await refreshApplicants()
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       const fieldFailure = saveErrors.capture(saveFailure);
 
       if (action === 'reject') {
@@ -257,48 +308,59 @@ function Bookings({ eventId }: { eventId: string }) {
         setActionError('予約を確定できませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。') }
       }
     } finally {
-      setBusy(false)
+      if (request.isCurrent()) setBusy(false)
+      request.finish()
     }
   }
 
   async function runAdminCancel() {
     if (!cancelApplicant || cancelling) return
     if (cancelApplicant.accountId !== selectedAccountId) return
+    const request = operations.start('cancel')
+    if (!request) return
     setCancelling(true)
     setCancelError('')
     try {
       const res = await eventsApi.adminCancelBooking(cancelApplicant.accountId, eventId, cancelApplicant.applicant.id)
+      if (!request.isCurrent()) return
       if (!res?.ok) throw new Error('cancel_not_applied')
       setCancelApplicant(null)
       await refreshApplicants()
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setCancelError('この予約をキャンセルできませんでした。ほかの操作で状態が変わっている場合があります。一覧を読み直してから、もう一度お試しください。') }
     } finally {
-      setCancelling(false)
+      if (request.isCurrent()) setCancelling(false)
+      request.finish()
     }
   }
 
   async function markStatus(applicant: EventOccurrenceApplicant, status: 'attended' | 'no_show') {
     const accountId = selectedAccountId
     if (!accountId || marking.has(applicant.id)) return
+    const request = operations.start(`mark:${applicant.id}`)
+    if (!request) return
     setMarking((current) => new Set(current).add(applicant.id))
     try {
       await eventsApi.updateBooking(accountId, eventId, applicant.id, { status })
+      if (!request.isCurrent()) return
       await refreshApplicants()
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setActionError('来場・不参加の記録を変えられませんでした。一覧を読み直してから、もう一度お試しください。') }
     } finally {
-      setMarking((current) => {
+      if (request.isCurrent()) setMarking((current) => {
         const next = new Set(current)
         next.delete(applicant.id)
         return next
       })
+      request.finish()
     }
   }
 
@@ -324,6 +386,8 @@ function Bookings({ eventId }: { eventId: string }) {
     if (!selectedAccountId || !occurrence || !waitlistDialog || waitlistBusy) return
     const trimmed = waitlistReason.trim()
     if (trimmed === '') return
+    const request = operations.start('waitlist')
+    if (!request) return
     setWaitlistBusy(true)
     setWaitlistError('')
     setActionError('')
@@ -348,38 +412,48 @@ function Bookings({ eventId }: { eventId: string }) {
           reason: trimmed,
         })
       }
+      if (!request.isCurrent()) return
       setWaitlistDialog(null)
       setWaitlistReason('')
       await refreshApplicants()
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       const fieldFailure = saveErrors.capture(saveFailure)
       await refreshApplicants()
+      if (!request.isCurrent()) return
       { if (!fieldFailure)
       setWaitlistError('変えられませんでした。ほかの操作で順番や空席が変わった可能性があります。最新の状態を確かめてから、もう一度お試しください。') }
     } finally {
-      setWaitlistBusy(false)
+      if (request.isCurrent()) setWaitlistBusy(false)
+      request.finish()
     }
   }
 
   async function exportCsv() {
     if (!selectedAccountId || !applicants || csvBusy) return
+    const request = operations.start('csv')
+    if (!request) return
     setCsvBusy(true)
     setActionError('')
     try {
       await eventsApi.downloadOccurrenceApplicantsCsv(selectedAccountId, applicants.occurrence.id, applicants.snapshotId)
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setActionError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
     } finally {
-      setCsvBusy(false)
+      if (request.isCurrent()) setCsvBusy(false)
+      request.finish()
     }
   }
 
   async function previewBroadcast() {
     const message = broadcastMessage.trim()
     if (!selectedAccountId || !occurrence || !message || broadcastBusy) return
+    const request = operations.start('broadcast')
+    if (!request) return
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
@@ -388,34 +462,42 @@ function Bookings({ eventId }: { eventId: string }) {
         messageContent: message,
         snapshotId: applicants?.snapshotId ?? '',
       }, crypto.randomUUID())
+      if (!request.isCurrent()) return
       setBroadcastPreview({ broadcastId: result.broadcastId, recipientCount: result.recipientCount })
       setBroadcastConfirmOpen(true)
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。') }
     } finally {
-      setBroadcastBusy(false)
+      if (request.isCurrent()) setBroadcastBusy(false)
+      request.finish()
     }
   }
 
   async function sendBroadcast() {
     if (!broadcastPreview || broadcastBusy) return
+    const request = operations.start('broadcast')
+    if (!request) return
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
       await api.broadcasts.send(broadcastPreview.broadcastId)
+      if (!request.isCurrent()) return
       setBroadcastConfirmOpen(false)
       setBroadcastMessage('')
       setBroadcastPreview(null)
     } catch (saveFailure) {
+      if (!request.isCurrent()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setBroadcastError('送信を開始できませんでした。まだ送られていない可能性があるため、配信一覧で状態を確認してから再試行してください。') }
     } finally {
-      setBroadcastBusy(false)
+      if (request.isCurrent()) setBroadcastBusy(false)
+      request.finish()
     }
   }
 
