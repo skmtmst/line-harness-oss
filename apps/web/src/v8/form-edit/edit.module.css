@@ -99,13 +99,15 @@
 
 .addBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-add-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
 .addTitle { margin: 0; font-size: var(--tpl-fe-note-size); font-weight: 700; line-height: var(--tpl-fe-note-lh); color: var(--color-ink); }
-.addGroup { display: flex; flex-direction: column; gap: var(--tpl-fe-chip-gap); }
+.addGroup { display: flex; flex-direction: column; gap: var(--polish-space-row); }
 .addGroupTitle { margin: 0; font-size: var(--tpl-fe-small-size); font-weight: 700; line-height: var(--tpl-fe-small-lh); color: var(--color-ink-secondary); }
-.addCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-fe-chip-gap); }
+.addCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--polish-space-row); }
 .designModes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--tpl-fe-chip-gap); }
-.addCards[data-writing] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.addCards[data-writing] > :nth-child(6) { grid-column: 1; }
-.addCards[data-writing] > :nth-child(10) { grid-column: 1; }
+.addCards[data-writing] { grid-template-columns: repeat(20, minmax(0, 1fr)); }
+.addCards[data-writing] > * { grid-column: span 4; }
+.addCards[data-writing] > :nth-child(n+6) { grid-column: span 5; }
+.addCards[data-writing] > :nth-child(6),
+.addCards[data-writing] > :nth-child(10) { grid-column: 1 / span 5; }
 .addCard {
   height: var(--tpl-fe-add-card-h); display: flex; flex-direction: column; justify-content: center; gap: var(--tpl-fe-add-card-gap);
   padding: var(--tpl-fe-add-card-pad); border: 0; border-radius: var(--radius-control); background: var(--color-canvas);
@@ -186,6 +188,12 @@
   .testNarrow { display: inline; }
   .urlValue { white-space: normal; height: auto; min-height: var(--tpl-fe-choice-h); }
   .addCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .addCards[data-writing] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .addCards[data-writing] > * { grid-column: span 3; }
+  .addCards[data-writing] > :nth-child(n+3):nth-child(-n+5) { grid-column: span 2; }
+  .addCards[data-writing] > :nth-child(n+6) { grid-column: span 3; }
+  .addCards[data-writing] > :nth-child(6),
+  .addCards[data-writing] > :nth-child(10) { grid-column: 1 / span 3; }
   .bookingRow { grid-template-columns: minmax(0, 1fr); }
 }
 

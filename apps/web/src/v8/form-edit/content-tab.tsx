@@ -623,7 +623,7 @@ function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) 
                   <span className={styles.addCardLabel}>{card.label}</span>
                   {card.fresh ? <span className={styles.newBadge}>新</span> : null}
                 </span>
-                <span className={styles.addCardHint}>{card.hint}</span>
+                <span className={styles.addCardHint} title={card.hint}>{card.hint}</span>
               </button>
             ))}
           </div>
