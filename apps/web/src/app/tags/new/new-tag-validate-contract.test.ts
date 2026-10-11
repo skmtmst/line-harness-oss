@@ -3,7 +3,7 @@ const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/components/friend-fields/new-tag-page-v4.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/v8/tags/create.tsx'), 'utf8')
 const ROUTE = fs.readFileSync(path.join(process.cwd(), 'src/app/tags/new/page.tsx'), 'utf8')
 const LIST = fs.readFileSync(path.join(process.cwd(), 'src/v8/tags/tags-tab.tsx'), 'utf8')
 const EDITOR = fs.readFileSync(path.join(process.cwd(), 'src/components/friend-fields/tag-editor-v4.tsx'), 'utf8')
@@ -21,7 +21,7 @@ describe('タグ作成の名前検査の契約', () => {
     expect(API).not.toContain('color?: string; isStarred?: boolean')
   })
 
-  it('旧作成画面を残さず、一覧と複製から現行V4作成画面へ進む', () => {
+  it('旧作成画面を残さず、一覧と複製から現役V8作成画面へ進む', () => {
     expect(ROUTE).toContain("@/v8/tags/create")
     expect(ROUTE).toContain('<Screen />')
     expect(ROUTE).not.toContain('LegacyNewTagPage')
@@ -30,11 +30,11 @@ describe('タグ作成の名前検査の契約', () => {
     expect(EDITOR).toContain('href={`/tags/new?copy=${tag?.id ?? \'\'}`}')
   })
 
-  it('現行V4作成画面が旧画面の保存項目を引き継ぐ', () => {
+  it('現役V8作成画面が旧画面の保存項目を引き継ぐ', () => {
     expect(PAGE).toContain('api.tags.createDefinition(')
-    expect(PAGE).toContain('groupId: values.groupId || null')
-    expect(PAGE).toContain('isStarred: values.isStarred')
-    expect(PAGE).toContain('mileage: { self: values.rewardMiles, referrer: values.referralRewardMiles')
-    expect(PAGE).toContain('actions: definitionsForSave(values.actions)')
+    expect(PAGE).toContain('groupId: groupId || null')
+    expect(PAGE).toContain('isStarred,')
+    expect(PAGE).toContain('self: source?.mileageReward ?? 0, referrer: source?.referralMileageReward ?? 0')
+    expect(PAGE).toContain('definitionsForSave((copySource.automation?.actions ?? [])')
   })
 })

@@ -6,14 +6,12 @@ const root = resolve(process.cwd(), 'src')
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
 describe('タグ V4 contract', () => {
-  it('タグ作成で本人・紹介者マイルと倍率を同時に設定できる', () => {
-    const editor = read('components/friend-fields/tag-editor-v4.tsx')
-    const page = read('components/friend-fields/new-tag-page-v4.tsx')
-    expect(editor).toContain('本人へのマイル付与')
-    expect(editor).toContain('紹介者へのマイル付与')
-    expect(editor).toContain('今後のマイル倍率')
-    expect(editor).toContain('タグを外して付け直したときの扱い')
-    expect(page).toContain('applyToExisting: false')
+  it('連動は現役の編集で設定でき、複製作成は本人・紹介者マイルと倍率を引き継ぐ', () => {
+    const editor = read('v8/tag-edit/edit-form.tsx')
+    const page = read('v8/tags/create.tsx')
+    for (const label of ['本人へのマイル付与', '紹介者へのマイル付与', '今後のマイル倍率', 'タグを外して付け直したときの扱い']) expect(editor).toContain(label)
+    expect(page).toContain('作ったあとの編集で足します')
+    for (const field of ['self: source?.mileageReward', 'referrer: source?.referralMileageReward', 'multiplier: source?.mileageMultiplierBps']) expect(page).toContain(field)
   })
 
   it('タグ編集の遡及付与は初期OFFで専用確認を通す', () => {
@@ -56,11 +54,11 @@ describe('タグ V4 contract', () => {
   })
 
   it('タグの複製はリンクだけで終わらず、既存データを作成画面へ引き継ぐ', () => {
-    const page = read('components/friend-fields/new-tag-page-v4.tsx')
+    const page = read('v8/tags/create.tsx')
     expect(page).toContain("const copyId = params.get('copy')")
     expect(page).toContain('api.tags.definition(copyId, selectedAccountId)')
-    expect(page).toContain('name: `${copySource.tag.name} のコピー`')
-    expect(page).toContain('rewardMiles: copySource.tag.mileageReward ?? 0')
+    expect(page).toContain('setName(`${definition.data.tag.name} のコピー`)')
+    expect(page).toContain('self: source?.mileageReward ?? 0')
     expect(page).toContain('.map((action) => linkedActionFromDefinition(')
     expect(page).toContain('copySource.tag.linkedActions?.find')
   })
