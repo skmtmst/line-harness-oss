@@ -1116,7 +1116,7 @@ export async function insertFormSubmissionRecord(
           WHERE f.id IN (${placeholders}) AND f.friend_id = ? AND f.form_id = ? AND f.submission_id IS NULL
             AND f.deleted_at IS NULL AND (f.expires_at IS NULL OR julianday(f.expires_at) > julianday(?)) AND s.status = 'clean') = ?`)
         .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.isTest ? 1 : 0, input.data, now,
-          ...fileIds, input.friendId ?? null, input.formId, now, fileIds.length),
+          ...sqlIdSet(fileIds).binds, input.friendId ?? null, input.formId, now, fileIds.length),
       db.prepare(`UPDATE form_submission_files SET submission_id = ? WHERE id IN (${placeholders}) AND submission_id IS NULL
         AND EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
         .bind(id, ...(fileIds.length ? sqlIdSet(fileIds).binds : []), id),
