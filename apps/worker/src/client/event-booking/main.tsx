@@ -2,6 +2,7 @@
 // apps/worker/src/client/main.ts (?page=event&id=<eventId> or ?page=event-me).
 // Mirrors salon-booking design language (LINE 緑 + sb-card + fade animations).
 
+import { useRequestGeneration } from '../../../../liff/src/lib/use-request-generation.js';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import './styles.css';
@@ -352,7 +353,7 @@ function EventDetailScreen({
   );
 }
 
-function ConfirmScreen({
+export function ConfirmScreen({
   ctx,
   event,
   slot,
@@ -376,11 +377,16 @@ function ConfirmScreen({
    */
   const slotIsFull = slot.remaining != null && slot.remaining <= 0;
 
+  const request = useRequestGeneration(JSON.stringify([ctx.liffId, event.id, slot.id]));
+  function back() { request.invalidate(); setSubmitting(false); onBack(); }
+
   async function submit() {
     if (note.length > 5000) {
       setError('備考は 5000 字以内で入力してください');
       return;
     }
+    if (submitting) return;
+    const generation = request.begin();
     setSubmitting(true);
     setError(null);
     try {
@@ -396,8 +402,10 @@ function ConfirmScreen({
        * undefined のまま渡り、完了画面が「予約が確定しました」と出す。
        * 満席の枠を押せるようにした以上、この道は日常的に通る。
        */
+      if (!request.isCurrent(generation)) return;
       onDone(bookingOutcome(res));
     } catch (err) {
+      if (!request.isCurrent(generation)) return;
       const e = err as { status?: number; body?: { error?: string } };
       const code = e.body?.error;
       const msg = (() => {
@@ -421,13 +429,13 @@ function ConfirmScreen({
       })();
       setError(msg);
     } finally {
-      setSubmitting(false);
+      if (request.isCurrent(generation)) setSubmitting(false);
     }
   }
 
   return (
     <div className="px-4 py-4 pb-24 space-y-4 eb-slide-up">
-      <button onClick={onBack} className="eb-back-btn">
+      <button onClick={back} className="eb-back-btn">
         <span aria-hidden>←</span>
         戻る
       </button>
@@ -482,7 +490,7 @@ function ConfirmScreen({
       <button onClick={submit} disabled={submitting} className="eb-primary-btn">
         {submitting ? '送信中...' : slotIsFull ? 'キャンセル待ちに入る' : '予約をリクエスト'}
       </button>
-      <button onClick={onBack} disabled={submitting} className="eb-secondary-btn">
+      <button onClick={back} disabled={submitting} className="eb-secondary-btn">
         戻る
       </button>
     </div>

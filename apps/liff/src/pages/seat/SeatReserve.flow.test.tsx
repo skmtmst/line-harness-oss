@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { RestaurantCustomerBooking, RestaurantCustomerSlot } from '@line-crm/shared';
 
@@ -214,4 +214,22 @@ describe('席の予約の流れ', () => {
     await screen.findByText('ご予約を受け付けました');
     expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null });
   });
+});
+
+it('XL-01: 席予約の確定中に戻ると古い成功で完了画面へ進まない', async () => {
+  vi.mocked(seat.hold).mockResolvedValue({success:true,data:held()});
+  let resolve!: (value: {success:true;data:RestaurantCustomerBooking})=>void;
+  const pending=new Promise<{success:true;data:RestaurantCustomerBooking}>(r=>{resolve=r;});
+  vi.mocked(seat.confirm).mockReturnValue(pending);
+  vi.mocked(seat.cancel).mockResolvedValue({success:true,data:held({status:'cancelled'})});
+  open();
+  fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));
+  fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));
+  await screen.findByText('ご予約の内容');
+  fireEvent.click(screen.getByRole('button',{name:'予約を確定する'}));
+  fireEvent.click(screen.getByRole('button',{name:/時刻を選び直す/}));
+  await screen.findByRole('radio',{name:'19:00 空きあり'});
+  await act(async()=>{resolve({success:true,data:held({status:'confirmed',holdExpiresAt:null,version:4})});await pending;});
+  expect(screen.queryByText('ご予約を受け付けました')).toBeNull();
+  expect(screen.getByRole('button',{name:'この時刻で進む'})).toBeTruthy();
 });

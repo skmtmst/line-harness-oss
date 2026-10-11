@@ -1,3 +1,4 @@
+import { useRequestGeneration } from '../../../../../liff/src/lib/use-request-generation.js';
 import BookingIntake from '../../../../../liff/src/components/BookingIntake.js';
 import { useState } from 'react';
 import { createApi, type MenuItem, type StaffItem } from '../lib/api.js';
@@ -23,7 +24,16 @@ export default function Confirm({
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
 
+  const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
+  function back() {
+    request.invalidate();
+    setSubmitting(false);
+    onBack();
+  }
+
   async function handleSubmit() {
+    if (submitting) return;
+    const generation = request.begin();
     setSubmitting(true);
     setError(null);
     try {
@@ -36,8 +46,10 @@ export default function Confirm({
         },
         idemKey,
       );
+      if (!request.isCurrent(generation)) return;
       onSubmitted();
     } catch (e) {
+      if (!request.isCurrent(generation)) return;
       const err = e as { status?: number; body?: { error?: string } };
       if (err.status === 409 && err.body?.error === 'slot_conflict') {
         setError('この時間枠は他の方の予約と重なりました。日時を選び直してください。');
@@ -45,13 +57,13 @@ export default function Confirm({
         setError('予約リクエストの送信に失敗しました。時間をおいて再度お試しください。');
       }
     } finally {
-      setSubmitting(false);
+      if (request.isCurrent(generation)) setSubmitting(false);
     }
   }
 
   return (
     <div className="space-y-4 sb-slide-up">
-      <button onClick={onBack} className="sb-back-btn">
+      <button onClick={back} className="sb-back-btn">
         <span aria-hidden>←</span>
         戻る
       </button>
