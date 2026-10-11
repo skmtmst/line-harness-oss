@@ -395,5 +395,7 @@
 }
 
 :global([data-theme='v8']) .frame[data-height-mode='content'] { min-height: 0; }
-/* 設定の本文が下の24を持つ。外枠で同じ余白を重ねない。 */
-:global([data-theme='v8']) .frame[data-height-mode='content'][data-page-template='settings']:not(:has([data-shared-part='sticky-bar'])) { padding-bottom: 0; }
+/* 内容で終わる設定は、外枠が下の24を持つ。本文と二重にしない。 */
+:global([data-theme='v8']) .frame[data-height-mode='content'][data-page-template='settings']:not(:has([data-shared-part='sticky-bar'])) .settingsContent { padding-bottom: 0; }
+/* 申込者の数の帯も、本文と同じ左右24・上16。 */
+:global([data-theme='v8']) .frame[data-template-layout='event-roster'] > .stats { padding: var(--tpl-roster-body-pad); padding-bottom: 0; }

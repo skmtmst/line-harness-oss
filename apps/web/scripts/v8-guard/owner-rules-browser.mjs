@@ -170,7 +170,9 @@ export default function scanOwnerRules() {
   for (const bar of [...root.querySelectorAll('[data-shared-part="sticky-bar"],[data-pencil-name*="下の帯"]')].filter(visible)) {
     const b=bar.getBoundingClientRect(), parent=bar.parentElement
     if (!parent || b.height<40 || root.closest('[data-liff]')) continue
-    const ends=textLeaves(parent).filter(d=>!bar.contains(d)).map(d=>d.getBoundingClientRect().bottom).filter(bottom=>bottom<=b.top+1)
+    // アイコンを子に持つボタンや、値を持つ入力も本文の終端。文字だけでは実際の空白を測れない。
+    const controls=[...parent.querySelectorAll('button,a,input,select,textarea,[role="button"]')].filter(visible)
+    const ends=[...textLeaves(parent),...controls].filter(d=>!bar.contains(d)).map(d=>d.getBoundingClientRect().bottom).filter(bottom=>bottom<=b.top+1)
     if (ends.length) { const gap=b.top-Math.max(...ends); if(gap>=96) add('footgap',bar,{excess:Math.ceil(gap-95)}) }
   }
   for (const table of [...root.querySelectorAll('[data-shared-part="list-table"]')].filter(visible)) {
