@@ -151,10 +151,6 @@
   "app/inflow-links/detail/page.tsx": {
     "direct-secondary-button": 1
   },
-  "app/inflow-links/new/page.tsx": {
-    "direct-th": 4,
-    "unresolved-classname": 4
-  },
   "app/inflow-links/page.tsx": {
     "arbitrary-value": 8
   },

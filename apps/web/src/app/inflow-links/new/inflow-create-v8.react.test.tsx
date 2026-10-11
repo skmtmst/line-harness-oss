@@ -12,9 +12,9 @@ import NewInflowLinkPage from './page'
 
 /*
  * ★V8-B 流入リンクを作る（Pencil `KMaMk`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい作る画面に切り替わり、
+ * テーマを選ぶことなく現役V8を出し、
  * 見本が決めた見出し・4つの段・右の進む順・下の帯が出ることを
- * 実DOMで固定する。v7 では従来の作る画面が出ることも固定する。
+ * 実DOMで固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
