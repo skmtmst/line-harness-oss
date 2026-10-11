@@ -652,6 +652,24 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     return c.json({ success: false, error: 'Event processing failed' }, 503);
   }
 
+  // 取り込み停止中は、受信の保存までは済ませたうえで動作を止める。
+  // 通知・タグ・シナリオ開始などの副作用は一切起こさない。再開時は
+  // 止めていた分を待ち行列へ戻す（コネクタ更新口が担う）。
+  const connector = await c.env.DB.prepare(
+    `SELECT status FROM ec_connectors WHERE line_account_id = ?`,
+  ).bind(lineAccountId).first<{ status: string }>();
+  if (connector?.status === 'paused') {
+    await c.env.DB.prepare(
+      `UPDATE ec_events SET status = 'skipped', error_message = 'connector_paused', updated_at = ? WHERE id = ?`,
+    ).bind(now, row.id).run();
+    await setEcActionExecutionStatus(c.env.DB, {
+      eventId: row.id, lineAccountId, status: 'skipped',
+      errorCode: 'connector_paused', errorMessageSafe: '取り込みは停止中のため処理しませんでした', now,
+    });
+    return c.json({ success: true, status: 'paused' }, 202);
+  }
+
+
   /*
    * IDEA-21: 注文の取り消し・返金が届いたら、その注文を起点に待っている
    * 発送後の案内（到着確認・口コミ・次の商品）を「送らない」へ倒す。
@@ -712,22 +730,6 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     return c.json({ success: true, status: 'identity_pending' }, 202);
   }
 
-  // 取り込み停止中は、受信の保存までは済ませたうえで動作を止める。
-  // 通知・タグ・シナリオ開始などの副作用は一切起こさない。再開時は
-  // 止めていた分を待ち行列へ戻す（コネクタ更新口が担う）。
-  const connector = await c.env.DB.prepare(
-    `SELECT status FROM ec_connectors WHERE line_account_id = ?`,
-  ).bind(lineAccountId).first<{ status: string }>();
-  if (connector?.status === 'paused') {
-    await c.env.DB.prepare(
-      `UPDATE ec_events SET status = 'skipped', error_message = 'connector_paused', updated_at = ? WHERE id = ?`,
-    ).bind(now, row.id).run();
-    await setEcActionExecutionStatus(c.env.DB, {
-      eventId: row.id, lineAccountId, status: 'skipped',
-      errorCode: 'connector_paused', errorMessageSafe: '取り込みは停止中のため処理しませんでした', now,
-    });
-    return c.json({ success: true, status: 'paused' }, 202);
-  }
 
   /*
    * F-20: 公式サイトの掲載閲覧数。友だちの突き合わせは要らない（回数だけ数える）

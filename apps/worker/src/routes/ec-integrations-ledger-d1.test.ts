@@ -298,3 +298,12 @@ it('R-EC02: 注文保存が一度失敗してもcronだけで注文と明細を�
  expect(sqlite.prepare('SELECT product_name FROM ec_order_lines').all()).toEqual([{product_name:'鹿肉ミンチ'}]);
  expect(sqlite.prepare("SELECT status FROM ec_events WHERE external_event_id='read-model-recovery'").get()).toEqual({status:'processed'});
 });
+it.each([true,false])('IN-H01: 停止したECは友だちの有無=%sでも運用者へ知らせない',async(linked)=>{
+ sqlite.prepare("INSERT INTO ec_connectors(id,line_account_id,provider,shop_domain,status,created_at,updated_at) VALUES('paused','account-a','ec_cube','fixture.test','paused','fixture','fixture')").run();
+ const {dispatchOperatorEvent}=await import('../services/operator-notification-dispatch.js');
+ const event:Record<string,unknown>=baseEvent({event_id:'paused-order'});if(!linked)delete event.line_user_id;
+ const response=await post(event);
+ expect(response.status).toBe(202);expect(await response.json()).toMatchObject({status:'paused'});
+ expect(dispatchOperatorEvent).not.toHaveBeenCalled();expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+ expect(sqlite.prepare("SELECT error_message FROM ec_events WHERE external_event_id='paused-order'").get()).toEqual({error_message:'connector_paused'});
+});
