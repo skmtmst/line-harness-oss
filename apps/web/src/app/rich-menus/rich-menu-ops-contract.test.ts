@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const PUBLISH_HISTORY = readFileSync(join(HERE, 'edit', 'publish-history.tsx'), 'utf8')
-const TEST_APPLY = readFileSync(join(HERE, 'edit', 'test-apply-section.tsx'), 'utf8')
+const TEST_APPLY = readFileSync(join(HERE, '../../v8/rich-menu-edit/test-apply.tsx'), 'utf8')
 const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const CREATE_FORM = readFileSync(
   join(HERE, '..', '..', 'components', 'rich-menus', 'rich-menu-create-form.tsx'),

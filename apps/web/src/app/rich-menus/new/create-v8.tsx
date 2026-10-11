@@ -105,6 +105,7 @@ import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { HQ_RICH_MENU_INTENTS, type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
+import RichMenuTestApply from '@/v8/rich-menu-edit/test-apply'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
@@ -2704,6 +2705,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     {checks.device.state === 'ok'
                       ? `スマホの実機で確認済みです${checks.device.at ? `（${formatDateTime(checks.device.at)}）` : ''}。`
                       : '管理画面の見本だけでは公開できません。スマホで見た担当者が押します'}
+                    {!host && group && (staffRole === 'owner' || staffRole === 'admin')
+                      ? <RichMenuTestApply key={`${accountId}:${group.id}`} groupId={group.id} /> : null}
                   </p>
                 </div>
                 <span className={styles.checkAction}>
