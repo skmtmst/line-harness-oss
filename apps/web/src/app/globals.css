@@ -1602,8 +1602,8 @@
   --tpl-setnav-w: 200px; --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: var(--polish-radius-control); --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;
   /* 設定 A（はじめの設定 xuJ7D・LINEアカウント V7vn3・プール管理 u3iab3・ログインユーザー nku0f ほか）。 */
   --tpl-sa-content-pad: 16px 24px 24px 0; --tpl-sa-gap: 14px; --tpl-sa-card-pad: var(--polish-space-card); --tpl-sa-card-gap: var(--polish-space-row); --tpl-sa-pair-gap: var(--polish-space-field);
-  --tpl-sa-progress-pad: 14px 18px; --tpl-sa-progress-gap: 12px; --tpl-sa-progress-size: 18px; --tpl-sa-bar-h: 8px; --tpl-sa-bar-radius: var(--polish-radius-small);
-  --tpl-sa-step-pad: 14px 18px; --tpl-sa-step-gap: 14px; --tpl-sa-mark: 28px; --tpl-sa-mark-line: 1.5px; --tpl-sa-step-text-gap: 2px; --tpl-sa-title-lh: 20px; --tpl-sa-sub-lh: 16px; --tpl-sa-card-title-lh: 20px; --tpl-sa-card-line-lh: 17px;
+  --tpl-sa-progress-pad: 16px; --tpl-sa-progress-gap: 12px; --tpl-sa-progress-size: 18px; --tpl-sa-bar-h: 8px; --tpl-sa-bar-radius: var(--polish-radius-small);
+  --tpl-sa-step-pad: 16px; --tpl-sa-step-gap: 16px; --tpl-sa-mark: 28px; --tpl-sa-mark-line: 1.5px; --tpl-sa-step-text-gap: 2px; --tpl-sa-title-lh: 20px; --tpl-sa-sub-lh: 16px; --tpl-sa-card-title-lh: 20px; --tpl-sa-card-line-lh: 17px;
   --tpl-sa-pool-pad: 18px; --tpl-sa-pool-gap: 10px; --tpl-sa-pool-name-size: var(--polish-text-body); --tpl-sa-pool-name-lh: 22px; --tpl-sa-pool-slug-lh: 16px; --tpl-sa-row-pad: 8px 12px; --tpl-sa-row-gap: 8px; --tpl-sa-row-radius: var(--polish-radius-control); --tpl-sa-url-lh: 15px; --tpl-sa-label-lh: 16px; --tpl-sa-link-lh: 17px; --tpl-sa-member-name-lh: 17px;
   --tpl-sa-notice-pad: 10px 14px; --tpl-sa-notice-gap: 10px; --tpl-sa-notice-lh: 20px; --tpl-sa-notice-radius: var(--polish-radius-control);
   --tpl-sa-kpi-gap: 12px; --tpl-sa-kpi-pad: 14px; --tpl-sa-kpi-inner-gap: 4px; --tpl-sa-kpi-value-size: 20px; --tpl-sa-kpi-value-lh: 24px; --tpl-sa-search-w: 260px; --tpl-sa-tool-gap: 8px; --tpl-sa-head-actions-gap: 12px;
