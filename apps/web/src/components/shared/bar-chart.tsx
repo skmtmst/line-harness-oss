@@ -65,9 +65,12 @@ const STEPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
 
 /** 目盛りは4本まで。上端が最大値を包むきりの良い段にする。 */
 export function barChartTicks(maxValue: number): number[] {
-  const max = Math.max(0, maxValue)
-  const step = STEPS.find((candidate) => max / candidate <= 3) ?? STEPS[STEPS.length - 1]
+  const max = Math.max(0, Number.isFinite(maxValue) ? maxValue : 0)
+  const magnitude = 10 ** Math.floor(Math.log10(Math.max(1, max / 3)))
+  const largeStep = [1, 2, 5, 10].map(value => value * magnitude).find(candidate => max / candidate <= 3)!
+  const step = STEPS.find((candidate) => max / candidate <= 3) ?? largeStep
   const top = Math.max(step, Math.ceil(max / step) * step)
+  if (!Number.isFinite(top)) return [0, max]
   const ticks: number[] = []
   for (let value = 0; value <= top; value += step) ticks.push(value)
   return ticks

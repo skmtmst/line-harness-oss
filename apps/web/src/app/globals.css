@@ -3162,3 +3162,5 @@ html[data-theme='v8'] button:not([role='tab']):is([aria-pressed='true'], [data-c
 
 /* 固定V8 登録メディアの縮小見本（O7hUt7）。 */
 [data-theme='v8'] { --tpl-media-file-surface: #e9ecef; --tpl-media-video-surface: #5a6577; --tpl-media-thumbnail-icon: 40px; }
+
+[data-theme='v8'] { --tpl-chart-summary-plot-h: 100px; }

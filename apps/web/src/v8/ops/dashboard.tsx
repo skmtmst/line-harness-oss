@@ -268,7 +268,7 @@ function AlertRow({ label, count, href }: { label: string; count: number; href: 
 
 /** 月ごとの売上の柱（千円）。いちばん高い月を柱の高さいっぱいにする。いまの月は濃い緑。 */
 function RevenueColumns({ rows }: { rows: Array<{ label: string; yen: number; current: boolean }> }) {
-  return <ValueBarChart label="月ごとの売上" unit="円" items={rows.map(r=>({key:r.label,label:r.label,value:r.yen,note:r.current?'今月':undefined}))} />
+  return <ValueBarChart label="月ごとの売上" unit="円" presentation="summary" items={rows.map(r=>({key:r.label,label:r.label,value:r.yen,note:r.current?'今月':undefined,emphasis:r.current}))} />
 }
 
 function revenueSourceLabel(pricing: 'stripe_actual' | 'list_price', lastSyncedAt: string | null): string {
