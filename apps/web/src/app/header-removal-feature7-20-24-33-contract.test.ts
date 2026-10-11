@@ -1,10 +1,10 @@
-import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 const APP = path.join(__dirname)
-const source = (relativePath: string) => fs.readFileSync(path.join(APP, relativePath), 'utf8')
+const source = (relativePath: string) => readUiSource(path.join(APP, relativePath), 'utf8')
 
 const pages = [
   'reminders/edit/page.tsx',
@@ -28,9 +28,9 @@ describe('機能7・20・24・33の本文上部', () => {
   it('Search ConsoleはV8の見出しに書き出し・連携の操作を残す', () => {
     const page = source('search-console/page.tsx')
     expect(page).toContain("usePageTitle('Search Console')")
-    expect(page).toContain('<ReadonlyHeaderV8')
+    expect(page).toContain('<ListPage')
     expect(page).toContain('onClick={exportCsv}')
-    expect(page).toContain('CSV で書き出す')
+    expect(page).toContain('CSVで書き出す')
     expect(page).toContain('連携を設定')
   })
 })
