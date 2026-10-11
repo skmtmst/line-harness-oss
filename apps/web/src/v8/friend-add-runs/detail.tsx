@@ -14,7 +14,9 @@ import { useFeatureAccess } from '@/lib/use-feature-access'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2, Clock, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
-import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { DetailPage } from '@/components/templates/detail-page'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import Card from '@/components/shared/card'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -258,92 +260,84 @@ function FriendAddRunDetailInner() {
       ? '届いたか分かりません。二重に届かないよう、自動では送り直しません。トークで確かめてください。'
       : '案内を送れませんでした。理由を確かめて、もう一度実行できます。'
 
-  return (
-    <PageFrame kind="detail" boardId="N43uVX">
-      <PageHeading
-        title={`${displayName}さんの友だち追加`}
-        help={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
-      />
-      <div className={styles.split}>
-        <div className={styles.main}>
-          {failedActions.length > 0 || runFailed || deliveryUnknown ? (
-            <Notice tone="danger" heading={<> {bandTitle} </>} action={<> {canManage && !deliveryUnknown && (failedActions.length > 0 || runFailed) ? (
-                <Button
-                  variant="primary"
-                  disabled={retrying}
-                  busy={retrying}
-                  busyLabel="再試行中…"
-                  onClick={() => (failedActions.length > 0 ? void retry() : setResendConfirmOpen(true))}
-                >
-                  <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
-                </Button>
-              ) : null} </>} >{bandNote}</Notice>
-          ) : null}
-
-          <section className={styles.card} aria-labelledby="friend-add-run-steps">
-            <div className={styles.cardHead}>
-              <h3 id="friend-add-run-steps" className={styles.cardTitle}>行ったこと</h3>
-              <p className={styles.cardSub}>設定された処理を、省かずに行った順に出します</p>
-            </div>
-            <ol className={styles.steps}>
-              {messageSent ? (
-                <li className={styles.step} data-state="ok">
-                  <CheckCircle2 size={18} className={styles.stepIcon} aria-hidden="true" />
-                  <span className={styles.stepIndex}>1</span>
-                  <span className={styles.stepText}>
-                    <span className={styles.stepTitle}>{`案内（${messageLabel}）を送った`}</span>
-                    <span className={styles.stepSub}>{`${jstClock(detail.processedAt ?? detail.receivedAt)}・LINE 受付済み`}</span>
-                  </span>
-                </li>
-              ) : null}
-              {actionRuns.map((action, index) => {
-                const state = action.status === 'completed' ? 'ok' : action.status === 'failed' ? 'ng' : 'wait'
-                const message = state === 'ng' ? safeErrorMessage(action.errorCode) : null
-                const time = jstClock(action.completedAt ?? action.startedAt)
-                return (
-                  <li key={action.id} className={styles.step} data-state={state}>
-                    {state === 'ok' ? <CheckCircle2 size={18} className={styles.stepIcon} aria-hidden="true" />
-                      : state === 'ng' ? <XCircle size={18} className={styles.stepIcon} aria-hidden="true" />
-                        : <Clock size={18} className={styles.stepIcon} aria-hidden="true" />}
-                    <span className={styles.stepIndex}>{index + (messageSent ? 2 : 1)}</span>
-                    <span className={styles.stepText}>
-                      <span className={styles.stepTitle}>{actionTitle(action, detail.configuredActions)}</span>
-                      <span className={styles.stepSub} data-kind={message || state === 'wait' ? undefined : 'time'}>
-                        {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount} 回目` : time)}
-                      </span>
-                    </span>
-                  </li>
-                )
-              })}
-            </ol>
-            {detail.status === 'suppressed' && !deliveryUnknown ? <p className={styles.cardSub}>配信なし</p> : null}
-            {actionRuns.length === 0 ? <p className={styles.cardSub}>追加の処理はありません。</p> : null}
-          </section>
-          {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-        </div>
-
-        <aside className={styles.side} aria-label="この追加について">
-          <section className={styles.box}>
-            <h3 className={styles.boxTitle}>この追加について</h3>
-            <dl className={styles.rows}>
-              <div className={styles.row}><dt>友だち</dt><dd title={displayName}>{displayName}</dd></div>
-              <div className={styles.row}><dt>追加の種類</dt><dd>{friendKindLabel}</dd></div>
-              <div className={styles.row}><dt>来た経路</dt><dd title={routeName}>{routeName}</dd></div>
-              <div className={styles.row}><dt>動いた設定</dt><dd title={ruleLabel}>{ruleLabel}</dd></div>
-              <div className={styles.row}><dt>受けた日時</dt><dd>{jstShortDateTime(detail.receivedAt)}</dd></div>
-              <div className={styles.row}><dt>処理した日時</dt><dd>{detail.processedAt ? jstShortDateTime(detail.processedAt) : 'まだ処理していません'}</dd></div>
-              <div className={styles.row}><dt>記録ID（お問い合わせ用）</dt><dd className={styles.mono} title={detail.id}>{shortId(detail.id)}</dd></div>
-            </dl>
-          </section>
-          {talkHref || settingsHref ? (
-            <div className={styles.sideActions}>
-              {talkHref ? <Button href={talkHref}><MessageCircle size={14} aria-hidden="true" />トークを開く</Button> : null}
-              {settingsHref ? <Button href={settingsHref}><Settings2 size={14} aria-hidden="true" />設定を開く</Button> : null}
-            </div>
-          ) : null}
-        </aside>
+  const summary = <>
+    <CreateSummaryCard title="この追加について" variant="record" rows={[
+      { label: '友だち', value: <span title={displayName}>{displayName}</span> },
+      { label: '追加の種類', value: friendKindLabel },
+      { label: '来た経路', value: <span title={routeName}>{routeName}</span> },
+      { label: '動いた設定', value: <span title={ruleLabel}>{ruleLabel}</span> },
+      { label: '受けた日時', value: jstShortDateTime(detail.receivedAt) },
+      { label: '処理した日時', value: detail.processedAt ? jstShortDateTime(detail.processedAt) : 'まだ処理していません' },
+      { label: '記録ID（お問い合わせ用）', value: <span className={styles.mono} title={detail.id}>{shortId(detail.id)}</span> },
+    ]} />
+    {talkHref || settingsHref ? (
+      <div className={styles.sideActions}>
+        {talkHref ? <Button href={talkHref}><MessageCircle size={14} aria-hidden="true" />トークを開く</Button> : null}
+        {settingsHref ? <Button href={settingsHref}><Settings2 size={14} aria-hidden="true" />設定を開く</Button> : null}
       </div>
+    ) : null}
+  </>
+  return (
+    <DetailPage boardId="N43uVX" layout="record-detail" heightMode="content"
+      title={`${displayName}さんの友だち追加`}
+      help={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
+      summary={summary}
+      summaryLabel="この追加について"
+    >
+      {failedActions.length > 0 || runFailed || deliveryUnknown ? (
+        <Notice tone="danger" heading={<> {bandTitle} </>} action={<> {canManage && !deliveryUnknown && (failedActions.length > 0 || runFailed) ? (
+            <Button
+              variant="primary"
+              disabled={retrying}
+              busy={retrying}
+              busyLabel="再試行中…"
+              onClick={() => (failedActions.length > 0 ? void retry() : setResendConfirmOpen(true))}
+            >
+              <RotateCcw size={14} aria-hidden="true" />失敗した処理をもう一度
+            </Button>
+          ) : null} </>} >{bandNote}</Notice>
+      ) : null}
 
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--tpl-rule-row-gap)" aria-labelledby="friend-add-run-steps">
+        <div className={styles.cardHead}>
+          <h3 id="friend-add-run-steps" className={styles.cardTitle}>行ったこと</h3>
+          <p className={styles.cardSub}>設定された処理を、省かずに行った順に出します</p>
+        </div>
+        <ol className={styles.steps}>
+          {messageSent ? (
+            <li className={styles.step} data-state="ok">
+              <CheckCircle2 size={18} className={styles.stepIcon} aria-hidden="true" />
+              <span className={styles.stepIndex}>1</span>
+              <span className={styles.stepText}>
+                <span className={styles.stepTitle}>{`案内（${messageLabel}）を送った`}</span>
+                <span className={styles.stepSub}>{`${jstClock(detail.processedAt ?? detail.receivedAt)}・LINE 受付済み`}</span>
+              </span>
+            </li>
+          ) : null}
+          {actionRuns.map((action, index) => {
+            const state = action.status === 'completed' ? 'ok' : action.status === 'failed' ? 'ng' : 'wait'
+            const message = state === 'ng' ? safeErrorMessage(action.errorCode) : null
+            const time = jstClock(action.completedAt ?? action.startedAt)
+            return (
+              <li key={action.id} className={styles.step} data-state={state}>
+                {state === 'ok' ? <CheckCircle2 size={18} className={styles.stepIcon} aria-hidden="true" />
+                  : state === 'ng' ? <XCircle size={18} className={`${styles.stepIcon} ${styles.failedIcon}`} aria-hidden="true" />
+                    : <Clock size={18} className={`${styles.stepIcon} ${styles.waitIcon}`} aria-hidden="true" />}
+                <span className={styles.stepIndex}>{index + (messageSent ? 2 : 1)}</span>
+                <span className={styles.stepText}>
+                  <span className={styles.stepTitle}>{actionTitle(action, detail.configuredActions)}</span>
+                  <span className={`${styles.stepSub}${state === 'ng' ? ` ${styles.failedSub}` : ''}`} data-kind={message || state === 'wait' ? undefined : 'time'}>
+                    {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount} 回目` : time)}
+                  </span>
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+        {detail.status === 'suppressed' && !deliveryUnknown ? <p className={styles.cardSub}>配信なし</p> : null}
+        {actionRuns.length === 0 ? <p className={styles.cardSub}>追加の処理はありません。</p> : null}
+      </Card>
+      {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
       <ConfirmDialog
         open={resendConfirmOpen}
         title="失敗した処理をもう一度行いますか？"
@@ -353,6 +347,6 @@ function FriendAddRunDetailInner() {
         onConfirm={() => retry()}
         onCancel={() => { if (!retrying) setResendConfirmOpen(false) }}
       />
-    </PageFrame>
+    </DetailPage>
   )
 }
