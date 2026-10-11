@@ -327,7 +327,7 @@ export default function TemplateDetailV8() {
       <span className={styles.usageKind}>{row.kind}</span>
       {row.href
         ? <Link href={row.href} className={styles.usageName} ><TruncatedText value={String(row.name ?? '')} /></Link>
-        : <span className={styles.usageNameQuiet} ><TruncatedText value={String(row.name ?? '')} /></span>}
+        : <span className={styles.usageNameQuiet} title="旧形式・開ける画面がありません"><TruncatedText value={String(row.name ?? '')} /></span>}
       <span className={row.fixed ? styles.usageVersionFixed : styles.usageVersion} title={row.version}>{row.version}</span>
       <span className={styles.usageState}>{row.status ?? emptyValue('unknown')}</span>
       {row.href
@@ -514,6 +514,7 @@ export default function TemplateDetailV8() {
                   ) : null}
                 </div>
               ))}
+              {versions?.length === 0 ? <p className={styles.empty}>版はまだありません。</p> : null}
               {typeof compareTarget === 'number' ? compareBox : null}
             </>
           )}

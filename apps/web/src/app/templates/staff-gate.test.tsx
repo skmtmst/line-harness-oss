@@ -274,7 +274,7 @@ describe('テンプレート詳細画面のstaffゲート (N-144)', () => {
     await act(async () => { await Promise.resolve() })
 
     expect((await screen.findAllByText('ご来店ありがとうございました。')).length).toBeGreaterThan(0)
-    expect(screen.getByText('テンプレートを編集')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '編集する' })).toBeTruthy()
   })
 })
 

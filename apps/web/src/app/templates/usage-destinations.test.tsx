@@ -150,14 +150,16 @@ async function renderDetailAndWait(usedBy = USED_BY) {
   render(<TemplateDetailPage />)
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
-  await screen.findByText('使われている場所')
+  await screen.findByRole('heading', { name: '使っている所' })
+  const more = screen.queryByRole('button', { name: /^ほか \d+ か所を見る$/ })
+  if (more) fireEvent.click(more)
 }
 
 describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
   test('使用先の各行が個別の編集・詳細画面へ行く', async () => {
     await renderDetailAndWait()
 
-    const hrefs = screen.getAllByText('開く').map((el) => (el as HTMLAnchorElement).getAttribute('href'))
+    const hrefs = screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))
     expect(hrefs).toEqual([
       '/auto-replies/edit?id=ar-1',
       '/scenarios/detail?id=sc-1',
@@ -166,7 +168,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
       '/inflow-links/detail?id=tl-1',
     ])
     // 旧形式オートメーションは開ける画面が無い。リンクを出さず理由を示す
-    expect(screen.getByText('開ける画面がありません')).toBeTruthy()
+    expect(screen.getByText('予約後フォロー').closest('[title]')?.getAttribute('title')).toContain('開ける画面がありません')
     expect(screen.getByText('オートメーション')).toBeTruthy()
     expect(screen.getByText('予約後フォロー')).toBeTruthy()
   })
@@ -174,7 +176,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
   test('使用先が0件なら「どこからも呼ばれていません」と出る', async () => {
     await renderDetailAndWait(EMPTY_USED_BY)
 
-    expect(screen.getByText('どこからも呼ばれていません')).toBeTruthy()
+    expect(screen.getByText('どこからも呼ばれていません。使われると、ここに並びます。')).toBeTruthy()
     expect(screen.queryByText('開く')).toBeNull()
   })
 
@@ -190,9 +192,9 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
     })
 
     expect(screen.getByText('前日案内')).toBeTruthy()
-    expect(screen.getByText('第1版')).toBeTruthy()
+    expect(screen.getByText('版1で固定（変わらない）')).toBeTruthy()
     expect(screen.getByText('送信待ち')).toBeTruthy()
-    const hrefs = screen.getAllByText('開く').map((el) => (el as HTMLAnchorElement).getAttribute('href'))
+    const hrefs = screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))
     expect(hrefs).toEqual(['/reminders/detail?id=re-1'])
   })
 })
@@ -238,7 +240,7 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
       '/rich-menus/edit?id=rg-1', '/inflow-links/detail?id=tl-1',
     ])
     expect(screen.getByText('予約後フォロー').closest('a')).toBeNull()
-    expect(screen.getByText('開ける画面がありません')).toBeTruthy()
+    expect(screen.getByText('予約後フォロー').closest('[title]')?.getAttribute('title')).toContain('開ける画面がありません')
   })
 
   test('一覧ドロワーの使用先も個別の画面へ行く', async () => {
