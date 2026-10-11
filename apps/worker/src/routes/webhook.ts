@@ -127,6 +127,7 @@ async function ensureFriendFromWebhookUser(
   lineClient: LineClient,
   userId: string,
   lineAccountId: string | null,
+  followOccurredAt?:string,
 ): Promise<Friend | null> {
   let friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
 
@@ -148,6 +149,7 @@ async function ensureFriendFromWebhookUser(
         displayName: profile?.displayName ?? null,
         pictureUrl: profile?.pictureUrl ?? null,
         statusMessage: profile?.statusMessage ?? null,
+        followOccurredAt,
       });
     } catch (err) {
       if (!isFriendScopeConflict(err)) throw err;
@@ -168,10 +170,10 @@ async function ensureFriendFromWebhookUser(
     // 別アカウントの行を「移動」する経路は Issue #961 で廃止した。
     const now = jstNow();
     await db
-      .prepare('UPDATE friends SET line_account_id = ?, is_following = 1, updated_at = ? WHERE id = ?')
+      .prepare('UPDATE friends SET line_account_id = ?, updated_at = ? WHERE id = ?')
       .bind(lineAccountId, now, friend.id)
       .run();
-    friend = { ...friend, line_account_id: lineAccountId, is_following: 1, updated_at: now };
+    friend = { ...friend, line_account_id: lineAccountId, updated_at: now };
   }
 
   return friend;
@@ -363,7 +365,7 @@ async function handleStoppedTenantEvent(
     return;
   }
 
-  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
+  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,event.type==='follow'?toJstString(new Date(event.timestamp)):undefined);
   if (!friend) return;
 
   if (event.type === 'follow') {
@@ -449,7 +451,7 @@ async function handleNoticeLinkCode(
   const userId = event.source.type === 'user' ? event.source.userId : undefined;
   if (!userId) return false;
   const { tryLinkStaffByCode } = await import('../services/platform-announcements.js');
-  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
+  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,event.type==='follow'?toJstString(new Date(event.timestamp)):undefined);
   if (!friend) return false;
   return tryLinkStaffByCode(env, {
     lineAccountId,

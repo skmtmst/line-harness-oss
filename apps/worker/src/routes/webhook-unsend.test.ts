@@ -15,6 +15,7 @@ const autoReply = vi.hoisted(() => vi.fn().mockResolvedValue({
   matched: false,
   replyTokenConsumed: false,
 }));
+const fire=vi.hoisted(()=>vi.fn().mockResolvedValue(undefined));
 const mileage = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock('@line-crm/line-sdk', async () => {
@@ -28,7 +29,7 @@ vi.mock('@line-crm/line-sdk', async () => {
 vi.mock('../services/auto-reply.js', () => ({ matchAndReply: autoReply }));
 vi.mock('../services/activity-mileage.js', () => ({ awardActivityMileage: mileage }));
 vi.mock('../services/event-bus.js', () => ({
-  fireEvent: vi.fn().mockResolvedValue(undefined),
+  fireEvent: fire,
   logOutgoingMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -160,6 +161,14 @@ describe('N-024 LINE送信取消', () => {
     const checkpoints=JSON.stringify(db.raw.prepare("SELECT input_json FROM workflow_steps WHERE subject_id='missing-payload' AND step_key='__run'").all());
     expect(checkpoints).not.toContain('人工の本文');
     expect(checkpoints).not.toContain('reply-missing-payload');
+  });
+
+  it('IN-C01: 停止した統括の初回追加も出来事時刻を保持する',async()=>{
+    db.raw.exec("UPDATE tenants SET status='suspended' WHERE id='tenant-1'; DELETE FROM friends WHERE id='friend-a'");
+    lineClient.getProfile.mockResolvedValue({displayName:'人工ユーザー'});
+    await postEvent(db,'a',{...base('a','stopped-follow',1_700_000_002_000),type:'follow',replyToken:'fake'});
+    await postEvent(db,'a',{...base('a','stopped-new-unfollow',1_700_000_003_000),type:'unfollow'});
+    expect(db.raw.prepare("SELECT is_following,last_followed_at FROM friends WHERE line_user_id='U-a'").get()).toEqual({is_following:0,last_followed_at:'2023-11-15T07:13:22.000+09:00'});
   });
 
   it('IN-C01: 新しい解除のあとに古い追加が届いてもブロックを戻さない', async () => {
