@@ -174,7 +174,7 @@ export default function OpsKnowledgeV8() {
             })}
           </div>
         )}
-        {ready && total > PAGE ? (
+        {ready && total > 0 ? (
           <Pagination page={Math.floor(offset / PAGE) + 1} pageCount={Math.ceil(total / PAGE)} onPageChange={(next) => setOffset((next - 1) * PAGE)} />
         ) : null}
       </div>
