@@ -66,7 +66,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: () => {}, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
@@ -304,8 +304,11 @@ describe('質問テンプレート画面のstaffゲート (N-144)', () => {
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
 
-    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存して公開' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '質問テンプレートの説明' }))
     expect(screen.getByText('質問テンプレートの作成・変更はオーナーと管理者だけができます')).toBeTruthy()
-    expect(screen.getByText('一覧へ戻る')).toBeTruthy()
+    expect(screen.getByText('一覧で中身を確認できます。')).toBeTruthy()
   })
 })

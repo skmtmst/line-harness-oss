@@ -268,6 +268,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
             <section className={te.sideCard}>
               <h2 className={te.sideTitle}>この質問を使う場所</h2>
               <p className={te.sideText}>{id ? `使用先 ${usageCount}か所` : '保存すると、一斉配信・シナリオから選べます。'}</p>
+              {host ? null : <p className={te.sideText}><Link href="/scenarios">シナリオで使う</Link></p>}
             </section>
             <h2 className={te.previewHead}>届き方</h2>
             <div className={te.phone}>{phone}</div>

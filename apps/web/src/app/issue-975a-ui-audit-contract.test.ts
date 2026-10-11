@@ -87,7 +87,7 @@ describe('U057: 質問テンプレートの置き場は1つの選択だけ', () 
     expect(page).not.toContain('datalist')
     expect(page).not.toContain('question-template-folders')
     // 置き場の選択肢だけが残る。
-    expect(page).toContain('aria-label="置き場"')
+    expect(page).toContain('aria-label="フォルダ"')
     // 置き場を選ぶと保存値（category）へも同じ名前を入れる。
     expect(page).toContain('setCategory(folders.find')
   })

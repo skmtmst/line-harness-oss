@@ -9,7 +9,7 @@ const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 const CAROUSEL = fs.readFileSync(path.join(__dirname, 'carousel/page.tsx'), 'utf8')
   + fs.readFileSync(path.join(__dirname, 'carousel/carousel-core.ts'), 'utf8')
 const QUESTION_NEW = fs.readFileSync(
-  path.join(__dirname, 'questions/new/page.tsx'),
+  path.join(__dirname, '../../v8/templates/question-new.tsx'),
   'utf8',
 )
 const ASSET_EDITOR = fs.readFileSync(
@@ -39,7 +39,7 @@ describe('点検・中: テンプレートの画面契約', () => {
 
   it('中5: 3つの作成・更新画面は置き場を選んでfolderIdを送る', () => {
     for (const page of [EDIT, CAROUSEL, QUESTION_NEW]) {
-      expect(page).toContain('置き場')
+      expect(page).toMatch(/置き場|フォルダ/)
       expect(page).toContain('folderId')
       expect(page).toContain("api.folders.list('template',")
     }

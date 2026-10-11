@@ -87,7 +87,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: () => {}, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
