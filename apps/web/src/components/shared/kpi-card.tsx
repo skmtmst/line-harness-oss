@@ -185,6 +185,7 @@ export default function KpiCard({
           全文は title で読めるようにする（読み上げは変わらない）。
         */}
         <p
+          data-kpi-label
           className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}
           title={title || undefined}
         >

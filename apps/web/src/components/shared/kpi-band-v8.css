@@ -103,3 +103,9 @@ html[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band']:not([data-k
   --tpl-band-cell-pad-side: var(--tpl-list-inset);
   --tpl-band-cell-gap: var(--space-8);
 }
+
+/* 題の文字も帯が持つ。画面側の本文サイズを継承させない。 */
+html[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] {
+  font-size: var(--text-caption);
+  line-height: 18px;
+}
