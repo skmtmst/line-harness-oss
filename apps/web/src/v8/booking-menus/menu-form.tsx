@@ -1197,7 +1197,7 @@ export default function MenuFormV8() {
                   ]}
                 /></SaveErrorField>
               )}
-              {unavailableTag && <Notice tone="warn">設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。</Notice>}
+              {unavailableTag && <Notice tone="warn" role="alert">設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。</Notice>}
               <div className={styles.toggleLineLead}>
                 <SaveErrorField names={["askQuestion","ask_question"]}><SettingCheckbox
                   label="予約するときに質問を出す"
