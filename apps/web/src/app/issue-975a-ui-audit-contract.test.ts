@@ -54,10 +54,10 @@ describe('U054: 作成画面の余白を二重に取らない', () => {
     const page = read('analytics/reports/new/page.tsx')
     expect(page).toContain('rounded-card border p-4 sm:p-6')
   })
-  it('U054の解決に共有部品（CreatePage）は触らない', () => {
-    // shared/ は Claude 所有領域。画面側の局所解決だけで直す。
+  it('共通の保存処理はV8の型へ入力を渡し、外側の余白を足さない', () => {
     const shared = read('../components/shared/create-page.tsx')
-    expect(shared).toContain("'rounded-card space-y-5 p-6'")
+    expect(shared).toContain('<CreateTemplate')
+    expect(shared).not.toContain('space-y-5 p-6')
   })
 })
 

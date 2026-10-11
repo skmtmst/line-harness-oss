@@ -13,7 +13,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
  * 足すときも同じ形にし、欄ごとの手書き検査を増やさない。
  */
 const WIRED = [
-  'app/staff/new/page.tsx',
+  'v8/settings/staff/create.tsx',
 ]
 
 describe('blur検証の配線（★V7 sTJsh §6）', () => {

@@ -100,7 +100,7 @@ shared-button-importer app/settings/manual-links/manual-links-v8.tsx
 shared-button-importer app/staff/email-change/page.tsx
 shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/users/users-v8.tsx
-shared-button-importer app/webhooks/edit/page.tsx
+shared-button-importer v8/webhooks/edit.tsx
 shared-button-importer app/webinars/published/page.tsx
 shared-button-importer components/accounts/account-edit-modal.tsx
 shared-button-importer components/accounts/account-ordering.tsx

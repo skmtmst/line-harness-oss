@@ -45,7 +45,7 @@ async function fillBasics() {
     expect(screen.getByLabelText('最初に表示するアカウント')).toBeTruthy()
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: /スタッフ/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /スタッフ/ }))
     fireEvent.change(screen.getByLabelText(/名前/), { target: { value: '承認担当' } })
     fireEvent.change(screen.getByLabelText(/メールアドレス/), { target: { value: 'approve@example.test' } })
     fireEvent.click(screen.getByLabelText('最初に表示するアカウント'))
