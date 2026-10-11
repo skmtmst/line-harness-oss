@@ -1301,10 +1301,13 @@ function EditCommonVarV8Inner() {
           ) : deleteImpact ? (
             <>
               <p className={deleteImpact.blockingTotal > 0 ? styles.fieldError : styles.fieldHint}>
-                {deleteImpact.blockingTotal > 0
+                {deleteImpact.unavailableReferences?.length
+                  ? 'まだ数えられていない使用先があります。読み直してから確認してください。'
+                  : deleteImpact.blockingTotal > 0
                   ? `いま${deleteImpact.blockingTotal}か所で使われています。一覧の削除の窓から差し替えてください。`
                   : '使っている設定はありません。'}
               </p>
+              {deleteImpact.unavailableReferences?.map((reference) => <p key={reference.kind} className={styles.fieldHint}>{reference.kindLabel}：{reference.reason}</p>)}
               <Field label="消した理由" required><SaveErrorField names={["deleteReason","delete_reason"]}><input
                   value={deleteReason}
                   onChange={(event) => setDeleteReason(event.target.value)}

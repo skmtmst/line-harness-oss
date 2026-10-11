@@ -937,6 +937,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onRenamePage={renameSection}
             onDuplicatePage={duplicateSection}
             onRemovePage={removeSection}
+            canUndoPageRemoval
             onSelectBlock={setSelectedBlockId}
             onAddBlock={addBlock}
             onPatchBlock={patchBlock}
