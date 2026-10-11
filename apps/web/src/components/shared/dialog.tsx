@@ -51,6 +51,14 @@ export type DialogProps = {
   footerLeadFlexible?: boolean
   /** 題の隣の補足。ほかの窓の題の並びは変えない。 */
   titleHelp?: ReactNode
+  /** 題の下に小さく置く補足（絵の窓の頭が題＋1行のとき）。渡さないときは今までどおり出ない。 */
+  titleNote?: ReactNode
+  /*
+   * ★V8：題の段の形を絵の値にする。渡さない窓は今までどおり（上そろえ・間8・太さ600）。
+   * `'mark'`：絵（dgeTy・XCVGd）の確認の窓のように、左の丸い印と題を縦の中央でそろえ、
+   * 間を 12 にして題を 18/700 にする。
+   */
+  designTitleRow?: 'mark'
   /** 段の帯を使わず続ける窓（hadfk）、またはアカウントの窓の余白。既定の窓は変えない。 */
   layout?: 'continuous' | 'account-inset'
   /** 手順の帯。本文のスクロールから独立させる。 */
@@ -126,6 +134,8 @@ export default function Dialog({
   footerDivider = true,
   footerLeadFlexible = true,
   titleHelp,
+  titleNote,
+  designTitleRow,
   layout,
   steps,
   stepKey,
@@ -236,6 +246,7 @@ export default function Dialog({
     <>
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
       {titlePart}
+      {titleNote ? <p className={styles.titleNote}>{titleNote}</p> : null}
       {designLayout === 'stacked' ? null : descriptionNode}
     </>
   )
@@ -265,6 +276,7 @@ export default function Dialog({
       data-design-header-padding={designHeaderPadding ? '' : undefined}
       data-design-header-height={designHeaderHeight ? '' : undefined}
       data-design-content-padding={designContentPadding ? '' : undefined}
+      data-design-title-row={designTitleRow}
       style={({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
         '--dialog-design-width': `${widthPreset === 'picker' ? 640 : dialogWidth((designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth) ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,

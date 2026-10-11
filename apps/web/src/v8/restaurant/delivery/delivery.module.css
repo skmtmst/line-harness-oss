@@ -4,35 +4,45 @@
  * ここで新しい色・新しい寸法を作らない（飲食店向けの板は Googleビジネスと同じ器）。
  */
 
-/* 頭の右の操作（品切れ一括設定・受付を一括停止）。 */
+/* 頭の右の操作（品切れ一括設定・受付を一括停止）。絵は操作の間を 12 で描く。 */
 .headActions {
   display: flex;
   align-items: center;
-  gap: var(--tpl-rt-dlv-gap);
+  gap: var(--tpl-rt-action-gap);
 }
 
-/* 自動更新の印。読み直した時刻を必ず添える（古い数字を今の数字と見間違えないため）。 */
+/*
+ * 自動更新の印。読み直した時刻を必ず添える（古い数字を今の数字と見間違えないため）。
+ * 絵（kDQHr の更新の行）は印と字の間を 6 で描く。
+ */
 .refreshRow {
   display: flex;
   align-items: center;
-  gap: var(--tpl-rt-dlv-gap);
+  gap: var(--tpl-rt-dlv-act-gap);
   min-width: 0;
 }
 
+/*
+ * 補足の文。絵は kDQHr の更新の注・kDQHr と OzHLO の表の足（「33件中 1〜7件を表示」）を
+ * どれも 12/18/500 で描いている（2026-10-11 実測）。行の高さを決めずにいると 14 になり、
+ * 絵より 2 詰まる。
+ */
 .muted {
   margin: 0;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  line-height: normal;
+  line-height: var(--tpl-rt-dlv-note-lh);
+  font-weight: var(--tpl-rt-dlv-note-weight);
 }
 
 .spacer {
   flex: 1 1 0;
 }
 
-.icon13 {
-  width: var(--tpl-rt-icon-13);
-  height: var(--tpl-rt-icon-13);
+/* 更新の印（絵 `CjYcP`）は 14 角。ここだけで使う印。 */
+.refreshIcon {
+  width: var(--tpl-rt-dlv-refresh-icon);
+  height: var(--tpl-rt-dlv-refresh-icon);
   flex-shrink: 0;
 }
 
@@ -52,23 +62,22 @@
   }
 }
 
-/* 数の帯の「…」。共通の帯に合わせ、線も影も重ねない（他の★V8の板と同じ書き方）。 */
+/*
+ * 数の帯の「…」。線も地も無い見た目は共通の「…」が持っている
+ * （RowMenu の appearance="plain"）。ここでは絵の大きさ（16角）だけを決める。
+ * RowMenu の className は「大きさを絵に合わせる」ために用意された口なので、
+ * 枠・地・影を画面から消し直さない（docs/v8-design-rules.md §部品の見た目）。
+ */
 .kpiMenu {
   display: inline-flex;
   align-items: center;
   height: var(--tpl-nph-kpi-menu);
 }
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
+.kpiMenuButton {
   width: var(--tpl-nph-kpi-menu);
   height: var(--tpl-nph-kpi-menu);
   min-height: 0;
   flex-basis: var(--tpl-nph-kpi-menu);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) {
-  outline-color: transparent;
 }
 
 .stateBox {
@@ -205,58 +214,31 @@
 }
 
 /*
- * 注文一覧（kDQHr）の段の取り方（2026-10-10 実測）。
- *
- * 絵と画面の入れ物をそのまま測ると、上の方（道しるべ・題・説明・サービスの札）は
- * ほぼ0ずれなのに、数の帯から下だけが 6 → 7 → 27px と下へずれていた。
- * 内訳は次のとおりで、どれも「段と段の間」の差が積み上がったもの。
- *   絵: 中身の上12・段の間12・表の前だけ0
- *   画面: 共通の器（CHz31）が上16・段の間16で、表の前にも16
- * 器（restaurant/common-a/frame.module.css）は他の飲食店の画面と同じ物なので触らず、
- * この板の中だけ上書きする。目印は中の表の `data-design`。
- *
- * 上を14にしているのは、画面の見出しの塊が絵より2px低く（55対57）、
- * 12のままだと帯も数の帯も2px上がってしまうため。14でサービスの帯161・
- * 数の帯247が絵と同じ位置になり、タブ377（絵380）・表の見出し412（絵411）に収まる。
+ * 絵では表がタブの段にくっついている（間0）。器の段の間（この板では12）が
+ * 入らないように、タブ・選んだ数の帯・表をこの塊でまとめて自分で並べる。
+ * 選んだ数の帯は絵に無い（選んだときだけ出る）ので、上下に12だけあける。
  */
-div:has(> .table table[data-design='kDQHr']) {
-  padding-top: 14px;
-  gap: 12px;
+.tabTableGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
 }
 
-/* 絵では表がタブの段にくっついている（間0）。上で入れた間12を打ち消す。 */
-.table:has(table[data-design='kDQHr']) {
-  margin-top: -12px;
+.tabTableGroup > .selectBar {
+  margin-block: 12px;
 }
 
 /*
- * 注文履歴（OzHLO）と品切れ一括設定（h7OeT）の段の取り方（2026-10-10 実測）。
- *
- * この2枚は中身が丸ごと下へずれていた（履歴 +15〜18px、品切れ +6〜13px）。
- * 中身どうしの間隔は絵と同じで、始まりの位置だけが違う。
- *   絵（履歴）: 板の頭が 60〜141、集計の札の中身が 145。頭の下4しかあけていない。
- *   絵（品切れ）: 板の頭の下に、まとめての帯の中身が 151。
- *   画面: 共通の器（CHz31）が上16なので、頭の下12＋16＝28あいて 163 から始まる。
- * 器は他の飲食店の画面と同じ物なので触らず、この板の中だけ上書きする。
- * 画面の頭の塊は絵より6px高い（22pxの題・55 対 18pxの題・49）ので、
- * 上0で集計の札147（絵145）・表の見出し249（絵247）、
- * 上4でまとめての帯の文字157（絵156）・表の見出し199（絵201）と、どれも4px以内に入る。
+ * 品切れ一括設定（h7OeT）の帯だけ、板の頭にぴたりと付ける。
+ * 絵では 板の頭(y81で終わり)→帯(y81から) の間が0で、帯の高さ48のあと12あけて
+ * 表の見出し(y141)が来る。板の段の間は12なので、帯の上の12を打ち消すと
+ * 絵と同じ 0＋48＋12＝60 になる（下の12は板の段の間がそのまま使える）。
+ * 以前は帯が高さ32のままで4px足りず、表を4px下げて埋めていた。
+ * 帯を絵どおり48にしたので、その埋め合わせは要らなくなった（2026-10-11 実測）。
  */
-div:has(> .table table[data-design='OzHLO']) {
-  padding-top: 0;
-}
-
-div:has(> .table table[data-design='h7OeT']) {
-  padding-top: 4px;
-}
-
-/*
- * 品切れ一括設定だけ、表をもう4px下げる。
- * 絵のまとめての帯は高さ48だが画面の帯は32で、共通の間16ではその差を埋めきらない。
- * そのぶん表が4px上に出るので、ここで戻す（見出し210→214・絵213、1行目も4px以内）。
- */
-.table:has(table[data-design='h7OeT']) {
-  margin-top: 4px;
+.selectBarFlush {
+  margin-top: calc(var(--tpl-rt-dlv-card-gap) * -1);
 }
 
 .th {
@@ -264,69 +246,11 @@ div:has(> .table table[data-design='h7OeT']) {
 }
 
 /*
- * 端の欄の外側の余白を取り消す（2026-10-10 実測の直し）。
- *
- * 絵も画面も、表の中身の左端は同じ 264px から始まっている（題・集計の札はどれも0ずれ）。
- * それでも表の中だけが「前半＋24・後半−24」ずれていた。原因は、板がすでに付けている
- * 外側の余白を、共通の表が端の欄でもう一度 24 付けていたこと（左右で合計48の二重取り）。
- * 使える幅が 264〜1404 から 288〜1380 に縮み、前半の列が右へ、後半の列が左へ寄っていた。
- *
- * ここで端の外側だけ 0 にして、その 24 は列の幅へ戻す（globals.css の kc/oc/hc）。
- * 共通部品（table.module.css・data-table.module.css）は `@layer components` の中にあり、
- * この files は層に入っていないので、細かさに関係なくこちらが勝つ。だから共通側は触らない。
- * 欄の間（片側8）はそのまま。絵の欄の間16と同じ。
- *
- * 行が1つの欄だけのとき（読み込み中・0件の案内）は最初と最後が同じ欄なので、
- * そこは両側とも残す（案内の文字が左端に張り付かないように）。
+ * 端の欄の余白・行の高さ・欄の中身のそろえ（2026-10-10 実測）は、画面CSSからの
+ * 上書きをやめて共通の表の受け口へ移した（presentation="delivery"）。
+ * 値とその根拠は data-table.module.css の
+ * `[data-theme='v8'] .frame[data-table-presentation='delivery']` にある。
  */
-.table table thead .th:first-child:not(:last-child),
-.table table tbody td:first-child:not(:last-child) {
-  padding-left: 0;
-}
-
-.table table thead .th:last-child:not(:first-child),
-.table table tbody td:last-child:not(:first-child) {
-  padding-right: 0;
-}
-
-/*
- * 行の高さを絵に合わせる（2026-10-10 実測でやり直した）。
- *
- * 絵の行は「上下の余白12＋中身＋下の線1」で、中身の高さは行ごとに違う。
- * 絵（kDQHr）の実測の行の間は 53・53・53・53・50・47 で、全部同じではない。
- * ボタンのある行は 12+28+12+1＝53、札だけの行は 12+22+12+1＝47。
- * だから1つの決め打ちの高さではどの表も合わない（前の回に 53 を入れて外した）。
- *
- * 共通部品は高さを決め打ちしている（data-table.module.css の
- * `[data-theme='v8'] .row` が 52px、濃さを詰めた形が 56px）。
- * ここでは高さを中身まかせ（auto）に戻し、絵の下の線1pxを下の余白へ足す。
- * 画面側の線は影（box-shadow）で引いていて場所を取らないので、足さないと1px足りない。
- * これで 行＝12＋中身＋13 になり、札だけの行は47、28pxのボタンの行は53と、
- * 絵の行ごとの違いがそのまま出る。
- */
-.table table tbody tr {
-  height: auto;
-}
-
-.table table tbody td {
-  padding-bottom: calc(var(--tpl-row-pad-block) + var(--tpl-rt-dlv-row-line));
-}
-
-/*
- * 札だけの行の1pxを落とす（2026-10-10 実測）。
- *
- * 共通の札は高さ22（status-badge の 字12×1.5＋上下2）で絵と同じなのに、
- * 欄の中身の高さが23になっていた。差の1pxは字の並びの決まりによるもので、
- * 札が「字の下そろえ（baseline）」で置かれるため、欄の見えない字の下の分だけ
- * 行がのびる。札そのものの高さではないので、札や共通部品は触らない。
- * 欄の中身を上そろえにすると中身の高さが22に戻り、行＝12+22+13＝47 と絵に合う。
- * どの欄も中身は1つだけなので、上そろえにしても中身同士のずれは起きない。
- * 字の大きさや行送りを変える直し方（line-height を0や1にする）でも47になったが、
- * 字の形そのものを変えてしまうため採らない。
- */
-.table table tbody td > * {
-  vertical-align: top;
-}
 
 /*
  * 注文一覧（kDQHr）の列の幅。
@@ -337,6 +261,11 @@ div:has(> .table table[data-design='h7OeT']) {
  *
  * ここは割合で置く。狭い画面でも表が器より広くならないため。
  * 絵の実寸は下の「広い画面」で入れる。
+ *
+ * これは共通部品の上書きではない。幅を書いているのは画面が付けた名前（`.th`）で、
+ * 共通の表は `table-layout: fixed` のときに列の幅を決めていない（決めるのは画面の役目）。
+ * 共通側の受け口（`columns`）は表を格子に組み替える別の並べ方で、行の線・余白・札の
+ * 置き方まで変わるため、承認 v02 の見え方とは合わない。
  */
 .table table[data-design='kDQHr'] thead .th:nth-child(1) { width: var(--tpl-rt-dlv-col-select); }
 .table table[data-design='kDQHr'] thead .th:nth-child(2) { width: 9.5%; }
@@ -423,10 +352,6 @@ div:has(> .table table[data-design='h7OeT']) {
   .table table[data-design='h7OeT'] thead:not(:has(.th:nth-child(5))) .th:nth-child(4) { width: var(--tpl-rt-dlv-hc5); }
 }
 
-.td {
-  vertical-align: middle;
-}
-
 .orderNumber {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -473,12 +398,9 @@ div:has(> .table table[data-design='h7OeT']) {
 }
 
 /*
- * 絵（kDQHr）の急ぎ度の札は印と字のすき間が3px（印 x=8・字 x=23 で幅56）。
- * 共通の札は点のために5pxなので、この画面だけ詰める。
+ * 札の中のすき間（点6＋間5／印12＋間3）は共通の札の `size="delivery"` が持つ
+ * （status-badge.module.css）。画面CSSから共通の札を削る書き方は★V8 §24で禁止。
  */
-.urgencyBadge {
-  gap: 3px;
-}
 
 /* 絵（kDQHr）の「操作」は左そろえ。右そろえだと狭い幅で右端から出る。 */
 .rowActions {
@@ -489,41 +411,13 @@ div:has(> .table table[data-design='h7OeT']) {
 }
 
 /*
- * 行の中のボタンを絵（kDQHr）の寸法に合わせる（2026-10-10 絵の実寸を読み直した）。
- *
- * 絵の実寸（`HYOW5` 受け付ける・`AuCyJ` 拒否・`WvPd6` 準備完了）は
- * 高さ28・左右の余白10・字12の太字・角丸8。共通のボタンの既定は
- * 字14・左右の余白13・高さ32（`size="compact"`）で、どれも絵と違っていた。
- * 前の回は「絵は字13・余白8」「高さ32は共通のまま」と書いていたが、両方まちがい。
- * 高さが32だと行が 12+32+12＝56 になり、絵の 53・50・47 と合わない（実測で出た差）。
- *
- * 共通部品の button.module.css は他の画面も使うので触らず、この板の中だけで上書きする。
- *
- * 高さは `height` だけでは下がらない。画面の実測（2026-10-10）では
- * 字12・余白10は効いていたのに高さだけ32のままで、行が57になっていた。
- * 理由は globals.css の全ボタン共通の下限
- * `@layer base { button:not([role="switch"]) { min-height: 32px } }`。
- * `min-height` は `height` より強いので、こちらも `min-height` で下限を28へ下げる。
- * 部品の CSS Module は層に属さないため、層の中の規定より常に強い。
- * 前の回は「触る端末の44pxは共通側が持つから大丈夫」と書いていたが、これもまちがい。
- * その44pxも同じ `@layer base` と共通部品の層の中にあるので、ここの下限に負けてしまう。
- * だから指で押す端末の当たり判定は、下のとおりこの板で明示して戻す（#976 U083）。
+ * 行の中のボタンの寸法（高さ28・左右の余白10・字12・角丸8。2026-10-10 実測）は、
+ * 画面CSSから共通のボタンを上書きするのをやめ、共通側の受け口へ移した
+ * （`size="delivery-row"`）。値とその根拠は button.module.css の
+ * `[data-theme='v8'] .button.delivery-row` にある。
+ * 字だけの「詳細」は共通の `variant="text" size="inline"` がそのまま絵と同じなので、
+ * 寸法を戻す上書きも要らなくなった。
  */
-.rowActions button {
-  height: var(--tpl-rt-dlv-act-h);
-  min-height: var(--tpl-rt-dlv-act-h);
-  padding: var(--tpl-rt-dlv-act-pad);
-  border-radius: var(--tpl-rt-dlv-act-radius);
-  font-size: var(--tpl-rt-dlv-act-size);
-  line-height: var(--tpl-rt-dlv-act-lh);
-}
-
-/* 指で押す端末の当たり判定44pxを戻す（上の下限28で共通側の規定を上書きしたため）。 */
-@media (pointer: coarse) {
-  .rowActions button {
-    min-height: 44px;
-  }
-}
 
 /*
  * 絵（kDQHr `WvPd6`・`jEsnn`）の「準備完了」は白地・灰の細枠で、字だけが緑（#087a3e）。
@@ -537,23 +431,6 @@ div:has(> .table table[data-design='h7OeT']) {
 /* 絵（kDQHr `HKAi1`）の「拒否」の字は #4a5565（本文より淡い方）。 */
 .rowActionReject {
   color: var(--color-ink-secondary);
-}
-
-/*
- * 絵（kDQHr `SdVq6`）の「詳細」は枠も地色も無い青（#0b63ce）の字だけ。
- * 共通の `variant="text" size="inline"` が
- * `[data-theme='v8'] .button.inline.text` で 字12・太字600・枠なし・色 --color-action になり、
- * 絵とそのまま同じなので寸法の上書きは要らない。上の `.rowActions button` の高さ28は
- * 字だけのこのボタンには付けない（`inline` は高さを中身まかせにしている）。
- * 下限も0へ戻す。上の規定で下限28を入れたため、ここで消さないと字だけのボタンが28へ伸びる。
- * この書き方（`.rowActions button.rowActionLink`）は上の規定より強いので、
- * 指で押す端末の規定にも勝ち、絵のとおり字の高さ（約17px）のままになる。
- */
-.rowActions button.rowActionLink {
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  border-radius: 0;
 }
 
 .srOnly {
@@ -584,30 +461,84 @@ div:has(> .table table[data-design='h7OeT']) {
   flex-wrap: wrap;
 }
 
+/*
+ * 札行の注文番号（絵 hjdqV）。絵は 14 の太字で幅 69・高さ 20。
+ * `.orderNumber` は表（注文一覧・注文履歴）とも使うので大きさを持たせていない。
+ * 窓の中だけ字が窓の既定の 16 を受け取ってしまい、幅が 74 になって
+ * 右のサービス・状態・急ぎの札を 5〜14 押していたので、ここでだけ絵の値に戻す。
+ */
+.detailHead .orderNumber {
+  font-size: var(--text-callout);
+  font-weight: 700;
+  line-height: var(--tpl-rs-lh-14);
+}
+
+/*
+ * 受け取り情報の表（絵 hjdqV）。題は x464・値は x586 なので、
+ * 左の列は 110＋間 12 で 122 にする。段は「文字 20＋下 6＋線 1＋間 6」で 33 ずつ下がる
+ * （絵 540→573→606）。最後の段には線を引かない。
+ */
 .detailFacts {
   display: grid;
-  grid-template-columns: var(--tpl-rt-col-96) minmax(0, 1fr);
+  grid-template-columns: var(--tpl-rt-dlv-fact-key) minmax(0, 1fr);
   gap: var(--tpl-rt-payload-gap) var(--tpl-rt-dlv-card-gap);
+  /*
+   * 絵は「受け取り情報」の題の文字から最初の段の文字まで 25。題の行が 20 なので間は 5 で、
+   * 共通の欄の任意の引数 contentGap={5}（order-detail.tsx）で渡す。ここでは足さない。
+   */
   margin: 0;
 }
 
-.factKey {
+.factKey,
+.factValue {
   margin: 0;
+  padding-bottom: var(--tpl-rt-payload-gap);
+  border-bottom: 1px solid var(--color-divider);
+  line-height: var(--tpl-rs-lh-14);
+}
+
+/* 最後の段（題と値の 2 つ）は線で区切らない。 */
+.detailFacts > :nth-last-child(-n + 2) {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+/* 絵の題は 12・値は 13。太さは決まりの文字の段（ラベル 12/500・本文 13/400）に合わせる。 */
+.factKey {
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
+  font-weight: 500;
 }
 
 .factValue {
-  margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-caption);
+  font-size: var(--text-body);
   overflow-wrap: anywhere;
 }
 
+/*
+ * 確認の窓（絵 dgeTy・XCVGd）の先頭の一文。
+ * 絵では段の区切りを窓の段の間だけで取るので、受け取り情報の段と違い
+ * 下の余白と線を持たない（持つと次の欄の題が 6 下がる）。
+ */
+.dialogLead {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-rs-lh-14);
+  overflow-wrap: anywhere;
+}
+
+/*
+ * 注文内容の品目（絵 hjdqV）。1 行ずつ下に線を引き、上下に 10 の余白を取る。
+ * 絵は品名だけの行が 41（10＋20＋10＋線 1）、補足つきの行が 61（10＋20＋2＋18＋10＋線 1）。
+ * 題の文字から最初の品名まで 28（題の行 20＋間 8）。間は共通の欄の任意の引数
+ * contentGap={8}（order-detail.tsx）で渡すので、ここでは足さない。
+ */
 .itemList {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-rt-payload-gap);
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -615,44 +546,99 @@ div:has(> .table table[data-design='h7OeT']) {
 
 .itemRow {
   display: flex;
-  align-items: baseline;
-  gap: var(--tpl-rt-dlv-gap);
+  align-items: center;
+  gap: 0;
   min-width: 0;
+  padding-bottom: var(--tpl-rt-dlv-item-pad);
+  border-bottom: 1px solid var(--color-divider);
 }
 
+.itemRow + .itemRow {
+  padding-top: var(--tpl-rt-dlv-item-pad);
+}
+
+/* 合計の前の線だけは絵のとおり濃い線（#dadde2）。 */
+.itemList > .itemRow:last-child {
+  border-bottom-color: var(--color-hairline);
+}
+
+/* 品名・数量・金額は絵のとおり本文の 13（決まりの文字の段も本文は 13）。補足だけ 12。 */
 .itemName {
   flex: 1 1 auto;
   min-width: 0;
+  padding-right: var(--tpl-rt-dlv-gap);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-14);
   overflow-wrap: anywhere;
 }
 
 .itemNote {
   display: block;
+  margin-top: var(--tpl-rt-dlv-note-gap);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
+  font-weight: 400;
+  /* 絵の補足は高さ 18（y355-373）。共通の 12px の行の高さ 17 では補足つきの行が 60 になる。 */
+  line-height: var(--tpl-rt-dlv-note-lh);
   overflow-wrap: anywhere;
 }
 
+/*
+ * 数量と金額は離れた 2 つの右寄せの列（絵は右端が 884 と 976）。
+ * 金額の列を 92 にすると、数量の右端が絵と同じ 884 になる。
+ */
 .itemQty,
 .itemAmount {
+  font-size: var(--text-body);
   font-variant-numeric: tabular-nums;
+  line-height: var(--tpl-rs-lh-14);
+  text-align: right;
   white-space: nowrap;
 }
 
-.total {
-  display: flex;
-  align-items: baseline;
-  gap: var(--tpl-rt-dlv-gap);
-  padding-top: var(--tpl-rt-dlv-total-pad-top);
-  border-top: 1px solid var(--card-edge);
+.itemQty {
+  flex: 0 0 var(--tpl-rt-dlv-item-qty);
+  font-weight: 500;
+}
+
+.itemAmount {
+  flex: 0 0 var(--tpl-rt-dlv-item-amount);
   font-weight: 600;
 }
 
-/* h7OeT の選択の帯（選択中の数と、まとめて送る操作）。 */
+/* 合計の段。区切りの線は最後の品目の行が持つのでここでは引かない。 */
+.total {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding-top: var(--tpl-rt-dlv-total-pad-top);
+}
+
+.total .itemName,
+.total .itemAmount {
+  font-weight: 700;
+}
+
+.total .itemAmount {
+  font-size: var(--tpl-rt-dlv-total-amount);
+  line-height: var(--tpl-rt-dlv-total-lh);
+}
+
+/*
+ * 選択の帯（選択中の数と、まとめて送る操作）。
+ * 絵（h7OeT の `P3rcI`）は 幅いっぱい・高さ48・内側10/16・中身の間10・
+ * 角丸はカードと同じ・地色は真珠色の一枚帯で、中のボタンは高さ28（2026-10-11 実測）。
+ * 注文一覧（kDQHr）の帯は絵に無い（選んだときだけ出る）ので、同じ見た目をそろえて使う。
+ */
 .selectBar {
   display: flex;
   align-items: center;
-  gap: var(--tpl-rt-dlv-gap);
+  gap: var(--tpl-rt-dlv-bulk-gap);
+  min-height: var(--tpl-rt-dlv-bulk-h);
+  padding: var(--tpl-rt-dlv-bulk-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-pearl);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -696,8 +682,13 @@ div:has(> .table table[data-design='h7OeT']) {
 
 /*
  * 絵（OzHLO `ZuE0v`）の集計の帯。枠付きの札を4枚（合計＋サービス3つ）横に並べる。
- * 共通の KpiCard は札どうしをつないだ1枚の帯に見せる形で、絵の「別々の枠・色の付いた札・
- * 3行目なし」にできないため、ここは絵のとおり作る（共通部品は他の板のままにする）。
+ * 共通の KpiCard は3行目（detail）が必須で、KpiBand は札どうしをつないだ1枚の帯しか
+ * 作れない（kpi-band.tsx の説明のとおり隙間0・右線・帯の上下線）。絵の「別々の枠・
+ * 色の付いた札・3行目なし」にはできず、他の板が使っている共通部品の形を変えることに
+ * なるため、ここは画面側の箱として絵のとおり作る。共通部品の宣言を画面から
+ * 上書きしているのではない（共通部品への画面からの上書きは設計ルール§2どおり入れていない）。
+ * 線で区切る数の帯なのでカードの影は付けない（B-153）。同じ理由の先例に合わせて
+ * card-shape-contract.test.ts の除外へ `.sumCard` を1規則だけ加えている。
  * 高さは中身から決まる（余白14＋頭18＋間8＋金額28＋余白14＝82、札の頭22なら86）。
  */
 .sumRow {
@@ -732,16 +723,10 @@ div:has(> .table table[data-design='h7OeT']) {
   white-space: nowrap;
 }
 
-/* 題と件数（札と印）の間を埋める細い線（絵の 1px の区切り）。集計の札と停止の札で使う。 */
-.fillLine {
-  flex: 1 1 auto;
-  min-width: 8px;
-  height: 1px;
-  background: var(--color-hairline);
-}
-
 .sumCount {
   flex-shrink: 0;
+  /* 細い横線を置かずに右端へ寄せる（絵 ZuE0v に線は無い）。 */
+  margin-left: auto;
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
   font-weight: 600;
@@ -758,11 +743,10 @@ div:has(> .table table[data-design='h7OeT']) {
 }
 
 /*
- * 絵（dgeTy・XCVGd）の確認の窓の頭は白地で、題は 16/700。左の丸い印の中身は
- * 絵ごとに違う（dgeTy は注意三角、XCVGd は一時停止の印）。印の地色と大きさは同じ。
- * 共通の窓は危険な操作のとき頭を桃色の帯で囲むので、`plainTitle` で帯を外し、
- * 題の段の形だけをここで絵に合わせる（共通部品 dialog は他の板でも使うため触らない）。
- * 共通部品に目印の印が無いので、この印（.warnMark）を手がかりに段をたどる。
+ * 絵（dgeTy・XCVGd）の確認の窓の頭は白地で、左に丸い印が付く。中身は絵ごとに違う
+ * （dgeTy は注意三角、XCVGd は一時停止の印）が、印の地色と大きさは同じなのでここで持つ。
+ * 題の段の形（中央そろえ・間12・題 18/700）は共通の窓の任意の引数 `titleRow="mark"` に
+ * 移した。画面CSSから共通部品の見た目を上書きしない（設計ルール§2）。
  */
 .warnMark {
   display: inline-flex;
@@ -773,21 +757,6 @@ div:has(> .table table[data-design='h7OeT']) {
   border-radius: var(--radius-pill);
   background: var(--color-status-danger-soft);
   color: var(--color-danger);
-}
-
-/* 印と題を縦の中央でそろえ、間を 12 にする（左 24＋印 36＋間 12＝題 72）。 */
-:global([data-design-part='dialog']) div:has(> span:has(> .warnMark)) {
-  align-items: center;
-  gap: var(--tpl-rs-pair-gap);
-}
-
-:global([data-design-part='dialog']) span:has(> .warnMark) {
-  padding-top: 0;
-}
-
-:global([data-design-part='dialog']) div:has(> span:has(> .warnMark)) > h2 {
-  font-size: var(--text-lead);
-  font-weight: 700;
 }
 
 /*
@@ -839,6 +808,8 @@ div:has(> .table table[data-design='h7OeT']) {
 /* 札の右端の印（「停止する」／「対象外」）。 */
 .stopMark {
   flex-shrink: 0;
+  /* 細い横線を置かずに右端へ寄せる（絵 XCVGd に線は無い）。 */
+  margin-left: auto;
   color: var(--color-accent-deep);
   font-size: var(--text-caption);
   font-weight: 600;

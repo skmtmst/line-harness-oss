@@ -398,12 +398,94 @@ describe('承認v02の見え方を守る', () => {
     expect(css).toMatch(/\.serviceRow \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
   })
 
-  it('注文一覧（kDQHr）は絵の段（頭の下14・段の間12・表は間0）で置く', () => {
-    // 共通の器 CHz31 は上16・間16。絵は12・12で、表だけタブにくっつく（間0）。
-    expect(css).toMatch(
-      /div:has\(> \.table table\[data-design='kDQHr'\]\) \{[^}]*padding-top: 14px;[^}]*gap: 12px;/,
-    )
-    expect(css).toMatch(/\.table:has\(table\[data-design='kDQHr'\]\) \{[^}]*margin-top: -12px/)
+  it('3枚の中身の余白は器の任意の引数で渡す（絵 kDQHr 14/12・OzHLO 4・h7OeT 0）', () => {
+    // 共通の器 CHz31 は上16・段の間16。絵は板ごとに違うので、画面CSSから器を
+    // 上書きせず、RestaurantPage の bodyPadTop/bodyGap で板ごとに渡す。
+    const page = readFileSync(join(__dirname, 'delivery.tsx'), 'utf8')
+    expect(page).toMatch(/orders: \{ padTop: 14, gap: 12 \}/)
+    expect(page).toMatch(/history: \{ padTop: 4 \}/)
+    expect(page).toMatch(/'sold-out': \{ padTop: 0 \}/)
+    expect(page).toMatch(/bodyPadTop=\{VIEW_BODY\[view\]\.padTop\}/)
+    expect(page).toMatch(/bodyGap=\{VIEW_BODY\[view\]\.gap\}/)
+  })
+
+  it('3枚の板の頭も器の任意の引数で渡す（絵 上20・間4・説明は題の下）', () => {
+    // 絵は説明を題のすぐ下に 1 行で描き、「?」は描かない。共通の器の既定（上24・間8・
+    // 説明は HelpTip の中）は変えず、RestaurantPage の任意の引数で板ごとに渡す。
+    // 題は絵のとおり kDQHr 22/700/32・注文履歴と品切れ 18/700/27（正本の順位は 絵 > 決まりの板）。
+    const page = readFileSync(join(__dirname, 'delivery.tsx'), 'utf8')
+    expect(page).toMatch(/const HEAD_PAD_TOP = 20/)
+    expect(page).toMatch(/const HEAD_TEXT_GAP = 4/)
+    expect(page).toMatch(/orders: \{ descriptionSize: 'body' \}/)
+    expect(page).toMatch(/history: \{ titleSize: 'sub' \}/)
+    expect(page).toMatch(/'sold-out': \{ titleSize: 'sub' \}/)
+    expect(page).toMatch(/descriptionAs="text"/)
+    expect(page).toMatch(/headPadTop=\{HEAD_PAD_TOP\}/)
+    expect(page).toMatch(/headTextGap=\{HEAD_TEXT_GAP\}/)
+  })
+
+  it('注文一覧（kDQHr）の表はタブと同じ塊に入れて間0にする', () => {
+    // 絵は表がタブの段にくっついている。負の margin で引き戻すのではなく、
+    // タブ・選んだ数の帯・表を自分の塊（間0）にまとめる。
+    expect(css).toMatch(/\.tabTableGroup \{[^}]*gap: 0;/)
+    const orders = readFileSync(join(__dirname, 'orders.tsx'), 'utf8')
+    expect(orders).toMatch(/<div className=\{styles\.tabTableGroup\}>/)
+  })
+
+  it('共通部品の見た目を画面CSSから上書きしない', () => {
+    // 設計ルール「部品の見た目を画面側で上書きしない（直すときは部品を直す）」。
+    // 親の共通器へ :has で届く指定と、別の場所で出る共通の窓への指定を置かない。
+    expect(css).not.toMatch(/\bdiv:has\(/)
+    expect(css).not.toMatch(/\[data-design-part='dialog'\]/)
+  })
+
+  it('確認の窓の題の段は共通部品の任意の引数で絵に合わせる', () => {
+    // 絵（dgeTy・XCVGd）は印と題が縦の中央・間12・題 18/700。画面CSSで上書きせず、
+    // 共通の窓の titleRow="mark" を渡す。渡さない窓の既定（上そろえ・間8・600）は変えない。
+    expect(readFileSync(join(__dirname, 'order-detail.tsx'), 'utf8')).toMatch(/titleRow="mark"/)
+    expect(readFileSync(join(__dirname, 'bulk.tsx'), 'utf8')).toMatch(/titleRow="mark"/)
+    const shared = readFileSync(join(__dirname, '../../../components/shared/dialog.module.css'), 'utf8')
+    expect(shared).toMatch(/\[data-design-title-row='mark'\] \.titleRow \{[^}]*align-items: center;[^}]*gap: 12px;/)
+    expect(shared).toMatch(/\[data-design-title-row='mark'\] \.title \{[^}]*font-weight: 700;/)
+  })
+
+  it('注文詳細（hjdqV）の頭は題＋受信・希望の1行で、窓の上端は絵の100', () => {
+    /*
+     * 絵は窓が y100 から始まり、題の段が 77（上20＋題27＋間4＋補足18＋下8）。
+     * 補足の行は共通の窓の任意の引数 titleNote で出し、渡さない窓の並びは変えない。
+     */
+    const detail = readFileSync(join(__dirname, 'order-detail.tsx'), 'utf8')
+    expect(detail).toMatch(/const DETAIL_TOP = 100/)
+    expect(detail).toMatch(/const DETAIL_HEAD_H = 77/)
+    expect(detail).toMatch(/titleNote=\{summaryLine\}/)
+    expect(detail).toMatch(/headerHeight=\{DETAIL_HEAD_H\}/)
+    // 絵の下のボタンの段に線は無い。
+    expect(detail).toMatch(/footerPlain/)
+    const shared = readFileSync(join(__dirname, '../../../components/shared/dialog.module.css'), 'utf8')
+    expect(shared).toMatch(/\[data-theme='v8'\] \.titleNote \{[^}]*font-size: var\(--text-caption\)/)
+  })
+
+  it('注文詳細（hjdqV）の数量と金額は離れた2つの右寄せの列にする', () => {
+    // 絵の右端は 884 と 976。隣り合わせに並べると金額が数量にくっつく。
+    expect(css).toMatch(/\.itemQty \{[^}]*flex: 0 0 var\(--tpl-rt-dlv-item-qty\)/)
+    expect(css).toMatch(/\.itemAmount \{[^}]*flex: 0 0 var\(--tpl-rt-dlv-item-amount\)/)
+    expect(css).toMatch(/\.itemQty,\n\.itemAmount \{[^}]*text-align: right/)
+    // 列の間に余白を入れると数量の右端が絵からずれる。
+    expect(css).toMatch(/\.itemRow \{[^}]*gap: 0;/)
+  })
+
+  it('注文詳細（hjdqV）は品目と受け取り情報を1行ずつ線で区切る', () => {
+    /*
+     * 絵は品目の行（41／補足つき61）と受け取り情報の段（33）をどれも薄い線で区切り、
+     * 合計の前だけ濃い線。最後の段には線を引かない。
+     */
+    expect(css).toMatch(/\.itemRow \{[^}]*padding-bottom: var\(--tpl-rt-dlv-item-pad\);[^}]*border-bottom: 1px solid var\(--color-divider\)/)
+    expect(css).toMatch(/\.itemRow \+ \.itemRow \{\n  padding-top: var\(--tpl-rt-dlv-item-pad\);/)
+    expect(css).toMatch(/\.itemList > \.itemRow:last-child \{\n  border-bottom-color: var\(--color-hairline\);/)
+    expect(css).toMatch(/\.factKey,\n\.factValue \{[^}]*border-bottom: 1px solid var\(--color-divider\)/)
+    expect(css).toMatch(/\.detailFacts > :nth-last-child\(-n \+ 2\) \{[^}]*border-bottom: 0;/)
+    // 合計の上の線は最後の品目の行が持つので、合計自身は線を引かない。
+    expect(css).not.toMatch(/\.total \{[^}]*border-top/)
   })
 
   it('注文履歴（OzHLO）の絞り込みは折り返さない', () => {

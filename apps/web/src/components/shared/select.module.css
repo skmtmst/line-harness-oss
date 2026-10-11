@@ -323,6 +323,17 @@
   text-align: left;
 }
 
+/*
+ * 決まった幅の箱でも、絵が「図柄のすぐ右から文字」と描いているときは
+ * `valueAlign="start"` を渡して同じ寄せ方にする
+ * （★V8 デリバリー受注の注文履歴 OzHLO：余白12・印15・間6で文字は x1120 から）。
+ * 渡さない箱は上の両端寄せのまま。
+ */
+[data-theme='v8'] .trigger[data-value-align='start'] .leadingIcon + .value {
+  flex: 1;
+  text-align: left;
+}
+
 /* WEB-006: 枠なしでも焦点の輪を残す。 */
 [data-theme='v8'] .textTrigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 

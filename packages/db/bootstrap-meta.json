@@ -563,13 +563,13 @@
     "618_hq_banner_folders.sql",
     "619_hq_folder_display_order.sql",
     "620_migrate_private_memo_to_chat_notes.sql",
-    "620_restaurant_delivery_orders.sql",
     "621_form_submission_files.sql",
     "622_hq_delivery_templates.sql",
     "623_form_fixed_friend_fields.sql",
     "624_entry_route_coupons.sql",
     "626_restaurant_floor_layout.sql",
-    "627_restaurant_dining_fields.sql"
+    "627_restaurant_dining_fields.sql",
+    "628_restaurant_delivery_orders.sql"
   ],
   "migrationCount": 570
 }

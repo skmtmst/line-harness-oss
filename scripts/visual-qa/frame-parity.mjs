@@ -542,6 +542,7 @@ async function main() {
    *   ONLY=kDQHr,hjdqV … その板・窓だけ測る（直しながら試すとき用）
    *   DUMP_PAIRS=1      … 突き合わせた1件ずつを metrics.json に残す（ずれの中身を見るため）
    *   DUMP_BOXES=1      … 板（カード）の箱も残す（どの段が何 px 高いのかを見るため）
+   *   PROBE='<CSSの選び方>' … 画面側のその要素の箱を画面に出すだけ（直すとき用・合否に関わらない）
    * どれも付けなければ 6枚すべて・要約だけ。
    * ONLY を付けた回は metrics.json がその板だけに書き換わる。
    * 残す記録は ONLY なしの回で取り直す。
@@ -557,6 +558,26 @@ async function main() {
 
       const designOut = await design.page.evaluate(MEASURE_CALL)
       const implOut = await impl.page.evaluate(MEASURE_CALL)
+
+      /*
+       * 直しているときだけ使う覗き窓。`PROBE='td, span[class*=badge]'` のように渡すと、
+       * 画面側のその要素の箱と内側の余白・すき間を画面に出す（metrics.json は変えない）。
+       * 合否には一切関わらない。小さな部品（札・升）の左端を知りたいとき用。
+       */
+      if (process.env.PROBE) {
+        const probe = await impl.page.evaluate((selector) => [...document.querySelectorAll(selector)].map((el) => {
+          const box = el.getBoundingClientRect()
+          const style = getComputedStyle(el)
+          return {
+            x: Math.round(box.x + window.scrollX), y: Math.round(box.y + window.scrollY),
+            w: Math.round(box.width), h: Math.round(box.height),
+            tag: el.tagName.toLowerCase(), cls: String(el.className || '').slice(0, 48),
+            text: (el.textContent || '').trim().slice(0, 16),
+            pad: style.padding, gap: style.gap, align: style.textAlign, display: style.display,
+          }
+        }), process.env.PROBE)
+        console.log(`         [PROBE ${frame.id} ${width}] ${JSON.stringify(probe)}`)
+      }
 
       if (implOut.theme !== 'v8') {
         console.error(`[frame-parity] ${frame.id}: data-theme が v8 でない（${implOut.theme}）。測定を止める。`)

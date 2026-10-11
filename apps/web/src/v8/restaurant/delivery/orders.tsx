@@ -89,16 +89,14 @@ const URGENCY_ICONS: Record<DeliveryUrgency, LucideIcon | null> = {
   normal: null,
 }
 
-/** 一覧の急ぎ度の札（絵 `HbgSR`/`O1JQq`/`C0hA1v`）。点は出さない。 */
-function UrgencyBadge({ urgency }: { urgency: DeliveryUrgency }) {
+/**
+ * 急ぎ度の札（絵 `HbgSR`/`O1JQq`/`C0hA1v`）。点は出さず、印＋字にする。
+ * 注文の詳細の窓（絵 `hjdqV`）も同じ形なので、そこからも使う。
+ */
+export function UrgencyBadge({ urgency }: { urgency: DeliveryUrgency }) {
   const Icon = URGENCY_ICONS[urgency]
   return (
-    <StatusBadge
-      tone={URGENCY_TONES[urgency]}
-      size="compact"
-      dot={false}
-      className={styles.urgencyBadge}
-    >
+    <StatusBadge tone={URGENCY_TONES[urgency]} size="delivery" dot={false}>
       {Icon ? <Icon size={12} aria-hidden="true" /> : null}
       {urgencyLabel(urgency)}
     </StatusBadge>
@@ -174,11 +172,11 @@ function ServiceCard({
       <div className={styles.serviceMid}>
         <span className={styles.serviceName}>{label}</span>
         <span className={styles.serviceBadges}>
-          <StatusBadge tone={CONNECTION_TONES[state.connectionStatus]} size="compact">
+          <StatusBadge tone={CONNECTION_TONES[state.connectionStatus]} size="delivery">
             {CONNECTION_LABELS[state.connectionStatus]}
           </StatusBadge>
           <span title={stopNote}>
-            <StatusBadge tone={INTAKE_TONES[state.intakeStatus]} size="compact">
+            <StatusBadge tone={INTAKE_TONES[state.intakeStatus]} size="delivery">
               {INTAKE_LABELS[state.intakeStatus]}
             </StatusBadge>
           </span>
@@ -261,7 +259,7 @@ function OrderRow({
     <Tr density="comfortable">
       {/* 閲覧のみの人には「選ぶ」を押せない形で置かずに列ごと出さない（★V8 2026-10-06）。 */}
       {canManage ? (
-        <Td className={styles.td}>
+        <Td>
           <Checkbox
             aria-label={`注文${order.orderNumber}を選ぶ`}
             checked={checked}
@@ -270,7 +268,7 @@ function OrderRow({
           />
         </Td>
       ) : null}
-      <Td className={styles.td}>
+      <Td>
         <Button
           variant="text"
           size="inline"
@@ -281,36 +279,36 @@ function OrderRow({
           {formatOrderNumber(order.orderNumber)}
         </Button>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         {/* 絵のサービス札（kDQHr `jrPce` ほか）は点なしの丸い札。状態札とは違い点を出さない。 */}
         <StatusBadge tone={SERVICE_TONES[order.service]} size="compact" dot={false}>
           {order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]}
         </StatusBadge>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         <span className={styles.items} title={order.itemSummary}>
           {order.itemSummary || DASH}
         </span>
       </Td>
       {/* 絵（kDQHr）の「金額」「経過」は中身も列の左端から始まる（`セル 金額`/`セル 経過`）。 */}
-      <Td className={styles.td}>
+      <Td>
         <span className={styles.amount}>{formatYen(order.totalAmount)}</span>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         <span className={styles.elapsed}>{formatElapsed(order.receivedAt, nowMs)}</span>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         {/* 絵（kDQHr）の一覧は印だけ。理由の文は幅を押し広げるので注文の詳細（hjdqV）で出す。 */}
         <span className={styles.urgencyCell} title={order.urgencyReason || undefined}>
           <UrgencyBadge urgency={order.urgency} />
         </span>
       </Td>
-      <Td className={styles.td}>
-        <StatusBadge tone={STATUS_TONES[order.status]} size="compact">
+      <Td>
+        <StatusBadge tone={STATUS_TONES[order.status]} size="delivery">
           {order.statusLabel || DASH}
         </StatusBadge>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         <span className={styles.rowActions}>
           {order.status === 'new' && canManage ? (
             <>
@@ -329,7 +327,7 @@ function OrderRow({
                 */}
               <Button
                 variant="primary"
-                size="compact"
+                size="delivery-row"
                 busy={busy}
                 busyLabel="受付中"
                 doneLabel="受付済"
@@ -340,7 +338,7 @@ function OrderRow({
               </Button>
               {/* 絵（kDQHr `AuCyJ`・`HKAi1`）の「拒否」は白地・灰の細枠で、字は #4a5565。 */}
               <Button
-                size="compact"
+                size="delivery-row"
                 className={styles.rowActionReject}
                 aria-label={`注文${order.orderNumber}を拒否`}
                 onClick={() => onReject(order)}
@@ -355,7 +353,7 @@ function OrderRow({
              * 字の色だけ板の中で緑に戻す。
              */
             <Button
-              size="compact"
+              size="delivery-row"
               className={styles.rowActionReady}
               busy={busy}
               busyLabel="変更中"
@@ -374,7 +372,6 @@ function OrderRow({
             <Button
               variant="text"
               size="inline"
-              className={styles.rowActionLink}
               aria-label={`注文${order.orderNumber}を開く`}
               onClick={() => onOpen(order.id)}
             >
@@ -396,6 +393,7 @@ function KpiMenu({ title, onOpenHistory }: { title: string; onOpenHistory: () =>
   return (
     <span className={styles.kpiMenu}>
       <RowMenu
+        appearance="plain"
         className={styles.kpiMenuButton}
         label={`${title}の操作`}
         open={open}
@@ -547,76 +545,82 @@ export default function OrdersBoard({
         />
       </KpiBand>
 
-      {/* 絵（kDQHr）の並びは サービス3枚 → 数の帯 → タブ → 表。 */}
-      <Tabs items={tabs} label="注文の状態" />
+      {/*
+        * 絵（kDQHr）の並びは サービス3枚 → 数の帯 → タブ → 表。
+        * 絵ではタブと表がくっついている（間0）ので、器の段の間（この板では12）が
+        * 入らないように、タブ・選んだ数の帯・表をひとつの塊にまとめる。
+        */}
+      <div className={styles.tabTableGroup}>
+        <Tabs items={tabs} label="注文の状態" />
 
-      {/* 閲覧のみの人は選べないので、選んだ数の帯もまとめての札も出さない。 */}
-      {canManage && checkedCount > 0 ? (
-        <div className={styles.selectBar}>
-          <span className={styles.selectCount}>選択中 {checkedCount}件</span>
-          <span className={styles.spacer} />
-          <Button
-            variant="primary"
-            size="compact"
-            busy={bulkBusy}
-            busyLabel="受付中…"
-            disabled={bulkBusy}
-            onClick={onBulkAccept}
-          >
-            まとめて受け付ける
-          </Button>
-        </div>
-      ) : null}
+        {/* 閲覧のみの人は選べないので、選んだ数の帯もまとめての札も出さない。 */}
+        {canManage && checkedCount > 0 ? (
+          <div className={styles.selectBar}>
+            <span className={styles.selectCount}>選択中 {checkedCount}件</span>
+            <span className={styles.spacer} />
+            <Button
+              variant="primary"
+              size="delivery-bulk"
+              busy={bulkBusy}
+              busyLabel="受付中…"
+              disabled={bulkBusy}
+              onClick={onBulkAccept}
+            >
+              まとめて受け付ける
+            </Button>
+          </div>
+        ) : null}
 
-      <DataTable className={styles.table} data-design="kDQHr" label="デリバリーの注文一覧"><thead>
-        <TableHeadRow>
-          {canManage ? (
-            <Th className={styles.th}>
-              <Checkbox
-                aria-label="新着の注文をすべて選ぶ"
-                checked={allChecked}
-                indeterminate={someChecked}
-                disabled={selectableIds.length === 0 || bulkBusy}
-                onCheckedChange={onToggleSelectAll}
-              />
-            </Th>
-          ) : null}
-          <Th className={styles.th}>注文番号</Th>
-          <Th className={styles.th}>サービス</Th>
-          <Th className={styles.th}>注文内容</Th>
-          {/* 絵（kDQHr）の見出しは9つとも列の左端から書き出す（`列 金額`/`列 経過`/`列 操作`）。 */}
-          <Th className={styles.th}>金額</Th>
-          <Th className={styles.th}>経過</Th>
-          <Th className={styles.th}>急ぎ度</Th>
-          <Th className={styles.th}>状態</Th>
-          <Th className={styles.th}>操作</Th>
-        </TableHeadRow></thead><tbody>
-        {visible.length === 0 ? (
-          <TableStateRow
-            colSpan={canManage ? COLUMN_COUNT : COLUMN_COUNT_VIEW_ONLY}
-            kind="empty"
-            title="この状態の注文はありません"
-            description="新しい注文が届くと、ここに表示されます。"
-          />
-        ) : (
-          visible.map((order) => (
-            <OrderRow
-              key={order.id}
-              order={order}
-              nowMs={nowMs}
-              busy={busyOrderId === order.id || bulkBusy}
-              canManage={canManage}
-              checked={selectedSet.has(order.id)}
-              selectable={canManage && order.status === 'new'}
-              onToggleSelect={onToggleSelect}
-              onOpen={onOpenOrder}
-              onAccept={onAccept}
-              onReject={onReject}
-              onReady={onReady}
+        <DataTable className={styles.table} data-design="kDQHr" presentation="delivery" label="デリバリーの注文一覧"><thead>
+          <TableHeadRow>
+            {canManage ? (
+              <Th className={styles.th}>
+                <Checkbox
+                  aria-label="新着の注文をすべて選ぶ"
+                  checked={allChecked}
+                  indeterminate={someChecked}
+                  disabled={selectableIds.length === 0 || bulkBusy}
+                  onCheckedChange={onToggleSelectAll}
+                />
+              </Th>
+            ) : null}
+            <Th className={styles.th}>注文番号</Th>
+            <Th className={styles.th}>サービス</Th>
+            <Th className={styles.th}>注文内容</Th>
+            {/* 絵（kDQHr）の見出しは9つとも列の左端から書き出す（`列 金額`/`列 経過`/`列 操作`）。 */}
+            <Th className={styles.th}>金額</Th>
+            <Th className={styles.th}>経過</Th>
+            <Th className={styles.th}>急ぎ度</Th>
+            <Th className={styles.th}>状態</Th>
+            <Th className={styles.th}>操作</Th>
+          </TableHeadRow></thead><tbody>
+          {visible.length === 0 ? (
+            <TableStateRow
+              colSpan={canManage ? COLUMN_COUNT : COLUMN_COUNT_VIEW_ONLY}
+              kind="empty"
+              title="この状態の注文はありません"
+              description="新しい注文が届くと、ここに表示されます。"
             />
-          ))
-        )}
-      </tbody></DataTable>
+          ) : (
+            visible.map((order) => (
+              <OrderRow
+                key={order.id}
+                order={order}
+                nowMs={nowMs}
+                busy={busyOrderId === order.id || bulkBusy}
+                canManage={canManage}
+                checked={selectedSet.has(order.id)}
+                selectable={canManage && order.status === 'new'}
+                onToggleSelect={onToggleSelect}
+                onOpen={onOpenOrder}
+                onAccept={onAccept}
+                onReject={onReject}
+                onReady={onReady}
+              />
+            ))
+          )}
+        </tbody></DataTable>
+      </div>
 
       <div className={styles.tableFoot}>
         <p className={styles.muted}>

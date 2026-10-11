@@ -23,20 +23,27 @@
   height: var(--tpl-rs-icon-btn);
 }
 
-/* 窓の中身：題の段（共通の窓の頭）のすぐ下から 14 の間で並べる */
+/*
+ * 窓の中身：題の段（共通の窓の頭）のすぐ下から 14 の間で並べる。
+ * 絵の段の間がそれと違う窓だけ RsDialog の bodyGap で `--rs-dlg-body-gap` を渡す。
+ */
 .dialogBody {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-rs-dlg-gap);
+  gap: var(--rs-dlg-body-gap, var(--tpl-rs-dlg-gap));
   width: 100%;
   margin-top: var(--tpl-rs-dlg-pull);
 }
 
+/*
+ * 上の間は既定のまま（線ありは 14・線なしは 8）。
+ * 絵の間がそれと違う窓だけ RsDialog の footerGap で `--rs-dlg-actions-pad-top` を渡す。
+ */
 .dialogActions {
   display: flex;
   justify-content: flex-end;
   gap: var(--tpl-rs-dlg-actions-gap);
-  padding-top: var(--tpl-rs-dlg-gap);
+  padding-top: var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-gap));
   box-shadow: var(--tpl-rs-line-top);
 }
 
@@ -45,14 +52,18 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--tpl-rs-dlg-actions-gap);
-  padding-top: 8px;
+  padding-top: var(--rs-dlg-actions-pad-top, 8px);
 }
 
+/*
+ * 欄（題＋中身）。間は既定の 6。
+ * 絵の間がそれと違う窓だけ RsDialog の fieldGap で `--rs-field-gap` を渡す。
+ */
 .field {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
-  gap: var(--tpl-rs-field-gap);
+  gap: var(--rs-field-gap, var(--tpl-rs-field-gap));
   min-width: 0;
 }
 

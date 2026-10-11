@@ -12,7 +12,7 @@
  * 取れない値は数を作らず「—」を出す（D024）。
  */
 
-import { Download } from 'lucide-react'
+import { Download, Funnel } from 'lucide-react'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import ListState from '@/components/shared/list-state'
@@ -89,8 +89,17 @@ export function HistoryHeaderActions({
         value={date}
         onChange={onDateChange}
       />
+      {/*
+        * 絵（OzHLO）のサービスの箱は先頭に漏斗の印がある（箱 x1085 幅195・余白12・印15 →
+        * 文字 x1120）。印が無いと文字が x1098 に寄って絵と22ずれる。画面CSSで足さず、
+        * 共通の箱が持つ `icon` へ渡す（★V8 §24 部品の見た目は部品側で決める）。
+        * さらに決まった幅の箱は値が両端に釣り合って真ん中へ浮くので、`valueAlign="start"` で
+        * 絵と同じ「印のすぐ右から文字」にする（余白12＋印16＋間6＝x1120）。
+        */}
       <Select
         aria-label="サービス"
+        icon={<Funnel size={15} aria-hidden="true" />}
+        valueAlign="start"
         className={styles.filterService}
         value={service}
         onChange={(value) => {
@@ -99,7 +108,15 @@ export function HistoryHeaderActions({
         }}
         options={SERVICE_OPTIONS}
       />
+      {/*
+        * 絵（OzHLO）の「CSVで保存」は幅112（余白14・印15・間6）。共通の既定（余白16・印13）
+        * だと131になり、左の絞り込み2つを19ずつ押し出してしまう。板の頭の操作は
+        * `size="delivery-head"`（絵 kDQHr と同じ値）で絵へ合わせる。
+        * また「保存しました」は出さないので、結果の文字の分の幅を控えない（widthReserve="idle"）。
+        */}
       <Button
+        size="delivery-head"
+        widthReserve="idle"
         onClick={onCsv}
         busy={csvBusy}
         busyLabel="保存中…"
@@ -123,7 +140,7 @@ function HistoryRow({
   const reason = order.cancelReasonCode ? CANCEL_REASON_LABELS[order.cancelReasonCode] : null
   return (
     <Tr>
-      <Td className={styles.td}>
+      <Td>
         <Button
           variant="text"
           size="inline"
@@ -133,28 +150,28 @@ function HistoryRow({
           <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
         </Button>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         {/* 絵のサービス札（OzHLO）は点なし。状態札だけが点を持つ。 */}
         <StatusBadge tone={SERVICE_TONES[order.service]} size="compact" dot={false}>
           {order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]}
         </StatusBadge>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         <span className={styles.elapsed}>{formatClock(order.receivedAt)}</span>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         {/* 絵（OzHLO）の注文内容は1行だけ。点数は注文の詳細（hjdqV）で出す。 */}
         <span className={styles.items} title={order.itemSummary || undefined}>
           {order.itemSummary || DASH}
         </span>
       </Td>
-      <Td className={styles.td} align="right">
+      <Td align="right">
         <span className={styles.amount}>{formatYen(order.totalAmount)}</span>
       </Td>
-      <Td className={styles.td}>
+      <Td>
         {/* 絵（OzHLO）の「状態」は札だけ。キャンセルの理由は札の下に書かず、指を当てたときだけ出す。 */}
         <span className={styles.urgencyCell} title={reason || undefined}>
-          <StatusBadge tone={STATUS_TONES[order.status]} size="compact">
+          <StatusBadge tone={STATUS_TONES[order.status]} size="delivery">
             {order.statusLabel || DASH}
           </StatusBadge>
         </span>
@@ -236,7 +253,7 @@ export default function HistoryBoard({
             <div className={styles.sumCard}>
               <div className={styles.sumHead}>
                 <span className={styles.sumTitle}>{isToday ? '本日の合計' : '合計'}</span>
-                <span className={styles.fillLine} aria-hidden="true" />
+                {/* 絵（ZuE0v）の札に細い横線は無いので、線は置かず件数を右端へ寄せるだけにする。 */}
                 <span className={styles.sumCount} title={countNote}>
                   {totals ? `${totals.count}件` : DASH}
                 </span>
@@ -247,7 +264,6 @@ export default function HistoryBoard({
               <div key={row.service} className={styles.sumCard}>
                 <div className={styles.sumHead}>
                   <StatusBadge tone={SERVICE_TONES[row.service]} size="compact" dot={false}>{row.label}</StatusBadge>
-                  <span className={styles.fillLine} aria-hidden="true" />
                   <span className={styles.sumCount}>{row.count}件</span>
                 </div>
                 <p className={styles.sumAmount}>{formatYen(row.amount)}</p>
@@ -255,7 +271,7 @@ export default function HistoryBoard({
             ))}
           </div>
 
-          <DataTable className={styles.table} data-design="OzHLO" label="デリバリーの注文履歴"><thead>
+          <DataTable className={styles.table} data-design="OzHLO" presentation="delivery" label="デリバリーの注文履歴"><thead>
             <TableHeadRow>
               <Th className={styles.th}>注文番号</Th>
               <Th className={styles.th}>サービス</Th>

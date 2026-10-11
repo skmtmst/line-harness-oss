@@ -14,7 +14,7 @@
  * 動きは BEHAVIOR.md。
  */
 
-import { RefreshCw } from 'lucide-react'
+import { PackageX, Pause, RefreshCw } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -57,6 +57,36 @@ const VIEW_BOARDS = {
 } as const
 
 type DeliveryView = keyof typeof VIEW_BOARDS
+
+/*
+ * 絵ごとの「板の頭」と「中身の余白」（2026-10-11 実測し直し）。
+ * 共通の器（CHz31）は 頭の上24・題と説明の間8・題22/700/32・説明を「?」の中、
+ * 中身は上16・段の間16。デリバリーの3枚はどれもそれと違うので、器の既定は変えず
+ * RestaurantPage の任意の引数で板ごとに渡す（画面CSSから器を上書きしない）。
+ *
+ *   絵の頭（1440・帯なし）           画面の頭（渡す値）
+ *   kDQHr 上20 間4 題22/33 説明13/20  → padTop20 gap4 題そのまま 説明body → 塊56・頭88（絵89）
+ *   OzHLO 上20 間4 題18/27 説明12/18  → padTop20 gap4 題sub     説明そのまま → 塊50・頭82（絵81）
+ *   h7OeT 同じ                        → 同じ
+ *
+ * 中身の上の余白は「絵の最初の段の y − 頭の下（60+頭の高さ）」。
+ *   kDQHr 絵161 − 148 = 13〜14 / OzHLO 絵145 − 142 = 3〜4 / h7OeT 絵141 − 142 = 0。
+ */
+const VIEW_HEAD: Record<DeliveryView, { titleSize?: 'sub'; descriptionSize?: 'body' }> = {
+  orders: { descriptionSize: 'body' },
+  history: { titleSize: 'sub' },
+  'sold-out': { titleSize: 'sub' },
+}
+
+/** 絵の頭はどの板も 上20・題と説明の間4。 */
+const HEAD_PAD_TOP = 20
+const HEAD_TEXT_GAP = 4
+
+const VIEW_BODY: Record<DeliveryView, { padTop: number; gap?: number }> = {
+  orders: { padTop: 14, gap: 12 },
+  history: { padTop: 4 },
+  'sold-out': { padTop: 0 },
+}
 
 const TABS: DeliveryOrderTab[] = ['all', 'new', 'cooking', 'handed_over']
 
@@ -595,7 +625,7 @@ function DeliveryInner() {
       {/* 絵の板の頭は「題 → 間 → 更新（印＋名 nDOMR）→ 品切れ設定 → 一括停止」の並び。 */}
       <div className={styles.refreshRow}>
         <RefreshCw
-          className={`${styles.icon13}${loading ? ` ${styles.spin}` : ''}`}
+          className={`${styles.refreshIcon}${loading ? ` ${styles.spin}` : ''}`}
           aria-hidden="true"
         />
         <p className={styles.muted}>
@@ -605,8 +635,15 @@ function DeliveryInner() {
       {storePicker}
       {canManage ? (
         <>
-          <Button onClick={() => go({ view: 'sold-out' })}>品切れ一括設定</Button>
-          <Button variant="danger-outline" onClick={() => openStop()}>受付を一括停止</Button>
+          {/* 絵は2つとも印つき（`lmSlb` package-x・`bX6bH` pause）。大きさは共通部品が持つ。 */}
+          <Button size="delivery-head" onClick={() => go({ view: 'sold-out' })}>
+            <PackageX aria-hidden="true" />
+            品切れ一括設定
+          </Button>
+          <Button size="delivery-head" variant="danger-outline" onClick={() => openStop()}>
+            <Pause aria-hidden="true" />
+            受付を一括停止
+          </Button>
         </>
       ) : null}
     </div>
@@ -714,7 +751,14 @@ function DeliveryInner() {
       boardId={VIEW_BOARDS[view]}
       title={meta.title}
       description={meta.description}
+      descriptionAs="text"
+      descriptionSize={VIEW_HEAD[view].descriptionSize}
+      titleSize={VIEW_HEAD[view].titleSize}
+      headPadTop={HEAD_PAD_TOP}
+      headTextGap={HEAD_TEXT_GAP}
       picker={picker}
+      bodyPadTop={VIEW_BODY[view].padTop}
+      bodyGap={VIEW_BODY[view].gap}
     >
       <BoundaryBanner note="デリバリー3社とは検証用の接続・本番の注文は流れません" />
 

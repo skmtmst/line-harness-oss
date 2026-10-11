@@ -32,9 +32,24 @@ import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
 import { DASH, INTAKE_STOP_PRESET_OPTIONS, SERVICE_TONES, formatYen } from './format'
 import styles from './delivery.module.css'
 
-/** 窓の寸法（絵のとおり）。受付停止（XCVGd）は 500×438 を (470,230) に置く。 */
-const STOP_WIDTH = 500
+/*
+ * 受付停止の確認（XCVGd）。上からの位置は絵のとおり 230。
+ * 幅は絵が 500 だが、窓の幅は正本で 480／560／720／960 の4段に決まっている
+ * （docs/v8-design-rules.md §8・B-177 の `DIALOG_WIDTHS`）。500 は4段に無いので
+ * 共通部品の `dialogWidth()` が 480 へ寄せる。暗に寄せられるのに任せず、
+ * 実際に出る 480 をここに書く。中身は真ん中に並ぶので絵より左右 10 外へ出る
+ * （この差は「絵と正本の食い違いを正本で解いた分」として記録する）。
+ */
+const STOP_WIDTH = 480
 const STOP_TOP = 230
+/*
+ * 絵（XCVGd）の段の間。絵は段ごとに下の余白を持つので、
+ * 段の間を 12（一文の下 10 と欄の下 12 の分）、欄の題と中身の間を 8、
+ * ボタンの段の上の間を 14（絵の y598→612）にする。
+ */
+const STOP_BODY_GAP = 12
+const STOP_FIELD_GAP = 8
+const STOP_FOOT_GAP = 14
 
 const SOLD_OUT_COLUMN_COUNT = 6
 /** 閲覧のみの人には「選択」と「切替」を出さないので2つ少ない（★V8 2026-10-06）。 */
@@ -155,33 +170,35 @@ export default function SoldOutBoard({
         <>
           {/* 閲覧のみの人は選べないので、選んだ数の帯もまとめての札も出さない（★V8 2026-10-06）。 */}
           {canManage ? (
-          <div className={styles.selectBar}>
+          <div className={`${styles.selectBar} ${styles.selectBarFlush}`}>
             <span className={styles.selectCount}>選択中 {checkedCount}品</span>
             <span className={styles.spacer} />
             <Button
               variant="danger-outline"
-              size="compact"
+              size="delivery-bulk"
+              widthReserve="idle"
               disabled={!canSubmit}
               busy={busy}
               busyLabel="送信中…"
               onClick={() => onSubmit(true)}
             >
-              <Ban size={15} aria-hidden="true" />選んだ商品を品切れにする
+              <Ban size={13} aria-hidden="true" />選んだ商品を品切れにする
             </Button>
             <Button
               variant="secondary"
-              size="compact"
+              size="delivery-bulk"
+              widthReserve="idle"
               disabled={!canSubmit}
               onClick={() => onSubmit(false)}
             >
-              <RotateCcw size={15} aria-hidden="true" />販売を再開する
+              <RotateCcw size={13} aria-hidden="true" />販売を再開する
             </Button>
           </div>
           ) : null}
 
           {error ? <p className={styles.muted}>{error}</p> : null}
 
-          <DataTable className={styles.table} data-design="h7OeT" label="メニューの品切れ設定"><thead>
+          <DataTable className={styles.table} data-design="h7OeT" presentation="delivery" label="メニューの品切れ設定"><thead>
             <TableHeadRow>
               {canManage ? (
                 <Th className={styles.th}>
@@ -213,7 +230,7 @@ export default function SoldOutBoard({
               visible.map((item) => (
                 <Tr key={item.id}>
                   {canManage ? (
-                    <Td className={styles.td}>
+                    <Td>
                       <Checkbox
                         aria-label={`${item.name || '商品'}を選ぶ`}
                         checked={selectedSet.has(item.id)}
@@ -221,22 +238,22 @@ export default function SoldOutBoard({
                       />
                     </Td>
                   ) : null}
-                  <Td className={styles.td}>
+                  <Td>
                     <span className={styles.menuName} title={item.name || undefined}>
                       {item.name || DASH}
                     </span>
                   </Td>
-                  <Td className={styles.td}>{item.category || DASH}</Td>
-                  <Td className={styles.td}>
+                  <Td>{item.category || DASH}</Td>
+                  <Td>
                     <span className={styles.amount}>{formatYen(item.price)}</span>
                   </Td>
-                  <Td className={styles.td}>
-                    <StatusBadge tone={item.soldOut ? 'warning' : 'success'} size="compact">
+                  <Td>
+                    <StatusBadge tone={item.soldOut ? 'warning' : 'success'} size="delivery">
                       {item.soldOut ? '品切れ' : '販売中'}
                     </StatusBadge>
                   </Td>
                   {canManage ? (
-                    <Td className={styles.td}>
+                    <Td>
                       <Toggle
                         label={`${item.name || '商品'}の販売`}
                         checked={!item.soldOut}
@@ -318,9 +335,13 @@ export function IntakeStopDialog({
           <Pause size={18} aria-hidden="true" />
         </span>
       )}
+      titleRow="mark"
       plainTitle
       contentPadding="18px 24px 20px"
+      bodyGap={STOP_BODY_GAP}
+      fieldGap={STOP_FIELD_GAP}
       footerPlain
+      footerGap={STOP_FOOT_GAP}
       onCancel={onClose}
       actions={(
         <>
@@ -337,7 +358,7 @@ export function IntakeStopDialog({
         </>
       )}
     >
-      <p className={styles.factValue}>
+      <p className={styles.dialogLead}>
         選んだサービスで新しい注文の受け付けを止めます。すでに受け付けた注文の調理・受け渡しはそのまま続きます。
       </p>
 
@@ -371,7 +392,7 @@ export function IntakeStopDialog({
                   <span className={[styles.stopState, stopped ? styles.stopStateOff : null].filter(Boolean).join(' ')}>
                     {stopped ? 'すでに停止中' : `現在 受付中・${state.todayCount}件対応中`}
                   </span>
-                  <span className={styles.fillLine} aria-hidden="true" />
+                  {/* 絵（XCVGd）の札には細い横線が無いので、線は置かず右へ寄せるだけにする。 */}
                   <span className={[styles.stopMark, stopped ? styles.stopMarkOff : null].filter(Boolean).join(' ')}>
                     {stopped ? '対象外' : '停止する'}
                   </span>

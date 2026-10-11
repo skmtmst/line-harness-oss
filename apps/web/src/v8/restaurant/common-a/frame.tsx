@@ -1,7 +1,7 @@
 'use client'
 
 import { notifySaved } from '@/components/shared/toast'
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import {
@@ -59,17 +59,55 @@ export function BoundaryBanner({ note = '予約媒体は受信専用・外部更
 }
 
 /** 板の頭と中身の並び（取得を持たない画面でも使う）。 */
-export function RestaurantPage({ boardId, title, description, picker, children }: {
+export function RestaurantPage({ boardId, title, description, descriptionAs, descriptionSize, picker, headPadTop, headTextGap, titleSize, bodyPadTop, bodyGap, children }: {
   boardId: string
   title: string
   description: string
+  /*
+   * 説明の出し方。渡さないときは今までどおり題の隣の「?」の中（HelpTip）。
+   * `'text'` は絵のとおり題のすぐ下へ 1 行で出す（絵 kDQHr・OzHLO・h7OeT）。
+   */
+  descriptionAs?: 'text'
+  /** 説明を本文の大きさ（13/20）にする。渡さないときは補足の 12/19 のまま。 */
+  descriptionSize?: 'body'
   picker?: ReactNode
+  /** 頭の上の余白を絵の値にする。渡さないときは共通の 24 のまま。 */
+  headPadTop?: number
+  /** 題と説明の間を絵の値にする。渡さないときは共通の 8 のまま。 */
+  headTextGap?: number
+  /** 題を絵の小さい題（18/700/27）にする。渡さないときは 22/700/32 のまま。 */
+  titleSize?: 'sub'
+  /** 中身の上の余白を絵の値にする。渡さないときは共通の 16 のまま。 */
+  bodyPadTop?: number
+  /** 中身の段の間を絵の値にする。渡さないときは共通の 16 のまま。 */
+  bodyGap?: number
   children: ReactNode
 }) {
+  const bodyStyle = bodyPadTop === undefined && bodyGap === undefined
+    ? undefined
+    : ({
+      ...(bodyPadTop === undefined ? null : { '--rt-body-pad-top': `${bodyPadTop}px` }),
+      ...(bodyGap === undefined ? null : { '--rt-body-gap': `${bodyGap}px` }),
+    } as CSSProperties)
   return (
     <PageFrame kind="list" boardId={boardId}>
-      <PageHeading title={title} help={description} actions={picker} />
-      <div className={styles.body}>{children}</div>
+      <PageHeading
+        title={title}
+        subtitle={descriptionAs === 'text' ? description : undefined}
+        subtitleSize={descriptionSize}
+        help={descriptionAs === 'text' ? undefined : description}
+        padTop={headPadTop}
+        textGap={headTextGap}
+        titleSize={titleSize}
+        actions={picker}
+      />
+      <div
+        className={styles.body}
+        data-body-pad-top={bodyPadTop === undefined ? undefined : ''}
+        style={bodyStyle}
+      >
+        {children}
+      </div>
     </PageFrame>
   )
 }
@@ -81,6 +119,8 @@ export default function RestaurantFrame({
   query,
   allStores = false,
   bannerNote,
+  bodyPadTop,
+  bodyGap,
   children,
 }: {
   /** Pencil の板 ID（例 `CHz31`）。外枠へ付ける。 */
@@ -92,6 +132,10 @@ export default function RestaurantFrame({
   /** 店舗を選ぶ欄の先頭に「すべての店舗」を足す（全店を見る画面）。 */
   allStores?: boolean
   bannerNote?: string
+  /** 中身の上の余白を絵の値にする。渡さないときは共通の 16 のまま。 */
+  bodyPadTop?: number
+  /** 中身の段の間を絵の値にする。渡さないときは共通の 16 のまま。 */
+  bodyGap?: number
   children: (ctx: RestaurantContext) => ReactNode
 }) {
   usePageTitle(title)
@@ -156,7 +200,14 @@ export default function RestaurantFrame({
   ) : null
 
   return (
-    <RestaurantPage boardId={boardId} title={title} description={description} picker={picker}>
+    <RestaurantPage
+      boardId={boardId}
+      title={title}
+      description={description}
+      picker={picker}
+      bodyPadTop={bodyPadTop}
+      bodyGap={bodyGap}
+    >
       <BoundaryBanner note={bannerNote} />
       {notice ? (
         <div role="status" className={`${styles.notice} ${notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError}`}>

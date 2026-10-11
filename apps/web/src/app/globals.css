@@ -1677,8 +1677,31 @@
   --tpl-rt-preview-w: 210px; --tpl-rt-preview-bg: #8fa8cf; --tpl-rt-preview-icon: 22px; --tpl-rt-rich-radius: var(--polish-radius-card); --tpl-rt-photo-h: 96px; --tpl-rt-photo-icon: 22px; --tpl-rt-rich-pad: 12px 14px; --tpl-rt-rich-ink: #111111; --tpl-rt-rich-sub: #666666; --tpl-rt-rich-body-lh: 17px; --tpl-rt-rich-action-pad: 10px 0; --tpl-rt-rich-link: #42659a;
   --tpl-rt-photo-a: #c8a27a; --tpl-rt-photo-b: #9fb3c8; --tpl-rt-photo-c: #d9b8a6; --tpl-rt-photo-d: #b9c7a5; --tpl-rt-mini-pad: 18px; --tpl-rt-mini-title-size: var(--polish-text-section);
   /* ★V8 デリバリー受注 v02（2026-10-09 承認：kDQHr・hjdqV・dgeTy・OzHLO・h7OeT・XCVGd）。行の間 8、札の間 12、列の幅は絵の実寸。 */
-  --tpl-rt-dlv-gap: 8px; --tpl-rt-dlv-card-gap: 12px; --tpl-rt-dlv-foot-pad-top: 4px; --tpl-rt-dlv-total-pad-top: 8px;
+  /* 合計の段は絵（hjdqV）で上 12。欄の段の間 8 が先に入るので、ここで足すのは 4。 */
+  --tpl-rt-dlv-gap: 8px; --tpl-rt-dlv-card-gap: 12px; --tpl-rt-dlv-foot-pad-top: 4px; --tpl-rt-dlv-total-pad-top: 4px;
+  /*
+   * 注文詳細の窓（hjdqV）の中身の実寸（2026-10-10 に絵の控えを測り直した）。
+   * ・品目は 1 行ずつ線で区切り、上下 10 の余白。品名だけの行は 41、補足つきの行は 61。
+   * ・数量と金額は離れた 2 つの右寄せの列で、絵の右端は 884 と 976。金額の列を 92 にすると
+   *   数量の右端がちょうど 884 になる（間に余白を入れない）。
+   * ・受け取り情報は 題 110＋間 12 で値が x586 から始まり、段は 33 ずつ下がる。
+   * ・合計の金額だけ 16/700（高さ 22）。合計の上の線は最後の品目の行が持つ。
+   * 2026-10-10 に 1440 で測って足した分（絵の段の間と実装の差）：
+   * ・「注文内容」→1つめの品目 は絵 28、共通の欄の間 6 だけでは 27 なので先頭に 5。
+   * ・補足つきの行は絵 61、共通の 12px の行の高さ 17 では 60 なので補足の行の高さを 18。
+   * ・最後の品目→合計 は絵 44、上の余白 7 では 45 なので 6。
+   * ・「受け取り情報」→1つめの段 は絵 25、共通の欄の間 6 だけでは 24 なので先頭に 3。
+   */
+  --tpl-rt-dlv-item-pad: 10px; --tpl-rt-dlv-item-qty: 48px; --tpl-rt-dlv-item-amount: 92px; --tpl-rt-dlv-note-gap: 2px; --tpl-rt-dlv-note-lh: 18px;
+  --tpl-rt-dlv-fact-key: 110px; --tpl-rt-dlv-total-amount: 16px; --tpl-rt-dlv-total-lh: 22px;
   --tpl-rt-dlv-col-select: 46px; --tpl-rt-dlv-col-service: 118px; --tpl-rt-dlv-col-actions: 204px;
+  /*
+   * 札の中の寸法（2026-10-11 に絵の控え kDQHr・hjdqV・OzHLO・h7OeT を測った）。
+   * ・点のある札：左8・点6・間5・字 で、字の始まりが札の左から19。共通の既定は間8。
+   * ・印（いなずま等）のある札：左8・印12・間3〜4・字。狭いほうの3に寄せる。
+   * 使うのは共通の札の `size="delivery"`（status-badge.module.css）だけ。
+   */
+  --tpl-rt-dlv-badge-pad: 2px 8px; --tpl-rt-dlv-badge-gap: 5px; --tpl-rt-dlv-badge-mark-gap: 3px;
   /*
    * 絵の行の高さ＝上下の余白12＋中身＋下の線1。中身の高さは行ごとに違い、絵（kDQHr）の
    * 実測の行の間は 53・53・53・53・50・47 で全部同じではない。だから決め打ちの高さは置かず、
@@ -1724,6 +1747,22 @@
    * ここで高さ28を入れても触る端末の当たり判定は44pxのまま残る。
    */
   --tpl-rt-dlv-act-h: 28px; --tpl-rt-dlv-act-size: 12px; --tpl-rt-dlv-act-pad: 0 10px; --tpl-rt-dlv-act-gap: 6px; --tpl-rt-dlv-act-radius: 8px; --tpl-rt-dlv-act-lh: 18px;
+  /*
+   * 絵（h7OeT の一括操作帯 `P3rcI`）のまとめての帯は、高さ48・内側の余白10/16・
+   * 中身の間10・角丸はカードと同じ・地色は真珠色。中のボタンは行の中と同じ
+   * 高さ28・左右10・角丸8・字12の太字で、違うのは印13角（行の中は印なし）と
+   * 印と字の間5だけ（2026-10-11 実測）。
+   */
+  --tpl-rt-dlv-bulk-h: 48px; --tpl-rt-dlv-bulk-pad: 10px 16px; --tpl-rt-dlv-bulk-gap: 10px; --tpl-rt-dlv-bulk-act-gap: 5px; --tpl-rt-dlv-bulk-act-icon: 13px;
+  /*
+   * 絵（kDQHr「品切れ設定ボタン」`lmSlb`＋`gcVZx`・「一括停止ボタン」`bX6bH`＋`aqR6A`）の
+   * 板の頭の操作は、高さ36・角丸10・左右の余白14・印15角・印と字の間6で、幅はちょうど 140
+   * （14＋15＋6＋字91＋14）。共通のボタンの既定は左右16・印16なので 144 になり、
+   * 右端 1404 に合わせると字の位置が絵より 19 右へずれる（2026-10-11 実測）。
+   * 高さ36・角丸10・字13は既定と同じなので触らない。
+   * 更新の印（`CjYcP`）だけ 14 角。注の文は 12/18/500。
+   */
+  --tpl-rt-dlv-head-pad: 14px; --tpl-rt-dlv-head-icon: 15px; --tpl-rt-dlv-refresh-icon: 14px; --tpl-rt-dlv-note-weight: 500;
   /* 絵（kDQHr `foYm6`）のサービス札は横1行・高さ74・左右の余白16。印は36角、札の間6、数と説明の間4。 */
   --tpl-rt-dlv-service-h: 74px; --tpl-rt-dlv-service-pad: 0 16px; --tpl-rt-dlv-mark: 36px; --tpl-rt-dlv-badge-gap: 6px; --tpl-rt-dlv-stat-gap: 4px;
   /* 絵（kDQHr `bfsIp`・`zFulL`）のサービス札の「停止」「再開」は、高さ28・左右の余白10・字12の小さな白い札で、枠は髪筋の色。字の色だけ停止が赤・再開が緑。共通のボタンの既定（高さ32・字13）だと52〜106になり、左の札の居場所を奪う。 */

@@ -33,8 +33,8 @@ import {
   formatOrderNumber,
   formatShortStamp,
   formatYen,
-  urgencyLabel,
 } from './format'
+import { UrgencyBadge } from './orders'
 import styles from './delivery.module.css'
 
 /* キャンセル・拒否は色で責めない（起きたことを文字で伝えるだけ）。 */
@@ -47,12 +47,6 @@ const STATUS_TONES: Record<DeliveryOrderStatus, StatusBadgeTone> = {
   rejected: 'neutral',
 }
 
-const URGENCY_TONES: Record<DeliveryUrgency, StatusBadgeTone> = {
-  urgent: 'danger',
-  watch: 'warning',
-  normal: 'neutral',
-}
-
 /* 急ぎ度の帯。「ふつう」は帯を出さない（札だけで足りる）。 */
 const URGENCY_NOTICE_TONES: Record<DeliveryUrgency, NoticeTone | null> = {
   urgent: 'danger',
@@ -60,12 +54,41 @@ const URGENCY_NOTICE_TONES: Record<DeliveryUrgency, NoticeTone | null> = {
   normal: null,
 }
 
-/** 窓の寸法（絵のとおり）。詳細は中身が多いので上に寄せる。 */
+/*
+ * 窓の寸法（絵のとおり）。詳細は中身が多いので上に寄せる。
+ * 絵（hjdqV）は窓が y100〜710（高さ 610）で、題の段が 77
+ * （上 20＋題 27＋間 4＋補足 18＋下 8）。中身は y177 から始まる。
+ */
 const DETAIL_WIDTH = 560
-const DETAIL_TOP = 120
-/* キャンセルの確認（dgeTy）は絵のとおり 460×258 を (490,330) に置く。 */
-const CANCEL_WIDTH = 460
+const DETAIL_TOP = 100
+const DETAIL_HEAD_H = 77
+/*
+ * 中身の余白。共通の中身（RsDialog の .dialogBody）は上に -14 引いてから 14 の間で並べるので、
+ * 1つめの段は「題の段のあと＋この上の余白－14」に来る。
+ * 2026-10-10 に 1440 で測ったら、12 では番号の段が y175（絵 179）・「注文内容」が y302（絵 305）
+ * と上にずれていた。共通の注意書き（Notice）の高さが絵より 5 低いぶんを 15 で吸収する。
+ * 下は絵のボタンの下 20（y690→710）。
+ */
+const DETAIL_CONTENT_PAD = '15px 24px 20px'
+/* 絵のボタンの段に上の線は無く、1つ上の段からの間は 14（y626→654 のうち段の間 14＋14）。 */
+const DETAIL_FOOT_GAP = 14
+/*
+ * キャンセルの確認（dgeTy）。上からの位置は絵のとおり 330。
+ * 幅は絵が 460 だが、窓の幅は正本で 480／560／720／960 の4段に決まっている
+ * （docs/v8-design-rules.md §8・B-177 の `DIALOG_WIDTHS`）。460 は4段に無いので
+ * 共通部品の `dialogWidth()` が 480 へ寄せる。暗に寄せられるのに任せず、
+ * 実際に出る 480 をここに書く。中身は真ん中に並ぶので絵より左右 10 内へ入る
+ * （この差は「絵と正本の食い違いを正本で解いた分」として記録する）。
+ */
+const CANCEL_WIDTH = 480
 const CANCEL_TOP = 330
+/*
+ * 絵（dgeTy）の段の間。絵は段ごとに下の余白を持つので、
+ * 一文の下 4＋欄の上 8＝12 を段の間に、欄の下 8＋ボタンの上 14＝22 のうち
+ * 12 を段の間に、残り 10 をボタンの段の上の間にする。
+ */
+const CANCEL_BODY_GAP = 12
+const CANCEL_FOOT_GAP = 10
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -132,22 +155,26 @@ export function OrderDetailDialog({
    * 右に「拒否する・受け付ける」。
    * 調理中は「閉じる・注文をキャンセル・準備完了」。
    * それ以外（受け渡し済み・キャンセル・拒否）は閉じるだけにする。
+   *
+   * 足のボタンは絵（hjdqV）の余白14・印15・間6に合わせる。板の頭（kDQHr）と同じ値なので
+   * 共通のボタンの `size="delivery-head"` を渡す（画面CSSから共通部品を上書きしない）。
    */
   const actions = (() => {
     if (!order || !canManage) {
-      return <Button onClick={onClose}>閉じる</Button>
+      return <Button size="delivery-head" onClick={onClose}>閉じる</Button>
     }
     if (order.status === 'new') {
       return (
         <>
-          <Button variant="danger-outline" disabled={busy} onClick={onCancelOrder}>
+          <Button size="delivery-head" variant="danger-outline" disabled={busy} onClick={onCancelOrder}>
             <Ban size={15} aria-hidden="true" />キャンセル
           </Button>
           <span className={styles.spacer} />
-          <Button disabled={busy} onClick={onReject}>
+          <Button size="delivery-head" disabled={busy} onClick={onReject}>
             <X size={15} aria-hidden="true" />拒否する
           </Button>
-          <Button variant="primary" busy={busy} busyLabel="受付中…" onClick={onAccept}>
+          {/* 絵（hjdqV）の足は幅114。結果の文字の分は控えないよう共通の任意引数で頼む。 */}
+          <Button size="delivery-head" variant="primary" busy={busy} busyLabel="受付中…" widthReserve="idle" onClick={onAccept}>
             <Check size={15} aria-hidden="true" />受け付ける
           </Button>
         </>
@@ -156,26 +183,32 @@ export function OrderDetailDialog({
     if (order.status === 'cooking') {
       return (
         <>
-          <Button variant="danger-outline" disabled={busy} onClick={onCancelOrder}>
+          <Button size="delivery-head" variant="danger-outline" disabled={busy} onClick={onCancelOrder}>
             <Ban size={15} aria-hidden="true" />注文をキャンセル
           </Button>
           <span className={styles.spacer} />
-          <Button onClick={onClose} disabled={busy}>閉じる</Button>
-          <Button variant="primary" busy={busy} busyLabel="変更中…" onClick={onReady}>
+          <Button size="delivery-head" onClick={onClose} disabled={busy}>閉じる</Button>
+          <Button size="delivery-head" variant="primary" busy={busy} busyLabel="変更中…" widthReserve="idle" onClick={onReady}>
             準備完了
           </Button>
         </>
       )
     }
-    return <Button onClick={onClose}>閉じる</Button>
+    return <Button size="delivery-head" onClick={onClose}>閉じる</Button>
   })()
 
   return (
     <RsDialog
       open={open}
       title="注文の詳細"
+      /* 絵の頭は題＋「12:02 受信・受け取り希望 12:15」の1行。共通の窓の任意の引数で出す。 */
+      titleNote={summaryLine}
       width={DETAIL_WIDTH}
       top={DETAIL_TOP}
+      headerHeight={DETAIL_HEAD_H}
+      contentPadding={DETAIL_CONTENT_PAD}
+      footerPlain
+      footerGap={DETAIL_FOOT_GAP}
       busy={busy}
       designNode="hjdqV"
       onCancel={onClose}
@@ -194,18 +227,17 @@ export function OrderDetailDialog({
       ) : null}
       {order ? (
         <>
-          {summaryLine ? <p className={styles.muted}>{summaryLine}</p> : null}
-
           <div className={styles.detailHead}>
             <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
-            {/* 絵のサービス札（hjdqV）は点なし。続く状態札・急ぎ札は点あり。 */}
-            <StatusBadge tone={SERVICE_TONES[order.service]} size="compact" dot={false}>{serviceLabel}</StatusBadge>
-            <StatusBadge tone={STATUS_TONES[order.status]} size="compact">
+            {/*
+              * 絵（hjdqV）を 1440 で測った結果（2026-10-11）：サービス札は点なし、状態札は点あり、
+              * 急ぎ札は点ではなく12pxの印＋字（一覧 kDQHr と同じ形）。印の札は一覧と共用する。
+              */}
+            <StatusBadge tone={SERVICE_TONES[order.service]} size="delivery" dot={false}>{serviceLabel}</StatusBadge>
+            <StatusBadge tone={STATUS_TONES[order.status]} size="delivery">
               {order.statusLabel || DASH}
             </StatusBadge>
-            <StatusBadge tone={URGENCY_TONES[order.urgency]} size="compact">
-              {urgencyLabel(order.urgency)}
-            </StatusBadge>
+            <UrgencyBadge urgency={order.urgency} />
           </div>
 
           {urgencyTone && order.urgencyReason ? (
@@ -218,7 +250,13 @@ export function OrderDetailDialog({
             </Notice>
           ) : null}
 
-          <DialogField label="注文内容">
+          {/* 絵の「注文内容」「受け取り情報」の題は 12/600（共通の窓の選ぶ欄の題と同じ形）。
+            * 絵には「任意」の札がない（読むだけの見出しで入力欄ではない）。共通の欄の任意の引数
+            * optional={false} で消す。画面CSSで隠さない。
+            *
+            * 題と中身の間は絵のとおり（題の行 20 を引いて「注文内容」8・「受け取り情報」5）。
+            * 共通の 14 とは違うので共通の欄の任意の引数 contentGap で渡す。画面CSSで足さない。 */}
+          <DialogField label="注文内容" kind="select" optional={false} contentGap={8}>
             <ul className={styles.itemList}>
               {items.length === 0 ? (
                 <li className={styles.itemRow}>
@@ -243,7 +281,7 @@ export function OrderDetailDialog({
             </div>
           </DialogField>
 
-          <DialogField label="受け取り情報">
+          <DialogField label="受け取り情報" kind="select" optional={false} contentGap={5}>
             <dl className={styles.detailFacts}>
               <Fact label="受け取り方法">{order.pickupMethod || DASH}</Fact>
               {/* 絵（hjdqV）は同じ日の受け取りなので時刻だけを出す。 */}
@@ -320,9 +358,13 @@ export function CancelOrderDialog({
           <AlertTriangle size={18} aria-hidden="true" />
         </span>
       )}
+      titleRow="mark"
       plainTitle
       contentPadding="18px 24px 20px"
+      /* 絵は段ごとに下の余白を持つ。一文のあと 12（4＋8）、欄のあと 22（8＋14）。 */
+      bodyGap={CANCEL_BODY_GAP}
       footerPlain
+      footerGap={CANCEL_FOOT_GAP}
       onCancel={onClose}
       actions={(
         <>
@@ -333,10 +375,12 @@ export function CancelOrderDialog({
         </>
       )}
     >
-      <p className={styles.factValue}>
+      <p className={styles.dialogLead}>
         {subject}をキャンセルします。{serviceLabel}側のお客様にも通知され、この操作は取り消せません。
       </p>
-      <DialogField label="キャンセルの理由" kind="select">
+      {/* 絵（dgeTy）の題に「任意」の札はない。理由は必ず選ばれている（既定あり）ので共通の
+        * 欄の任意の引数で消す。 */}
+      <DialogField label="キャンセルの理由" kind="select" optional={false}>
         <Select
           aria-label="キャンセルの理由"
           size="full"
