@@ -184,13 +184,13 @@
 }
 
 /*
- * ★V8「選ぶ欄」（wMMk6）：高さ36・左12右10・文字13/500。
+ * ★V8「選ぶ欄」（wMMk6）：高さ36・左右12・間8（wMMk6）。文字の段はB-159を優先。
  * 開いた矢印は ink-faint のまま（v7 と同じ）。
  */
 [data-theme='v8'] .trigger {
   height: 36px;
-  gap: 6px;
-  padding: 0 10px 0 12px;
+  gap: var(--tpl-select-gap);
+  padding: 0 var(--tpl-select-inset);
   border-color: var(--color-control-border);
   font-size: var(--text-label);
   font-weight: 500;
@@ -238,12 +238,12 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .trigger { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; padding: 0 10px 0 12px; gap: 6px; box-shadow: var(--control-shadow); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .trigger { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; padding: 0 var(--tpl-select-inset); gap: var(--tpl-select-gap); box-shadow: var(--control-shadow); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 [data-theme='v8'] .value { font-size: 13px; font-weight: 500; line-height: 20px; }
-[data-theme='v8'] .chevron { width: 14px; height: 14px; }
+[data-theme='v8'] .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 [data-theme='v8'] .trigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 [data-theme='v8'] .invalid .trigger { outline-color: var(--color-danger); }
-[data-theme='v8'] .chevron { flex-basis: 14px; }
+[data-theme='v8'] .chevron { flex-basis: var(--polish-icon-control); }
 }
 /* B-192: 表示件数は文字と矢印の幅を保つ。96では「20 件表示」が切れる。 */
 [data-theme='v8'] .pageSize { width: 100px; min-width: 100px; flex-shrink: 0; }

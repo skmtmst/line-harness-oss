@@ -526,6 +526,8 @@
 }
 :root {
   --polish-icon-control: 16px;
+  --tpl-select-inset: 12px;
+  --tpl-select-gap: 8px;
   --polish-icon-heading: 20px;
   --polish-icon-empty: 40px;
   --polish-icon-stroke: 1.75;

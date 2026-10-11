@@ -2,6 +2,19 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {chromium} from '@playwright/test'
+test('本物の選ぶ欄CSS: wMMk6の左右12・間8・矢印16を共通値で保つ',async()=>{
+ const css=readFileSync(new URL('../../src/components/shared/select.module.css',import.meta.url),'utf8')
+ const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
+ const browser=await chromium.launch()
+ try{
+  const page=await browser.newPage();const html=style=>`<html data-theme="v8"><style>${globals}\n${style}</style><body><div class="trigger closedTrigger"><span class="value">20件表示</span><svg class="chevron"></svg></div></body></html>`
+  const values=()=>page.locator('.trigger').evaluate(el=>{const s=getComputedStyle(el);return [s.paddingLeft,s.paddingRight,s.gap,el.querySelector('svg').getBoundingClientRect().width]})
+  for(const width of [1440,1152]){
+   await page.setViewportSize({width,height:600});await page.setContent(html(css));assert.deepEqual(await values(),['12px','12px','8px',16])
+   await page.setContent(html(css.replaceAll('padding: 0 var(--tpl-select-inset)', 'padding: 0 10px 0 12px').replaceAll('gap: var(--tpl-select-gap)','gap: 6px')));assert.deepEqual((await values()).slice(0,3),['12px','10px','6px'])
+  }
+ }finally{await browser.close()}
+})
 test('本物のページ送りCSS: 現在地の緑は通常セルの色に負けない（B-211）',async()=>{
  const css=readFileSync(new URL('../../src/components/shared/pagination.module.css',import.meta.url),'utf8')
  // ボタン全体のaria-current用CSSに頼らず、cursorのspanも共通部品自身で緑になる。
