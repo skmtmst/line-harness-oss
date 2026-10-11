@@ -11,7 +11,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useCustomerDeletion } from '@/lib/use-customer-deletion'
 import Notice from '@/components/shared/notice'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
@@ -155,7 +155,9 @@ function FriendDetailV8Inner() {
     <PageFrame kind="detail" boardId="Q5F2QE">
       <PageHeading title={friend?.displayName ?? '友だち詳細'}
         help={<>{subtitle}</>}
-        actions={<><Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />{status ? <StatusPill tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusPill> : friend ? <span className={styles.faint}>やり取りなし</span> : null}<span className={styles.menuAnchor}>
+        leading={<Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />}
+        titleAccessory={status ? <StatusBadge tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusBadge> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
+        actions={<><span className={styles.menuAnchor}>
           <RowMenu
             className={styles.square}
             label="その他の操作"
