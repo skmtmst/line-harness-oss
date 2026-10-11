@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
 export interface Friend {
   id: string;
@@ -437,7 +438,8 @@ export async function getFriendAddBreakdown(
   scope: { allowedAccountIds: readonly string[]; includeUnassigned: boolean } | { allTenants: true },
 ): Promise<{ days: number; firstTime: number; returning: number; unblocked: number }> {
   const allTenants = 'allTenants' in scope;
-  const placeholders = allTenants ? '' : scope.allowedAccountIds.map(() => '?').join(', ');
+  const accountBinds = allTenants || !scope.allowedAccountIds.length ? [] : sqlIdSet(scope.allowedAccountIds).binds;
+  const placeholders = accountBinds.length ? sqlIdSet((scope as { allowedAccountIds: readonly string[] }).allowedAccountIds).sql : '';
   const accountPredicate = allTenants
     ? '1 = 1'
     : placeholders
@@ -445,7 +447,7 @@ export async function getFriendAddBreakdown(
       : scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
   const accountClause = `AND ${accountPredicate}`;
   const binds: unknown[] = [days];
-  if (!allTenants) binds.push(...scope.allowedAccountIds);
+  binds.push(...accountBinds);
   const row = await db
     .prepare(
       `SELECT
@@ -460,7 +462,7 @@ export async function getFriendAddBreakdown(
 
   // ブロック解除で戻ってきた人。いまフォロー中で、外れたことがある人。
   const unblockBinds: unknown[] = [days];
-  if (!allTenants) unblockBinds.push(...scope.allowedAccountIds);
+  unblockBinds.push(...accountBinds);
   const unblockRow = await db
     .prepare(
       `SELECT COUNT(*) AS count

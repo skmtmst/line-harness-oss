@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { refreshBroadcastReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
 // 'segment' は 029 の CHECK では前から許されていたが、型だけ落ちていた。
@@ -134,7 +135,8 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
   } else if (scope) {
     const conditions: string[] = [];
     if (scope.allowedAccountIds.length > 0) {
-      const placeholders = scope.allowedAccountIds.map(() => '?').join(',');
+      const idSet = sqlIdSet(scope.allowedAccountIds);
+      const placeholders = idSet.sql;
       conditions.push(`(
         b.line_account_id IN (${placeholders})
         OR (
@@ -146,7 +148,7 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
           )
         )
       )`);
-      params.push(...scope.allowedAccountIds, ...scope.allowedAccountIds);
+      params.push(...idSet.binds, ...idSet.binds);
     }
     if (scope.canSeeUnassigned) {
       conditions.push('(b.line_account_id IS NULL AND b.account_ids IS NULL)');
