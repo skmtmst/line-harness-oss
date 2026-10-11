@@ -641,6 +641,75 @@ it.each([
   },
 );
 
+/**
+ * Workers の実行環境は転送の扱いに `follow` と `manual` しか受け付けず、`error` を渡すと
+ * **通信する前に** TypeError で弾かれる（転送が起きたかに関係ない）。
+ * 試験のここでの `fetch` は実行環境の検査をしないため、指定そのものを確かめる。
+ */
+it('Metaへの要求は転送の扱いに manual を指定する（error は実行環境が受け付けない）', async () => {
+  await connect();
+  const redirects = vi
+    .mocked(fetch)
+    .mock.calls.map(([, init]) => (init as RequestInit | undefined)?.redirect);
+  expect(redirects.length).toBeGreaterThan(0);
+  expect(redirects).not.toContain('error');
+  expect(new Set(redirects)).toEqual(new Set(['manual']));
+});
+
+/**
+ * 転送は追わない。追えば合鍵・アプリシークレット・認可コードを Meta 以外の宛先へ
+ * 渡してしまう。転送先（`Location`）は戻り先URLにも記録にも出さず、状態番号だけ残す。
+ */
+it('転送応答は失敗にし、転送先URLは戻り先URLと記録へ出さない', async () => {
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string, init?: RequestInit) => {
+      if (new URL(String(url)).pathname.endsWith('/oauth/access_token'))
+        return new Response(null, {
+          status: 302,
+          // 転送先に秘密値のような値を入れておく。
+          headers: { location: 'https://example.invalid/x?secret=abcdef' },
+        });
+      return original(url, init);
+    }),
+  );
+  const logged: string[] = [];
+  const spy = vi
+    .spyOn(console, 'error')
+    .mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+  let location = '';
+  try {
+    const start = await read(await req('/api/instagram/oauth/start', {})),
+      state = new URL(start.data.url).searchParams.get('state')!;
+    const callback = await req(
+      '/api/instagram/oauth/callback?' +
+        new URLSearchParams({ state, code: 'mock_code' }),
+    );
+    expect(callback.status).toBe(302);
+    location = callback.headers.get('location') ?? '';
+  } finally {
+    spy.mockRestore();
+  }
+  const back = new URL(location);
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  expect(back.searchParams.get('instagram_code')).toBe('meta_request_failed');
+  expect(back.searchParams.get('instagram_detail')).toBe(
+    'GET v24.0/oauth/access_token redirect=302',
+  );
+  const returned = `${location}\n${decodeURIComponent(location)}`;
+  expect(`${returned}\n${logged.join('\n')}`).not.toContain('example.invalid');
+  expect(`${returned}\n${logged.join('\n')}`).not.toContain('secret');
+  // 境目でも状態番号だけに絞り直す。
+  expect(
+    instagramUrlDetail(
+      'GET v24.0/oauth/access_token redirect=302 location=https://example.invalid/x',
+    ),
+  ).toBe('GET v24.0/oauth/access_token redirect=302');
+});
+
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {
   await connect();
   const messages = [
