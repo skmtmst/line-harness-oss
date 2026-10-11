@@ -22,7 +22,7 @@
 | 本線・修正前 | 18/20合格 | 18/20合格 | 通常9・20回目、CPU4倍15・20回目 |
 | 列車21・修正後 | **20/20合格** | **20/20合格** | なし |
 
-各回は同じCLIで1440・1152・1920の3幅を順番に完走する。各条件20回、合計120回。重い処理は同時実行せず、CPU4倍は各pageへCDP `Emulation.setCPUThrottlingRate({ rate: 4 })` を適用した。小さい標本なので故障率の同一性までは断定しないが、本線にも同じ待ち条件の故障がある。
+各回は同じCLIで1440・1152・1920の3幅を順番に検査する（失敗時はその幅で停止）。修正後の40回はすべて3幅を完走した。各条件20回、合計120回。重い処理は同時実行せず、CPU4倍は各pageへCDP `Emulation.setCPUThrottlingRate({ rate: 4 })` を適用した。小さい標本なので故障率の同一性までは断定しないが、本線にも同じ待ち条件の故障がある。
 
 環境は手元のmacOS・Node v26・PlaywrightのChromium。CIのLinux・Node 22とOSは異なるが、組み立て方は `.github/workflows/required-pr-gate.yml` と同じ。`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788`、`NEXT_PUBLIC_RESTAURANT_TEST_ENABLED=true` で共有パッケージとwebをビルドし、静的outを4310（列車）・4311（本線）で配る。8788の既存見本APIを起動し、変更していないstress APIで実際に2,000件を返す。修正前の本線比較には、待ち条件を変えず診断だけ足した検査の保存版を使用。
 
