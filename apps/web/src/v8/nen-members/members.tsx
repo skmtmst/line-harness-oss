@@ -90,9 +90,9 @@ export default function MembersV8({
   if (!accountId) {
     body = <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、会員を見るLINEアカウントを選びます。" />
   } else if (tab === 'ranks') {
-    body = <RankSettingsV8 key={accountId} accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} onTopBand={setTopBand} />
+    body = <RankSettingsV8 accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} onTopBand={setTopBand} />
   } else if (tab === 'lifetime') {
-    body = <LifetimeV8 key={accountId} accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} />
+    body = <LifetimeV8 accountId={accountId} status={status} settings={settings} onSaved={onSaved} onRetry={onRetry} readonly={readonly} />
   } else {
     body = <MembersListV8 key={accountId} accountId={accountId} settings={settings} />
   }
