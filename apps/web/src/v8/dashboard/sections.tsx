@@ -164,6 +164,7 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
 }) {
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
   const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
+  const twoFactorText = `・組織全体の二段階認証：${twoFactor === null ? emptyValue('unknown') : `${twoFactor.enabled} / ${twoFactor.total}人`}`
   return (
     <DashboardAsideSection>
       <SectionHeader title="運用アラート" href="/emergency" linkLabel="運用状態を見る" />
@@ -174,7 +175,7 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
         {!failed && count !== null ? <Tag tone={count > 0 ? 'warning' : 'success'}>{count > 0 ? '要確認' : '正常'}</Tag> : null}
       </p>
       <p className={styles.item}>{`・最も古い未対応：${oldestWaitMinutes === null ? emptyValue('unknown') : formatWaitRough(oldestWaitMinutes)}`}</p>
-      <p className={styles.item}>{`・組織全体の二段階認証：${twoFactor === null ? emptyValue('unknown') : `${twoFactor.enabled} / ${twoFactor.total}人`}`}</p>
+      <p className={styles.item} title={twoFactorText}>{twoFactorText}</p>
       <Updated>{dashboardLocalUpdatedAt(updatedAt)}</Updated>
     </DashboardAsideSection>
   )
