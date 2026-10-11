@@ -161,3 +161,19 @@ describe('V8 ウェビナー一覧', () => {
     expect(buttonByLabel('フォルダ「セミナー」の操作')).toBeTruthy()
   })
 })
+
+it('B-241：フォルダ取得失敗と空を分け、読み直して分類を復帰する',async()=>{
+ const fixtureFetch=globalThis.fetch
+ let reads=0
+ vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{
+   if(new URL(String(input)).pathname.includes('/folders')) {reads++;if(reads===1)throw new Error('fixture failure')}
+   return fixtureFetch(input,init)
+ })
+ await render()
+ expect(host.textContent).toContain('フォルダを読み込めませんでした')
+ await act(async()=>{(host.querySelector('[data-list-state="error"] button') as HTMLButtonElement).click()})
+ await act(async()=>{})
+ expect(host.textContent).not.toContain('フォルダを読み込めませんでした')
+ expect(host.textContent).toContain('セミナー')
+ expect(reads).toBe(2)
+})

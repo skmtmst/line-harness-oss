@@ -9,6 +9,7 @@ export type ScheduledJobFailure = {
 };
 
 export const SCHEDULED_CRONS = {
+  restaurantMinute: '* * * * *',
   delivery: '*/5 * * * *',
   frequentHeavy: '1-56/5 * * * *',
   sixHourlyHeavy: '0 */6 * * *',

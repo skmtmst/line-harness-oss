@@ -85,10 +85,10 @@ describe('getFriendByLineUserIdForAccount', () => {
     expect(friend?.id).toBe('friend-u');
   });
 
-  test('lineAccountId 未指定はアカウント文脈なしのレガシー呼出として先頭一致を返す', async () => {
+  test('SEC-04 lineAccountId 未指定では他店の行を返さない', async () => {
     const friend = await getFriendByLineUserIdForAccount(db, 'U-shared', null);
 
-    expect(friend).not.toBeNull();
+    expect(friend).toBeNull();
   });
 
   test('同一アカウントにも未割当にも無い場合は null を返す', async () => {

@@ -2,7 +2,18 @@
 /*
  * ★V8 友だち（src/v8/friends）の言葉・日付・権限の判定の試験。BEHAVIOR.md の決まりを守る。
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// 見本を作る前に時計を固定。日付以外の待ち合わせは実時間で動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-11T15:09:00Z'))
+})
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-11T15:09:00Z'))
+})
+afterEach(() => vi.useRealTimers())
 import { lastContactOf, monthDayTime, splitTags, statusOf } from './list/words'
 import { FRIENDS_TABS, hasEditKey } from './shared/nav'
 import { STATUS_FILTERS, slashDateTime } from './duplicates/words'
@@ -17,7 +28,7 @@ describe('友だち一覧の言葉', () => {
   })
 
   it('受信の時刻は記録の文字のまま（時差を足さない）', () => {
-    const year = new Date().getFullYear()
+    const year = 2026
     expect(monthDayTime(`${year}-08-14T07:58:00.000Z`)).toBe('08/14 07:58')
     expect(monthDayTime('2020-01-02T10:05:00')).toBe('2020/01/02')
     expect(monthDayTime('壊れた値')).toBe('—')

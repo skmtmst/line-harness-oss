@@ -1,9 +1,10 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange } from '@line-crm/shared';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
-  getBroadcasts,
+  getBroadcastListPage,
   getBroadcastById,
   createBroadcast,
   updateBroadcast,
@@ -619,56 +620,28 @@ broadcasts.get('/api/broadcasts', async (c) => {
     try { range = parseExecutionDateRange({ from: c.req.query('from'), to: c.req.query('to') }); }
     catch (error) { return c.json({ success: false, error: (error as Error).message }, 400); }
     const sort = c.req.query('sort') === 'oldest' ? 'asc' as const : 'desc' as const;
-    const allItems = await getBroadcasts(c.env.DB, lineAccountId || undefined, scope, { order: sort, ...range });
     const status = c.req.query('status');
     const folderId = c.req.query('folderId');
-    /*
-     * ★V8 一覧：絞り込みの札（すべて・予約中・下書き・承認待ち・送信済み・
-     * エラー）は 10 の状態（displayStatus）で絞る。台帳の status は4つしか
-     * 無いので、displayStatus パラメータで画面の札と同じ分け方を受ける。
-     */
     const displayStatusParam = c.req.query('displayStatus');
-    const wantedDisplayStatuses = displayStatusParam
-      ? new Set(displayStatusParam.split(',').map((value) => value.trim()).filter(Boolean))
-      : null;
-    /*
-     * 札の件数と displayStatus の絞りは、フォルダだけを効かせた集団で数える
-     * （状態の札そのもので絞った数を札へ書くと、選ぶたびに他の札が減る）。
-     */
-    const folderFiltered = allItems.filter((item) =>
-      !folderId || (folderId === 'unfiled' ? !item.folder_id : item.folder_id === folderId));
-    // 一覧の状態（10の状態・#816）は台帳の集計と合わせて読む。N+1にしない。
-    const ledgerMap = await ledgerCountsForBroadcasts(
-      c.env.DB,
-      folderFiltered.map((item) => String((item as unknown as Record<string, unknown>).id)),
-    );
+    const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') ?? '20', 10) || 20));
+    const page = await getBroadcastListPage(c.env.DB, lineAccountId || undefined, scope, {
+      order: sort, ...range, folderId, status,
+      displayStatuses: displayStatusParam ? displayStatusParam.split(',').map(value => value.trim()).filter(Boolean) : undefined,
+      limit, offset: cursor,
+    });
+    const pageItems = page.items;
+    const statusCounts = page.statusCounts;
+    const ledgerMap = await ledgerCountsForBroadcasts(c.env.DB, pageItems.map(item => item.id));
     const displayStatusOf = (item: unknown): BroadcastDisplayStatus => {
       const raw = item as Record<string, unknown>;
-      const counts = ledgerMap.get(String(raw.id)) ?? { sent: 0, failed: 0, unknown: 0, claimed: 0, temp: 0, perm: 0 };
-      return deriveBroadcastDisplayStatus({
-        status: String(raw.status ?? 'draft'),
-        approvalStatus: (raw.approval_status as string | null | undefined) ?? 'none',
-        scheduledAt: (raw.scheduled_at as string | null | undefined) ?? null,
-        stopped: !!(raw.stopped_at),
-        sent: counts.sent,
-        failed: counts.failed,
-        unknown: counts.unknown,
-        ledgerRows: counts.sent + counts.failed + counts.unknown + counts.claimed,
-      });
+      const counts = ledgerMap.get(String(raw.id)) ?? { sent: 0, failed: 0, unknown: 0, claimed: 0 };
+      return deriveBroadcastDisplayStatus({status:String(raw.status??'draft'),
+        approvalStatus:(raw.approval_status as string|null|undefined)??'none',
+        scheduledAt:(raw.scheduled_at as string|null|undefined)??null,stopped:!!raw.stopped_at,
+        sent:counts.sent,failed:counts.failed,unknown:counts.unknown,
+        ledgerRows:counts.sent+counts.failed+counts.unknown+counts.claimed});
     };
-    // 札ごとの件数。札の横の数はここから出す（数の出所を画面に分散させない）。
-    const statusCounts: Record<string, number> = { all: folderFiltered.length };
-    for (const item of folderFiltered) {
-      const key = displayStatusOf(item);
-      statusCounts[key] = (statusCounts[key] ?? 0) + 1;
-    }
-    const filtered = folderFiltered.filter((item) =>
-      (!status || (item as unknown as Record<string, unknown>).status === status)
-      && (!wantedDisplayStatuses || wantedDisplayStatuses.has(displayStatusOf(item))));
-    const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
-    const requestedLimit = c.req.query('limit');
-    const limit = requestedLimit ? Math.min(100, Math.max(1, Number.parseInt(requestedLimit, 10) || 20)) : filtered.length;
-    const pageItems = filtered.slice(cursor, cursor + limit);
     const { getBroadcastStats } = await import('@line-crm/db');
     const stats = await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope);
     const data = pageItems.map((item) => {
@@ -685,17 +658,17 @@ broadcasts.get('/api/broadcasts', async (c) => {
       data,
       kpis: {
         scheduled: stats.scheduled,
-        drafts: allItems.filter((item) => item.status === 'draft').length,
+        drafts: page.drafts,
         thisMonth: stats.thisMonth,
         delivered: stats.delivered,
         openRate: stats.openRate,
       },
       statusCounts,
       pagination: {
-        total: filtered.length,
+        total: page.total,
         limit,
         cursor,
-        nextCursor: cursor + limit < filtered.length ? String(cursor + limit) : null,
+        nextCursor: cursor + limit < page.total ? String(cursor + limit) : null,
       },
     });
   } catch (err) {
@@ -1161,7 +1134,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
     // sent 数: messages_log の line_account_id (送信時固定) で GROUP BY する。
     // 旧データ (032 migration 前) は ml.line_account_id=NULL なので、その場合だけ
     // friends.line_account_id にフォールバックする (best-effort、現在のアカウント帰属で集計)。
-    const placeholders = accountIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(accountIds).sql;
     const sentRes = await c.env.DB.prepare(
       `SELECT COALESCE(ml.line_account_id, f.line_account_id) AS account_id, COUNT(*) AS sent
        FROM messages_log ml
@@ -1169,14 +1142,14 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
        WHERE ml.broadcast_id = ? AND ml.direction = 'outgoing'
          AND COALESCE(ml.line_account_id, f.line_account_id) IN (${placeholders})
        GROUP BY COALESCE(ml.line_account_id, f.line_account_id)`,
-    ).bind(id, ...accountIds).all<{ account_id: string; sent: number }>();
+    ).bind(id, ...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ account_id: string; sent: number }>();
     const sentMap = new Map<string, number>();
     for (const r of sentRes.results ?? []) sentMap.set(r.account_id, r.sent);
 
     // アカウント名
     const metaRes = await c.env.DB.prepare(
       `SELECT id, name FROM line_accounts WHERE id IN (${placeholders})`,
-    ).bind(...accountIds).all<{ id: string; name: string }>();
+    ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ id: string; name: string }>();
     const nameMap = new Map<string, string>();
     for (const r of metaRes.results ?? []) nameMap.set(r.id, r.name);
 
@@ -1301,7 +1274,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
     const scheduledAt = typeof body.scheduledAt === 'string' && body.scheduledAt ? body.scheduledAt : null;
     let concurrentBroadcasts: Array<{ id: string; title: string; scheduledAt: string }> = [];
     if (scheduledAt && accountIds.length > 0) {
-      const placeholders = accountIds.map(() => '?').join(',');
+      const placeholders = sqlIdSet(accountIds).sql;
       const rows = await c.env.DB.prepare(
         `SELECT id, title, scheduled_at
            FROM broadcasts
@@ -1309,7 +1282,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
             AND line_account_id IN (${placeholders})
             AND ABS(strftime('%s', scheduled_at) - strftime('%s', ?)) <= 3600
           ORDER BY scheduled_at, id LIMIT 10`,
-      ).bind(...accountIds, scheduledAt).all<{ id: string; title: string; scheduled_at: string }>();
+      ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : []), scheduledAt).all<{ id: string; title: string; scheduled_at: string }>();
       concurrentBroadcasts = rows.results.map((row) => ({ id: row.id, title: row.title, scheduledAt: row.scheduled_at }));
     }
 
@@ -3196,10 +3169,10 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
       return c.json({ success: false, error: '短時間に繰り返し送信しています。10秒待ってからやり直してください' }, { status: 429, headers: { 'Retry-After': '10' } });
     }
 
-    const placeholders = friendIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(friendIds).sql;
     const friends = await c.env.DB.prepare(
       `SELECT id, line_user_id, display_name FROM friends WHERE id IN (${placeholders})`
-    ).bind(...friendIds).all<{ id: string; line_user_id: string; display_name: string | null }>();
+    ).bind(...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string; display_name: string | null }>();
 
     const account = await getLineAccountById(c.env.DB, accountId);
     if (!account) return inputError(c, { success: false, error: 'LINE account not found' }, 400, []);
@@ -3317,7 +3290,7 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
     uniqueClick: null;
   }> = [];
   if (accountIds.length > 0) {
-    const placeholders = accountIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(accountIds).sql;
     const [sentRows, accountRows] = await Promise.all([
       c.env.DB.prepare(
         `SELECT COALESCE(ml.line_account_id, f.line_account_id) AS account_id, COUNT(*) AS sent
@@ -3326,9 +3299,9 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
           WHERE ml.broadcast_id = ? AND ml.direction = 'outgoing'
             AND COALESCE(ml.line_account_id, f.line_account_id) IN (${placeholders})
           GROUP BY COALESCE(ml.line_account_id, f.line_account_id)`,
-      ).bind(id, ...accountIds).all<{ account_id: string; sent: number }>(),
+      ).bind(id, ...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ account_id: string; sent: number }>(),
       c.env.DB.prepare(`SELECT id, name FROM line_accounts WHERE id IN (${placeholders})`)
-        .bind(...accountIds).all<{ id: string; name: string }>(),
+        .bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ id: string; name: string }>(),
     ]);
     const sentByAccount = new Map(sentRows.results.map((row) => [row.account_id, Number(row.sent)]));
     const nameByAccount = new Map(accountRows.results.map((row) => [row.id, row.name]));

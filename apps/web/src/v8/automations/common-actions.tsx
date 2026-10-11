@@ -122,6 +122,7 @@ export default function CommonActionsV8() {
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
+  const [foldersError,setFoldersError]=useState(false)
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
@@ -169,12 +170,14 @@ export default function CommonActionsV8() {
   /* フォルダの箱と件数（kind=common_action）。 */
   const loadFolders = useCallback(async () => {
     if (!selectedAccountId) { setFolders([]); return }
+    setFoldersError(false)
     try {
       const res = await api.folders.list('common_action', selectedAccountId)
-      setFolders(res.success ? res.data : [])
+      if(!res.success)throw new Error(res.error)
+      setFolders(res.data)
       setUnfiledCount(res.success ? res.unfiledCount ?? null : null)
     } catch {
-      setFolders([])
+      setFoldersError(true)
     }
   }, [selectedAccountId])
 
@@ -418,7 +421,7 @@ export default function CommonActionsV8() {
         {viewerOnly ? <ViewerBand /> : null}
         <AutomationBand label="共通アクションの数の帯" cells={cells} />
       </>}
-      folders={<>
+      folders={foldersError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void loadFolders()}/>:<>
         {createButton}
         {/* 共通のフォルダの列（種類 common_action）。一覧の口がフォルダで絞れるまでは件数を出さず、未分類に全部を数える。 */}
         <ManagedFolderPanel
@@ -438,7 +441,7 @@ export default function CommonActionsV8() {
           placeholder="例： 購入・予約"
         />
       </>}
-      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
+      folderNav={foldersError?undefined:{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: canEdit ? createButton : undefined }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

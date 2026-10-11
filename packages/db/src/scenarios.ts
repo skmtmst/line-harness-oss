@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { accountFeatureOffExclusionSql } from './account-settings.js';
 import { refreshScenarioReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
@@ -418,8 +419,8 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
     ...(referrerIds.length > 0
       ? [
         db.prepare(
-          `UPDATE scenarios SET on_complete_mode = 'pause', on_complete_scenario_id = NULL WHERE id IN (${referrerIds.map(() => '?').join(',')})`,
-        ).bind(...referrerIds),
+          `UPDATE scenarios SET on_complete_mode = 'pause', on_complete_scenario_id = NULL WHERE id IN (${sqlIdSet(referrerIds).sql})`,
+        ).bind(...(referrerIds.length ? sqlIdSet(referrerIds).binds : [])),
       ]
       : []),
   ]);

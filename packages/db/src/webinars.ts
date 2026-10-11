@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 
 export interface Webinar {
@@ -297,15 +298,15 @@ function webinarScopeWhere(scope: WebinarListScope, alias = 'w'): {
     return { sql: `${alias}.account_id = ?`, bindings: [scope.accountId] };
   }
   const accountSql = scope.allowedAccountIds.length > 0
-    ? `${alias}.account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})`
+    ? `${alias}.account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})`
     : null;
   if (accountSql && scope.canSeeUnassigned) {
     return {
       sql: `(${accountSql} OR ${alias}.account_id IS NULL)`,
-      bindings: scope.allowedAccountIds,
+      bindings: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [],
     };
   }
-  if (accountSql) return { sql: accountSql, bindings: scope.allowedAccountIds };
+  if (accountSql) return { sql: accountSql, bindings: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [] };
   return {
     sql: scope.canSeeUnassigned ? `${alias}.account_id IS NULL` : '1 = 0',
     bindings: [],

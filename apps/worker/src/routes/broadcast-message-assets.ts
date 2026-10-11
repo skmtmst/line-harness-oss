@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateTapExtraReferences } from '../services/tap-extras.js';
 import { prepareImagemapImages, IMAGEMAP_WIDTHS } from '../services/imagemap-images.js';
@@ -104,7 +105,7 @@ async function readPrefix(stream: ReadableStream<Uint8Array>, length: number): P
 async function adminAccountScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const where = scope.allowedAccountIds.length
-    ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+    ? `(line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
     : scope.canSeeUnassigned
       ? 'line_account_id IS NULL'
       : '1 = 0';
@@ -236,7 +237,7 @@ broadcastMessageAssets.get('/api/broadcast-message-assets/counts', async (c) => 
   const counts = await countBroadcastMessageAssetsByKind(
     c.env.DB,
     where,
-    scope.allowedAccountIds,
+    scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [],
     lineAccountId || undefined,
     folderParam !== undefined || statusParam !== undefined
       ? { folderId: folderFilter, status: statusParam }

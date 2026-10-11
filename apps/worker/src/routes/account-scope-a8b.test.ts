@@ -68,14 +68,14 @@ describe('A-8b omitted account scope', () => {
     // (ec_orders側の口)が1件増えて計4件。
     expect(records).toHaveLength(4);
     expect(records[3].sql).toContain('FROM ec_orders');
-    expect(records[3].sql).toContain('o.line_account_id IN (?,?)');
-    expect(records[3].binds).toEqual(['account-a', 'account-b']);
+    expect(records[3].sql).toContain('o.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(records[3].binds).toEqual([JSON.stringify(['account-a', 'account-b'])]);
     // 経路別一覧は注文の相関副問合せ(f2)ぶんも同じアカウント範囲で束縛する
-    expect(records[0].sql).toContain('f.line_account_id IN (?,?)');
-    expect(records[0].binds).toEqual(Array(8).fill('account-a', 0, 8).map((_, i) => (i % 2 === 0 ? 'account-a' : 'account-b')));
+    expect(records[0].sql).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(records[0].binds).toEqual(Array(4).fill(JSON.stringify(['account-a', 'account-b'])));
     for (const record of records.slice(1, 3)) {
-      expect(record.sql).toContain('f.line_account_id IN (?,?)');
-      expect(record.binds).toEqual(['account-a', 'account-b']);
+      expect(record.sql).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+      expect(record.binds).toEqual([JSON.stringify(['account-a', 'account-b'])]);
     }
   });
 
@@ -87,8 +87,8 @@ describe('A-8b omitted account scope', () => {
 
     expect(response.status).toBe(200);
     const friendQuery = records[1];
-    expect(friendQuery.sql).toContain('f.line_account_id IN (?,?)');
-    expect(friendQuery.binds).toEqual(['campaign-a', 'campaign-a', 'account-a', 'account-b']);
+    expect(friendQuery.sql).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(friendQuery.binds).toEqual(['campaign-a', 'campaign-a', JSON.stringify(['account-a', 'account-b'])]);
   });
 
   test.each([

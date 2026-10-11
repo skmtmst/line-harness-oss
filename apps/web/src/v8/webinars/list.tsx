@@ -364,6 +364,7 @@ function WebinarList() {
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
   const [foldersReady, setFoldersReady] = useState(false)
+  const [foldersLoadError,setFoldersLoadError]=useState(false)
   const [folders, setFolders] = useState<WebinarFolder[]>([])
   const [folderFormOpen, setFolderFormOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<WebinarFolder | null>(null)
@@ -486,16 +487,18 @@ function WebinarList() {
     const generation = ++folderGeneration.current
     setFolders([])
     setFoldersReady(false)
+    setFoldersLoadError(false)
     if (!selectedAccountId) return
     try {
       const response = await webinarApi.folders(selectedAccountId)
       if (folderGeneration.current !== generation) return
-      setFolders(response.success ? response.data : [])
+      if(!response.success)throw new Error(response.error)
+      setFolders(response.data)
       setFoldersReady(response.success && Array.isArray(response.data))
     } catch (saveFailure) {
       saveErrors.capture(saveFailure);
 
-      if (folderGeneration.current === generation) setFolders([])
+      if (folderGeneration.current === generation) setFoldersLoadError(true)
     }
   }, [selectedAccountId, saveErrors])
 
@@ -992,7 +995,7 @@ function WebinarList() {
           ))}
         </KpiBand>
       </>}
-      folders={<>
+      folders={foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>
         <FolderPanel
           createAction={createButton}
           activeId={selectedFolder}
@@ -1005,7 +1008,7 @@ function WebinarList() {
           <FolderPanelNote>フォルダを消しても、中のウェビナーは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
+      collapsedFolders={narrow ? undefined : foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}</>}
       toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{narrow ? narrowToolbar : wideToolbar}</>}
       pagination={pager}
       overlays={<>

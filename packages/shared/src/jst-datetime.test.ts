@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { jstDate, jstCalendar, jstDayStartIso, jstMonthStart, jstDateTimeLocal, jstDateOffset, jstMonthRange } from './jst-datetime'
+import { jstDate, jstCalendar, jstDayStartIso, jstMonthStart, jstDateTimeLocal, jstDateOffset, jstMonthRange, isCalendarDate } from './jst-datetime'
 afterEach(() => vi.useRealTimers())
 test.each(['UTC', 'Pacific/Honolulu'])('全アプリで%sの時計でも日本の00:09を当日と扱う', timezone => {
   const previous = process.env.TZ
@@ -19,3 +19,5 @@ test.each(['UTC', 'Pacific/Honolulu'])('全アプリで%sの時計でも日本�
     else process.env.TZ = previous
   }
 })
+
+test.each([['2026-02-30', false], ['2026-02-29', false], ['2028-02-29', true], ['2026-04-31', false], ['2026-12-31', true], ['2026-13-01', false], [null, false]])('実在する暦日を共通で検査する: %s', (date, valid) => { expect(isCalendarDate(date)).toBe(valid) })

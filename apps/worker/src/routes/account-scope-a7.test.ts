@@ -94,8 +94,8 @@ describe('A-7 tenant scope', () => {
   ])('%s filters rows to visible accounts', async (path) => {
     const harness = app();
     expect((await harness.instance.request(path)).status).toBe(200);
-    expect(harness.sql[0].query).toContain('f.line_account_id IN (?)');
-    expect(harness.sql[0].bindings).toEqual(['own-account']);
+    expect(harness.sql[0].query).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(harness.sql[0].bindings).toEqual([JSON.stringify(['own-account'])]);
   });
 
   test('/api/nen-members/photos requires and filters to one selected account', async () => {

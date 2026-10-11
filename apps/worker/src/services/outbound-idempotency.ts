@@ -22,6 +22,7 @@ export type OutboundFailureClassification = {
 };
 
 type OutboundRow = {
+  created_at: string;
   channel: OutboundChannel;
   resource_id: string;
   payload_hash: string;
@@ -64,7 +65,7 @@ async function readOutboundRow(db: D1Database, key: string): Promise<OutboundRow
   return db
     .prepare(
       `SELECT channel, resource_id, payload_hash, line_account_id, status, response_id,
-              failure_code, retryable, next_retry_at, lease_token
+              failure_code, retryable, next_retry_at, lease_token, created_at
          FROM outbound_send_requests WHERE idempotency_key = ?`,
     )
     .bind(key)
@@ -168,6 +169,13 @@ export async function reserveOutboundSend(
     return { kind: 'in_progress' };
   }
 
+  if (args.retryInProgress && row.channel === 'line'
+      && (!Number.isFinite(Date.parse(row.created_at)) || Date.parse(args.now)-Date.parse(row.created_at) >= 86_400_000)) {
+    await db.prepare(`UPDATE outbound_send_requests SET status='unknown',failure_code='LINE_RETRY_KEY_EXPIRED',
+      retryable=0,next_retry_at=NULL,last_failed_at=?,updated_at=?,lease_token=NULL,lease_expires_at=NULL
+      WHERE idempotency_key=? AND status='in_progress'`).bind(args.now,args.now,args.key).run();
+    return {kind:'unknown',code:'LINE_RETRY_KEY_EXPIRED'};
+  }
   if (args.retryInProgress && row.lease_token) {
     return { kind: 'retry', leaseToken: row.lease_token };
   }

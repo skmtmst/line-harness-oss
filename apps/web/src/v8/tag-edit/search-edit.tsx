@@ -612,7 +612,8 @@ export default function SavedSearchEditV8() {
     ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult, formResult, operatorResult]) => {
       // R518: 切替後に届いた古い応答は捨てる。今の対象の再試行だけを描く。
       if (cancelled || generation !== loadGenerationRef.current) return
-      if (tagResult.success) setTags(tagResult.data)
+      if(!searches.success || !tagResult.success)throw new Error('references unavailable')
+      setTags(tagResult.data)
       setMarks(markResult?.success ? markResult.data : [])
       setScenarios(scenarioResult?.success ? scenarioResult.data : [])
       setFields(fieldResult?.success ? fieldResult.data : [])
@@ -625,8 +626,8 @@ export default function SavedSearchEditV8() {
         forms: formResult?.success !== true,
         operators: operatorResult?.success !== true,
       })
-      setSavedCount(searches.success ? searches.summary.total : null)
-      setSiblingSearches(searches.success ? searches.items.map((item) => ({ id: item.id, name: item.name })) : [])
+      setSavedCount(searches.summary.total)
+      setSiblingSearches(searches.items.map((item) => ({ id: item.id, name: item.name })))
       const found = detail.success ? detail.data : null
       if (!found) {
         setError('保存した検索が見つかりません')

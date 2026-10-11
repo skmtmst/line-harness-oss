@@ -246,19 +246,22 @@ export default function TemplatesListV8() {
   const [pickerOpen, setPickerOpen] = useState(false)
   /* 見本から作る（F-5）。窓を初めて開いたときに1回だけ読む。読めなければ段を出さない。 */
   const [examples, setExamples] = useState<TemplateExample[] | null>(null)
+  const [examplesError,setExamplesError]=useState(false)
+  const [examplesRetry,setExamplesRetry]=useState(0)
   const examplesRequested = useRef(false)
   useEffect(() => {
     if (!pickerOpen || examplesRequested.current) return
     examplesRequested.current = true
+    setExamplesError(false)
     let cancelled = false
     loadTemplateExamples()
       .then((items) => { if (!cancelled) setExamples(items) })
       .catch(() => {
         examplesRequested.current = false
-        if (!cancelled) setExamples([])
+        if (!cancelled) setExamplesError(true)
       })
     return () => { cancelled = true }
-  }, [pickerOpen])
+  }, [pickerOpen,examplesRetry])
   const [savedMenuOpen, setSavedMenuOpen] = useState(false)
   const savedAnchorRef = useRef<HTMLElement | null>(null)
 
@@ -1328,6 +1331,7 @@ export default function TemplatesListV8() {
               </button>
             ))}
           </div>
+          {examplesError?<ListState kind="error" title="見本を読み込めませんでした" onRetry={()=>setExamplesRetry(value=>value+1)}/>:null}
           {examples && examples.length > 0 ? (
             <section className={styles.examples} aria-label="見本から作る">
               <h3 className={styles.examplesTitle}>見本から作る</h3>

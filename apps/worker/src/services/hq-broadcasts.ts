@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import type { HqMediaRuntime } from './hq-media.js';
 import { resolveHqBroadcastAudience, countHqAudience } from './hq-broadcast-audience.js';
 import { hqBroadcastApprovalState } from './hq-broadcast-approval.js';
@@ -80,7 +81,7 @@ export async function prepareHqBroadcast(db:D1Database,tenantId:string,actorId:s
   for(const tag of b.accountTagIds)if(!await db.prepare('SELECT id FROM line_account_tags WHERE id=? AND tenant_id=?').bind(tag,tenantId).first())throw new StampError('分類を確認してください',403);
   const all=(await db.prepare('SELECT id,name FROM line_accounts WHERE tenant_id=? AND archived_at IS NULL').bind(tenantId).all<{id:string;name:string}>()).results;
   for(const id of [...b.accountIds,...b.excludedAccountIds])if(!all.some(a=>a.id===id))throw new StampError('店舗を確認してください',403);
-  const tagged=b.accountTagIds.length?(await db.prepare(`SELECT DISTINCT line_account_id FROM line_account_tag_links WHERE tenant_id=? AND tag_id IN (${b.accountTagIds.map(()=>'?').join(',')})`).bind(tenantId,...b.accountTagIds).all<{line_account_id:string}>()).results.map(x=>x.line_account_id):[];
+  const tagged=b.accountTagIds.length?(await db.prepare(`SELECT DISTINCT line_account_id FROM line_account_tag_links WHERE tenant_id=? AND tag_id IN (${sqlIdSet(b.accountTagIds).sql})`).bind(tenantId,...(b.accountTagIds.length ? sqlIdSet(b.accountTagIds).binds : [])).all<{line_account_id:string}>()).results.map(x=>x.line_account_id):[];
   const selected=all.filter(a=>[...b.accountIds,...tagged].includes(a.id));if(!selected.length)throw new StampError('対象店がありません', 400, ["accountIds","accountTagIds"]);
   const id=update?.run.id??crypto.randomUUID(),token=crypto.randomUUID(),statements=[db.prepare('INSERT INTO hq_broadcast_runs(id,tenant_id,request_id,actor_id,input_json,scheduled_at) VALUES(?,?,?,?,?,?)').bind(id,tenantId,b.requestId,actorId,canonical,b.scheduledAt)];
   if(update){

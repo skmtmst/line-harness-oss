@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
 export interface Friend {
   id: string;
@@ -108,7 +109,7 @@ export async function getFollowingLineUserIdsByTag(
  *   紐づいていない未割当 (NULL) の行だけを返す。**別アカウント所有の行は
  *   絶対に返さない**（跨ぎフォールバックは廃止）。
  * - lineAccountId が null の場合: アカウント文脈を持たないレガシー呼出として
- *   従来どおり line_user_id の先頭一致を返す。
+ *   未割当の行だけを返す。他店の所属を推測しない。
  *
  * 未割当行を受信アカウントへ引き当てるかは各呼出側の明示的な判断に委ねる
  * （例: webhook は受信時に NULL 行を自アカウントへ引き当てる）。
@@ -132,7 +133,7 @@ export async function getFriendByLineUserIdForAccount(
       .bind(lineUserId, lineAccountId, lineAccountId)
       .first<Friend>();
   }
-  return getFriendByLineUserId(db, lineUserId);
+  return db.prepare('SELECT * FROM friends WHERE line_user_id = ? AND line_account_id IS NULL LIMIT 1').bind(lineUserId).first<Friend>();
 }
 
 export async function getFriendByLineUserId(
@@ -437,7 +438,8 @@ export async function getFriendAddBreakdown(
   scope: { allowedAccountIds: readonly string[]; includeUnassigned: boolean } | { allTenants: true },
 ): Promise<{ days: number; firstTime: number; returning: number; unblocked: number }> {
   const allTenants = 'allTenants' in scope;
-  const placeholders = allTenants ? '' : scope.allowedAccountIds.map(() => '?').join(', ');
+  const accountBinds = allTenants || !scope.allowedAccountIds.length ? [] : sqlIdSet(scope.allowedAccountIds).binds;
+  const placeholders = accountBinds.length ? sqlIdSet((scope as { allowedAccountIds: readonly string[] }).allowedAccountIds).sql : '';
   const accountPredicate = allTenants
     ? '1 = 1'
     : placeholders
@@ -445,7 +447,7 @@ export async function getFriendAddBreakdown(
       : scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
   const accountClause = `AND ${accountPredicate}`;
   const binds: unknown[] = [days];
-  if (!allTenants) binds.push(...scope.allowedAccountIds);
+  binds.push(...accountBinds);
   const row = await db
     .prepare(
       `SELECT
@@ -460,7 +462,7 @@ export async function getFriendAddBreakdown(
 
   // ブロック解除で戻ってきた人。いまフォロー中で、外れたことがある人。
   const unblockBinds: unknown[] = [days];
-  if (!allTenants) unblockBinds.push(...scope.allowedAccountIds);
+  unblockBinds.push(...accountBinds);
   const unblockRow = await db
     .prepare(
       `SELECT COUNT(*) AS count

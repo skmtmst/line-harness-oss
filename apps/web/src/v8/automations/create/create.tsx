@@ -15,6 +15,7 @@ import { CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 import HelpTip from '@/components/shared/help-tip'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -839,6 +840,8 @@ export function NewAutomationV8({
   }, [inputError])
   const [notice, setNotice] = useState('')
   const [existingAutomations, setExistingAutomations] = useState<Automation[]>([])
+  const [existingError,setExistingError]=useState(false)
+  const [existingRetry,setExistingRetry]=useState(0)
   /*
    * DETAIL-13: 「再開」は `?draft=<番号>` で明示した下書きだけ。
    * `undefined` はURLをまだ読んでいない（読み終わるまで画面を出さない）。
@@ -1031,17 +1034,19 @@ export function NewAutomationV8({
         cancelled = true
       }
     }
+    setExistingError(false)
     api.automations.list({ accountId: selectedAccountId })
       .then((response) => {
-        if (!cancelled && response.success) setExistingAutomations(response.data)
+        if(!response.success)throw new Error(response.error)
+        if (!cancelled) setExistingAutomations(response.data)
       })
       .catch(() => {
-        if (!cancelled) setExistingAutomations([])
+        if (!cancelled) setExistingError(true)
       })
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId,existingRetry])
 
   /*
    * DETAIL-13: `?draft=` の読み取りは画面が開いてから1回。
@@ -1119,7 +1124,7 @@ export function NewAutomationV8({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId])
+  }, [selectedAccountId,existingRetry])
 
   /*
    * DETAIL-13: `?draft=` で示された下書きは、番号・中身・版を一緒に読む。
@@ -2453,6 +2458,7 @@ export function NewAutomationV8({
 
       <section className={styles.sideCard} aria-label="気をつけること">
         <h2 className={styles.sideTitle}>気をつけること</h2>
+        {existingError?<ListState kind="error" title="既存のルールを読み込めませんでした" onRetry={()=>setExistingRetry(value=>value+1)}/>:null}
         <ul className={styles.cautionList}>
           {/* 同じきっかけのルールがほかにあるときは、1行目をその知らせに替える（一覧で確かめられる）。 */}
           <li>{hasSameTrigger ? '・同じきっかけのルールが他にもあり、両方動きます' : '・同じきっかけのルールが2つあると、両方動きます'}</li>

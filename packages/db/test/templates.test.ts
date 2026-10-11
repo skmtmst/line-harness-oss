@@ -119,8 +119,8 @@ describe('テンプレートの使用先', () => {
     });
 
     expect(calls[0]?.sql).toContain('category = ?');
-    expect(calls[0]?.sql).toContain('line_account_id IN (?)');
-    expect(calls[0]?.values).toEqual(['general', 'account-1']);
+    expect(calls[0]?.sql).toContain('line_account_id IN (SELECT value FROM json_each(?))');
+    expect(calls[0]?.values).toEqual(['general', JSON.stringify(['account-1'])]);
   });
 });
 

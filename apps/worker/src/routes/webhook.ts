@@ -1,3 +1,4 @@
+import { webhookDemoTargets } from '../services/webhook-demo-targets.js';
 import { parseRestaurantConfirmationPostback, respondToRestaurantConfirmation } from '../services/restaurant-confirmations.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { handleResearchTap } from '../services/research-tap.js';
@@ -226,7 +227,7 @@ webhook.post('/webhook', async (c) => {
     if (valid) {
       const accounts = await listLineAccountsWithTenantStatus(db);
       const main = accounts.find(
-        (a) => a.is_active && a.channel_secret === envSecret,
+        (a) => a.is_active && !a.archived_at && a.channel_secret === envSecret,
       );
       if (main) {
         channelAccessToken = main.channel_access_token;
@@ -239,7 +240,7 @@ webhook.post('/webhook', async (c) => {
   if (!valid) {
     const accounts = await listLineAccountsWithTenantStatus(db);
     for (const account of accounts) {
-      if (!account.is_active) continue;
+      if (!account.is_active || account.archived_at) continue;
       if (envSecret && account.channel_secret === envSecret) continue; // already tried via fast path
       const isValid = await verifySignature(account.channel_secret, rawBody, signature);
       if (isValid) {
@@ -256,6 +257,9 @@ webhook.post('/webhook', async (c) => {
     console.error('Invalid LINE signature');
     return c.json({ status: 'ok' }, 200);
   }
+
+  // 署名だけでは店の所属を証明できない。解決不能な受信は副作用を起こさない。
+  if (!matchedAccountId) return c.json({ status: 'ok' }, 200);
 
   // 届いた時刻を覚える。届かない警告（X-2）の判定に使う。
   if (matchedAccountId) {
@@ -1585,11 +1589,9 @@ async function handleEvent(
         const friendRecord = await db.prepare('SELECT user_id FROM friends WHERE id = ?').bind(friend.id).first<{ user_id: string | null }>();
         if (friendRecord?.user_id) {
           // Find the same user on other accounts
-          const otherFriends = await db.prepare(
-            'SELECT f.line_user_id, f.line_account_id, la.channel_access_token, la.channel_access_token_encrypted FROM friends f INNER JOIN line_accounts la ON la.id = f.line_account_id WHERE f.user_id = ? AND f.line_account_id != ? AND f.is_following = 1'
-          ).bind(friendRecord.user_id, lineAccountId).all<{ line_user_id: string; line_account_id: string; channel_access_token: string; channel_access_token_encrypted: string | null }>();
+          const otherFriends = await webhookDemoTargets(db, friendRecord.user_id, lineAccountId);
 
-          for (const other of otherFriends.results) {
+          for (const other of otherFriends) {
             const accessToken = await resolveLineCredential(
               other.channel_access_token_encrypted,
               other.channel_access_token,

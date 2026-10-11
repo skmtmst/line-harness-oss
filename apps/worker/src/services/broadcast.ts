@@ -1,3 +1,4 @@
+import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
 import { buildBroadcastAudienceQuery as buildSegmentQuery } from './broadcast-audience-query.js';
 import { buildMessage } from './line-message.js';
 import {
@@ -395,9 +396,37 @@ export async function processBroadcastSend(
         throw new Error('target_tag_id is required for tag-targeted broadcasts');
       }
 
-      const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId);
-      const followingFriends = friends.filter((f) => f.is_following && !f.is_hidden);
-      totalCount = followingFriends.length;
+      const ledger = await db.prepare(`SELECT COUNT(*) AS n,SUM(state='sent') AS sent
+        FROM broadcast_send_claims WHERE broadcast_id=?`).bind(broadcastId).first<{n:number;sent:number}>();
+      const known = Number(ledger?.n ?? 0);
+      if (await holdMissingBroadcastAudience(db, {id:broadcastId,expected:broadcast.total_count,known,
+        started:known>0 || broadcast.success_count>0 || Number((broadcast as unknown as {batch_offset?:number}).batch_offset ?? 0)>0})) {
+        return (await getBroadcastById(db,broadcastId))!;
+      }
+      let followingFriends: Awaited<ReturnType<typeof getFriendsByTag>>;
+      if (known > 0) {
+        await db.prepare(`UPDATE broadcast_send_claims SET state='unknown',error_code='interrupted_dispatch'
+          WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL`).bind(broadcastId).run();
+        // 現在のタグではなく最初の台帳を読む。ブロック・非表示だけは直前の状態を見る。
+        followingFriends = (await db.prepare(`SELECT f.* FROM friends f JOIN broadcast_send_claims c ON c.friend_id=f.id
+          WHERE c.broadcast_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0
+            AND (? IS NULL OR f.line_account_id=?) ORDER BY c.friend_id`)
+          .bind(broadcastId,broadcastAccountId,broadcastAccountId).all<import('@line-crm/db').Friend>()).results;
+        totalCount = broadcast.total_count || known;
+        successCount = Number(ledger?.sent ?? 0);
+      } else {
+        const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId);
+        followingFriends = friends.filter((f) => f.is_following && !f.is_hidden);
+        totalCount = followingFriends.length;
+        // 送信前に全IDを残す。JSON配列を1変数で渡しD1のbind数上限に当てない。
+        await db.batch([
+          db.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state)
+            SELECT ?,value,?,?,'claimed' FROM json_each(?)
+            WHERE NOT EXISTS(SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=?)`)
+            .bind(broadcastId,broadcastAccountId,Number(broadcast.send_attempt_no ?? 1),JSON.stringify(followingFriends.map(f=>f.id)),broadcastId),
+          db.prepare('UPDATE broadcasts SET total_count=? WHERE id=?').bind(totalCount,broadcastId),
+        ]);
+      }
 
       // Send in batches with stealth delays to mimic human patterns
       const now = jstNow();
@@ -463,6 +492,7 @@ export async function processBroadcastSend(
           ));
           await db.batch([
             ...logStmts,
+            db.prepare('UPDATE broadcasts SET success_count=success_count+? WHERE id=?').bind(sendable.length,broadcastId),
             ...buildBroadcastSettleStatements(db, {
               broadcastId,
               friendIds: sendableIds,
@@ -613,15 +643,10 @@ export async function processScheduledBroadcasts(
   const activeByAccount = new Map(
     accountsWithStatus.map((account) => [account.id, Boolean(account.is_active)]),
   );
-  const allBroadcasts = await getBroadcasts(db);
-
   const nowMs = Date.now();
-  const scheduled = allBroadcasts.filter(
-    (b) =>
-      b.status === 'scheduled' &&
-      b.scheduled_at !== null &&
-      new Date(b.scheduled_at).getTime() <= nowMs,
-  );
+  const scheduled = await getBroadcasts(db, undefined, undefined, {
+    status: 'scheduled', dueAt: new Date(nowMs).toISOString(),
+  });
 
   /*
    * 二者承認（m12a）。予約時刻を過ぎても承認されなかった依頼は、
@@ -1003,34 +1028,32 @@ async function processQueuedBroadcastBatches(
     return;
   }
 
-  // 対象ユーザーリストを取得（アカウントで絞り込む）
+  // 宛先は最初の送信前に、既存の台帳へ一括で固定する。
+  // 再開・失敗分再送で条件を評価し直さない。offset は表示用だけ。
   const accountId = raw.line_account_id as string | null;
-  let friends: Array<{ id: string; line_user_id: string; display_name: string | null }>;
-  if (segmentConditionsStr) {
-    const condition = JSON.parse(segmentConditionsStr);
-    const { sql, bindings } = buildSegmentQuery(condition);
-    // アカウントフィルタを追加（line_account_idで絞り込み）
-    let accountSql = sql;
-    const accountBindings = [...bindings];
-    if (accountId) {
-      accountSql = sql.replace('WHERE', 'WHERE f.line_account_id = ? AND');
-      accountBindings.unshift(accountId);
-    }
-    const result = await db.prepare(accountSql).bind(...accountBindings).all<{
-      id: string;
-      line_user_id: string;
-      display_name: string | null;
-    }>();
-    friends = result.results ?? [];
-  } else if (broadcast.target_tag_id) {
-    const { getFriendsByTag } = await import('@line-crm/db');
-    const tagFriends = await getFriendsByTag(db, broadcast.target_tag_id, accountId);
-    friends = tagFriends.filter(f => f.is_following && !f.is_hidden).map(f => ({
-      id: f.id,
-      line_user_id: f.line_user_id,
-      display_name: f.display_name,
-    }));
-  } else {
+  const hasAudience = await db.prepare('SELECT 1 FROM broadcast_send_claims WHERE broadcast_id = ? LIMIT 1')
+    .bind(broadcast.id).first();
+  const previousAudience = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
+    .bind(broadcast.id).first<{n:number}>();
+  if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:Number(raw.total_count ?? 0),
+    known:Number(previousAudience?.n ?? 0),started:!!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1})) return;
+  if (!hasAudience && (segmentConditionsStr || broadcast.target_tag_id)) {
+    const conditions = segmentConditionsStr ? JSON.parse(segmentConditionsStr)
+      : { operator: 'AND', rules: [{ type: 'tag_exists', value: broadcast.target_tag_id }] };
+    const query = buildSegmentQuery(conditions);
+    const sql = accountId ? query.sql.replace('WHERE', 'WHERE f.line_account_id = ? AND') : query.sql;
+    const bindings = accountId ? [accountId, ...query.bindings] : query.bindings;
+    await db.batch([
+      db.prepare(`INSERT INTO broadcast_send_claims
+        (broadcast_id,friend_id,line_account_id,attempt_no,state)
+        SELECT ?,q.id,?,?,'claimed' FROM (${sql}) q
+        WHERE NOT EXISTS (SELECT 1 FROM broadcast_send_claims WHERE broadcast_id = ?)`)
+        .bind(broadcast.id,accountId,Number(raw.send_attempt_no ?? 1),...bindings,broadcast.id),
+      db.prepare(`UPDATE broadcasts SET total_count =
+        (SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id = ?) WHERE id = ?`)
+        .bind(broadcast.id,broadcast.id),
+    ]);
+  } else if (!hasAudience) {
     // target_type='all' でキューに入ることはないが、念のため
     const retryKey = await createBroadcastRetryKey(
       broadcast.id,
@@ -1043,12 +1066,27 @@ async function processQueuedBroadcastBatches(
     await updateBroadcastStatus(db, broadcast.id, 'sent', { totalCount: 0, successCount: 0 });
     return;
   }
-
-  // 初回: total_count を設定
-  if (batchOffset === 0) {
-    await db.prepare('UPDATE broadcasts SET total_count = ? WHERE id = ?')
-      .bind(friends.length, broadcast.id).run();
-  }
+  // 前の実行が外部呼出しの途中で失われた行は、送達不明として残す。
+  await db.prepare(`UPDATE broadcast_send_claims SET state='unknown',error_code='interrupted_dispatch'
+    WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL`).bind(broadcast.id).run();
+  // ブロック・非表示・アカウント変更は宛先の変更と別。送らずに結果を残す。
+  await db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable'
+    WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM friends f WHERE f.id=friend_id AND f.is_following=1
+        AND COALESCE(f.is_hidden,0)=0 AND (? IS NULL OR f.line_account_id=?))`)
+    .bind(broadcast.id,accountId,accountId).run();
+  const pending = await db.prepare(`SELECT f.id,f.line_user_id,f.display_name
+    FROM broadcast_send_claims c JOIN friends f ON f.id=c.friend_id
+    WHERE c.broadcast_id=? AND (
+      (c.state='claimed' AND c.dispatched_at IS NULL)
+      OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))
+    ORDER BY c.friend_id`).bind(broadcast.id,Number(raw.send_attempt_no ?? 1)).all<{
+      id:string; line_user_id:string; display_name:string|null;
+    }>();
+  const friends = pending.results;
+  const audienceCount = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
+    .bind(broadcast.id).first<{n:number}>();
+  const progressBase = Number(audienceCount?.n ?? 0) - friends.length;
 
   const now = jstNow();
   // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
@@ -1067,8 +1105,8 @@ async function processQueuedBroadcastBatches(
    */
   const blocked = await getBlockedRecipientIds(db, broadcast.id);
   const attemptNo = Number(raw.send_attempt_no ?? 1) || 1;
-  let currentOffset = batchOffset;
-  const tickStartOffset = batchOffset;
+  let currentOffset = 0;
+  const tickStartOffset = 0;
   const personalized = hasRecipientVariablesInParts(finalParts);
   const unsupportedVariables = unsupportedMessageVariables(finalParts);
   if (unsupportedVariables.length > 0) {
@@ -1107,7 +1145,7 @@ async function processQueuedBroadcastBatches(
       await db.prepare(
         `UPDATE broadcasts SET batch_offset = ?, batch_lock_at = NULL
           WHERE id = ? AND stopped_at IS NOT NULL`,
-      ).bind(currentOffset, broadcast.id).run();
+      ).bind(progressBase + currentOffset, broadcast.id).run();
       return;
     }
     const batch = friends.slice(currentOffset, currentOffset + deliveryBatchSize);
@@ -1215,7 +1253,7 @@ async function processQueuedBroadcastBatches(
                          AND COALESCE(delivery_type, '') != 'test'
                     )
               WHERE id = ?`,
-          ).bind(currentOffset, broadcast.id, broadcast.id).run();
+          ).bind(progressBase + currentOffset, broadcast.id, broadcast.id).run();
           return;
         }
       }
@@ -1229,7 +1267,7 @@ async function processQueuedBroadcastBatches(
                      AND COALESCE(delivery_type, '') != 'test'
                 )
           WHERE id = ?`,
-      ).bind(currentOffset, broadcast.id, broadcast.id).run();
+      ).bind(progressBase + currentOffset, broadcast.id, broadcast.id).run();
       if (currentOffset >= friends.length) break;
       // subrequest を使い切る手前で切り上げる。次の cron が続きから再開する。
       if (currentOffset - tickStartOffset >= PERSONALIZED_PUSH_PER_TICK) return;
@@ -1291,7 +1329,7 @@ async function processQueuedBroadcastBatches(
         errorCode: deliveryErrorCode(err),
       });
       // 送信失敗: ロック解除 + offsetを保存して次のCronで再開
-      await updateBroadcastBatchProgress(db, broadcast.id, currentOffset, 0);
+      await updateBroadcastBatchProgress(db, broadcast.id, progressBase + currentOffset, 0);
       return; // batch_offset が currentOffset に戻り、次の cron で再開可能
     }
 
@@ -1348,7 +1386,7 @@ async function processQueuedBroadcastBatches(
   // まだ残っている（時間をかけて配る設定で途中まで送った）。
   // ロックだけ外して、次の tick が続きから送る。完了にはしない。
   if (currentOffset < friends.length) {
-    await updateBroadcastBatchProgress(db, broadcast.id, currentOffset, 0);
+    await updateBroadcastBatchProgress(db, broadcast.id, progressBase + currentOffset, 0);
     return;
   }
 

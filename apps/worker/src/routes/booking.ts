@@ -1,3 +1,5 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { peopleBoardEntry } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { BOOKING_PERSON_LIMIT_GUARD_SQL, bookingPersonLimitBindings, bookingPersonLimitError } from '../services/booking-person-limit.js';
@@ -3020,8 +3022,8 @@ booking.get('/api/booking/admin/menus/:id/versions', async (c) => {
   const staffNames = new Map<string, string>();
   if (staffIds.length > 0) {
     const staffRows = await c.env.DB.prepare(
-      `SELECT id, display_name FROM staff WHERE id IN (${staffIds.map(() => '?').join(',')})`,
-    ).bind(...staffIds).all<{ id: string; display_name: string }>();
+      `SELECT id, display_name FROM staff WHERE id IN (${sqlIdSet(staffIds).sql})`,
+    ).bind(...(staffIds.length ? sqlIdSet(staffIds).binds : [])).all<{ id: string; display_name: string }>();
     for (const row of staffRows.results ?? []) staffNames.set(row.id, row.display_name);
   }
   return c.json({
@@ -4199,10 +4201,10 @@ async function getTodaySeatReservations(
         .prepare(
           `SELECT reservation_id, kind, late_minutes, marked_by_name, marked_at
              FROM rt_seat_visit_marks
-            WHERE store_id = ? AND undone_at IS NULL AND reservation_id IN (${list.map(() => '?').join(',')})
+            WHERE store_id = ? AND undone_at IS NULL AND reservation_id IN (${sqlIdSet(list.map(reservation => reservation.id)).sql})
             ORDER BY marked_at DESC`,
         )
-        .bind(store.id, ...list.map((reservation) => reservation.id))
+        .bind(store.id, ...sqlIdSet(list.map(reservation => reservation.id)).binds)
         .all<{
           reservation_id: string;
           kind: string;
@@ -4247,7 +4249,7 @@ booking.get('/api/booking/admin/today', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const rawDate = c.req.query('date')?.trim() || jstDateString(new Date());
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDate) || Number.isNaN(Date.parse(`${rawDate}T00:00:00+09:00`))) {
+  if (!isExistingCalendarDate(rawDate)) {
     return c.json({ error: 'invalid_date' }, 400);
   }
   const mode = c.req.query('mode')?.trim() === 'seat' ? 'seat'
@@ -4255,8 +4257,7 @@ booking.get('/api/booking/admin/today', async (c) => {
   // 週・月の席は期間で取る（from/to は店の暦日。無ければ date の1日）。
   const rawFrom = c.req.query('from')?.trim() || null;
   const rawTo = c.req.query('to')?.trim() || null;
-  const dayLike = /^\d{4}-\d{2}-\d{2}$/;
-  if ((rawFrom && !dayLike.test(rawFrom)) || (rawTo && !dayLike.test(rawTo))) {
+  if ((rawFrom && !isExistingCalendarDate(rawFrom)) || (rawTo && !isExistingCalendarDate(rawTo))) {
     return c.json({ error: 'invalid_date' }, 400);
   }
   const rangeStart = rawFrom ?? rawDate;
@@ -4321,10 +4322,10 @@ booking.get('/api/booking/admin/today', async (c) => {
       .prepare(
         `SELECT booking_id, kind, late_minutes, marked_by_name, marked_at
            FROM booking_visit_marks
-          WHERE line_account_id = ? AND booking_id IN (${bookings.map(() => '?').join(',')})
+          WHERE line_account_id = ? AND booking_id IN (${sqlIdSet(bookings.map(booking => booking.id)).sql})
           ORDER BY marked_at DESC`,
       )
-      .bind(accountId, ...bookings.map((booking) => booking.id))
+      .bind(accountId, ...sqlIdSet(bookings.map(booking => booking.id)).binds)
       .all<{
         booking_id: string;
         kind: string;

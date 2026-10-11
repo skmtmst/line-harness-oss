@@ -175,6 +175,7 @@ export default function AutomationListV8() {
   const [summary, setSummary] = useState<{ executionCount30d: number; failureCount30d: number } | null>(null)
   const [skipped, setSkipped] = useState<number | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
+  const [foldersError,setFoldersError]=useState(false)
   const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
   /* ?search= で開くと、その言葉で探した状態から始める（動いた記録の「ルールを開く」）。 */
   const [search, setSearch] = useListUrlValue('search', '')
@@ -232,11 +233,13 @@ export default function AutomationListV8() {
   /* フォルダの箱（kind=automation）。ルールをフォルダへ入れる口がまだ無いので、件数は出さない。 */
   const loadFolders = useCallback(async () => {
     if (!selectedAccountId) { setFolders([]); return }
+    setFoldersError(false)
     try {
       const res = await api.folders.list('automation', selectedAccountId)
-      setFolders(res.success ? res.data : [])
+      if(!res.success)throw new Error(res.error)
+      setFolders(res.data)
     } catch {
-      setFolders([])
+      setFoldersError(true)
     }
   }, [selectedAccountId])
 
@@ -624,7 +627,7 @@ export default function AutomationListV8() {
         {viewerOnly ? <ViewerBand /> : null}
         <AutomationBand label="ルールの数の帯" cells={cells} />
       </>}
-      folders={<>
+      folders={foldersError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void loadFolders()}/>:<>
         {createButton(true)}
         {/* 共通のフォルダの列（種類 automation）。ルールの一覧がフォルダを返すまでは、件数を出さずルールは未分類に数える。 */}
         <ManagedFolderPanel
@@ -644,7 +647,7 @@ export default function AutomationListV8() {
           placeholder="例： 予約・購入"
         />
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
+      collapsedFolders={narrow ? undefined : foldersError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void loadFolders()}/>:<>{createButton(false)}{folderSelect}</>}
       toolbar={narrow ? narrowToolbar : wideToolbar}
       pagination={pager}
       overlays={<>

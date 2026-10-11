@@ -174,3 +174,16 @@ describe('日本時間の今日（端末の時間帯とは別）', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: '10月11日（日）' })).not.toBeNull())
   })
 })
+
+ it('OP-R01 日別取得失敗は空の予約台帳にせず、再試行で予約を戻す',async()=>{
+  fixture.reservationsDay.mockRejectedValueOnce(new Error('synthetic day failure')).mockResolvedValue({data:{reservations:today,closures:[]}})
+  render(<ReservationsPage/>)
+  const alert=(await screen.findByText('予約を読み込めませんでした')).closest('[data-list-state="error"]') as HTMLElement
+  expect(alert.textContent).toContain('読み込めませんでした')
+  expect(screen.queryByText('予約がありません')).toBeNull()
+  expect(document.querySelector('[data-design-node="l9NlC0"] [data-list-state="empty"]')).toBeNull()
+  fireEvent.click(within(alert).getByRole('button',{name:/もう一度/}))
+  await screen.findByText('山田 太郎')
+  expect(fixture.reservationsDay).toHaveBeenCalledTimes(2)
+  expect(screen.queryByRole('alert')).toBeNull()
+ })

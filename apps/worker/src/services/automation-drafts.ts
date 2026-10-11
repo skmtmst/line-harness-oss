@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { readFolderAssignment, FolderAssignmentError } from '@line-crm/db';
 import { resolveCommonActionVersion } from './automation-engine.js';
 import { buildSegmentWhere, parseCondition, type SegmentCondition } from './segment-query.js';
@@ -497,10 +498,10 @@ async function validateTriggerConfig(
       throw new AutomationDraftError('trigger_config_invalid', '対象の友だちは1〜100人で選んでください', 'friendIds');
     }
     const friendIds = [...new Set(config.friendIds as string[])];
-    const placeholders = friendIds.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(friendIds).sql;
     const count = await db.prepare(
       `SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`,
-    ).bind(lineAccountId, ...friendIds).first<{ count: number }>();
+    ).bind(lineAccountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).first<{ count: number }>();
     if (Number(count?.count ?? 0) !== friendIds.length) {
       throw new AutomationDraftError('resource_not_found', '対象の友だちを選び直してください', 'friendIds');
     }

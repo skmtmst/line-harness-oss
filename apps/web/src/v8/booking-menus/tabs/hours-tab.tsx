@@ -21,6 +21,7 @@ import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
 /* ② 受付枠（yRPxl）（settings-v8.tsx から分割。見た目・動きは変えない） */
@@ -571,6 +572,8 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [staffId, setStaffId] = useState('')
+  const [staffError,setStaffError]=useState(false)
+  const [staffRetry,setStaffRetry]=useState(0)
   const [staffOptions, setStaffOptions] = useState<BookingStaff[]>([])
   const staffRows = useMemo(() => staffOptions.map((person) => ({ id: person.id, name: person.display_name })), [staffOptions])
   const [checking, setChecking] = useState(false)
@@ -590,24 +593,24 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
     setResult(null)
     setChecking(false)
     setCheckError(null)
-  }, [accountId])
+  }, [accountId,staffRetry])
 
   useEffect(() => {
     let cancelled = false
     void bookingApi.listStaff(accountId)
       .then((res) => {
-        if (!cancelled) setStaffOptions(res.staff.filter((person) => person.is_active))
+        if (!cancelled) {setStaffOptions(res.staff.filter((person) => person.is_active));setStaffError(false)}
       })
-      .catch(() => { if (!cancelled) setStaffOptions([]) })
+      .catch(() => { if (!cancelled) setStaffError(true) })
     return () => { cancelled = true }
-  }, [accountId])
+  }, [accountId,staffRetry])
 
   useEffect(() => {
     if (!menuId && activeMenus.length > 0) setMenuId(activeMenus[0].id)
   }, [activeMenus, menuId])
 
   async function run() {
-    if (!menuId || !date || !time) return
+    if (staffError || !menuId || !date || !time) return
     const requestId = ++requestRef.current
     setChecking(true)
     setCheckError(null)
@@ -636,6 +639,7 @@ export function SlotCheckV8({ accountId, menus }: { accountId: string; menus: Bo
         <HelpTip label="空きを確かめるの説明">お客さまの画面と同じ条件で、その日時に受けられるか確かめます。確かめても予約は作られません。<TextLink href="/booking/staff">予約の担当者</TextLink>・<TextLink href="/staff">ログインユーザー</TextLink>の設定も確かめられます。</HelpTip>
       </div>
       <div className={styles.checkGrid}>
+        {staffError?<ListState kind="error" title="担当を読み込めませんでした" onRetry={()=>setStaffRetry(n=>n+1)}/>:null}
         <SaveErrorField names={["menuId"]}><EntityKindField
           kind="booking_menu"
           label="確かめるメニュー"

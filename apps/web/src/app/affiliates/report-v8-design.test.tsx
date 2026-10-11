@@ -8,11 +8,21 @@
  */
 import { AffiliateShell } from '@/v8/affiliates/frame'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+
+// 見本を作る前に時計を固定。日付以外の待ち合わせは実時間で動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-11T15:09:00Z'))
+})
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-11T15:09:00Z'))
+})
+afterEach(() => vi.useRealTimers())
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-const now = new Date()
-const thisMonth = now.toISOString()
-const lastMonth = new Date(now.getTime() - 45 * 86_400_000).toISOString()
+const thisMonth = '2026-10-12T00:09:00+09:00'
+const lastMonth = '2026-09-15T12:00:00+09:00'
 
 const ITEMS = [
   {

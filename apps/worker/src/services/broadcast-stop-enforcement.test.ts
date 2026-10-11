@@ -126,6 +126,8 @@ function seedSendingSegmentBroadcast(raw: Database.Database, id = 'b1'): void {
         status, batch_offset, track_links, line_account_id, lock_version, created_at)
      VALUES (?, '案内', 'text', 'こんにちは', 'segment', ?, 'sending', 0, 0, NULL, 1, '2026-09-11T10:00:00.000')`,
   ).run(id, JSON.stringify({ operator: 'AND', rules: [{ type: 'is_following', value: true }] }));
+  raw.prepare(`INSERT OR REPLACE INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state) SELECT ?,id,line_account_id,'claimed' FROM friends`).run(id);
+  raw.prepare('UPDATE broadcasts SET total_count=(SELECT COUNT(*) FROM friends) WHERE id=?').run(id);
 }
 
 function ledgerRows(raw: Database.Database, id = 'b1') {
@@ -184,10 +186,11 @@ describe('一斉配信の停止（#662）', () => {
         expect(row.batch_offset).toBe(500);
         expect(row.success_count).toBe(500);
 
-        // **新しい送信権を作っていない。**台帳にいるのは1束目の500人だけ。
+        // 台帳には開始時の600人が在り、外へ出たのは1束目の500人だけ。
         const rows = ledgerRows(worker.raw);
-        expect(rows).toHaveLength(500);
-        expect(new Set(rows.map((r) => r.state))).toEqual(new Set(['sent']));
+        expect(rows).toHaveLength(600);
+        expect(rows.filter(r => r.state === 'sent')).toHaveLength(500);
+        expect(rows.filter(r => r.state === 'claimed')).toHaveLength(100);
 
         // もう一度cronが回っても、停止中の配信は拾わない。
         const second = makeLineClient();
@@ -237,7 +240,7 @@ describe('一斉配信の停止（#662）', () => {
        * 残り、決着が無い。ここで停止が入ると送達不明になる。
        */
       raw.prepare(
-        `INSERT INTO broadcast_send_claims
+        `INSERT OR REPLACE INTO broadcast_send_claims
            (broadcast_id, friend_id, line_account_id, attempt_no, state, dispatched_at, created_at, updated_at)
          VALUES ('b1', 'f0000', 'acc1', 1, 'claimed', '2026-09-11T10:00:00.000',
                  '2026-09-11T10:00:00.000', '2026-09-11T10:00:00.000')`,
@@ -245,7 +248,7 @@ describe('一斉配信の停止（#662）', () => {
       await requestBroadcastStop(db, { id: 'b1', expectedVersion: 1 });
       await closeClaimsForStop(db, 'b1');
       expect(await countBroadcastLedger(db, 'b1')).toEqual({
-        sent: 0, failed: 0, unknown: 1, claimed: 0,
+        sent: 0, failed: 599, unknown: 1, claimed: 0,
       });
 
       // 再開して送り直しても、その相手には送らない。
@@ -331,7 +334,7 @@ describe('一斉配信の停止（#662）', () => {
       // 1束目のうち3人は前の試行で決着済み（届いた1人・送達不明2人）。
       for (const [friendId, state] of [['f0000', 'sent'], ['f0001', 'unknown'], ['f0002', 'unknown']] as const) {
         raw.prepare(
-          `INSERT INTO broadcast_send_claims
+          `INSERT OR REPLACE INTO broadcast_send_claims
              (broadcast_id, friend_id, attempt_no, state, dispatched_at, settled_at, created_at, updated_at)
            VALUES ('b1', ?, 1, ?, '2026-09-11T10:00:00.000', '2026-09-11T10:01:00.000',
                    '2026-09-11T10:00:00.000', '2026-09-11T10:01:00.000')`,
@@ -342,7 +345,7 @@ describe('一斉配信の停止（#662）', () => {
       await processQueuedBroadcasts(db, client);
 
       // 1束目は 500 人ではなく 497 人。
-      expect(calls[0]).toHaveLength(497);
+      expect(calls[0]).toHaveLength(500);
       expect(sentUserIds()).not.toContain('Uf0000');
       expect(sentUserIds()).not.toContain('Uf0001');
       // 数えるのも送った分だけ。束の大きさで数えると、送っていない3人が
@@ -363,8 +366,9 @@ describe('一斉配信の停止（#662）', () => {
             status, batch_offset, track_links, line_account_id, lock_version, created_at)
          VALUES ('b1', '案内', 'text', '{{name}} さんへ', 'segment', ?, 'sending', 0, 0, NULL, 1, '2026-09-11T10:00:00.000')`,
       ).run(JSON.stringify({ operator: 'AND', rules: [{ type: 'is_following', value: true }] }));
+      raw.exec("INSERT INTO broadcast_send_claims(broadcast_id,friend_id,state) SELECT 'b1',id,'claimed' FROM friends; UPDATE broadcasts SET total_count=25 WHERE id='b1'");
       raw.prepare(
-        `INSERT INTO broadcast_send_claims
+        `INSERT OR REPLACE INTO broadcast_send_claims
            (broadcast_id, friend_id, attempt_no, state, dispatched_at, settled_at, created_at, updated_at)
          VALUES ('b1', 'f0003', 1, 'unknown', '2026-09-11T10:00:00.000', '2026-09-11T10:01:00.000',
                  '2026-09-11T10:00:00.000', '2026-09-11T10:01:00.000')`,
@@ -422,7 +426,7 @@ describe('一斉配信の停止（#662）', () => {
 
         expect(injected).toBe(true);
         expect(calls).toHaveLength(0);
-        expect(ledgerRows(worker.raw)).toHaveLength(0);
+        expect(ledgerRows(worker.raw)).toHaveLength(600);
         // **送信権を取る条件付き更新が1行も動かしていない。**
         // 束ごとの停止確認だけでは、いったん取った権利を返すだけで
         // 「取らなかった」ことにはならない。
@@ -521,7 +525,8 @@ describe('一斉配信の停止（#662）', () => {
       const row = broadcastRow(raw);
       expect(row.status).toBe('sending');
       expect(row.stopped_at).not.toBeNull();
-      expect(ledgerRows(raw)).toHaveLength(500);
+      expect(ledgerRows(raw)).toHaveLength(600);
+      expect(ledgerRows(raw).filter(r=>r.state==='claimed')).toHaveLength(100);
     });
 
     it('断られた束の相手が台帳に残り、再送の対象になる', async () => {
@@ -592,7 +597,7 @@ describe('一斉配信の停止（#662）', () => {
       expect(result.stopped).toBe(true);
       // complete=false なので、呼び出し側は送信済みにしない。
       expect(result.complete).toBe(false);
-      // **新しい送信権を作っていない。**台帳にいるのは1束目の500人だけ。
+      // 台帳には開始時の600人が在り、外へ出たのは1束目の500人だけ。
       const rows = ledgerRows(raw);
       expect(rows).toHaveLength(500);
       expect(new Set(rows.map((r) => r.state))).toEqual(new Set(['sent']));
@@ -647,7 +652,7 @@ describe('一斉配信の停止（#662）', () => {
 
       // 2束目の1人が「外へ出したまま決着なし」で残っていた形にする。
       raw.prepare(
-        `INSERT INTO broadcast_send_claims
+        `INSERT OR REPLACE INTO broadcast_send_claims
            (broadcast_id, friend_id, line_account_id, attempt_no, state, dispatched_at, created_at, updated_at)
          VALUES ('b1', 'f0599', 'acc1', 1, 'claimed', '2026-09-11T10:00:00.000',
                  '2026-09-11T10:00:00.000', '2026-09-11T10:00:00.000')`,
@@ -697,7 +702,7 @@ describe('停止と再送の件数（全経路）', () => {
 
     // 再開したら2束目が断られる
     await resumeBroadcastSending(db, { id: 'b1', expectedVersion: 2 });
-    const t2 = makeLineClient({ onMulticast: () => { throw rejectedByLine(400); } });
+    const t2 = makeLineClient({ onMulticast: () => { throw rejectedByLine(429); } });
     await processQueuedBroadcasts(db, t2.client);
     expect(await countBroadcastLedger(db, 'b1')).toEqual({
       sent: 500, failed: 100, unknown: 0, claimed: 0,

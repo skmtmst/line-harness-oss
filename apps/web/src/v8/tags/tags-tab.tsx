@@ -359,6 +359,9 @@ export default function TagsTab({
         actionLabel: 'もう一度',
         onAction: () => { void applyTagOrder(order) },
       })
+    } else {
+      setItems((current) => mergeVisibleOrder(current, order.map((id) => current.find((tag) => tag.id === id)).filter((tag): tag is Tag => Boolean(tag))))
+      setActionError('')
     }
   }
 
