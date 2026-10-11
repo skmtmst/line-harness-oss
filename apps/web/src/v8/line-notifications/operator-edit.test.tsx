@@ -115,7 +115,7 @@ describe('運用者へのお知らせを なおす（hiBO8）', () => {
 
 test('狭い板の案内は開閉しても入力内容を保つ', async () => {
   await render()
-  const toggle = host?.querySelector<HTMLButtonElement>('button[aria-controls][aria-expanded]')
+  const toggle = host?.querySelector<HTMLButtonElement>('button[aria-controls][aria-expanded]:not([data-screen-explanation-toggle])')
   expect(toggle?.getAttribute('aria-expanded')).toBe('false')
   const aside = document.getElementById(toggle!.getAttribute('aria-controls')!)
   await act(async () => { toggle?.click() })

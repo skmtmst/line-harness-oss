@@ -19,6 +19,7 @@ export function SbSettingsScreen({
   boardId,
   title,
   help,
+  explanationKey,
   actions,
   children,
   saveActions,
@@ -34,6 +35,7 @@ export function SbSettingsScreen({
   boardId?: string
   title: ReactNode
   help?: ReactNode
+  explanationKey?: string
   /** @deprecated ★V8 では板の頭に戻るを描かない（オーナー 2026-10-08）。戻るのは上の帯のパンくず。 */
   identity?: ReactNode
   actions?: ReactNode
@@ -48,6 +50,7 @@ export function SbSettingsScreen({
       boardId={boardId}
       title={title}
       help={help}
+      explanationKey={explanationKey}
       actions={actions}
       navigation={<SettingsInnerNav inline />}
       saveActions={saveActions}

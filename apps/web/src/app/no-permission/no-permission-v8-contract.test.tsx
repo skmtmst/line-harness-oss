@@ -61,7 +61,7 @@ describe('V8 権限なし（O5tUeE）の板', () => {
     })
     expect(host?.querySelector('[data-design-node="O5tUeE"]')).not.toBeNull()
     expect(host?.textContent).toContain('シナリオ配信')
-    await act(async () => { (host?.querySelector('button[aria-label="シナリオ配信の説明"]') as HTMLButtonElement).click() })
+    await act(async () => { (host?.querySelector('button[data-screen-explanation-toggle]') as HTMLButtonElement).click() })
     expect(host?.textContent).toContain('この機能は、あなたの役割では開けません。')
     expect(host?.textContent).toContain('シナリオ配信を開く権限がありません')
     expect(host?.textContent).toContain('いまの役割は「受付」です。')

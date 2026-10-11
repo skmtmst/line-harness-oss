@@ -334,7 +334,7 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
     const friendId = action.friendId ?? order?.friendId ?? null
     return [
       friendId
-        ? { id: 'friend', label: '中身を見る', onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(friendId)}`) }
+        ? { id: 'friend', label: "友だちの詳細を見る", onSelect: () => router.push(`/friends/detail?id=${encodeURIComponent(friendId)}`) }
         : { id: 'identity', label: 'つき合わせる', onSelect: () => router.push('/ec-commerce/identity-candidates') },
       ...(order ? [{ id: 'order', label: '注文の状況を見る', onSelect: () => setDetailSlot({ accountId, orderId: order.id }) }] : []),
       ...(canEdit && action.retryAvailable

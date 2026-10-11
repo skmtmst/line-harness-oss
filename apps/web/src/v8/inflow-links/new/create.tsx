@@ -1,5 +1,11 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("リンク名を入力してください"),
+}
+
+
 import Toggle from '@/components/shared/toggle';
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
@@ -184,7 +190,7 @@ function InflowCreate() {
     if(candidatesError || candidatesLoading)return
     setSaveError(null)
     const errors: Record<string, string> = {}
-    if (!name.trim()) errors['ir-name'] = 'リンク名を入力してください'
+    if ((b244Requirements.name.check(name) !== null)) errors['ir-name'] = 'リンク名を入力してください'
     if (!validRef) errors['ir-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
     if (redirectUrl.trim()) {
       try {
@@ -400,7 +406,7 @@ function InflowCreate() {
           <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
         </div>
         <div className={styles.fieldRow}>
-          <Field label="名前"><SaveErrorField names={["name","mine"]}><TextField
+          <Field label="名前" requirement={b244Requirements.name}><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"
               value={name}

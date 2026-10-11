@@ -120,7 +120,7 @@ describe('担当まとめ（V8）の読み込みと保存', () => {
     fireEvent.click(saveButton)
 
     // ボタンの内側だけ保存中に変わる。
-    expect(await screen.findByRole('button', { name: '保存中…' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '保存しています…' })).toBeTruthy()
 
     await act(async () => { gate.resolve({ ok: true }) })
     // 完了（✓：ボタンと知らせ）がでて、知らせに「元に戻す」が付く。

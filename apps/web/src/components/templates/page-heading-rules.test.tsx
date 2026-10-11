@@ -3,12 +3,17 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { PageHeading } from './page-frame'
 afterEach(cleanup)
-it('B-158 決まり2：説明は？を開いたときだけ読み、本文への再表示を検出する', () => {
+it('B-245：画面の説明は初めに開き、同じ場所で開閉する', () => {
   const { container } = render(<PageHeading title="配信" help="送る相手と日時を決めます。" />)
-  expect(screen.queryByText('送る相手と日時を決めます。')).toBeNull()
-  expect(container.querySelector('p')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '配信の説明' }))
-  expect(screen.getByText('送る相手と日時を決めます。')).toBeTruthy()
+  const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+  const panel = container.querySelector<HTMLElement>('[data-screen-explanation]')!
+  expect(panel.hidden).toBe(false)
+  expect(panel.textContent).toBe('送る相手と日時を決めます。')
+  fireEvent.click(toggle)
+  expect(panel.hidden).toBe(true)
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(toggle)
+  expect(panel.hidden).toBe(false)
 })
 
 it('認証画面の見出し段と、フォーカス先のIDを共通部品でも保つ', () => {

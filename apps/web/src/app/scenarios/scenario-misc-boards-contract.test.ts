@@ -22,9 +22,9 @@ describe('シナリオ配信の細かい板', () => {
   })
 
   it('一覧1152（wjfLe）は狭い板でフォルダの列を道具の段の選ぶ欄へ畳む', () => {
-    // 新しい一覧は CSS の @container ではなく、狭い板の判定（narrow）で畳む。
+    // B-244：フォルダと作成の口を型へ渡し、並べ方は共通部品が持つ。
     expect(LIST).toContain('useNarrowViewport()')
-    expect(LIST).toContain('collapsedFolders={narrow ? undefined :')
+    expect(LIST).toContain('collapsedFolders={<>{createButton(false)}{folderSelect}</>}')
   })
 
   it('編集の競合は帯・比べる・読み直しを出す（kz2B6）', () => {

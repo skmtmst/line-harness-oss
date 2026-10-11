@@ -266,13 +266,13 @@ test.each(['すぐ返る', '入力後に返る'] as const)(
 
     if (timing === '入力後に返る') {
       expect(fixture.getAvailability).toHaveBeenCalledTimes(1)
-      expect(week().getByRole('button', { name: '保存中…' }).hasAttribute('disabled')).toBe(true)
+      expect(week().getByRole('button', { name: '保存しています…' }).hasAttribute('disabled')).toBe(true)
       // 再取得が止まっている間も、休憩は編集できる。
       setTime('休憩の終わり', '12:30')
       await act(async () => { rulesReload.resolve(refreshedRules) })
     }
     await waitFor(() => expect(fixture.getAvailability).toHaveBeenCalledTimes(2))
-    expect(week().getByRole('button', { name: '保存中…' }).hasAttribute('disabled')).toBe(true)
+    expect(week().getByRole('button', { name: '保存しています…' }).hasAttribute('disabled')).toBe(true)
 
     // 保存通知やPUTの呼び出しでは終わりにしない。予約枠の再取得も返して、
     // 保存ボタンが戻った後に、取り直したDOMと実際の保存内容の両方を見る。

@@ -1,5 +1,11 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  reason: requiredText("理由を入力してください。"),
+}
+
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -896,8 +902,8 @@ export function ScoreAdjustDialog({
   const bandChanges = validAmount && bandAfter !== band
   /* 確定で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
   const fields = useFormErrors()
-  fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'))
-  fields.define('reason', '理由', () => (!reason.trim() ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null))
+  fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'), { required: true })
+  fields.define('reason', '理由', () => ((b244Requirements.reason.check(reason) !== null) ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null), { required: true })
 
   const submit = async () => {
     if (fields.submit().length > 0) {
@@ -975,7 +981,7 @@ export function ScoreAdjustDialog({
           </div>
         </div>
 
-        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount"><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
+        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount" requirement={fields.requirement('amount')}><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -987,7 +993,7 @@ export function ScoreAdjustDialog({
           /></SaveErrorField>
 <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></div>
 
-        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason"><SaveErrorField names={["reason"]}><textarea
+        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason" requirement={b244Requirements.reason}><SaveErrorField names={["reason"]}><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}

@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from 'lucide-react'
 import { useRef, useState, type ButtonHTMLAttributes, type MouseEvent, type ReactNode, type RefObject } from 'react'
-import ActionMenu, { type ActionMenuItem } from './action-menu'
+import ActionMenu, { orderActionMenuItems, type ActionMenuItem } from './action-menu'
 import Button from './button'
 import IconButton from './icon-button'
 import ReorderHandle, { type ReorderDirection } from './reorder-handle'
@@ -86,12 +86,7 @@ export function MoreAction({ label = 'そのほかの操作', buttonRef, ...rest
  * 「危険な操作は赤字で区切りの下」は部品の中で決める（画面ごとに並べない）。
  */
 export function orderRowMenuItems(items: ActionMenuItem[]): ActionMenuItem[] {
-  const safe = items.filter((item) => item.tone !== 'danger')
-  const danger = items.filter((item) => item.tone === 'danger')
-  return [
-    ...safe,
-    ...danger.map((item, index) => ({ ...item, dividerBefore: index === 0 ? safe.length > 0 : false })),
-  ]
+  return orderActionMenuItems(items)
 }
 
 type RowMenuTriggerProps = Omit<

@@ -876,7 +876,7 @@ export default function RewardsTab() {
       }
       stats={stats}
       folders={<>{createButton(true)}{folderPanel}</>}
-      folderNav={narrow ? undefined : { rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >

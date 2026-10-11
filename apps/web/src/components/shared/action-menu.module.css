@@ -245,3 +245,6 @@
 
 /* B-161：浮く面の影と薄い縁を共通化。 */
 [data-theme='v8'] .menu { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
+
+/* B-244：5項目以上の組名は11px。 */
+[data-theme="v8"] .section { font-size: var(--text-micro); }

@@ -609,24 +609,7 @@ export default function InflowListV8({
   const searchLabel = '経路の名前・URLで探す'
   const onSearch = (value: string) => { setSearch(value); setPage(1) }
   // 1152 の板（y1ztx）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {notice}
-      <ListToolbarRow>
-        {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField value={search} onChange={onSearch} onClear={() => onSearch('')} placeholder={searchLabel} aria-label={searchLabel} />
-        </ListToolbarSearchSlot>
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {presetBox}
-        {perPageBox}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
   const wideToolbar = (
     <>
       {notice}
@@ -949,8 +932,8 @@ export default function InflowListV8({
           <FolderPanelNote>フォルダを消しても、中の経路は未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-      toolbar={<>{auxiliaryError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>setAuxiliaryRetry(value=>value+1)}/>:null}{narrow ? narrowToolbar : wideToolbar}</>}
+      collapsedFolders={<>{createButton}{folderSelect}</>}
+      toolbar={<>{auxiliaryError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>setAuxiliaryRetry(value=>value+1)}/>:null}{wideToolbar}</>}
       pagination={pager}
       overlays={<>
         <ConfirmDialog

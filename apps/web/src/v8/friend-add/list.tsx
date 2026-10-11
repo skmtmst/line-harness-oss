@@ -641,9 +641,7 @@ function FriendAddList() {
   )
   const perPageBox = <PageSizeSelect value={perPage} onChange={changePerPage} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div className={styles.noticeRow}>
-      <Notice tone="info" icon={<Route size={16} aria-hidden="true" />} message={ROUTE_NOTICE} />
-    </div>
+    null
   )
   const errorBand = actionError ? (
     <Notice tone="danger" >{actionError}<Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></Notice>
@@ -651,7 +649,7 @@ function FriendAddList() {
   /* 1152 の板（P20kYU）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「状態の札」。 */
   const toolbar = narrow ? (
     <ListToolbarFrame>
-      {notice}
+
       {errorBand}
       <ListToolbarRow>
         {createButton}
@@ -664,7 +662,7 @@ function FriendAddList() {
     </ListToolbarFrame>
   ) : (
     <>
-      {notice}
+
       {errorBand}
       {searchBox}
       {statusChips}
@@ -846,7 +844,7 @@ function FriendAddList() {
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       skeleton
-      help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}
+      help={<>{<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}</>}<div>{ROUTE_NOTICE}</div></>}
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"
@@ -906,7 +904,7 @@ function FriendAddList() {
           <FolderPanelNote>フォルダを消しても、中の設定は未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      folderNav={narrow ? undefined : { rows: folderRows, activeId: folder ?? '', onSelect: (id) => selectFolder(id || null), createAction: createButton ?? undefined }}
+      folderNav={{ rows: folderRows, activeId: folder ?? '', onSelect: (id) => selectFolder(id || null), createAction: createButton ?? undefined }}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

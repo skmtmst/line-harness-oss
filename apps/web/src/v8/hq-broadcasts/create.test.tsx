@@ -240,6 +240,10 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     render(<HqBroadcastCreate />)
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('配信名を入れてください')
+    const titleInput = screen.getByLabelText('配信名')
+    expect(titleInput.getAttribute('aria-invalid')).toBe('true')
+    const errorIds = titleInput.getAttribute('aria-describedby')?.split(' ') ?? []
+    expect(errorIds.some(id => document.getElementById(id)?.textContent?.includes('配信名を入れてください'))).toBe(true)
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '告知' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('送るアカウントを選んでください')

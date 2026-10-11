@@ -256,7 +256,6 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
         </>}
         toolbar={<>
           <div className={styles.noticeRow}>
-            <Notice tone="info">「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</Notice>
           </div>
           {csvError ? <div className={styles.noticeRow}><Notice tone="danger">{csvError}</Notice></div> : null}
           <ListToolbar

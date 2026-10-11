@@ -54,7 +54,7 @@ export default function ManualLinksScreen() {
   } = useManualLinks()
 
   const frame = (children: React.ReactNode) => (
-    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION}>
+    <SbSettingsScreen boardId="cIdA2" title={TITLE} help={<>{DESCRIPTION}<div>この表を直せるのは運営だけです。お客さまの組織からは見えません。</div></>}>
       {children}
       <UnsavedLeaveDialog open={guard.leaveTarget !== null} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </SbSettingsScreen>
@@ -85,7 +85,7 @@ export default function ManualLinksScreen() {
 
   return frame(
     <>
-      <Notice tone="warn" icon={<ShieldCheck size={16} aria-hidden="true" />}>この表を直せるのは運営だけです。お客さまの組織からは見えません。</Notice>
+
 
       <div className={styles.toolbar}>
         <SearchField

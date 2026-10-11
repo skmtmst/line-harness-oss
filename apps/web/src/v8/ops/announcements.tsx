@@ -192,14 +192,14 @@ export default function OpsAnnouncementsV8() {
 
   /* 欄に結び付く誤りは欄で知らせて1つ目へ移る（B-139）。上の帯は LINE の設定だけ。 */
   const fields = useFormErrors()
-  fields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入力してください'))
-  fields.define('body', '本文', () => (form.body.trim() ? null : '本文を入力してください'))
+  fields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入力してください'), { required: true })
+  fields.define('body', '本文', () => (form.body.trim() ? null : '本文を入力してください'), { required: true })
   fields.define('audience', '宛先', () => (
     form.audienceKind === 'plan' && form.audiencePlans.length === 0 ? 'プランを 1 つ以上選んでください'
       : form.audienceKind === 'tenants' && form.audienceTenantIds.length === 0 ? '契約先を 1 つ以上選んでください'
         : null
-  ))
-  fields.define('channels', '送り方', () => (form.channels.length === 0 ? '送り方を 1 つ以上選んでください' : null))
+  ), { required: form.audienceKind !== 'all' })
+  fields.define('channels', '送り方', () => (form.channels.length === 0 ? '送り方を 1 つ以上選んでください' : null), { required: true })
   const describedBy = (key: string) => (fields.invalid(key) ? `ann-${key}-error` : undefined)
 
   const validation = useMemo(() => {
@@ -351,9 +351,9 @@ export default function OpsAnnouncementsV8() {
               ] : null} />
             {formError && !confirmSend ? <Notice tone="danger" className={parts.alertNoticePlacement} >{formError}</Notice> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-            <div className={styles.field}><Field label="件名" htmlFor="ann-subject"><SaveErrorField names={["subject","form.subject"]}><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} /></SaveErrorField>
+            <div className={styles.field}><Field label="件名" htmlFor="ann-subject" requirement={fields.requirement('subject')}><SaveErrorField names={["subject","form.subject"]}><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} /></SaveErrorField>
 <FieldError id="ann-subject-error">{fields.error('subject')}</FieldError></Field></div>
-            <div className={styles.field}><Field label="本文" htmlFor="ann-body"><SaveErrorField names={["body","form.body"]}><TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} /></SaveErrorField>
+            <div className={styles.field}><Field label="本文" htmlFor="ann-body" requirement={fields.requirement('body')}><SaveErrorField names={["body","form.body"]}><TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} /></SaveErrorField>
 <FieldError id="ann-body-error">{fields.error('body')}</FieldError></Field></div>
             <fieldset className={styles.field} {...fields.bind('audience')} aria-invalid={fields.invalid('audience') || undefined} aria-describedby={describedBy('audience')}>
               <legend className={`${styles.smallLabel} ${styles.legend}`}>

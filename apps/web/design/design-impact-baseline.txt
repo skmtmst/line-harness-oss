@@ -777,3 +777,7 @@ shared-button-importer v8/restaurant/reservations/waitlist.tsx
 # B-234〜238：アレルギー・統括本文・お客さまデザインの共通操作。
 shared-button-importer components/shared/allergy-field.tsx
 shared-button-importer v8/settings/customer-look/screen.tsx
+# B-244〜B-247: 新しい共通の知らせの持ち主
+shared-button-importer components/shared/aggregation-status.tsx
+shared-button-importer components/shared/friend-filter-band.tsx
+shared-button-importer components/shared/save-feedback.tsx

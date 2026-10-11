@@ -9,7 +9,8 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field';
-import { Field } from '@/components/shared/form-controls';
+import { Field, RequiredBadge } from '@/components/shared/form-controls';
+import { requiredText } from '@/lib/form-requirement';
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
@@ -19,6 +20,10 @@ import DefaultValueInput from '@/components/friend-fields/default-value-input'
 import { sameLabels, storedDefaultLabels, suggestKey } from './field-model';
 import styles from './create.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors';
+
+const nameRequirement = requiredText('項目名を入力してください')
+const keyRequirement = requiredText('差し込みの名前を入力してください')
+const ecPathRequirement = requiredText('EC側の項目名を入力してください')
 
 /*
  * ★V8 友だち情報欄を作る・編集（Pencil `w9zY5`）。
@@ -227,10 +232,10 @@ export default function FieldEditor({
   const submit = () => {
     if (saving) return
     if (mode === 'create' && !siblingsReady) return
-    if (!name.trim()) return failField('name', '項目名を入力してください')
-    if (mode === 'create' && !fieldKey.trim()) return failField('key', '差し込みの名前を入力してください')
+    if (nameRequirement.check(name)) return failField('name', nameRequirement.check(name)!)
+    if (mode === 'create' && keyRequirement.check(fieldKey)) return failField('key', keyRequirement.check(fieldKey)!)
     if (NEEDS_OPTIONS.has(effectiveType) && optionList.length === 0) return failField('options', '選択肢を1つ以上入力してください')
-    if (ecIsMaster && !ecFieldPath.trim()) return failField('ec', 'EC側の項目名を入力してください')
+    if (ecIsMaster && ecPathRequirement.check(ecFieldPath)) return failField('ec', ecPathRequirement.check(ecFieldPath)!)
     /* 選択肢から外れた既定値は送る前に止める（R139）。 */
     if (effectiveType === 'multi_select') {
       const missing = defaultOptions.filter((item) => !optionList.includes(item))
@@ -333,7 +338,7 @@ export default function FieldEditor({
           <SaveErrorField names={["isStarred","is_starred"]}><Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked || saving}>友だち一覧の列に出す</Checkbox></SaveErrorField>
           <SaveErrorField names={["ecIsMaster","ec_is_master"]}><Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked || saving}>EC側の値を正とする（EC連携で上書き）</Checkbox></SaveErrorField>
           {ecIsMaster ? (
-            <Field label="EC側の項目名"><SaveErrorField names={["ecFieldPath","ec_field_path"]}><TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" /></SaveErrorField>
+            <Field label="EC側の項目名" requirement={{ ...ecPathRequirement, required: ecIsMaster }}><SaveErrorField names={["ecFieldPath","ec_field_path"]}><TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" /></SaveErrorField>
 {fieldError('ec')}</Field>
           ) : null}
         </section>
@@ -393,7 +398,7 @@ export default function FieldEditor({
 
         <section className={styles.card} aria-labelledby="ff-basic">
           <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ff-basic">基本</h2></div>
-          <Field label="項目名"><SaveErrorField names={["name"]}><TextField
+          <Field label="項目名" requirement={nameRequirement}><SaveErrorField names={["name"]}><TextField
               ref={(element) => { validationRefs.current.name = element }}
               invalid={validationTarget === 'name' && Boolean(validationError)}
               aria-describedby={validationTarget === 'name' && validationError ? 'ff-error-name' : undefined}
@@ -406,7 +411,7 @@ export default function FieldEditor({
 {fieldError('name')}
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" /></Field>
           <div className={styles.field} data-field="key">
-            <span className={styles.labelStrong} id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>
+            <span className={styles.labelStrong} id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}{mode === 'create' && keyRequirement.required ? <RequiredBadge /> : null}</span>
             <span className={styles.keyRow}>
               <span className={styles.keyBrace}>{'{{field.'}</span>
               {mode === 'create' ? (

@@ -40,8 +40,8 @@ describe('U007: 同時購読のラベルと説明を一致させる', () => {
 describe('U027: シナリオ一覧のフォルダ領域を折り畳む', () => {
   it('狭い板では左の列を道具の段の選ぶ欄へ畳む', () => {
     // 板 `wjfLe`：フォルダの列は道具の段の「フォルダ：すべて」へ畳まれる。
-    // 新しい一覧は狭い板で道具の段に narrowFolder の枠を置き、その中に選ぶ欄を出す。
-    expect(LIST).toContain('styles.narrowFolder}>{folderSelect}')
+    // B-244：作成とフォルダの口を型へ渡す。
+    expect(LIST).toContain('collapsedFolders={<>{createButton(false)}{folderSelect}</>}')
     expect(LIST).toContain('フォルダ：すべて')
     expect(LIST).toContain('aria-label="フォルダ"')
   })

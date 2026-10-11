@@ -349,7 +349,6 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
           description={`このまま保存すると、${conflict.who}の変更（${conflict.scope}）が消えます`}
           onCompare={() => setDiffOpen(true)} onReload={reloadLatest} />
       ) : null}
-      <Notice tone="info" icon={<Armchair size={16} />} message="ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。" />
       <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
         <div className={styles.sideColumn}>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-tables-title">

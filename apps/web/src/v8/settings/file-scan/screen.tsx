@@ -1,4 +1,7 @@
 'use client'
+import { requiredText } from '@/lib/form-requirement'
+const providerRequirement = requiredText('提供元を入力してください')
+const endpointRequirement = requiredText('送り先を入力してください')
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, RotateCcw, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -106,8 +109,8 @@ export default function FileScanScreen() {
   const configServerError = actionError === '宛先は https にし、提供元と宛先の両方を入れてください。' ? actionError : ''
   const saveExternalConfig = () => {
     const errors: { provider?: string; endpoint?: string } = {}
-    if (endpoint.trim() && !provider.trim()) errors.provider = '提供元を入力してください'
-    if (provider.trim() && !endpoint.trim()) errors.endpoint = '送り先を入力してください'
+    if (endpoint.trim() && providerRequirement.check(provider)) errors.provider = providerRequirement.check(provider)!
+    if (provider.trim() && endpointRequirement.check(endpoint)) errors.endpoint = endpointRequirement.check(endpoint)!
     if (endpoint.trim()) {
       try { if (new URL(endpoint.trim()).protocol !== 'https:') errors.endpoint = 'https:// で始まる送り先を入力してください' }
       catch { errors.endpoint = '送り先の URL を確かめてください（https:// から）' }
@@ -216,7 +219,7 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={<>{DESCRIPTION}<div>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</div></>}>
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -246,8 +249,8 @@ export default function FileScanScreen() {
   const externalOn = Boolean(config?.externalProvider && config?.externalEndpointUrl)
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
-      <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={<>{DESCRIPTION}<div>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</div></>}>
+
 
       {actionError && !configServerError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
@@ -365,10 +368,10 @@ export default function FileScanScreen() {
         </div>
         {configOpen ? (
           <div className={styles.form}>
-            <Field label="提供元" htmlFor="file-scan-provider" error={configErrors.provider}>
+            <Field label="提供元" htmlFor="file-scan-provider" requirement={{ ...providerRequirement, required: Boolean(endpoint.trim()) }} error={configErrors.provider}>
               <SaveErrorField names={["provider"]}><TextField ref={providerRef} id="file-scan-provider" value={provider} onChange={(event) => { setProvider(event.target.value); setConfigErrors((current) => ({ ...current, provider: undefined })); if (configServerError) setActionError('') }} placeholder="例：example-scan" /></SaveErrorField>
             </Field>
-            <Field label="送り先（https）" htmlFor="file-scan-endpoint" error={configErrors.endpoint || configServerError || undefined}>
+            <Field label="送り先（https）" htmlFor="file-scan-endpoint" requirement={{ ...endpointRequirement, required: Boolean(provider.trim()) }} error={configErrors.endpoint || configServerError || undefined}>
               <SaveErrorField names={["endpoint"]}><TextField ref={endpointRef} id="file-scan-endpoint" value={endpoint} onChange={(event) => { setEndpoint(event.target.value); setConfigErrors((current) => ({ ...current, endpoint: undefined })); if (configServerError) setActionError('') }} placeholder="https://example.com/scan" /></SaveErrorField>
             </Field>
             <Field label="鍵の名前" htmlFor="file-scan-secret-ref">

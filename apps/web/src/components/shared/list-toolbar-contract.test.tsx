@@ -19,6 +19,15 @@ describe('B-178 共通の道具の段の操作', () => {
     expect(onChange).toHaveBeenCalledWith('')
   })
 
+  it('保存した条件の操作を2段目の口へ渡し、元のイベントを保つ', () => {
+    const useCondition = vi.fn()
+    render(<ListToolbar search={{ placeholder: '探す', value: '', onChange: vi.fn() }} actions={<button onClick={useCondition}>保存した条件</button>} />)
+    const action = screen.getByRole('button', { name: '保存した条件' })
+    expect(action.closest('[data-toolbar-actions]')).toBeTruthy()
+    fireEvent.click(action)
+    expect(useCondition).toHaveBeenCalledOnce()
+  })
+
   it('読み上げ名が省略されたときは探す欄の説明を使う', () => {
     render(<ListToolbar search={{ placeholder: '名前・本文を探す', value: '', onChange: vi.fn() }} />)
     expect(screen.getByRole('searchbox', { name: '名前・本文を探す' })).toBeTruthy()
@@ -88,8 +97,9 @@ describe('B-178 共通の道具の段の操作', () => {
   it('畳む道具がないV8一覧では実際の空き幅に合わせて折り返す', () => {
     const css = read('list-toolbar.module.css')
     expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
-    // 「…」へ畳む一覧と、段を明示する一覧の指定は残す。
-    expect(css).toContain('.optional[data-collapsed] > summary')
+    // B-244：名前の無い「…」へ畳まず、狭い白い板で2段にする。
+    expect(css).not.toContain('.optional[data-collapsed] > summary')
+    expect(css).toContain('@container v8-page (max-width: 1099px)')
     expect(css).toContain(".toolbar[data-toolbar-layout='stacked']")
   })
 

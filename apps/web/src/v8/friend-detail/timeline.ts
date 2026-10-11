@@ -5,6 +5,7 @@ import { jstDate } from '@/lib/jst-datetime'
  * 今の画面（app/friends/detail/page.tsx）の決まりを写した（import は不可）。
  */
 import { formatDay } from '@/lib/format'
+import { friendFilterHref } from '@/components/shared/friend-filter-band'
 
 export type FriendTimelineItem = {
   id: string
@@ -95,7 +96,7 @@ export function timelineSourceHref(item: FriendTimelineItem, friendId: string): 
     case 'event_booking':
       return source.parentId ? { href: `/events/bookings?id=${encodeURIComponent(source.parentId)}`, external: false, label: '予約' } : null
     case 'friend_reminder':
-      return { href: '/reminders', external: false, label: 'リマインダ' }
+      return { href: friendFilterHref('/reminders', friendId), external: false, label: 'リマインダ' }
     default:
       return null
   }

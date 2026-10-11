@@ -1,4 +1,11 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  input_startDate: requiredText("はじめの日を入れてください。"),
+  input_endDate: requiredText("おわりの日を入れてください。"),
+}
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Phone } from 'lucide-react'
 import type { RestaurantClosure, RestaurantClosureInput, RestaurantClosureKind, RestaurantClosurePreview } from '@line-crm/shared'
@@ -140,8 +147,8 @@ export default function ClosureDialog({
 
   const save = async () => {
     const errors: typeof fieldErrors = {}
-    if (!input.startDate || input.startDate < today) errors.start = problem
-    else if (!input.endDate || input.endDate < input.startDate) errors.end = problem
+    if ((b244Requirements.input_startDate.check(input.startDate) !== null) || input.startDate < today) errors.start = problem
+    else if ((b244Requirements.input_endDate.check(input.endDate) !== null) || input.endDate < input.startDate) errors.end = problem
     else if (problem) errors.time = problem
     if (pickTables && !partial) errors.tables = '閉じる卓を1つ以上選んでください。'
     setFieldErrors(errors)
@@ -211,7 +218,7 @@ export default function ClosureDialog({
         </div>
 
         <div className={styles.dates}>
-          <Field label="はじめの日" htmlFor="e10-start" error={fieldErrors.start}>
+          <Field label="はじめの日" htmlFor="e10-start" error={fieldErrors.start} requirement={b244Requirements.input_startDate}>
             <SaveErrorField names={["startDate","input.startDate","start_date","input.start_date"]}><DateField
               id="e10-start"
               aria-label="はじめの日"
@@ -222,7 +229,7 @@ export default function ClosureDialog({
             /></SaveErrorField>
           </Field>
           <span className={styles.wave} aria-hidden="true">〜</span>
-          <Field label="おわりの日" htmlFor="e10-end" error={fieldErrors.end}>
+          <Field label="おわりの日" htmlFor="e10-end" error={fieldErrors.end} requirement={b244Requirements.input_endDate}>
             <SaveErrorField names={["endDate","input.endDate","end_date","input.end_date"]}><DateField id="e10-end" aria-label="おわりの日" invalid={Boolean(fieldErrors.end)} value={input.endDate} min={input.startDate || today} onChange={(value) => set({ endDate: value })} /></SaveErrorField>
           </Field>
         </div>

@@ -140,9 +140,9 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
 
   /* 予約を入れるときに落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
   const fields = useFormErrors()
-  fields.define('name', 'お名前', () => (name.trim() ? null : 'お名前を入れてください。'))
-  fields.define('date', '日付', () => (date ? null : '日付を選んでください。'))
-  fields.define('time', '時刻', () => (!date ? null : !time ? '時刻を選んでください。' : chosenTable ? null : 'この時刻に人数が入る卓がありません。時刻か人数を変えてください。'))
+  fields.define('name', 'お名前', () => (name.trim() ? null : 'お名前を入れてください。'), { required: true })
+  fields.define('date', '日付', () => (date ? null : '日付を選んでください。'), { required: true })
+  fields.define('time', '時刻', () => (!date ? null : !time ? '時刻を選んでください。' : chosenTable ? null : 'この時刻に人数が入る卓がありません。時刻か人数を変えてください。'), { required: true })
   const describedBy = (key: string) => (fields.invalid(key) ? `e2-${key}-error` : undefined)
 
   const save = async () => {
@@ -209,7 +209,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
             })}
           </div>
         ) : null}
-        <div className={styles.field}><Field label="お名前" htmlFor="e2-name"><SaveErrorField names={["name","customerName"]}><TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" /></SaveErrorField>
+        <div className={styles.field}><Field label="お名前" htmlFor="e2-name" requirement={fields.requirement('name')}><SaveErrorField names={["name","customerName"]}><TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" /></SaveErrorField>
 <FieldError id="e2-name-error">{fields.error('name')}</FieldError></Field></div>
         <div className={styles.field}>
           <span className={styles.label} id="e2-guests">人数</span>

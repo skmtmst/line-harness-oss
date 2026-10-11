@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-09",
+  "version": "2026-10-12",
   "doc": "docs/v8-pattern-catalog.md",
   "note": "型の対応表の機械の表。人が読む説明は docs/v8-pattern-catalog.md。正規表現は JavaScript の書き方（JSON の文字列）。持ち主（owner）は B-172：形と値を持つ所は1つ。",
   "global": {
@@ -296,7 +296,9 @@
         "§6.11-12",
         "B-143",
         "B-122",
-        "B-157"
+        "B-157",
+        "§6.43",
+        "B-244"
       ],
       "owner": {
         "code": {
@@ -365,7 +367,9 @@
       "guard": {
         "tests": [
           "apps/web/src/components/shared/list-toolbar-contract.test.tsx",
-          "apps/web/src/components/ui/list-controls-contract.test.ts"
+          "apps/web/src/components/ui/list-controls-contract.test.ts",
+          "apps/web/src/components/shared/b244-behavior.test.tsx",
+          "apps/web/scripts/v8-guard/b244-rules.test.mjs"
         ],
         "needed": ""
       }
@@ -626,7 +630,9 @@
       "rules": [
         "§2",
         "§6.8",
-        "B-143"
+        "B-143",
+        "§6.43",
+        "B-244"
       ],
       "owner": {
         "code": {
@@ -693,7 +699,9 @@
       "guard": {
         "tests": [
           "apps/web/src/components/shared/row-actions-contract.test.tsx",
-          "apps/web/src/v8/row-menu-contract.test.ts"
+          "apps/web/src/v8/row-menu-contract.test.ts",
+          "apps/web/src/components/shared/b244-behavior.test.tsx",
+          "apps/web/scripts/v8-guard/b244-rules.test.mjs"
         ],
         "needed": ""
       }
@@ -1425,7 +1433,9 @@
       "rules": [
         "§6.12-4",
         "§6.12-16",
-        "B-158"
+        "B-158",
+        "§6.43",
+        "B-244"
       ],
       "owner": {
         "code": {
@@ -1507,7 +1517,9 @@
       "guard": {
         "tests": [
           "apps/web/src/components/shared/optional-badge.test.tsx",
-          "apps/web/src/components/shared/text-field-unified.react.test.tsx"
+          "apps/web/src/components/shared/text-field-unified.react.test.tsx",
+          "apps/web/src/components/shared/b244-behavior.test.tsx",
+          "apps/web/scripts/v8-guard/b244-rules.test.mjs"
         ],
         "needed": "「（任意）」「＊」を書いたら落ちる試験"
       }
@@ -1519,7 +1531,9 @@
       "rules": [
         "§6.9",
         "B-154",
-        "B-139"
+        "B-139",
+        "§6.43",
+        "B-244"
       ],
       "owner": {
         "code": {
@@ -1579,7 +1593,9 @@
       "guard": {
         "tests": [
           "apps/web/src/lib/use-form-errors.test.tsx",
-          "apps/web/src/components/shared/field-errors-controls.react.test.tsx"
+          "apps/web/src/components/shared/field-errors-controls.react.test.tsx",
+          "apps/web/src/components/shared/b244-behavior.test.tsx",
+          "apps/web/scripts/v8-guard/b244-rules.test.mjs"
         ],
         "needed": "作る・編集の画面が useFormErrors を読まないと落ちる試験"
       }
@@ -3008,6 +3024,141 @@
           "apps/web/src/components/shared/folder-select-rollout-contract.test.ts"
         ],
         "needed": ""
+      }
+    },
+    {
+      "id": "screen-explanation",
+      "name": "この画面の説明",
+      "role": "人ごと・画面ごとに開閉を覚える説明",
+      "rules": [
+        "§6.44",
+        "B-245"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/screen-explanation.tsx",
+            "apps/web/src/components/shared/screen-explanation.module.css"
+          ],
+          "components": [
+            "ScreenExplanation"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "採用済み。Penの共通部品IDと絵の照合は司令塔が記録する。"
+      },
+      "code": {
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/b244-behavior.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "save-feedback",
+      "name": "保存の4つの状態",
+      "role": "送信中・成功・失敗・一部成功と残りだけの再試行",
+      "rules": [
+        "§6.45",
+        "B-246 D1"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/save-feedback.tsx"
+          ],
+          "components": [
+            "SaveFeedback",
+            "useSaveFeedback"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "採用済み。Penの共通部品IDと絵の照合は司令塔が記録する。"
+      },
+      "code": {
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/b244-behavior.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "friend-filter-band",
+      "name": "お客さまで絞った一覧の帯",
+      "role": "名前をURLへ入れず絞り込み解除と詳細への帰り道を示す",
+      "rules": [
+        "§6.46",
+        "B-247 E1"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/friend-filter-band.tsx",
+            "apps/web/src/components/shared/friend-filter-band.module.css"
+          ],
+          "components": [
+            "FriendFilterBand"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "採用済み。Penの共通部品IDと絵の照合は司令塔が記録する。"
+      },
+      "code": {
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/b244-behavior.test.tsx"
+        ]
+      }
+    },
+    {
+      "id": "aggregation-status",
+      "name": "集計の状態",
+      "role": "未集計・集計中・失敗・完成と再試行",
+      "rules": [
+        "§6.46",
+        "B-247 E2"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/aggregation-status.tsx"
+          ],
+          "components": [
+            "AggregationStatus"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "採用済み。Penの共通部品IDと絵の照合は司令塔が記録する。"
+      },
+      "code": {
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/b244-behavior.test.tsx"
+        ]
       }
     }
   ]

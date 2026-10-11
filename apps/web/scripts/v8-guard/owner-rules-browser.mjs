@@ -54,7 +54,7 @@ export default function scanOwnerRules() {
     if (['rgb(37, 99, 235)','rgb(29, 78, 216)'].includes(c.color)) {
       let pill = false
       for (let p = el, i = 0; p && i < 4; p = p.parentElement,i++) if (tinted(css(p))) { pill = true; break }
-      if (!pill) add('blue',el,{count:1},text)
+      if (!pill && !el.closest('[data-screen-explanation-toggle]')) add('blue',el,{count:1},text)
     }
   }
   // 同じ列の主操作・メニュー・状態。幅とxを別々に見張る。

@@ -70,7 +70,7 @@ describe('Td4TN 作る画面の絵合わせ', () => {
     await waitFor(() => {
       expect(screen.getByText('案件を作る')).toBeTruthy()
     })
-    fireEvent.click(screen.getByRole('button', { name: '案件を作るの説明' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
     expect(screen.getByText(/何を紹介すると/)).toBeTruthy()
     expect(screen.getAllByText(/アフィリエイターの画面に出ます/).length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('アフィリエイターの画面での見え方')).toBeTruthy()

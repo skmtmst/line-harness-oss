@@ -182,3 +182,10 @@
 [data-theme='v8'] .field[data-field-content-gap] .labelRow {
   margin-bottom: 0;
 }
+
+/* B-244：必須は赤い札・11px。ネイティブ欄も同じ赤枠。 */
+[data-theme='v8'] .required { font-size: var(--text-micro); }
+[data-theme='v8'] .field [aria-invalid='true']:is(input, textarea, select) { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
+
+/* B-244：必須の札は11px。欄や型の寸法は変えない。 */
+[data-theme='v8'] .required { font-size: var(--text-micro); }

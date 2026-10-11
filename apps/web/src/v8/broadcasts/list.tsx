@@ -692,7 +692,7 @@ export default function BroadcastListV8() {
      */
     if (isFromHeadquarters(broadcast)) {
       return [
-        { id: 'view', label: '見る', external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
+        { id: 'view', label: "配信の詳細を見る", external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
         ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={14} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
       ]
     }
@@ -927,16 +927,14 @@ export default function BroadcastListV8() {
   const toolbar = (
     <ListToolbarFrame>
       <ListToolbarRow>
-        {narrow ? createButton(false) : null}
-        {narrow ? folderSelect : null}
         {searchBox}
         {dateBox}
-        {narrow ? null : saveCurrentButton}
+        {saveCurrentButton}
         <span className={styles.spacer} aria-hidden="true" />
         {savedSearchBox}
       </ListToolbarRow>
       <ListToolbarRow>
-        {narrow ? statusSelect : statusChips}
+        {statusChips}
         <span className={styles.spacer} aria-hidden="true" />
         {pageSizeBox}
         {sortButton}
@@ -1161,8 +1159,8 @@ export default function BroadcastListV8() {
           ))}
         </KpiBand>
       </>}
-      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
-      folders={narrow ? undefined : (
+      folderNav={error ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
+      folders={error ? undefined : (
         <FolderPanel
           createAction={createButton(true)}
           activeId={folderFilter}

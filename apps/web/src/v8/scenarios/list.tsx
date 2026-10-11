@@ -1019,9 +1019,7 @@ export default function ScenariosListV8() {
   /* ===== 道具の段の部品（広い板と狭い板で同じものを並べ替える） ===== */
 
   const noteBand = (
-    <Notice tone="info" icon={<Lightbulb size={16} aria-hidden="true" />}>
-      作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。
-    </Notice>
+    null
   )
 
   const filterChips = (
@@ -1095,36 +1093,12 @@ export default function ScenariosListV8() {
    * 1152 の板（wjfLe）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {noteBand}
-      <ListToolbarRow>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="シナリオ名で探す"
-            aria-label="シナリオ名で探す"
-            value={nameQuery}
-            onChange={(value) => setNameQuery(clampSearchQuery(value))}
-            onClear={() => setNameQuery('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.narrowSpacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        <div className={styles.savedIconOnly} title="よく使う絞り込み">{savedBox}</div>
-      </ListToolbarRow>
-      {filteredCount}
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <>
       {/* 案内の帯は表の上の主列に置く（板 axFrW）。toolbar 枠の先頭で一行を取る。 */}
-      <div className={styles.noteRow}>{noteBand}</div>
+      <div className={styles.noteRow}></div>
       <ListToolbar
         search={{
           placeholder: 'シナリオ名で探す',
@@ -1161,7 +1135,9 @@ export default function ScenariosListV8() {
       headingSize="regular"
       title="シナリオ配信"
 
-      help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
+      help={<>{<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}<div>
+      作っただけでは送られません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。
+    </div></>}
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
         {!canEdit && (
@@ -1319,8 +1295,8 @@ export default function ScenariosListV8() {
         {createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         {folderPanel}
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      collapsedFolders={<>{createButton(false)}{folderSelect}</>}
+      toolbar={wideToolbar}
       pagination={listPager}
     >
       {actionError ? (

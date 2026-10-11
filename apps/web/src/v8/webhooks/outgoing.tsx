@@ -477,9 +477,7 @@ export default function WebhooksOutgoingV8() {
   )
   const perPage = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div className={styles.noticeRow}>
-      <Notice tone="info">友だちの動きを、決めたタイミングでほかのシステムへ送ります。送るときは秘密の鍵を付けます。鍵は「…」から作り直せます。</Notice>
-    </div>
+    null
   )
   const searchBox = (
     <SearchField
@@ -491,25 +489,10 @@ export default function WebhooksOutgoingV8() {
     />
   )
   /* 1152 の板（AsfFB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
-  const narrowToolbar = (
-    <div className={styles.narrowTools}>
-      {notice}
-      <div className={styles.narrowRow}>
-        {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>{searchBox}</div>
-      </div>
-      <div className={styles.narrowRow}>
-        {chips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {savedBox}
-        {perPage}
-      </div>
-    </div>
-  )
+
   const wideToolbar = (
     <>
-      {notice}
+
       <ListToolbar
         search={{ placeholder: 'つなぎ先で探す', label: 'つなぎ先で探す', width: 240, value: query, onChange: setQuery }}
         filters={chips}
@@ -654,7 +637,7 @@ export default function WebhooksOutgoingV8() {
                             open={menuId === item.id}
                             onOpenChange={(next) => setMenuId(next ? item.id : null)}
                             items={[
-                              { id: 'view', label: '中身を見る', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } },
+                              { id: 'view', label: "送信の記録を見る", onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } },
                               ...(item.deliverySummary.canRetry && canManage
                                 ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.push('/webhooks?tab=interactions') } }]
                                 : []),
@@ -745,9 +728,9 @@ export default function WebhooksOutgoingV8() {
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       skeleton
-      help={<>{WEBHOOKS_DESCRIPTION}{narrow
+      help={<>{<>{WEBHOOKS_DESCRIPTION}{narrow
           ? '行の「…」から 中身を見る・試しに送る・失敗をやり直す・鍵を作り直す・止める・削除。'
-          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</>}
+          : '行の「設定」から 直す・止める・鍵を作り直す・試しに送る・削除。「中身を見る」で送った中身と返事を見られます。'}</>}<div>友だちの動きを、決めたタイミングでほかのシステムへ送ります。送るときは秘密の鍵を付けます。鍵は「…」から作り直せます。</div></>}
       boardId={narrow ? 'AsfFB' : 'ZSbFY'}
       headingSize="regular"
       title="外部連携"
@@ -783,8 +766,8 @@ export default function WebhooksOutgoingV8() {
           placeholder="例：顧客・会員"
         />
       </>}
-      collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      collapsedFolders={<>{createButton}{folderSelect}</>}
+      toolbar={wideToolbar}
       pagination={pager}
       overlays={<>
         {folderMove.overlays}

@@ -163,22 +163,8 @@
 [data-theme='v8'] .toolbar :global(button[aria-haspopup='listbox']) { width: max-content; max-width: 100%; }
 [data-theme='v8'] .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
 [data-theme='v8'] .toolbar:has(.optional) .row1 > .search { flex: none; }
-.optional { position: relative; flex: none; width: max-content; }
-.optional > summary { display: none; }
-.optional > div { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
-.optional[data-collapsed] > summary {
-  display: flex; align-items: center; justify-content: center; list-style: none;
-  height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap); cursor: pointer;
-  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
-}
-.optional > summary::-webkit-details-marker { display: none; }
-.optional > summary:focus-visible { outline: 2px solid var(--color-focus-ring); }
-.optional[data-collapsed] > div {
-  position: absolute; right: 0; top: 100%; z-index: 50;
-  padding: var(--tpl-toolbar-gap); background: var(--color-canvas);
-  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
-}
-.optional[data-collapsed]:not([open]) > div { display: none; }
+.optional { display: inline-flex; flex: none; align-items: center; gap: var(--tpl-toolbar-gap); }
+.leading { display: none; }
 [data-theme='v8'] .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
 /*
  * ★V8「道具の2段」（acRIl 予約管理）：1段目＝探す・担当・経路・CSV、
@@ -228,4 +214,38 @@
 @container v8-list-toolbar (max-width: 1100px) { .filterWide { display: none; } .filterNarrow { display: flex; } }
 .slots { flex-direction: row; flex-wrap: wrap; align-items: center; }
 .slots > .slotsRow { display: contents; }
+.slotTool { display: contents; }
+.rowBreak { display: none; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
+
+/* B-244：白い板が狭い時、役目で必ず2段。件数は2段目の右端。 */
+@container v8-page (max-width: 1099px) {
+  [data-theme='v8'] .toolbar:is([data-toolbar-layout='band'], [data-toolbar-layout='stacked']) {
+    display: flex; flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: var(--tpl-toolbar-gap);
+  }
+  [data-theme='v8'] .toolbar .row1,
+  [data-theme='v8'] .toolbar .row2 { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tpl-toolbar-gap); min-width: 0; }
+  [data-theme='v8'] .toolbar .row1 > *,
+  [data-theme='v8'] .toolbar .filters > *,
+  [data-theme='v8'] .toolbar .trailing { order: 0; }
+  [data-theme='v8'] .toolbar .filters { display: flex; flex: 1 1 0; min-width: 0; }
+  [data-theme='v8'] .toolbar .row2 .trailing { margin-left: auto; }
+  [data-theme='v8'] .toolbar .leading { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); }
+  [data-theme='v8'] .toolbar .row1 > .search { flex: 1 1 var(--tpl-list-search-min); min-width: 0; }
+  [data-theme='v8'] .slots > .slotsRow { display: contents; }
+  [data-theme='v8'] .slots .leading,
+  [data-theme='v8'] .slotsRow > .leading { display: inline-flex; gap: var(--tpl-toolbar-gap); order: 0; }
+  [data-theme='v8'] .rowBreak { display: block; flex-basis: 100%; height: 0; order: 1; }
+  [data-theme='v8'] .slotTool { display: flex; align-items: center; min-width: 0; order: 2; }
+  [data-theme='v8'] .slotTool[data-toolbar-role='search'] { order: 0; flex: 1 1 var(--tpl-list-search-min); }
+  [data-theme='v8'] .slotTool[data-toolbar-role='sort'] { order: 3; margin-left: auto; }
+  [data-theme='v8'] .slotTool[data-toolbar-role='count'] { order: 4; margin-left: auto; }
+  [data-theme='v8'] .slotsEnd { margin-left: auto; }
+}
+
+/* B-244：保存した条件などの道具は、狭い板の2段目へ。広い板の順は保つ。 */
+.actions { display: contents; }
+[data-theme='v8'] .actions > * { order: 3; }
+@container v8-page (max-width: 1099px) {
+  [data-theme='v8'] .actions > * { order: 0; }
+}

@@ -1,4 +1,11 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  changeReason: requiredText("変える理由を入力してください"),
+  draft_date: requiredText("開始日を入れてください"),
+}
+
 import { jstDate } from '@/lib/jst-datetime';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { notifySaved } from '@/components/shared/toast';
@@ -417,7 +424,7 @@ function EditCommonVarV8Inner() {
       document.getElementById('cv-fallback-value')?.focus()
       return
     }
-    if (!changeReason.trim()) {
+    if ((b244Requirements.changeReason.check(changeReason) !== null)) {
       const message = '変える理由を入力してください'
       if (!saveErrors.fail("changeReason", message))
       setError(message)
@@ -596,7 +603,7 @@ function EditCommonVarV8Inner() {
 
   const addSchedule = async () => {
     if (addingSchedule || !item || !draft || !selectedAccountId) return
-    if (!draft.date) {
+    if ((b244Requirements.draft_date.check(draft.date) !== null)) {
       setScheduleDateError('開始日を入れてください')
       focusFieldById('sc-date')
       return
@@ -1178,7 +1185,7 @@ function EditCommonVarV8Inner() {
                 )}</Field></div>
             </div>
             {valueFieldError ? <p className={styles.fieldError} role="alert">{valueFieldError}</p> : null}
-            <div className={styles.field}><Field label="変える理由（記録に残ります）" htmlFor="cv-change-reason"><SaveErrorField names={["changeReason","saved","change_reason"]}><input
+            <div className={styles.field}><Field label="変える理由（記録に残ります）" htmlFor="cv-change-reason" requirement={b244Requirements.changeReason}><SaveErrorField names={["changeReason","saved","change_reason"]}><input
                 id="cv-change-reason"
                 type="text"
                 value={changeReason}
@@ -1336,7 +1343,7 @@ function EditCommonVarV8Inner() {
         {draft ? (
           <div className={styles.dialogBody}>
             <div className={styles.dialogPair}>
-              <div className={styles.field}><Field label="開始日" htmlFor="sc-date"><SaveErrorField names={["date","draft.date"]}><DateField
+              <div className={styles.field}><Field label="開始日" htmlFor="sc-date" requirement={b244Requirements.draft_date}><SaveErrorField names={["date","draft.date"]}><DateField
                   id="sc-date"
                   value={draft.date}
                   min={jstNowLocalInput().date}

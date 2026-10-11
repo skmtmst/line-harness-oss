@@ -82,9 +82,7 @@ export default function PetsListV8({
 
   return (
     <>
-      <div className={styles.noteRow}>
-        <Notice tone="info" message="体重が90日更新されていないペットは、マイページで更新をお願いできます（行の「…」→マイページで更新を促す）。" />
-      </div>
+
 
       <ListToolbarRow data-design="ListControls">
         <ListToolbarSearchSlot>

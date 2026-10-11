@@ -162,7 +162,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const fields = useFormErrors()
   ;(ctas ?? []).forEach((card, i) => {
     const check = () => cardFieldProblems(card, times[i] ?? '', webinar.durationSeconds)
-    const opts = { reveal: () => setSelected(i), group: `card-${i}` }
+    const opts = { required: true, reveal: () => setSelected(i), group: `card-${i}` }
     fields.define(`cta-${i}-title`, `カード${i + 1}の見出し`, () => check().title, opts)
     fields.define(`cta-${i}-time`, `カード${i + 1}の出す時刻`, () => check().time, opts)
     fields.define(`cta-${i}-button`, `カード${i + 1}のボタンの言葉`, () => check().button, opts)
@@ -342,15 +342,15 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
               {/* 閲覧のみ：文字の欄は読み取りだけ、選ぶ部品は選んでいる値を文字で見せる（2026-10-06 オーナー決定）。 */}
               <p className={styles.editorTitle}>{`選んでいるカード：${times[currentIndex] ?? fmtMinSec(current.atSeconds)}`}</p>
               <div className={form.pair}>
-                <div className={form.field}><Field label="見出し" htmlFor="cta-title"><SaveErrorField names={["title","current.title"]}><TextField {...fields.bind(`cta-${currentIndex}-title`)} id="cta-title" value={current.title} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-title`)} aria-describedby={errId('title')} onChange={(event) => update(currentIndex, { title: event.target.value })} /></SaveErrorField>
+                <div className={form.field}><Field label="見出し" htmlFor="cta-title" requirement={fields.requirement(`cta-${currentIndex}-title`)}><SaveErrorField names={["title","current.title"]}><TextField {...fields.bind(`cta-${currentIndex}-title`)} id="cta-title" value={current.title} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-title`)} aria-describedby={errId('title')} onChange={(event) => update(currentIndex, { title: event.target.value })} /></SaveErrorField>
 <FieldError id="cta-title-error">{fields.error(`cta-${currentIndex}-title`)}</FieldError></Field></div>
-                <div className={form.field}><Field label="出す時刻（分:秒）" htmlFor="cta-time"><SaveErrorField names={["times"]}><TextField {...fields.bind(`cta-${currentIndex}-time`)} id="cta-time" value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" invalid={fields.invalid(`cta-${currentIndex}-time`)} aria-describedby={errId('time')} onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></SaveErrorField>
+                <div className={form.field}><Field label="出す時刻（分:秒）" htmlFor="cta-time" requirement={fields.requirement(`cta-${currentIndex}-time`)}><SaveErrorField names={["times"]}><TextField {...fields.bind(`cta-${currentIndex}-time`)} id="cta-time" value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" invalid={fields.invalid(`cta-${currentIndex}-time`)} aria-describedby={errId('time')} onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></SaveErrorField>
 <FieldError id="cta-time-error">{fields.error(`cta-${currentIndex}-time`)}</FieldError></Field></div>
               </div>
-              <div className={form.field}><Field label="ボタンの言葉" htmlFor="cta-button"><SaveErrorField names={["buttonLabel","current.buttonLabel","button_label","current.button_label"]}><TextField {...fields.bind(`cta-${currentIndex}-button`)} id="cta-button" value={current.buttonLabel} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-button`)} aria-describedby={errId('button')} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></SaveErrorField>
+              <div className={form.field}><Field label="ボタンの言葉" htmlFor="cta-button" requirement={fields.requirement(`cta-${currentIndex}-button`)}><SaveErrorField names={["buttonLabel","current.buttonLabel","button_label","current.button_label"]}><TextField {...fields.bind(`cta-${currentIndex}-button`)} id="cta-button" value={current.buttonLabel} readOnly={readOnly} invalid={fields.invalid(`cta-${currentIndex}-button`)} aria-describedby={errId('button')} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></SaveErrorField>
 <FieldError id="cta-button-error">{fields.error(`cta-${currentIndex}-button`)}</FieldError></Field></div>
               <div className={form.field}>
-                <span className={form.labelSmall}>押したら</span>
+                <Field label="押したら" errorId="cta-link-error" requirement={fields.requirement(`cta-${currentIndex}-link`)} error={fields.error(`cta-${currentIndex}-link`)} errorFrame>
                 {/*
                   押したらの共通の欄（TapActionField・YPzmo）。ウェビナーの視聴ページの CTA なので URL と回答フォームの2つだけ
                   （回答フォームは視聴ページの中で開くので LIFF は要らない）。保存の形（kind・formId・url）は今のまま。
@@ -373,7 +373,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                     sources={forms.state === 'ready' ? { form: forms.items.map((item) => ({ id: item.id, name: item.name, note: item.isActive ? '公開中' : '公開していません', disabled: !item.isActive })) } : undefined}
                   /></SaveErrorField>
                 </div>
-                <FieldError id="cta-link-error">{fields.error(`cta-${currentIndex}-link`)}</FieldError>
+                </Field>
               </div>
               <div className={styles.toggleRow}>
                 {readOnly ? null : <SaveErrorField names={["autoOpen","current.autoOpen","auto_open","current.auto_open"]}><SettingCheckbox checked={current.autoOpen} label="ボタンを押したら、フォームを自動で開く" onChange={(next) => update(currentIndex, { autoOpen: next })} /></SaveErrorField>}

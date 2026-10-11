@@ -1025,33 +1025,7 @@ export default function FormsListV8() {
   )
 
   /* 1152 の板（GrnO4）：1段目「作る・フォルダ・探す … 件数」、2段目「札・並び」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      <ListToolbarRow>
-        {reviewMode ? null : createButton(false)}
-        {reviewMode ? null : (
-          <div className={styles.narrowFolder}>
-            <SaveErrorField names={["activeFolderId","activeId","active_folder_id"]}><Select aria-label="フォルダ" value={activeFolderId} onChange={selectFolder} options={folderSelectOptions} /></SaveErrorField>
-          </div>
-        )}
-        <ListToolbarSearchSlot>
-          <SearchField
-            aria-label="フォーム名・質問文で探す"
-            placeholder="フォーム名・質問文"
-            value={query}
-            onChange={onSearch}
-            onClear={() => onSearch('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.spacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        {sortBox}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <ListToolbarFrame>
@@ -1622,11 +1596,11 @@ export default function FormsListV8() {
             ))}
           </KpiBand>
         )}
-        folderNav={narrow ? undefined : { rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
+        folderNav={{ rows: folderRows, activeId: activeFolderId, onSelect: selectFolder, createAction: createButton(false) }}
         folders={reviewMode ? undefined : folderPanel}
         toolbar={(
           <>
-            {narrow ? narrowToolbar : wideToolbar}
+            {wideToolbar}
             {reviewMode ? (
               <div className={styles.reviewNote}>
                 <p><strong>管理者確認中のフォーム</strong> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>

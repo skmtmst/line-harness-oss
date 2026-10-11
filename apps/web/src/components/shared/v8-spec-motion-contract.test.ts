@@ -27,7 +27,7 @@ describe('V8 仕上げ3回目の動き', () => {
     const button = readFileSync(new URL('./button.tsx', import.meta.url), 'utf8')
     expect(button).toMatch(/disabled=\{disabled \|\| busyNow\}/)
     expect(button).toMatch(/aria-busy=\{busyNow \? true : undefined\}/)
-    expect(button).toMatch(/busyLabel = '保存中…'/)
+    expect(button).toMatch(/busyLabel = '保存しています…'/)
   })
 
   it('⑤ プルダウンの開いた中身は提案 F で 150ms（StFE7・B-45）。候補つき入力は200ms・色・暦ポップは120msのまま。「…」は 120ms', () => {

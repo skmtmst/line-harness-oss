@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NenCampaignSetting, NenColumn, NenDeliveryList, NenFlowMetrics } from '@/lib/api'
 
@@ -134,6 +134,9 @@ describe('V8 NEN配信の一覧', () => {
     expect(items).toEqual(expect.arrayContaining(['編集', 'テスト送信', 'クーポンの決めごと', '止める', '送った履歴を見る']))
     const stop = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.trim() === '止める') as HTMLElement
     await act(async () => { fireEvent.click(stop) })
+    expect(props.onToggleSetting).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog').textContent).toContain('この自動配信を送りません')
+    await act(async () => { fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '止める', exact: true })) })
     expect(props.onToggleSetting).toHaveBeenCalledWith(expect.objectContaining({ campaignKey: 'birthday_coupon' }))
   })
 

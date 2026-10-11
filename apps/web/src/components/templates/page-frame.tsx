@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import HelpTip from '@/components/shared/help-tip'
+import ScreenExplanation from '@/components/shared/screen-explanation'
 import StickyBar from '@/components/shared/sticky-bar'
 import styles from './page-templates.module.css'
 
@@ -30,7 +30,9 @@ export interface PageHeadingProps {
   subtitleSize?: 'body'
   /** 詳細の説明とタブを詰める口。指定しない画面には効かない。 */
   bottomSpacing?: 'compact'
+  /** B-245：画面全体の説明。題の横から開閉し、人ごと・画面ごとに覚える。 */
   help?: ReactNode
+  explanationKey?: string
   /** 題の隣の状態の札・名前を変える操作。 */
   titleAccessory?: ReactNode
   /**
@@ -61,7 +63,7 @@ export function PageTitle({ children, as: Tag = 'h2', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', titleId, titleTabIndex, help, titleAccessory, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', titleId, titleTabIndex, help, explanationKey, titleAccessory, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   /*
    * 絵の値を渡された分だけ、この頭の中だけに効く変数で下へ流す。`.heading`・`.title` は
@@ -77,9 +79,7 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', title
       } as CSSProperties)
   return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     <div className={styles.headingText}>
-      <div className={styles.titleRow}><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}
-        {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}
-      </div>
+      <ScreenExplanation titleClassName={styles.titleRow} panelClassName={styles.description} screenKey={explanationKey} title={<><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}</>}>{help}</ScreenExplanation>
       {subtitle?<p className={styles.subtitle}>{subtitle}</p>:null}
       {tabs ? <div className={styles.headingTabs} data-template-region="heading-tabs">{tabs}</div> : null}
     </div>

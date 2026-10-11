@@ -1,4 +1,10 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  createName: requiredText("名前を入力してください"),
+}
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useSearchParams } from 'next/navigation'
@@ -430,7 +436,7 @@ export default function WebhooksIncomingV8() {
       return
     }
     const sourceValue = createSource === SOURCE_OTHER ? createSourceFree.trim() : createSource
-    if (!createName.trim()) {
+    if ((b244Requirements.createName.check(createName) !== null)) {
       setCreateFieldError({ name: '名前を入力してください' })
       requestAnimationFrame(() => { const field = document.getElementById('wh-incoming-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
@@ -871,7 +877,7 @@ export default function WebhooksIncomingV8() {
           confirmIcon={<Plus size={15} aria-hidden="true" />}
         >
           <div className={`${styles.form} ${styles.formTight}`}>
-            <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name}>
+            <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name} requirement={b244Requirements.createName}>
               <SaveErrorField names={["createName","name","create_name"]}><TextField
                 value={createName}
                 onChange={(event) => setCreateName(event.target.value)}
