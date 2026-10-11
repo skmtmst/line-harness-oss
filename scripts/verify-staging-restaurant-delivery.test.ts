@@ -16,7 +16,9 @@ import {
   readAdminTarget,
   readOnlyRequest,
   readRestaurantTestFlag,
+  screenFailures,
   type DeliveryGates,
+  type ScreenReport,
 } from './verify-staging-restaurant-delivery.js';
 import { readVerificationTarget } from './verify-staging-operational-path.js';
 
@@ -40,6 +42,33 @@ const workflow = readFileSync(
   new URL('../.github/workflows/migrate-d1.yml', import.meta.url),
   'utf8',
 );
+const historyScreen = readFileSync(
+  new URL('../apps/web/src/v8/restaurant/delivery/history.tsx', import.meta.url),
+  'utf8',
+);
+const bulkScreen = readFileSync(
+  new URL('../apps/web/src/v8/restaurant/delivery/bulk.tsx', import.meta.url),
+  'utf8',
+);
+const listState = readFileSync(
+  new URL('../apps/web/src/components/shared/list-state.tsx', import.meta.url),
+  'utf8',
+);
+
+/** 3画面とも題が出て、中身も読めている状態。ここから1つずつ壊して不合格を確かめる。 */
+function passingScreen(overrides: Partial<ScreenReport> = {}): ScreenReport {
+  return {
+    view: 'orders',
+    title: 'デリバリー受注',
+    titlePasses: true,
+    landedOnLogin: false,
+    crashed: false,
+    loadFailures: [],
+    pageErrors: 0,
+    blockedWriteRequests: 0,
+    ...overrides,
+  };
+}
 
 const target = { accountId: 'account', databaseId: 'database', workerUrl: 'https://stg-api.musubo.jp' };
 
@@ -277,6 +306,60 @@ describe('staging delivery verification safety', () => {
     expect(script).toContain("title.size === '22px' && title.weight === '700' && title.lh === '32px'");
     expect(script).toContain("const CRASH_TITLE = '画面を表示できませんでした'");
     expect(script).toContain('landedOnLogin');
+  });
+
+  test('fails a screen that shows a load failure or throws, even when the title is right', () => {
+    // 題が出ているだけでは合格にしない。これが今回直した取りこぼし。
+    expect(screenFailures(passingScreen())).toEqual([]);
+
+    // 画面の中の「注文を表示できませんでした」。Node から読み口を呼べていても、
+    // 画面からの取得が CORS や合言葉で落ちるとこの形になる。
+    expect(screenFailures(passingScreen({
+      loadFailures: ['error:注文を表示できませんでした'],
+    }))).toEqual(['load-failure(error:注文を表示できませんでした)']);
+    expect(screenFailures(passingScreen({
+      view: 'history',
+      title: '注文履歴・売上',
+      loadFailures: ['error:注文履歴を表示できませんでした'],
+    }))).toHaveLength(1);
+    expect(screenFailures(passingScreen({
+      view: 'sold-out',
+      title: '品切れ一括設定',
+      loadFailures: ['forbidden:表示する権限がありません'],
+    }))).toEqual(['load-failure(forbidden:表示する権限がありません)']);
+
+    // 未捕捉の例外も不合格。数えるだけで通していたのを直した。
+    expect(screenFailures(passingScreen({ pageErrors: 1 }))).toEqual(['page-error(1)']);
+
+    // もとから見ていた3つは引き続き不合格。
+    expect(screenFailures(passingScreen({ landedOnLogin: true }))).toContain('login');
+    expect(screenFailures(passingScreen({ crashed: true }))).toContain('crash');
+    expect(screenFailures(passingScreen({ titlePasses: false }))).toContain('title');
+    // 重なったときは理由を全部並べる。
+    expect(screenFailures(passingScreen({
+      titlePasses: false, loadFailures: ['error:注文を表示できませんでした'], pageErrors: 2,
+    }))).toEqual([
+      'title', 'load-failure(error:注文を表示できませんでした)', 'page-error(2)',
+    ]);
+
+    // 合否は `screenFailures` だけで決める（題の判定へ戻らない）。
+    expect(script).toContain('reasons: screenFailures(screen)');
+    expect(script).toContain('reasons.length !== 0');
+    expect(script).not.toContain('screen.landedOnLogin || screen.crashed || !screen.titlePasses');
+    expect(script).toContain('Staging delivery screens failed');
+
+    // 読む場所は本物の部品が必ず付ける印。3画面とも同じ部品で失敗を出す。
+    expect(script).toContain('[data-list-state="error"], [data-list-state="forbidden"]');
+    expect(listState).toContain('data-list-state="error"');
+    expect(listState).toContain("const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]");
+    expect(deliveryScreen).toContain('kind="error"');
+    expect(historyScreen).toContain('kind="error"');
+    expect(bulkScreen).toContain('kind="error"');
+    // 例外は画面ごとに拾う。
+    expect(script).toContain("page.on('pageerror'");
+    expect(script).toContain('await page.evaluate(readFailureStatesInPage)');
+    // 失敗の控えには説明文をそのまま載せない（識別子が混じるため見出しだけ・40字で切る）。
+    expect(script).toContain('.slice(0, 40)');
   });
 
   test('reports a next step instead of a bare failure when an entry gate is empty', () => {

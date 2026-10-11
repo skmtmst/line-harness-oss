@@ -82,15 +82,35 @@ export type DeliveryGates = {
   storesLinkedToLineAccount: number;
 };
 
-type ScreenReport = {
+export type ScreenReport = {
   view: string;
   title: string | null;
   titlePasses: boolean;
   landedOnLogin: boolean;
   crashed: boolean;
+  /** 画面の中に出た「表示できませんでした」の1枚。題が正しくても取得に失敗していれば入る。 */
+  loadFailures: string[];
   pageErrors: number;
   blockedWriteRequests: number;
 };
+
+/**
+ * 1画面の不合格の理由を並べる。空なら合格。
+ *
+ * **題が出ているだけでは合格にしない。** 読み口を Node から呼べていても、
+ * 画面からの取得が CORS や合言葉で落ちると、題はそのままで中身だけが
+ * 「注文を表示できませんでした」に変わる（`delivery.tsx` / `history.tsx` /
+ * `bulk.tsx` の `ListState kind="error"`）。未捕捉の例外も同じく不合格にする。
+ */
+export function screenFailures(report: ScreenReport): string[] {
+  const reasons: string[] = [];
+  if (report.landedOnLogin) reasons.push('login');
+  if (report.crashed) reasons.push('crash');
+  if (!report.titlePasses) reasons.push('title');
+  for (const failure of report.loadFailures) reasons.push(`load-failure(${failure})`);
+  if (report.pageErrors !== 0) reasons.push(`page-error(${report.pageErrors})`);
+  return reasons;
+}
 
 function required(name: string, value: string | undefined): string {
   if (!value) throw new Error(`Missing ${name}`);
@@ -252,6 +272,29 @@ async function countSessionLeftovers(query: QueryD1, sessionHash: string): Promi
  * 題を読む。型の題を優先し、札・窓・引き出し・外側の帯の見出しは数えない
  * （`scripts/visual-qa/title-audit.mjs` と同じ選び方。横の案内の文字を拾わない）。
  */
+/**
+ * 画面の中で「読み込めなかった」を出していないか見る。
+ *
+ * 失敗の1枚は共通部品に寄せてあり（`components/shared/list-state.tsx`）、
+ * `kind="error"` / `kind="forbidden"` のとき必ず `data-list-state` が付く。
+ * 3画面とも同じ部品で出すので、ここを見れば取得の失敗を取りこぼさない。
+ */
+function readFailureStatesInPage(): string[] {
+  const visible = (el: Element) => el.getBoundingClientRect().height > 1
+    && getComputedStyle(el).visibility !== 'hidden';
+  return Array.from(
+    document.querySelectorAll('[data-list-state="error"], [data-list-state="forbidden"]'),
+  )
+    .filter(visible)
+    .map((el) => {
+      const kind = el.getAttribute('data-list-state') || 'error';
+      // 見出しだけを残す。説明文に識別子が入ることがあるので長さも切る。
+      const text = (el.querySelector('h1, h2, h3, p')?.textContent || '')
+        .trim().replace(/\s+/g, ' ').slice(0, 40);
+      return `${kind}:${text}`;
+    });
+}
+
 function readTitleInPage(): { text: string; size: string; weight: string; lh: string } | null {
   const visible = (el: Element) => el.getBoundingClientRect().height > 1
     && getComputedStyle(el).visibility !== 'hidden';
@@ -314,6 +357,7 @@ async function inspectScreens(
         await page.waitForTimeout(4000);
         await page.evaluate(() => document.fonts.ready.then(() => true));
         const title = await page.evaluate(readTitleInPage);
+        const loadFailures = await page.evaluate(readFailureStatesInPage);
         const landedOnLogin = new URL(page.url()).pathname.startsWith('/login');
         reports.push({
           view: screen.view,
@@ -322,6 +366,7 @@ async function inspectScreens(
             && title.size === '22px' && title.weight === '700' && title.lh === '32px',
           landedOnLogin,
           crashed: title?.text === CRASH_TITLE,
+          loadFailures,
           pageErrors: pageErrors.length,
           blockedWriteRequests,
         });
@@ -420,13 +465,13 @@ async function main(): Promise<void> {
     );
 
     const screens = await inspectScreens(admin, sessionToken, scoped.line_account_id);
-    const brokenScreens = screens.filter(
-      (screen) => screen.landedOnLogin || screen.crashed || !screen.titlePasses,
-    );
+    const brokenScreens = screens
+      .map((screen) => ({ screen, reasons: screenFailures(screen) }))
+      .filter(({ reasons }) => reasons.length !== 0);
     if (brokenScreens.length !== 0) {
       throw new Error(
         `Staging delivery screens failed: ${brokenScreens.map(
-          (screen) => `${screen.view}[login=${screen.landedOnLogin},crash=${screen.crashed},title=${screen.titlePasses}]`,
+          ({ screen, reasons }) => `${screen.view}[${reasons.join(',')}]`,
         ).join(', ')}`,
       );
     }
@@ -458,6 +503,7 @@ async function main(): Promise<void> {
         titlePasses: screen.titlePasses,
         landedOnLogin: screen.landedOnLogin,
         crashed: screen.crashed,
+        loadFailures: screen.loadFailures.length,
         pageErrors: screen.pageErrors,
         blockedWriteRequests: screen.blockedWriteRequests,
       })),
