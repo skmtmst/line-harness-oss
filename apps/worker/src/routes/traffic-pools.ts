@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { CreateTrafficPoolRequest } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
@@ -150,8 +151,8 @@ trafficPools.post('/api/traffic-pools', requireRole('owner'), inputJsonBoundary(
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const accounts = await c.env.DB.prepare(`SELECT id FROM line_accounts
-      WHERE id IN (${accountIds.map(() => '?').join(',')}) AND is_active = 1 AND archived_at IS NULL`)
-      .bind(...accountIds).all<{ id: string }>();
+      WHERE id IN (${sqlIdSet(accountIds).sql}) AND is_active = 1 AND archived_at IS NULL`)
+      .bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ id: string }>();
     if (accounts.results.length !== accountIds.length) {
       return inputError(c, { success: false, error: '稼働中のアカウントを選んでください' }, 422, ["accountIds","activeAccountId"]);
     }

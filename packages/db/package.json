@@ -37,5 +37,10 @@
     "crm",
     "d1",
     "cloudflare"
-  ]
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./id-queries": "./src/id-queries.ts",
+    "./*": "./*"
+  }
 }

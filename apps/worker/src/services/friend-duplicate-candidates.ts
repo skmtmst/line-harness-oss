@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 import type { DetectIdentityCandidatesResult } from '@line-crm/shared';
 import {
@@ -102,7 +103,7 @@ export async function detectFriendDuplicateCandidates(
     return { processed: 0, hasMore: false, nextCursor: null };
   }
 
-  const placeholders = allowedAccountIds.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(allowedAccountIds).sql;
   const result = await db.prepare(
     `SELECT f.id, f.display_name, f.line_account_id, la.name AS line_account_name,
             (${URL_TOKEN_SQL}) AS profile_token
@@ -116,7 +117,7 @@ export async function detectFriendDuplicateCandidates(
         AND LENGTH(f.picture_url) > 50
         AND (${URL_TOKEN_SQL}) IS NOT NULL
       ORDER BY f.id ASC`,
-  ).bind(input.tenantId, ...allowedAccountIds).all<DuplicateFriendRow>();
+  ).bind(input.tenantId, ...(allowedAccountIds.length ? sqlIdSet(allowedAccountIds).binds : [])).all<DuplicateFriendRow>();
 
   const after = decodeCursor(input.after);
   const pairs = makePairs(result.results).filter((pair) => pair.key > after);

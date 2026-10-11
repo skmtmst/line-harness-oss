@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -1151,10 +1152,10 @@ autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), asy
         .prepare(
           `SELECT id, name FROM line_accounts
             WHERE is_active = 1
-              AND id IN (${scope.allowedAccountIds.map(() => '?').join(',')})
+              AND id IN (${sqlIdSet(scope.allowedAccountIds).sql})
             ORDER BY name`,
         )
-        .bind(...scope.allowedAccountIds)
+        .bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []))
         .all<{ id: string; name: string }>()).results ?? []
       : [];
     const automationIdx = await buildAutomationKeywordIndex(c.env.DB);

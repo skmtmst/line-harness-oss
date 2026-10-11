@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { getPublicationThirtyDayViews } from '@line-crm/db';
@@ -1222,7 +1223,7 @@ nenMembers.put('/api/liff/nen/photos/:id/publication-consent', inputJsonBoundary
 async function adminAccountScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const where = scope.allowedAccountIds.length
-    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    ? `AND (f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
     : scope.canSeeUnassigned
       ? 'AND f.line_account_id IS NULL'
       : 'AND 1 = 0';
@@ -1236,7 +1237,7 @@ nenMembers.get('/api/nen-members/overview', async (c) => {
       `SELECT COUNT(*) count FROM ${table} ${alias}
        JOIN friends f ON f.id = ${alias}.friend_id
        WHERE 1 = 1 ${extra} ${accountWhere}`,
-    ).bind(...scope.allowedAccountIds).first<{ count: number }>();
+    ).bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).first<{ count: number }>();
   const [pets, logs, care, photos, members, consultations] = await Promise.all([
     countScoped('nen_pet_profiles', 'p'),
     countScoped('nen_health_logs', 'h'),
@@ -1250,7 +1251,7 @@ nenMembers.get('/api/nen-members/overview', async (c) => {
 
 nenMembers.get('/api/nen-members/care-flags', async (c) => {
   const { scope, where } = await adminAccountScope(c);
-  const rows = await c.env.DB.prepare(`SELECT cf.*, p.name pet_name, f.display_name owner_name FROM nen_care_flags cf JOIN nen_pet_profiles p ON p.id=cf.pet_id JOIN friends f ON f.id=cf.friend_id WHERE 1 = 1 ${where} ORDER BY cf.status='active' DESC, cf.detected_at DESC LIMIT 200`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
+  const rows = await c.env.DB.prepare(`SELECT cf.*, p.name pet_name, f.display_name owner_name FROM nen_care_flags cf JOIN nen_pet_profiles p ON p.id=cf.pet_id JOIN friends f ON f.id=cf.friend_id WHERE 1 = 1 ${where} ORDER BY cf.status='active' DESC, cf.detected_at DESC LIMIT 200`).bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 
@@ -2341,7 +2342,7 @@ nenMembers.get('/api/nen-members/friends/:friendId', requireRole('owner', 'admin
 
 nenMembers.get('/api/nen-members/ranks', async (c) => {
   const { scope, where } = await adminAccountScope(c);
-  const rows = await c.env.DB.prepare(`SELECT s.*, f.display_name, f.line_user_id FROM nen_ec_member_snapshots s JOIN friends f ON f.id=s.friend_id WHERE 1 = 1 ${where} ORDER BY s.purchase_amount DESC LIMIT 300`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
+  const rows = await c.env.DB.prepare(`SELECT s.*, f.display_name, f.line_user_id FROM nen_ec_member_snapshots s JOIN friends f ON f.id=s.friend_id WHERE 1 = 1 ${where} ORDER BY s.purchase_amount DESC LIMIT 300`).bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 

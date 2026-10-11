@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration, resolveLineCredential } from '@line-crm/db';
@@ -80,8 +81,8 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       `SELECT id, is_active, channel_access_token, channel_access_token_encrypted,
               channel_secret, channel_secret_encrypted
          FROM line_accounts
-        WHERE archived_at IS NULL AND id IN (${accountIds.map(() => '?').join(', ')})`,
-    ).bind(...accountIds).all<AccountRow>() : { results: [] as AccountRow[] };
+        WHERE archived_at IS NULL AND id IN (${sqlIdSet(accountIds).sql})`,
+    ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<AccountRow>() : { results: [] as AccountRow[] };
     const rows = accounts.results;
 
     /*

@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange } from '@line-crm/shared';
 import { Hono } from 'hono';
@@ -1133,7 +1134,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
     // sent 数: messages_log の line_account_id (送信時固定) で GROUP BY する。
     // 旧データ (032 migration 前) は ml.line_account_id=NULL なので、その場合だけ
     // friends.line_account_id にフォールバックする (best-effort、現在のアカウント帰属で集計)。
-    const placeholders = accountIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(accountIds).sql;
     const sentRes = await c.env.DB.prepare(
       `SELECT COALESCE(ml.line_account_id, f.line_account_id) AS account_id, COUNT(*) AS sent
        FROM messages_log ml
@@ -1141,14 +1142,14 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
        WHERE ml.broadcast_id = ? AND ml.direction = 'outgoing'
          AND COALESCE(ml.line_account_id, f.line_account_id) IN (${placeholders})
        GROUP BY COALESCE(ml.line_account_id, f.line_account_id)`,
-    ).bind(id, ...accountIds).all<{ account_id: string; sent: number }>();
+    ).bind(id, ...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ account_id: string; sent: number }>();
     const sentMap = new Map<string, number>();
     for (const r of sentRes.results ?? []) sentMap.set(r.account_id, r.sent);
 
     // アカウント名
     const metaRes = await c.env.DB.prepare(
       `SELECT id, name FROM line_accounts WHERE id IN (${placeholders})`,
-    ).bind(...accountIds).all<{ id: string; name: string }>();
+    ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ id: string; name: string }>();
     const nameMap = new Map<string, string>();
     for (const r of metaRes.results ?? []) nameMap.set(r.id, r.name);
 
@@ -1273,7 +1274,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
     const scheduledAt = typeof body.scheduledAt === 'string' && body.scheduledAt ? body.scheduledAt : null;
     let concurrentBroadcasts: Array<{ id: string; title: string; scheduledAt: string }> = [];
     if (scheduledAt && accountIds.length > 0) {
-      const placeholders = accountIds.map(() => '?').join(',');
+      const placeholders = sqlIdSet(accountIds).sql;
       const rows = await c.env.DB.prepare(
         `SELECT id, title, scheduled_at
            FROM broadcasts
@@ -1281,7 +1282,7 @@ broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINIT
             AND line_account_id IN (${placeholders})
             AND ABS(strftime('%s', scheduled_at) - strftime('%s', ?)) <= 3600
           ORDER BY scheduled_at, id LIMIT 10`,
-      ).bind(...accountIds, scheduledAt).all<{ id: string; title: string; scheduled_at: string }>();
+      ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : []), scheduledAt).all<{ id: string; title: string; scheduled_at: string }>();
       concurrentBroadcasts = rows.results.map((row) => ({ id: row.id, title: row.title, scheduledAt: row.scheduled_at }));
     }
 
@@ -3289,7 +3290,7 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
     uniqueClick: null;
   }> = [];
   if (accountIds.length > 0) {
-    const placeholders = accountIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(accountIds).sql;
     const [sentRows, accountRows] = await Promise.all([
       c.env.DB.prepare(
         `SELECT COALESCE(ml.line_account_id, f.line_account_id) AS account_id, COUNT(*) AS sent
@@ -3298,9 +3299,9 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
           WHERE ml.broadcast_id = ? AND ml.direction = 'outgoing'
             AND COALESCE(ml.line_account_id, f.line_account_id) IN (${placeholders})
           GROUP BY COALESCE(ml.line_account_id, f.line_account_id)`,
-      ).bind(id, ...accountIds).all<{ account_id: string; sent: number }>(),
+      ).bind(id, ...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ account_id: string; sent: number }>(),
       c.env.DB.prepare(`SELECT id, name FROM line_accounts WHERE id IN (${placeholders})`)
-        .bind(...accountIds).all<{ id: string; name: string }>(),
+        .bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ id: string; name: string }>(),
     ]);
     const sentByAccount = new Map(sentRows.results.map((row) => [row.account_id, Number(row.sent)]));
     const nameByAccount = new Map(accountRows.results.map((row) => [row.id, row.name]));

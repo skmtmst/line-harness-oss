@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { classifyEcErrorCode, encryptCredential, getLineAccountById, jstDateString, jstNow, nextDateString } from '@line-crm/db';
@@ -183,9 +184,9 @@ ecCommerce.get(
   const accountWhere = lineAccountId
     ? 'line_account_id = ?'
     : scope?.allowedAccountIds.length
-      ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+      ? `(line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
-  const accountBindings = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
+  const accountBindings = lineAccountId ? [lineAccountId] : (scope?.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []);
   /*
    * 「今日」はJSTの0時から。`received_at` はJST文字列（`jstNow`）で入るので、
    * 頭の日付で半開区間を切る。SQLiteの `datetime('now', '-1 day')` はUTCの
@@ -238,7 +239,7 @@ ecCommerce.get(
   const friendAccountWhere = lineAccountId
     ? 'f.line_account_id = ?'
     : scope?.allowedAccountIds.length
-      ? `(f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+      ? `(f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'f.line_account_id IS NULL' : '1 = 0';
   const subscriptionCount = await c.env.DB.prepare(
     `SELECT COUNT(*) AS count
@@ -288,7 +289,7 @@ ecCommerce.get(
   const accountClause = lineAccountId
     ? 'e.line_account_id = ?'
     : scope?.allowedAccountIds.length
-      ? `(e.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR e.line_account_id IS NULL' : ''})`
+      ? `(e.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR e.line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'e.line_account_id IS NULL' : '1 = 0';
   const requestedLimit = Number(c.req.query('limit') || '30');
   const requestedOffset = Number(c.req.query('offset') || '0');
@@ -314,7 +315,7 @@ ecCommerce.get(
     }
 
     const actionClauses: string[] = [accountClause];
-    const actionBindings: Array<string | number> = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
+    const actionBindings: Array<string | number> = lineAccountId ? [lineAccountId] : (scope?.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []);
     if (status) {
       actionClauses.push('a.status = ?');
       actionBindings.push(status);
@@ -377,7 +378,7 @@ ecCommerce.get(
            JOIN ec_events e ON e.id = a.event_id
           WHERE ${accountClause}
           GROUP BY a.status`,
-      ).bind(...(lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? []))
+      ).bind(...(lineAccountId ? [lineAccountId] : (scope?.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])))
         .all<{ status: string; count: number }>(),
     ]);
     const orderIds = [...new Set(actionRows.results.flatMap((row) => (
@@ -472,7 +473,7 @@ ecCommerce.get(
   if (status && !STATUS_SET.has(status)) return c.json({ success: false, error: 'Invalid status' }, 400);
 
   const clauses: string[] = [accountClause];
-  const bindings: Array<string | number> = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
+  const bindings: Array<string | number> = lineAccountId ? [lineAccountId] : (scope?.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []);
   if (eventType) { clauses.push('e.event_type = ?'); bindings.push(eventType); }
   if (status) { clauses.push('e.status = ?'); bindings.push(status); }
   const where = `WHERE ${clauses.join(' AND ')}`;
@@ -1228,11 +1229,11 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
   const accountWhere = requestedAccountId
     ? 'AND f.line_account_id = ?'
     : scope.allowedAccountIds.length
-      ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+      ? `AND (f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
       : scope.canSeeUnassigned
         ? 'AND f.line_account_id IS NULL'
         : 'AND 1 = 0';
-  const accountBinds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds;
+  const accountBinds = requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [];
   const placeholders = SHIPMENT_EVENT_TYPES.map(() => '?').join(', ');
   const rows = await c.env.DB.prepare(
     `SELECT e.id, e.event_type, e.friend_id, e.received_at,

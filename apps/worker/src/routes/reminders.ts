@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -846,8 +847,8 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
         const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
         const accountParts: string[] = [];
         if (scope.allowedAccountIds.length > 0) {
-          accountParts.push(`r.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
-          bindings.push(...scope.allowedAccountIds);
+          accountParts.push(`r.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})`);
+          bindings.push(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []));
         }
         if (scope.canSeeUnassigned) accountParts.push('r.line_account_id IS NULL');
         clauses.push(accountParts.length > 0 ? `(${accountParts.join(' OR ')})` : '1 = 0');

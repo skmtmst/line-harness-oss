@@ -1,4 +1,4 @@
-import { idChunks, sqlIdSet } from '@line-crm/db';
+import { idChunks, sqlIdSet } from '@line-crm/db/id-queries';
 import { deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { hydrateDocumentAnswers } from '../services/form-documents.js';

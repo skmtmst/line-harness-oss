@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import * as dbPackage from '@line-crm/db';
 import type { NenRankSetting } from '@line-crm/db';
 import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
@@ -713,14 +714,14 @@ export async function refreshAllNenTags(
   const allowedAccountIds = scope;
   const assignedIds = allowedAccountIds.filter((id): id is string => id !== null);
   const accountWhere = assignedIds.length
-    ? `(line_account_id IN (${assignedIds.map(() => '?').join(',')})${allowedAccountIds.includes(null) ? ' OR line_account_id IS NULL' : ''})`
+    ? `(line_account_id IN (${sqlIdSet(assignedIds).sql})${allowedAccountIds.includes(null) ? ' OR line_account_id IS NULL' : ''})`
     : allowedAccountIds.includes(null) ? 'line_account_id IS NULL' : '1 = 0';
   const friends = await db.prepare(
     `SELECT id, user_id, line_account_id FROM friends
       WHERE is_following = 1 AND user_id IS NOT NULL AND user_id <> ''
         AND ${accountWhere}
       ORDER BY updated_at DESC LIMIT ?`,
-  ).bind(...assignedIds, Math.max(1, Math.min(limit, 1000))).all<{ id: string }>();
+  ).bind(...(assignedIds.length ? sqlIdSet(assignedIds).binds : []), Math.max(1, Math.min(limit, 1000))).all<{ id: string }>();
   let added = 0;
   let removed = 0;
   for (const friend of friends.results) {

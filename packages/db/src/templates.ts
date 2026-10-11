@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { applyMediaUsageMutation } from './media.js';
 // テンプレート管理クエリヘルパー
@@ -964,9 +965,9 @@ export async function getTemplatesWithUsageCount(
   if (scope) {
     if (scope.accountIds.length > 0) {
       filters.push(
-        `(line_account_id IN (${scope.accountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
+        `(line_account_id IN (${sqlIdSet(scope.accountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
       );
-      values.push(...scope.accountIds);
+      values.push(...(scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : []));
     } else {
       filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }
@@ -1134,9 +1135,9 @@ export async function getTemplateFolderCounts(
   if (scope) {
     if (scope.accountIds.length > 0) {
       filters.push(
-        `(line_account_id IN (${scope.accountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
+        `(line_account_id IN (${sqlIdSet(scope.accountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
       );
-      values.push(...scope.accountIds);
+      values.push(...(scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : []));
     } else {
       filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }

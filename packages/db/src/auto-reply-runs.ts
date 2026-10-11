@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import type { AutoReply, CreateAutoReplyInput } from './auto-replies.js';
 import { jstNow } from './utils.js';
 
@@ -1471,8 +1472,8 @@ function visibleAccountClause(input: {
   const pieces: string[] = [];
   const bindings: string[] = [];
   if (input.lineAccountIds.length > 0) {
-    pieces.push(`are.line_account_id IN (${input.lineAccountIds.map(() => '?').join(', ')})`);
-    bindings.push(...input.lineAccountIds);
+    pieces.push(`are.line_account_id IN (${sqlIdSet(input.lineAccountIds).sql})`);
+    bindings.push(...(input.lineAccountIds.length ? sqlIdSet(input.lineAccountIds).binds : []));
   }
   if (input.includeUnassigned) pieces.push('are.line_account_id IS NULL');
   return { sql: pieces.length > 0 ? `(${pieces.join(' OR ')})` : '0 = 1', bindings };

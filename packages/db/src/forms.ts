@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT, toJstString } from './utils.js';
 
 /**
@@ -140,7 +141,7 @@ export async function getFormsWithStats(
            EXISTS (
              SELECT 1 FROM form_accounts visible
              WHERE visible.form_id = f.id
-               AND visible.line_account_id IN (${accountIds.map(() => '?').join(', ')})
+               AND visible.line_account_id IN (${sqlIdSet(accountIds).sql})
            )
            ${scope.includeUnassigned
              ? `OR NOT EXISTS (SELECT 1 FROM form_accounts pending WHERE pending.form_id = f.id)`
@@ -205,7 +206,7 @@ export async function getFormsWithStats(
          last_submitted_at DESC,
          f.created_at DESC`,
     )
-    .bind(monthPrefix, monthPrefix, staleBefore, ...accountIds, ...folderBinds)
+    .bind(monthPrefix, monthPrefix, staleBefore, ...(accountIds.length ? sqlIdSet(accountIds).binds : []), ...folderBinds)
     .all<Form & {
       last_submitted_at: string | null;
       account_scope_review_required: number;

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import type { ReminderRunReadOptions, ReminderScheduleMetrics } from '@line-crm/shared';
 import { jstNow, nextVersionToken } from './utils.js';
 import { getPlatformSetting, setPlatformSetting } from './platform-announcements.js';
@@ -114,8 +115,8 @@ function reminderRowScopePredicate(
   if (!scope) return null;
   const parts: string[] = [];
   if (scope.allowedAccountIds.length > 0) {
-    parts.push(`${column} IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
-    bindings.push(...scope.allowedAccountIds);
+    parts.push(`${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})`);
+    bindings.push(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []));
   }
   if (scope.canSeeUnassigned) parts.push(`${column} IS NULL`);
   return parts.length > 0 ? `(${parts.join(' OR ')})` : '1 = 0';
