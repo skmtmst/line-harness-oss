@@ -178,19 +178,20 @@ export async function stampCardLocked(db:D1Database,cardId:string,friendId:strin
     WHERE a.line_account_id=? AND c.active=1 AND json_extract(c.settings_json,'$.completion')='next_card'
     AND json_extract(c.settings_json,'$.nextCardId')=? LIMIT 1`).bind(accountId,cardId).first();
 }
-export async function stampWallet(db:D1Database,cardId:string,friendId:string,accountId:string):Promise<VisitStampWallet> {
+export async function stampWallet(db:D1Database,cardId:string,friendId:string,accountId:string,writeGuard?:{sql:string;args:unknown[]}):Promise<VisitStampWallet> {
   await stampFriend(db,cardId,friendId,accountId);
   if(await stampCardLocked(db,cardId,friendId,accountId))throw new StampError('前のカードのゴール特典を使うと受け取れます',409);
   friendId=await canonicalStampFriend(db,cardId,friendId);
   const settings=JSON.parse((await stampCard(db,cardId)).settings_json) as VisitStampSettings;
-  await db.batch(createStampWalletStatements(db,cardId,friendId,accountId,settings.receiptBonus??0));
+  await db.batch(createStampWalletStatements(db,cardId,friendId,accountId,settings.receiptBonus??0,writeGuard?.sql??'1=1',writeGuard?.args??[]));
   // 期限切れは再読込でも一度だけ。残高はSQLの現在値を使う。
   await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,occurred_at)
     SELECT ?,card_id,friend_id,?,'expire',-MAX(balance,0),'有効期限切れ','expire:'||expires_at||':'||version,datetime('now')
-    FROM visit_stamp_wallets WHERE card_id=? AND friend_id=? AND expires_at IS NOT NULL AND julianday(expires_at)<=julianday('now') AND balance>0`)
-    .bind(crypto.randomUUID(),accountId,cardId,friendId).run();
+    FROM visit_stamp_wallets WHERE card_id=? AND friend_id=? AND expires_at IS NOT NULL AND julianday(expires_at)<=julianday('now') AND balance>0 AND ${writeGuard?.sql??'1=1'}`)
+    .bind(crypto.randomUUID(),accountId,cardId,friendId,...writeGuard?.args??[]).run();
   const r=await db.prepare('SELECT balance,earned_total,expires_at FROM visit_stamp_wallets WHERE card_id=? AND friend_id=?').bind(cardId,friendId).first<{balance:number;earned_total:number;expires_at:string|null}>();
-  return {cardId,friendId,balance:r!.balance,earnedTotal:r!.earned_total,expiresAt:r!.expires_at};
+  if(!r)throw new StampError('来店の記録が更新されました',409);
+  return {cardId,friendId,balance:r.balance,earnedTotal:r.earned_total,expiresAt:r.expires_at};
 }
 export async function readStampWallet(db:D1Database,cardId:string,friendId:string):Promise<VisitStampWallet> {
  const r=await db.prepare('SELECT balance,earned_total,expires_at FROM visit_stamp_wallets WHERE card_id=? AND friend_id=?').bind(cardId,friendId).first<{balance:number;earned_total:number;expires_at:string|null}>();
@@ -316,15 +317,31 @@ export async function requestPaperStamps(db:D1Database,cardId:string,friendId:st
 export type StampVisitKind='restaurant'|'booking';
 export async function getStampVisit(db:D1Database,kind:StampVisitKind,id:string) {
   if(!['restaurant','booking'].includes(kind))throw new StampError('来店の種類を確認してください');
-  if(kind==='restaurant')return db.prepare(`SELECT r.id,s.line_account_id AS account_id,f.id AS friend_id,COALESCE((SELECT marked_at FROM rt_seat_visit_marks WHERE reservation_id=r.id AND kind='visited' AND undone_at IS NULL ORDER BY marked_at DESC LIMIT 1),r.starts_at) AS occurred_at,
+  if(kind==='restaurant')return db.prepare(`SELECT r.id,r.customer_version AS source_version,r.updated_at AS source_updated_at,
+    COALESCE((SELECT generation FROM visit_stamp_visit_queue WHERE kind='restaurant' AND visit_id=r.id),0) AS queue_generation,
+    s.line_account_id AS account_id,f.id AS friend_id,COALESCE((SELECT marked_at FROM rt_seat_visit_marks WHERE reservation_id=r.id AND kind='visited' AND undone_at IS NULL ORDER BY marked_at DESC LIMIT 1),r.starts_at) AS occurred_at,
     CASE WHEN r.status IN ('visited','seated') THEN 1 ELSE 0 END AS visited
     FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid WHERE r.id=?`).bind(stampId(id)).first<StampVisit>();
-  return db.prepare(`SELECT id,line_account_id AS account_id,friend_id,COALESCE((SELECT marked_at FROM booking_visit_marks WHERE booking_id=bookings.id AND kind='visited' ORDER BY marked_at DESC LIMIT 1),starts_at) AS occurred_at,CASE WHEN status='completed' THEN 1 ELSE 0 END AS visited FROM bookings WHERE id=?`).bind(stampId(id)).first<StampVisit>();
+  return db.prepare(`SELECT id,lock_version AS source_version,updated_at AS source_updated_at,
+    COALESCE((SELECT generation FROM visit_stamp_visit_queue WHERE kind='booking' AND visit_id=bookings.id),0) AS queue_generation,
+    line_account_id AS account_id,friend_id,COALESCE((SELECT marked_at FROM booking_visit_marks WHERE booking_id=bookings.id AND kind='visited' ORDER BY marked_at DESC LIMIT 1),starts_at) AS occurred_at,CASE WHEN status='completed' THEN 1 ELSE 0 END AS visited FROM bookings WHERE id=?`).bind(stampId(id)).first<StampVisit>();
 }
-type StampVisit={id:string;account_id:string;friend_id:string|null;occurred_at:string;visited:number};
+type StampVisit={id:string;account_id:string;friend_id:string|null;occurred_at:string;visited:number;source_version:number;source_updated_at:string;queue_generation:number};
+/** 状態・版・時刻・queue世代を、押印のSQLが実行される時点で照合する。 */
+function stampVisitWriteGuard(kind:StampVisitKind,visit:StampVisit):{sql:string;args:unknown[]} {
+  const table=kind==='restaurant'?'rt_reservations':'bookings';
+  const version=kind==='restaurant'?'customer_version':'lock_version';
+  const visited=kind==='restaurant'?"status IN ('visited','seated')":"status='completed'";
+  return {sql:`EXISTS(SELECT 1 FROM ${table} WHERE id=? AND ${version}=? AND updated_at=?
+    AND CASE WHEN ${visited} THEN 1 ELSE 0 END=?)
+    AND COALESCE((SELECT generation FROM visit_stamp_visit_queue WHERE kind=? AND visit_id=?),0)=?`,
+    args:[visit.id,visit.source_version,visit.source_updated_at,visit.visited,kind,visit.id,visit.queue_generation]};
+}
 /** 来店と会計から同じキーで押す。再送・同時処理では既存の押印を増やさない。 */
-export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:string) {
+export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:string,expectedGeneration?:number) {
   const visit=await getStampVisit(db,kind,id);if(!visit?.account_id||!visit.friend_id)return;
+  if(expectedGeneration!==undefined&&visit.queue_generation!==expectedGeneration)return;
+  const guard=stampVisitWriteGuard(kind,visit);
   const key=kind+':'+id;
   const cards=(await db.prepare(`SELECT c.* FROM visit_stamp_cards c JOIN visit_stamp_card_accounts a ON a.card_id=c.id WHERE a.line_account_id=?`).bind(visit.account_id).all<CardRow>()).results;
   for(const card of cards) {
@@ -336,7 +353,7 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
         const positive=await db.prepare(`SELECT e.id,e.delta FROM visit_stamp_entries e WHERE e.card_id=? AND e.friend_id=? AND e.visit_key=? AND e.delta>0
           AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries r WHERE r.original_id=e.id) ORDER BY e.created_at DESC LIMIT 1`).bind(card.id,subject,key).first<{id:string;delta:number}>();
         if(positive)await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,original_id,visit_key,occurred_at)
-          VALUES(?,?,?,?,'reverse',?,'来店記録の取消',?,?,?,datetime('now'))`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,-positive.delta,'reverse:'+positive.id,positive.id,key).run();
+          SELECT ?,?,?,?,'reverse',?,'来店記録の取消',?,?,?,datetime('now') WHERE ${guard.sql}`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,-positive.delta,'reverse:'+positive.id,positive.id,key,...guard.args).run();
       }
       continue;
     }
@@ -344,14 +361,15 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
       const cancelled=await db.prepare(`SELECT r.id,r.delta FROM visit_stamp_entries r WHERE r.card_id=? AND r.friend_id=? AND r.visit_key=? AND r.kind='reverse' AND r.reason='来店記録の取消'
         AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries e WHERE e.original_id=r.id) ORDER BY r.created_at DESC LIMIT 1`).bind(card.id,subject,key).first<{id:string;delta:number}>();
       if(cancelled&&card.active&&await featureJobCanRun(db,{accountId:visit.account_id,featureId:'visit_stamps',job:'visit stamps'}))await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,original_id,visit_key,occurred_at)
-        VALUES(?,?,?,?,'restore',?,'来店記録の再確認',?,?,?,datetime('now'))`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,-cancelled.delta,'restore:'+cancelled.id,cancelled.id,key).run();
+        SELECT ?,?,?,?,'restore',?,'来店記録の再確認',?,?,?,datetime('now') WHERE ${guard.sql}`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,-cancelled.delta,'restore:'+cancelled.id,cancelled.id,key,...guard.args).run();
       continue;
     }
     if(!card.active||!await featureJobCanRun(db,{accountId:visit.account_id,featureId:'visit_stamps',job:'visit stamps'}))continue;
     const s=JSON.parse(card.settings_json) as VisitStampSettings;
     const checkout=await db.prepare('SELECT amount FROM visit_stamp_checkouts WHERE kind=? AND visit_id=?').bind(kind,id).first<{amount:number}>();
     if(s.mode==='amount'&&!checkout)continue;
-    const wallet=await stampWallet(db,card.id,visit.friend_id,visit.account_id);
+    if(!await db.prepare(`SELECT 1 WHERE ${guard.sql}`).bind(...guard.args).first())continue;
+    await stampWallet(db,card.id,visit.friend_id,visit.account_id,guard);
     const tags=(await db.prepare('SELECT t.name FROM tags t JOIN friend_tags ft ON ft.tag_id=t.id WHERE ft.friend_id=?').bind(visit.friend_id).all<{name:string}>()).results.map(x=>x.name);
     // SQLで初回かどうかを最後に判定し、別の来店との競合でも初回ボーナスは1度。
     const regular=calculateVisitStamps(s,checkout?.amount??0,visit.occurred_at,false,tags),first=calculateVisitStamps(s,checkout?.amount??0,visit.occurred_at,true,tags);
@@ -360,7 +378,7 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
     await db.prepare(`INSERT OR IGNORE INTO visit_stamp_entries(id,card_id,friend_id,line_account_id,kind,delta,reason,idempotency_key,visit_key,expires_at,occurred_at)
       SELECT ?,?,?,?,'visit',CASE WHEN w.visit_count=0 THEN ? ELSE ? END,'来店から自動押印',?,?,${expiry.sql},? FROM visit_stamp_wallets w
       WHERE w.card_id=? AND w.friend_id=? AND EXISTS(SELECT 1 FROM visit_stamp_cards WHERE id=? AND active=1)
-      AND CASE WHEN w.visit_count=0 THEN ? ELSE ? END>0 AND ${interval.sql}`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,first,regular,'auto:'+key,key,...expiry.args,visit.occurred_at,card.id,subject,card.id,first,regular,...interval.args).run();
+      AND CASE WHEN w.visit_count=0 THEN ? ELSE ? END>0 AND ${interval.sql} AND ${guard.sql}`).bind(crypto.randomUUID(),card.id,subject,visit.account_id,first,regular,'auto:'+key,key,...expiry.args,visit.occurred_at,card.id,subject,card.id,first,regular,...interval.args,...guard.args).run();
   }
 }
 export async function processVisitStampQueue(env:Env['Bindings']) {
@@ -368,7 +386,7 @@ export async function processVisitStampQueue(env:Env['Bindings']) {
   try {queue=(await db.prepare('SELECT kind,visit_id,generation FROM visit_stamp_visit_queue ORDER BY updated_at LIMIT 100').all<{kind:StampVisitKind;visit_id:string;generation:number}>()).results;}
   catch {console.error(JSON.stringify({event:'visit_stamp_queue_unavailable'}));return;}
   for(const q of queue) {
-    try {await reconcileStampVisit(db,q.kind,q.visit_id);await db.prepare('DELETE FROM visit_stamp_visit_queue WHERE kind=? AND visit_id=? AND generation=?').bind(q.kind,q.visit_id,q.generation).run();}
+    try {await reconcileStampVisit(db,q.kind,q.visit_id,q.generation);await db.prepare('DELETE FROM visit_stamp_visit_queue WHERE kind=? AND visit_id=? AND generation=?').bind(q.kind,q.visit_id,q.generation).run();}
     catch {
       // 失敗を先頭に固定しない。並走して積まれた新しい世代は触らない。
       await db.prepare("UPDATE visit_stamp_visit_queue SET updated_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE kind=? AND visit_id=? AND generation=?")
