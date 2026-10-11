@@ -26,6 +26,7 @@ import { EventRosterCard, EventRosterTable, EventRosterRow, EventRosterActions, 
 import { TextField, TextArea } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import { useBookingRequests } from './booking-requests'
+import BookingRecords from './booking-records'
 
 /*
  * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
@@ -717,6 +718,7 @@ function Bookings({ eventId }: { eventId: string }) {
           {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}
         </EventRosterCard>
       ) : null}
+      {selectedOccurrenceId ? <BookingRecords accountId={selectedAccountId} eventId={eventId} occurrenceId={selectedOccurrenceId} questionsJson={event?.questions_json} revision={applicants?.snapshotId} /> : null}
       </div>
 
       <ConfirmDialog

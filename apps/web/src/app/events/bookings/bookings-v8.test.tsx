@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
 
 const getEvent = vi.hoisted(() => vi.fn())
+const listBookings = vi.hoisted(() => vi.fn())
 const listOccurrenceSelector = vi.hoisted(() => vi.fn())
 const getOccurrenceApplicants = vi.hoisted(() => vi.fn())
 const decideBooking = vi.hoisted(() => vi.fn())
@@ -35,6 +36,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     eventsApi: {
       ...actual.eventsApi,
       getEvent,
+      listBookings,
       listOccurrenceSelector,
       getOccurrenceApplicants,
       decideBooking,
@@ -147,6 +149,7 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   getEvent.mockReset()
+  listBookings.mockReset().mockResolvedValue({ items: [], total: 0 })
   listOccurrenceSelector.mockReset()
   getOccurrenceApplicants.mockReset()
   decideBooking.mockReset()
@@ -193,6 +196,56 @@ async function prepareMessage(value: string) {
 }
 
 describe('V8-B 申込者（Mu8qW）', () => {
+  it('開いた申込記録で回答と通知の予定・結果を同じ予約に出す', async () => {
+    getEvent.mockResolvedValue({ id: 'e1', name: '秋のしつけ教室', questions_json: JSON.stringify([{ id: 'food', label: '好きな食べ物', type: 'text', required: false }]) })
+    listBookings.mockResolvedValue({ items: [{ id: 'record-1', friend_id: 'f1', friend_display_name: '記録の太郎', status: 'attended', requested_at: '2026-10-01T00:00:00Z', slot_starts_at: '2026-10-12T05:00:00Z', answer_snapshot_json: JSON.stringify({ food: 'りんご' }), customer_note: '椅子を希望', companion_note: '家族1人', reminders: ['pending', 'sent', 'cancelled', 'failed', 'failed_permanent'].map((status) => ({ kind: status === 'pending' ? 'day_before' : 'hours_before', scheduled_at: '2026-10-11T03:00:00Z', status })) }], total: 1 })
+    await renderV8()
+    expect(listBookings).not.toHaveBeenCalled()
+    const details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    expect(listBookings).toHaveBeenCalledWith('acc-1', 'e1', { slot_id: 'slot-1', status: undefined, page: 1, limit: 20 })
+    expect(details.textContent).toContain('好きな食べ物りんご')
+    expect(details.textContent).toContain('備考：椅子を希望')
+    expect(details.textContent).toContain('同行者：家族1人')
+    const reminders = details.querySelector('[data-booking-reminders="record-1"]')!
+    expect(reminders.querySelectorAll('li')).toHaveLength(5)
+    for (const label of ['前日のお知らせ', '開始前のお知らせ', '送信予定', '送信済み', '停止済み', '失敗', '12:00']) expect(reminders.textContent).toContain(label)
+    expect(details.querySelector('a')?.getAttribute('href')).toBe('/chats?friend=f1')
+  })
+
+  it('申込記録の失敗を空と混ぜず、開き直すと読み直せる', async () => {
+    listBookings.mockRejectedValueOnce(new Error('offline'))
+    await renderV8()
+    const details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    expect(details.textContent).toContain('申込記録を読み込めませんでした')
+    expect(details.textContent).not.toContain('この状態の申込記録はありません')
+    await act(async () => { [...details.querySelectorAll('button')].find((button) => button.textContent === '開き直す')!.click() })
+    await flush()
+    expect(listBookings).toHaveBeenCalledTimes(2)
+    expect(details.textContent).toContain('この状態の申込記録はありません')
+  })
+
+  it('申込記録のページを進めても前の応答を混ぜず、閉じた後の返事も使わない', async () => {
+    const oldPage = deferred<{ items: unknown[]; total: number }>()
+    listBookings.mockResolvedValueOnce({ items: [{ id: 'r1', friend_id: 'f1', friend_display_name: '1ページ目の人', status: 'confirmed' }], total: 21 }).mockImplementationOnce(() => oldPage.promise)
+    await renderV8()
+    const details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    await act(async () => { details.querySelector<HTMLButtonElement>('[aria-label="次のページ"]')!.click() })
+    await flush()
+    expect(listBookings).toHaveBeenLastCalledWith('acc-1', 'e1', expect.objectContaining({ page: 2, slot_id: 'slot-1' }))
+    expect(details.textContent).not.toContain('1ページ目の人')
+    await act(async () => { details.open = false; fireEvent(details, new Event('toggle')) })
+    await act(async () => { oldPage.resolve({ items: [{ id: 'late', friend_display_name: '遅い記録' }], total: 21 }) })
+    await flush()
+    expect(details.textContent).not.toContain('遅い記録')
+    expect(details.querySelector('[role="table"]')).toBeNull()
+  })
+
   it('開催回の見せ方で数と表が出る', async () => {
     await renderV8()
     expect(document.querySelector('[data-design-node="Mu8qW"]'), '板IDの枠がある').toBeTruthy()
