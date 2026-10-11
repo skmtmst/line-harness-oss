@@ -123,7 +123,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
     const wizard = readWithParts(path.join(SRC, 'app/accounts/new/page.tsx'))
     expect(wizard).toContain('V8_STEPS')
     expect(wizard).toContain('type="submit"')
-    expect(wizard).toContain('!connectionPassed')
+    expect(wizard).toContain('!rowsPassed || !manualAck || busy')
     expect(wizard).toContain('api.lineAccounts.connect(')
   })
 

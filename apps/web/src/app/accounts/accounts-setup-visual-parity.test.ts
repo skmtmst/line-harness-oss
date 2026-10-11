@@ -24,7 +24,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     expect(accountsSource).not.toContain("redirect('/hq')")
     expect(accountsSource).toContain('boardId="V7vn3"')
     expect(setupSource).not.toContain("redirect('/restaurant-test/stores/new')")
-    expect(setupSource).toContain('data-design-node="b2NGxk"')
+    expect(setupSource).toContain('boardId={shownStep.node}')
   })
 
   it('新設計の4項目入力・自動接続と5つの正本ノードを使う', () => {
@@ -33,12 +33,12 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       'api.lineAccounts.connectCheck',
       'api.lineAccounts.connect',
       'api.lineAccounts.followerImportState',
-      'data-design-node="a8qMXX"',
-      'data-design-node="oeVQQ"',
+      'data-design-node="xj3zz"',
+      'data-design-node="GwKE2"',
       'data-design-node="JYfda"',
-      'data-design-node="K1zHyx"',
-      "'VPh1U'",
-      "'t3Mlu'",
+      'data-design-node="v2KMj"',
+      'data-design-node="TvXII"',
+      'designNode="qw80E"',
     ]) {
       expect(setupSource).toContain(value)
     }

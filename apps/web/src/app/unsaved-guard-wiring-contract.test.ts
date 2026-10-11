@@ -200,8 +200,6 @@ const EXEMPTIONS: Record<string, string> = {
     '支払いCSV出力の確認窓（Vの本人確認入力を含む）。保存する編集画面ではなく番兵の対象外',
   'app/affiliates/new/page.tsx':
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
-  'app/accounts/new/page.tsx':
-    '登録ウィザードでdirty管理なし（コメント中の「未保存」記述のみ。R523の復帰案内の文言）',
   'app/accounts/new/register-v8.tsx':
     'V8登録ウィザード。入力は端末の下書きへ随時保存（秘密値は除く）し、閉じる確認は手順内の戻る・あとで続きからで済ませる設計',
   'app/booking/bookings/new/page.tsx':

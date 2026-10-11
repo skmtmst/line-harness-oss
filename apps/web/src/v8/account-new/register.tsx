@@ -676,7 +676,7 @@ export default function AccountRegisterV8() {
               )}
               <p className={styles.groupLabel}>次にすること</p>
               <div className={styles.buttonRow}>
-                <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
+                {importingIds ? <Button disabled>登録したアカウントを見る</Button> : <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>}
                 <Button href="/friends"><Users size={15} aria-hidden="true" />友だち一覧</Button>
                 <Button href="/friend-add-settings"><QrCode size={15} aria-hidden="true" />友だち追加URL・QR</Button>
                 <Button href="/emergency"><Activity size={15} aria-hidden="true" />運用状態の接続監視</Button>
