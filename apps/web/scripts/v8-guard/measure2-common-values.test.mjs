@@ -5,14 +5,16 @@ import {chromium} from '@playwright/test'
 test('本物の件数欄CSS: 20 件表示を切らず、旧幅100の故障を検出する',async()=>{
  const css=readFileSync(new URL('../../src/components/shared/select.module.css',import.meta.url),'utf8')
  const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
+ const toolbar=readFileSync(new URL('../../src/components/shared/list-toolbar.module.css',import.meta.url),'utf8').replace(/:global\(([^)]+)\)/g,'$1')
  const browser=await chromium.launch()
  try{
   const page=await browser.newPage()
-  const html=style=>`<html data-theme="v8"><style>${globals}\n${css}\n${style}</style><body><div class="root pageSize"><button class="trigger closedTrigger"><span class="value">20 件表示</span><svg class="chevron"></svg></button></div></body></html>`
+  const html=style=>`<html data-theme="v8"><style>${globals}\n${css}\n${toolbar}\n${style}</style><body><div class="toolbar"><div class="root pageSize" data-design-node="niGPF"><button class="trigger closedTrigger"><span class="value">20 件表示</span><svg class="chevron"></svg></button></div></div></body></html>`
   const fits=()=>page.locator('.value').evaluate(el=>el.scrollWidth<=el.clientWidth)
   for(const width of [1440,1152]){
    await page.setViewportSize({width,height:600});await page.setContent(html(''));assert.equal(await fits(),true)
    await page.setContent(html("html[data-theme='v8'] {--tpl-select-page-size:100px}"));assert.equal(await fits(),false)
+   await page.setContent(html("[data-theme='v8'] .toolbar [data-design-node='niGPF'] {width:100px;min-width:0}"));assert.equal(await fits(),false,'親で最小幅を解除する故障を検出')
   }
  }finally{await browser.close()}
 })

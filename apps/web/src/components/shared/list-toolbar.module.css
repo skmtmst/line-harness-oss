@@ -159,7 +159,6 @@
 [data-theme='v8'] .trailing > * { width: max-content; flex: none; }
 [data-theme='v8'] .toolbar :global([data-design-node='rpot9']),
 [data-theme='v8'] .toolbar :global([data-design-node='Gfsb4']),
-[data-theme='v8'] .toolbar :global([data-design-node='niGPF']) { width: max-content; min-width: 0; max-width: 100%; }
 [data-theme='v8'] .toolbar :global(button[aria-haspopup='listbox']) { width: max-content; max-width: 100%; }
 [data-theme='v8'] .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
 [data-theme='v8'] .toolbar:has(.optional) .row1 > .search { flex: none; }

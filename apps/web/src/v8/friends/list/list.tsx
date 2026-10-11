@@ -723,7 +723,7 @@ export default function FriendsListV8() {
         {columnsOpen && !readOnly ? <DisplayItemsDialog items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/friend-fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
         <SaveErrorField names={["pageSize","limit","page_size"]}><Select
           aria-label="表示件数"
-          width={98}
+          size="page-size"
           value={String(pageSize)}
           onChange={(value) => resetPageWith(() => setPageSize(Number(value) as PageSize))}
           options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} 件表示` }))}
