@@ -1,9 +1,4 @@
 {
-  "app/accounts/handover/handover-v8.module.css": {
-    "spacing": 15,
-    "height": 6,
-    "font": 10
-  },
   "app/auto-replies/edit/wizard-v8.module.css": {
     "spacing": 42,
     "height": 13,
