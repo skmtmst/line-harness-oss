@@ -214,4 +214,24 @@ describe('下書き編集の選択可能一覧(#734)', () => {
     expect(el.textContent).toContain('きっかけのタグを選んでください')
     expect(el.querySelector('#v8-trigger-tag')?.getAttribute('aria-invalid')).toBe('true')
   })
+
+  it('保存の失敗で内部の文を出さず入力を残し、同じ下書きを保存し直せる', async () => {
+    const el = await mountWithDraft('friend_add', {})
+    const name = el.querySelector<HTMLInputElement>('#v8-rule-name')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(name, '直したルール名')
+      name.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    mockUpdateDraft.mockRejectedValueOnce(new Error('database_write_failed'))
+    await act(async () => { saveButton(el).click() })
+    await act(async () => { await drainMicrotasks() })
+    expect(el.textContent).toContain('下書きを保存できませんでした。状態を読み直してから')
+    expect(el.textContent).not.toContain('database_write_failed')
+    expect(name.value).toBe('直したルール名')
+    await act(async () => { saveButton(el).click() })
+    await act(async () => { await drainMicrotasks() })
+    expect(mockUpdateDraft).toHaveBeenCalledTimes(2)
+    expect(mockUpdateDraft.mock.calls.map(call => call.slice(0, 2))).toEqual([['draft-1', 'account-1'], ['draft-1', 'account-1']])
+    expect(mockUpdateDraft.mock.calls[1][2].name).toBe('直したルール名')
+  })
 })

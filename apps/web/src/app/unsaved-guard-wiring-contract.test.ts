@@ -236,8 +236,6 @@ const EXEMPTIONS: Record<string, string> = {
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
   'app/scenarios/mode/page.tsx':
     '★V7: 方式選択はラジオの即時確定で未保存を持たない。名前・フォルダ欄は新規時は確定時に同送、既存時は欄内の保存で確定する小さな操作のため番兵を付けない',
-  'components/automations/automation-draft-editor.tsx':
-    '自動化ウィザードの段内エディタ。下書きはサーバーへ保存し、離脱の扱いは app/automations/new/page.tsx と同じく別途検討',
   'components/scenarios/trigger-editor.tsx':
     'ダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'app/inflow-links/ad-integration.tsx':

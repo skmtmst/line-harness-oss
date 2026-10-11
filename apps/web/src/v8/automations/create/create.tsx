@@ -35,7 +35,7 @@ import { FriendMultiSelect } from './friend-multi-select'
 import { formatNumber, formatTime } from '@/lib/format'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { japaneseDetailOf, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
@@ -2012,9 +2012,7 @@ export function NewAutomationV8({
         } else {
           { if (!fieldFailure)
           setError(
-            caught instanceof ApiError || caught instanceof Error
-              ? caught.message
-              : '保存できませんでした',
+            japaneseDetailOf(caught) || '下書きを保存できませんでした。状態を読み直してから、もう一度お試しください。',
           ) }
         }
       }
