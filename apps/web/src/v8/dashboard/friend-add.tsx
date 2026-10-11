@@ -130,6 +130,8 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
         onRouteIdChange={(id) => writeQr(id || 'base')}
         routes={routes ?? []}
         routesPending={routes === null}
+        routesError={routesError}
+        onRetryRoutes={()=>setRoutesRetry(value=>value+1)}
         visualReferenceQr={visualQa?.referenceQr ?? false}
       />
     </>
