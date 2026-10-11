@@ -189,6 +189,9 @@ html[data-theme='v8'] .field:not([data-density]):not([data-spacing]) > .labelRow
 
 /* 固定絵のラベル行18。B-244の11px札も行の高さを押し広げない。 */
 html[data-theme='v8'] .field .label { line-height: var(--tpl-field-label-lh); }
+/* input の密度は20のラベル行を持つ。ふつうの18の行で押しつぶさない。 */
+html[data-theme='v8'] .field[data-density='input'] { gap: var(--polish-space-row); }
+html[data-theme='v8'] .field[data-density='input'] .label { line-height: var(--tpl-rt-label-lh); }
 html[data-theme='v8'] :is(.required, .optional) {
   font-size: var(--polish-text-note);
   line-height: var(--tpl-field-badge-lh);

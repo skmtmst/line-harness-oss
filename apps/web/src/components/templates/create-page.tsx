@@ -40,12 +40,14 @@ export interface CreatePageProps extends PageHeadingProps {
   /** 右の列の地。`'plain'` は地の色を敷かない（E-9 p17Qku）。渡さなければ表の頭と同じ地。 */
   previewSurface?: 'plain'
   footerActions: ReactNode
+  /** 浮いた帯が本文の末尾の余白に重なる板。入力段の中身には重ねない。 */
+  footerPlacement?: 'floating'
   /** 枠のある下部の帯を描く板だけで使う。StickyBar の既定は変えない。 */
   footerOutlined?: boolean
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ readOnly, dirty, busy, boardId, standalone, heightMode = 'content', children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+export function CreatePage({ readOnly, dirty, busy, boardId, standalone, heightMode = 'content', children, preview, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
   return <PageFrame kind="create" boardId={boardId} standalone={standalone} heightMode={heightMode} hasFooter>
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     <PageHeading {...heading} />
@@ -57,6 +59,6 @@ export function CreatePage({ readOnly, dirty, busy, boardId, standalone, heightM
       <div className={styles.createContent} data-template-region="content" data-content-spacing={contentSpacing}>{children}</div>
       {preview ? <aside className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{preview}</div></aside> : null}
     </div>
-    <div className={styles.footer} data-template-region="footer"><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div>
+    <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={footerActions} outlined={footerOutlined} destructive={destructive} status={status} /></div>
   </PageFrame>
 }
