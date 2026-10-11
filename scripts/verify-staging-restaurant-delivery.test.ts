@@ -1,0 +1,303 @@
+/*
+ * 検証環境のデリバリー受注を「ログイン済みで読むだけ」確かめる段取りが、
+ * 本番へ届かず・書き込まず・秘密値を漏らさないことを固める試験。
+ *
+ * 未認証では3画面とも `/login` へ移るため、承認版v02（板 kDQHr・OzHLO・h7OeT）が
+ * 実際に描けているかを確かめるには一時的な管理セッションが要る。その一時行が
+ * 15分で切れ、終わりに自分の1行だけ消え、残存0件を数えることまでを縛る。
+ */
+import { readFileSync } from 'node:fs';
+import { describe, expect, test, vi } from 'vitest';
+
+import {
+  inspectFlatBody,
+  missingFields,
+  nextStepFor,
+  readAdminTarget,
+  readOnlyRequest,
+  readRestaurantTestFlag,
+  type DeliveryGates,
+} from './verify-staging-restaurant-delivery.js';
+import { readVerificationTarget } from './verify-staging-operational-path.js';
+
+const script = readFileSync(
+  new URL('./verify-staging-restaurant-delivery.ts', import.meta.url),
+  'utf8',
+);
+const stagingConfig = readFileSync(
+  new URL('../apps/worker/wrangler.staging.toml', import.meta.url),
+  'utf8',
+);
+const deliveryRoute = readFileSync(
+  new URL('../apps/worker/src/routes/restaurant-delivery.ts', import.meta.url),
+  'utf8',
+);
+const deliveryScreen = readFileSync(
+  new URL('../apps/web/src/v8/restaurant/delivery/delivery.tsx', import.meta.url),
+  'utf8',
+);
+const workflow = readFileSync(
+  new URL('../.github/workflows/migrate-d1.yml', import.meta.url),
+  'utf8',
+);
+
+const target = { accountId: 'account', databaseId: 'database', workerUrl: 'https://stg-api.musubo.jp' };
+
+function fakeFetch(status: number, body: unknown) {
+  return vi.fn(async () => new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })) as unknown as typeof fetch & { mock: { calls: unknown[][] } };
+}
+
+/** 入口がすべて開いている状態。ここから1つずつ閉じて次の手を確かめる。 */
+function openGates(overrides: Partial<DeliveryGates> = {}): DeliveryGates {
+  return {
+    restaurantTestEnabled: true,
+    activeAdmins: 1,
+    activeLineAccounts: 1,
+    tenantsWithRestaurantPack: 1,
+    storesLinkedToLineAccount: 1,
+    ...overrides,
+  };
+}
+
+describe('staging delivery verification safety', () => {
+  test('targets only the dedicated staging Worker, D1 and admin site', () => {
+    // 対象の決め方は既に検証済みの共通処理へ委ねる。
+    expect(script).toContain("const CONFIG_PATH = 'apps/worker/wrangler.staging.toml'");
+    expect(script).toContain("readFileSync(CONFIG_PATH, 'utf8')");
+    expect(script).toContain('readVerificationTarget(config)');
+    expect(script).toContain("process.env.VERIFY_ENVIRONMENT !== 'staging'");
+
+    expect(readVerificationTarget(stagingConfig)).toMatchObject({
+      workerUrl: 'https://stg-api.musubo.jp',
+    });
+    expect(() => readVerificationTarget(
+      stagingConfig.replace('name = "nen-line-stg"', 'name = "production"'),
+    )).toThrow('Only the staging Worker is allowed');
+    expect(() => readVerificationTarget(
+      stagingConfig.replace('database_name = "nen-line-stg"', 'database_name = "nen-line"'),
+    )).toThrow('Only the staging D1 database is allowed');
+    expect(() => readVerificationTarget(
+      stagingConfig.replace('WORKER_PUBLIC_URL = "https://stg-api.musubo.jp"', 'WORKER_PUBLIC_URL = "https://api.musubo.jp"'),
+    )).toThrow('Unexpected staging Worker URL');
+    expect(() => readVerificationTarget(
+      `${stagingConfig}\n[triggers]\ncrons = ["* * * * *"]`,
+    )).toThrow('must not have cron triggers');
+
+    // 画面を開く宛先も設定から読む。本番の管理画面は開かない。
+    expect(readAdminTarget(stagingConfig)).toEqual({ adminUrl: 'https://stg-admin.musubo.jp' });
+    expect(() => readAdminTarget(
+      stagingConfig.replace('ADMIN_PUBLIC_URL = "https://stg-admin.musubo.jp"', 'ADMIN_PUBLIC_URL = "https://admin.musubo.jp"'),
+    )).toThrow('Only the staging admin site is allowed');
+    expect(() => readAdminTarget(
+      stagingConfig.replace('ADMIN_PUBLIC_URL = "https://stg-admin.musubo.jp"', 'ADMIN_PUBLIC_URL = "http://stg-admin.musubo.jp"'),
+    )).toThrow('Unexpected staging admin URL');
+    expect(() => readAdminTarget(
+      stagingConfig.replace('ADMIN_PUBLIC_URL = "https://stg-admin.musubo.jp"', 'ADMIN_PUBLIC_URL = "stg-admin.musubo.jp"'),
+    )).toThrow('Unexpected staging admin URL');
+    expect(() => readAdminTarget(
+      stagingConfig.replace('ADMIN_PUBLIC_URL =', 'ADMIN_PUBLIC_URL_DISABLED ='),
+    )).toThrow('ADMIN_PUBLIC_URL is missing');
+
+    // 設定の `ADMIN_ORIGIN` にも同じ文字列が入るので、取り違えないことを押さえる。
+    expect(stagingConfig).toContain('ADMIN_ORIGIN =');
+    expect(readRestaurantTestFlag(stagingConfig)).toBe(true);
+    expect(readRestaurantTestFlag(
+      stagingConfig.replace('RESTAURANT_TEST_ENABLED = "true"', 'RESTAURANT_TEST_ENABLED = "false"'),
+    )).toBe(false);
+  });
+
+  test('runs only from the staging workflow entry, so no secret is needed on a laptop', () => {
+    // 手元に秘密値を置かずに走らせる唯一の入口。staging と codex/development に限る。
+    expect(workflow).toContain("inputs.operation == 'verify-restaurant-delivery'");
+    expect(workflow).toContain('scripts/verify-staging-restaurant-delivery.ts');
+    expect(workflow).toContain("inputs.environment == 'staging'");
+    expect(workflow).toContain("github.repository == 'skmtmst/line-harness-oss'");
+    expect(workflow).toContain("github.ref == 'refs/heads/codex/development'");
+    expect(workflow).toContain('VERIFY_ENVIRONMENT: staging');
+    expect(workflow).toContain('group: verify-staging-restaurant-delivery');
+    expect(workflow).toContain('set -o pipefail');
+    expect(workflow).not.toMatch(/\bset\s+-x\b/);
+    // 実ブラウザで開くので、走らせる側に Chromium が要る。
+    expect(workflow).toContain('playwright install --with-deps chromium');
+    // 集計だけを出す。秘密値や個別の識別子をサマリーへ流さない。
+    expect(workflow).toContain('tail -n 1 "$RUNNER_TEMP/delivery-verification.json"');
+    expect(workflow).not.toMatch(/CLOUDFLARE_API_TOKEN[^\n]*GITHUB_STEP_SUMMARY/);
+  });
+
+  test('calls only the four read-only endpoints, never an order operation', async () => {
+    const allowed = fakeFetch(200, { success: true, store: { id: 'store-1' } });
+    const result = await readOnlyRequest(
+      target,
+      'token-value',
+      '/api/restaurant-test/delivery/orders?account_id=account-1&tab=all',
+      allowed,
+    );
+    expect(result).toMatchObject({ status: 200 });
+    const [url, init] = allowed.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://stg-api.musubo.jp/api/restaurant-test/delivery/orders?account_id=account-1&tab=all');
+    expect(init.method).toBe('GET');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer lh_session:token-value');
+
+    // 注文の詳細は通る。
+    const detail = fakeFetch(200, { success: true, order: { id: 'order-1' }, items: [] });
+    await expect(readOnlyRequest(
+      target, 'token-value', '/api/restaurant-test/delivery/orders/order-1?account_id=account-1', detail,
+    )).resolves.toMatchObject({ status: 200 });
+
+    // 操作の口は、識別子の後ろへ付けても通らない（道の頭だけで許さない）。
+    const blocked = fakeFetch(200, { success: true });
+    for (const forbidden of [
+      '/api/restaurant-test/delivery/orders/order-1/accept',
+      '/api/restaurant-test/delivery/orders/order-1/ready',
+      '/api/restaurant-test/delivery/orders/order-1/handed-over',
+      '/api/restaurant-test/delivery/orders/order-1/reject',
+      '/api/restaurant-test/delivery/orders/order-1/cancel',
+      '/api/restaurant-test/delivery/menu-items/bulk-sold-out',
+      '/api/restaurant-test/delivery/intake/stop',
+      '/api/restaurant-test/delivery/intake/resume',
+      '/api/restaurant-test/delivery/webhooks/ubereats',
+      '/api/restaurant-test/delivery/history.csv?account_id=account-1',
+      '/api/notifications/rules',
+    ]) {
+      await expect(readOnlyRequest(target, 'token-value', forbidden, blocked)).rejects.toThrow(
+        'may only call the read-only',
+      );
+    }
+    expect(blocked).not.toHaveBeenCalled();
+
+    // 止めた道は、本物の路線表に本当に書き込みとして載っている。
+    for (const writeRoute of [
+      '/api/restaurant-test/delivery/orders/:id/accept',
+      '/api/restaurant-test/delivery/orders/:id/cancel',
+      '/api/restaurant-test/delivery/menu-items/bulk-sold-out',
+      '/api/restaurant-test/delivery/intake/stop',
+    ]) {
+      expect(deliveryRoute).toContain(`restaurantDelivery.post(\n  '${writeRoute}'`);
+    }
+    // 読む道は4つとも本物の路線表にある。
+    for (const readRoute of [
+      '/api/restaurant-test/delivery/orders',
+      '/api/restaurant-test/delivery/orders/:id',
+      '/api/restaurant-test/delivery/history',
+      '/api/restaurant-test/delivery/menu-items',
+    ]) {
+      expect(deliveryRoute).toContain(`restaurantDelivery.get(\n  '${readRoute}'`);
+    }
+
+    expect(script).toContain("method: 'GET'");
+    for (const verb of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      expect(script).not.toContain(`method: '${verb}'`);
+    }
+    // 画面からの通信も GET だけ通し、それ以外は断つ。
+    expect(script).toContain("route.request().method() === 'GET'");
+    expect(script).toContain('route.abort()');
+    expect(script).toContain('blockedWriteRequests');
+    expect(script).toContain('writeRequestsSent: 0');
+    // 配信・台帳・在庫を自分で動かさない。
+    for (const forbidden of ['sendWithLedger', 'pushMessage', 'multicast', 'UPDATE rt_', 'INSERT INTO rt_']) {
+      expect(script).not.toContain(forbidden);
+    }
+  });
+
+  test('keeps the temporary session short-lived and deletes only its own row', () => {
+    expect(script).toContain('const SESSION_TTL_MINUTES = 15');
+    expect(script).toContain('INSERT OR IGNORE INTO admin_sessions (token_hash, staff_id, expires_at)');
+    expect(script).toContain('DELETE FROM admin_sessions WHERE token_hash = ?');
+    expect(script).toContain('temporarySessionDeleted: true');
+    // 自分が作った一時行だけを消す。期限切れの他行を一括削除する道を作らない。
+    expect(script).not.toContain('expires_at <=');
+    expect(script).not.toMatch(/DELETE FROM admin_sessions WHERE(?! token_hash = \?)/);
+    expect(script).not.toMatch(/DELETE FROM (?!admin_sessions)/);
+    // 担当者は作らずに探す。
+    expect(script).not.toContain('INSERT INTO staff_members');
+    expect(script).not.toContain('INSERT OR IGNORE INTO staff_members');
+    // 残存0件を数えてから合格にする。
+    expect(script).toContain('SELECT COUNT(*) AS count FROM admin_sessions WHERE token_hash = ?');
+    expect(script).toContain('Staging cleanup incomplete');
+    expect(script).toContain('leftoverCount !== 0');
+  });
+
+  test('never puts the session token in a URL, log or summary', () => {
+    // 合言葉は `sessionStorage` へ直接置く。URL（fragment）へは載せない。
+    expect(script).toContain("sessionStorage.setItem('lh_admin_session_fallback', token)");
+    expect(script).toContain('await page.goto(`${admin.adminUrl}${SCREEN_PATH}${screen.search}`');
+    expect(script).not.toContain('lh_session=');
+    expect(script).not.toContain('#lh_session');
+    // 画面側が同じ場所を読むので、これで `AuthGuard` も通る。
+    const adminSession = readFileSync(
+      new URL('../apps/web/src/lib/admin-session.ts', import.meta.url),
+      'utf8',
+    );
+    expect(adminSession).toContain("ADMIN_SESSION_STORAGE_KEY = 'lh_admin_session_fallback'");
+    // 店舗の選び取りは明示する（未選択のとき先頭へ落ちない作りなので）。
+    expect(script).toContain("localStorage.setItem('lh_selected_account', accountId)");
+    const accountContext = readFileSync(
+      new URL('../apps/web/src/contexts/account-context.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(accountContext).toContain("const STORAGE_KEY = 'lh_selected_account'");
+    // 合言葉・鍵・識別子をログへ出さない。
+    expect(script).not.toMatch(
+      /console\.(?:log|error)\([^\n]*(?:sessionToken|sessionHash|apiToken|CLOUDFLARE_API_TOKEN|staff_id|line_account_id)/,
+    );
+  });
+
+  test('checks the real flat shape the three screens actually read', async () => {
+    // 既定の器は `data` で包むので、包まれていないことが本物と同じ形の証。
+    expect(inspectFlatBody(
+      { success: true, store: { id: 's', name: 'n' }, services: [], kpis: { todayCount: 0 }, tab: 'all', tabCounts: {}, orders: [] },
+      ['store.id', 'store.name', 'services', 'kpis.todayCount', 'tab', 'tabCounts', 'orders'],
+    )).toEqual({ wrapped: false, success: true, missing: [] });
+
+    expect(inspectFlatBody(
+      { success: true, data: { store: { id: 's' } } },
+      ['store.id', 'orders'],
+    )).toEqual({ wrapped: true, success: true, missing: ['orders', 'store.id'] });
+
+    // 配列を器と間違えない。中身が null の項目も欠けとして数える。
+    expect(missingFields({ store: ['id'], range: { from: '2026-10-01', to: null } }, ['store.id', 'range.from', 'range.to']))
+      .toEqual(['range.to', 'store.id']);
+
+    const shape = inspectFlatBody({ success: false, order: { id: 'o' } }, ['order.id']);
+    expect(shape).toEqual({ wrapped: false, success: false, missing: [] });
+    expect(script).toContain('Unexpected staging delivery response for');
+
+    // 題は画面側の `PAGE_META` と同じ3つ。
+    for (const title of ['デリバリー受注', '注文履歴・売上', '品切れ一括設定']) {
+      expect(script).toContain(`title: '${title}'`);
+      expect(deliveryScreen).toContain(`title: '${title}'`);
+    }
+    expect(script).toContain("const SCREEN_PATH = '/restaurant-test/delivery'");
+    expect(script).toContain("search: '?view=history'");
+    expect(script).toContain("search: '?view=sold-out'");
+    // 合格の線は題の測定と同じ 22px/700/32px、落ちた画面の題は不合格。
+    expect(script).toContain("title.size === '22px' && title.weight === '700' && title.lh === '32px'");
+    expect(script).toContain("const CRASH_TITLE = '画面を表示できませんでした'");
+    expect(script).toContain('landedOnLogin');
+  });
+
+  test('reports a next step instead of a bare failure when an entry gate is empty', () => {
+    expect(nextStepFor(openGates({ restaurantTestEnabled: false })))
+      .toContain('RESTAURANT_TEST_ENABLED');
+    expect(nextStepFor(openGates({ activeAdmins: 0 }))).toContain('owner/admin');
+    expect(nextStepFor(openGates({ activeLineAccounts: 0 }))).toContain('LINE公式アカウント');
+    expect(nextStepFor(openGates({ tenantsWithRestaurantPack: 0 }))).toContain('feature_packs');
+    expect(nextStepFor(openGates({ storesLinkedToLineAccount: 0 }))).toContain('rt_stores.line_account_id');
+    // すべて埋まっていれば、残るのは担当者の可視範囲。
+    expect(nextStepFor(openGates())).toContain('account_scope');
+
+    expect(script).toContain("status: 'blocked'");
+    expect(script).toContain('nextStep: nextStepFor(gates)');
+    expect(script).toContain('temporarySessionCreated: false');
+
+    // 本物と同じ3つの 404 の門（試験スイッチ・機能パック・店舗の紐付け）を見ている。
+    expect(deliveryRoute).toMatch(/if \(!restaurantTestEnabled\(c\.env\)\) return fail\(c, 404/);
+    expect(deliveryRoute).toMatch(/tenantHasFeaturePack\(.*'restaurant'\)/);
+    expect(deliveryRoute.includes('このLINEアカウントに店舗が紐付いていません')).toBe(true);
+    expect(script).toContain('feature_packs LIKE \'%"restaurant"%\'');
+    expect(script).toContain('JOIN rt_stores s ON s.line_account_id = la.id');
+  });
+});
