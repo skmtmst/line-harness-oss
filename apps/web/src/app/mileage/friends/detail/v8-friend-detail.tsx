@@ -1,5 +1,8 @@
 'use client'
 
+import { jstMonthStart } from '@/lib/jst-datetime'
+
+
 /*
  * ★V8-B マイル「友だちのマイル詳細」（板 `R6kIG`、手で増やす・減らす
  * `M8zhjL`）。
@@ -243,8 +246,7 @@ function FriendDetailInner() {
     [mileage, v6History],
   )
   const monthStart = useMemo(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    return jstMonthStart()
   }, [])
   const periodFrom = period === 'month' ? monthStart : undefined
   const filtered = useMemo(() => {

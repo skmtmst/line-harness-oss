@@ -1,5 +1,8 @@
+'use client'
+
+import { useTableActionWidth } from './use-table-action-width'
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
-import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
+import { Children, cloneElement, isValidElement, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import styles from './grid-table.module.css'
 
 /** 板ごとの列幅と密度を受け取る共通の表。色・線・省略・役割は部品が持つ。 */
@@ -29,12 +32,13 @@ export function GridTable({ children, label, design, framed = true, className }:
   /** 幅と、狭い板での列の並びだけを渡す。 */
   className?: string
 }) {
+  const actionWidthRef = useTableActionWidth<HTMLDivElement>()
   const variables = Object.fromEntries(Object.entries(design).map(([key, value]) => [`--grid-table-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value]))
-  return <div data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={framed || undefined} style={variables as CSSProperties}>{children}</div>
+  return <div ref={actionWidthRef} data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={framed || undefined} style={variables as CSSProperties}>{children}</div>
 }
 
 export function GridHeadRow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div data-shared-part="list-head" role="row" className={[styles.row, className].filter(Boolean).join(' ')} data-head="">{children}</div>
+  return <div data-shared-part="list-head" role="row" className={[styles.row, className].filter(Boolean).join(' ')} data-head="">{Children.map(children, child => isValidElement<{ children?: ReactNode }>(child) && child.props.children === '操作' ? cloneElement(child, {}, <span className="sr-only">操作</span>) : child)}</div>
 }
 
 export function GridRow({ children, className, ...props }: HTMLAttributes<HTMLDivElement>) {

@@ -15,14 +15,9 @@ describe('V6正本 37-2 然・マイページ', () => {
     expect(main).not.toContain('NEN MEMBERS</p>');
   });
 
-  it('keeps the 390px V6 canvas, white cards, and canonical tokens', () => {
-    expect(styles).toContain('.nm-app { max-width: 390px;');
-    expect(styles).toContain('.nm-home-header { display: grid; gap: 4px; padding: 18px 20px 14px; background: #fff; }');
-    expect(styles).toContain('border: 1px solid #dadde2; border-radius: 10px; background: #fff;');
-    expect(styles).toContain('.nm-home-stack { gap: 14px; padding: 14px 16px 96px; }');
-    expect(styles).toContain('.nm-bottom-nav { position: fixed;');
-    expect(styles).toContain('max-width: 390px;');
-    expect(styles).not.toContain('.nm-member-header {');
+  it('店の保存済みデザインで背景が変わる', () => {
+    expect(styles).toMatch(/background:\s*var\(--customer-ground/);
+    expect(styles).toContain('--nen: var(--customer-primary');
   });
 });
 

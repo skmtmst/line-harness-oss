@@ -693,7 +693,7 @@ function OfferCard({
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="af-badge" style={{ background: '#ecfdf5', color: '#06C755' }}>
+          <span className="af-badge" style={{ background: '#ecfdf5', color: 'var(--customer-primary, #06C755)' }}>
             {rewardText(offer.rewardAmount)}
           </span>
           {offer.rewardMiles > 0 && (
@@ -872,7 +872,7 @@ function App({ ctx }: { ctx: AffiliateContext }) {
   }
 
   return (
-    <div className="af-fade-in max-w-md mx-auto p-4 pb-12 space-y-5" style={{ background: '#f7f8fa', minHeight: '100vh' }}>
+    <div className="af-fade-in max-w-md mx-auto p-4 pb-12 space-y-5" style={{ background: 'var(--customer-background, #f7f8fa)', minHeight: '100vh' }}>
       <div>
         <h1 className="text-lg font-bold text-gray-900">マイル・紹介</h1>
         <p className="text-xs text-gray-500 mt-1">あなたの活動と紹介成果をまとめて確認できます</p>

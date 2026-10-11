@@ -16,6 +16,7 @@ import { dialogWidth } from './destination-policy'
 
 export type DialogProps = {
   open: boolean
+  contentLayout?: 'form'
   /** V8 の幅。v7 の寸法は維持する。 */
   size?: 'small' | 'medium' | 'large' | 'wide'
   /**
@@ -121,6 +122,7 @@ export type DialogProps = {
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
 export default function Dialog({
   open,
+  contentLayout,
   size = 'medium',
   designWidth,
   widthPreset,
@@ -304,7 +306,7 @@ export default function Dialog({
       </div>
       {designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
-      {children ? <div className={styles.content} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
+      {children ? <div className={styles.content} data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <p className={styles.error} role="alert">{error || automaticError}</p> : null}
       <div className={styles.footer} onClickCapture={(event) => {
         const button = (event.target as Element).closest?.('button')
@@ -372,4 +374,9 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
       </button>
     </React.Fragment>)}
   </nav>
+}
+
+/** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
+export function DialogActions({ children }: { children: ReactNode }) {
+  return <div className={styles.actions}>{children}</div>
 }

@@ -10,10 +10,9 @@
  * 予約日時は自動応答で差し込める値がまだ無いので、押せない札にして理由を出す。
  */
 import { useEffect, useRef, useState } from 'react'
-import { Braces, CalendarDays, IdCard, User } from 'lucide-react'
 import ActionMenu from '@/components/shared/action-menu'
 import { EMPTY_REFERENCES, loadTemplateReferences, type TemplateReferences } from '@/v8/template-edit/core'
-import styles from './wizard-v8.module.css'
+import { MessageInsertButton } from '@/components/shared/message-insert-row'
 
 export const NAME_TOKEN = '{{name}}'
 
@@ -63,41 +62,10 @@ export default function AutoReplyInsertChips({
 
   return (
     <>
-      <button type="button" className={styles.insertChip} title="名前を差し込む" onClick={() => onInsert(NAME_TOKEN)}>
-        <User size={16} aria-hidden="true" />名前
-      </button>
-      <button
-        ref={fieldRef}
-        type="button"
-        className={styles.insertChip}
-        title={why(fieldsReady, '友だち情報')}
-        aria-haspopup="menu"
-        aria-expanded={menu === 'field'}
-        disabled={!fieldsReady}
-        onClick={() => setMenu((m) => (m === 'field' ? null : 'field'))}
-      >
-        <IdCard size={16} aria-hidden="true" />友だち情報
-      </button>
-      <button
-        ref={varRef}
-        type="button"
-        className={styles.insertChip}
-        title={why(varsReady, '共通情報')}
-        aria-haspopup="menu"
-        aria-expanded={menu === 'var'}
-        disabled={!varsReady}
-        onClick={() => setMenu((m) => (m === 'var' ? null : 'var'))}
-      >
-        <Braces size={16} aria-hidden="true" />共通情報
-      </button>
-      <button
-        type="button"
-        className={styles.insertChip}
-        title="自動応答では予約日時を差し込めません（予約の通知で使えます）"
-        disabled
-      >
-        <CalendarDays size={16} aria-hidden="true" />予約日時
-      </button>
+      <MessageInsertButton kind="name" label="名前" title="名前を差し込む" onClick={() => onInsert(NAME_TOKEN)} />
+      <MessageInsertButton kind="field" label="友だち情報" ref={fieldRef} title={why(fieldsReady, '友だち情報')} expanded={menu === 'field'} disabled={!fieldsReady} onClick={() => setMenu(m => m === 'field' ? null : 'field')} />
+      <MessageInsertButton kind="var" label="共通情報" ref={varRef} title={why(varsReady, '共通情報')} expanded={menu === 'var'} disabled={!varsReady} onClick={() => setMenu(m => m === 'var' ? null : 'var')} />
+      <MessageInsertButton kind="date" label="予約日時" disabled title="自動応答では予約日時を差し込めません" onClick={() => {}} />
       <ActionMenu
         open={menu === 'field'}
         anchorRef={fieldRef}

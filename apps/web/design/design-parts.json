@@ -4,7 +4,8 @@
     "Pencilは暗号化されていてCIから読めないため、値をここへ写して機械で照合できるようにしている。",
     "値を変えるときは必ずPencilを先に直し、そのあとここへ写す。",
     "2026-10-09: ★V8 の決まり B-146〜B-161（docs/v8-design-rules.md §6）と Pen（V8.pen の部品）に合わせて、決まりとぶつかる値を V8 の値へ写し直した。各宣言の pencil の欄の「→ 2026-10-09 V8」の後ろが根拠。コードがまだ古い値のうちは、この照合は落ちる（Codex の look・polish と同じ列車で入れる）。",
-    "2026-10-10 19:37 JST 固定HTMLからB-198・B-203・B-211・B-217・B-218の色・余白・番号の丸を再生成。実装が古ければ落とす。既存の本番部品の棚卸し・未変更の契約も残す。"
+    "2026-10-10 19:37 JST 固定HTMLからB-198・B-203・B-211・B-217・B-218の色・余白・番号の丸を再生成。実装が古ければ落とす。既存の本番部品の棚卸し・未変更の契約も残す。",
+    "2026-10-11 03:10 JST 固定HTMLからB-219〜B-238を含む共通部品の色・余白・枠・文字を再生成。実装が古ければ落とす。既存の本番部品の棚卸し・未変更の契約も残す。"
   ],
   "$pencilFile": "4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen",
   "$componentInventory": {
@@ -956,7 +957,7 @@
       ],
       "cssPrefix": "pagination",
       "pencilUsage": 139,
-      "lastCheckedAt": "2026-10-10",
+      "lastCheckedAt": "2026-10-11",
       "note": "Pencil全体で139回参照される共通部品。V5を基本とし、V6代表10画面のうち受信箱を除く9画面でも同じBlot6を使う。第1段階ではページ番号へ直接移動できる6利用先を移行し、前後移動だけの画面は動作差を確認して次段階で移す。",
       "routes": {
         "v5": [
@@ -1078,21 +1079,21 @@
           "resolved": "38px"
         },
         {
-          "pencil": "2026-10-10 19:37 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211",
+          "pencil": "2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211",
           "class": "current",
           "prop": "border-color",
           "source": "#087a3e",
           "resolved": "#087a3e"
         },
         {
-          "pencil": "2026-10-10 19:37 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211",
+          "pencil": "2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211",
           "class": "current",
           "prop": "background",
           "source": "#e8f5ec",
           "resolved": "#e8f5ec"
         },
         {
-          "pencil": "2026-10-10 19:37 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211",
+          "pencil": "2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211",
           "class": "current",
           "prop": "color",
           "source": "#087a3e",
@@ -1837,7 +1838,7 @@
       ],
       "cssPrefix": "card",
       "pencilUsage": "未計測（ダッシュボードへ適用開始）",
-      "lastCheckedAt": "2026-10-10",
+      "lastCheckedAt": "2026-10-11",
       "note": "標準48pxとダッシュボード用58pxを名前付きsizeへ固定し、長い見出しを省略する。",
       "routes": {
         "active": [
@@ -1946,7 +1947,7 @@
           "resolved": "700"
         },
         {
-          "pencil": "2026-10-10 19:37 JST 固定HTML: components-ZBjxY リンク/文字 B-198",
+          "pencil": "2026-10-11 03:10 JST 固定HTML: components-ZBjxY リンク/文字 B-198",
           "class": "action",
           "prop": "color",
           "source": "#087a3e",
@@ -3981,11 +3982,11 @@
     }
   },
   "$snapshot": {
-    "frozenAt": "2026-10-10 19:37 JST",
+    "frozenAt": "2026-10-11 03:10 JST",
     "generatedBy": "apps/web/scripts/regenerate-v8-design-values.mjs",
     "exports": {
       "html/components-ZBjxY.html": "dd7293f366bb6280982eced45d7868e226410421a7668d91087fe5ebf85cab23",
-      "html/components-NbomF.html": "a4b2178c623d713b654b6ddb7a5d4e2c6c53340d426e714d7be300a4cdd8f9b5",
+      "html/components-NbomF.html": "9a08e6c8d88f0a1c811635aaab7a593bfe9c82fbdf39a7c06a6d90529062c0c0",
       "html/l5V9a.html": "21346c78b46c84581b66b43b71a107ec5c994c1f5a7458066b67ec73963a57f4"
     }
   }

@@ -24,3 +24,10 @@
  */
 [data-theme='v8'] .root[data-size='small'] .label { font-size: var(--text-caption); line-height: 17px; }
 }
+
+/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+html[data-theme='v8'] .input { width: var(--choice-size); height: var(--choice-size); outline-color: transparent; border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); box-shadow: none; }
+html[data-theme='v8'] .input:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); outline-color: transparent; box-shadow: none; }
+html[data-theme='v8'] .input:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+
+html[data-theme='v8'] .input:focus-visible { width: var(--choice-size); height: var(--choice-size); border: var(--choice-ring) solid var(--color-selection-border); }

@@ -7,6 +7,10 @@ describe('595の配信種類追加（外部キー有効）',()=>{
  it('履歴・参照を残し、新しい種類を保存できる',()=>{
   const db=new Database(':memory:');
   db.exec(readFileSync(new URL('../bootstrap.sql',import.meta.url),'utf8').replaceAll(", 'imagemap', 'rich_message', 'coupon'",''));
+  // 595を遡って再適用する試験。後続631の店舗ひな形triggerは、
+  // 作り直し中のscenario_stepsを参照するため、595時点のtrigger構成に戻す。
+  // 595の履歴・参照・外部キーの全検査は維持する。
+  for(const row of db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'rt_followup_%'").all() as Array<{name:string}>)db.exec('DROP TRIGGER '+row.name);
   db.pragma('foreign_keys=ON');
   db.exec(`INSERT INTO friends(id,line_user_id) VALUES('f','u');
    INSERT INTO scenarios(id,name,trigger_type) VALUES('s','試験','manual');

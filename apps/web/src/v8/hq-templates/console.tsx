@@ -1209,7 +1209,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   <tr key={account.id} data-selected={on || undefined}>
                     <td><SaveErrorField names={["on","selected"]}><Checkbox id={`hq-dist-${account.id}`} aria-label={account.name} checked={on} disabled={busy || stage !== 'accounts'} onCheckedChange={(checked) => setSelected((current) => checked ? [...current, account.id] : current.filter((id) => id !== account.id))} /></SaveErrorField></td>
                     <td>
-                      <DistributionAccountName name={account.name} folder={accountFolders.membership?.get(account.id)?.folder} htmlFor={`hq-dist-${account.id}`} note={on ? (stage === 'result' ? progressLabel(account.id) || '配る' : '配る') : '配らない'} />
+                      <DistributionAccountName name={account.name} folder={accountFolders.membership?.get(account.id)?.folder} htmlFor={`hq-dist-${account.id}`} note={on ? (stage === 'result' ? progressLabel(account.id) || '配る' : '配る') : '配らない'} />{store?.warnings?.map(warning=><Notice key={warning} tone="warn">{warning}</Notice>)}
                     </td>
                     <td>
                       {on ? <span className={styles.cellLine}>

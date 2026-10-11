@@ -86,6 +86,7 @@ export default function SegmentedControl<T extends string>({
 
   return (
     <div
+      data-segmented-control
       ref={rootRef}
       id={id ?? field?.controlId}
       data-invalid={bad || undefined}

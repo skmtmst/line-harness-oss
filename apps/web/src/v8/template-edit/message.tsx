@@ -36,6 +36,7 @@ import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import InsertRow from './insert-row'
+import { MessageBody } from '@/components/shared/message-insert-row'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import { loadTemplateExamples } from '@/v8/templates/examples'
@@ -571,7 +572,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
-              <div className={styles.bodyBox} {...fields.bind('content')}>
+              <div {...fields.bind('content')}><MessageBody>
                 <SaveErrorField names={["messageContent","message_content"]}><InsertTextField
                   id="te-content"
                   ref={contentRef}
@@ -586,9 +587,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                   tokenNames={tokenNames}
                   placeholder={messageType === 'flex' ? '{"type":"bubble", …}' : '例：いつもご利用ありがとうございます。今月のおすすめをお知らせします。'}
                 /></SaveErrorField>
-                <span className={styles.bodySpacer} aria-hidden="true" />
                 <InsertRow accountId={editorAccountId} state={referenceState} references={references} length={messageContent.length} onInsert={insert} />
-              </div>
+              </MessageBody></div>
               <FieldError id="te-content-error">{fields.error('content')}</FieldError>
               {messageType === 'flex' && flexError && messageContent.trim() && !fields.invalid('content') ? (
                 <Notice tone="danger" >{flexError}このままでは保存できません。</Notice>

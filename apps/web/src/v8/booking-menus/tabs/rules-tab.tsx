@@ -2,6 +2,7 @@
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import Link from 'next/link'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -400,6 +401,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
                   ]}
                 /></SaveErrorField>
               ) : <ReadOnlyText label="日時を選ぶ画面の最初の形" value={draft.liffDateView === 'calendar' ? 'カレンダー' : '週で見る（日付の横ならび）'} spaced />}</Field>
+            <Notice tone="info">お客さまの画面の色と書体は、すべての画面で共通です。<Link href="/settings/customer-look">お客さまのデザインを開く ↗</Link></Notice>
           </div>
         </Disclosure>
 

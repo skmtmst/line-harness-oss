@@ -7,7 +7,7 @@ import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -98,6 +98,7 @@ beforeEach(() => {
   root = createRoot(host)
   role.value = 'owner'
   narrow.value = false
+  window.history.replaceState(null, '', '/conversions')
   push.mockReset()
   calls.length = 0
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -127,6 +128,22 @@ afterEach(() => {
 })
 
 describe('V8 コンバージョンの一覧', () => {
+  it('行の詳細を右パネルとURLへ残し、再表示・閉じるを同期する', async () => {
+    await mount()
+    fireEvent.click(screen.getByText('商品を買った'))
+    await flush()
+    expect(new URLSearchParams(window.location.search).get('point')).toBe('cp-1')
+    expect(screen.getByRole('dialog', { name: '商品を買った' })).toBeTruthy()
+    act(() => root.unmount())
+    root = createRoot(host)
+    await mount()
+    const panel = screen.getByRole('dialog', { name: '商品を買った' })
+    fireEvent.click(within(panel).getByRole('button', { name: '閉じる' }))
+    await flush()
+    expect(new URLSearchParams(window.location.search).get('point')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: '商品を買った' })).toBeNull()
+  })
+
   it('一覧の読み込みが失敗しても空とは扱わず、読み直すと成果地点を表示する', async () => {
     const base = globalThis.fetch
     let failed = true
@@ -181,7 +198,7 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByText('アフィリエイト 1')).toBeTruthy()
   })
 
-  it('管理できる人：作る・使う場所を足すがあり、「…」から止めると表の下に止める小窓が開く（理由が無いと止められない）', async () => {
+  it('管理できる人：作る・使う場所を足すがあり、「…」から止めると確認画面が開く（理由が無いと止められない）', async () => {
     await mount()
     expect(screen.getAllByRole('link', { name: /成果地点を作る/ }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('link', { name: '使う場所を足す' }).length).toBe(2)
@@ -192,7 +209,7 @@ describe('V8 コンバージョンの一覧', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '止める' }))
     await flush()
     expect(calls).toContain('GET /api/conversions/definitions/cp-1/delete-impact')
-    const card = screen.getByRole('region', { name: '止めるときの小窓' })
+    const card = screen.getByRole('dialog', { name: '商品を買ったを止めますか？' })
     expect(card.textContent).toContain('2か所で使われています。どうしますか。')
     const stop = Array.from(card.querySelectorAll('button')).find((button) => button.textContent === '止める') as HTMLButtonElement
     expect(stop.disabled).toBe(true)
@@ -239,17 +256,17 @@ describe('V8 コンバージョンの一覧', () => {
     await mount()
     fireEvent.click(screen.getByText('商品を買った'))
     await flush()
-    const panel = screen.getByRole('region', { name: '詳細の小窓' })
+    const panel = screen.getByRole('dialog', { name: '商品を買った' })
     expect(panel.textContent).toContain('（動いています）')
     fireEvent.click(screen.getByRole('button', { name: '詳細「商品を買った」のその他の操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '受け口を止める' }))
     await flush()
     expect(calls).toContain('POST /api/conversions/definitions/cp-1/ingest-disable')
     // 返事を待たずに変わっている
-    expect(screen.getByRole('region', { name: '詳細の小窓' }).textContent).toContain('（止まっています）')
+    expect(screen.getByRole('dialog', { name: '商品を買った' }).textContent).toContain('（止まっています）')
     await act(async () => { finish(json({ success: false, error: 'conflict' }, 409)) })
     await flush()
-    expect(screen.getByRole('region', { name: '詳細の小窓' }).textContent).toContain('（動いています）')
+    expect(screen.getByRole('dialog', { name: '商品を買った' }).textContent).toContain('（動いています）')
     expect(calls.filter((call) => call === 'GET /api/conversions/definitions')).toHaveLength(1)
   })
 

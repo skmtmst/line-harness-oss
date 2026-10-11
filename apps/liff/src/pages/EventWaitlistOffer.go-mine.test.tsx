@@ -13,7 +13,7 @@ import App from '../App.js';
 vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
 vi.mock('./EventBookings.js', () => ({ default: Probe }));
 vi.mock('../lib/api.js', () => ({
-  api: {
+  api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     eventWaitlistOffer: vi.fn().mockRejectedValue(new Error('offline')),
     acceptEventWaitlistOffer: vi.fn().mockRejectedValue(Object.assign(new Error('gone'), { status: 410 })),
     liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),

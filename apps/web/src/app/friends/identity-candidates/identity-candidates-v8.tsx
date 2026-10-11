@@ -133,7 +133,7 @@ function FriendIdentityCandidatesV8Inner() {
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>結び付けた人に使う値</h3>
               <p className={styles.sectionDesc}>
-                「同じ人として結び付ける」を選んだあとの小窓で、使う値を確かめて決めます。
+                「同じ人として結び付ける」を選んだあとの確認画面で、使う値を確かめて決めます。
               </p>
               <div className={styles.tableWrap} style={{ border: 0 }}>
                 <table className={styles.table}>

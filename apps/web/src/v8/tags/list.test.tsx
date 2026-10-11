@@ -93,8 +93,8 @@ describe('V8 タグ タグの一覧', () => {
     narrow.value = true
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="aPeD8"]')).not.toBeNull()
-    // 1152 でもタグ札の形は同じ。フォルダ列の出し入れは今のまま。
-    expect([...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())).toContain('フォルダ')
+    // B-217：1152でも名前の色の丸でフォルダを伝え、重複の列を置かない。
+    expect([...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())).not.toContain('フォルダ')
     expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     await act(async () => root.unmount())
     root = createRoot(container)

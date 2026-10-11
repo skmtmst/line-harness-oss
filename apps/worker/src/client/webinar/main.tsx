@@ -1,3 +1,4 @@
+import { jstDate } from '@line-crm/shared';
 // main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
 // from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
 // Worker の入口と apps/liff の入口が共用する、申込・視聴・回答の本体。
@@ -1204,7 +1205,7 @@ export function FormSheet({
 
   const inputCls =
     'w-full min-w-0 rounded border border-gray-300 bg-white px-3 py-2 text-base text-gray-900';
-  const todayJst = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const todayJst = jstDate();
   const meetingDateOptions = buildMeetingDateOptions(todayJst);
 
   const completionUrl = sheet.phase === 'done'
