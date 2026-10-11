@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { chromium } from '@playwright/test'
 import { assess, record, measurePage, validateAllowances } from './layout-defects.mjs'
+import scanPanelBlank from './panel-blank-browser.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
 const cases = {
   wrap: '<span style="display:block;width:50px">短い名前の折り返し</span>',
@@ -29,6 +30,20 @@ const repairs = {
   'blank-horizontal': cases['blank-horizontal'].replace('width:240px','width:1000px').replace('height:320px','height:auto'),
   'blank-kpi': cases['blank-kpi'].replaceAll('min-height:160px','min-height:0'),
 }
+test('入れ子のカードの余白は合算せず、カード自身の大きな余りは検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    const card = height => `<section data-design-part="card" style="background:white;padding:24px;${height}"><p style="margin:0;height:200px">内容</p></section>`
+    const markup = inner => shell(`<div style="background:white;padding:24px"><section data-design-part="card" style="background:white;padding:24px">${inner}</section></div><footer style="margin-top:900px">続き</footer>`)
+    await page.setContent(markup(card('')))
+    assert.deepEqual(await page.evaluate(scanPanelBlank), [])
+    await page.setContent(markup(card('height:360px')))
+    const failures = await page.evaluate(scanPanelBlank)
+    assert.equal(failures.length, 1)
+    assert.equal(failures[0].measure.gap, 136)
+  } finally { await browser.close() }
+})
 test('種類ごとに実物を壊し、検出・終了コード1・修復後0を確認する', async () => {
   const browser = await chromium.launch()
   const dir = mkdtempSync(join(tmpdir(),'v8-defects-'))

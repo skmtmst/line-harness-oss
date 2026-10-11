@@ -36,7 +36,10 @@ export default function scanPanelBlank() {
     for (const d of el.querySelectorAll('*')) {
       if (!visible(d)) continue
       const dr = d.getBoundingClientRect()
-      if (dr.bottom <= r.bottom + 1 && (d.childElementCount === 0 || d.textContent.trim() === '' || [...d.children].every(x => x.tagName === 'BR'))) bottom = Math.max(bottom, dr.bottom)
+      // B-180 D-7：入れ子のカードの余白を親へ重ねて数えない。
+      // カード自身の余りは、このループで別に検査する。
+      const nestedCard = d.matches('[data-design-part="card"]') && d.textContent.trim() !== ''
+      if (dr.bottom <= r.bottom + 1 && (nestedCard || d.childElementCount === 0 || d.textContent.trim() === '' || [...d.children].every(x => x.tagName === 'BR'))) bottom = Math.max(bottom, dr.bottom)
     }
     // Web の main が縦送りの枠でも、画面いっぱいの板の下は数えない。
     const height = document.documentElement.scrollHeight

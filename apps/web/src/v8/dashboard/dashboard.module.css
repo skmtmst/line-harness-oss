@@ -11,7 +11,6 @@
 .notices { display: flex; flex-direction: column; gap: var(--tpl-db-row-gap); }
 
 /* 数の帯の寸法はKpiBandとKpiCardの共通値を使う。 */
-.cellMenu.cellMenu { width: var(--tpl-db-menu); height: var(--tpl-db-menu); flex-basis: var(--tpl-db-menu); min-width: 0; min-height: 0; box-shadow: none; outline: 0; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); }
 .cellDetail {
   display: flex; flex-wrap: wrap; gap: var(--tpl-db-row-gap) var(--tpl-db-fig-gap);
   padding: var(--tpl-db-th-pad); border-bottom: 1px solid var(--color-hairline);
@@ -93,16 +92,6 @@ a.kv:hover .kvKey { text-decoration: underline; }
 .trendTable { flex: 1; min-height: 0; overflow: auto; }
 
 /* ── 段B：対応が必要な受信 ── */
-.inboxTable { display: flex; flex-direction: column; gap: var(--tpl-db-inbox-gap); min-width: 0; }
-.inboxHead, .inboxRow { display: flex; align-items: center; gap: var(--tpl-db-col-gap); min-width: 0; }
-.inboxHead {
-  padding: var(--tpl-db-th-pad); border-radius: var(--tpl-db-th-radius); background: var(--tpl-db-th-bg);
-  color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-db-caption-lh);
-}
-.inboxRow {
-  padding: var(--tpl-db-td-pad); border-bottom: 1px solid var(--color-hairline);
-  color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-db-text-lh);
-}
 .colName { width: var(--tpl-db-col-name); flex-shrink: 0; display: flex; align-items: center; gap: var(--tpl-db-row-gap); min-width: 0; }
 .colBody { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colWait { width: var(--tpl-db-col-wait); flex-shrink: 0; white-space: nowrap; }

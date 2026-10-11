@@ -8,8 +8,6 @@ import { Calendar, Image as ImageIcon, Inbox, Package, Plus, SlidersHorizontal }
 import type { DashboardCardId } from '@line-crm/shared'
 import { DashboardColumns, DashboardPage, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
-import { type ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import SectionHeader from './head'
@@ -63,11 +61,6 @@ export function headline(asOf: string | null | undefined, risk: 'normal' | 'warn
   return time ? `更新 ${time} ・ ${health}` : health
 }
 
-/** 「…」のメニュー。数のマスごとに1つ。 */
-function CellMenu({ title, items }: { title: string; items: ActionMenuItem[] }) {
-  return <RowMenu className={styles.cellMenu} label={`${title}の操作`} items={items} />
-}
-
 /* 右の列の組み合わせ（WQmep）：どの本文の段の右に、どの右の列のカードを置くか。 */
 const ASIDE_OF: Partial<Record<DashboardCardId, DashboardCardId[]>> = {
   'friend-trend': ['send-quota', 'operational-alerts'],
@@ -96,16 +89,7 @@ export default function DashboardV8() {
 
   /* ── 数の帯（今日やること） ─────────────────────── */
   const todayCell = (id: DashboardCardId): { node: ReactNode; detail: ReactNode } | null => {
-    const menu = (title: string, href: string, label: string) => (
-      <CellMenu
-        title={title}
-        items={[
-          { id: 'detail', label: openDetail === id ? '内訳を閉じる' : '内訳を見る', onSelect: () => setOpenDetail((current) => (current === id ? null : id)) },
-          { id: 'go', label, external: false, href: href, onSelect: () => router.push(href) },
-          ...(canEditLayout ? [{ id: 'edit', label: 'ダッシュボード編集', dividerBefore: true, onSelect: d.openEditor }] : []),
-        ]}
-      />
-    )
+    const valueAction = (title: string) => ({ label: `${title}の内訳${openDetail === id ? 'を閉じる' : 'を見る'}`, expanded: openDetail === id, onClick: () => setOpenDetail((current) => current === id ? null : id) })
     if (id === 'today-inbox') {
       const total = d.pendingTotal
       return {
@@ -114,7 +98,7 @@ export default function DashboardV8() {
           presentation="band"
           title="対応が必要な受信"
           icon={<Inbox size={13} aria-hidden="true" />}
-          menu={menu('対応が必要な受信', '/chats?status=unread', '受信箱を開く')}
+          valueAction={valueAction('対応が必要な受信')}
           value={total}
           unit="件"
           loading={d.pendingDetailState === 'loading'}
@@ -144,7 +128,7 @@ export default function DashboardV8() {
           presentation="band"
           title="写真審査"
           icon={<ImageIcon size={13} aria-hidden="true" />}
-          menu={menu('写真審査', href, action)}
+          valueAction={valueAction('写真審査')}
           value={forbidden ? null : value}
           unit="件"
           loading={state === 'loading'}
@@ -171,7 +155,7 @@ export default function DashboardV8() {
           presentation="band"
           title="今日の予約"
           icon={<Calendar size={13} aria-hidden="true" />}
-          menu={menu('今日の予約', '/booking/bookings?view=day', '予約を見る')}
+          valueAction={valueAction('今日の予約')}
           value={value}
           unit="件"
           loading={value === null && !d.bookingsFailed}
@@ -192,7 +176,7 @@ export default function DashboardV8() {
           presentation="band"
           title="出荷予定（今日・明日）"
           icon={<Package size={13} aria-hidden="true" />}
-          menu={menu('出荷予定', '/ec-commerce', 'ECを見る')}
+          valueAction={valueAction('出荷予定')}
           value={state === 'ready' ? (s?.soon ?? null) : null}
           unit="件"
           loading={state === 'loading'}

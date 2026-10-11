@@ -95,7 +95,13 @@ export default function scanOwnerRules() {
     const r = row.getBoundingClientRect(), leaves = textLeaves(row)
     if (r.height >= 40 && leaves.length) {
       const used = Math.max(...leaves.map(d=>d.getBoundingClientRect().bottom))-Math.min(...leaves.map(d=>d.getBoundingClientRect().top))
-      if (used > 0 && r.height-used > 48) add('tallrow',row,{excess:Math.ceil(r.height-used-48)})
+      // 固定したWQmepの受信表は72px。共通の指定を使い、その実寸以内なら
+      // 1行の名前でも高さを詰めない。指定を越えた行と、通常の表は引き続き検出する。
+      const frame = row.closest('[data-column-layout]')
+      const inboxDensity = frame?.style.getPropertyValue('--table-row-height') === 'var(--tpl-db-inbox-row-h)'
+        && parseFloat(css(row).getPropertyValue('--tpl-db-inbox-row-h')) === 72
+        && r.height <= 73
+      if (!inboxDensity && used > 0 && r.height-used > 48) add('tallrow',row,{excess:Math.ceil(r.height-used-48)})
     }
     const table = row.closest(tableSelector)
     if (tinted(css(row)) && table) {

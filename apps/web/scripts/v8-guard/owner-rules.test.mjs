@@ -54,6 +54,14 @@ test('14種類を実寸で故障注入し、修正すれば検出0（ブラウ�
       await page.setContent(shell(repairs[kind]))
       assert.deepEqual(await page.evaluate(scan),[],`修正後: ${kind}`)
     }
+    // WQmep：正本の共通72pxの指定だけを認める。指定を越える行は見逃さない。
+    const inbox = height => `<div data-shared-part="list-table" data-column-layout style="--tpl-db-inbox-row-h:72px;--table-row-height:var(--tpl-db-inbox-row-h)">${row('<span style="line-height:18px">名前</span>',`height:${height}px`)}</div>`
+    await page.setContent(shell(inbox(72)))
+    assert.equal((await page.evaluate(scan)).some(f=>f.kind==='tallrow'),false)
+    await page.setContent(shell(inbox(80)))
+    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='tallrow'))
+    await page.setContent(shell(inbox(72).replace('--table-row-height:var(--tpl-db-inbox-row-h)','--table-row-height:72px')))
+    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='tallrow'),'画面で直接72にして見張りを外せない')
     await page.setContent(shell('<p>本文</p>') + '<div role="tooltip" style="background:#111;color:white;width:200px;height:36px">黒いふきだし</div>')
     assert.ok((await page.evaluate(scan)).some(f=>f.kind==='dark'),'mainの外の吹き出しも見逃さない')
     await page.setContent(shell('<span style="display:block;width:32px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">元の全文は長い名前なのに二文字しか見えない</span>'))

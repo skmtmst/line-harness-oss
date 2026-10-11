@@ -202,7 +202,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
         <KeyValue
           key={row.label}
           label={<StatusPill tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusPill>}
-          value={row.value === null ? emptyValue('unknown') : `${formatNumber(row.value)}件`}
+          value={row.value === null ? emptyValue('unknown') : `${formatNumber(row.value)} 件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}
           title={`${row.label}で絞った受信箱を開く`}
@@ -282,7 +282,7 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
       {state.label === '要確認' && state.reason && !checking ? <p className={`${styles.stale} ${styles.connectionReason}`} title={state.reason.title}>{state.reason.text}</p> : null}
       {checkError ? <p className={styles.alert} role="alert">{checkError}</p> : null}
       <KeyValue label="自動処理" value={autoLabel} dot={dotOf(autoLabel)} tone={autoLabel === '要確認' ? 'danger' : 'default'} />
-      <KeyValue label="有効友だち" value={activeFriends === null ? emptyValue('unknown') : `${formatNumber(activeFriends)}人`} />
+      <KeyValue label="有効友だち" value={activeFriends === null ? emptyValue('unknown') : `${formatNumber(activeFriends)} 人`} />
     </DashboardAsideSection>
   )
 }
