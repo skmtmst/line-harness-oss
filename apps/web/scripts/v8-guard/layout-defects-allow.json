@@ -305,7 +305,7 @@
     "route": "/broadcasts/new?step=message",
     "width": 1152,
     "kind": "blank-vertical",
-    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(2) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1)",
+    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(1) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1)",
     "text": "between → テンプレートから選ぶ → メッセージを追加する",
     "measure": {
       "excess": 267
@@ -905,7 +905,7 @@
     "route": "/nen-members",
     "width": 1152,
     "kind": "blank-horizontal",
-    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(2) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(2) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(1) > div.review_body:nth-of-type(1) > div.review_reviewGrid:nth-of-type(1) > div.review_leftColumn:nth-of-type(1) > p.review_listHint:nth-of-type(1)",
+    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(1) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(2) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(1) > div.review_body:nth-of-type(1) > div.review_reviewGrid:nth-of-type(1) > div.review_leftColumn:nth-of-type(1) > p.review_listHint:nth-of-type(1)",
     "text": "right",
     "measure": {
       "excess": 413
@@ -4697,7 +4697,7 @@
     "route": "/hq/broadcasts/detail",
     "width": 1440,
     "kind": "blank-horizontal",
-    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(2) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.detail_split:nth-of-type(1) > aside.detail_side:nth-of-type(1) > dl.detail_rows:nth-of-type(1) > div.detail_row:nth-of-type(1) > dd:nth-of-type(1)",
+    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(1) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.detail_split:nth-of-type(1) > aside.detail_side:nth-of-type(1) > dl.detail_rows:nth-of-type(1) > div.detail_row:nth-of-type(1) > dd:nth-of-type(1)",
     "text": "right",
     "measure": {
       "excess": 156
@@ -4721,7 +4721,7 @@
     "route": "/hq/broadcasts/detail",
     "width": 1920,
     "kind": "blank-horizontal",
-    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(2) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.detail_split:nth-of-type(1) > aside.detail_side:nth-of-type(1) > dl.detail_rows:nth-of-type(1) > div.detail_row:nth-of-type(1) > dd:nth-of-type(1)",
+    "target": "div.app-shell_shell:nth-of-type(2) > div.app-shell_workspace:nth-of-type(1) > div.app-shell_side:nth-of-type(2) > main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.detail_split:nth-of-type(1) > aside.detail_side:nth-of-type(1) > dl.detail_rows:nth-of-type(1) > div.detail_row:nth-of-type(1) > dd:nth-of-type(1)",
     "text": "right",
     "measure": {
       "excess": 156
