@@ -47,7 +47,7 @@ export default function LayoutPicker({ options, value, onChange, disabled = fals
   return <div className={styles.list} role="radiogroup" aria-label={label} data-preview={preview}>
     {options.map((option, index) => <RadioCard key={option.value} className={styles.tile}
       name={name} value={option.value} checked={option.value === value} disabled={disabled}
-      title={option.label} variant="compact" onChange={onChange}
+      title={option.label} variant="compact" contentPlacement="below-indicator" onChange={onChange}
       inputRef={(input) => { inputs.current[index] = input }}
       tabIndex={index === selected ? 0 : -1}
       ariaLabel={`${option.label}（面 ${option.areas.map((area) => area.label).join('・')}）`}

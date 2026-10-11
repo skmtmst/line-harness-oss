@@ -2,6 +2,23 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {chromium} from '@playwright/test'
+test('本物の選ぶカードCSS: 丸の下の本文は狭めず、通常の本文は丸から離す',async()=>{
+ const css=readFileSync(new URL('../../src/components/shared/radio-card.module.css',import.meta.url),'utf8')
+ const picker=readFileSync(new URL('../../src/components/shared/layout-picker.module.css',import.meta.url),'utf8')
+ const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
+ const browser=await chromium.launch()
+ try{
+  const page=await browser.newPage()
+  const html=style=>`<html data-theme="v8"><style>${globals}\n* {box-sizing:border-box}\n${style}\n${picker}</style><body><div class="list" data-preview="message"><label class="card compact tile" data-content-placement="below-indicator"><input class="radio" type="radio"><span class="body"><strong class="title">上1・下2</strong></span><span class="sample"></span></label></div><label class="card" style="width:240px"><input class="radio" type="radio"><span class="body"><strong class="title">通常の選択肢</strong></span></label></body></html>`
+  const values=()=>page.locator('.tile').evaluate(el=>{const title=el.querySelector('.title'),sample=el.querySelector('.sample'),radio=el.querySelector('.radio');return {fits:title.scrollWidth<=title.clientWidth,pad:getComputedStyle(el).paddingTop,bodyPad:getComputedStyle(el.querySelector('.body')).paddingRight,clear:sample.getBoundingClientRect().top>=radio.getBoundingClientRect().bottom+8}})
+  for(const width of [1440,1152]){
+   await page.setViewportSize({width,height:600});await page.setContent(html(css));assert.deepEqual(await values(),{fits:true,pad:'40px',bodyPad:'0px',clear:true})
+   assert.equal(await page.locator('.card:not(.tile) .body').evaluate(el=>getComputedStyle(el).paddingRight),'24px')
+   const correctWidth=await page.locator('.tile .title').evaluate(el=>el.getBoundingClientRect().width)
+   await page.setContent(html(css.replace(/html\[data-theme='v8'\] \.card:not\(\.row\)\[data-content-placement='below-indicator'\] \.body\s*\{[^}]*\}/,'')));assert.equal(correctWidth-await page.locator('.tile .title').evaluate(el=>el.getBoundingClientRect().width),24,'本文を丸用に24px狭める故障を検出')
+  }
+ }finally{await browser.close()}
+})
 test('本物の件数欄CSS: 20 件表示を切らず、旧幅100の故障を検出する',async()=>{
  const css=readFileSync(new URL('../../src/components/shared/select.module.css',import.meta.url),'utf8')
  const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
