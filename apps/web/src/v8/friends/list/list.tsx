@@ -36,7 +36,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast';
 import MenuPortal from '@/components/shared/menu-portal'
@@ -931,15 +931,14 @@ export default function FriendsListV8() {
 
   const pager = (
     <ListPager>
-      <span className={styles.pagerCount}>
-        {loadStatus === 'ready' ? `${formatNumber(total)}人中 ${formatNumber(rangeStart)}〜${formatNumber(rangeEnd)}人` : emptyValue('unknown')}
-      </span>
-      <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ" />
+      <Pagination page={page} pageCount={totalPages} onPageChange={setPage} disabled={loadStatus !== 'ready'} ariaLabel="友だち一覧のページ"
+        summary={loadStatus === 'ready' ? paginationSummary(total, rangeStart, rangeEnd, '人') : emptyValue('unknown')} />
     </ListPager>
   )
 
   return (
     <ListPage
+      heightMode="content"
       skeleton
       boardId="x6QsVz"
       headingSize="compact"
