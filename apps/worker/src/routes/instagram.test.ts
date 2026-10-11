@@ -21,8 +21,12 @@ const admin: AuthenticatedStaff = {
   permissionKeys: [],
 };
 const config = {
+  // Webhook の署名照合に使う Facebook アプリ側の値。接続には使わない。
   META_APP_ID: '100',
   META_APP_SECRET: 'secret_mock',
+  // 接続（Instagram直接ログイン）で使う Instagram アプリ側の値。番号は Facebook とは別。
+  INSTAGRAM_APP_ID: '200',
+  INSTAGRAM_APP_SECRET: 'ig_secret_mock',
   META_REDIRECT_URI: 'https://worker.test/api/instagram/oauth/callback',
   META_GRAPH_API_VERSION: 'v24.0',
   META_TOKEN_ENCRYPTION_KEY: btoa('x'.repeat(32)),
@@ -58,7 +62,6 @@ type Payload = {
   data: {
     url: string;
     state: string;
-    pages: Array<{ pageId: string }>;
     connection: { version: number };
     version: number;
     connected: boolean;
@@ -78,42 +81,30 @@ beforeEach(() => {
     vi.fn(async (url: URL | string) => {
       const u = new URL(String(url)),
         path = u.pathname;
-      const result = path.endsWith('/debug_token')
+      // `/oauth/access_token` を `/access_token` より先に見る。後者は前者にも当たるため、
+      // 順番を逆にすると認可コードの引き換えが長期の合鍵の形で返ってしまう。
+      const result = path.endsWith('/oauth/access_token')
         ? {
-            data: {
-              is_valid: true,
-              app_id: '100',
-              expires_at: Math.floor(Date.now() / 1000) + 60 * 86400,
-              scopes: [
-                'pages_show_list',
-                'instagram_basic',
-                'instagram_content_publish',
-              ],
-            },
+            // 認可コードの引き換え（api.instagram.com）。許可された権限と投稿先のIDは
+            // この応答にしか入っていない。
+            data: [
+              {
+                access_token: 'short_mock',
+                user_id: '20',
+                permissions:
+                  'instagram_business_basic,instagram_business_content_publish',
+              },
+            ],
           }
-        : path.endsWith('/oauth/access_token')
-          ? {
-              access_token: u.searchParams.has('code')
-                ? 'short_mock'
-                : 'long_mock',
-              expires_in: 60 * 86400,
-            }
-          : path.endsWith('/me/accounts')
-            ? {
-                data: [
-                  {
-                    id: '10',
-                    name: 'ページ',
-                    access_token: 'page_mock',
-                    instagram_business_account: { id: '20' },
-                  },
-                ],
-              }
-            : path.endsWith('/subscribed_apps')
-              ? { success: true }
-              : path.endsWith('/media')
-                ? { data: [{ id: 'post1', caption: '新着' }] }
-                : { id: '20', username: 'test_ig' };
+        : path.endsWith('/access_token') ||
+            path.endsWith('/refresh_access_token')
+          ? // 長期の合鍵への交換と、その期限延ばし（graph.instagram.com、版を付けない）
+            { access_token: 'long_mock', expires_in: 60 * 86400 }
+          : path.endsWith('/subscribed_apps')
+            ? { success: true }
+            : path.endsWith('/media')
+              ? { data: [{ id: 'post1', caption: '新着' }] }
+              : { id: '20', username: 'test_ig' };
       return Response.json(result);
     }),
   );
@@ -129,7 +120,15 @@ afterEach(() => {
 async function connect() {
   const start = await read(await req('/api/instagram/oauth/start', {}));
   const url = new URL(start.data.url);
-  expect(url.searchParams.get('scope')).toContain('instagram_content_publish');
+  // Facebookページを介さない Instagram 直接ログイン。認可画面も Instagram 側に出る。
+  expect(url.origin + url.pathname).toBe(
+    'https://www.instagram.com/oauth/authorize',
+  );
+  expect(url.searchParams.get('client_id')).toBe(config.INSTAGRAM_APP_ID);
+  expect(url.searchParams.get('response_type')).toBe('code');
+  expect(url.searchParams.get('scope')).toContain(
+    'instagram_business_content_publish',
+  );
   const state = url.searchParams.get('state')!;
   const callback = await req(
     '/api/instagram/oauth/callback?' +
@@ -154,7 +153,7 @@ it('設定なしは未設定。Metaへ接続せず画面の読取を返す', asy
   ).toBe(503);
   expect(fetch).not.toHaveBeenCalled();
 });
-it('OAuth→ページ選択→暗号化保存→更新→新着同期→切断をモックで通す', async () => {
+it('Instagramログイン→暗号化保存→更新→新着同期→切断をモックで通す', async () => {
   await connect();
   const row = db.raw
     .prepare(
@@ -162,7 +161,8 @@ it('OAuth→ページ選択→暗号化保存→更新→新着同期→切断�
     )
     .get() as Record<string, string>;
   expect(row.page_token_encrypted).toMatch(/^v1\./);
-  expect(JSON.stringify(row)).not.toContain('page_mock');
+  expect(JSON.stringify(row)).not.toContain('long_mock');
+  expect(JSON.stringify(row)).not.toContain('short_mock');
   const status = await read(await req('/api/instagram/connection'));
   expect(status.data.connection.version).toBe(1);
   expect(JSON.stringify(status)).not.toContain('token');
@@ -219,7 +219,7 @@ it('閲覧のみ・別アカウント・偽state・再利用・期限切れを�
 it('同時投稿の許可が無い古い接続は認可切れにして取り直させる', async () => {
   await connect();
   db.raw.exec(
-    "UPDATE instagram_connections SET scopes='pages_show_list,instagram_basic'",
+    "UPDATE instagram_connections SET scopes='instagram_business_basic'",
   );
   expect((await read(await req('/api/instagram/connection'))).data.state).toBe(
     'expired',
@@ -227,27 +227,40 @@ it('同時投稿の許可が無い古い接続は認可切れにして取り直�
   // 期限内でも投稿できないので、更新ではなく接続のやり直しへ回す。
   expect((await req('/api/instagram/refresh', {})).status).toBe(409);
 });
-it('ビジネスアカウントのつながったページが無ければ保存せず失敗を返す', async () => {
+/** 折り返しを1回通し、画面へ戻すURLを読む。 */
+async function callback(query: Record<string, string>) {
+  const start = await read(await req('/api/instagram/oauth/start', {}));
+  const state = new URL(start.data.url).searchParams.get('state')!;
+  const res = await req(
+    '/api/instagram/oauth/callback?' +
+      new URLSearchParams({ state, ...query }),
+  );
+  expect(res.status).toBe(302);
+  return new URL(res.headers.get('location')!);
+}
+it('投稿に使えるIDが返らなければ保存せず失敗を返す', async () => {
   const original = vi.mocked(fetch).getMockImplementation()!;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: URL | string, init?: RequestInit) => {
-      // つながっていない普通のページだけを返す＝投稿の口が無い状態。
-      if (new URL(String(url)).pathname.endsWith('/me/accounts'))
+      const path = new URL(String(url)).pathname;
+      // 投稿先の利用者IDが返らない＝プロアカウントになっていない状態。
+      if (path.endsWith('/oauth/access_token'))
         return Response.json({
-          data: [{ id: '10', name: 'ページ', access_token: 'page_mock' }],
+          data: [
+            {
+              access_token: 'short_mock',
+              permissions:
+                'instagram_business_basic,instagram_business_content_publish',
+            },
+          ],
         });
+      // プロフィール側のIDも数字で返らない。
+      if (path.endsWith('/me')) return Response.json({ username: 'test_ig' });
       return original(url, init);
     }),
   );
-  const start = await read(await req('/api/instagram/oauth/start', {}));
-  const state = new URL(start.data.url).searchParams.get('state')!;
-  const callback = await req(
-    '/api/instagram/oauth/callback?' +
-      new URLSearchParams({ state, code: 'mock_code' }),
-  );
-  expect(callback.status).toBe(302);
-  const back = new URL(callback.headers.get('location')!);
+  const back = await callback({ code: 'mock_code' });
   // 画面が見る値は従来どおり failed だけ（帯の文言は変わらない）。
   expect(back.pathname).toBe('/settings/sns');
   expect(back.searchParams.get('instagram')).toBe('failed');
@@ -255,9 +268,8 @@ it('ビジネスアカウントのつながったページが無ければ保存�
   expect(back.searchParams.get('instagram_code')).toBe(
     'instagram_business_account_required',
   );
-  expect(back.searchParams.get('instagram_pages')).toBe('1/0/1');
   expect(back.searchParams.get('instagram_scopes')).toContain(
-    'instagram_content_publish',
+    'instagram_business_content_publish',
   );
   expect(
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
@@ -266,6 +278,68 @@ it('ビジネスアカウントのつながったページが無ければ保存�
   expect(
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_oauth_states').get(),
   ).toEqual({ n: 0 });
+});
+it('同時投稿の許可を外されたまま戻ってきたら保存しない', async () => {
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string, init?: RequestInit) => {
+      // 認可画面で同時投稿の許可だけ外された場合を模す。
+      if (new URL(String(url)).pathname.endsWith('/oauth/access_token'))
+        return Response.json({
+          data: [
+            {
+              access_token: 'short_mock',
+              user_id: '20',
+              permissions: 'instagram_business_basic',
+            },
+          ],
+        });
+      return original(url, init);
+    }),
+  );
+  const back = await callback({ code: 'mock_code' });
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  expect(back.searchParams.get('instagram_code')).toBe(
+    'instagram_publish_not_granted',
+  );
+  expect(back.searchParams.get('instagram_scopes')).toBe(
+    'instagram_business_basic',
+  );
+  // 投稿できない合鍵は長期化もせず保存もしない。
+  expect(
+    db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
+  ).toEqual({ n: 0 });
+});
+it('認可画面で断られたときはMetaへ問い合わせず、やり直しへ回す', async () => {
+  const before = vi.mocked(fetch).mock.calls.length;
+  const back = await callback({
+    error: 'access_denied',
+    error_reason: 'user_denied',
+    error_description: 'The user denied your request',
+  });
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  expect(back.searchParams.get('instagram_code')).toBe(
+    'instagram_login_denied',
+  );
+  // 断られた時点で打ち切る。Meta への問い合わせは1回も増えない。
+  expect(vi.mocked(fetch).mock.calls).toHaveLength(before);
+  // Instagram 側の説明文はそのまま外へ出さない。
+  expect(back.search).not.toContain('denied your request');
+  expect(
+    db.raw.prepare('SELECT COUNT(*) n FROM instagram_oauth_states').get(),
+  ).toEqual({ n: 0 });
+});
+it('戻り先URLの末尾に付く `#_` を落として認可コードを引き換える', async () => {
+  // Instagram は成功時の戻り先に `#_` を足して返す。そのまま渡すと引き換えが失敗する。
+  const back = await callback({ code: 'mock_code#_' });
+  expect(back.searchParams.get('instagram')).toBe('connected');
+  const exchange = vi
+    .mocked(fetch)
+    .mock.calls.find(([url]) =>
+      String(url).includes('/oauth/access_token'),
+    )![1] as RequestInit;
+  expect((exchange.body as URLSearchParams).get('code')).toBe('mock_code');
 });
 async function signed(raw: string) {
   const key = await crypto.subtle.importKey(
@@ -364,7 +438,7 @@ it('Webhookの確認・署名・宛先・重複を検査し、審査前の返信
   ).toEqual({ n: 0 });
 });
 
-it('壊れた設定・署名済みの壊れた本文・偽のページ候補を外へ進めない', async () => {
+it('壊れた設定・署名済みの壊れた本文・期限切れのstateを外へ進めない', async () => {
   expect(
     instagramConfig({
       ...config,
@@ -421,7 +495,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
             // 混在した形で返してきた最悪の場合を模す。
             message:
               `Invalid request: ${String(url)} ` +
-              `client_secret=${config.META_APP_SECRET} code=mock_code ` +
+              `client_secret=${config.INSTAGRAM_APP_SECRET} code=mock_code ` +
               `access_token=${longToken} ` +
               `access_token_encoded=${doubleEncoded}`,
           },
@@ -461,6 +535,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
   // 説明文（message）自体を記録に出さないため、どの表現も残らない。
   expect(record).not.toContain('message=');
   for (const secret of [
+    config.INSTAGRAM_APP_SECRET,
     config.META_APP_SECRET,
     'mock_code',
     longToken,
@@ -474,6 +549,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
   const returned = `${location}\n${decodeURIComponent(location)}`;
   expect(location).toContain('instagram_detail=');
   for (const secret of [
+    config.INSTAGRAM_APP_SECRET,
     config.META_APP_SECRET,
     'mock_code',
     longToken,
@@ -486,7 +562,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
 
 /**
  * 戻り先URLは利用者に見える場所なので、Meta の応答から来る値をそのまま置かない。
- * Meta は応答の中身（`error.type` や `debug_token` の権限名）を自由に決められるため、
+ * Meta は応答の中身（`error.type` や引き換え応答の権限名）を自由に決められるため、
  * 「自由文ではない項目」という理由だけでは守れない。ここでは**英小文字32文字**という、
  * 合鍵のような見た目でありながら名前の形としては通ってしまう試験用の値を混ぜて、
  * 形での見分けではなく**許可一覧**が効いていることを確かめる。実在する秘密値は使わない。
@@ -500,21 +576,18 @@ it('模擬応答の種別名・権限名に秘密値のような値が混ざっ�
     vi.fn(async (url: URL | string, init?: RequestInit) => {
       const path = new URL(String(url)).pathname;
       // 許可された権限の名前に試験用の値が混ざった場合を模す。
-      if (path.endsWith('/debug_token'))
+      if (path.endsWith('/oauth/access_token'))
         return Response.json({
-          data: {
-            is_valid: true,
-            app_id: '100',
-            expires_at: Math.floor(Date.now() / 1000) + 60 * 86400,
-            scopes: [
-              'pages_show_list',
-              synthetic,
-              'instagram_content_publish',
-            ],
-          },
+          data: [
+            {
+              access_token: 'short_mock',
+              user_id: '20',
+              permissions: `instagram_business_basic,${synthetic},instagram_business_content_publish`,
+            },
+          ],
         });
       // 種別名・番号に試験用の値が混ざった場合を模す（番号は整数ですらない）。
-      if (path.endsWith('/me/accounts'))
+      if (path.endsWith('/access_token'))
         return Response.json(
           {
             error: {
@@ -554,11 +627,11 @@ it('模擬応答の種別名・権限名に秘密値のような値が混ざっ�
   expect(back.searchParams.get('instagram_code')).toBe('meta_request_failed');
   // 許可一覧に無い種別名は中身を出さず `other` に置き換える。検査を通らない番号は落とす。
   expect(back.searchParams.get('instagram_detail')).toBe(
-    'GET v24.0/me/accounts status=400 type=other',
+    'GET graph/access_token status=400 type=other',
   );
   // 許可一覧に無い権限名も中身を出さず、件数だけを添える。
   expect(back.searchParams.get('instagram_scopes')).toBe(
-    'pages_show_list,instagram_content_publish,other1',
+    'instagram_business_basic,instagram_business_content_publish,other1',
   );
   // 記録と戻り先URL（元に戻した形も）のどちらにも試験用の値は出ない。
   const returned = `${location}\n${decodeURIComponent(location)}`;
@@ -567,11 +640,11 @@ it('模擬応答の種別名・権限名に秘密値のような値が混ざっ�
   // 絞り込みは境目でも二重に効く。仮に手がかりへ自由文が入り込んでも通さない。
   expect(
     instagramUrlDetail(
-      `GET v24.0/me/accounts status=400 type=${synthetic} code=${synthetic}`,
+      `GET graph/access_token status=400 type=${synthetic} code=${synthetic}`,
     ),
-  ).toBe('GET v24.0/me/accounts status=400 type=other');
-  expect(instagramUrlScopes(`pages_show_list,${synthetic}`)).toBe(
-    'pages_show_list,other1',
+  ).toBe('GET graph/access_token status=400 type=other');
+  expect(instagramUrlScopes(`instagram_business_basic,${synthetic}`)).toBe(
+    'instagram_business_basic,other1',
   );
 });
 
@@ -626,7 +699,7 @@ it.each([
     expect(back.searchParams.get('instagram')).toBe('failed');
     expect(back.searchParams.get('instagram_code')).toBe('meta_unavailable');
     expect(back.searchParams.get('instagram_detail')).toBe(
-      `GET v24.0/oauth/access_token fetch=${expected}`,
+      `POST api/oauth/access_token fetch=${expected}`,
     );
     // 自由文（`message`）は記録にも戻り先URLにも出さない。
     const returned = `${location}\n${decodeURIComponent(location)}`;
@@ -635,9 +708,9 @@ it.each([
     // 境目でも同じ許可一覧で絞り直す。
     expect(
       instagramUrlDetail(
-        'GET v24.0/oauth/access_token fetch=abcdefabcdefabcdefabcdefabcdefab',
+        'POST api/oauth/access_token fetch=abcdefabcdefabcdefabcdefabcdefab',
       ),
-    ).toBe('GET v24.0/oauth/access_token fetch=other');
+    ).toBe('POST api/oauth/access_token fetch=other');
   },
 );
 
@@ -697,7 +770,7 @@ it('転送応答は失敗にし、転送先URLは戻り先URLと記録へ出さ�
   expect(back.searchParams.get('instagram')).toBe('failed');
   expect(back.searchParams.get('instagram_code')).toBe('meta_request_failed');
   expect(back.searchParams.get('instagram_detail')).toBe(
-    'GET v24.0/oauth/access_token redirect=302',
+    'POST api/oauth/access_token redirect=302',
   );
   const returned = `${location}\n${decodeURIComponent(location)}`;
   expect(`${returned}\n${logged.join('\n')}`).not.toContain('example.invalid');
@@ -705,9 +778,9 @@ it('転送応答は失敗にし、転送先URLは戻り先URLと記録へ出さ�
   // 境目でも状態番号だけに絞り直す。
   expect(
     instagramUrlDetail(
-      'GET v24.0/oauth/access_token redirect=302 location=https://example.invalid/x',
+      'POST api/oauth/access_token redirect=302 location=https://example.invalid/x',
     ),
-  ).toBe('GET v24.0/oauth/access_token redirect=302');
+  ).toBe('POST api/oauth/access_token redirect=302');
 });
 
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {
