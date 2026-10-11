@@ -73,7 +73,7 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     await screen.findByPlaceholderText('口コミを探す')
     await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ filter: 'all' })))
     fireEvent.click(screen.getByRole('button', { name: '状態で絞り込み' }))
-    const option = await screen.findByRole('option', { name: '状態：未返信' })
+    const option = await screen.findByRole('option', { name: '未返信' })
     fireEvent.click(option.querySelector('button')!)
     await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ filter: 'unreplied' })))
   })

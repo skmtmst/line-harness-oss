@@ -52,7 +52,7 @@ describe('統括の情報欄・対応マーク', () => {
   })
   it('対応マークの下書き保存は配布せず、削除は確認後に版付きで送る', async () => {
     mocks.list.mockResolvedValue([{ ...mark.template, friend_count: 2 }]); mocks.get.mockResolvedValue(mark); mocks.update.mockResolvedValue(mark); mocks.remove.mockResolvedValue({ archived: true })
-    render(<HqAttributes type="mark" tab="marks" onTab={vi.fn()} />); await screen.findByText('未対応'); fireEvent.click(screen.getByRole('link', { name: '未対応' })); await screen.findByRole('button', { name: '下書きを保存' }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })); await waitFor(() => expect(mocks.update).toHaveBeenCalledWith('mark-one', expect.objectContaining({ expectedRevision: 4 }))); await screen.findByText('未対応'); expect(screen.queryByText('保存しました。アカウントに配りますか？')).toBeNull()
+    render(<HqAttributes type="mark" tab="marks" onTab={vi.fn()} />); await screen.findByText('未対応'); fireEvent.click(await screen.findByRole('link', { name: '未対応' })); await screen.findByRole('button', { name: '下書きを保存' }); fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })); await waitFor(() => expect(mocks.update).toHaveBeenCalledWith('mark-one', expect.objectContaining({ expectedRevision: 4 }))); await screen.findByRole('button', { name: '対応マーク「未対応」の操作' }); expect(screen.queryByText('保存しました。アカウントに配りますか？')).toBeNull()
     fireEvent.click(await screen.findByRole('button', { name: '対応マーク「未対応」の操作' })); fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })); expect(mocks.remove).not.toHaveBeenCalled(); fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '削除する' })); await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith('mark-one', 4))
   })
   it('並び替えは既存PATCHで順序と読んだ版を保存する', async () => {
@@ -79,7 +79,7 @@ describe('統括の情報欄・対応マーク', () => {
   it('マーク編集のキャンセルは未保存の変更を確認し、断ると入力を残す', async () => {
     mocks.list.mockResolvedValue([mark.template]); mocks.get.mockResolvedValue(mark)
     render(<HqAttributes type="mark" tab="marks" onTab={vi.fn()} />)
-    await screen.findByText('未対応'); fireEvent.click(screen.getByRole('link', { name: '未対応' }))
+    await screen.findByText('未対応'); fireEvent.click(await screen.findByRole('link', { name: '未対応' }))
     const name = await screen.findByRole('textbox', { name: /マーク名/ })
     fireEvent.change(name, { target: { value: '名前を変更' } }); fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     const dialog = screen.getByRole('dialog')

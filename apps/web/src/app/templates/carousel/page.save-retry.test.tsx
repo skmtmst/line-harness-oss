@@ -271,7 +271,7 @@ describe('N-149: 保存に失敗しても下書きを保持して再試行でき
       fireEvent.click(screen.getByLabelText('カード1のボタン1の動き'))
     })
     await settle()
-    await act(async () => { fireEvent.click(within(screen.getByRole('listbox')).getByRole('button', { name: '動きを実行する' })) })
+    await act(async () => { fireEvent.click(within(screen.getByRole('listbox')).getByRole('option', { name: '動きを実行する' }).querySelector('button')!) })
     await settle()
 
     await act(async () => { click(saveButton()!) })

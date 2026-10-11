@@ -40,7 +40,7 @@ it('名前の誤りは欄だけに出し、処理の誤りは設定を開いて�
   fireEvent.click(save)
   const tag = await screen.findByRole('button', { name: '自動化で付けるタグ：選ぶ' })
   await waitFor(() => expect(document.activeElement).toBe(tag))
-  expect(tag.closest('[data-invalid]')).toBeTruthy()
+  expect(tag.getAttribute('aria-invalid')).toBe('true')
   expect(screen.getAllByText('付けるタグを選んでください')).toHaveLength(1)
   expect(createDraft).not.toHaveBeenCalled()
 })
