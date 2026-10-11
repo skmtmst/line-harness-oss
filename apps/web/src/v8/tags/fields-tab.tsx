@@ -25,7 +25,8 @@ import { withViewTransition } from '@/components/shared/view-transition';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
-import Pagination from '@/components/shared/pagination'
+import { ListPager } from '@/components/templates/list-page'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
@@ -43,7 +44,6 @@ import type { AttributeListHost } from './attribute-host';
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
-import { ListPager } from '@/components/templates/list-page';
 import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import Notice from '@/components/shared/notice'
 
@@ -469,14 +469,10 @@ export default function FieldsTab({ accountId, canEdit, narrow = false, host }: 
         </tbody>
       </DataTable>
 
-      {pages > 1 ? (
-        <ListPager>
-          <span className={styles.pagerCount}>
-            {`${visible.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)} 件`}
-          </span>
-          <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="友だち情報欄のページ送り" />
-        </ListPager>
-      ) : null}
+      <ListPager>
+        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="友だち情報欄のページ送り"
+          summary={paginationSummary(visible.length, (currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, visible.length))} />
+      </ListPager>
 
     </DelayedSkeleton>
   )

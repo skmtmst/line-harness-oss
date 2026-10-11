@@ -26,7 +26,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import Pagination from '@/components/shared/pagination'
+import { ListPager } from '@/components/templates/list-page'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
@@ -423,14 +424,10 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
         </tbody>
       </DataTable>
 
-      {pages > 1 ? (
-        <div className={styles.pager}>
-          <span className={styles.pagerCount}>
-            {`${filteredList.length} 件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, filteredList.length)} 件`}
-          </span>
-          <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り" />
-        </div>
-      ) : null}
+      <ListPager>
+        <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="保存した検索のページ送り"
+          summary={paginationSummary(filteredList.length, (currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, filteredList.length))} />
+      </ListPager>
 
     </DelayedSkeleton>
   )
