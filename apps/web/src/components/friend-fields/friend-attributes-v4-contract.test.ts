@@ -163,7 +163,7 @@ describe('タグ V4 contract', () => {
       read('components/friend-fields/edit-tag-page-v4.tsx'),
       (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')),
       (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx')),
-      read('components/friend-fields/saved-search-list.tsx'),
+      (read('v8/tags/searches-tab.tsx') + read('components/friend-fields/saved-search-list.tsx')),
     ]
     for (const source of sources) {
       expect(source).not.toMatch(/\bconfirm\s*\(/)

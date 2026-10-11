@@ -91,7 +91,6 @@ const BASELINE: Record<string, number> = {
   'v8/events/edit-form.tsx': 5,
   'components/friend-fields/edit-tag-page-v4.tsx': 1,
   'components/friend-fields/new-tag-page-v4.tsx': 1,
-  'components/friend-fields/saved-search-list.tsx': 2,
   'components/friend-fields/tag-csv-import-dialog.tsx': 2,
   'components/friend-fields/tags-page-v4.tsx': 3,
   'components/friends/advanced-search-dialog.tsx': 1,

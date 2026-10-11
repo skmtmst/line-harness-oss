@@ -89,7 +89,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import FriendFieldList from '@/v8/tags/fields-tab'
-import SavedSearchList from './saved-search-list'
+import SavedSearchList from '@/v8/tags/searches-tab'
 
 let host: HTMLDivElement
 let root: Root
@@ -155,7 +155,7 @@ describe('PERF-14: 一覧は補助取得を待たない', () => {
     calls.tagsList.mockReturnValue(tags.promise)
     calls.marksList.mockReturnValue(marks.promise)
     calls.scenariosList.mockReturnValue(scenarios.promise)
-    await render(React.createElement(SavedSearchList, { accountId: 'a1' }))
+    await render(React.createElement(SavedSearchList, { canEdit: true, accountId: 'a1' }))
     expect(host.textContent).toContain('検索A')
     expect(host.textContent).not.toContain('保存した検索を読み込めませんでした')
     tags.resolve({ success: true, data: [] })

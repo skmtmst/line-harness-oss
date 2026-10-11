@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { balanced, between, withoutComments } from './design-fit-slice'
-import { filterSavedSearches } from './saved-search-kpis'
+import { filterSavedSearches, savedSearchKpiValues } from './saved-search-kpis'
 
 /*
  * 設計 `hqrOv` `rIhbN` `QKx8Q` `sfTEW` `XBkiQ` の直しを見張る。
@@ -22,7 +22,7 @@ const readWeb = (relative: string) =>
   readUiSource(path.resolve(ROOT, '../../..', relative), 'utf8')
 
 const MARK_LIST = readWeb('src/v8/tags/marks-tab.tsx') + read('mark-list.tsx')
-const SAVED_LIST = read('saved-search-list.tsx')
+const SAVED_LIST = readWeb('src/v8/tags/searches-tab.tsx') + read('saved-search-list.tsx')
 const FIELD_LIST = readWeb('src/v8/tags/fields-tab.tsx') + read('field-list.tsx')
 const TAG_EDITOR = read('tag-editor-v4.tsx')
 const CSV_DIALOG = read('tag-csv-import-dialog.tsx')
@@ -35,6 +35,8 @@ describe('切り出しの道具そのもの', () => {
     expect(withoutComments(source)).toContain('使用先')
     // 行の途中の `//` は消さない。URLまで切ってしまう。
     expect(withoutComments(source)).toContain('https://example.com')
+    // 関数の冒頭の注釈から、後ろのJSX注釈まで本文ごと消さない。
+    expect(withoutComments('function f() { /* 説明 */ return visible.map(fn) }\n{/* 図 */}')).toContain('return visible.map(fn)')
   })
 
   it('入れ子の波括弧を数えて、関数の本体だけを返す', () => {
@@ -99,22 +101,24 @@ describe('QKx8Q 保存した検索の一覧', () => {
   })
 
   it('設計の3つの絞り込みと表の列を画面に置き、絞った結果を一覧に渡す', () => {
-    const toolbar = between(SAVED_LIST, 'type="search"', '<span className="flex-1"')
-    expect(toolbar).toContain('placeholder="条件名で検索"')
-    expect(toolbar).toContain('使用先：すべて')
+    const toolbar = between(SAVED_LIST, 'toolbar={<>', '<span className={styles.toolbarSpacer}')
+    expect(toolbar).toContain('placeholder="条件名で探す"')
+    expect(toolbar).toContain('使っている所：すべて')
     expect(toolbar).toContain('該当人数：すべて')
     expect(toolbar).toContain('setUsageFilter')
     expect(toolbar).toContain('setMatchFilter')
-    expect(SAVED_LIST).toContain('<Th className="w-1/4 px-3 py-3">条件の要約</Th>')
-    expect(SAVED_LIST).toContain('<Th className="w-1/6 px-3 py-3">使用先</Th>')
+    expect(SAVED_LIST).toContain('<Th className={styles.searchColName}>条件名・内容</Th>')
+    expect(SAVED_LIST).toContain('<Th className={styles.searchColUsage}>使っている所</Th>')
     expect(withoutComments(SAVED_LIST)).toContain('{visible.map((search)')
     expect(withoutComments(SAVED_LIST)).not.toContain('{items.map((search)')
   })
 
   it('読めていないときに「0 / 50 件」と書かない', () => {
-    const limitNote = between(SAVED_LIST, '{ready\n', '</p>')
-    expect(limitNote).toContain('ready')
-    expect(limitNote).toContain('いまの件数は読み込めていません')
+    expect(SAVED_LIST).toContain('const ready = Boolean(accountId) && !loading && !loadError && !forbidden')
+    expect(SAVED_LIST).toContain('savedSearchKpiValues(items, ready)')
+    expect(SAVED_LIST).toContain('value: kpis.total')
+    expect(savedSearchKpiValues([], false).total).toBeNull()
+    expect(SAVED_LIST).not.toContain('0 / 50 件')
   })
 })
 

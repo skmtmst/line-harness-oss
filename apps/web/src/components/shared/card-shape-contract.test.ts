@@ -106,7 +106,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/forms/form-preview.tsx", "className=\"rounded-card border-hairline border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["components/forms/hq-form-definition-editor.tsx", "className=\"rounded-card border border-dashed border-hairline bg-canvas p-8 text-center text-sm text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/friend-fields/mark-list.tsx", "className=\"flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
-  ["components/friend-fields/saved-search-list.tsx", "className=\"bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/friend-fields/tag-editor-v4.tsx", "className=\"relative w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-overlay\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["components/friend-fields/tags-page-v4.tsx", "className=\"relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-overlay\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["components/friends/single-friend-actions.tsx", "className=\"bg-canvas rounded-card border-hairline mt-2 border p-3\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
