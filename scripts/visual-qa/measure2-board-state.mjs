@@ -8,6 +8,8 @@ const createTemplate = (kind) => ({
 
 export const BOARD_STATE_PROFILES = {
   iN6np: { url: '/broadcasts/new?step=message' },
+  pIHp3: { url: '/hq/broadcasts/new?step=message' },
+  M2tJM: { url: '/hq/broadcasts/detail?id=hq-run-sent' },
   HfK0O: createTemplate('メッセージ'),
   SDSsr: createTemplate('カルーセル'),
   IY3nx: createTemplate('質問'),
