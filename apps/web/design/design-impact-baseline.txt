@@ -83,7 +83,7 @@ shared-button-importer app/ec-commerce/order-detail-drawer.tsx
 shared-button-importer app/ec-commerce/page.tsx
 shared-button-importer app/ec-commerce/subscriptions-panel.tsx
 shared-button-importer app/emergency/control-v8.tsx
-shared-button-importer app/events/preview/page.tsx
+shared-button-importer v8/events/preview.tsx
 shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
 shared-button-importer app/friend-add-settings/publish/done-v8.tsx
 shared-button-importer app/friend-add-settings/runs/detail/detail-v8.tsx
