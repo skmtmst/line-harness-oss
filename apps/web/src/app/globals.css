@@ -1617,7 +1617,7 @@
   --tpl-sa-ring: inset 0 0 0 1px var(--color-hairline); --tpl-sa-ring-ink: inset 0 0 0 1px var(--color-ink); --tpl-sa-ring-mark: inset 0 0 0 var(--tpl-sa-mark-line) var(--color-hairline);
   --tpl-sa-line-top: inset 0 1px 0 var(--color-hairline); --tpl-sa-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-sa-line-bottom-soft: inset 0 -1px 0 var(--color-divider); --tpl-sa-line-left: inset 1px 0 0 var(--color-hairline); --tpl-sa-staff-guide-gap: 10px; --tpl-sa-staff-guide-chip-w: 80px;
   --tpl-sa-acc-head-pad: 9px 16px; --tpl-sa-acc-row-pad: 10px 16px; --tpl-sa-acc-gap: 14px; --tpl-sa-acc-conn-w: 120px; --tpl-sa-acc-hook-w: 100px; --tpl-sa-acc-friends-w: 80px; --tpl-sa-acc-friends-pad: 12px; --tpl-sa-acc-default-w: 56px; --tpl-sa-acc-parent-w: 120px; --tpl-sa-acc-menu-w: 36px;
-  --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 28px; --tpl-settings-content-gap: 16px;
+  --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 24px; --tpl-settings-content-gap: 16px;
   --tpl-settings-gap: 16px;
   /* ★V8 設定の板（機能設定・マニュアルの正本表・ファイルの検査・運用状態・EC連携・LINE通知）。sb の作業役が足した値。 */
   --tpl-sb-nav-w: 183px; --tpl-sb-head-gap: 8px; --tpl-sb-head-pad-bottom: 16px; --tpl-sb-desc-size: var(--polish-text-body); --tpl-sb-desc-lh: 17px; --tpl-sb-footer-side: 12px;

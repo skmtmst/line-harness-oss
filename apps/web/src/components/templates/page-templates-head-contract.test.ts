@@ -38,7 +38,7 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-detail-content-gap', '20px'],
       ['--tpl-footer-pad-block', '12px'], ['--tpl-footer-pad-side', '24px'], ['--tpl-footer-gap', '8px'],
       ['--tpl-settings-nav-width', '208px'], ['--tpl-settings-nav-pad-block', '16px'], ['--tpl-settings-nav-pad-side', '12px'],
-      ['--tpl-settings-content-pad-block', '24px'], ['--tpl-settings-content-pad-side', '28px'], ['--tpl-settings-content-gap', '16px'],
+      ['--tpl-settings-content-pad-block', '24px'], ['--tpl-settings-content-pad-side', '24px'], ['--tpl-settings-content-gap', '16px'],
       ['--tpl-settings-gap', '16px'],
       ['--tpl-inbox-list-width', '372px'], ['--tpl-inbox-summary-width', '320px'],
       ['--tpl-inbox-summary-pad', '20px'], ['--tpl-inbox-summary-gap', '16px'],
