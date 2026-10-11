@@ -81,10 +81,11 @@ describe('表の外側の余白の洗い出し', () => {
   })
 
   it('/rich-menus：外側は px-5、操作列はボタン幅で固定', () => {
-    const body = code(read('app', 'rich-menus', 'page.tsx'))
-    expect(body).toContain("width: '12rem'")
-    expect(body).toContain('<Th className="pl-5">メニュー</Th>')
-    expect(body).toContain('sticky right-0 pr-5">操作')
+    const body = code(read('v8', 'rich-menus', 'list.tsx'))
+    expect(body).toContain('className={styles.menuCell}')
+    const css = read('v8', 'rich-menus', 'list.module.css')
+    expect(css).toContain('.colMenu { width: var(--tpl-rml-col-menu); }')
+    expect(css).toContain('justify-content: flex-end')
   })
 
   it('/ec-commerce：操作列は中身の幅で固定', () => {

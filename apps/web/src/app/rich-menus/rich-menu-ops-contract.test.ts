@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST_PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const PUBLISH_HISTORY = readFileSync(join(HERE, 'edit', 'publish-history.tsx'), 'utf8')
 const TEST_APPLY = readFileSync(join(HERE, 'edit', 'test-apply-section.tsx'), 'utf8')
@@ -18,7 +18,7 @@ const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 /** #898 / N-163: ボタン名でも見つかる検索 */
 describe('一覧の検索はボタン名にも当たる', () => {
   it('案内文が「メニュー名・ボタン名」になっている', () => {
-    expect(LIST_PAGE).toContain('メニュー名・ボタン名で検索')
+    expect(LIST_PAGE).toContain('メニュー名・ボタン名で探す')
   })
 })
 
@@ -74,13 +74,13 @@ describe('本人LINEへのテスト適用', () => {
 
 /** #902 / N-154: 下書き複製 */
 describe('一覧と編集からの複製', () => {
-  it('一覧の各行に複製があり、確認ダイアログ経由で作成→編集へ進む', () => {
-    expect(LIST_PAGE).toContain('setDuplicateTarget')
+  it('行の複製は二重実行を防ぎ、再取得した一覧に結果を示す', () => {
+    expect(LIST_PAGE).toContain('duplicateLock.current = true')
     expect(LIST_PAGE).toContain('api.richMenuGroups.duplicate')
     expect(LIST_PAGE).toContain('confirmDuplicate')
     // 確認なしの即実行ではない
     expect(LIST_PAGE).toContain('複製')
-    expect(LIST_PAGE).toContain('router.push(`/rich-menus/edit?id=${res.data.id}`)')
+    expect(LIST_PAGE).toContain('duplicateFeedback.mark(duplicateTarget.id, res.data.id)')
   })
 
   it('編集画面にも複製がある', () => {

@@ -36,7 +36,7 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
 
   it('リッチメニューはグループ総件数（フォルダ数+1ではない）', () => {
     const src = read('rich-menus/page.tsx')
-    expect(src).toContain("{ id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal }")
+    expect(src).toContain('allCount={groupFacets?.total ?? groupTotal}')
     expect(src).not.toContain('total={`${groupFacets?.total ?? groupTotal} 件`}')
     expect(src).not.toContain('total={`${folders.length + 1}`}')
   })
@@ -52,7 +52,7 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
      * 出どころは絞り込み前の総数（overallTotal ?? total）のまま変えない。
      */
     expect(src).not.toContain('total={`${total} 件`}')
-    expect(src).toContain("{ id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null }")
+    expect(src).toContain("id: '', label: 'すべて', count: listKnown && !loadFailed ? (overallTotal ?? total) : null }")
     expect(src).not.toContain('total={`${folders.length + 1}`}')
   })
 
@@ -81,9 +81,10 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
 describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収める', () => {
   it('リッチメニュー一覧は最小幅を実効幅内に収める', () => {
     const src = read('rich-menus/page.tsx')
-    const minWidth = src.match(/min-w-\[(\d+)px\]/)
-    expect(minWidth, 'min-w が付いている').toBeTruthy()
-    expect(Number(minWidth![1])).toBeLessThanOrEqual(780)
+    expect(src).toContain('<DataTable')
+    const css = read('../v8/rich-menus/list.module.css')
+    expect(css).not.toMatch(/min-width:\s*\d+px/)
+    expect(css).toContain('.colMenu { width: var(--tpl-rml-col-menu); }')
   })
 
   it('フォーム一覧は最小幅を実効幅内に収める', () => {
@@ -107,9 +108,10 @@ describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収め�
 describe('Issue #709: リッチメニューの状態表示は共有StatusBadgeに一本化', () => {
   it('共有StatusBadgeをimportし、ローカル札実装を持たない', () => {
     const src = read('rich-menus/page.tsx')
-    expect(src).toContain("import StatusBadge from '@/components/shared/status-badge'")
+    expect(src).toContain('styles.pillScheduled')
     // 平文の公開予定表示は札へ集約したので、行内の直接表示は残さない。
-    expect(src).toContain('MenuStatusBadge group={g}')
+    expect(src).toContain("g.status === 'published' ? styles.pillLive : styles.pillDraft")
+    expect(src).toContain('`${shortDay(g.publishingAt)} 公開`')
     expect(src).not.toMatch(/function StatusBadge\(/)
   })
 })

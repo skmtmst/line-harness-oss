@@ -41,8 +41,12 @@ describe('m22b 表の左右の余白（共通部品）', () => {
 describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
 
   it('/common-actions：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = read('app', 'common-actions', 'page.tsx')
-    expect(body).toContain('relative flex w-full items-center justify-end gap-1.5')
+    const body = read('v8', 'automations', 'common-actions.tsx')
+    expect(body).toContain('<Td className={styles.colOps}')
+    expect(body).toContain('className={styles.opsBox}')
+    const css = read('v8', 'automations', 'common-actions.module.css')
+    expect(css).toContain('.colOps { width: var(--tpl-am-run-col-ops); flex-shrink: 0; }')
+    expect(css).toMatch(/\.opsBox[^}]*display: flex;[^}]*align-items: center;/)
   })
 
   it('/affiliate-offers（案件タブ）：操作は右端にそろえる', () => {
@@ -61,13 +65,15 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
   })
 
   it('/rich-menus：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = read('app', 'rich-menus', 'page.tsx')
-    expect(body).toContain('relative flex w-full items-center justify-end gap-1.5')
+    const body = read('v8', 'rich-menus', 'list.tsx')
+    expect(body).toContain('className={styles.menuBox}')
+    expect(read('v8', 'rich-menus', 'list.module.css')).toMatch(/\.menuBox[^}]*justify-content: flex-end/)
   })
 
   it('/contents/vars：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = read('app', 'contents', 'vars', 'page.tsx')
-    expect(body).toContain('flex w-full items-center justify-end gap-2')
+    const body = read('v8', 'common-vars', 'list.tsx')
+    expect(body).toContain('className={styles.menuBox}')
+    expect(read('v8', 'common-vars', 'list.module.css')).toMatch(/\.menuBox[^}]*justify-content: flex-end/)
   })
 
   it('/tags：操作列は中身＋共通の余白に広げる', () => {
@@ -92,9 +98,9 @@ describe('m22b 表の左右の余白（文字だけのセルを包む）', () =>
   })
 
   it('/duplicates：先頭の文字を包む', () => {
-    const body = read('app', 'duplicates', 'page.tsx')
-    expect(body).toContain('<span className="block truncate">{candidate.left.label}')
-    expect(body).toContain('<span className="block truncate">{row.accountName}</span>')
+    const body = read('v8', 'friends', 'duplicates', 'list.tsx')
+    expect(body).toContain('className={styles.cellText}')
+    expect(body).toContain('title={row.accountName}>{row.accountName}</span>')
   })
 
   it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {

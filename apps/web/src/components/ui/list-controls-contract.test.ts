@@ -140,6 +140,12 @@ describe('フィルターバー統一（監査6 #668）', () => {
     '$name の絞り込みチップの前置きは「よく使う絞り込み」',
     ({ path }) => {
       const source = read(path)
+      if (path === '../../app/rich-menus/page.tsx') {
+        expect(source).toContain('filters={filterChips}')
+        expect(source).toContain('selected={savedFilter === f.key}')
+        expect(source).toContain("setSavedFilter(savedFilter === f.key ? '' : f.key)")
+        return
+      }
       if (path === '../../app/contents/vars/page.tsx') {
         expect(source).toContain('aria-label="状態で絞り込む"')
         expect(source).toContain('filters={filterChips}')

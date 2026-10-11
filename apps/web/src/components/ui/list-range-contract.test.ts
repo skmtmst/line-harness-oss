@@ -59,7 +59,12 @@ describe('ListRange 統一（監査6 #667）', () => {
     '$name は ListRange を呼ぶ',
     ({ path }) => {
       const source = read(path)
-      if (path === '../../v8/webhooks/interactions.tsx') {
+      if (path === '../../app/rich-menus/page.tsx') {
+        expect(source).toContain('(currentPage - 1) * pageSize + 1')
+        expect(source).toContain('Math.min(currentPage * pageSize, groupTotal)')
+        expect(source).toContain('formatNumber(groupTotal)')
+        expect(source).toContain('pageCount > 1')
+      } else if (path === '../../v8/webhooks/interactions.tsx') {
         expect(source).toContain('`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`')
         expect(source).toContain('data.total === 0 ? 0 : (data.page - 1) * data.limit + 1')
       } else if (path === '../../v8/automations/runs.tsx') {

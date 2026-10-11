@@ -3,7 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/rich-menus/connections.tsx'), 'utf8')
-const LIST = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
+const LIST = fs.readFileSync(path.join(__dirname, '../../../v8/rich-menus/list.tsx'), 'utf8')
 
 describe('V8 リッチメニューの切替つながり', () => {
   it('現役の板へ同じ実データから切替先の有無を描く', () => {

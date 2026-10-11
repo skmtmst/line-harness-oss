@@ -40,14 +40,15 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
   })
   it.each(GRID_PAGES)('%s は共通幅を使う', (relativePath) => {
     const page = readFileSync(resolve(APP, relativePath), 'utf8')
-    expect(page).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
-    expect(page).toContain('style={FOLDER_RAIL_STYLE}')
+    expect(page).toMatch(/<ListPage[\s\S]*?folders=\{/)
+    const css = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
+    expect(css).toContain('width: var(--tpl-folder-width)')
     expect(page).not.toContain('lg:grid-cols-[16rem_minmax(0,1fr)]')
   })
 
   it.each(GRID_PAGES)('%s は追加操作をフォルダ欄へ渡す', (relativePath) => {
     const page = readFileSync(resolve(APP, relativePath), 'utf8')
-    expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)/)
+    expect(page).toMatch(/<ManagedFolderPanel[\s\S]*?canManage=\{canEdit\}/)
   })
 
   it.each(V8_FOLDER_PAGES)('%s は共通の FolderPanel（ManagedFolderPanel）と追加操作を使う', (relativePath) => {
