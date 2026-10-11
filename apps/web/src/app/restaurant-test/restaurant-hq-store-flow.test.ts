@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 // 旧一覧の転送の部品（stores/store-list.tsx）はどこからも読まれないので 2026-10-07 に消した。転送は stores/page.tsx の redirect が担う。
 const wizard = readFileSync(new URL('../../v8/restaurant/store-new/store-new.tsx', import.meta.url), 'utf8')
 const terms = readFileSync(new URL('../../v8/restaurant/terms/terms.tsx', import.meta.url), 'utf8')
-const banner = readFileSync(new URL('./stores/store-context-banner.tsx', import.meta.url), 'utf8')
+const menu = readFileSync(new URL('../../components/hq/account-menu.tsx', import.meta.url), 'utf8')
 const index = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const storesPage = readFileSync(new URL('./stores/page.tsx', import.meta.url), 'utf8')
 const accountsPage = readFileSync(new URL('../accounts/page.tsx', import.meta.url), 'utf8')
@@ -39,10 +39,10 @@ describe('飲食店向けHQと店舗追加動線', () => {
   it('URLへ店舗識別子を付けず、サーバーセッションAPIで切り替える', () => {
     expect(api).toContain('selectStore:')
     expect(api).toContain('clearStoreSelection:')
-    expect(banner).toContain('を表示しています')
-    expect(banner).toContain('統括に戻る')
-    expect(banner).toContain("router.push('/hq')")
-    expect(banner).not.toContain('?store=')
+    expect(menu).toContain('統括に戻る')
+    expect(menu).toContain('restaurantTestApi.clearStoreSelection(selectedAccountId)')
+    expect(menu).toContain("router.push('/hq')")
+    expect(menu).not.toContain('?store=')
   })
 
   it('規約同意を先頭にした5ステップで、資格情報は2項目だけ入力する', () => {

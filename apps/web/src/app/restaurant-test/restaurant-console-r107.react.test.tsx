@@ -7,7 +7,6 @@ const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), updateMembership: vi.fn()
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/components/layout/header', () => ({ default: () => null }))
-vi.mock('./stores/store-context-banner', () => ({ default: () => null }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 
 import Tables from '@/v8/restaurant/tables/tables'

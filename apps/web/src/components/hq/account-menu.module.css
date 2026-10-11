@@ -1,6 +1,6 @@
 /*
  * ★V8 左下の自分とメニュー（絵 V8.pen `zUg8S/T7XSI6/shBJJ`・開いた形 `ZBjxY/Xn3xt`）。
- * v8 の左メニューの中でだけ使う（v7 の統括は `HqAccountMenu` のまま）。
+ * 店と統括の左メニューで使う。
  */
 .root {
   flex-shrink: 0;

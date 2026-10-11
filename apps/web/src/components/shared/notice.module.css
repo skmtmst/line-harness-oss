@@ -114,8 +114,6 @@
 }
 :root .info { background: var(--color-status-info-soft); }
 :root .info .icon { color: var(--color-status-info); }
-:root .infoIconV8 { display: block; }
-:root .infoIconV7 { display: none; }
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 :root .notice { -webkit-font-smoothing: auto; }
