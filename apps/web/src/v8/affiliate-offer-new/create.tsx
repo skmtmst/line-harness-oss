@@ -27,6 +27,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import Card from '@/components/shared/card'
 
 /*
  * ★V8-B 案件を作る（絵 Td4TN・機能追加 F-23）。
@@ -235,7 +236,7 @@ export default function AffiliateOfferCreateV8() {
 
   const preview = (
     <>
-      <section className={styles.sideCard} aria-labelledby="af-new-preview">
+      <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-labelledby="af-new-preview">
         <h2 className={styles.sideTitle} id="af-new-preview">アフィリエイターの画面での見え方</h2>
         <p className={styles.sideNote}>公開するとこう見えます</p>
         <div className={styles.previewBox}>
@@ -243,19 +244,20 @@ export default function AffiliateOfferCreateV8() {
           {description.trim() ? <p className={styles.previewDesc}>{description.trim()}</p> : null}
           <p className={styles.previewReward}>{`報酬 ¥${formatNumber(yen)}${miles > 0 ? ` ＋ ${formatNumber(miles)}マイル` : ''} / 件`}</p>
         </div>
-      </section>
-      <section className={styles.sideCard} aria-labelledby="af-new-care">
+      </Card>
+      <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-labelledby="af-new-care">
         <h2 className={styles.sideTitle} id="af-new-care">気をつけること</h2>
         <ul className={styles.careList}>
           <li>・公開中の案件の報酬額を変えると、変えたあとの成果から新しい額になります</li>
           <li>{`・紹介リンクを開いた方は「${selectedAccount ? selectedAccount.name : '上部で選んだLINEアカウント'}」へ案内します。ほかのアカウントに作るときは、先に上部で切り替えてください`}</li>
         </ul>
-      </section>
+      </Card>
     </>
   )
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
+      hidePreviewWhenNarrow
       boardId="Td4TN"
 
       title="案件を作る"
@@ -283,7 +285,7 @@ export default function AffiliateOfferCreateV8() {
       {saveNote ? <p className={styles.note} role="status">{saveNote}</p> : null}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
-      <section className={styles.card} aria-labelledby="af-new-what">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="af-new-what">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="af-new-what">どんな案件か</h2>
           <p className={styles.cardNote}>アフィリエイターの画面に出ます</p>
@@ -291,9 +293,9 @@ export default function AffiliateOfferCreateV8() {
         <div className={styles.field}><Field label="案件名" htmlFor="of-name"><SaveErrorField names={["name"]}><TextField {...fields.bind('name')} invalid={fields.invalid('name')} aria-describedby={describedBy('name')} id="of-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="例：定期便の初回" maxLength={120} readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-name-error">{fields.error('name')}</FieldError></Field></div>
         <div className={styles.field}><Field label="説明" htmlFor="of-description"><SaveErrorField names={["description"]}><TextField id="of-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：初回の定期便をお申し込みいただいた方が対象です。" maxLength={500} readOnly={!canEdit} /></SaveErrorField></Field></div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="af-new-point">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="af-new-point">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="af-new-point">何を成果として数えるか</h2>
           <p className={styles.cardNote}>コンバージョンで作った成果地点から選びます</p>
@@ -315,9 +317,9 @@ export default function AffiliateOfferCreateV8() {
             />
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="af-new-reward">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="af-new-reward">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="af-new-reward">いくら払うか</h2>
           <p className={styles.cardNote}>アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
@@ -328,9 +330,9 @@ export default function AffiliateOfferCreateV8() {
           <div className={styles.field}><Field label="マイル" htmlFor="of-miles" help={<>現金とマイルは併用できます。マイルは標準プログラムで付けます。</>}><SaveErrorField names={["rewardMiles","reward_miles"]}><NumberInput {...fields.bind('miles')} invalid={fields.invalid('miles')} aria-describedby={describedBy('miles')} id="of-miles" type="number" min={0} step={1} value={rewardMiles} onChange={(event) => setRewardMiles(event.target.value)} placeholder="200" readOnly={!canEdit} /></SaveErrorField>
 <FieldError id="of-miles-error">{fields.error('miles')}</FieldError></Field></div>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="af-new-after">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="af-new-after">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="af-new-after">成果を認めたときにすること</h2>
           <p className={styles.cardNote}>任意</p>
@@ -389,7 +391,7 @@ export default function AffiliateOfferCreateV8() {
             {scenariosFetch === 'failed' ? retry('シナリオ') : null}
           </div>
         </div>
-      </section>
+      </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した案件" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage></SaveErrorScope>

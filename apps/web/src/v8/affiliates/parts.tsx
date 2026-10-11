@@ -6,11 +6,10 @@ import { type ReactNode } from 'react'
 import { Bookmark } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
-import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import styles from './affiliates.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -35,10 +34,10 @@ export function SavedSelect({
   onChange: (value: string) => void
 }) {
   return (
-    <div className={styles.savedBox}>
+    <ListToolbarOptional compact label="保存した絞り込み"><div className={styles.savedBox}>
       <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
       <SaveErrorField names={["value"]}><Select aria-label="よく使う絞り込み" value={value} options={options} onChange={onChange} /></SaveErrorField>
-    </div>
+    </div></ListToolbarOptional>
   )
 }
 
@@ -94,44 +93,17 @@ export interface AffiliateToolbarProps {
   narrowLead?: ReactNode
 }
 
-/**
- * 道具の段。広い板は型の道具（ListToolbar）を1段、1152 の板は
- * 「作る・フォルダ・探す」→「札 … 右の道具」の2段。部品は同じ。
- */
-export function AffiliateToolbar({ narrow, notices, search, chips, trailing, narrowLead }: AffiliateToolbarProps) {
-  if (narrow) {
-    return (
-      <div className={styles.narrowTools}>
-        {notices}
-        <div className={styles.narrowRow}>
-          {narrowLead}
-          <div className={styles.narrowSearch}>
-            <SearchField
-              aria-label={search.placeholder}
-              placeholder={search.placeholder}
-              value={search.value}
-              onChange={search.onChange}
-              onClear={() => search.onChange('')}
-            />
-          </div>
-        </div>
-        <div className={styles.narrowRow}>
-          {chips}
-          <span className={styles.spacer} aria-hidden="true" />
-          {trailing}
-        </div>
-      </div>
-    )
-  }
+/** 道具は1段。狭い板の作成・フォルダはListPageの畳んだ口へ任せる。 */
+export function AffiliateToolbar({ notices, search, chips, trailing }: AffiliateToolbarProps) {
   return (
-    <>
+    <div className={styles.wideTools}>
       {notices}
       <ListToolbar
         search={{ placeholder: search.placeholder, value: search.value, width: 240, onChange: search.onChange }}
         filters={chips}
         trailing={trailing}
       />
-    </>
+    </div>
   )
 }
 

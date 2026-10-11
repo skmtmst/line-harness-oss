@@ -907,7 +907,7 @@
   --tpl-head-pad-top: var(--polish-space-section); --tpl-head-pad-side: var(--polish-space-section); --tpl-head-pad-bottom: var(--polish-space-field);
   /* 成果とアフィリエイトの V8（nJlxX・KdFRI・v9JWQ・h7dmB・OylSV・aINnz・Eo56k・tnTn9）。表は絵の列の並び（見出し 13/20・欄の間16）。 */
   --tpl-af-col-gap: 16px; --tpl-af-head-h: var(--polish-table-head); --tpl-af-head-pad: 13px 20px; --tpl-af-row-h: var(--polish-table-row); --tpl-af-row-pad: 9px 20px;
-  --tpl-af-col-check: 24px; --tpl-af-col-links: 76px; --tpl-af-col-friends: 84px; --tpl-af-col-conv: 60px; --tpl-af-col-reward: 84px; --tpl-af-col-ops: 140px;
+  --tpl-af-col-state: 96px; --tpl-af-col-check: 24px; --tpl-af-col-links: 76px; --tpl-af-col-friends: 84px; --tpl-af-col-conv: 60px; --tpl-af-col-reward: 84px; --tpl-af-col-ops: 140px;
   --tpl-af-offer-row-h: var(--polish-table-row); --tpl-af-col-offer-reward: 110px; --tpl-af-col-offer-action: 150px; --tpl-af-col-offer-people: 96px; --tpl-af-col-offer-conv: 100px; --tpl-af-col-offer-ops: 170px;
   --tpl-af-col-ap-affiliate: 96px; --tpl-af-col-ap-account: 92px; --tpl-af-col-ap-offer: 150px; --tpl-af-col-ap-reward: 72px; --tpl-af-col-ap-check: 72px; --tpl-af-col-ap-ops: 124px;
   --tpl-af-detail-key-w: 120px; --tpl-af-bulk-target-pad: 10px 12px; --tpl-af-bulk-choices-gap: 12px; --tpl-af-close-gap: 14px; --tpl-af-close-line-pad: 12px 0;

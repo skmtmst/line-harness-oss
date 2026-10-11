@@ -547,6 +547,7 @@ function ConversionCreate() {
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
+      hidePreviewWhenNarrow
       boardId="j8p3yj"
       title="成果地点を作る"
       help="「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。"
