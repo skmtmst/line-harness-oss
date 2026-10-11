@@ -57,6 +57,7 @@ export type EntityLike = {
   updatedAt?: string | null
   updated_at?: string | null
   isActive?: boolean | null
+  disabled?: boolean
   messageType?: string | null
 }
 
@@ -80,6 +81,7 @@ export function toPickerItems(kind: EntityKind, rows: ReadonlyArray<EntityLike>,
     const category = kind === 'template' && row.messageType ? row.messageType : undefined
     return {
       id: row.id,
+      disabled: row.disabled,
       name: row.name ?? row.title ?? row.label ?? '（名前なし）',
       folderId,
       category,
