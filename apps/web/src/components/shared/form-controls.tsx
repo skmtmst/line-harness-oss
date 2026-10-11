@@ -184,7 +184,7 @@ export function Field({
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
       {label && !labelHidden ? <div className={styles.labelRow}>
-        <label htmlFor={controlId} className={styles.label}>
+        <label htmlFor={controlId} className={styles.label} title={typeof shownLabel === 'string' ? shownLabel : undefined}>
           {shownLabel}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
               何も伝わらない。 */}

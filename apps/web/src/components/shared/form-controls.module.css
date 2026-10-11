@@ -196,3 +196,13 @@ html[data-theme='v8'] :is(.required, .optional) {
   font-size: var(--polish-text-note);
   line-height: var(--tpl-field-badge-lh);
 }
+
+/* B-191：欄の名前は1行で省略し、全文は label の title と読み上げ名に残す。 */
+html[data-theme='v8'] .labelRow { min-width: 0; }
+html[data-theme='v8'] .labelRow > .label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-theme='v8'] .labelRow > :not(.label) { flex-shrink: 0; }
