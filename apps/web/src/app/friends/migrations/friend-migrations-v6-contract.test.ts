@@ -92,7 +92,7 @@ describe('V6 機能3 UID・CSV移行', () => {
   })
 
   it('設計Nodeと本物のAPIに接続する', () => {
-    expect(UID_PAGE).toContain('data-design-node="vtBCu"')
+    expect(UID_PAGE).toContain('data-design-node="Z0jHp"')
     expect(CSV_PAGE).toContain('current="csv"')
     expect(UID_PAGE).toContain('api.friendMigrations.dryRun')
     expect(CSV_PAGE).toContain('api.friendMigrations.previewImport')
