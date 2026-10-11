@@ -13,12 +13,21 @@ const results = []
 let fatal = null
 async function open(width, route) {
   const page = await browser.newPage({ viewport: { width, height: 1000 }, locale: 'ja-JP', timezoneId: 'Asia/Tokyo' })
+  page.on('request', request => {
+    const url = new URL(request.url())
+    if (url.pathname === '/api/entry-routes') page.__stgfix17ApiOrigin = url.origin
+  })
   await page.route('**/*', r => new URL(r.request().url()).origin === new URL(base).origin ? r.continue() : r.abort())
   await stubApi(page, mockFetch)
   await page.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
     sessionStorage.setItem('lh_visual_qa_capture', '1')
+    window.__stgfix17CopiedUrl = null
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async value => { window.__stgfix17CopiedUrl = value } },
+    })
   })
   if (route) await page.goto(new URL(route, base).href, { waitUntil: 'networkidle' })
   return page
@@ -37,7 +46,13 @@ try {
       assert.equal(geometry.hitInside, true, '「…」の中央は別の列に遮られない')
       await menu.click({ timeout: 1500 })
       await expect(page.getByRole('menuitem', { name: 'QRコードを見る', exact: true })).toBeVisible()
-      await expect(page.getByRole('menuitem', { name: 'URLをコピー', exact: true })).toBeVisible()
+      const copy = page.getByRole('menuitem', { name: '夏のInstagram投稿のURLをコピー', exact: true })
+      await expect(copy).toBeVisible()
+      await copy.click()
+      await expect.poll(() => page.evaluate(() => window.__stgfix17CopiedUrl)).toMatch(/\/r\/[^/?#]+$/)
+      const copiedUrl = new URL(await page.evaluate(() => window.__stgfix17CopiedUrl))
+      assert.ok(page.__stgfix17ApiOrigin, '対象アカウントの流入経路APIを読み込んだ')
+      assert.equal(copiedUrl.href, `${page.__stgfix17ApiOrigin}/r/summer-ig`, '対象行の発行URLの全文をコピーする')
     } catch (caught) { error = caught.message }
     await page.keyboard.press('Escape')
     await menu.focus(); await page.keyboard.press('Enter')
