@@ -6,10 +6,13 @@
  * 実際に描けているかを確かめるには一時的な管理セッションが要る。その一時行が
  * 15分で切れ、終わりに自分の1行だけ消え、残存0件を数えることまでを縛る。
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, test, vi } from 'vitest';
 
 import {
+  FONTS_READY_SOURCE,
+  READ_FAILURE_STATES_SOURCE,
+  READ_TITLE_SOURCE,
   inspectFlatBody,
   missingFields,
   nextStepFor,
@@ -19,6 +22,7 @@ import {
   screenFailures,
   type DeliveryGates,
   type ScreenReport,
+  type TitleInfo,
 } from './verify-staging-restaurant-delivery.js';
 import { readVerificationTarget } from './verify-staging-operational-path.js';
 
@@ -71,6 +75,37 @@ function passingScreen(overrides: Partial<ScreenReport> = {}): ScreenReport {
 }
 
 const target = { accountId: 'account', databaseId: 'database', workerUrl: 'https://stg-api.musubo.jp' };
+
+/**
+ * 実ブラウザ用の雛形。3画面の題（型の題）と、共通部品が付ける失敗の印を再現する。
+ * 横の案内・窓の見出し・見えない失敗は数えないことまで同じ1枚で確かめる。
+ */
+const FIXTURE_HTML = `<!doctype html>
+<html lang="ja"><body style="margin:0">
+  <aside><h1 style="font-size:22px;font-weight:700;line-height:32px">横の案内</h1></aside>
+  <main>
+    <div data-template-region="heading">
+      <h1 style="font-size:22px;font-weight:700;line-height:32px">デリバリー受注</h1>
+    </div>
+    <div data-list-state="empty"><p>注文はまだありません</p></div>
+    <div data-list-state="error" role="alert">
+      <h3>注文を表示できませんでした</h3>
+      <p>識別子を含む説明文はここに出る</p>
+    </div>
+    <div data-list-state="forbidden" style="visibility:hidden"><h3>表示する権限がありません</h3></div>
+  </main>
+</body></html>`;
+
+/** 実ブラウザを入れていない場所（必須CIの `pnpm test:scripts` など）では飛ばす。 */
+const chromiumExecutable = await (async (): Promise<string | null> => {
+  try {
+    const { chromium } = await import('@playwright/test');
+    const path = chromium.executablePath();
+    return path && existsSync(path) ? path : null;
+  } catch {
+    return null;
+  }
+})();
 
 function fakeFetch(status: number, body: unknown) {
   return vi.fn(async () => new Response(JSON.stringify(body), {
@@ -357,10 +392,74 @@ describe('staging delivery verification safety', () => {
     expect(bulkScreen).toContain('kind="error"');
     // 例外は画面ごとに拾う。
     expect(script).toContain("page.on('pageerror'");
-    expect(script).toContain('await page.evaluate(readFailureStatesInPage)');
+    expect(script).toContain('await page.evaluate<string[]>(READ_FAILURE_STATES_SOURCE)');
     // 失敗の控えには説明文をそのまま載せない（識別子が混じるため見出しだけ・40字で切る）。
     expect(script).toContain('.slice(0, 40)');
   });
+
+  test('hands the browser plain strings, so the tsx transform cannot inject a helper', () => {
+    // 検証環境の実行 38141457930 が `ReferenceError: __name is not defined` で
+    // 落ちた原因と、その再発を止める縛り。`pnpm tsx` の esbuild は keepNames が
+    // 入っているため、関数の中の「名前付きの」矢印や関数を `__name(...)` で包む。
+    // Playwright は関数を本文の文字列にして送るので、ブラウザに無い `__name` を
+    // 呼んで落ちる。文字列で渡せば変換の対象外になり、この失敗の形が消える。
+    const payloads = { READ_TITLE_SOURCE, READ_FAILURE_STATES_SOURCE, FONTS_READY_SOURCE };
+    for (const [name, source] of Object.entries(payloads)) {
+      expect(source, name).not.toContain('__name');
+      // keepNames が包むのは名前の付いた宣言。ブラウザへ渡す本文には作らない。
+      expect(source, name).not.toMatch(/\bfunction\s+[A-Za-z_$]/);
+      expect(source, name).not.toMatch(
+        /\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:async\s*)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/,
+      );
+    }
+
+    // 渡し方も文字列に固定する。関数参照へ戻すと同じ失敗がそのまま再発する。
+    expect(script).toContain('await page.evaluate<boolean>(FONTS_READY_SOURCE)');
+    expect(script).toContain('await page.evaluate<TitleInfo | null>(READ_TITLE_SOURCE)');
+    expect(script).toContain('await page.evaluate<string[]>(READ_FAILURE_STATES_SOURCE)');
+    expect(script).not.toMatch(/page\.evaluate\(\s*(?:\(|async\b|function\b|read[A-Za-z]*InPage)/);
+    // 合言葉を渡す `addInitScript` だけは関数のまま（引数を渡す必要があり、
+    // 呼び出しの引数に直接書いた無名の矢印は keepNames に包まれない）。
+    expect(script).toMatch(/await page\.addInitScript\(\s*\(\[token, accountId\]\) => \{/);
+  });
+
+  // 実ブラウザ試験。Chromium を入れていない場所では飛ばす（必須CIの
+  // `pnpm test:scripts` の工程はブラウザを入れていない）。
+  (chromiumExecutable ? test : test.skip)(
+    'runs the exact strings we ship inside a real Chromium',
+    async () => {
+      const { chromium } = await import('@playwright/test');
+      const browser = await chromium.launch();
+      try {
+        const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+        await page.setContent(FIXTURE_HTML);
+
+        // 配るものと同じ本文を、そのままブラウザへ渡して動くことを確かめる。
+        expect(await page.evaluate<boolean>(FONTS_READY_SOURCE)).toBe(true);
+        expect(await page.evaluate<TitleInfo | null>(READ_TITLE_SOURCE)).toEqual({
+          text: 'デリバリー受注', size: '22px', weight: '700', lh: '32px',
+        });
+        // 見える失敗だけ・見出しだけを拾う（説明文と「まだありません」は数えない）。
+        expect(await page.evaluate<string[]>(READ_FAILURE_STATES_SOURCE))
+          .toEqual(['error:注文を表示できませんでした']);
+
+        // 型の題が無い画面では、窓の見出しを題と取り違えない。
+        await page.setContent('<main><div role="dialog"><h1 style="font-size:22px">窓の見出し</h1>'
+          + '</div><h2 style="font-size:22px;font-weight:700;line-height:32px">品切れ一括設定</h2></main>');
+        expect((await page.evaluate<TitleInfo | null>(READ_TITLE_SOURCE))?.text)
+          .toBe('品切れ一括設定');
+
+        // 再発の検出：変換ヘルパーが混ざった本文は、実ブラウザでこう落ちる。
+        // 上の3つが通りこれが落ちることで、「文字列で渡す」が効いている証になる。
+        await expect(page.evaluate<boolean>(
+          "(() => { const visible = /* @__PURE__ */ __name((el) => !!el, 'visible'); return visible(document.body) })()",
+        )).rejects.toThrow('__name is not defined');
+      } finally {
+        await browser.close();
+      }
+    },
+    120_000,
+  );
 
   test('reports a next step instead of a bare failure when an entry gate is empty', () => {
     expect(nextStepFor(openGates({ restaurantTestEnabled: false })))
