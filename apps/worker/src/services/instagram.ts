@@ -16,31 +16,57 @@ export class InstagramError extends Error {
   }
 }
 /**
+ * Meta が `error.type` に入れてくる種別名。応答の中身は Meta が自由に決められるため、
+ * この一覧に載っている名前だけをそのまま使い、載っていない名前は `other` に置き換える。
+ * 名前の形（英字だけ等）で見分けるやり方は使わない。たとえば英小文字と数字から成る
+ * 32文字の合鍵のような値も「ありそうな形」に当てはまってしまい、守り切れないため。
+ */
+const META_ERROR_TYPES = new Set([
+  'OAuthException',
+  'FacebookApiException',
+  'GraphMethodException',
+  'GraphBatchException',
+  'IGApiException',
+]);
+/** 一覧に無い種別名・検査を通らない値の置き換え先。固定の文言。 */
+const OTHER = 'other';
+/**
  * Meta のエラー本文から、原因調べに使う安全な項目だけを短く取り出す。
  *
  * `error.message` は Meta が書く自由な文章で、要求に渡した値（合鍵・アプリシークレット・
  * 認可コード）がそのまま、あるいは URL エンコード・二重エンコードなど様々な形で混ざって
  * 返ってくる可能性がある。どの形で混ざるかを網羅して消す（伏せ字処理を重ねる）やり方は
  * 新しい表現が見つかるたびに後追いになり守り切れないため、`message` 自体を記録に出さない。
- * `status` / `type` / `code` / `subcode` は Meta の応答のうち種別・番号を表す項目で、
- * 要求した値がそのまま入り込む自由な文章ではないため、これらだけで原因調べを行う。
+ *
+ * `type` / `code` / `subcode` も Meta の応答の一部で、好きな中身を入れられる。
+ * そのため「自由な文章ではない項目」という理由だけで通さず、
+ * `type` は上の一覧に載る名前だけ、`code` と `subcode` は整数だけに限る。
+ * `status` はこちらが受け取った応答の番号で、Meta の本文には由来しない。
  */
 async function metaErrorDetail(response: Response): Promise<string | undefined> {
   try {
     const body = (await response.json()) as {
       error?: {
-        type?: string;
-        code?: number;
-        error_subcode?: number;
+        type?: unknown;
+        code?: unknown;
+        error_subcode?: unknown;
       };
     };
     const e = body?.error;
     if (!e) return undefined;
+    const type =
+      typeof e.type === 'string' && e.type !== ''
+        ? META_ERROR_TYPES.has(e.type)
+          ? e.type
+          : OTHER
+        : '';
     return [
       `status=${response.status}`,
-      e.type ? `type=${e.type}` : '',
-      e.code != null ? `code=${e.code}` : '',
-      e.error_subcode != null ? `subcode=${e.error_subcode}` : '',
+      type ? `type=${type}` : '',
+      Number.isInteger(e.code) ? `code=${e.code as number}` : '',
+      Number.isInteger(e.error_subcode)
+        ? `subcode=${e.error_subcode as number}`
+        : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -48,6 +74,76 @@ async function metaErrorDetail(response: Response): Promise<string | undefined> 
     // 本文が読めなくても、どの状態で落ちたかだけは残す。
     return `status=${response.status}`;
   }
+}
+/**
+ * 失敗の手がかりを、利用者に見える戻り先URLへ載せてよい形だけに絞り直す。
+ *
+ * 受け取った文字列をそのまま通さず、こちらが決めた形に合う部分を**組み立て直す**。
+ * `metaErrorDetail` で絞ったあとの値を、URLへ出す直前にもう一度ここで確かめることで、
+ * 取り出し側の作りが将来変わっても、Meta の応答の中身がURLへ出ない状態を保つ。
+ *
+ * 通すのは次の4つだけ。
+ * - 要求の種別と宛先（`GET v21.0/me/accounts` など。こちらのコードが決める形のみ）
+ * - `status` … 3桁の数字
+ * - `type` … 上の一覧に載る名前（載っていなければ `other`）
+ * - `code` / `subcode` … 数字
+ */
+export function instagramUrlDetail(
+  detail: string | null | undefined,
+): string | null {
+  if (typeof detail !== 'string' || detail.length > 200) return null;
+  const parts: string[] = [];
+  const step =
+    /^(GET|POST|DELETE) (v[0-9]{1,3}\.[0-9]{1,3})\/(me\/accounts|oauth\/access_token|debug_token|[0-9]{1,24}(?:\/[a-z_]{1,24})?)(?= |$)/.exec(
+      detail,
+    );
+  if (step) parts.push(`${step[1]} ${step[2]}/${step[3]}`);
+  const status = /(?:^| )status=([0-9]{3})(?= |$)/.exec(detail);
+  if (status) parts.push(`status=${status[1]}`);
+  const type = /(?:^| )type=([A-Za-z]{1,40})(?= |$)/.exec(detail);
+  if (type)
+    parts.push(`type=${META_ERROR_TYPES.has(type[1]) ? type[1] : OTHER}`);
+  const code = /(?:^| )code=([0-9]{1,9})(?= |$)/.exec(detail);
+  if (code) parts.push(`code=${code[1]}`);
+  const subcode = /(?:^| )subcode=([0-9]{1,9})(?= |$)/.exec(detail);
+  if (subcode) parts.push(`subcode=${subcode[1]}`);
+  return parts.length ? parts.join(' ') : null;
+}
+/**
+ * 失敗の種類名を戻り先URLへ載せてよい形だけに絞る。
+ * この値は `InstagramError` を投げるときにこちらのコードが書いた固定の文言で、
+ * Meta の応答から入り込む経路が無い。それでも念のため、英小文字と `_` だけの形に限る。
+ */
+export function instagramUrlCode(code: string | null | undefined): string {
+  return typeof code === 'string' && /^[a-z]+(?:_[a-z]+)*$/.test(code)
+    ? code
+    : OTHER;
+}
+/**
+ * 許可された権限の名前を戻り先URLへ載せてよい形だけに絞る。
+ *
+ * 名前は Meta の応答（`debug_token` の `scopes`）由来なので、こちらが要求した権限の
+ * 一覧に載っている名前だけを通す。形で見分けるやり方は使わない（`META_ERROR_TYPES` と同じ理由）。
+ * 一覧に無い名前は中身を出さず、`other2` のように件数だけを添える。
+ */
+export function instagramUrlScopes(
+  scopes: string | null | undefined,
+): string | null {
+  if (typeof scopes !== 'string' || scopes === '') return null;
+  const known: string[] = [];
+  let others = 0;
+  for (const s of scopes.split(',')) {
+    if (s === '') continue;
+    if ((INSTAGRAM_SCOPES as readonly string[]).includes(s)) {
+      if (!known.includes(s)) known.push(s);
+    } else others++;
+  }
+  if (others) known.push(`${OTHER}${others}`);
+  return known.length ? known.join(',') : null;
+}
+/** 件数は整数だけを通す。整数でなければ `-1` にして、数え損ねたことが分かるようにする。 */
+export function instagramUrlCount(n: unknown): number {
+  return Number.isInteger(n) && (n as number) >= 0 ? (n as number) : -1;
 }
 export type InstagramConfig = {
   appId: string;
@@ -245,6 +341,17 @@ export async function instagramLongToken(
       : [],
   };
 }
+/**
+ * 接続のときに要求する権限の一覧（認可画面へ渡す順そのまま）。
+ * 戻り先URLへ載せてよい権限名の許可一覧も、この定義を正本として使う。
+ */
+export const INSTAGRAM_SCOPES = [
+  'pages_show_list',
+  'pages_read_engagement',
+  'instagram_basic',
+  'instagram_manage_messages',
+  'instagram_content_publish',
+] as const;
 /** 同時投稿に必要な許可。足りない接続は画面で「認可が切れています」にして再接続へ誘導する。 */
 export const INSTAGRAM_PUBLISH_SCOPE = 'instagram_content_publish';
 export function instagramCanPublish(scopes: string): boolean {

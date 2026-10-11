@@ -8,6 +8,8 @@ import {
   verifyInstagramSignature,
   purgeInstagramTransientData,
   instagramConfig,
+  instagramUrlDetail,
+  instagramUrlScopes,
 } from '../services/instagram.js';
 let db: SqliteD1;
 const admin: AuthenticatedStaff = {
@@ -245,7 +247,18 @@ it('ビジネスアカウントのつながったページが無ければ保存�
       new URLSearchParams({ state, code: 'mock_code' }),
   );
   expect(callback.status).toBe(302);
-  expect(callback.headers.get('location')).toContain('instagram=failed');
+  const back = new URL(callback.headers.get('location')!);
+  // 画面が見る値は従来どおり failed だけ（帯の文言は変わらない）。
+  expect(back.pathname).toBe('/settings/sns');
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  // サーバー記録が読めない場合でも原因が分かるよう、戻り先URLに手がかりを添える。
+  expect(back.searchParams.get('instagram_code')).toBe(
+    'instagram_business_account_required',
+  );
+  expect(back.searchParams.get('instagram_pages')).toBe('1/0/1');
+  expect(back.searchParams.get('instagram_scopes')).toContain(
+    'instagram_content_publish',
+  );
   expect(
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
   ).toEqual({ n: 0 });
@@ -423,6 +436,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
     .mockImplementation((...args: unknown[]) => {
       logged.push(args.map(String).join(' '));
     });
+  let location = '';
   try {
     const start = await read(await req('/api/instagram/oauth/start', {})),
       state = new URL(start.data.url).searchParams.get('state')!;
@@ -431,7 +445,8 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
         new URLSearchParams({ state, code: 'mock_code' }),
     );
     expect(callback.status).toBe(302);
-    expect(callback.headers.get('location')).toContain('instagram=failed');
+    location = callback.headers.get('location') ?? '';
+    expect(location).toContain('instagram=failed');
   } finally {
     spy.mockRestore();
   }
@@ -454,6 +469,110 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
     config.META_TOKEN_ENCRYPTION_KEY,
   ])
     expect(logged.join('\n')).not.toContain(secret);
+  // 戻り先URLにも同じ手がかりを添えるので、そこにも秘密値が移らないことを確かめる。
+  // URLは値をエンコードして持つため、元に戻した形でも照合する。
+  const returned = `${location}\n${decodeURIComponent(location)}`;
+  expect(location).toContain('instagram_detail=');
+  for (const secret of [
+    config.META_APP_SECRET,
+    'mock_code',
+    longToken,
+    encodeURIComponent(longToken),
+    doubleEncoded,
+    config.META_TOKEN_ENCRYPTION_KEY,
+  ])
+    expect(returned).not.toContain(secret);
+});
+
+/**
+ * 戻り先URLは利用者に見える場所なので、Meta の応答から来る値をそのまま置かない。
+ * Meta は応答の中身（`error.type` や `debug_token` の権限名）を自由に決められるため、
+ * 「自由文ではない項目」という理由だけでは守れない。ここでは**英小文字32文字**という、
+ * 合鍵のような見た目でありながら名前の形としては通ってしまう試験用の値を混ぜて、
+ * 形での見分けではなく**許可一覧**が効いていることを確かめる。実在する秘密値は使わない。
+ */
+it('模擬応答の種別名・権限名に秘密値のような値が混ざっても、記録と戻り先URLのどちらにも出さない', async () => {
+  // 実在しない試験用の値。英小文字だけなので「ありそうな名前の形」には当てはまる。
+  const synthetic = 'abcdefabcdefabcdefabcdefabcdefab';
+  const original = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: URL | string, init?: RequestInit) => {
+      const path = new URL(String(url)).pathname;
+      // 許可された権限の名前に試験用の値が混ざった場合を模す。
+      if (path.endsWith('/debug_token'))
+        return Response.json({
+          data: {
+            is_valid: true,
+            app_id: '100',
+            expires_at: Math.floor(Date.now() / 1000) + 60 * 86400,
+            scopes: [
+              'pages_show_list',
+              synthetic,
+              'instagram_content_publish',
+            ],
+          },
+        });
+      // 種別名・番号に試験用の値が混ざった場合を模す（番号は整数ですらない）。
+      if (path.endsWith('/me/accounts'))
+        return Response.json(
+          {
+            error: {
+              type: synthetic,
+              code: `100${synthetic}`,
+              error_subcode: synthetic,
+              message: `secret=${synthetic}`,
+            },
+          },
+          { status: 400 },
+        );
+      return original(url, init);
+    }),
+  );
+  const logged: string[] = [];
+  const spy = vi
+    .spyOn(console, 'error')
+    .mockImplementation((...args: unknown[]) => {
+      logged.push(args.map(String).join(' '));
+    });
+  let location = '';
+  try {
+    const start = await read(await req('/api/instagram/oauth/start', {})),
+      state = new URL(start.data.url).searchParams.get('state')!;
+    const callback = await req(
+      '/api/instagram/oauth/callback?' +
+        new URLSearchParams({ state, code: 'mock_code' }),
+    );
+    expect(callback.status).toBe(302);
+    location = callback.headers.get('location') ?? '';
+  } finally {
+    spy.mockRestore();
+  }
+  const back = new URL(location);
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  // 失敗の種類名はこちらが決めた固定の文言。
+  expect(back.searchParams.get('instagram_code')).toBe('meta_request_failed');
+  // 許可一覧に無い種別名は中身を出さず `other` に置き換える。検査を通らない番号は落とす。
+  expect(back.searchParams.get('instagram_detail')).toBe(
+    'GET v24.0/me/accounts status=400 type=other',
+  );
+  // 許可一覧に無い権限名も中身を出さず、件数だけを添える。
+  expect(back.searchParams.get('instagram_scopes')).toBe(
+    'pages_show_list,instagram_content_publish,other1',
+  );
+  // 記録と戻り先URL（元に戻した形も）のどちらにも試験用の値は出ない。
+  const returned = `${location}\n${decodeURIComponent(location)}`;
+  expect(logged.join('\n')).not.toContain(synthetic);
+  expect(returned).not.toContain(synthetic);
+  // 絞り込みは境目でも二重に効く。仮に手がかりへ自由文が入り込んでも通さない。
+  expect(
+    instagramUrlDetail(
+      `GET v24.0/me/accounts status=400 type=${synthetic} code=${synthetic}`,
+    ),
+  ).toBe('GET v24.0/me/accounts status=400 type=other');
+  expect(instagramUrlScopes(`pages_show_list,${synthetic}`)).toBe(
+    'pages_show_list,other1',
+  );
 });
 
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {
