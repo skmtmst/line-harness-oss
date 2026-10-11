@@ -24,7 +24,7 @@ export interface BookingPaymentConfig {
   holdMinutes: number;
 }
 
-const DEFAULT_CONFIG: BookingPaymentConfig = { mode: 'none', provider: 'none', holdMinutes: 30 };
+const DEFAULT_CONFIG: BookingPaymentConfig = { mode: 'none', provider: 'none', holdMinutes: 10 };
 
 function normalizeMode(value: unknown): BookingPaymentMode | null {
   return value === 'none' || value === 'onsite' || value === 'online' ? value : null;
@@ -49,7 +49,7 @@ export async function getBookingPaymentConfig(
     provider: normalizeProvider(row.provider, 'none'),
     holdMinutes: Number.isFinite(Number(row.hold_minutes))
       ? Math.min(1440, Math.max(5, Math.trunc(Number(row.hold_minutes))))
-      : 30,
+      : 10,
   };
 }
 

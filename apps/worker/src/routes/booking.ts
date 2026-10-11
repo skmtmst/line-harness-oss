@@ -1019,7 +1019,9 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   // 予約のルール「お店が承認してから確定する」が automatic の店は、
   // 未承認を通さずその場で確定にする。設定が読めないときは承認ありに倒す。
   const adminSettings = await getBookingAdminSettings(c.env.DB, accountId);
-  const autoConfirm = adminSettings?.approvalMode === 'automatic';
+  const paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
+  const requiresOnlinePayment = paymentConfig.mode === 'online' && menuRow.price > 0;
+  const autoConfirm = adminSettings?.approvalMode === 'automatic' && !requiresOnlinePayment;
   const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
   const decidedAt = autoConfirm ? nowIso : null;
   const reserved = await reserveIdempotencyResponse(c.env.DB, {
@@ -1290,8 +1292,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
    */
   let bookingPayment: { id: string; status: string; holdUntil: string | null } | null = null;
   try {
-    const paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
-    if (paymentConfig.mode === 'online' && menuRow.price > 0) {
+    if (requiresOnlinePayment) {
       const holdUntil = new Date(Date.now() + paymentConfig.holdMinutes * 60_000).toISOString();
       const record = await createBookingPayment(c.env.DB, {
         lineAccountId: accountId,

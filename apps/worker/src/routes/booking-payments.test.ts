@@ -3,12 +3,13 @@
  * 外へ通信しない。Stripeは署名付きの試験の知らせで進める。
  * 本物のお金は動かさない。
  */
+import { runExpirer } from '../services/booking-expirer.js';
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../index';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
-import { saveBookingPaymentConfig } from '@line-crm/db';
-import { registerTestPaymentProvider } from './booking-payments.js';
+import { getBookingPaymentConfig, saveBookingPaymentConfig } from '@line-crm/db';
+import { applyPaidBookingPayment, registerTestPaymentProvider } from './booking-payments.js';
 
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
@@ -77,12 +78,91 @@ const paidEvent = (providerPaymentId: string) => JSON.stringify({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('外部通信は禁止'); }));
   const created = createTestD1();
   sqlite = created.raw;
   db = created.db;
 });
 
+afterEach(() => { sqlite.close(); vi.unstubAllGlobals(); });
+
 describe('予約の支払いの共通口', () => {
+  it('BK-P02: 支払い反映の途中失敗を次の読込で回復し、監査は一度だけ', async () => {
+    seedBooking();
+    sqlite.exec(`INSERT INTO booking_payments
+      (id,line_account_id,booking_id,amount,provider,provider_payment_id,idempotency_key,status,created_at,updated_at)
+      VALUES ('pay-a','account-a','booking-a',8000,'fake','fake-a','booking:booking-a','pending','2026-10-01','2026-10-01');
+      CREATE TRIGGER crash_confirmation BEFORE UPDATE OF status ON bookings
+      WHEN NEW.status = 'confirmed' BEGIN SELECT RAISE(ABORT,'injected crash'); END;`);
+    await expect(applyPaidBookingPayment(db, 'fake-a')).rejects.toThrow('injected crash');
+    sqlite.exec(`DROP TRIGGER crash_confirmation;
+      UPDATE booking_payments SET status='paid' WHERE id='pay-a';`);
+    // 過去版で paid だけ保存されていた行も、同じ読込口から補完する。
+    const response = await app().request('/api/booking/payments/by-booking?bookingId=booking-a', {}, env());
+    expect(response.status).toBe(200);
+    expect(sqlite.prepare("SELECT status FROM bookings WHERE id='booking-a'").get()).toEqual({ status: 'confirmed' });
+    await applyPaidBookingPayment(db, 'fake-a');
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM booking_audit_logs WHERE booking_id='booking-a' AND action='confirmed'").get()).toEqual({ n: 1 });
+  });
+
+  it('BK-P03: 顧客が戻らなくても10分の支払い期限で定期回収し枠を空ける', async () => {
+    seedBooking();
+    await saveBookingPaymentConfig(db, 'account-a', { mode: 'online', provider: 'stripe', holdMinutes: 10 });
+    await app().request('/api/booking/payments/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId: 'booking-a' }),
+    }, env());
+    sqlite.exec(`UPDATE bookings SET requested_at='2099-01-01T00:00:00.000Z';
+      UPDATE booking_payments SET hold_until='2099-01-01T00:10:00.000Z';`);
+    const sender = vi.fn();
+    await runExpirer(db, { now: new Date('2099-01-01T00:11:00.000Z'), sender });
+    expect(sqlite.prepare("SELECT status FROM booking_payments WHERE booking_id='booking-a'").get()).toEqual({ status: 'expired' });
+    expect(sqlite.prepare("SELECT status FROM bookings WHERE id='booking-a'").get()).toEqual({ status: 'expired' });
+    expect(sender).not.toHaveBeenCalled();
+  });
+
+  it('BK-P02: 予約更新失敗は支払いも戻し、定期回収はpaidを確定・manualを保つ', async () => {
+    seedBooking();
+    sqlite.exec(`INSERT INTO booking_payments
+      (id,line_account_id,booking_id,amount,provider,provider_payment_id,idempotency_key,status,created_at,updated_at)
+      VALUES ('pay-a','account-a','booking-a',8000,'fake','fake-a','booking:booking-a','pending','2026-10-01','2026-10-01');
+      CREATE TRIGGER crash_confirmation BEFORE UPDATE OF status ON bookings
+      WHEN NEW.status = 'confirmed' BEGIN SELECT RAISE(ABORT,'injected crash'); END;`);
+    await expect(applyPaidBookingPayment(db, 'fake-a')).rejects.toThrow('injected crash');
+    expect(sqlite.prepare("SELECT status FROM booking_payments WHERE id='pay-a'").get()).toEqual({ status: 'pending' });
+    sqlite.exec(`DROP TRIGGER crash_confirmation; UPDATE booking_payments SET status='paid';`);
+    const sender = vi.fn();
+    await runExpirer(db, { now: new Date('2099-01-01T00:11:00.000Z'), sender });
+    expect(sqlite.prepare("SELECT status FROM bookings WHERE id='booking-a'").get()).toEqual({ status: 'confirmed' });
+    sqlite.exec(`UPDATE bookings SET status='requested';
+      INSERT INTO booking_settings (id,line_account_id,approval_mode) VALUES ('manual','account-a','manual');`);
+    await runExpirer(db, { now: new Date('2099-01-01T00:11:00.000Z'), sender });
+    expect(sqlite.prepare("SELECT status FROM bookings WHERE id='booking-a'").get()).toEqual({ status: 'requested' });
+    expect(sender).not.toHaveBeenCalled();
+  });
+
+  it('BK-P03: 決済の既定は10分、店が決めた期限は保つ', async () => {
+    seedBooking();
+    expect((await getBookingPaymentConfig(db, 'account-a')).holdMinutes).toBe(10);
+    await saveBookingPaymentConfig(db, 'account-a', { mode: 'online', provider: 'stripe', holdMinutes: 45 });
+    expect((await getBookingPaymentConfig(db, 'account-a')).holdMinutes).toBe(45);
+  });
+
+  it('BK-P03: 期限回収の途中失敗も原子化し、paidを期限切れにしない', async () => {
+    seedBooking();
+    sqlite.exec(`INSERT INTO booking_payments
+      (id,line_account_id,booking_id,amount,provider,provider_payment_id,idempotency_key,status,hold_until,created_at,updated_at)
+      VALUES ('pay-a','account-a','booking-a',8000,'fake','fake-a','booking:booking-a','pending','2000-01-01','2026-10-01','2026-10-01');
+      CREATE TRIGGER crash_expiry BEFORE UPDATE OF status ON bookings
+      WHEN NEW.status = 'expired' BEGIN SELECT RAISE(ABORT,'injected expiry crash'); END;`);
+    const response = await app().request('/api/booking/payments/by-booking?bookingId=booking-a', {}, env());
+    expect(response.status).toBe(500);
+    expect(sqlite.prepare("SELECT status FROM booking_payments WHERE id='pay-a'").get()).toEqual({ status: 'pending' });
+    sqlite.exec(`DROP TRIGGER crash_expiry; UPDATE booking_payments SET status='paid';`);
+    await runExpirer(db, { now: new Date('2099-01-01T00:11:00.000Z'), sender: vi.fn() });
+    expect(sqlite.prepare("SELECT status FROM booking_payments WHERE id='pay-a'").get()).toEqual({ status: 'paid' });
+  });
+
   it('同じ申込の再試行は最初の決済URLと同じ支払い記録を返す', async () => {
     seedBooking();
     await saveBookingPaymentConfig(db, 'account-a', { mode: 'online', provider: 'stripe', holdMinutes: 30 });
