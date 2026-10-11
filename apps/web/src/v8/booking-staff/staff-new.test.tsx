@@ -28,7 +28,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
-    api: { staff: { me: async () => ({ success: true, data: { role: 'owner' } }), list: async () => ({ success: true, data: [] }) } },
+    api: { media: {contentUrl:()=> 'https://fixture.invalid/photo.png',list:async()=>({success:true,data:{items:[{id:'photo',filename:'人工画像',kind:'image',url:'https://fixture.invalid/photo.png',lineAccountId:'account-a'}],total:1}})}, staff: { me: async () => ({ success: true, data: { role: 'owner' } }), list: async () => ({ success: true, data: [] }) } },
     bookingApi: {
       listMenus: async () => ({ menus: MENUS }),
       listStaff: async () => ({ staff: fixture.staff }),
@@ -107,3 +107,15 @@ describe('予約スタッフを登録（V8）', () => {
     expect(fixture.create).toHaveBeenCalledTimes(1)
     expect(fixture.update).toHaveBeenCalledWith('account-a', 'created', expect.objectContaining({ name: '田中 美咲' }))
  })
+
+test('REM3-06 new staff can choose registered media and save its public URL',async()=>{
+ render(<StaffNewV8 />)
+ await screen.findByRole('button',{name:'予約を受けられるメニュー'})
+ fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'),{target:{value:'人工スタッフ'}})
+ await pickEntities('予約を受けられるメニュー',['カット'])
+ fireEvent.click(screen.getByRole('button',{name:'登録メディアから選ぶ'}))
+ fireEvent.click(await screen.findByRole('option',{name:/人工画像/}))
+ fireEvent.click(screen.getByRole('button',{name:'スタッフを登録する'}))
+ await waitFor(()=>expect(fixture.create).toHaveBeenCalled())
+ expect(fixture.create.mock.calls[0][1]).toMatchObject({profile_image_url:'https://fixture.invalid/photo.png'})
+})

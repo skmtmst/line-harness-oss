@@ -2,6 +2,7 @@
 import Toggle from '@/components/shared/toggle'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePermissionAccess } from '@/lib/use-feature-access'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -42,6 +43,7 @@ import Notice from '@/components/shared/notice'
 
 export default function StaffNewV8() {
   const saveErrors = useSaveFormErrors()
+  const [mediaOpen, setMediaOpen] = useState(false)
   const { selectedAccountId, selectedAccount } = useAccount()
   const router = useRouter()
   // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
@@ -342,7 +344,7 @@ export default function StaffNewV8() {
               <div className={layout.field}><Field label="肩書き" htmlFor="bs-role"><SaveErrorField names={["role"]}><input id="bs-role" type="text" value={role} onChange={(e) => setRole(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.role} placeholder="トリミング担当" className={layout.input} /></SaveErrorField></Field></div>
               <div className={layout.field}>
                 <SaveErrorField names={["imageUrl"]}><ImageUploader
-                  mode="url"
+                  mode="url" onMediaPick={() => setMediaOpen(true)}
                   size="compact"
                   label="顔写真（正方形・1MB まで）"
                   title="顔写真を追加"
@@ -477,6 +479,7 @@ export default function StaffNewV8() {
         </aside>
       </div>
 
+      <MediaPickerDialog open={mediaOpen} accountId={selectedAccountId} kind="image" onClose={() => setMediaOpen(false)} onSelect={(item) => { setImageUrl(item.url); setMediaOpen(false) }} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div></SaveErrorScope>
   )
