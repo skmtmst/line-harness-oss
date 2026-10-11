@@ -1,6 +1,6 @@
 {
   "_comment": "Pen.dev の承認済み設計から書き写した、各画面の Main 直下の並び。ダッシュボードと共通レイアウトはV4、未改修画面はV2を参照する。実装側は data-design 属性で同じ名前を付け、ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。 V8へ切り替えた分析・Search Console・たまる決めごとの新規作成・NEN配信編集は旧V2/V6の節名と文言を固定しない。各機能のV8契約・操作試験で板IDと動きを確認する。 2026-10-08: V2〜V6 の画像比較の記録（visualVerification）は外した。見た目の合格は ★V8 の絵との照合（docs/v8-design-rules.md）。ここに残る節と語は、本番 v7 の画面から節・機能が消えていないかの見張り。 2026-10-09: mainAのダッシュボード・友だち・タグ・情報欄は★V8の入口と現在の骨格へ更新。画面の型が持つ枠は、旧画面のdata-design節として要求しない。",
-  "_source": "docs/archive/design-node-ids.md（V2/V4 の旧表。比較には使わない）",
+  "_source": "旧画面の節・語は履歴由来。現在の板とルートは scripts/visual-qa/v8-design-map.json。残る節の検査は各機能のV8移行時に更新する。",
   "screens": {
     "/ops/knowledge": {
       "node": "csVox",
