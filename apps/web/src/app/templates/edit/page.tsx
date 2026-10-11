@@ -2,8 +2,8 @@
 import { Suspense } from 'react'
 import ListState from '@/components/shared/list-state'
 import TemplateEditV8New from '@/v8/template-edit/edit'
-import { isTemplateDetailData } from '../template-detail-data'
-import { ACCOUNT_MISMATCH_MESSAGE, TEMPLATE_LOAD_FAILED_MESSAGE, TEMPLATE_LOADING_MESSAGE, loadTemplateReferences, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, templateAccountMismatch, templateSaveGuard, templateUsageEntries, validateTemplateSave, TemplateAccountNotice, TemplateUsageNotice } from './edit-core'
+import { ACCOUNT_MISMATCH_MESSAGE, TEMPLATE_LOAD_FAILED_MESSAGE, TEMPLATE_LOADING_MESSAGE, isTemplateDetailData, loadTemplateReferences, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, templateAccountMismatch, templateSaveGuard, templateUsageEntries, validateTemplateSave } from '@/v8/template-edit/core'
+import { TemplateAccountNotice, UsageCard as TemplateUsageNotice } from '@/v8/template-edit/message'
 import { TemplateInsertControls, buildTemplatePreview, extractMessageUrls, previewDateValue } from '@/components/templates/message-template-editor'
 
 

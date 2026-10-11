@@ -17,7 +17,7 @@ const BOOKING_DETAIL = read('app/booking/bookings/detail/page.tsx')
 const CHATS = read('app/chats/page.tsx')
 const DASHBOARD_EDITOR = read('v8/dashboard/dashboard-editor.tsx')
 const DASHBOARD = read('app/page.tsx')
-const TEMPLATE_EDIT = read('app/templates/edit-v8.tsx')
+const TEMPLATE_EDIT = read('v8/template-edit/message.tsx')
 const REMINDER_EDIT = read('app/reminders/edit/edit-v8.tsx')
 // 友だち追加の作る・直すの入口は src/v8/friend-add/editor.tsx（古い editor-v8.tsx はもう描かれない）。
 const FRIEND_ADD_EDITOR = read('v8/friend-add/editor.tsx')

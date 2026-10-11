@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LIST = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
-const EDIT = readFileSync(join(HERE, 'edit-v8.tsx'), 'utf8')
+const EDIT = readFileSync(join(HERE, '../../v8/template-edit/message.tsx'), 'utf8')
 
 /*
  * 状態・1152・閲覧のみ・競合の板は `data-design-node` が無いと

@@ -14,7 +14,7 @@ const SCREENS: Array<[string, string]> = [
   ['v8/reminders/edit.tsx', 'k32cn'],
   ['app/tags/edit-tag-page-v8.tsx', 'xn95q'],
   ['v8/tag-edit/edit.tsx', 'xn95q'],
-  ['app/templates/edit-v8.tsx', 'NCbYn'],
+  ['v8/template-edit/message.tsx', 'NCbYn'],
   ['app/auto-replies/edit/wizard-v8.tsx', 'UGrd2'],
   ['v8/friend-add/editor.tsx', 'h5rm8t'],
   ['app/rich-menus/new/create-v8.tsx', 'r8dGXT'],

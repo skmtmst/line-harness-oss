@@ -31,7 +31,7 @@ import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/com
 import { TextField } from '@/components/shared/text-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
-import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
+import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateAccountBinding, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
 import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
@@ -124,7 +124,6 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     : binding
   /* 統括の入口では店のアカウントに結びつけない（差し込み候補・フォルダは店のものを使わない）。 */
   const editorAccountId = host ? null : resolveEditorAccountId(binding)
-  const accountMismatch = host ? false : templateAccountMismatch(binding)
   const saveGuard = host ? null : templateSaveGuard(binding)
   const loadFailed = editor.status === 'failed'
   const loading = Boolean(id) && (editor.status === 'idle' || editor.status === 'loading')
@@ -602,11 +601,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               {referenceState === 'failed' ? <Notice tone="danger" >差し込み項目を読み込めませんでした。画面を再読み込みしてください。</Notice> : null}
               {host ? <p className={styles.hint}>統括のテンプレートで差し込めるのは、名前・配信日・その他です（友だち情報・共通情報はアカウントごとに違うため）。</p>
                 : !editorAccountId && !loading ? <p className={styles.hint}>LINE公式アカウントを選ぶと、友だち情報と共通情報を選べます。</p> : null}
-              {accountMismatch ? (
-                <Notice tone="warn" role="alert">
-                  {ACCOUNT_MISMATCH_MESSAGE}（このテンプレートは「{accountName(editor.templateAccountId) ?? editor.templateAccountId}」のものです。差し込み候補もそのアカウントのまま出しています）
-                </Notice>
-              ) : null}
+              <TemplateAccountNotice binding={binding} templateAccountLabel={accountName(editor.templateAccountId)} selectedAccountLabel={accountName(selectedAccountId)} />
             </Card>
 
             <Card padding="none" layout="vertical" className={styles.card}>
@@ -701,7 +696,7 @@ function SenderCard({ emptyUsage }: { emptyUsage?: string }) {
 }
 
 /* 変更が使われる場所（IDEA-11）。保存は下書き、利用先へは公開した内容だけが届く。 */
-function UsageCard({ usedBy, published }: { usedBy: NonNullable<TemplateEditorState['usedBy']>; published: boolean }) {
+export function UsageCard({ usedBy, published }: { usedBy: NonNullable<TemplateEditorState['usedBy']>; published: boolean }) {
   const entries = templateUsageEntries(usedBy)
   return (
     <section className={styles.sideCard} aria-label="このテンプレートの利用先">
@@ -724,4 +719,14 @@ function UsageCard({ usedBy, published }: { usedBy: NonNullable<TemplateEditorSt
       )}
     </section>
   )
+}
+
+/** 現役の所属ちがいの知らせ。見える文はそのまま、選択中の名前を補足で読める。 */
+export function TemplateAccountNotice({ binding, templateAccountLabel, selectedAccountLabel }: {
+  binding: TemplateAccountBinding; templateAccountLabel: string | null; selectedAccountLabel: string | null
+}) {
+  if (!templateAccountMismatch(binding)) return null
+  return <Notice tone="warn" role="alert" title={`いま選んでいるのは「${selectedAccountLabel ?? binding.selectedAccountId}」です。差し込み候補は「${templateAccountLabel ?? binding.templateAccountId}」のまま出しています。`}>
+    {ACCOUNT_MISMATCH_MESSAGE}（このテンプレートは「{templateAccountLabel ?? binding.templateAccountId}」のものです。差し込み候補もそのアカウントのまま出しています）
+  </Notice>
 }
