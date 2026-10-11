@@ -18,12 +18,11 @@ import {
   instagramConfig,
   instagramHash,
   instagramGraph,
-  instagramPages,
-  type InstagramPageScan,
+  instagramShortToken,
   instagramLongToken,
+  instagramRefreshToken,
   instagramCanPublish,
   instagramUrlCode,
-  instagramUrlCount,
   instagramUrlDetail,
   instagramUrlScopes,
   INSTAGRAM_PUBLISH_SCOPE,
@@ -156,16 +155,19 @@ instagram.post(
         now.toISOString(),
       )
       .run();
-    const url = new URL(`https://www.facebook.com/${cfg.version}/dialog/oauth`);
+    // 認可画面は Instagram 側（`www.instagram.com/oauth/authorize`）。Facebook の認可画面は
+    // 使わない。Facebook の方式ではビジネスアカウントが Facebook ページにつながっていないと
+    // 投稿の口が見つからず、ページを持たない店舗では必ず失敗する。こちらは Instagram に
+    // ログインするだけで終わり、ページは一切見ない。版は付けない宛先。
+    const url = new URL('https://www.instagram.com/oauth/authorize');
     url.search = new URLSearchParams({
       client_id: cfg.appId,
       redirect_uri: cfg.redirectUri,
       state,
       response_type: 'code',
-      // instagram_content_publish が無いと同時投稿ができないので、接続のときに一緒に貰う。
-      // pages_manage_metadata は求めない。ページのWebhook購読にしか使わない権限で、
-      // その口（instagramWebhook）は審査待ちのため止めてある。Meta のアプリ側でも
-      // Instagram API のユースケースに並ばないため、求めると認可画面で弾かれる。
+      // 同時投稿の許可（`instagram_business_content_publish`）が無いと投稿できないので、
+      // 接続のときに一緒に貰う。用途に入っていない権限を混ぜると認可画面そのものが
+      // 断られるため、求めるのは `services/instagram.ts` の2つだけ。
       scope: INSTAGRAM_SCOPES.join(','),
     }).toString();
     return c.json({
@@ -184,12 +186,11 @@ instagram.post(
  * 失敗したときは、画面に出す文言を変えないまま、手がかりだけをクエリへ添える。
  * サーバー記録は閲覧の権限が無くて読めない場合があり、そのときは原因が全く分からなく
  * なってしまうため、戻り先のURLそのものに失敗の種別が残るようにしておく。
- * 添えるのは次の4つ。画面側は `instagram` の値だけを見るので、見た目は変わらない。
+ * 添えるのは次の3つ。画面側は `instagram` の値だけを見るので、見た目は変わらない。
  *
  * - `instagram_code` … こちらで決めた失敗の種類名
- * - `instagram_detail` … 要求の宛先と、Meta の応答の種別名・番号
+ * - `instagram_detail` … 要求の宛先と、Instagram の応答の種別名・番号
  * - `instagram_scopes` … 利用者が許可した権限の名前
- * - `instagram_pages` … 見つかった Facebook ページの件数（`総数/Instagram有り/合鍵有り`）
  *
  * 値は `instagramDiagnostic` で一度だけ安全な形へ絞ってから渡す。URLは利用者に見える
  * 場所なので、固定の識別子・許可一覧に載る名前・検査した整数しか置かない
@@ -211,7 +212,6 @@ function snsReturnUrl(
       url.searchParams.set('instagram_detail', diagnostic.detail);
     if (diagnostic.scopes)
       url.searchParams.set('instagram_scopes', diagnostic.scopes);
-    url.searchParams.set('instagram_pages', diagnostic.pages);
   }
   return url.toString();
 }
@@ -219,36 +219,30 @@ type InstagramDiagnostic = {
   code: string;
   detail: string | null;
   scopes: string | null;
-  pages: string;
 };
 /**
  * 失敗の手がかりを、サーバー記録と戻り先URLのどちらへ出しても安全な形に絞る。
  *
  * 絞り込みはここ1か所だけで行い、記録とURLは同じ値を使う。
- * `detail` と `scopes` は Meta の応答由来なので、`instagramUrl*` が通した部分
+ * `detail` と `scopes` は Instagram の応答由来なので、`instagramUrl*` が通した部分
  * （固定の識別子・許可一覧に載る名前・整数）しか残らない。
  */
 function instagramDiagnostic(failure: {
   code: string;
   detail: string | null;
   grantedScopes: string | null;
-  pages: InstagramPageScan;
 }): InstagramDiagnostic {
-  const p = failure.pages;
   return {
     code: instagramUrlCode(failure.code),
     detail: instagramUrlDetail(failure.detail),
     scopes: instagramUrlScopes(failure.grantedScopes),
-    pages: [p.total, p.withInstagram, p.withToken]
-      .map(instagramUrlCount)
-      .join('/'),
   };
 }
 const INSTAGRAM_RETURN_PATH = '/settings/sns';
 /**
  * Instagram にログインするだけで接続が終わる口（2026-10-07 利用者承認）。
- * Facebook ページを選ばせる画面は出さず、ビジネスアカウントのつながったページを
- * ここで自動採用して保存し、必ず設定 › SNS連携へ戻す。
+ * Facebook ページは一切見ない。認可コードを合鍵へ引き換え、その応答に入っている
+ * Instagram の利用者IDとプロフィールをそのまま保存し、必ず設定 › SNS連携へ戻す。
  */
 instagram.get(
   '/api/instagram/oauth/callback',
@@ -256,20 +250,24 @@ instagram.get(
   denyReadOnly(),
   async (c) => {
     let hash: string | null = null;
-    // 失敗したときだけサーバー記録へ出す手がかり。権限の名前と件数だけで、合鍵や個人の情報は入れない。
-    const scan: InstagramPageScan = {
-      total: 0,
-      withInstagram: 0,
-      withToken: 0,
-    };
+    // 失敗したときだけサーバー記録へ出す手がかり。権限の名前だけで、合鍵や個人の情報は入れない。
     let grantedScopes: string | null = null;
     try {
       const cfg = ready(c),
-        state = c.req.query('state'),
-        code = c.req.query('code');
-      if (!state || !code || code.length > 4096 || state.length > 256)
+        state = c.req.query('state');
+      if (!state || state.length > 256)
         throw new InstagramError('invalid_callback', 400);
+      // 先に state を控える。この後でどこで失敗しても、使い切りの state を必ず捨てられるようにする。
       hash = await instagramHash(state);
+      // 利用者が認可画面で「許可しない」を選んだとき。`error=access_denied` が付いて戻る。
+      // 失敗の種別を分けておけば、作りの不具合と見分けられる。
+      if (c.req.query('error'))
+        throw new InstagramError('instagram_login_denied', 403);
+      // Instagram は成功した戻り先URLの末尾に `#_` を足す。付いたままだと認可コードが
+      // 1文字ずれて必ず引き換えに失敗するので、ここで落とす。
+      const code = (c.req.query('code') ?? '').replace(/#_$/, '');
+      if (!code || code.length > 4096)
+        throw new InstagramError('invalid_callback', 400);
       const row = await c.env.DB.prepare(
         "SELECT line_account_id FROM instagram_oauth_states WHERE state_hash=? AND staff_id=? AND phase='started' AND expires_at>?",
       )
@@ -290,45 +288,37 @@ instagram.get(
         .run();
       if (!claimed.meta.changes)
         throw new InstagramError('oauth_state_used', 409);
-      const short = await instagramGraph<{ access_token: string }>(
-        cfg,
-        'oauth/access_token',
-        null,
-        {
-          client_id: cfg.appId,
-          client_secret: cfg.appSecret,
-          redirect_uri: cfg.redirectUri,
-          code,
-        },
-      );
-      if (!short.access_token) throw new InstagramError('invalid_meta_token');
-      const long = await instagramLongToken(cfg, short.access_token);
-      grantedScopes = long.scopes.join(',');
+      // 認可コードを短期の合鍵へ。許可された権限はこの応答にしか入っていないので、
+      // ここで控えて同時投稿の許可を確かめる。
+      const short = await instagramShortToken(cfg, code);
+      grantedScopes = short.scopes.join(',');
       // 同時投稿の許可が無い接続は保存しない。画面は未接続のままなので、もう一度ログインすれば取り直せる。
-      if (!long.scopes.includes(INSTAGRAM_PUBLISH_SCOPE))
+      if (!short.scopes.includes(INSTAGRAM_PUBLISH_SCOPE))
         throw new InstagramError('instagram_publish_not_granted', 403);
-      const pages = await instagramPages(cfg, long.token, scan),
-        page = pages[0];
-      // ビジネスアカウント（またはクリエイターアカウント）でなければ投稿の口が無い。
-      if (!page)
-        throw new InstagramError('instagram_business_account_required', 403);
+      const long = await instagramLongToken(cfg, short.token);
       const profile = await instagramGraph<InstagramProfile>(
         cfg,
-        page.instagramId,
-        page.token,
+        'me',
+        long.token,
         {
           fields:
             'id,username,name,biography,profile_picture_url,followers_count,media_count',
         },
       );
+      // 投稿に使うIDは、合鍵の引き換えで返る Instagram の利用者ID。
+      // 形がおかしいときだけプロフィール側のIDで拾う。どちらも数字でなければ
+      // 投稿の口が無い（プロアカウントになっていない）とみなす。
+      const instagramId = short.userId || String(profile.id ?? '');
+      if (!/^\d{1,24}$/.test(instagramId))
+        throw new InstagramError('instagram_business_account_required', 403);
+      // 画面に出す名前。`page_name` は空にできない列なので、表示名→利用者名→IDの順に埋める。
+      const pageName = profile.name || profile.username || instagramId;
+      // この方式の合鍵は1本だけ（ページ用と利用者用の区別が無い）。列は両方そのまま使う。
       const pageToken = await encryptInstagramCredential(
-          page.token,
-          cfg.encryptionKey,
-        ),
-        userToken = await encryptInstagramCredential(
           long.token,
           cfg.encryptionKey,
-        );
+        ),
+        userToken = pageToken;
       // ブラウザの折り返しでは版を預かれないので、保存の直前に今の版を読んで衝突だけ見る。
       const current = await c.env.DB.prepare(
         'SELECT version FROM instagram_connections WHERE line_account_id=?',
@@ -342,15 +332,15 @@ instagram.get(
       )
         .bind(
           id,
-          page.pageId,
-          page.instagramId,
-          page.pageName,
+          instagramId,
+          instagramId,
+          pageName,
           profile.username ?? null,
           pageToken,
           userToken,
           long.expiresAt,
           long.dataAccessExpiresAt,
-          long.scopes.join(','),
+          short.scopes.join(','),
           JSON.stringify(profile),
           now,
           c.get('staff').id,
@@ -374,7 +364,6 @@ instagram.get(
         code: e instanceof InstagramError ? e.code : 'instagram_failed',
         detail: e instanceof InstagramError ? (e.detail ?? null) : null,
         grantedScopes,
-        pages: scan,
       });
       console.error(
         JSON.stringify({
@@ -401,23 +390,21 @@ instagram.post(
       cfg = ready(c),
       r = await connection(c, id);
     if (expired(r)) throw new InstagramError('meta_token_expired', 409);
-    const long = await instagramLongToken(
-        cfg,
-        await decryptInstagramCredential(
-          r.user_token_encrypted,
-          cfg.encryptionKey,
-        ),
+    // 期限を延ばすだけの口。Instagram は同じ合鍵を延長するので、つながっている相手も
+    // 許可の範囲も変わらない（Facebook ページの照合は無くなった）。
+    const long = await instagramRefreshToken(
+      cfg,
+      await decryptInstagramCredential(
+        r.user_token_encrypted,
+        cfg.encryptionKey,
       ),
-      pages = await instagramPages(cfg, long.token),
-      page = pages.find(
-        (p) => p.pageId === r.page_id && p.instagramId === r.instagram_id,
-      );
-    if (!page) throw new InstagramError('page_not_authorized', 403);
-    const user = await encryptInstagramCredential(
+    );
+    // 合鍵は1本だけなので、2つの列へ同じものを入れ直す。
+    const token = await encryptInstagramCredential(
         long.token,
         cfg.encryptionKey,
       ),
-      token = await encryptInstagramCredential(page.token, cfg.encryptionKey);
+      user = token;
     const saved = await c.env.DB.prepare(
       'UPDATE instagram_connections SET page_token_encrypted=?,user_token_encrypted=?,expires_at=?,data_access_expires_at=?,scopes=?,refreshed_at=?,version=version+1 WHERE line_account_id=? AND version=?',
     )
@@ -426,7 +413,8 @@ instagram.post(
         user,
         long.expiresAt,
         long.dataAccessExpiresAt,
-        long.scopes.join(','),
+        // 許可の範囲は延長で変わらないので、保存済みの値をそのまま残す。
+        r.scopes,
         new Date().toISOString(),
         id,
         r.version,

@@ -368,6 +368,10 @@ export type Env = {
     X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
     META_APP_ID?: string;
     META_APP_SECRET?: string;
+    // Instagram API with Instagram Login (no Facebook Page). Separate credentials
+    // from META_APP_*: App Dashboard > Instagram > API setup with Instagram login.
+    INSTAGRAM_APP_ID?: string;
+    INSTAGRAM_APP_SECRET?: string;
     META_REDIRECT_URI?: string;
     META_GRAPH_API_VERSION?: string;
     META_TOKEN_ENCRYPTION_KEY?: string;
