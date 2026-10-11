@@ -2771,7 +2771,12 @@ const HQ_RUN_SENT = {
 /* 作成③の撮影状態。既存APIから5つの吹き出しを戻す。未選択の素材は下書きのまま。 */
 const VISUAL_COMPOSE_BUBBLES = [
   { id: 'visual-text', type: 'text', content: { text: HQ_RUN_INPUT.messageContent } },
-  { id: 'visual-sticker', type: 'sticker', content: { packageId: '11537', stickerId: '52002734' } },
+  { id: 'visual-sticker', type: 'sticker', content: { state: {
+    location: { title: '', address: '', latitude: '', longitude: '' },
+    video: { originalContentUrl: '', previewImageUrl: '' },
+    audio: { originalContentUrl: '', duration: '' },
+    sticker: { packageId: '11537', stickerId: '52002734' },
+  } } },
   { id: 'visual-carousel', type: 'carousel', content: {} },
   { id: 'visual-audio', type: 'audio', content: {} },
   { id: 'visual-rich', type: 'rich_message', content: {} },
