@@ -117,8 +117,8 @@ export type RowMenuProps = {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   /**
-   * 見た目。'plain' は固定V8一覧の枠なしの「…」。
-   * 'box' は行内で行う操作など、枠付きの印ボタンが指定された場所。
+   * 見た目。'plain' は一覧の標準操作、'box' は行内の小さい印ボタン。
+   * V8では両方とも共通の薄い枠を持つ（B-253・一覧の型i0Ao0R）。
    */
   appearance?: 'box' | 'plain'
   /**

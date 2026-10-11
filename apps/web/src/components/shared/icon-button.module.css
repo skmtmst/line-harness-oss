@@ -144,3 +144,11 @@
 /* B-152・仕上げ7 */
 [data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }
 [data-theme='v8'] .button:is(:hover, :active):not(:disabled) { filter: none; }
+
+/* 行の「…」はplainの操作にも枠を付ける。寸法と動きは既存の口のまま。 */
+html[data-theme='v8'] .button[data-row-menu]:not(:focus-visible) {
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  box-shadow: var(--control-shadow);
+}

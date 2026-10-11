@@ -1233,7 +1233,7 @@ export default function MediaLibraryListV8() {
             search={{
               placeholder: 'ファイル名で探す',
               label: 'ファイル名で探す',
-              width: 258,
+              width: 240,
               value: query,
               onChange: (value) => {
                 setQuery(value)
