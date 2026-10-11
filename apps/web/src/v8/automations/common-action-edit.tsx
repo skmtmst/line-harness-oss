@@ -19,11 +19,14 @@ import { useCanManageCommonActions } from '@/components/automations/use-common-a
 import { TextArea, TextField } from '@/components/shared/text-field'
 import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from './branch-editor'
 import { mergeOrderedActions, stepNumbers } from './action-order'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
 }
 function EditCommonActionInner() {
+  const saveErrors = useSaveFormErrors()
   const canManage = useCanManageCommonActions()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
@@ -133,6 +136,7 @@ function EditCommonActionInner() {
       })
       router.push(`/common-actions/versions?id=${encodeURIComponent(id)}`)
     } catch (caught) {
+      saveErrors.capture(caught)
       setError(caught instanceof ApiError || caught instanceof Error ? caught.message : '下書きを保存できませんでした')
       // 監査 R473: 先行保存との競合は入力を保持したまま、読み直しへ導く。
       if (caught instanceof ApiError && caught.status === 409) setSaveConflict(true)
@@ -226,7 +230,7 @@ function EditCommonActionInner() {
   }
 
   return (
-    <CreatePage title="下書きの中身を編集"
+    <SaveErrorScope errors={saveErrors}><CreatePage title="下書きの中身を編集"
         help="公開済みの版は変えず、新しい下書きだけを編集します。"
       busy={saving}
       status={saving ? '下書きを保存しています' : '公開済みの版には影響しません'}
@@ -251,8 +255,8 @@ function EditCommonActionInner() {
           <Card spacing="normal">
             <CardHeader title="名前と説明" />
             <div className="mt-4 space-y-4">
-              <label className="text-ink-secondary block text-sm">共通アクション名<TextField value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1" /></label>
-              <label className="text-ink-secondary block text-sm">説明<TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1" /></label>
+              <label className="text-ink-secondary block text-sm">共通アクション名<SaveErrorField names={["name"]}><TextField value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1" /></SaveErrorField></label>
+              <label className="text-ink-secondary block text-sm">説明<SaveErrorField names={["description"]}><TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1" /></SaveErrorField></label>
             </div>
           </Card>
           <section>
@@ -275,7 +279,7 @@ function EditCommonActionInner() {
           <Button onClick={() => { setSaveConflict(false); setReloadKey((key) => key + 1) }}>最新の内容を読み込み直す</Button>
         </div>
       ) : null}
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 

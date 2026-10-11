@@ -155,6 +155,21 @@ afterEach(async () => {
 })
 
 describe('M507残差・409で止めて最新を見せる（実mount）', () => {
+  it('2枚目の入力検査はその紹介文だけに返し、ほかのカードの入力を変えない', async () => {
+    updateColumnMessageApi.mockRejectedValueOnce(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { introText: '紹介文を短くしてください' }))
+    await mount()
+    await setDraft(1, '2枚目の書きかけ')
+    await click(saveButtons()[1])
+    expect(textareas()[1].value).toBe('2枚目の書きかけ')
+    expect(textareas()[1].getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(textareas()[1])
+    expect(textareas()[0].getAttribute('aria-invalid')).not.toBe('true')
+    expect(textareas()[0].value).toBe('紹介文a')
+    await setDraft(1, '短い紹介文')
+    expect(textareas()[1].getAttribute('aria-invalid')).not.toBe('true')
+    await click(saveButtons()[1])
+    expect(updateColumnMessageApi).toHaveBeenLastCalledWith(ACCOUNT_ID, 'b', '短い紹介文', '2026-09-30T00:00:00Z')
+  })
   it('409後は自入力を残したまま最新の紹介文が同カードに別表示され、別カードに触れない', async () => {
     updateColumnMessageApi.mockRejectedValueOnce(conflictError())
     await mount()

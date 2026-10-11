@@ -20,6 +20,8 @@ import { restaurantGoogleApi, type GooglePhoto, type GoogleProfileData, type Goo
 import { errorMessage } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 type ProfileForm = { title: string; postalCode: string; administrativeArea: string; locality: string; addressLines: string; phone: string; websiteUri: string; description: string }
 
@@ -38,6 +40,7 @@ function formFrom(data: GoogleProfileData): ProfileForm {
 }
 
 export function ProfileEditScreen({ accountId, go }: { accountId: string; go: GoogleNav }) {
+  const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
   const canEdit = canManageRole(role)
   const submitLock = useRef(false)
@@ -109,6 +112,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
       disarm()
       go({ tab: 'profile', view: 'confirm', id: ids.join(',') })
     } catch (err) {
+      saveErrors.capture(err)
       setActionError(`${errorMessage(err, '変更案を作れませんでした。')}${ids.length ? `（${ids.length}件は作成済みです。変更履歴から確認できます）` : ''}`)
     } finally {
       submitLock.current = false
@@ -127,7 +131,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
   const editable = canEdit && !data.closed && !busy
   const closePicker = () => { pickerRequest.current += 1; setPicker((value) => ({ ...value, open: false, loading: false })) }
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <div className={styles.buttonRow}><Button onClick={() => guarded(() => go({ tab: 'profile' }))}>プロフィールへ戻る</Button></div>
       <SectionHeader title="プロフィールを編集" note={<StatusBadge tone="warning">まだ反映していません</StatusBadge>} />
       <p className={styles.muted}>対象店舗：{storeName} / 変更した項目だけをGoogleへ送ります。送信前に確認画面を表示します。</p>
@@ -136,17 +140,17 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
         <Field label="店舗名" htmlFor="gb-title" note="Googleに表示される名前です。屋号以外の宣伝文句は入れないでください。">
-          <TextField id="gb-title" value={form.title} onChange={(e) => set('title')(e.target.value)} maxLength={100} disabled={!editable} />
+          <SaveErrorField names={["title"]}><TextField id="gb-title" value={form.title} onChange={(e) => set('title')(e.target.value)} maxLength={100} disabled={!editable} /></SaveErrorField>
         </Field>
         <Notice tone="warn">住所を変えると、Googleが本人確認（はがきの郵送など）を求めることがあります。その間、変更は保留になります。</Notice>
-        <Field label="郵便番号" htmlFor="gb-postal"><TextField id="gb-postal" placeholder="150-0001" value={form.postalCode} onChange={(e) => set('postalCode')(e.target.value)} maxLength={8} disabled={!editable} /></Field>
-        <Field label="都道府県" htmlFor="gb-region"><TextField id="gb-region" placeholder="東京都" value={form.administrativeArea} onChange={(e) => set('administrativeArea')(e.target.value)} maxLength={20} disabled={!editable} /></Field>
-        <Field label="市区町村" htmlFor="gb-locality"><TextField id="gb-locality" placeholder="渋谷区神宮前" value={form.locality} onChange={(e) => set('locality')(e.target.value)} maxLength={40} disabled={!editable} /></Field>
-        <Field label="番地・建物" htmlFor="gb-address"><TextField id="gb-address" placeholder="1-2-3 こもれびビル 1F" value={form.addressLines} onChange={(e) => set('addressLines')(e.target.value)} maxLength={160} disabled={!editable} /></Field>
-        <Field label="電話番号" htmlFor="gb-phone" note="ハイフンありで入力できます。"><TextField id="gb-phone" inputMode="tel" value={form.phone} onChange={(e) => set('phone')(e.target.value)} maxLength={20} disabled={!editable} /></Field>
-        <Field label="ウェブサイト" htmlFor="gb-website"><TextField id="gb-website" inputMode="url" placeholder="https://" value={form.websiteUri} onChange={(e) => set('websiteUri')(e.target.value)} maxLength={200} disabled={!editable} /></Field>
+        <Field label="郵便番号" htmlFor="gb-postal"><SaveErrorField names={["postalCode","address.postalCode"]}><TextField id="gb-postal" placeholder="150-0001" value={form.postalCode} onChange={(e) => set('postalCode')(e.target.value)} maxLength={8} disabled={!editable} /></SaveErrorField></Field>
+        <Field label="都道府県" htmlFor="gb-region"><SaveErrorField names={["administrativeArea","address.administrativeArea"]}><TextField id="gb-region" placeholder="東京都" value={form.administrativeArea} onChange={(e) => set('administrativeArea')(e.target.value)} maxLength={20} disabled={!editable} /></SaveErrorField></Field>
+        <Field label="市区町村" htmlFor="gb-locality"><SaveErrorField names={["locality","address.locality"]}><TextField id="gb-locality" placeholder="渋谷区神宮前" value={form.locality} onChange={(e) => set('locality')(e.target.value)} maxLength={40} disabled={!editable} /></SaveErrorField></Field>
+        <Field label="番地・建物" htmlFor="gb-address"><SaveErrorField names={["addressLines","address.addressLines"]}><TextField id="gb-address" placeholder="1-2-3 こもれびビル 1F" value={form.addressLines} onChange={(e) => set('addressLines')(e.target.value)} maxLength={160} disabled={!editable} /></SaveErrorField></Field>
+        <Field label="電話番号" htmlFor="gb-phone" note="ハイフンありで入力できます。"><SaveErrorField names={["phone"]}><TextField id="gb-phone" inputMode="tel" value={form.phone} onChange={(e) => set('phone')(e.target.value)} maxLength={20} disabled={!editable} /></SaveErrorField></Field>
+        <Field label="ウェブサイト" htmlFor="gb-website"><SaveErrorField names={["websiteUri","website_uri"]}><TextField id="gb-website" inputMode="url" placeholder="https://" value={form.websiteUri} onChange={(e) => set('websiteUri')(e.target.value)} maxLength={200} disabled={!editable} /></SaveErrorField></Field>
         <Field label="店舗紹介文" htmlFor="gb-description" count={{ value: form.description.length, max: 750 }}>
-          <TextArea id="gb-description" rows={7} value={form.description} onChange={(e) => set('description')(e.target.value)} maxLength={750} disabled={!editable} />
+          <SaveErrorField names={["description"]}><TextArea id="gb-description" rows={7} value={form.description} onChange={(e) => set('description')(e.target.value)} maxLength={750} disabled={!editable} /></SaveErrorField>
         </Field>
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="写真">
@@ -178,6 +182,6 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
         <Button variant="primary" onClick={() => void submit()} disabled={busy || !dirty || data.closed || form.description.length > 750} busy={busy} busyLabel="確認中…">変更内容を確認</Button>
       </>} /> : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="プロフィールの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }

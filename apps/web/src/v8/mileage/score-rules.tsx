@@ -34,6 +34,8 @@ import {
 import { localDateTime, utcDateTime } from '@/lib/presentation'
 import { validateRuleName, validateTestScore } from '@/app/mileage/score-rules/score-rules-validation'
 import { formatDay, formatNumber } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
@@ -135,6 +137,7 @@ function fieldError(error: unknown) {
 }
 
 export default function ActionScoreRulesPage() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('スコアのルール')
   usePageCrumbs([{ label: 'マイル', href: '/mileage' }, { label: '行動スコア', href: '/mileage?tab=score' }])
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -362,6 +365,7 @@ export default function ActionScoreRulesPage() {
       }
       return response.data
     } catch (error) {
+      saveErrors.capture(error)
       setActionError(fieldError(error))
       return null
     } finally {
@@ -390,6 +394,7 @@ export default function ActionScoreRulesPage() {
       setConfirmAction(null)
       notifyToast(`第${response.data.publishedVersion?.versionNumber ?? '—'}版を公開しました。利用先は公開した版に固定されます。`)
     } catch (error) {
+      saveErrors.capture(error)
       setActionError(fieldError(error))
     } finally {
       setBusy(false)
@@ -467,7 +472,7 @@ export default function ActionScoreRulesPage() {
   const RuleName = canEdit ? 'button' : 'span'
 
   return (
-    <CreatePage title="スコアのルール"
+    <SaveErrorScope errors={saveErrors}><CreatePage title="スコアのルール"
       busy={busy}
       readOnly={configuration !== null && !canEdit}
       actions={<Button onClick={() => setTestOpen(true)}>1人で試す</Button>}
@@ -496,9 +501,9 @@ export default function ActionScoreRulesPage() {
 </> : null}
       hidePreviewWhenNarrow
       status={bundle && configuration ? <p className="text-xs text-ink-faint">{versionLabel}。公開後に起きたことから新しい点数が付きます。</p> : null}
-      footerActions={bundle && configuration && canEdit ? <>          {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={!canEdit || busy}>公開中のルールを停止</Button> : null}
-          <Button onClick={() => void saveDraft()} disabled={!canEdit || busy}>下書きを保存する</Button>
-          <Button variant="primary" onClick={() => void preparePublish()} disabled={!canEdit || busy || bundle.rules.every((rule) => !rule.enabled)}>スコアのルールを公開</Button></> : null}
+      footerActions={bundle && configuration && canEdit ? <>          {configuration.currentPublishedVersionId ? <Button onClick={() => setConfirmAction({ kind: 'stop' })} disabled={busy}>公開中のルールを停止</Button> : null}
+          <Button onClick={() => void saveDraft()} disabled={busy}>下書きを保存する</Button>
+          <Button variant="primary" onClick={() => void preparePublish()} disabled={busy || bundle.rules.every((rule) => !rule.enabled)}>スコアのルールを公開</Button></> : null}
     >
       {!selectedAccountId && !accountLoading ? (
         <ListState kind="empty" title="LINEアカウントを選択してください" description="スコアのルールは、共通トップバーで選んだLINEアカウントごとに保存します。" />
@@ -566,9 +571,9 @@ export default function ActionScoreRulesPage() {
               <p className="text-sm font-semibold text-ink">帯の分けかた</p>
               <p className="mt-1 text-xs text-ink-faint">この分けかたで、配信の相手を選べます。</p>
               <div className="mt-4 grid max-w-2xl grid-cols-3 gap-3">
-                <Field label="高い（以上）" htmlFor="score-high"><TextInput id="score-high" type="number" value={bundle.bands.highMin} disabled={!canEdit} onChange={(event) => updateBands({ highMin: Number(event.target.value) })} /></Field>
-                <Field label="ふつう（以上）" htmlFor="score-normal"><TextInput id="score-normal" type="number" value={bundle.bands.normalMin} disabled={!canEdit} onChange={(event) => updateBands({ normalMin: Number(event.target.value) })} /></Field>
-                <Field label="点の上限" htmlFor="score-max"><TextInput id="score-max" type="number" value={bundle.bands.max} disabled={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></Field>
+                <Field label="高い（以上）" htmlFor="score-high"><SaveErrorField names={["highMin","bands.highMin","bands.high_min"]}><TextInput id="score-high" type="number" value={bundle.bands.highMin} readOnly={!canEdit} onChange={(event) => updateBands({ highMin: Number(event.target.value) })} /></SaveErrorField></Field>
+                <Field label="ふつう（以上）" htmlFor="score-normal"><SaveErrorField names={["normalMin","bands.normalMin","bands.normal_min"]}><TextInput id="score-normal" type="number" value={bundle.bands.normalMin} readOnly={!canEdit} onChange={(event) => updateBands({ normalMin: Number(event.target.value) })} /></SaveErrorField></Field>
+                <Field label="点の上限" htmlFor="score-max"><SaveErrorField names={["max","bands.max"]}><TextInput id="score-max" type="number" value={bundle.bands.max} readOnly={!canEdit} onChange={(event) => updateBands({ max: Number(event.target.value) })} /></SaveErrorField></Field>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 {canEdit ? <Button onClick={() => void previewBands()} disabled={bandPreviewBusy} busy={bandPreviewBusy} busyLabel="数えています">この分けかただと何人入るか見る</Button> : null}
@@ -599,8 +604,8 @@ export default function ActionScoreRulesPage() {
         footer={<div className="flex justify-end gap-2"><Button variant="primary" onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button></div>}
       >
         <div className="grid gap-3">
-          <Field label="テスト前の点数" htmlFor="test-score" note={`${bundle?.bands.min ?? 0}〜${bundle?.bands.max ?? 100}の整数で入力`} error={testScoreError || undefined}><TextInput id="test-score" type="number" value={testScore} invalid={Boolean(testScoreError)} onChange={(event) => { setTestScore(event.target.value); setTestScoreError(''); setTestResult(null); testRunRef.current += 1 }} /></Field>
-          <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={(value) => { setTestEvent(value); setTestError(''); setTestResult(null); testRunRef.current += 1 }} options={[...EVENT_OPTIONS]} size="full" /></Field>
+          <Field label="テスト前の点数" htmlFor="test-score" note={`${bundle?.bands.min ?? 0}〜${bundle?.bands.max ?? 100}の整数で入力`} error={testScoreError || undefined}><SaveErrorField names={["testScore","test_score"]}><TextInput id="test-score" type="number" value={testScore} invalid={Boolean(testScoreError)} onChange={(event) => { setTestScore(event.target.value); setTestScoreError(''); setTestResult(null); testRunRef.current += 1 }} /></SaveErrorField></Field>
+          <Field label="試す行動"><SaveErrorField names={["testEvent","test_event"]}><Select aria-label="テストする行動" value={testEvent} onChange={(value) => { setTestEvent(value); setTestError(''); setTestResult(null); testRunRef.current += 1 }} options={[...EVENT_OPTIONS]} size="full" /></SaveErrorField></Field>
           {testResult ? (
             <Notice tone="success">
               <p className="text-xs font-semibold">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
@@ -621,7 +626,7 @@ export default function ActionScoreRulesPage() {
             footer={<div className="flex justify-end"><Button variant="primary" onClick={() => applyEditor()}>設定を反映</Button></div>}
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Field label="表示名" htmlFor="rule-name" error={editError || undefined}><TextInput id="rule-name" value={rule.name} invalid={Boolean(editError)} onChange={(event) => { updateEditDraft({ name: event.target.value }); setEditError('') }} /></Field></div>
+              <div className="sm:col-span-2"><Field label="表示名" htmlFor="rule-name" error={editError || undefined}><SaveErrorField names={["name"]}><TextInput id="rule-name" value={rule.name} invalid={Boolean(editError)} onChange={(event) => { updateEditDraft({ name: event.target.value }); setEditError('') }} /></SaveErrorField></Field></div>
               <div className="sm:col-span-2"><Field label="きっかけ"><Select aria-label={`${rule.name}のきっかけ`} value={eventValue(rule)} onChange={(value) => {
                 const [eventType, source] = value.split('|')
                 const name = EVENT_OPTIONS.find((option) => option.value === value)?.label ?? rule.name
@@ -634,8 +639,8 @@ export default function ActionScoreRulesPage() {
                 const amount = Math.abs(Number(event.target.value))
                 updateEditDraft({ value: operationValue(rule) === 'subtract' ? -amount : amount })
               }} /></Field>
-              <Field label="回数"><Select aria-label={`${rule.name}の回数制限`} value={rule.frequency.kind} onChange={(value) => updateEditDraft({ frequency: { kind: value as ActionScoreFrequencyKind, limit: 1 } })} options={FREQUENCY_OPTIONS} size="full" /></Field>
-              <Field label="上限回数" htmlFor="rule-limit"><TextInput id="rule-limit" type="number" min={1} max={1000} value={rule.frequency.limit} disabled={!['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind)} onChange={(event) => updateEditDraft({ frequency: { ...rule.frequency, limit: Number(event.target.value) } })} /></Field>
+              <Field label="回数"><SaveErrorField names={["frequency.kind"]}><Select aria-label={`${rule.name}の回数制限`} value={rule.frequency.kind} onChange={(value) => updateEditDraft({ frequency: { kind: value as ActionScoreFrequencyKind, limit: 1 } })} options={FREQUENCY_OPTIONS} size="full" /></SaveErrorField></Field>
+              <Field label="上限回数" htmlFor="rule-limit"><SaveErrorField names={["frequency.limit"]}><TextInput id="rule-limit" type="number" min={1} max={1000} value={rule.frequency.limit} disabled={!['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind)} onChange={(event) => updateEditDraft({ frequency: { ...rule.frequency, limit: Number(event.target.value) } })} /></SaveErrorField></Field>
               <Field label="開始日時" htmlFor="rule-start"><DateTimeField id="rule-start" value={localDateTime(rule.validFrom)} onChange={(v) => updateEditDraft({ validFrom: utcDateTime(v) })} /></Field>
               <Field label="終了日時" htmlFor="rule-end"><DateTimeField id="rule-end" value={localDateTime(rule.validUntil)} onChange={(v) => updateEditDraft({ validUntil: utcDateTime(v) })} /></Field>
               <div className="sm:col-span-2"><Toggle checked={rule.enabled} label="このできごとを動かす" onChange={(enabled) => updateEditDraft({ enabled })} /></div>
@@ -679,6 +684,6 @@ export default function ActionScoreRulesPage() {
           setDeleteRuleIndex(null)
         }}
       />
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }

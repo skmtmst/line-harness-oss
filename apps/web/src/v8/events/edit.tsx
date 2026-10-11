@@ -19,6 +19,8 @@ import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import EventForm from '@/v8/events/edit-form'
 import { useBookingRequests } from './booking-requests'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 const NEXT_LIFECYCLE: Record<EventLifecycleStatus, Array<{ to: EventLifecycleStatus; label: string; needsReason: boolean }>> = {
   draft: [{ to: 'published', label: '公開する', needsReason: false }],
@@ -79,6 +81,7 @@ function BookingStatus({ accountId, eventId, refreshKey }: { accountId: string; 
 }
 
 function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string; eventId: string; onChanged: () => void }) {
+  const saveErrors = useSaveFormErrors()
   const [lifecycle, setLifecycle] = useState<EventLifecycleStatus | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [loadSeq, setLoadSeq] = useState(0)
@@ -111,13 +114,14 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
       onChanged()
     } catch (failure) {
       if (!request.isCurrent()) return
+      saveErrors.capture(failure)
       const code = (failure as { body?: { error?: string } }).body?.error
       setError(code === 'lifecycle_transition_invalid'
         ? 'いまの状態からは変えられません。開き直して最新の状態で、もう一度お試しください。'
         : '変えられませんでした。時間をおいて、もう一度お試しください。')
     } finally { if (request.isCurrent()) setBusy(false); request.finish() }
   }
-  return <FormSection id="ev-edit-lifecycle" title="公開の状態" action={<>
+  return <SaveErrorScope errors={saveErrors}><FormSection id="ev-edit-lifecycle" title="公開の状態" action={<>
     {(lifecycle ? NEXT_LIFECYCLE[lifecycle] : []).map((option) => <Button key={option.to} disabled={busy} onClick={() => { setReason(''); setError(''); setPending(option) }}>{option.label}</Button>)}
   </>}>
     {lifecycle === null ? loadFailed ? <Notice tone="warn" message="公開の状態を読み込めませんでした。"
@@ -127,9 +131,9 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
       destructive={pending?.to === 'cancelled'} confirmLabel={pending?.label ?? '変える'} busy={busy} error={error}
       confirmDisabled={Boolean(pending?.needsReason && reason.trim() === '')} onConfirm={runSwitch}
       onCancel={() => { if (!busy) { setPending(null); setReason(''); setError('') } }}>
-      {pending?.needsReason ? <Field label="理由（必須・変更の記録に残ります）" required><TextArea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} placeholder="例：台風のため今週の受付を止めます" /></Field> : null}
+      {pending?.needsReason ? <Field label="理由（必須・変更の記録に残ります）" required><SaveErrorField names={["reason"]}><TextArea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} placeholder="例：台風のため今週の受付を止めます" /></SaveErrorField></Field> : null}
     </ConfirmDialog>
-  </FormSection>
+  </FormSection></SaveErrorScope>
 }
 
 function EditEntry() {

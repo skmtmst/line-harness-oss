@@ -16,6 +16,9 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDay } from '@/lib/format'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { readSaveFieldErrors } from '@/lib/api-field-errors'
+
 
 type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'publishedAt' | 'updatedAt'>
 
@@ -27,6 +30,7 @@ type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'published
  * という食い違いになる。
  */
 export default function ColumnIntros() {
+  const saveErrors = useSaveFormErrors()
   usePageTitle('コラムの紹介文')
   usePageCrumbs([{ label: 'NEN配信', href: '/nen-campaigns' }, { label: 'コラムの紹介文' }])
   const canEdit = canManageRole(useStaffRole())
@@ -125,6 +129,7 @@ export default function ColumnIntros() {
       setLatestIntro(null)
     } catch (e) {
       if (stale()) return
+      saveErrors.setServerErrors(Object.fromEntries(Object.entries(readSaveFieldErrors(e)).map(([key, message]) => [`${column.id}.${key}`, message])))
       // M507: 競合時は最新の紹介文を読み直し、入力は残したまま比べながら
       // 保存し直せるようにする。
       if (e instanceof ApiError && e.status === 409 && e.code === 'VERSION_CONFLICT') {
@@ -150,18 +155,18 @@ export default function ColumnIntros() {
   }
 
 
-  return <DetailPage title="コラムの紹介文" readOnly={!canEdit} subtitle="コラムの本文はEC側にあります。ここで直せるのは、LINEで配るときに前に付ける一言だけです。">
+  return <SaveErrorScope errors={saveErrors}><DetailPage title="コラムの紹介文" readOnly={!canEdit} subtitle="コラムの本文はEC側にあります。ここで直せるのは、LINEで配るときに前に付ける一言だけです。">
     {error ? <Notice tone="danger" message={error} action={<Button onClick={() => void load()}>読み直す</Button>} /> : null}
     {loading ? <ListState kind="loading" /> : columns.length === 0 ? error ? null : <ListState kind="empty" title="コラムがまだありません。EC側で公開されると、ここに出ます。" /> : columns.map((column) => <FormSection
       key={column.id} id={`column-intro-${column.id}`} title={column.title}
       description={column.publishedAt ? formatDay(column.publishedAt) : '未公開'}
       action={canEdit ? <Button onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')} busy={savingId === column.id} done={savedId === column.id}>保存する</Button> : undefined}>
       <Field label={`${column.title}の紹介文`}>
-        <TextArea rows={3} value={drafts[column.id] ?? ''} maxLength={1500} readOnly={!canEdit} onChange={(event) => {
+        <SaveErrorField names={[`${column.id}.introText`]}><TextArea rows={3} value={drafts[column.id] ?? ''} maxLength={1500} readOnly={!canEdit} onChange={(event) => {
           setDrafts((previous) => ({ ...previous, [column.id]: event.target.value }))
           if (savedId === column.id) setSavedId(null)
           if (saveError?.id === column.id) setSaveError(null)
-        }} />
+        }} /></SaveErrorField>
       </Field>
       {latestIntro?.id === column.id ? <Field label="ほかの人が保存した最新の紹介文"><p>{latestIntro.text === '' ? '（空になっています）' : latestIntro.text}</p></Field> : null}
       {savingId === column.id ? <Notice tone="info" message="保存しています…" />
@@ -170,5 +175,5 @@ export default function ColumnIntros() {
         : (drafts[column.id] ?? '') !== (column.introText ?? '') ? <Notice tone="info" message="変更があります。保存するまで反映されません。" /> : null}
     </FormSection>)}
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した紹介文" onConfirm={confirmLeave} onCancel={cancelLeave} />
-  </DetailPage>
+  </DetailPage></SaveErrorScope>
 }

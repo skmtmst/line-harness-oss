@@ -25,6 +25,21 @@ async function open() { render(<ProfileEditScreen accountId="account-1" go={go} 
 function edit(name: string, value: string) { fireEvent.change(screen.getByRole('textbox', { name }), { target: { value } }) }
 
 describe('Googleプロフィールを現在の共通部品で編集する', () => {
+  it('保存先の入力検査は該当欄へ理由を返し、入力を残して修正・再試行できる', async () => {
+    await open(); edit('店舗名', '書きかけ')
+    mocks.proposeProfile.mockRejectedValueOnce(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { title: '店舗名を短くしてください' }))
+    fireEvent.click(screen.getByRole('button', { name: '変更内容を確認' }))
+    const name = screen.getByRole('textbox', { name: '店舗名' })
+    await screen.findByText('店舗名を短くしてください')
+    expect(name).toHaveProperty('value', '書きかけ')
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(name)
+    expect(go).not.toHaveBeenCalled()
+    edit('店舗名', '短い名前')
+    expect(screen.queryByText('店舗名を短くしてください')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '変更内容を確認' }))
+    await waitFor(() => expect(go).toHaveBeenCalledWith({ tab: 'profile', view: 'confirm', id: 'proposal-2' }))
+  })
   it('変更した項目と住所・写真の追加/削除だけを変更案にし、確認へ移るまでGoogleへ送らない', async () => {
     await open()
     edit('店舗名', ' 新しい名前 '); edit('番地・建物', '1-2-4 / 二階')

@@ -44,6 +44,8 @@ import {
 } from '@/components/events/event-draft-shared'
 import { formatDateTime, formatDay, formatTime } from '@/lib/format'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 
@@ -102,6 +104,7 @@ export function toEventDraft(row: EventDetail): EventDetail {
 }
 
 export default function EventForm({ accountId, eventId }: EventFormProps) {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccount, accounts } = useAccount()
   const [tab, setTab] = useState<Tab>('overview')
@@ -133,6 +136,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       notifyToast('複製した下書きを追加しました')
       router.push(`/events?highlight=${encodeURIComponent(response.id)}`)
     } catch (caught) {
+      saveErrors.capture(caught)
       setError(caught instanceof ApiError && caught.status === 409
         ? '別の人が変更しました。読み直してから複製してください。' : '複製できませんでした。もう一度お試しください。')
     } finally { setDuplicating(false) }
@@ -289,6 +293,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         router.replace(`/events/edit?id=${created.id}`)
       }
     } catch (e) {
+      saveErrors.capture(e)
       setError(
         e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
           ? '別の画面でイベントが更新されました。開き直してからもう一度保存してください。'
@@ -301,7 +306,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
   if (loading) return <ListState kind="loading" title="読み込んでいます…" />
 
-  return <>
+  return <SaveErrorScope errors={saveErrors}><>
     <FormSection id="ev-form-record" title={eventId ? draft.name || 'イベント編集' : '新規イベント作成'}
       description={eventId ? 'タブで各項目を編集できます' : 'まず「概要」を保存するとイベントが作成されます'}
       action={<>
@@ -363,7 +368,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         </Button>
       </>} /> : null}
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-  </>
+  </></SaveErrorScope>
 }
 
 // ----------------------------------------------------------------
@@ -400,7 +405,7 @@ function OverviewTab({
     <>
       <FormSection id="ev-form-overview" title="概要">
       <Field label="イベント名" required error={nameError}>
-        <TextInput
+        <SaveErrorField names={["name"]}><TextInput
           type="text"
           value={draft.name}
           onChange={(e) => {
@@ -411,25 +416,25 @@ function OverviewTab({
           maxLength={EVENT_NAME_MAX_LENGTH}
           placeholder="例: 第1回 AAA 説明会"
           aria-invalid={nameError !== null}
-        />
+        /></SaveErrorField>
       </Field>
         <Field label="開催場所">
-          <TextInput
+          <SaveErrorField names={["venue_name"]}><TextInput
             type="text"
             value={draft.venue_name ?? ''}
             onChange={(e) => update('venue_name', e.target.value || null)}
             placeholder="例: 渋谷ベース 3F"
-          />
+          /></SaveErrorField>
         </Field>
         <Field label="会場 URL">
-          <TextInput
+          <SaveErrorField names={["venue_url"]}><TextInput
             type="url"
             value={draft.venue_url ?? ''}
             onChange={(e) => update('venue_url', e.target.value || null)}
             placeholder="https://..."
-          />
+          /></SaveErrorField>
         </Field>
-      <Field label="会場の住所"><TextInput value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>
+      <Field label="会場の住所"><SaveErrorField names={["venue_address"]}><TextInput value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></SaveErrorField></Field>
         <ImageUploader
           mode="url"
           value={draft.image_url ? { mode: 'url', url: draft.image_url } : null}
@@ -438,12 +443,12 @@ function OverviewTab({
           title="イベント画像を追加"
         />
       <Field label="イベント詳細" count={{ value: descLen, max: EVENT_DESCRIPTION_MAX_LENGTH }}>
-        <TextArea
+        <SaveErrorField names={["description"]}><TextArea
           value={draft.description ?? ''}
           onChange={(e) => update('description', e.target.value || null)}
           rows={8}
           placeholder="開催趣旨、注意事項、持ち物などを記載..."
-        />
+        /></SaveErrorField>
       </Field>
         <Checkbox
           checked={draft.description_centered === 1}
@@ -461,7 +466,7 @@ function OverviewTab({
 
       <FormSection id="ev-form-target" title="公開対象">
       <Field label="1 人あたり予約回数">
-        <Select
+        <SaveErrorField names={["max_bookings_per_friend"]}><Select
           aria-label="1 人あたり予約回数"
           value={draft.max_bookings_per_friend == null ? 'unlimited' : String(draft.max_bookings_per_friend)}
           onChange={(value) =>
@@ -477,7 +482,7 @@ function OverviewTab({
             { value: '3', label: '3 回まで' },
             { value: '5', label: '5 回まで' },
           ]}
-        />
+        /></SaveErrorField>
       </Field>
 
         <RadioCardGroup legend="公開するアカウント">
@@ -527,6 +532,7 @@ function SlotsTab({
   slots: EventSlot[]
   setSlots: (s: EventSlot[]) => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
@@ -615,6 +621,7 @@ function SlotsTab({
       await refresh()
       setShowBulk(false)
     } catch (e) {
+      saveErrors.capture(e)
       // 400件ずつ送るので、途中で切れると一部だけ作られたまま残る。
       // 作成が確認できた件数を数え、残りだけを次の送信対象にする。
       const completed = e instanceof EventSlotsPartialError ? e.completed.length : 0
@@ -651,6 +658,7 @@ function SlotsTab({
     try {
       await eventsApi.updateSlot(accountId, eventId, slot.id, body, slot.version ?? 1)
     } catch (e) {
+      saveErrors.capture(e)
       if (e instanceof ApiError && e.status === 409 && e.code === 'version_conflict') {
         await refresh()
         throw new Error(slotConflictMessage(e))
@@ -674,7 +682,7 @@ function SlotsTab({
   }
 
   return (
-    <FormSection id="ev-form-slots" title="予約枠" description={`${slots.length} 件の予約枠`} action={<>
+    <SaveErrorScope errors={saveErrors}><FormSection id="ev-form-slots" title="予約枠" description={`${slots.length} 件の予約枠`} action={<>
           <Button onClick={() => setShowAdd(true)}>
             ＋ 枠を追加する
           </Button>
@@ -815,7 +823,7 @@ function SlotsTab({
           setBulkPreview(null)
         }}
       />
-    </FormSection>
+    </FormSection></SaveErrorScope>
   )
 }
 
@@ -826,6 +834,7 @@ function AddSlotDialog({
   onClose: () => void
   onSubmit: (s: { starts_at: string; ends_at: string; capacity: number | null }) => Promise<void>
 }) {
+  const saveErrors = useSaveFormErrors()
   const todayJst = jstDate()
   const [date, setDate] = useState(todayJst)
   const [startTime, setStartTime] = useState('10:00')
@@ -850,6 +859,7 @@ function AddSlotDialog({
       if (cap != null && (!Number.isInteger(cap) || cap < 1)) throw new Error('定員は1以上の整数')
       await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
     } catch (e) {
+      saveErrors.capture(e)
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
       submitLock.current = false
@@ -857,13 +867,13 @@ function AddSlotDialog({
     }
   }
 
-  return <Dialog open title="予約枠を追加" onCancel={onClose} onConfirm={submit} confirmLabel="追加する" busy={busy} error={err ?? undefined}>
+  return <SaveErrorScope errors={saveErrors}><Dialog open title="予約枠を追加" onCancel={onClose} onConfirm={submit} confirmLabel="追加する" busy={busy} error={err ?? undefined}>
 
-    <Field label="日付（JST）"><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></Field>
-    <Field label="開始"><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></Field>
-    <Field label="終了"><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></Field>
-    <Field label="定員（空欄=無制限）"><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></Field>
-  </Dialog>
+    <Field label="日付（JST）"><SaveErrorField names={["date"]}><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></SaveErrorField></Field>
+    <Field label="開始"><SaveErrorField names={["startTime","start_time","starts_at","startsAt"]}><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></SaveErrorField></Field>
+    <Field label="終了"><SaveErrorField names={["endTime","end_time","ends_at","endsAt"]}><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></SaveErrorField></Field>
+    <Field label="定員（空欄=無制限）"><SaveErrorField names={["capacity"]}><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></SaveErrorField></Field>
+  </Dialog></SaveErrorScope>
 }
 
 
@@ -889,6 +899,7 @@ function EditSlotDialog({
   onClose: () => void
   onSubmit: (s: { starts_at: string; ends_at: string; capacity: number | null }) => Promise<void>
 }) {
+  const saveErrors = useSaveFormErrors()
   const booked = slot.active_count ?? 0
   const [date, setDate] = useState(() => utcIsoToJstDate(slot.starts_at))
   const [startTime, setStartTime] = useState(() => utcIsoToJstHHMM(slot.starts_at))
@@ -915,6 +926,7 @@ function EditSlotDialog({
       }
       await onSubmit({ starts_at: s, ends_at: e, capacity: cap })
     } catch (e) {
+      saveErrors.capture(e)
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
       submitLock.current = false
@@ -925,13 +937,13 @@ function EditSlotDialog({
   // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
 
   // 新しい部品はデザイントークンで書く（このファイルの古い生色クラスを増やさない）。
-  return <Dialog open title="予約枠を編集" onCancel={onClose} onConfirm={submit} confirmLabel="保存する" busy={busy} error={err ?? undefined}>
+  return <SaveErrorScope errors={saveErrors}><Dialog open title="予約枠を編集" onCancel={onClose} onConfirm={submit} confirmLabel="保存する" busy={busy} error={err ?? undefined}>
     {booked > 0 ? <Notice tone="warn" message={`この枠には${booked}件の予約が入っています。日時を変えると、確定している予約のリマインド予定も新しい日時へ合わせて動きます。定員は${booked}以上にしてください。`} /> : null}
-    <Field label="日付（JST）"><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></Field>
-    <Field label="開始"><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></Field>
-    <Field label="終了"><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></Field>
-    <Field label="定員（空欄=無制限）"><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></Field>
-  </Dialog>
+    <Field label="日付（JST）"><SaveErrorField names={["date"]}><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></SaveErrorField></Field>
+    <Field label="開始"><SaveErrorField names={["startTime","start_time","starts_at","startsAt"]}><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></SaveErrorField></Field>
+    <Field label="終了"><SaveErrorField names={["endTime","end_time","ends_at","endsAt"]}><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></SaveErrorField></Field>
+    <Field label="定員（空欄=無制限）"><SaveErrorField names={["capacity"]}><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></SaveErrorField></Field>
+  </Dialog></SaveErrorScope>
 }
 
 
@@ -948,6 +960,7 @@ export function BulkSlotDialog({
   onClose: () => void
   onSubmit: (input: BulkSlotInput) => Promise<void>
 }) {
+  const saveErrors = useSaveFormErrors()
   const todayJst = jstDate()
   const [start, setStart] = useState(todayJst)
   const [end, setEnd] = useState(todayJst)
@@ -985,6 +998,7 @@ export function BulkSlotDialog({
         capacity: cap,
       })
     } catch (e) {
+      saveErrors.capture(e)
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
       submitLock.current = false
@@ -992,9 +1006,9 @@ export function BulkSlotDialog({
     }
   }
 
-  return <Dialog open title="予約枠の一括追加" onCancel={onClose} onConfirm={submit} confirmLabel="生成" cancelLabel="キャンセル" busy={busy} error={err ?? undefined}>
-    <Field label="開始日"><DateField value={start} onChange={setStart} aria-label="開始日" /></Field>
-    <Field label="終了日"><DateField value={end} onChange={setEnd} aria-label="終了日" /></Field>
+  return <SaveErrorScope errors={saveErrors}><Dialog open title="予約枠の一括追加" onCancel={onClose} onConfirm={submit} confirmLabel="生成" cancelLabel="キャンセル" busy={busy} error={err ?? undefined}>
+    <Field label="開始日"><SaveErrorField names={["start","start_date"]}><DateField value={start} onChange={setStart} aria-label="開始日" /></SaveErrorField></Field>
+    <Field label="終了日"><SaveErrorField names={["end","end_date"]}><DateField value={end} onChange={setEnd} aria-label="終了日" /></SaveErrorField></Field>
     <Field label="曜日">
       <div role="group" aria-label="枠を作る曜日">
         {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => <Button key={index}
@@ -1003,8 +1017,8 @@ export function BulkSlotDialog({
     </Field>
     <Checkbox checked={divideBand} onCheckedChange={setDivideBand}>時間帯を同じ長さの枠に分ける</Checkbox>
     {divideBand ? <FormSection id="ev-form-time-band" title="同じ長さの枠">
-      <Field label="時間帯の開始"><TimeField value={bandStart} onChange={setBandStart} aria-label="時間帯の開始" /></Field>
-      <Field label="時間帯の終了"><TimeField value={bandEnd} onChange={setBandEnd} aria-label="時間帯の終了" /></Field>
+      <Field label="時間帯の開始"><SaveErrorField names={["bandStart","band_start"]}><TimeField value={bandStart} onChange={setBandStart} aria-label="時間帯の開始" /></SaveErrorField></Field>
+      <Field label="時間帯の終了"><SaveErrorField names={["bandEnd","band_end"]}><TimeField value={bandEnd} onChange={setBandEnd} aria-label="時間帯の終了" /></SaveErrorField></Field>
       <Field label="1枠の長さ"><Select aria-label="1枠の長さ" value={String(slotMinutes)} onChange={(value) => setSlotMinutes(Number(value))}
         options={[30, 45, 60, 90, 120].map((minutes) => ({ value: String(minutes), label: `${minutes}分` }))} /></Field>
     </FormSection> : <>
@@ -1015,8 +1029,8 @@ export function BulkSlotDialog({
     </FormSection>)}
     <Button onClick={() => setPatterns((items) => [...items, { start: '14:00', end: '15:00' }])}>＋ パターンを追加する</Button>
     </>}
-    <Field label="定員（各枠共通・空欄=無制限）"><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></Field>
-  </Dialog>
+    <Field label="定員（各枠共通・空欄=無制限）"><SaveErrorField names={["capacity"]}><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></SaveErrorField></Field>
+  </Dialog></SaveErrorScope>
 }
 
 
@@ -1048,37 +1062,37 @@ function PublishTab({
       <Checkbox checked={draft.requires_approval === 1} onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
         description={<>ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />OFF: 定員空きがあれば即時確定</>}>承認制</Checkbox>
       <Field label="承認の期限" htmlFor="ev-approval-deadline" note="期限を過ぎた申請は自動で期限切れになり、席を戻します。">
-        <Select id="ev-approval-deadline" aria-label="承認の期限" value={String(draft.approval_deadline_hours)} disabled={draft.requires_approval !== 1}
-          onChange={(value) => update('approval_deadline_hours', Number(value))} options={APPROVAL_DEADLINE_OPTIONS} size="full" />
+        <SaveErrorField names={["approval_deadline_hours"]}><Select id="ev-approval-deadline" aria-label="承認の期限" value={String(draft.approval_deadline_hours)} disabled={draft.requires_approval !== 1}
+          onChange={(value) => update('approval_deadline_hours', Number(value))} options={APPROVAL_DEADLINE_OPTIONS} size="full" /></SaveErrorField>
       </Field>
       <Checkbox checked={draft.waitlist_enabled === 1} onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
         description={<>ON: 定員に達したあとも申込を受け、待ちとして記録する<br />OFF: 定員に達したら締め切る<br />待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。</>}>キャンセル待ちを受ける</Checkbox>
       {tagPruned ? <Notice tone="warn" message="選んでいたタグは、今のアカウントにないため外しました。選び直してください。" onClose={() => setTagPruned(false)} /> : null}
       <Field label="公開対象" htmlFor="ev-visible-tag" note="絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。URL を直接開いても表示されません。">
-        <EntitySelect kind="tag" aria-label="公開対象" id="ev-visible-tag" value={draft.visible_tag_id ?? ''} onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
-          options={[{ value: '', label: '友だち全員' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `${tag.name} を持つ人だけ` }))]} />
+        <SaveErrorField names={["visible_tag_id"]}><EntitySelect kind="tag" aria-label="公開対象" id="ev-visible-tag" value={draft.visible_tag_id ?? ''} onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
+          options={[{ value: '', label: '友だち全員' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `${tag.name} を持つ人だけ` }))]} /></SaveErrorField>
       </Field>
       <Field label="申込の締め切り" htmlFor="ev-entry-cutoff">
-        <Select aria-label="申込の締め切り" id="ev-entry-cutoff" value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
-          onChange={(value) => update('entry_cutoff_hours_before', parseDeadlineSelect(value))} options={deadlineOptionsWithSaved(EVENT_ENTRY_CUTOFF_OPTIONS, draft.entry_cutoff_hours_before)} />
+        <SaveErrorField names={["entry_cutoff_hours_before"]}><Select aria-label="申込の締め切り" id="ev-entry-cutoff" value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
+          onChange={(value) => update('entry_cutoff_hours_before', parseDeadlineSelect(value))} options={deadlineOptionsWithSaved(EVENT_ENTRY_CUTOFF_OPTIONS, draft.entry_cutoff_hours_before)} /></SaveErrorField>
       </Field>
       <Field label="キャンセル期限（友だち側）">
-        <Select aria-label="キャンセル期限（友だち側）" value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
-          onChange={(value) => update('cancel_deadline_hours_before', parseDeadlineSelect(value))} options={deadlineOptionsWithSaved(EVENT_CANCEL_DEADLINE_OPTIONS, draft.cancel_deadline_hours_before)} />
+        <SaveErrorField names={["cancel_deadline_hours_before"]}><Select aria-label="キャンセル期限（友だち側）" value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
+          onChange={(value) => update('cancel_deadline_hours_before', parseDeadlineSelect(value))} options={deadlineOptionsWithSaved(EVENT_CANCEL_DEADLINE_OPTIONS, draft.cancel_deadline_hours_before)} /></SaveErrorField>
       </Field>
       <Checkbox checked={draft.reminder_day_before_enabled === 1} onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)} description="前日 18:00 JST に LINE で通知">前日リマインダ</Checkbox>
       <Field label="開始 N 時間前リマインダ">
-        <Select aria-label="開始 N 時間前リマインダ" value={draft.reminder_hours_before == null ? 'off' : String(draft.reminder_hours_before)}
+        <SaveErrorField names={["reminder_hours_before"]}><Select aria-label="開始 N 時間前リマインダ" value={draft.reminder_hours_before == null ? 'off' : String(draft.reminder_hours_before)}
           onChange={(value) => update('reminder_hours_before', value === 'off' ? null : Number(value))}
-          options={[{ value: 'off', label: '送信しない' }, { value: '1', label: '1 時間前' }, { value: '2', label: '2 時間前' }, { value: '3', label: '3 時間前' }, { value: '6', label: '6 時間前' }, { value: '24', label: '24 時間前' }]} />
+          options={[{ value: 'off', label: '送信しない' }, { value: '1', label: '1 時間前' }, { value: '2', label: '2 時間前' }, { value: '3', label: '3 時間前' }, { value: '6', label: '6 時間前' }, { value: '24', label: '24 時間前' }]} /></SaveErrorField>
       </Field>
     </FormSection>
     <FormSection id="ev-form-messages" title="予約者向けカスタムメッセージ" description="予約者だけに届く LINE 通知の末尾に追加されます（Zoom URL など）。空欄ならデフォルト文言のみ。">
       <Field label="予約確定メッセージへの追記" count={{ value: (draft.confirmation_message_extra ?? '').length, max: 2000 }} note="確定通知（即時 / 後追い承認）の末尾に追加">
-        <TextArea value={draft.confirmation_message_extra ?? ''} onChange={(event) => update('confirmation_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/..." />
+        <SaveErrorField names={["confirmation_message_extra"]}><TextArea value={draft.confirmation_message_extra ?? ''} onChange={(event) => update('confirmation_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/..." /></SaveErrorField>
       </Field>
       <Field label="リマインドメッセージへの追記" count={{ value: (draft.reminder_message_extra ?? '').length, max: 2000 }} note="前日 / N 時間前のリマインド末尾に追加">
-        <TextArea value={draft.reminder_message_extra ?? ''} onChange={(event) => update('reminder_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 開始 10 分前に同じ URL からご入室ください" />
+        <SaveErrorField names={["reminder_message_extra"]}><TextArea value={draft.reminder_message_extra ?? ''} onChange={(event) => update('reminder_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 開始 10 分前に同じ URL からご入室ください" /></SaveErrorField>
       </Field>
     </FormSection>
     <FormSection id="ev-form-publication" title="公開状態">

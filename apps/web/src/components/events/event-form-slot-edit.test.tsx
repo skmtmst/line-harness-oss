@@ -217,6 +217,24 @@ describe('予約枠の編集（入口29）', () => {
     expect(listSlots).toHaveBeenCalledTimes(2)
   })
 
+  it('保存先の入力検査は窓の定員欄へ返し、書きかけを保って再試行できる', async () => {
+    const { ApiError } = await import('@/lib/api')
+    await openEdit()
+    updateSlot.mockRejectedValueOnce(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { capacity: '定員を確認してください' }))
+    await act(async () => { setInput(dialogInput('number'), '10') })
+    await click(dialogSaveButton())
+    const capacity = dialogInput('number')
+    expect(capacity.value).toBe('10')
+    expect(capacity.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(capacity)
+    expect(dialog()?.textContent).toContain('定員を確認してください')
+    await act(async () => { setInput(capacity, '11') })
+    expect(capacity.getAttribute('aria-invalid')).not.toBe('true')
+    await click(dialogSaveButton())
+    expect(updateSlot).toHaveBeenLastCalledWith('acc-1', 'ev-1', 'slot-1', expect.objectContaining({ capacity: 11 }), 1)
+    expect(dialog()).toBeNull()
+  })
+
   it('開始時刻を動かすと JST→UTC に戻して送る', async () => {
     await openEdit()
     await pickTime(dialogTimeTriggers()[0], '13:00')

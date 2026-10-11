@@ -21,6 +21,8 @@ import { restaurantGoogleApi, type GoogleDayHours, type GoogleHoursPeriod, type 
 import { errorMessage, formatPeriods, formatYmdShort, weekdayOf, TIME_OPTIONS, WEEKDAYS, WEEKDAY_JA } from './format'
 import type { GoogleNav } from './google'
 import styles from './google.module.css'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 export type HoursMode = 'text' | 'calendar' | 'weekly'
 const samePeriods = (a: GoogleHoursPeriod[], b: GoogleHoursPeriod[]) => formatPeriods(a, '-') === formatPeriods(b, '-')
@@ -52,6 +54,7 @@ function periodDiff(before: GoogleHoursPeriod[], after: GoogleHoursPeriod[]): [s
 }
 
 export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: string; mode: HoursMode; initialDate?: string | null; go: GoogleNav }) {
+  const saveErrors = useSaveFormErrors()
   const role = useStaffRole()
   const canEdit = canManageRole(role)
   const submitLock = useRef(false)
@@ -120,6 +123,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
         go({ tab: 'profile', view: 'confirm', id: response.change.id })
       } else setQuestion(response.question ?? 'もう少し具体的に教えてください。')
     } catch (err) {
+      saveErrors.capture(err)
       setActionError(err instanceof ApiError && err.code === 'unchanged' ? 'すでにその営業時間になっています。' : errorMessage(err, '変更案を作れませんでした。'))
     } finally {
       submitLock.current = false
@@ -148,7 +152,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
   const describeDay = (day: GoogleDayHours) => day.remove ? `特別営業時間を外す → 通常 ${formatPeriods(regularFor(day.date).periods, '定休日')}` : day.closed ? (day.special ? '休業（特別営業時間）' : '定休日') : formatPeriods(day.periods)
 
   return (
-    <>
+    <SaveErrorScope errors={saveErrors}><>
       <div className={styles.buttonRow}><Button onClick={() => guarded(() => go({ tab: 'profile' }))}>プロフィールへ戻る</Button></div>
       <SectionHeader title="営業時間を変更" description={`対象店舗：${storeName} / 基準日：${formatYmdShort(today.date)} / ${timeZone}`} />
       <Tabs size="compact" label="営業時間の変更方式" items={([
@@ -160,7 +164,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
       {mode === 'text' ? <>
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
           <SectionHeader size="small" title="いつ、何時に変更しますか？" />
-          <Field label="文章で入力" htmlFor="gb-hours-text"><TextArea id="gb-hours-text" value={text} onChange={(event) => { setText(event.target.value); setQuestion('') }} rows={4} maxLength={500} placeholder="例：今週の金曜日は9:00から17:00オープンにして" disabled={!editable || !data.aiAvailable} /></Field>
+          <Field label="文章で入力" htmlFor="gb-hours-text"><SaveErrorField names={["text"]}><TextArea id="gb-hours-text" value={text} onChange={(event) => { setText(event.target.value); setQuestion('') }} rows={4} maxLength={500} placeholder="例：今週の金曜日は9:00から17:00オープンにして" disabled={!editable || !data.aiAvailable} /></SaveErrorField></Field>
           {canEdit ? <div className={styles.buttonRow}>
             <Button onClick={() => { setText('今日を休みにして'); setQuestion('') }} disabled={!editable || !data.aiAvailable}>今日を休みにして</Button>
             <Button onClick={() => { setText('明日は20時に閉店'); setQuestion('') }} disabled={!editable || !data.aiAvailable}>明日は20時に閉店</Button>
@@ -177,7 +181,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
       </> : mode === 'calendar' ? <>
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
           <SectionHeader size="small" title="日付を選んで、その日の営業時間を決めます" />
-          <Field label="変更する日" htmlFor="gb-hours-day"><DateField id="gb-hours-day" aria-label="変更する日" value={selectedDate} onChange={setSelectedDate} min={today.date} max={addDays(today.date, 366)} /></Field>
+          <Field label="変更する日" htmlFor="gb-hours-day"><SaveErrorField names={["selectedDate","selected_date"]}><DateField id="gb-hours-day" aria-label="変更する日" value={selectedDate} onChange={setSelectedDate} min={today.date} max={addDays(today.date, 366)} /></SaveErrorField></Field>
           {profile.specialHours.length ? <dl className={styles.facts} aria-label="登録済みの特別営業時間">{profile.specialHours.map((day) => <div key={day.date} className={styles.factRow}>
             <dt className={styles.factKey}><Button variant="text" disabled={day.date < today.date || day.date > addDays(today.date, 366)} onClick={() => setSelectedDate(day.date)}>{formatYmdShort(day.date)}</Button></dt>
             <dd className={styles.factValue}>{day.closed ? '休業' : formatPeriods(day.periods)}</dd>
@@ -223,7 +227,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
       {mode !== 'text' ? <p className={styles.muted}>15分刻みで選べます。翌日にまたぐ時間（例：18:00–02:00）はそのまま入力できます。</p> : null}
       {canEdit ? <StickyBar actions={<><Button onClick={clear} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={!canSubmit} busy={busy} busyLabel="確認中…">変更案を確認</Button></>} /> : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した営業時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </></SaveErrorScope>
   )
 }
 

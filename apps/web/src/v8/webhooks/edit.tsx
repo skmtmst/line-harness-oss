@@ -8,6 +8,8 @@ import Notice from '@/components/shared/notice'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
 
 /**
  * 送信Webhookの編集（#939 N-363）。
@@ -17,6 +19,7 @@ import { useAccount } from '@/contexts/account-context'
  * 「設定 → 合言葉」から行う（値が画面に残らない専用の窓がある）。
  */
 function EditWebhookPageInner() {
+  const saveErrors = useSaveFormErrors()
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
@@ -128,7 +131,7 @@ function EditWebhookPageInner() {
   }
 
   return (
-    <CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage
       title="送り先を直す"
       help="送り先の設定を直します。合言葉はこの画面では変わりません。"
       parent={['外部連携', '/webhooks']}
@@ -162,6 +165,7 @@ function EditWebhookPageInner() {
           })
           if (!res.success) throw new Error(res.error)
         } catch (caught) {
+      saveErrors.capture(caught)
           // 変更は統括だけ。権限不足は生の `API error: 403` ではなく依頼の案内にする（R32）。
           if (caught instanceof ApiError && caught.status === 403) {
             throw new Error('送り先の変更は統括だけができます。必要なときは統括に頼んでください。')
@@ -185,33 +189,33 @@ function EditWebhookPageInner() {
           <p className="text-ink text-sm font-semibold">基本の設定</p>
 
           <Field label="名前" htmlFor="wh-edit-name" required>
-            <input
+            <SaveErrorField names={["name"]}><input
               id="wh-edit-name"
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
               className={inputClass}
-            />
+            /></SaveErrorField>
           </Field>
 
           <Field label="送り先のURL" htmlFor="wh-edit-url" required note="https:// のみです。">
-            <input
+            <SaveErrorField names={["url"]}><input
               id="wh-edit-url"
               type="url"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               className={inputClass}
-            />
+            /></SaveErrorField>
           </Field>
 
           <Field label="送るイベント" htmlFor="wh-edit-events" note="カンマ区切り。* を入れると全部のイベントを送ります。">
-            <input
+            <SaveErrorField names={["eventTypes","event_types"]}><input
               id="wh-edit-events"
               type="text"
               value={eventTypes}
               onChange={(event) => setEventTypes(event.target.value)}
               className={inputClass}
-            />
+            /></SaveErrorField>
           </Field>
 
           <Field
@@ -220,7 +224,7 @@ function EditWebhookPageInner() {
             note="相手が 5xx を返したときや、つながらなかったときに送り直します。1分・5分・30分…と間隔を空け、上限は7回です。相手が 4xx を返した場合は送り直しません。"
           >
             <div className="flex items-center gap-1.5">
-              <input
+              <SaveErrorField names={["maxRetries","max_retries"]}><input
                 id="wh-edit-retries"
                 type="number"
                 min={0}
@@ -228,13 +232,13 @@ function EditWebhookPageInner() {
                 value={maxRetries}
                 onChange={(event) => setMaxRetries(event.target.value)}
                 className={`${inputClass} w-24 tabular-nums`}
-              />
+              /></SaveErrorField>
               <span className="text-ink-faint text-xs">回まで</span>
             </div>
           </Field>
         </>
       )}
-    </CreatePage>
+    </CreatePage></SaveErrorScope>
   )
 }
 
