@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import * as reminderTrigger from '../services/reminder-trigger.js';
 
 const liffAuthMocks = {
   verifyCallerLineUserId: vi.fn(),
@@ -435,6 +436,26 @@ describe('U-3 LIFF の開催回変更', () => {
     expect(res.status).toBe(500);
     expect(sqlite.prepare("SELECT id, status FROM event_bookings WHERE event_id='e1'").all())
       .toEqual([{ id: 'b1', status: 'confirmed' }]);
+  });
+
+  test.each([false, true])('開催回変更の補償も途中失敗=%sで予約を失わない', async (restoreFails) => {
+    seedChangeBase();
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    const cancel = vi.spyOn(reminderTrigger, 'cancelByTrigger')
+      .mockRejectedValueOnce(new Error('REMINDER_SEND_IN_FLIGHT'));
+    try {
+      if (restoreFails) sqlite.exec(`CREATE TRIGGER synthetic_restore_failure BEFORE UPDATE OF status ON event_bookings
+        WHEN OLD.id = 'b1' AND NEW.status = 'confirmed'
+        BEGIN SELECT RAISE(ABORT, 'synthetic restore failure'); END;`);
+      const res = await changeRequest('s2', `synthetic-compensation-${restoreFails}`);
+      expect(res.status).toBe(restoreFails ? 500 : 409);
+      expect(sqlite.prepare("SELECT COUNT(*) AS n FROM event_bookings WHERE event_id='e1' AND status='confirmed'").get())
+        .toEqual({ n: 1 });
+      expect(sqlite.prepare("SELECT slot_id, status FROM event_bookings WHERE event_id='e1' ORDER BY slot_id").all())
+        .toEqual(restoreFails
+          ? [{ slot_id: 's1', status: 'cancelled' }, { slot_id: 's2', status: 'confirmed' }]
+          : [{ slot_id: 's1', status: 'confirmed' }]);
+    } finally { cancel.mockRestore(); }
   });
 
   test('新しい席を確保できた時だけ元の申込を取り消す', async () => {

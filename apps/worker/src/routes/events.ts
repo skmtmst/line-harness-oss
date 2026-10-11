@@ -2646,15 +2646,15 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
       });
     } catch (error) {
       if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
-        await c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId).run();
-        await c.env.DB
-          .prepare(
+        await c.env.DB.batch([
+          c.env.DB.prepare(`DELETE FROM event_bookings WHERE id = ?`).bind(newId),
+          c.env.DB.prepare(
             `UPDATE event_bookings
                 SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
               WHERE id = ? AND status = 'cancelled'`,
           )
-          .bind(current.status, nowIso, current.id)
-          .run();
+          .bind(current.status, nowIso, current.id),
+        ]);
         return finalize(409, { error: 'send_in_flight_retry' });
       }
       throw error;
