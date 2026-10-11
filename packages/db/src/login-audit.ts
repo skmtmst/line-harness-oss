@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { recordAuditEvent, type AuditRiskLevel } from './access-audit.js';
 
@@ -167,7 +168,7 @@ export async function getLastLoginByStaff(
   staffIds: string[],
 ): Promise<Record<string, string>> {
   if (staffIds.length === 0) return {};
-  const placeholders = staffIds.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(staffIds).sql;
   const { results } = await db
     .prepare(
       `SELECT admin_user_id, MAX(created_at) AS last_at
@@ -175,7 +176,7 @@ export async function getLastLoginByStaff(
         WHERE action = 'login' AND admin_user_id IN (${placeholders})
         GROUP BY admin_user_id`,
     )
-    .bind(...staffIds)
+    .bind(...sqlIdSet(staffIds).binds)
     .all<{ admin_user_id: string; last_at: string }>();
   const out: Record<string, string> = {};
   for (const row of results ?? []) out[row.admin_user_id] = row.last_at;

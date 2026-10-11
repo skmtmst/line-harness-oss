@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
@@ -448,8 +449,8 @@ export async function getStaffAccountScopeMap(
   const ids = [...new Set(staffIds.filter((id) => typeof id === 'string' && id.length > 0))];
   if (ids.length === 0) return map;
   const result = await db
-    .prepare(`SELECT staff_id, line_account_id FROM staff_account_scopes WHERE staff_id IN (${ids.map(() => '?').join(',')}) ORDER BY staff_id, line_account_id`)
-    .bind(...ids)
+    .prepare(`SELECT staff_id, line_account_id FROM staff_account_scopes WHERE staff_id IN (${sqlIdSet(ids).sql}) ORDER BY staff_id, line_account_id`)
+    .bind(...sqlIdSet(ids).binds)
     .all<{ staff_id: string; line_account_id: string }>();
   for (const row of result.results) {
     const list = map.get(row.staff_id) ?? [];
