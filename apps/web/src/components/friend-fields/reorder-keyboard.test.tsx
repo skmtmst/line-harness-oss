@@ -114,7 +114,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 import TagsPageV4 from './tags-page-v4'
 import FriendFieldList from '@/v8/tags/fields-tab'
-import SupportMarkList from './mark-list'
+import SupportMarkList from '@/v8/tags/marks-tab'
 import SavedSearchList from '@/v8/tags/searches-tab'
 
 let host: HTMLDivElement
@@ -256,7 +256,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
   })
 
   it('対応マーク: ↓で1つ下へ動き、新しい並びを reorder API へ1回で送る', async () => {
-    await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
+    await render(React.createElement(SupportMarkList, { canEdit: true, accountId: 'a1' }))
     await press(grip('マークA'), 'ArrowDown')
     expect(calls.supportMarksReorder).toHaveBeenCalledTimes(1)
     expect(calls.supportMarksReorder).toHaveBeenCalledWith('a1', ['m2', 'm1', 'm3'])
@@ -278,7 +278,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
       mark('m2', 'マークB', 1),
       { ...mark('m3', '共有マーク', 2), isInherited: true },
     ]
-    await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
+    await render(React.createElement(SupportMarkList, { canEdit: true, accountId: 'a1' }))
     await press(grip('マークA'), 'ArrowDown')
     // 末尾の共有マークは位置が固定なので送らない。動かせる2件だけの新しい順。
     expect(calls.supportMarksReorder).toHaveBeenCalledWith('a1', ['m2', 'm1'])
@@ -291,7 +291,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
       { ...mark('m2', '共有マーク', 1), isInherited: true },
       mark('m3', 'マークC', 2),
     ]
-    await render(React.createElement(SupportMarkList, { accountId: 'a1' }))
+    await render(React.createElement(SupportMarkList, { canEdit: true, accountId: 'a1' }))
     await press(grip('マークA'), 'ArrowDown')
     // 共有マークに向かう移動は止める。送られないので複製も起きない。
     expect(calls.supportMarksReorder).not.toHaveBeenCalled()

@@ -5,22 +5,22 @@ import { describe, expect, it } from 'vitest'
 import { element } from './design-fit-slice'
 
 const ROOT = path.resolve(__dirname)
-const LIST = fs.readFileSync(path.join(ROOT, 'mark-list.tsx'), 'utf8')
+const LIST = fs.readFileSync(path.join(ROOT, '../../v8/tags/marks-tab.tsx'), 'utf8') + fs.readFileSync(path.join(ROOT, 'mark-list.tsx'), 'utf8')
 const EDITOR = fs.readFileSync(path.join(ROOT, 'support-mark-editor.tsx'), 'utf8')
-const TABS = fs.readFileSync(path.join(ROOT, 'tags-page-v4.tsx'), 'utf8')
+const TABS = fs.readFileSync(path.join(ROOT, '../../v8/tags/list.tsx'), 'utf8')
 
-describe('V6 対応マーク', () => {
+describe('V8 対応マーク', () => {
   it('一覧は実Node、KPI、絞り込み、設計の列を持つ', () => {
-    expect(LIST).toContain('data-design-node="rIhbN"')
-    for (const label of ['マークの種類', '未対応', '対応中', '過去7日の変更']) expect(LIST).toContain(label)
+    expect(TABS).toContain("'vKDj5'")
+    for (const label of ['マーク', '未対応', '対応中', '過去7日の変更']) expect(LIST).toContain(label)
     // 見出しは表の中だけを見る。注釈や他の行に同じ言葉があっても通さない。
     const thead = element(LIST, 'thead')
-    for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '表示先', '操作']) expect(thead).toContain(label)
+    for (const label of ['並び替え', 'マーク', '付いている人', 'はじめの値', '自動で変わる', '出す場所', '操作']) expect(thead).toContain(label)
     // 絞り込みは共通 Select。題と「すべて」の選択肢が分かれている。
-    expect(LIST).toContain('label="利用状態"')
-    expect(LIST).toContain("{ value: 'all', label: 'すべて' }")
+    expect(LIST).toContain('aria-label="使っているかで絞り込む"')
+    expect(LIST).toContain("{ value: 'all', label: '使っている：すべて' }")
     // ATTR-01: 取得時のアカウントを退避し、応答が届いた時点の選択と照合する。
-    expect(LIST).toContain('api.supportMarks.list(account)')
+    expect(LIST).toContain('api.supportMarks.list(account, { includeArchived: true })')
   })
 
   it('追加編集画面は本文タイトルを置かず、トップバーへ画面名を渡す', () => {
@@ -56,8 +56,8 @@ describe('V6 対応マーク', () => {
     expect(LIST).not.toContain('force: mark.friendCount > 0')
   })
 
-  it('保管確認は zGZMA の位置と幅で、置換先と対象人数に絞る', () => {
-    expect(LIST).toContain('data-design-node="zGZMA"')
+  it('保管確認は fy5dz の位置と幅で、置換先と対象人数に絞る', () => {
+    expect(LIST).toContain('data-design-node="fy5dz"')
     expect(LIST).toContain('そのまま保管できます')
     expect(LIST).toContain('{impact.friendCount}人を「{selected.name}」へ置き換えます。')
     /*
@@ -75,6 +75,6 @@ describe('V6 対応マーク', () => {
 
   it('タブ行から追加画面へ進める', () => {
     expect(TABS).toContain('href="/tags/marks/new"')
-    expect(TABS).toContain('＋ マークを作る')
+    expect(TABS).toContain('マークを作る')
   })
 })

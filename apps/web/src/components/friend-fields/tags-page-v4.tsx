@@ -23,7 +23,7 @@ import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import FriendFieldList from '@/v8/tags/fields-tab'
-import SupportMarkList from './mark-list'
+import SupportMarkList from '@/v8/tags/marks-tab'
 import SavedSearchList from './saved-search-list'
 import ReorderGrip from './reorder-grip'
 import { mergeVisibleOrder } from './reorder-utils'
@@ -1253,7 +1253,7 @@ export default function TagsPageV4({
             <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} />
           </div>
         ) : null}
-      </> : tab === 'fields' ? <FriendFieldList accountId={accountId} canEdit /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
+      </> : tab === 'fields' ? <FriendFieldList accountId={accountId} canEdit /> : tab === 'marks' ? <SupportMarkList accountId={accountId} canEdit /> : <SavedSearchList accountId={accountId} />}
       </div>
       {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={(result) => { setDeleteTarget(null); if (result) notifyToast(result); void load() }} />}
     </div></SaveErrorScope>

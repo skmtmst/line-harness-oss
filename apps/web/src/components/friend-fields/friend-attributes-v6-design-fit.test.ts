@@ -21,7 +21,7 @@ const read = (name: string) => fs.readFileSync(path.join(ROOT, name), 'utf8')
 const readWeb = (relative: string) =>
   readUiSource(path.resolve(ROOT, '../../..', relative), 'utf8')
 
-const MARK_LIST = read('mark-list.tsx')
+const MARK_LIST = readWeb('src/v8/tags/marks-tab.tsx') + read('mark-list.tsx')
 const SAVED_LIST = read('saved-search-list.tsx')
 const FIELD_LIST = readWeb('src/v8/tags/fields-tab.tsx') + read('field-list.tsx')
 const TAG_EDITOR = read('tag-editor-v4.tsx')
@@ -46,7 +46,7 @@ describe('切り出しの道具そのもの', () => {
 
 describe('rIhbN 対応マーク一覧', () => {
   const usageLabel = balanced(MARK_LIST, 'function usageLabel')
-  const kindCard = between(MARK_LIST, "title: 'マークの種類'", "title: '未対応'")
+  const kindCard = between(MARK_LIST, "title: 'マーク'", "title: '未対応'")
 
   it('使用先の列に、隣の「使用中」と同じ友だちの人数を重ねて出さない', () => {
     expect(usageLabel).not.toContain('友だち')
@@ -61,18 +61,18 @@ describe('rIhbN 対応マーク一覧', () => {
 
   it('帯の「マークの種類・使用中」を、同じ画面の一覧そのものから数える', () => {
     expect(kindCard).toContain('listReady ? items.length : null')
-    expect(kindCard).toContain('使用中 ${inUseCount}件')
+    expect(kindCard).toContain('使っている ${inUseCount}')
     // 別の集計口から取ると、表に行があるのに帯が0件のままになる。
     expect(kindCard).not.toContain('stats.marks.total')
     expect(kindCard).not.toContain('stats.marks.inUse')
   })
 
   it('読めていないときに0件と言い切らず、読めない理由を出す', () => {
-    const detail = between(MARK_LIST, 'const listStateDetail', 'return (')
+    const detail = between(MARK_LIST, 'const kpis = [', 'const filterActive')
     expect(withoutComments(MARK_LIST)).toContain('const listReady = status === \'ready\'')
-    expect(detail).toContain('見る権限がありません')
-    expect(detail).toContain('読み込んでいます')
-    expect(detail).toContain('読み込めませんでした')
+    expect(detail).toContain('STATE_TEXT.forbiddenView')
+    expect(detail).toContain('STATE_TEXT.loading')
+    expect(detail).toContain('STATE_TEXT.error')
   })
 })
 

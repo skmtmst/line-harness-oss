@@ -36,7 +36,7 @@ describe('タグ V4 contract', () => {
 
   it('タグ編集と対応マーク保管はV6の結果を正しく案内する', () => {
     const editor = read('components/friend-fields/tag-editor-v4.tsx')
-    const markList = read('components/friend-fields/mark-list.tsx')
+    const markList = (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx'))
     expect(editor).toContain("mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'")
     expect(editor).toContain('取り消せない操作です')
     expect(markList).toContain('人は下で選んだマークへ置き換え、履歴に残します')
@@ -84,7 +84,7 @@ describe('タグ V4 contract', () => {
   it('情報欄と対応マークもPC画面で横スクロールを要求しない', () => {
     const sources = [
       (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')),
-      read('components/friend-fields/mark-list.tsx'),
+      (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx')),
     ]
     for (const source of sources) {
       if (source.includes('<DataTable')) {
@@ -162,7 +162,7 @@ describe('タグ V4 contract', () => {
       read('components/friend-fields/tag-editor-v4.tsx'),
       read('components/friend-fields/edit-tag-page-v4.tsx'),
       (read('v8/tags/fields-tab.tsx') + read('components/friend-fields/field-list.tsx')),
-      read('components/friend-fields/mark-list.tsx'),
+      (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx')),
       read('components/friend-fields/saved-search-list.tsx'),
     ]
     for (const source of sources) {
