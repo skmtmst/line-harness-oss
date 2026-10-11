@@ -763,10 +763,5 @@
     "file": "v8/templates/staff-asset-list.tsx",
     "selector": "className=\"bg-canvas border-hairline text-ink-faint col-span-full rounded-card border border-dashed p-12 text-center text-sm\"",
     "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
-  },
-  {
-    "file": "app/accounts/new/register-v8.module.css",
-    "selector": ".checkList",
-    "reason": "設定項目の一覧の外枠。行で区切り、影を重ねない。"
   }
 ]

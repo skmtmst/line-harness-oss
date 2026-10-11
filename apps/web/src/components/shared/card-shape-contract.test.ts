@@ -17,7 +17,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/date-field.module.css", ".popover", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/date-time-field.module.css", ".popover", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/multi-select.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
-  ["app/accounts/new/register-v8.module.css", ".checkList", "設定項目の一覧の外枠。行で区切り、影を重ねない。"],
   ["app/affiliates/create-v8.css", ".af-create-choiceCard", "申込方法の選択肢。内容をまとめるカードではない。"],
   ["app/affiliates/list-v8.css", ".af-list-tableWrap", "一覧表を切り取る枠。表の外側に影を重ねない。"],
   ["app/affiliates/list-v8.css", ".af-list-stateWrap", "一覧表の空・待機状態。表の枠と同じ形を保つ。"],

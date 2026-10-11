@@ -4,11 +4,6 @@
     "height": 6,
     "font": 10
   },
-  "app/accounts/new/register-v8.module.css": {
-    "spacing": 26,
-    "height": 4,
-    "font": 21
-  },
   "app/auto-replies/edit/wizard-v8.module.css": {
     "spacing": 42,
     "height": 13,
