@@ -411,6 +411,7 @@ export function isStaffSelfEndpoint(method: string, path: string, staffId?: stri
 const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/staff'],
   ['GET', '/api/restaurant-test/stores'],
+  ['GET', '/api/restaurant-test/store-groups'],
   ['GET', '/api/restaurant-test/store-context'],
   ['GET', '/api/restaurant-test/terms-agreement'],
   ['POST', '/api/restaurant-test/stores/selection/clear'],

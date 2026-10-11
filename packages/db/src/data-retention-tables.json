@@ -4365,5 +4365,32 @@
       "by": "lineAccount",
       "column": "line_account_id"
     }
+  },
+  "rt_store_groups": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "organization_id",
+      "parent": "rt_organizations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_store_group_members": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "group_id",
+      "parent": "rt_store_groups",
+      "parentColumn": "id"
+    }
+  },
+  "rt_reservation_referrals": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "source_store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
   }
 }

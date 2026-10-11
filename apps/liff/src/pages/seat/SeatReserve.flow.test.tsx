@@ -22,6 +22,9 @@ vi.mock('../../lib/api.js', () => ({
   },
   restaurantBookingApi: {
     link: vi.fn(),
+    courses: vi.fn().mockResolvedValue({success:true,data:[]}),
+    referrals: vi.fn().mockResolvedValue({success:true,data:[]}),
+    referral: vi.fn(),
     availability: vi.fn(),
     hold: vi.fn(),
     mine: vi.fn(),
@@ -103,7 +106,7 @@ describe('席の予約の流れ', () => {
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     expect(screen.getByRole('radio', { name: '19:30 満席' })).toHaveProperty('disabled', true);
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('この内容で予約します');
+    await screen.findByText('ご予約の内容');
     const body = vi.mocked(seat.hold).mock.calls[0]![0];
     expect(body).toMatchObject({ storeId: 'st', startsAt: new Date('2026-10-07T19:00:00+09:00').toISOString(), guestCount: 2 });
     expect(body.requestId).toMatch(/^[a-zA-Z0-9_-]{8,128}$/);
@@ -130,7 +133,7 @@ describe('席の予約の流れ', () => {
     expect(await screen.findByText('10/9（金）は臨時休業のため選べません')).toBeTruthy();
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('この内容で予約します');
+    await screen.findByText('ご予約の内容');
     expect(screen.getByText('テーブル席（お店で決めます）')).toBeTruthy();
     expect(screen.getByText('・15分を過ぎてご連絡がない場合は、取り消しになることがあります')).toBeTruthy();
     fireEvent.change(screen.getByLabelText(/ご要望/), { target: { value: '記念日です' } });
@@ -149,7 +152,7 @@ describe('席の予約の流れ', () => {
     open();
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('この内容で予約します');
+    await screen.findByText('ご予約の内容');
     fireEvent.change(screen.getByLabelText('電話'), { target: { value: 'でんわ' } });
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     expect(await screen.findByText('電話番号は数字とハイフンで入れてください。')).toBeTruthy();
@@ -171,7 +174,7 @@ describe('席の予約の流れ', () => {
     vi.mocked(seat.hold).mockResolvedValueOnce({ success: true, data: held() });
     fireEvent.click(await screen.findByRole('radio', { name: '18:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('この内容で予約します');
+    await screen.findByText('ご予約の内容');
     expect(vi.mocked(seat.hold).mock.calls[2]![0].requestId).not.toBe(ids[1]);
   });
 
@@ -204,7 +207,7 @@ describe('席の予約の流れ', () => {
     fireEvent.click(screen.getByRole('radio', { name: '18:00 空きあり' }));
     expect(screen.getByRole('radio', { name: '19:00 空きあり' }).getAttribute('aria-checked')).toBe('true');
     resolveHold({ success: true, data: held() });
-    await screen.findByText('この内容で予約します');
+    await screen.findByText('ご予約の内容');
     expect(screen.queryByText(/18:00/)).toBeNull();
     expect(screen.getAllByText(/19:00/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));

@@ -19,7 +19,7 @@ export default function Button({
   ref,
   ...rest
 }: {
-  variant?: 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend';
+  variant?: 'restaurant-select' | 'restaurant-date' | 'restaurant-primary' | 'restaurant-control' | 'restaurant-time' | 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend';
   selected?: boolean;
   unavailable?: boolean;
   waitlisted?: boolean;
@@ -43,6 +43,11 @@ export default function Button({
       ? 'bg-liff-off-bg outline-1 -outline-offset-1 outline-liff-line'
       : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line';
   const tones = {
+    'restaurant-date': 'liff-hit text-[15px] leading-[23px] font-bold text-ink',
+    'restaurant-select': 'liff-hit flex min-h-9 w-full items-center justify-between rounded-(--liff-radius) bg-canvas px-3 text-[13px] leading-5 font-medium text-ink outline-1 -outline-offset-1 outline-liff-line-strong shadow-(--liff-control-shadow)',
+    'restaurant-primary': `${action} min-h-9 text-[13px] leading-5 font-semibold bg-liff-primary text-(--liff-on-primary) shadow-(--liff-card-shadow)`,
+    'restaurant-control': 'liff-hit inline-flex min-h-9 items-center justify-center gap-2 rounded-(--liff-radius) px-4 text-[13px] leading-5 font-semibold bg-canvas text-ink outline-1 -outline-offset-1 outline-liff-line-strong shadow-(--liff-control-shadow)',
+    'restaurant-time': `liff-hit inline-flex min-h-9 items-center rounded-full px-3 text-xs leading-[18px] shadow-(--liff-control-shadow) outline-1 -outline-offset-1 ${selected ? 'bg-liff-soft text-liff-primary font-semibold outline-liff-primary' : 'bg-canvas text-ink font-medium outline-liff-line-strong'} disabled:text-liff-off-ink`,
     primary: `${action} min-h-12 bg-liff-primary text-[15px] text-(--liff-on-primary) focus-visible:outline-liff-primary active:opacity-90`,
     danger: `${action} min-h-12 bg-danger text-[15px] text-white focus-visible:outline-danger active:opacity-90`,
     secondary: `${action} min-h-11 border border-liff-line-strong bg-canvas text-sm font-semibold text-ink active:bg-liff-off-bg`,

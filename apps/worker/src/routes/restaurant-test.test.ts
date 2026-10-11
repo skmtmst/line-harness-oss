@@ -1695,7 +1695,7 @@ describe('提案E 媒体リンク',()=>{
     seedRestaurantFixture();env.LIFF_URL='https://liff.line.me/wrong-global';testDb.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,liff_id) VALUES('account-1','統括','hq','','','hq-liff'),('account-2','店','shop','','','shop-liff')");const path='/api/restaurant-test/reservation-link?account_id=account-1';
     const a=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
     const b=(await (await request(path,{storeId:'store-ginza'})).json() as any).data;
-    expect(a).toEqual(b);expect(a.available).toBe(true);expect(a.url).toMatch(/^https:\/\/liff\.line\.me\/shop-liff\/restaurant\/reserve\/[a-z0-9-]+$/);expect(a.html).toContain('noopener');
+    expect(a).toEqual(b);expect(a.available).toBe(true);expect(a.url).toMatch(/^https:\/\/liff\.line\.me\/shop-liff\?page=restaurant&token=[a-z0-9-]+$/);expect(a.html).toContain('noopener');
   });
 });
 
@@ -1790,5 +1790,27 @@ describe('飲食3・共通フォローのHTTP境界',()=>{
   expect((await detail.json() as {data:unknown}).data).toMatchObject({courseAllergens:['乳','小麦'],allergensSource:'registered_at_booking'});
   const history=await request(path+'/review-history'+scope);expect(history.status).toBe(200);
   expect((await history.json() as {data:unknown}).data).toMatchObject({reviewSelection:'all_customers',origin:'line_invitation',verifiedGoogleReviewAttributions:[]});
+ });
+});
+
+describe('飲食4 系列の管理と権限',()=>{
+ it('案内の組と確認済み座標を管理者だけが変更できる。別店・閲覧のみを拒否',async()=>{
+  seedRestaurantFixture();
+  const query='?account_id=account-1';
+  for(const members of [[null,{}],[{storeId:123},{}]]) {
+   expect((await request('/api/restaurant-test/store-groups'+query,{name:'壊れた入力',members})).status).toBe(400);
+  }
+  expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_groups').get()).toEqual({n:0});
+  const made=await request('/api/restaurant-test/store-groups'+query,{name:'近くの店',members:[{storeId:'store-ginza',referralEnabled:true,maxDistance:5},{storeId:'store-yokohama',referralEnabled:false,maxDistance:5}]});
+  expect(made.status).toBe(201);
+  const id=(await made.json() as {data:{id:string}}).data.id;
+  expect((await requestWithMethod('/api/restaurant-test/stores/store-ginza/referral-location'+query,'PUT',{latitude:35.6,longitude:139.7,confirmed:false})).status).toBe(400);
+  expect((await requestWithMethod('/api/restaurant-test/stores/store-ginza/referral-location'+query,'PUT',{latitude:35.6,longitude:139.7,confirmed:true})).status).toBe(200);
+  expect((await requestWithMethod(`/api/restaurant-test/store-groups/${id}/members/store-yokohama${query}`,'PATCH',{referralEnabled:true,maxDistance:10})).status).toBe(200);
+  expect((await request('/api/restaurant-test/store-groups'+query)).status).toBe(200);
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'viewer',role:'admin',name:'閲覧',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+  expect((await requestWithMethod(`/api/restaurant-test/store-groups/${id}/members/store-ginza${query}`,'PATCH',{referralEnabled:false,maxDistance:5},'viewer-key')).status).toBe(403);
+  authMocks.getStaffByApiKey.mockResolvedValue(null);
+  expect((await request('/api/restaurant-test/store-groups'+query,{name:'越境',members:[{storeId:'store-ginza',referralEnabled:true,maxDistance:5},{storeId:'not-owned',referralEnabled:true,maxDistance:5}]})).status).toBe(404);
  });
 });

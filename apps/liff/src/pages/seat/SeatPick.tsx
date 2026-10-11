@@ -1,27 +1,25 @@
-import { FormSelectControl, TextInput, FieldLabel } from '../../components/forms/controls.js';
+import Icon from '../../components/ui/Icon.js';
+import { TextInput } from '../../components/forms/controls.js';
 import Button from '../../components/ui/Button.js';
 import { useRef } from 'react';
 import type { RestaurantCustomerSlot, RestaurantUnavailableReason } from '@line-crm/shared';
 import {
   closedNote,
+  longDate,
   hasOpenSlot,
-  md,
   slotLabel,
-  slotState,
-  weekday,
   zonedParts,
   type DayChip,
 } from '../../lib/seat-reserve.js';
-import { LiffInput } from '../../components/forms/controls.js'
 
-/** 札で選べる人数。5 は「5名以上」で、選ぶと下に人数の選択が出る。 */
-const GUESTS = [1, 2, 3, 4, 5] as const;
-const MANY_MAX = 20;
+
+
+
 
 export type DaySlots = RestaurantCustomerSlot[] | 'loading' | 'error' | 'closed';
 
 /**
- * ① 人数と日時 (★V8 glL3g)。人数の札・今日から5日の札・ほかの日・時刻の3列。
+ * ① 人数・日時・コース (★V8 KRppA)。人数は増減、日にちは端末の選択、時刻は空きの札。
  * 選べない時刻 (満席) は押せない。空きを1つも持たない日は札を押せない形にし、下に注を出す。
  */
 export default function SeatPick({
@@ -57,7 +55,7 @@ export default function SeatPick({
 }) {
   const otherRef = useRef<HTMLInputElement>(null);
   const day = days[date];
-  const inChips = chips.some((c) => c.date === date);
+
   // 札の日とその次の日で、空きが1つも無い日を注に出す (今日は営業が終わっただけのことが多いので外す)。
   const noted = [...chips.map((c) => c.date), chips.length ? nextDay(chips) : null]
     .filter((d): d is string => !!d && d !== today)
@@ -66,7 +64,7 @@ export default function SeatPick({
       return v === 'closed' || (Array.isArray(v) && !hasOpenSlot(v));
     });
   const note = closedNote(noted, reasons);
-  const many = guestCount >= 5;
+
 
   function openOther() {
     const el = otherRef.current;
@@ -78,144 +76,23 @@ export default function SeatPick({
     }
   }
 
-  return (
-    <div className="space-y-3.5" data-design-node="glL3g">
-      <h2 className="text-xl font-bold text-ink">人数と日時を選んでください</h2>
-
-      <FieldLabel id="seat-guest" required>人数</FieldLabel>
-      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-labelledby="seat-guest">
-        {GUESTS.map((n) => {
-          const on = n === 5 ? many : guestCount === n;
-          return (
-            <Button variant="chip" selected={on}
-              key={n}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => onGuest(n === 5 && many ? guestCount : n)}
-            >
-              {n === 5 ? '5名以上' : `${n}名`}
-            </Button>
-          );
-        })}
-        {many && (
-          <label className="flex items-center gap-1.5 text-[13px] text-ink">
-            <span className="sr-only">人数</span>
-            <FormSelectControl
-              value={guestCount}
-              onChange={(e) => onGuest(Number(e.target.value))}
-            >
-              {Array.from({ length: MANY_MAX - 4 }, (_, i) => i + 5).map((n) => (
-                <option key={n} value={n}>
-                  {n}名
-                </option>
-              ))}
-            </FormSelectControl>
-          </label>
-        )}
-      </div>
-
-      <FieldLabel id="seat-day" required>日にち</FieldLabel>
-      <div className="flex gap-1.5" role="radiogroup" aria-labelledby="seat-day">
-        {chips.map((c) => {
-          const v = days[c.date];
-          const off = v === 'closed' || (Array.isArray(v) && !hasOpenSlot(v));
-          const on = c.date === date;
-          return (
-            <Button variant="day" selected={on} unavailable={off} className="flex-1"
-              key={c.date}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              aria-label={`${md(c.date)}（${weekday(c.date)}）${off ? '・空きなし' : ''}`}
-              onClick={() => onDate(c.date)}
-            >
-              <span className={`liff-num text-[13px] leading-5 font-bold ${off && !on ? 'text-liff-off-ink' : 'text-ink'}`}>
-                {c.top}
-              </span>
-              <span className={`text-[11px] leading-[17px] ${off && !on ? 'text-liff-off-ink' : 'text-liff-sub'}`}>
-                {c.bottom}
-              </span>
-            </Button>
-          );
-        })}
-      </div>
-
-      <div className="flex">
-        <Button variant="text"
-          type="button"
-          onClick={openOther}
-        >
-          {inChips ? 'ほかの日を選ぶ ›' : `ほかの日：${md(date)}（${weekday(date)}） ›`}
-        </Button>
-        <TextInput appearance="hidden"
-          ref={otherRef}
-          type="date"
-          min={today}
-          value={date}
-          aria-label="ほかの日"
-          tabIndex={-1}
-          onChange={(e) => e.target.value && onDate(e.target.value)}
-        />
-      </div>
-
-      <FieldLabel required>{`時刻（${guestCount}名で空いている時間）`}</FieldLabel>
-      {day === 'loading' || day === undefined ? (
-        <div className="grid grid-cols-3 gap-1.5" aria-label="読み込み中">
-          {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="liff-shimmer-bone h-[53px] rounded-(--liff-radius) bg-liff-off-bg" />
-          ))}
-        </div>
-      ) : day === 'error' ? (
-        <p className="text-[13px] leading-6 text-liff-sub">
-          空きを読み込めませんでした。{' '}
-          <Button variant="text" type="button" onClick={onRetry}>
-            もう一度読み込む
-          </Button>
-        </p>
-      ) : day === 'closed' || day.length === 0 ? (
-        <p className="text-[13px] leading-6 text-liff-sub">この日は予約を受け付けていません。ほかの日を選んでください。</p>
-      ) : (
-        <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="時刻">
-          {day.map((s) => {
-            const st = slotState(s);
-            const on = s.startsAt === startsAt;
-            const hm = zonedParts(s.startsAt, timeZone).hm;
-            return (
-              <Button variant="day" selected={on} unavailable={st === 'full'}
-                key={s.startsAt}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                aria-label={`${hm} ${slotLabel(s)}`}
-                disabled={st === 'full'}
-                onClick={() => onTime(s.startsAt)}
-              >
-                <span className={`liff-num text-[13px] leading-5 font-bold ${st === 'full' ? 'text-liff-full' : 'text-ink'}`}>
-                  {hm}
-                </span>
-                <span
-                  className={`text-[11px] leading-[17px] ${
-                    st === 'full' ? 'text-liff-full' : st === 'few' ? 'text-liff-dot-few' : 'text-liff-sub'
-                  }`}
-                >
-                  {slotLabel(s)}
-                </span>
-              </Button>
-            );
-          })}
-        </div>
-      )}
-
-      {note && <p className="text-xs leading-[18px] text-liff-sub">{note}</p>}
-      {error && (
-        <p role="alert" className="text-[13px] leading-6 text-danger">
-          {error}
-        </p>
-      )}
-      <div className="pb-40" aria-hidden="true" />
+  return <div className="space-y-3" data-design-node="KRppA">
+    <div className="flex items-center gap-2">
+      <span id="seat-guest" className="flex-1 text-xs leading-[18px] font-semibold text-liff-sub">人数</span>
+      <Button variant="restaurant-control" aria-label="人数を減らす" disabled={guestCount<=1} onClick={()=>onGuest(guestCount-1)}>−</Button>
+      <span aria-live="polite" className="text-[15px] leading-[23px] font-bold text-ink">{`${guestCount}名`}</span>
+      <Button variant="restaurant-control" aria-label="人数を増やす" disabled={guestCount>=100} onClick={()=>onGuest(guestCount+1)}>＋</Button>
     </div>
-  );
+    <Button variant="restaurant-date" type="button" aria-label="日にちを選ぶ" onClick={openOther}>{longDate(date).trim()}</Button>
+    <TextInput appearance="hidden" ref={otherRef} type="date" min={today} value={date} aria-label="ほかの日" tabIndex={-1} onChange={e=>e.target.value&&onDate(e.target.value)} />
+    {day==='loading'||day===undefined ? <p role="status" className="text-xs text-liff-sub">空きを読み込んでいます…</p>
+      : day==='error' ? <p className="text-[13px] leading-5 text-liff-sub">空きを読み込めませんでした。<Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
+      : day==='closed'||!day.length ? <p className="text-[13px] leading-5 text-liff-sub">この日は予約を受け付けていません。ほかの日を選んでください。</p>
+      : <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="時刻">{day.map(s=><Button variant="restaurant-time" key={s.startsAt} role="radio" aria-checked={s.startsAt===startsAt} aria-label={`${zonedParts(s.startsAt,timeZone).hm} ${slotLabel(s)}`} selected={s.startsAt===startsAt} disabled={!s.available} onClick={()=>onTime(s.startsAt)}>{zonedParts(s.startsAt,timeZone).hm}</Button>)}</div>}
+    {Array.isArray(day)&&day.some(s=>!s.available) && <p className="flex items-center gap-3 rounded-(--liff-radius) bg-liff-note px-4 py-3 text-[13px] leading-5 text-liff-sub"><Icon name="info" className="h-4 w-4 shrink-0" />{day.filter(s=>!s.available).map(s=>zonedParts(s.startsAt,timeZone).hm).join('・')} は満席です</p>}
+    {note&&<p className="text-xs leading-[18px] text-liff-sub">{note}</p>}
+    {error&&<p role="alert" className="text-[13px] leading-5 text-danger">{error}</p>}
+  </div>;
 }
 
 function nextDay(chips: DayChip[]): string {

@@ -8,8 +8,8 @@ export function FieldMark({ required = false }: { required?: boolean }) {
   return <span aria-hidden="true" className={required ? styles.required : styles.optional}>{required ? '必須' : '任意'}</span>
 }
 
-export function FieldLabel({ required = false, children, ...props }: LabelHTMLAttributes<HTMLLabelElement> & { required?: boolean }) {
-  return <div className={styles.label}><label {...props}>{children}</label><FieldMark required={required} /></div>
+export function FieldLabel({ required = false, children, size, ...props }: LabelHTMLAttributes<HTMLLabelElement> & { required?: boolean; size?: 'form' }) {
+  return <div className={`${styles.label} ${size === 'form' ? styles.formLabel : ''}`}><label {...props}>{children}</label><FieldMark required={required} /></div>
 }
 
 export function FieldCount({ value, max, night = false }: { value: string; max: number; night?: boolean }) {

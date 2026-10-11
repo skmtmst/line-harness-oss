@@ -26,11 +26,13 @@ export type CustomerReservationRow = {
   note: string | null;
   customer_phone: string | null;
   seat_type: string | null;
+  course_id?: string | null;
+  course_name?: string | null;
 };
 export function customerBooking(r: CustomerReservationRow): RestaurantCustomerBooking {
   return { id:r.id, storeId:r.store_id, startsAt:r.starts_at, endsAt:r.ends_at, guestCount:r.guest_count,
     status:r.status, version:r.customer_version, holdExpiresAt:r.hold_expires_at,
-    note:r.note, customerPhone:r.customer_phone, seatType:r.seat_type };
+    note:r.note, customerPhone:r.customer_phone, seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null };
 }
 /** 任意欄はUnicodeの文字数で検査。空欄・nullは保存済みの値を消す。 */
 export function validCustomerDetails(b: {note?: unknown; customerPhone?: unknown}): boolean {
@@ -51,6 +53,7 @@ export async function customerAvailability(
   date: string,
   count: number,
   excludeId?: string,
+  courseId?: string | null,
 ): Promise<{
   data: RestaurantCustomerAvailability;
   hoursVersion: number;
@@ -63,6 +66,9 @@ export async function customerAvailability(
     count > 100
   )
     return null;
+  const course = await customerCourse(db, store.id, courseId);
+  if (course === undefined) return null;
+  const duration = course?.durationMinutes ?? 120;
   const settings = await getBookingAdminSettings(db, store.line_account_id);
   if (!settings) return null;
   const now = Date.now(),
@@ -111,11 +117,11 @@ export async function customerAvailability(
           (minute(period.closesAt) < start ? 1440 : 0);
       for (
         let m = start;
-        m + 120 <= end;
+        m + duration <= end;
         m += settings.slotGranularityMinutes
       ) {
         const startsAt = restaurantCivilTime(civilDate, m, store.timezone),
-          endsAt = new Date(Date.parse(startsAt) + 120 * 60000).toISOString();
+          endsAt = new Date(Date.parse(startsAt) + duration * 60000).toISOString();
         if (tzDateStr(store.timezone,new Date(startsAt)) !== date) continue;
         hasOperatingSlot = true;
         if (Date.parse(startsAt) <= now + settings.cutoffMinutesBefore * 60000) continue;
@@ -237,4 +243,13 @@ export async function processRestaurantCustomerNotices(
     }
   }
   return count;
+}
+
+/** コースは同じ店の公開済みの物だけ。未指定は従来の120分。 */
+export async function customerCourse(db: D1Database, storeId: string, courseId?: string | null): Promise<import('@line-crm/shared').RestaurantCustomerCourse | null | undefined> {
+  if (courseId == null || courseId === '') return null;
+  if (typeof courseId !== 'string') return undefined;
+  const row = await db.prepare("SELECT id,name,duration_minutes,price,allergens_json FROM rt_menu_items WHERE id=? AND store_id=? AND kind='course' AND status='active'").bind(courseId,storeId).first<{id:string;name:string;duration_minutes:number|null;price:number;allergens_json:string}>();
+  if (!row || !Number.isSafeInteger(row.duration_minutes) || row.duration_minutes! < 1 || row.duration_minutes! > 1440) return undefined;
+  return {id:row.id,name:row.name,durationMinutes:row.duration_minutes!,price:row.price,allergens:JSON.parse(row.allergens_json)};
 }
