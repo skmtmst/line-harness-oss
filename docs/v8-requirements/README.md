@@ -18,3 +18,9 @@
 - 版のある設定の保存は、版の競合を 409 で返す。
 - migration は番号ごとにオーナー承認。検証 D1 への適用は司令塔、本番は対象外。
 - 閲覧のみの人には押せないボタンを置かず隠す（`docs/v8-design-rules.md` §2）。
+
+## 報告から移した契約（2026-10-11）
+
+- [restaurant-fusion3-contract.md](restaurant-fusion3-contract.md)：承認した共通シナリオから予約ごとに送る・前日の返事。
+- [restaurant-fusion4-contract.md](restaurant-fusion4-contract.md)：席予約・回答後の予約・参加許可のある系列店の紹介。
+- 保存記録を残す削除は [form-file-attachments.md](form-file-attachments.md) §12、共通操作は `docs/v8-design-rules.md`、配備・速度の確認は `docs/brain/Memory.md`。
