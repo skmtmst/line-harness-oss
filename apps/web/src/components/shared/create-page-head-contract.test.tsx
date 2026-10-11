@@ -23,22 +23,24 @@ const css = readFileSync(join(HERE, 'create-page.module.css'), 'utf8')
  * 既定（v7）の頭は変えない。上書きは [data-theme="v8"] だけ。
  */
 describe('作る型の頭（v8・作成画面の絵）', () => {
-  it('戻る行は頭の内側（題の上）', () => {
+  it('頭は題を出し、本文のパンくずを重ねない', () => {
     const html = renderToStaticMarkup(
       <CreatePage title="試しの作成" parent={['一覧', '/items']} onSave={async () => {}}>
         <p>中身</p>
       </CreatePage>,
     )
-    expect(html).toMatch(/data-design="Head"[^>]*>[\s\S]*?<nav data-design="Crumb"/)
+    expect(html).toContain('data-design="Head"')
+    expect(html).not.toContain('data-design="Crumb"')
   })
 
-  it('頭なしでは戻る行だけ外に出る（v7 と同じ）', () => {
+  it('頭なしでも本文のパンくずを重ねず、キャンセルの行き先を残す', () => {
     const html = renderToStaticMarkup(
       <CreatePage title="試しの作成" parent={['一覧', '/items']} onSave={async () => {}} showHeader={false}>
         <p>中身</p>
       </CreatePage>,
     )
-    expect(html).toContain('data-design="Crumb"')
+    expect(html).not.toContain('data-design="Crumb"')
+    expect(html).toContain('href="/items"')
     expect(html).not.toContain('data-design="Head"')
   })
 

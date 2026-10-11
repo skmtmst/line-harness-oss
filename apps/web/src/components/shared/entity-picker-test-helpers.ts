@@ -11,7 +11,8 @@ function escape(text: string) { return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
 export async function pickEntity(label: string, name: string, confirm = '選ぶ') {
   fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${escape(label)}(?::|：)?(選ぶ|変える)?$`) }))
   const dialog = (await screen.findAllByRole('dialog')).at(-1)!
-  fireEvent.click(await within(dialog).findByRole(within(dialog).queryByRole('checkbox', {name}) ? 'checkbox' : 'radio', { name }))
+  await waitFor(() => expect(within(dialog).queryByRole('checkbox', { name }) ?? within(dialog).queryByRole('radio', { name })).not.toBeNull())
+  fireEvent.click((within(dialog).queryByRole('checkbox', { name }) ?? within(dialog).getByRole('radio', { name }))!)
   fireEvent.click(within(dialog).getByRole('button', { name: within(dialog).queryByRole('button',{name:confirm}) ? confirm : /^選ぶ（\d+件）$/ }))
   await waitFor(() => expect(screen.queryAllByRole('dialog').includes(dialog)).toBe(false))
 }

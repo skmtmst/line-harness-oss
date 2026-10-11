@@ -2,7 +2,6 @@
 
 import TagOverflow from './tag-overflow'
 import { useEffect, useState } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { TagToggle } from './tag-pill'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'

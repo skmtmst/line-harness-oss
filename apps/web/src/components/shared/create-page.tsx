@@ -14,7 +14,6 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { describeSaveFailure } from '@/lib/api'
 import { SaveErrorScope, useSaveFormErrors } from './save-form-errors'
 import type { FormErrors } from '@/lib/use-form-errors'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /*
  * D005: `ApiError.message` は安全と判定されない応答では `API error: <番号>` の
@@ -129,7 +128,6 @@ export default function CreatePage({
   const saveErrors = useSaveFormErrors()
 
   const router = useRouter()
-  const theme = useAdminTheme()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -242,15 +240,7 @@ export default function CreatePage({
    * v7 は頭の上に「親 / 今の題」の行を置く。★V8 は描かない（オーナー 2026-10-08）：
    * 戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ。
    */
-  const crumb = theme === 'v8' ? null : (
-    <nav data-design="Crumb" className={`${styles.crumb} text-ink-faint mb-2 text-xs`}>
-      <Link href={parent[1]} className="hover:underline">
-        {parent[0]}
-      </Link>
-      <span className="mx-1.5">/</span>
-      <span>{title}</span>
-    </nav>
-  )
+
 
   return (
     <SaveErrorScope errors={saveErrors}><VariantContext.Provider value={variant}>
@@ -258,10 +248,9 @@ export default function CreatePage({
       <AutoFormLeaveGuard busy={saving} />
       {showHeader ? (
         <div data-design="Head" className={styles.head}>
-          {crumb}
           <PageHeading title={title} help={help} />
         </div>
-      ) : crumb}
+      ) : null}
 
       <div data-design="Body" className={aside ? 'flex flex-col gap-4 xl:flex-row' : undefined}>
         <div
