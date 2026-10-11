@@ -82,7 +82,7 @@ export function ContentTab(props: Props) {
 
   return (
     <>
-      <Card layout="vertical" padding="roomy" gap="normal" aria-labelledby="fe-pages-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-pages-title">
         <div className={styles.cardHead}>
           <span className={styles.cardHeadText}>
             <h2 id="fe-pages-title" className={styles.cardTitle}>ページ</h2>
@@ -121,7 +121,7 @@ export function ContentTab(props: Props) {
         </div>
       </Card>
 
-      <Card layout="vertical" padding="roomy" gap="normal" aria-labelledby="fe-blocks-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>
           <h2 id="fe-blocks-title" className={styles.cardTitle}>{`ページ${page + 1} のブロック`}</h2>
           <p className={styles.cardNote}>つまみで並べ替え。押すと設定が開きます</p>

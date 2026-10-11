@@ -113,7 +113,7 @@ export function AppearanceTab(props: Props) {
       ['フォーム名', props.name],
       ['覚え書き', props.description || 'なし'],
     ]
-    return <Card layout="vertical" padding="roomy" gap="normal">
+    return <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)">
       <h2 className={styles.cardTitle}>受付と見た目</h2>
       <dl>{rows.map(([label, value]) => <div className={styles.field} key={label}><dt className={styles.fieldLabel}>{label}</dt><dd>{value}</dd></div>)}</dl>
     </Card>
@@ -121,7 +121,7 @@ export function AppearanceTab(props: Props) {
 
   return (
     <>
-      <Card layout="vertical" padding="roomy" gap="normal" aria-labelledby="fe-reception-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-reception-title">
         <h2 id="fe-reception-title" className={styles.cardTitle}>受付のきまり</h2>
         <div className={styles.periodRow}>
           <div className={styles.field}>
@@ -163,7 +163,7 @@ export function AppearanceTab(props: Props) {
         ) : null}
       </Card>
 
-      <Card layout="vertical" padding="roomy" gap="normal" aria-label="受付のつづきと見た目">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-label="受付のつづきと見た目">
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>受付のきまり（つづき）</h3>
           <SaveErrorField names={["restorePrevious","options.restorePrevious","restore_previous","options.restore_previous"]}><Checkbox checked={options.restorePrevious ?? false} onCheckedChange={(restorePrevious) => onChangeOptions({ restorePrevious })}>前回の答えを最初から入れておく</Checkbox></SaveErrorField>
@@ -253,7 +253,7 @@ export function AppearanceTab(props: Props) {
         </div>
       </Card>
 
-      <Card layout="vertical" padding="roomy" gap="normal" aria-labelledby="fe-about-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-about-title">
         <div className={styles.cardHeadText}>
           <h2 id="fe-about-title" className={styles.cardTitle}>フォームのこと</h2>
           <p className={styles.cardNote}>名前は一覧と題に出ます。覚え書きはお客さまには出ません。</p>
