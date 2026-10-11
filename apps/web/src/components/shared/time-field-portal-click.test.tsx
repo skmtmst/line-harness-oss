@@ -12,7 +12,7 @@
  * 全画面に効かせる。内側の候補への押下は外側扱いしない。
  */
 import { useState } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TimeField } from './date-time-field'
 
@@ -38,7 +38,7 @@ function pointerDown(element: Element) {
 }
 
 function openTimeDialog() {
-  fireEvent.click(screen.getByRole('button', { name: '時間帯の始まり' }))
+  fireEvent.click(screen.getByRole('button', { name: '時刻の一覧を開く' }))
   expect(screen.getByRole('dialog', { name: '時刻を選ぶ' })).toBeTruthy()
 }
 
@@ -47,7 +47,9 @@ function openTimeDialog() {
  * 時刻ダイアログは開いたまま（分も続けて選べる）。
  */
 function clickOption(name: string) {
-  const option = screen.getByRole('button', { name })
+  const column = name.endsWith('時') ? '時' : '分'
+  const value = name.slice(0, -1).padStart(2, '0')
+  const option = within(screen.getByRole('listbox', { name: column })).getByRole('option', { name: value })
   pointerDown(option)
   fireEvent.click(option)
 }
@@ -56,27 +58,24 @@ describe('R251 時刻候補のクリックで値が入る', () => {
   it('空欄で時22時をクリックすると 22:00 になり、箱は開いたまま', () => {
     render(<TimeHarness />)
     openTimeDialog()
-    fireEvent.click(screen.getByRole('button', { name: '時' }))
     clickOption('22時')
     expect(screen.getByTestId('value').textContent).toBe('22:00')
     // 直し前はここで箱が閉じている（外側扱いで閉じる予約が流れる）。
     expect(screen.getByRole('dialog', { name: '時刻を選ぶ' })).toBeTruthy()
   })
 
-  it('空欄で分15分をクリックすると :15 が入り、箱は開いたまま', () => {
+  it('空欄で分15分をクリックすると10:15が入り、確定して閉じる', () => {
     render(<TimeHarness />)
     openTimeDialog()
-    fireEvent.click(screen.getByRole('button', { name: '分' }))
     clickOption('15分')
     // 時は既定の10時（空欄の置き場所）で、分だけ替わる。
     expect(screen.getByTestId('value').textContent).toBe('10:15')
-    expect(screen.getByRole('dialog', { name: '時刻を選ぶ' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '時刻を選ぶ' })).toBeNull()
   })
 
   it('既存値04:00で時2時をクリックすると 02:00 に替わる', () => {
     render(<TimeHarness initial="04:00" />)
     openTimeDialog()
-    fireEvent.click(screen.getByRole('button', { name: '時' }))
     clickOption('2時')
     expect(screen.getByTestId('value').textContent).toBe('02:00')
     expect(screen.getByRole('dialog', { name: '時刻を選ぶ' })).toBeTruthy()
@@ -85,9 +84,8 @@ describe('R251 時刻候補のクリックで値が入る', () => {
   it('キーボード（↓・Enter）でも時を選べる', () => {
     render(<TimeHarness />)
     openTimeDialog()
-    const trigger = screen.getByRole('button', { name: '時' })
-    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    expect(screen.getByRole('listbox')).toBeTruthy()
+    const trigger = screen.getByRole('listbox', { name: '時' })
+    expect(trigger).toBeTruthy()
     // 既定10時から2つ下へ進めて12時で確定する。
     fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     fireEvent.keyDown(trigger, { key: 'ArrowDown' })
@@ -98,10 +96,11 @@ describe('R251 時刻候補のクリックで値が入る', () => {
   it('閉じる・開き直しで選んだ時刻が残る', () => {
     render(<TimeHarness />)
     openTimeDialog()
-    fireEvent.click(screen.getByRole('button', { name: '時' }))
     clickOption('22時')
-    fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+    fireEvent.keyDown(screen.getByRole('combobox', { name: '時間帯の始まり' }), { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('button', { name: '時間帯の始まり' }).textContent).toContain('22:00')
+    expect((screen.getByRole('combobox', { name: '時間帯の始まり' }) as HTMLInputElement).value).toBe('22 : 00')
+    openTimeDialog()
+    expect(within(screen.getByRole('listbox', { name: '時' })).getByRole('option', { name: '22' }).getAttribute('aria-selected')).toBe('true')
   })
 })

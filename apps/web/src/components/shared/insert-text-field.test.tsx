@@ -184,14 +184,16 @@ describe('題（label）とのつながり', () => {
   })
 })
 
-describe('v7 の見た目は変えない', () => {
-  it('data-theme が v8 でないときは今までどおりの textarea', async () => {
-    document.documentElement.removeAttribute('data-theme')
+describe('旧指定でも現在の差し込み表示', () => {
+  it('旧テーマ指定でも札を出し、保存値を保つ', async () => {
+    document.documentElement.setAttribute('data-theme', 'v7')
     await mount(<Harness initial="{{name}}さん" />)
     const element = box()
-    expect(element.tagName).toBe('TEXTAREA')
+    expect(element.tagName).toBe('DIV')
+    expect(chips()).toEqual(['{{name}}'])
     expect((element as HTMLTextAreaElement).value).toBe('{{name}}さん')
-    await act(async () => { fireEvent.change(element, { target: { value: '{{name}}' } }) })
+    element.textContent = '{{name}}'
+    await act(async () => { fireEvent.input(element) })
     expect(current()).toBe('{{name}}')
   })
 })
