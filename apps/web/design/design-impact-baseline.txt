@@ -76,7 +76,6 @@ shared-button-importer v8/nen-campaigns/column-intros.tsx
 shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/photo-policy-history-v8.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
-shared-button-importer app/nen-members/photo-review-v8.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
 shared-button-importer app/recipes/page.tsx
