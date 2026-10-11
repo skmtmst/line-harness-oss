@@ -142,6 +142,7 @@ const ALLOWLIST_MAX = 771;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/images/{key}',
   'GET /api/account-settings/allergy-options',
   'PUT /api/account-settings/allergy-options',
   'GET /api/account-settings/customer-look',
