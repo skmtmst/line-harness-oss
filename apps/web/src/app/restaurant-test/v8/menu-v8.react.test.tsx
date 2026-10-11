@@ -34,7 +34,7 @@ beforeEach(() => {
   fixture.createMenu.mockResolvedValue({ success: true })
   fixture.updateMenu.mockResolvedValue({ success: true })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
 /*
  * ★V8-B メニュー管理（板 `MJoJR`）の契約。
@@ -97,7 +97,8 @@ it('申請中と承認済み開始待ちの新価格を現行価格と併記す�
  expect(screen.getByText('¥8,800')).not.toBeNull()
  expect(screen.getByTitle(/^新価格 ¥9,900/)).not.toBeNull()
 })
-it('価格変更に開始日時を添えて承認へ送る',async()=>{
+it.each(['2026-10-11T15:09:00Z','2026-10-11T23:59:00Z'])('日本時間00:09・08:59でも価格変更の開始日時を添えて承認へ送る（%s）',async(now)=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(now))
  render(<MenuV8 />)
  const row=(await screen.findByText('秋の鹿肉コース')).closest('tr')!
  fireEvent.click(within(row).getByRole('button',{name:/その他操作|操作/}))
@@ -112,5 +113,5 @@ it('価格変更に開始日時を添えて承認へ送る',async()=>{
  fireEvent.click(within(screen.getByRole('dialog',{name:'日時を選ぶ'})).getByRole('button',{name:'閉じる'}))
  const ymd=`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-10`
  fireEvent.click(screen.getByRole('button',{name:'保存して申請する'}))
- await waitFor(()=>expect(fixture.updateMenu).toHaveBeenCalledWith('account-1','m1',expect.objectContaining({price:9900,effectiveAt:new Date(`${ymd}T10:00`).toISOString()})))
+ await waitFor(()=>expect(fixture.updateMenu).toHaveBeenCalledWith('account-1','m1',expect.objectContaining({price:9900,effectiveAt:new Date(`${ymd}T10:00:00+09:00`).toISOString()})))
 })

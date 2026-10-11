@@ -180,7 +180,9 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
 
   it('公開OFFの保存はボタン名も公開と読ませない(EVENT-02)', () => {
     expect(CREATE).toContain('onClick={() => void save(false)}')
-    expect(CREATE).toContain('onClick={() => void save(true)}')
-    expect(CREATE).toContain('is_published: publish ? 1 : 0')
+    expect(CREATE).toContain('if (validateInput()) setPublishOpen(true)')
+    expect(CREATE).toContain('onConfirm={() => save(true)}')
+    // 枠だけ失敗した公開済み本体の再試行では、公開状態を下書きへ戻さない。
+    expect(CREATE).toContain('is_published: publish || saved?.is_published === 1 ? 1 : 0')
   })
 })

@@ -22,7 +22,8 @@ afterEach(() => vi.useRealTimers())
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const thisMonth = '2026-10-12T00:09:00+09:00'
-const lastMonth = '2026-09-15T12:00:00+09:00'
+// V8の過去30日（9/13〜10/12）の、さらに前の30日に置く。
+const lastMonth = '2026-08-28T12:00:00+09:00'
 
 const ITEMS = [
   {
@@ -70,7 +71,11 @@ vi.mock('@/v8/affiliates/drawer', () => ({ default: () => null }))
 
 const { default: ReportTabV8 } = await import('@/v8/affiliates/report')
 
-beforeEach(() => { fixture.failed = false; fixture.truncated = false; fixture.missingReward = false })
+beforeEach(() => {
+  fixture.failed = false; fixture.truncated = false; fixture.missingReward = false
+  window.history.replaceState(null, '', '/affiliates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+})
 
 afterEach(() => {
   cleanup()
@@ -80,7 +85,8 @@ function renderTab() {
   render(<AffiliateShell.Provider value={{ tab: 'report', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><ReportTabV8 /></AffiliateShell.Provider>)
 }
 
-describe('Eo56k レポートタブの絵合わせ', () => {
+describe.each(['2026-10-11T15:09:00Z', '2026-10-11T23:59:00Z'])('Eo56k レポートタブ（日本時間00:09・08:59、時計 %s）', (now) => {
+  beforeEach(() => vi.setSystemTime(new Date(now)))
   test('紹介者の取得失敗をゼロ件に見せず、再読み込みで回復する', async () => {
     fixture.failed = true
     renderTab()

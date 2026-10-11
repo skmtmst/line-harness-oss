@@ -22,7 +22,7 @@ describe('イベント作成の最初の予約枠', () => {
     const createSlot = SOURCE.indexOf('eventsApi.createSlots(selectedAccountId, eventId, [')
     expect(createEvent).toBeGreaterThanOrEqual(0)
     expect(createSlot).toBeGreaterThan(createEvent)
-    expect(SOURCE).toContain('createdIdRef.current = eventId')
+    expect(SOURCE).toContain('createdRef.current = { accountId: selectedAccountId, event: saved! }')
     expect(SOURCE).toContain('client_key: `first-slot:${eventId}`')
     expect(EDIT).toContain('slot.id, body, slot.version ?? 1')
   })

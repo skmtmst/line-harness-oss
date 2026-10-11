@@ -41,7 +41,8 @@ describe('V8 ウェビナー一覧の契約', () => {
 
   it('選択アカウントのフォルダ件数を表示し、追加・改名・並び替え・削除を保存する', () => {
     expect(PAGE).toContain('<FolderPanel')
-    expect(PAGE).toContain('folders={<>')
+    expect(PAGE).toContain('folders={foldersLoadError?')
+    expect(PAGE).toContain('title="フォルダを読み込めませんでした"')
     expect(PAGE).toContain("onAddFolder={canEdit ? () => { setFolderError(''); closeDetail(); setFolderFormOpen(true) } : undefined}")
     expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name, color })")
     expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name, color })')

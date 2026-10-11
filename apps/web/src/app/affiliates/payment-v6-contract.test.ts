@@ -95,7 +95,8 @@ describe('V6 支払いの追記台帳契約', () => {
     const settlementCheck = PAYMENT.indexOf('Array.isArray(settlement.data.affiliates)')
     const setPreview = PAYMENT.indexOf('setPreview(settlement.data)')
     expect(settlementCheck).toBeGreaterThan(-1)
-    expect(PAYMENT).toContain('setItems(summaries?.success && Array.isArray(summaries.data) ? summaries.data : [])')
+    expect(PAYMENT).toContain('!summaries.success || !Array.isArray(summaries.data) || !current.success')
+    expect(PAYMENT).toContain('setItems(summaries.data)')
     expect(setPreview).toBeGreaterThan(settlementCheck)
   })
 
