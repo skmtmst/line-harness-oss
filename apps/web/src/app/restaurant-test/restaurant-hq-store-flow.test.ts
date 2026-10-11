@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 // 旧一覧の転送の部品（stores/store-list.tsx）はどこからも読まれないので 2026-10-07 に消した。転送は stores/page.tsx の redirect が担う。
 const wizard = readFileSync(new URL('./stores/new/page.tsx', import.meta.url), 'utf8')
-const terms = readFileSync(new URL('./terms/page.tsx', import.meta.url), 'utf8')
+const terms = readFileSync(new URL('../../v8/restaurant/terms/terms.tsx', import.meta.url), 'utf8')
 const banner = readFileSync(new URL('./stores/store-context-banner.tsx', import.meta.url), 'utf8')
 const index = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const storesPage = readFileSync(new URL('./stores/page.tsx', import.meta.url), 'utf8')
@@ -68,7 +68,7 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(wizard).toContain("usePageTitle('店舗を追加')")
     expect(terms).toContain("usePageTitle('利用規約')")
     expect(wizard).toContain('統括へ戻る')
-    expect(terms).toContain('店舗追加へ戻る')
+    expect(terms).toContain("label: '店舗を追加', href: '/restaurant-test/stores/new'")
     expect(wizard).not.toContain("@/components/layout/header")
     expect(terms).not.toContain("@/components/layout/header")
     expect(wizard).not.toContain('<Header')
