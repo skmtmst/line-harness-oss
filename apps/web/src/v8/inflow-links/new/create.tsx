@@ -17,6 +17,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
@@ -92,6 +93,9 @@ function InflowCreate() {
   const [genre, setGenre] = useState('')
   const [newGenre, setNewGenre] = useState('')
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
+  const [candidatesError,setCandidatesError]=useState(false)
+  const [candidatesLoading,setCandidatesLoading]=useState(true)
+  const [candidatesRetry,setCandidatesRetry]=useState(0)
   const [refCode, setRefCode] = useState(initialRef || suggestRef(initialName))
   const [refTouched, setRefTouched] = useState(initialRef !== '')
   const [tagId, setTagId] = useState('')
@@ -116,7 +120,11 @@ function InflowCreate() {
     clearConflict()
     setCoupon({ couponEnabled: false, couponAssetId: null, couponAudience: 'new_friends' })
     setCouponOptions([])
+  },[selectedAccountId])
+  useEffect(()=>{
     let cancelled = false
+    setCandidatesError(false)
+    setCandidatesLoading(true)
     /* プールは補助データ。機能がオフでも発行画面は止めない。有効と分からない限り口を呼ばない。 */
     const poolsRequest: Promise<ApiResponse<TrafficPool[]>> = isPoolsFeatureAvailable().then((ok) =>
       ok ? api.pools.list({ suppressFeatureDisabledEvent: true }) : { success: false as const, error: 'feature_disabled' },
@@ -129,9 +137,12 @@ function InflowCreate() {
       poolsRequest,
       api.templates.list(undefined, selectedAccountId ?? undefined),
       api.tagGroups.list(selectedAccountId),
-      api.entryRouteGenres.list().catch(() => ({ success: false as const, data: [] as EntryRouteGenre[] })),
+      api.entryRouteGenres.list(),
     ]).then(([t, s, p, tp, tg, g]) => {
       if (cancelled) return
+      setCandidatesLoading(false)
+      const required=[t,s,tp,tg,g]
+      if(required.some(result=>result.status==='rejected'||!result.value.success)||p.status==='rejected'||(!p.value.success&&p.value.error!=='feature_disabled')){setCandidatesError(true);return}
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
       if (tg.status === 'fulfilled' && tg.value.success) setTagGroups(tg.value.data)
       if (s.status === 'fulfilled' && s.value.success) setScenarios(s.value.data)
@@ -142,7 +153,7 @@ function InflowCreate() {
     return () => { cancelled = true }
     // 候補はアカウントごとに違う。切替後に古い候補のまま保存しないよう取り直す（入力は残す）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId])
+  }, [selectedAccountId,candidatesRetry])
 
   /* 新しい候補にない選択は外し、外したときだけ帯で知らせる。 */
   useEffect(() => {
@@ -172,6 +183,7 @@ function InflowCreate() {
 
   /* 発行の失敗は原文のまま出さない（403 は権限、409 は重複の立て直し、ほかは再試行の案内）。 */
   const doSave = async () => {
+    if(candidatesError || candidatesLoading)return
     setSaveError(null)
     const errors: Record<string, string> = {}
     if (!name.trim()) errors['ir-name'] = 'リンク名を入力してください'
@@ -373,13 +385,14 @@ function InflowCreate() {
           {conflict ? (
             <Button variant="primary" onClick={() => setShowCompare(true)} disabled={saving}><ArrowLeftRight size={15} aria-hidden="true" />比べてから保存</Button>
           ) : (
-            <Button variant="primary" onClick={() => void doSave()} disabled={saving} busy={saving} busyLabel="発行しています…">
+            <Button variant="primary" onClick={() => void doSave()} disabled={saving || candidatesError || candidatesLoading} busy={saving} busyLabel="発行しています…">
               <Link2 size={15} aria-hidden="true" />発行して URL を受け取る
             </Button>
           )}
         </>
       )} dirty={false}
     >
+      {candidatesError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>setCandidatesRetry(value=>value+1)}/>:null}
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError(null)} /> : null}
 
