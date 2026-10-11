@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { AlignLeft, Calendar, Check, CircleDot, Hash, ListChecks, Star, Type } from 'lucide-react';
@@ -391,7 +392,7 @@ export default function FieldEditor({
         {error ? <Notice tone="danger" message={error} /> : null}
         {locked && !host ? <Notice tone="warn">共通項目はこのアカウントから直接変更できません。新しい項目へ移行してから編集してください。</Notice> : null}
 
-        <section className={styles.card} aria-labelledby="ff-basic">
+        <Card variant="form" gap="normal" aria-labelledby="ff-basic">
           <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ff-basic">基本</h2></div>
           <Field label="項目名"><SaveErrorField names={["name"]}><TextField
               ref={(element) => { validationRefs.current.name = element }}
@@ -405,8 +406,8 @@ export default function FieldEditor({
             /></SaveErrorField>
 {fieldError('name')}
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="項目" /></Field>
-          <div className={styles.field} data-field="key">
-            <span className={styles.labelStrong} id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>
+          <div  data-field="key"><Field label={<span id="ff-key">{mode === 'create' ? '差し込みの名前（英字）' : '差し込みの名前（変えられません）'}</span>}>
+
             <span className={styles.keyRow}>
               <span className={styles.keyBrace}>{'{{field.'}</span>
               {mode === 'create' ? (
@@ -428,9 +429,9 @@ export default function FieldEditor({
             {keyOwners.length > 0
               ? <p className={styles.fieldError}>{`この差し込みの名前はすでに「${keyOwners[0]}」で使われています。別の名前にしてください。`}</p>
               : <p className={styles.keyNote}>{`メッセージに {{field.${shownKey}}} と書くと、その人の値に置き換わります`}</p>}
-          </div>
-          <div className={styles.field}>
-            <span className={styles.labelStrong}>フォルダ</span>
+          </Field></div>
+          <div ><Field label={<span>フォルダ</span>}>
+
             {foldersState === 'error' ? (
               <div className={styles.inlineRetry}>
                 <Notice tone="danger" className={styles.fieldErrorNoticePlacement} >{mode === 'create' ? 'フォルダを読み込めませんでした。今は未分類にしか入れられません。' : '所属を読み込めませんでした。今の所属は変わらず保存されます。'}</Notice>
@@ -449,10 +450,10 @@ export default function FieldEditor({
                 /></SaveErrorField>
               </span>
             )}
-          </div>
-        </section>
+          </Field></div>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="ff-type">
+        <Card variant="form" gap="normal" aria-labelledby="ff-type">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="ff-type">種類</h2>
             <p className={styles.cardNote}>
@@ -482,7 +483,7 @@ export default function FieldEditor({
               )
             })}
           </div>
-        </section>
+        </Card>
       </CreatePage>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject={mode === 'edit' ? '項目への変更' : '入力した項目'} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>

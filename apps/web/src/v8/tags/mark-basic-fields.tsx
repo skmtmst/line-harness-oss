@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 import type { Ref } from 'react'
 import { TextField } from '@/components/shared/text-field'
 import { DuplicateNameNote } from '@/components/friend-fields/attribute-kind-guide'
@@ -17,7 +18,7 @@ const COLORS = [
 
 export default function MarkBasicFields({ name, color, onName, onColor, nameDuplicates = [], disabled = false, error, nameRef }: { name: string; color: string; onName: (name: string) => void; onColor: (color: string) => void; nameDuplicates?: string[]; disabled?: boolean; error?: string; nameRef?: Ref<HTMLInputElement> }) {
   return (
-            <section className={styles.card} aria-labelledby="mark-basic">
+            <Card variant="form" gap="normal" aria-labelledby="mark-basic">
               <div className={styles.cardHead}><h2 className={styles.cardTitle} id="mark-basic">基本</h2></div>
               <Field label="マーク名"><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} className={styles.input} value={name} onChange={(event) => onName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
 {error ? <p role="alert" className={styles.fieldError}>{error}</p> : null}
@@ -41,6 +42,6 @@ export default function MarkBasicFields({ name, color, onName, onColor, nameDupl
                 </span>
                 <p className={styles.keyNote}>赤・オレンジ・緑・青・紫・グレー（色と名前の両方で見分ける）</p>
               </div>
-            </section>
+            </Card>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import Card from '@/components/shared/card'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
@@ -530,11 +531,11 @@ function FieldMigrate() {
       </p>
       {error ? <Notice tone="danger" message={error} /> : null}
 
-      <section className={styles.card} aria-labelledby="migrate-target">
+      <Card variant="form" gap="normal" aria-labelledby="migrate-target">
         <div className={styles.cardHead}><h2 className={styles.cardTitle} id="migrate-target">移行の先</h2></div>
         {targetMode === 'new' && !createdTarget ? (
-          <div className={styles.field}>
-            <span className={styles.labelStrong}>移行後の種類</span>
+          <div ><Field label={<span>移行後の種類</span>}>
+
             <span className={styles.selectBox}>
               <SaveErrorField names={["targetType","type","target_type"]}><Select
                 value={targetType}
@@ -544,7 +545,7 @@ function FieldMigrate() {
                 options={TYPES.map((type) => ({ value: type, label: FIELD_TYPE_WORDS[type] }))}
               /></SaveErrorField>
             </span>
-          </div>
+          </Field></div>
         ) : null}
 
         <div className={styles.sampleTable} role="table" aria-label="値の移り方の見本">
@@ -566,13 +567,13 @@ function FieldMigrate() {
         </div>
 
         {target ? (
-          <div className={styles.field}>
-            <span className={styles.labelStrong}>移行先の項目</span>
+          <div ><Field label={<span>移行先の項目</span>}>
+
             <p className={styles.cardNote}>{`${target.name}（{{field.${target.fieldKey}}}・${FIELD_TYPE_WORDS[target.type]}）`}</p>
             <span>
               <Button type="button" variant="text" onClick={() => { setCreatedTarget(null); setExistingTargetId(''); resetConfirmation() }}>別の項目を選び直す</Button>
             </span>
-          </div>
+          </Field></div>
         ) : (
           <>
             <SaveErrorField names={["targetMode"]}><SegmentedControl
@@ -587,8 +588,8 @@ function FieldMigrate() {
                 <Field label="差し込みの名前"><SaveErrorField names={["targetKey","fieldKey","target_key"]}><input className={styles.input} value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} /></SaveErrorField></Field>
               </div>
             ) : (
-              <div className={styles.field}>
-                <span className={styles.label}>移行先</span>
+              <div ><Field label={<span>移行先</span>}>
+
                 <span className={styles.selectBox}>
                   <SaveErrorField names={["existingTargetId","targetFieldId","existing_target_id"]}><EntitySelect
                     value={existingTargetId}
@@ -601,15 +602,15 @@ function FieldMigrate() {
                     ]}
                   /></SaveErrorField>
                 </span>
-              </div>
+              </Field></div>
             )}
           </>
         )}
         {targetMode === 'new' && !createdTarget ? <p className={styles.fieldNote}>{FIELD_TYPE_HINTS[targetType]}</p> : null}
-      </section>
+      </Card>
 
       {preview ? (
-        <section className={styles.card} aria-labelledby="migrate-preview">
+        <Card variant="form" gap="normal" aria-labelledby="migrate-preview">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="migrate-preview">事前確認の結果</h2>
             <p className={styles.cardNote}>登録済みの値を読み取り、移せる数だけを確かめました。まだ何も変えていません。</p>
@@ -629,18 +630,18 @@ function FieldMigrate() {
             </dl>
           ) : <p className={styles.fieldNote}>切り替えが必要な使用先はありません。</p>}
           {preview.runId && preview.previewExpiresAt ? <p className={styles.fieldNote}>{`確認番号：${preview.runId} ／ 有効期限：${formatDateTime(preview.previewExpiresAt)}`}</p> : null}
-        </section>
+        </Card>
       ) : null}
 
       {/* 実行を受け付けたのに結果がまだ無い間は「未確認」と出し、再取得・再開へつなげる（R548）。 */}
       {!run && executedRunId ? (
-        <section className={styles.card} aria-live="polite">
+        <Card variant="form" gap="normal" aria-live="polite">
           <h2 className={styles.cardTitle}>移行の結果</h2>
           <p className={styles.cardNote}>{pollProblem || '実行を受け付けました。結果を確認しています…'}</p>
-        </section>
+        </Card>
       ) : null}
       {run ? (
-        <section className={styles.card} aria-live="polite">
+        <Card variant="form" gap="normal" aria-live="polite">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>移行の結果</h2>
             <p className={styles.cardNote}>{RUN_STATUS_LABELS[run.status]}</p>
@@ -656,7 +657,7 @@ function FieldMigrate() {
           {run.error ? <Notice tone="danger" message={run.error} /> : null}
           {/* 元に戻す操作はまだ無い。戻す必要が出たときの行き先をはっきり書く。 */}
           {run.rollbackDeadline ? <p className={styles.fieldNote}>{`元の項目の値は ${formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。`}</p> : null}
-        </section>
+        </Card>
       ) : null}
     </CreatePage></SaveErrorScope>
   )
