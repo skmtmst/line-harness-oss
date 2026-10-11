@@ -385,15 +385,14 @@ it('許可名が一覧（配列）で返っても読み取り、接続できる'
     db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
   ).toEqual({ n: 1 });
 });
-it('許可名がどこにも入っていなければ、要求した許可で接続する', async () => {
+it('許可名がどこにも入っていなければ、許可済みとみなさず接続に失敗する', async () => {
   const original = vi.mocked(fetch).getMockImplementation()!;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: URL | string, init?: RequestInit) => {
-      // 項目名が変わった・項目自体が無い場合。利用者は許可を押して認可コードが
-      // 返っているので、読めないことを「許可されていない」と決めつけない。
-      // ここを空のままにすると、実際には許可されていても接続が必ず失敗し、
-      // 画面からは理由も分からないまま直す手段が無くなる。
+      // 項目名が変わった・項目自体が無い場合。公式ドキュメント上、成功応答には
+      // 許可名（permissions）が必ず入る前提なので、読めない＝応答の形が想定外とみなし、
+      // 「要求した許可で接続済み」と推定しない（実際に許可されていない接続を通してしまうため）。
       if (new URL(String(url)).pathname.endsWith('/oauth/access_token'))
         return Response.json({
           data: [{ access_token: 'short_mock', user_id: '20' }],
@@ -402,14 +401,13 @@ it('許可名がどこにも入っていなければ、要求した許可で接�
     }),
   );
   const back = await callback({ code: 'mock_code' });
-  expect(back.searchParams.get('instagram')).toBe('connected');
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  expect(back.searchParams.get('instagram_code')).toBe(
+    'instagram_publish_not_granted',
+  );
   expect(
-    db.raw
-      .prepare('SELECT scopes FROM instagram_connections LIMIT 1')
-      .get() as { scopes: string },
-  ).toEqual({
-    scopes: 'instagram_business_basic,instagram_business_content_publish',
-  });
+    db.raw.prepare('SELECT COUNT(*) n FROM instagram_connections').get(),
+  ).toEqual({ n: 0 });
 });
 it('認可画面で断られたときはMetaへ問い合わせず、やり直しへ回す', async () => {
   const before = vi.mocked(fetch).mock.calls.length;
