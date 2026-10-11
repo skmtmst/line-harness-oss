@@ -1,3 +1,6 @@
+import { acquireWorkflow } from '../services/workflow-execution.js';
+import { sendRecordedNotification } from '../services/recorded-notification-send.js';
+import { prepareWorkflowStep, getWorkflowStep } from '@line-crm/db';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -63,7 +66,6 @@ app.post('/api/meet-callback', async (c) => {
     if (existing.payload_hash !== payloadHash) {
       return c.json({ success: false, error: 'Session payload conflict' }, 409);
     }
-    return c.json({ success: true, duplicate: true });
   }
 
   const scenario = await getScenarioById(c.env.DB, body.scenario_id);
@@ -76,11 +78,31 @@ app.post('/api/meet-callback', async (c) => {
     return c.json({ success: false, error: 'friend not found' }, 404);
   }
 
-  const receipt = await c.env.DB.prepare(
-    `INSERT OR IGNORE INTO meet_callback_receipts (session_id, payload_hash, received_at)
-     VALUES (?, ?, ?)`,
-  ).bind(body.session_id, payloadHash, new Date().toISOString()).run();
-  if (!receipt.meta.changes) return c.json({ success: true, duplicate: true });
+  const ref = {scopeId:`line:${friend.line_account_id ?? 'default'}`,processKind:'meet_callback',subjectId:body.session_id};
+  if (existing && !await getWorkflowStep(c.env.DB,{...ref,stepKey:'__run'})) {
+    // Old receipts do not prove whether LINE accepted a notification. Repair only the result.
+    await patchFriendMetadata(c.env.DB,friend.id,{meet_hearing:body});
+    return c.json({success:false,code:'MEET_DELIVERY_REVIEW_REQUIRED'},202);
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare(`INSERT OR IGNORE INTO meet_callback_receipts(session_id,payload_hash,received_at) VALUES(?,?,?)`)
+      .bind(body.session_id,payloadHash,new Date().toISOString()),
+    prepareWorkflowStep(c.env.DB,{...ref,stepKey:'__run'},{input:{payloadHash},maxAttempts:50}),
+  ]);
+  const actualReceipt=await c.env.DB.prepare('SELECT payload_hash FROM meet_callback_receipts WHERE session_id=?').bind(body.session_id).first<{payload_hash:string}>();
+  if(actualReceipt?.payload_hash!==payloadHash)return c.json({success:false,error:'Session payload conflict'},409);
+  const execution=await acquireWorkflow(c.env.DB,ref);
+  if(!execution){
+    const finished=await getWorkflowStep(c.env.DB,{...ref,stepKey:'__run'});
+    return finished?.status==='succeeded'?c.json({success:true,duplicate:true}):c.json({success:false,code:'MEET_PROCESSING_INCOMPLETE'},202);
+  }
+  try {
+    await execution.step('metadata',async()=>{
+      if(!await patchFriendMetadata(execution.mutationDb('metadata'),friend.id,{meet_hearing:{
+        session_id:body.session_id,status:body.status,context:body.context,transcripts:body.transcripts,
+        requirements_doc:body.requirements_doc,completed_at:body.completed_at,
+      }}))throw new Error('friend_metadata_unavailable');
+    });
 
   // Resolve LINE access token (multi-account support)
   let accountToken: string | null = null;
@@ -132,32 +154,18 @@ app.post('/api/meet-callback', async (c) => {
     },
   };
 
-  try {
-    await lineClient.pushMessage(friend.line_user_id, [
-      { type: 'flex', altText: 'ヒアリング結果', contents: resultFlex },
-    ]);
-  } catch (e) {
-    console.error('Failed to send meet callback message:', e);
-  }
-
-  // Save to friend metadata
-  try {
-    const updated = {
-      meet_hearing: {
-        session_id: body.session_id,
-        status: body.status,
-        context: body.context,
-        transcripts: body.transcripts,
-        requirements_doc: body.requirements_doc,
-        completed_at: body.completed_at,
-      },
-    };
-    if (!await patchFriendMetadata(c.env.DB, friend.id, updated)) throw new Error('friend_metadata_unavailable');
-  } catch (e) {
-    console.error('Failed to save meet hearing to metadata:', e);
-  }
-
+  const messages = [{type:'flex' as const,altText:'ヒアリング結果',contents:resultFlex}];
+  await sendRecordedNotification(execution.db,{
+    sourceId:`meet:${body.session_id}`,channel:'line',recipient:friend.line_user_id,
+    lineAccountId:friend.line_account_id,payload:JSON.stringify(messages),
+    send:key=>lineClient.pushMessage(friend.line_user_id,messages,key),
+  });
+  await execution.complete();
   return c.json({ success: true });
+  } catch {
+    await execution.fail().catch(()=>undefined);
+    return c.json({success:false,code:'MEET_PROCESSING_INCOMPLETE'},202);
+  }
 });
 
 export { app as meetCallback };
