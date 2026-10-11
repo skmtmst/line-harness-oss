@@ -32,6 +32,31 @@ const cases = {
   kpiblank:['<div data-kpi-strip><p data-kpi-detail style="min-height:18px"></p></div>','<div data-kpi-strip><p data-kpi-detail style="display:none"></p></div>'],
   kpialign:['<div data-kpi-strip><p data-kpi-detail data-kpi-detail-present>補足</p><p data-kpi-detail style="display:none"></p></div>','<div data-kpi-strip><p data-kpi-detail data-kpi-detail-present>補足</p><p data-kpi-detail style="min-height:18px"></p></div>'],
 }
+test('閉じたdetailsの中は箱のはみ出し・下の余白に数えず、開いたら検出する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(shell(card('<p>見出し</p><details><summary>詳細設定</summary><p style="width:240px;height:120px">中の内容</p></details>')))
+    assert.equal((await page.evaluate(scan)).some(f => ['cardspill', 'cardbottom'].includes(f.kind)), false)
+    await page.locator('summary').click()
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'cardspill'))
+    await page.locator('section').evaluate(el => el.style.paddingBottom = '0px')
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'cardbottom'))
+  } finally { await browser.close() }
+})
+test('baseの共通Cardの印でも新しい種類を測り、属性を増やしても同じ結果になる', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(shell(card('<p style="width:240px">はみ出す内容</p>').replace('data-rule-card','data-design-part="card"')))
+    const before = await page.evaluate(scan)
+    assert.ok(before.some(f=>f.kind==='cardspill'))
+    await page.locator('section').evaluate(el => el.setAttribute('data-card-variant','default'))
+    assert.deepEqual(await page.evaluate(scan), before)
+    await page.locator('p').evaluate(el => el.style.width='auto')
+    assert.deepEqual(await page.evaluate(scan), [])
+  } finally { await browser.close() }
+})
 test('B-219〜233の19種類は故障注入で落ち、修正後は0（1152・1440・1920）', async () => {
   const browser=await chromium.launch()
   try {

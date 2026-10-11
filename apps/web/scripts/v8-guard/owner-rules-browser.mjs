@@ -134,7 +134,9 @@ export default function scanOwnerRules() {
   for (const el of surfaces.filter(visible)) {
     const c = css(el), r = el.getBoundingClientRect(), name = el.getAttribute('data-pencil-name') || ''
     // 時間×卓、スマホの見え方、画像そのものは意図した端接触。ALLOW.tsvと同じ対象限定。
-    const media = el.closest('[data-line-preview-part="talk"],video,[data-media-slot],[data-qr-code], [data-booking-calendar],[role="grid"]') || /写真|画像の枠|サムネ|時間×卓|スマホ|見え方/.test(name)
+    // 古いbaseにも同じ判定を当てる。共通部品の既存の印も読む。
+    const phone = el.closest('[data-line-preview-part],[class*="line-preview_phoneRoot__"]')
+    const media = phone || el.closest('video,[data-media-slot],[data-design-node="Z7vd2"][data-kind][role="group"],[data-qr-code], [data-booking-calendar],[role="grid"]') || /写真|画像の枠|サムネ|時間×卓|スマホ|見え方/.test(name)
     // 主なページの器はスクロールする。内側の箱だけをtightで測る（ALLOWのパネルと同じ）。
     if (el !== root && !media && r.height >= 80 && r.width >= 120 && (hasBorder(c) || c.outlineStyle!=='none' || tinted(c) && c.borderRadius!=='0px') && !el.matches(tableSelector) && !el.querySelector('table,[role="table"]')) {
       // 内側のスクロール欄の続きは、外側の窓の余白には数えない。
@@ -152,7 +154,7 @@ export default function scanOwnerRules() {
     const rgb = c.backgroundColor.match(/[\d.]+/g)
     if (rgb?.length>=3 && (rgb.length<4 || +rgb[3]>=.5) && Math.max(...rgb.slice(0,3).map(Number))<=70 && r.width>=24 && r.height>=16 && el.textContent.trim()) {
       // 白地を要求する面を読む。動画と写真上の文字、端末の枠は固定Penでも除外。
-      const exempt = el.closest('video,[data-line-preview-part],[data-avatar],[data-video-player],[data-photo-caption]') || /スマホ|島|動画|再生|プレイヤー|写真|アバター|顔|phone|video/i.test(name)
+      const exempt = phone || el.closest('video,[data-avatar],[data-video-player],[data-photo-caption]') || /スマホ|島|動画|再生|プレイヤー|写真|アバター|顔|phone|video/i.test(name)
       if (!exempt) add('dark',el,{count:1},el.textContent.trim().slice(0,20))
     }
     if (!media && hasBorder(c) && r.width>=80 && r.height>=40) {

@@ -86,6 +86,27 @@ test('新規の故障をCLIが非0で止める。理由なしの除外は使え�
   assert.throws(()=>assess([f],'/friends',1152,[{...allowances[0],reason:''}]))
 })
 
+test('共通スマホの外枠・島・上の帯と画像枠は除外し、隣の黒い箱と余白不足は落とす', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    for (const width of [1152, 1440, 1920]) {
+      await page.setViewportSize({width, height:900})
+      const phone = '<div style="background:#111;color:white;width:330px;height:690px"><div style="background:#000;width:96px;height:28px">島</div><div style="background:#222;height:44px">LINEの上の帯</div></div>'
+      for (const marker of ['data-line-preview-part="phone"', 'class="line-preview_phoneRoot__oldBase"']) {
+        await page.setContent(shell(`<section ${marker}>${phone}</section>${cases.dark}${cases.tight}`))
+        const findings = await page.evaluate(scan)
+        assert.equal(findings.filter(f => f.kind === 'dark').length, 1, '隣の黒い箱だけを検出')
+        assert.equal(findings.filter(f => f.kind === 'tight').length, 1, '隣の通常の箱は検査する')
+      }
+      for (const marker of ['data-media-slot', 'data-design-node="Z7vd2" data-kind="image" role="group"']) {
+        await page.setContent(shell(`<div ${marker} style="border:1px solid;width:200px;height:100px"><span>画像を追加</span></div>${cases.tight}`))
+        assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'tight').length, 1)
+      }
+    }
+  } finally { await browser.close() }
+})
+
 test('一覧の判定を足しても、既存GridTableの幅による畳み方を失わない', async () => {
   const browser = await chromium.launch()
   try {

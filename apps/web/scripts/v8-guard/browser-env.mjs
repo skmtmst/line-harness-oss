@@ -33,7 +33,7 @@ const SESSION = {
   lh_selected_account: 'visual-qa-account',
 }
 
-export async function openPage(browser, { baseUrl, route, width, theme, stable = false, settleMs = 2500, onPageError }) {
+export async function openPage(browser, { baseUrl, route, width, theme, stable = false, settleMs = 2500, onPageError, requireSuccess = false }) {
   const page = await browser.newPage({
     viewport: { width, height: 900 },
     ...(stable ? { reducedMotion: 'reduce' } : {}),
@@ -46,7 +46,8 @@ export async function openPage(browser, { baseUrl, route, width, theme, stable =
       localStorage.setItem('lh_auth_selection_cleared', '1')
       localStorage.setItem('lh-admin-theme', t)
     }, [SESSION, theme])
-    await page.goto(new URL(route, baseUrl).toString())
+    const response = await page.goto(new URL(route, baseUrl).toString())
+    if (requireSuccess && (!response || !response.ok())) throw new Error(`指定画面のHTTP応答が正常ではありません: ${response?.status() ?? 'なし'}`)
     if (stable) {
       await page.addStyleTag({
         /*

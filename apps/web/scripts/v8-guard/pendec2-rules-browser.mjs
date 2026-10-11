@@ -4,7 +4,10 @@ export default function scanPendec2Rules() {
   const css = el => getComputedStyle(el)
   const visible = el => {
     if (!el || el.closest('svg,script,style,[inert],[data-line-preview-part="talk"],[data-template-region="folders"]')) return false
-    for (let p = el; p; p = p.parentElement) { const c = css(p); if (c.display === 'none' || c.visibility === 'hidden' || +c.opacity === 0) return false }
+    for (let p = el; p; p = p.parentElement) {
+      if (p !== el && p.matches('details:not([open])') && !p.querySelector(':scope > summary')?.contains(el)) return false
+      const c = css(p); if (c.display === 'none' || c.visibility === 'hidden' || +c.opacity === 0) return false
+    }
     const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0
   }
   const sel = el => {
@@ -20,7 +23,8 @@ export default function scanPendec2Rules() {
   const all = selector => [...root.querySelectorAll(selector)].filter(visible)
   const framed = el => { const c=css(el); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth)>0 || ['Top','Right','Bottom','Left'].every(x => c['border'+x+'Style']!=='none' && parseFloat(c['border'+x+'Width'])>0) || c.boxShadow!=='none' }
   const choiceSelector = '[data-choice-card],label[class*="radio-card_card"]:not([data-variant="row"]),label[class*="layout-picker_tile"]'
-  const cardSelector = '[data-card-variant]:not([data-card-unframed]), [data-liff-card], [data-rule-card],'+choiceSelector
+  // baseのCardにも付いている印で読む。新しい属性の追加自体を新規崩れにしない。
+  const cardSelector = '[data-design-part="card"]:not([data-card-unframed]), [data-card-variant]:not([data-card-unframed]), [data-liff-card], [data-rule-card],'+choiceSelector
   for (const card of all(cardSelector)) {
     if (card.querySelector('table,[role="table"],[data-shared-part="list-table"]') || !framed(card)) continue
     const r=card.getBoundingClientRect(), c=css(card)
