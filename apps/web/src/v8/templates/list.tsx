@@ -68,7 +68,7 @@ import { useTemplatePanelDetail } from './panel-detail'
  * 削除できない `Z0g3si`・作る種類を選ぶ `R9XUMr`・状態の板 `susGP`。
  *
  * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
- * （app/templates/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
+ * を型（ListPage）と部品で組む。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 

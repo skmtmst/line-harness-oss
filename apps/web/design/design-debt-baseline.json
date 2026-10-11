@@ -265,10 +265,6 @@
   "app/templates/edit/page.tsx": {
     "unresolved-classname": 1
   },
-  "app/templates/list-v8.tsx": {
-    "unresolved-classname": 9,
-    "direct-th": 8
-  },
   "app/templates/page.tsx": {
     "unresolved-classname": 2,
     "arbitrary-value": 2

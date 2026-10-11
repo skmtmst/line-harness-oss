@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
+const LIST = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 const EDIT = readFileSync(join(HERE, '../../v8/template-edit/message.tsx'), 'utf8')
 
 /*

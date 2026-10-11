@@ -11,7 +11,7 @@ const LISTS = [
   'v8/auto-replies/list.tsx',
   'app/tags/tags-tab-v8.tsx',
   'v8/broadcasts/list.tsx',
-  'app/templates/list-v8.tsx',
+  'v8/templates/list.tsx',
 ]
 
 describe('主な一覧の行は RovingTbody に入っている', () => {

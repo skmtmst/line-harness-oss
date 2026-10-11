@@ -9,7 +9,6 @@ const GRID_PAGES = [
 /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
 const V8_FOLDER_PAGES = [
   'reminders/list-v8.tsx',
-  'templates/list-v8.tsx',
 ]
 /*
  * シナリオ・回答フォームの入口は src/v8 の新しい一覧（2026-10-06〜。古い list-v8.tsx はもう描かれない）。
@@ -17,6 +16,7 @@ const V8_FOLDER_PAGES = [
  */
 const SRC_V8 = resolve(import.meta.dirname, '../../v8')
 const NEW_V8_FOLDER_PAGES = [
+  'templates/list.tsx',
   'scenarios/list.tsx',
   'auto-replies/list.tsx',
   'broadcasts/list.tsx',
