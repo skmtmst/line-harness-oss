@@ -40,7 +40,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['ウェビナー', '../../v8/webinars/list.tsx'],
   ['運営 監査ログ', '../../app/ops/audit/page.tsx'],
   ['運営 お問い合わせ', '../../app/ops/support/page.tsx'],
-  ['自動化の実行記録', '../../app/automations/runs/page.tsx'],
+  ['自動化の実行記録', '../../v8/automations/runs.tsx'],
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
   ['Webhook のやり取り', '../../v8/webhooks/interactions.tsx'],
   // 受信一覧（旧inbox部品 ../inbox/inbox-list.tsx）は、どの入口からも読まれなくなったので外した（2026-10-06）。
@@ -62,6 +62,11 @@ describe('ListRange 統一（監査6 #667）', () => {
       if (path === '../../v8/webhooks/interactions.tsx') {
         expect(source).toContain('`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`')
         expect(source).toContain('data.total === 0 ? 0 : (data.page - 1) * data.limit + 1')
+      } else if (path === '../../v8/automations/runs.tsx') {
+        expect(source).toContain('data.pagination.offset + 1')
+        expect(source).toContain('data.pagination.offset + data.items.length')
+        expect(source).toContain('formatNumber(total)')
+        expect(source).toContain('pageCount > 1')
       } else if (path === '../../v8/conversions/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + current.length')
         expect(source).toContain('formatNumber(shown.length)')

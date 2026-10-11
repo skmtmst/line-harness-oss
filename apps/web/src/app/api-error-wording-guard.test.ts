@@ -60,7 +60,6 @@ const BASELINE: Record<string, number> = {
   'app/analytics/reports/new/page.tsx': 1,
   'app/auto-replies/edit/page.tsx': 1,
   'app/automations/runs-v8.tsx': 2,
-  'app/automations/runs/page.tsx': 2,
   'app/booking/bookings/detail/page.tsx': 1,
   'app/booking/bookings/page.tsx': 2,
   'app/booking/menus/staff/page.tsx': 1,

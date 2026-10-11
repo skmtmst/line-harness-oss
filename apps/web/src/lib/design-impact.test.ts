@@ -79,7 +79,6 @@ describe('共通部品の影響範囲', () => {
       // ★V8 自動応答の実行結果（app/auto-replies/runs/runs-v8.tsx）は描かれなくなった。入口は src/v8/auto-replies/runs.tsx（下）。
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
       // 20件ずつのページ送りに寄せた。
-      'app/automations/runs/page.tsx',
       'app/booking/bookings/page.tsx',
       // 予約設定の入口は現役v8/booking-menus/settingsを読む。ページ送りの利用先は下の本体で数える。
       // #1145(★V8) の一斉配信の一覧（app/broadcasts/list-v8.tsx）は描かれなくなった。入口は src/v8/broadcasts/list.tsx（下）。
