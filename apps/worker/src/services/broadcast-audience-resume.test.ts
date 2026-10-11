@@ -39,6 +39,22 @@ describe('SEND-S01: 開始時の宛先をIDで保つ', () => {
     expect(new Set(sends).size).toBe(160);
     expect(sends).toContain('Uf155'); expect(sends).not.toContain('Uadded');
   });
+  it('開始時の相手が全員削除されても、新しい一致者へ取り直さない', async () => {
+    const f = fixture();await processQueuedBroadcasts(f.db,client);
+    // 人工DBでも、友だち削除時の宛先台帳のCASCADEを再現する。
+    f.raw.exec('DELETE FROM friends; DELETE FROM broadcast_send_claims');insertFriend(f.raw,'added');
+    f.raw.exec("INSERT INTO friend_tags VALUES('added','t',datetime('now'))");
+    await processQueuedBroadcasts(f.db,client);
+    expect(sends).toHaveLength(150);expect(sends).not.toContain('Uadded');
+    expect(f.raw.prepare("SELECT total_count,stopped_at FROM broadcasts WHERE id='b'").get()).toMatchObject({total_count:160,stopped_at:expect.any(String)});
+  });
+  it('旧配信の一部しか宛先台帳が無い場合は、完了にせず確認待ちで止める', async () => {
+    const f=fixture();
+    f.raw.exec("UPDATE broadcasts SET total_count=160,success_count=150,batch_offset=150; INSERT INTO broadcast_send_claims(broadcast_id,friend_id,attempt_no,state) SELECT 'b',id,1,'sent' FROM friends WHERE id<'f150'");
+    await processQueuedBroadcasts(f.db,client);
+    expect(sends).toHaveLength(0);
+    expect(f.raw.prepare("SELECT status,stopped_at FROM broadcasts WHERE id='b'").get()).toMatchObject({status:'sending',stopped_at:expect.any(String)});
+  });
   it('再送は現在のタグでなく、台帳の一時失敗IDだけを選ぶ', async () => {
     const f = fixture();
     await processQueuedBroadcasts(f.db, client); await processQueuedBroadcasts(f.db, client); sends.length = 0;
@@ -95,4 +111,31 @@ it('重複除外の完了後の再試行でも最初の宛先だけを選ぶ', a
   const {dedup_progress} = f.raw.prepare("SELECT dedup_progress FROM broadcasts WHERE id='b'").get() as {dedup_progress:string};
   await processMultiAccountDedupBroadcast(f.db,{...args,send_attempt_no:2,dedup_progress},()=>({async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never));
   expect(sends).toHaveLength(160); expect(sends).toContain('Uf155'); expect(sends).not.toContain('Uadded');
+});
+
+it('差し込み無しのタグ一斉配信も、停止後は最初の600人の残りへ送る', async () => {
+  const f=fixture('tag');
+  for(let i=160;i<600;i++){const id=`f${String(i).padStart(3,'0')}`;insertFriend(f.raw,id);f.raw.prepare("INSERT INTO friend_tags(friend_id,tag_id) VALUES(?,'t')").run(id);}
+  f.raw.exec("UPDATE broadcasts SET message_content='案内'");
+  await processBroadcastSend(f.db,{async multicast(ids:string[]){sends.push(...ids);f.raw.exec("UPDATE broadcasts SET stopped_at='stop' WHERE id='b'");return {requestId:'fake'};}} as never,'b');
+  expect(sends).toHaveLength(500);
+  f.raw.exec("DELETE FROM friend_tags WHERE friend_id IN ('f001','f555'); UPDATE broadcasts SET stopped_at=NULL WHERE id='b'");
+  insertFriend(f.raw,'added');f.raw.exec("INSERT INTO friend_tags VALUES('added','t',datetime('now'))");
+  await processBroadcastSend(f.db,{async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never,'b');
+  expect(new Set(sends).size).toBe(600);expect(sends).toContain('Uf555');expect(sends).not.toContain('Uadded');
+  expect(f.raw.prepare("SELECT total_count,success_count FROM broadcasts WHERE id='b'").get()).toEqual({total_count:600,success_count:600});
+});
+
+it('タグのその場送信も、受理後に記録ごと消えた相手を送り直さない', async () => {
+  const f=fixture('tag');
+  for(let i=160;i<600;i++){const id=`f${String(i).padStart(3,'0')}`;insertFriend(f.raw,id);f.raw.prepare("INSERT INTO friend_tags(friend_id,tag_id) VALUES(?,'t')").run(id);}
+  f.raw.exec("UPDATE broadcasts SET message_content='案内'");
+  let batches=0;
+  const lost = {...f.db,async batch(stmts:D1PreparedStatement[]){if(++batches>=3)throw new Error('process lost after provider acceptance');return f.db.batch(stmts);}} as D1Database;
+  const fake={async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never;
+  await expect(processBroadcastSend(lost,fake,'b')).rejects.toThrow('process lost');
+  expect(sends).toHaveLength(500);
+  await processBroadcastSend(f.db,fake,'b');
+  expect(sends).toHaveLength(600);expect(new Set(sends).size).toBe(600);
+  expect(f.raw.prepare("SELECT COUNT(*) n FROM broadcast_send_claims WHERE state='unknown'").get()).toEqual({n:500});
 });

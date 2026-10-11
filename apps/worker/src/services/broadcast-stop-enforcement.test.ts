@@ -525,7 +525,8 @@ describe('一斉配信の停止（#662）', () => {
       const row = broadcastRow(raw);
       expect(row.status).toBe('sending');
       expect(row.stopped_at).not.toBeNull();
-      expect(ledgerRows(raw)).toHaveLength(500);
+      expect(ledgerRows(raw)).toHaveLength(600);
+      expect(ledgerRows(raw).filter(r=>r.state==='claimed')).toHaveLength(100);
     });
 
     it('断られた束の相手が台帳に残り、再送の対象になる', async () => {

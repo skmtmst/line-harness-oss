@@ -127,6 +127,23 @@ async function broadcastWideContext(
   return context;
 }
 
+/** 宛先の写しを失った旧配信は、現在の条件で補わず要確認で止める。 */
+async function holdMissingBroadcastAudience(db: D1Database, input: {
+  id: string; expected: number; known: number; started: boolean;
+}): Promise<boolean> {
+  if (!input.started || (input.known > 0 && (input.expected <= 0 || input.known >= input.expected))) return false;
+  const at = jstNow();
+  const reason = '開始時の宛先を確認できないため要確認です。現在の条件で取り直さず送信を止めました';
+  await db.batch([
+    db.prepare(`UPDATE broadcasts SET stopped_at=COALESCE(stopped_at,?),batch_offset=0,batch_lock_at=NULL WHERE id=?`)
+      .bind(at,input.id),
+    db.prepare(`INSERT INTO broadcast_lifecycle_events(id,broadcast_id,action,reason,detail_json,created_at)
+      VALUES (?,?,'stopped',?,?,?)`).bind(crypto.randomUUID(),input.id,reason,
+        JSON.stringify({code:'recipient_snapshot_missing',expected:input.expected,known:input.known}),at),
+  ]);
+  return true;
+}
+
 export async function processBroadcastSend(
   db: D1Database,
   lineClient: LineClient,
@@ -395,9 +412,37 @@ export async function processBroadcastSend(
         throw new Error('target_tag_id is required for tag-targeted broadcasts');
       }
 
-      const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId);
-      const followingFriends = friends.filter((f) => f.is_following && !f.is_hidden);
-      totalCount = followingFriends.length;
+      const ledger = await db.prepare(`SELECT COUNT(*) AS n,SUM(state='sent') AS sent
+        FROM broadcast_send_claims WHERE broadcast_id=?`).bind(broadcastId).first<{n:number;sent:number}>();
+      const known = Number(ledger?.n ?? 0);
+      if (await holdMissingBroadcastAudience(db, {id:broadcastId,expected:broadcast.total_count,known,
+        started:known>0 || broadcast.success_count>0 || Number((broadcast as unknown as {batch_offset?:number}).batch_offset ?? 0)>0})) {
+        return (await getBroadcastById(db,broadcastId))!;
+      }
+      let followingFriends: Awaited<ReturnType<typeof getFriendsByTag>>;
+      if (known > 0) {
+        await db.prepare(`UPDATE broadcast_send_claims SET state='unknown',error_code='interrupted_dispatch'
+          WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL`).bind(broadcastId).run();
+        // 現在のタグではなく最初の台帳を読む。ブロック・非表示だけは直前の状態を見る。
+        followingFriends = (await db.prepare(`SELECT f.* FROM friends f JOIN broadcast_send_claims c ON c.friend_id=f.id
+          WHERE c.broadcast_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0
+            AND (? IS NULL OR f.line_account_id=?) ORDER BY c.friend_id`)
+          .bind(broadcastId,broadcastAccountId,broadcastAccountId).all<import('@line-crm/db').Friend>()).results;
+        totalCount = broadcast.total_count || known;
+        successCount = Number(ledger?.sent ?? 0);
+      } else {
+        const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId);
+        followingFriends = friends.filter((f) => f.is_following && !f.is_hidden);
+        totalCount = followingFriends.length;
+        // 送信前に全IDを残す。JSON配列を1変数で渡しD1のbind数上限に当てない。
+        await db.batch([
+          db.prepare(`INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state)
+            SELECT ?,value,?,?,'claimed' FROM json_each(?)
+            WHERE NOT EXISTS(SELECT 1 FROM broadcast_send_claims WHERE broadcast_id=?)`)
+            .bind(broadcastId,broadcastAccountId,Number(broadcast.send_attempt_no ?? 1),JSON.stringify(followingFriends.map(f=>f.id)),broadcastId),
+          db.prepare('UPDATE broadcasts SET total_count=? WHERE id=?').bind(totalCount,broadcastId),
+        ]);
+      }
 
       // Send in batches with stealth delays to mimic human patterns
       const now = jstNow();
@@ -463,6 +508,7 @@ export async function processBroadcastSend(
           ));
           await db.batch([
             ...logStmts,
+            db.prepare('UPDATE broadcasts SET success_count=success_count+? WHERE id=?').bind(sendable.length,broadcastId),
             ...buildBroadcastSettleStatements(db, {
               broadcastId,
               friendIds: sendableIds,
@@ -1008,6 +1054,10 @@ async function processQueuedBroadcastBatches(
   const accountId = raw.line_account_id as string | null;
   const hasAudience = await db.prepare('SELECT 1 FROM broadcast_send_claims WHERE broadcast_id = ? LIMIT 1')
     .bind(broadcast.id).first();
+  const previousAudience = await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
+    .bind(broadcast.id).first<{n:number}>();
+  if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:Number(raw.total_count ?? 0),
+    known:Number(previousAudience?.n ?? 0),started:!!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1})) return;
   if (!hasAudience && (segmentConditionsStr || broadcast.target_tag_id)) {
     const conditions = segmentConditionsStr ? JSON.parse(segmentConditionsStr)
       : { operator: 'AND', rules: [{ type: 'tag_exists', value: broadcast.target_tag_id }] };
