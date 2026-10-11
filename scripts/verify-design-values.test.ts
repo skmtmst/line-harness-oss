@@ -25,6 +25,12 @@ describe('ビルド後CSSの設計照合', () => {
     expect(builtRuleBody(css, 'breadcrumb', 'root')).toBe('gap:8px')
   })
 
+  it('ページ送りのV8選択色を、通常色・別テーマ・hoverから分けて読む', () => {
+    const css = '.pagination_current__A1{background:black}html[data-theme=v8] .pagination_current__A1{background:#e8f5ec}html[data-theme=v7] .pagination_current__A1{background:blue}html[data-theme=v8] .pagination_current__A1:hover{background:red}'
+    expect(builtRuleBody(css, 'pagination', 'current', "html[data-theme='v8'] .current")).toBe('background:#e8f5ec')
+    expect(builtRuleBody(css, 'pagination', 'current')).toBe('background:black')
+  })
+
   it('数の帯はビルド済みのV8指定で照合し、旧カードや狭い幅の別状態を混ぜない', () => {
     const css = [
       '.kpi-card_card__A1{box-shadow:var(--card-shadow)}',

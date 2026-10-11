@@ -4,27 +4,6 @@
   "base": "41d2589c97fa1b783311081310c6284210235a5a",
   "design": [
     {
-      "match": "不一致: pagination の border-color\n    設計 Pencil 2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #087a3e\n    実際 transparent\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
-      "count": 1,
-      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
-      "owner": "pendec",
-      "expires": "2026-10-17"
-    },
-    {
-      "match": "不一致: pagination の background\n    設計 Pencil 2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #e8f5ec\n    実際 #1d1d1f\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
-      "count": 1,
-      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
-      "owner": "pendec",
-      "expires": "2026-10-17"
-    },
-    {
-      "match": "不一致: pagination の color\n    設計 Pencil 2026-10-11 03:10 JST 固定HTML: components-NbomF ページ送り/頁 1 B-211 = #087a3e\n    実際 #ffffff\n    Pencilを変えたのであれば design/design-parts.json も更新してください。",
-      "count": 1,
-      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
-      "owner": "pendec",
-      "expires": "2026-10-17"
-    },
-    {
       "match": "V8不一致: リンク の fw\n    設計 Pencil g5Db8 = 500\n    実際 400",
       "count": 1,
       "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
