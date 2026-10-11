@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsSupportPage from './page'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import { compareLabel, durationLabel, elapsedLabel } from './format'
 import type { OpsKnowledgeReference, OpsSupportDetail } from '@/lib/api'
 
@@ -37,6 +38,7 @@ function respond(url: string, init?: RequestInit) {
   const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : null
   calls.push({ url, method, body })
   const json = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } })
+  if (url.endsWith('/api/ops/me')) return json({ success: true, data: { id: 'ops-1', readOnly: false } })
   if (url.endsWith('/api/ops/support/summary')) {
     return json({ success: true, data: { byStage: { all: 86, new: 3, in_progress: 2, waiting: 1, resolved: 12, closed: 68 }, kpis: { untouched: 3, untouchedFromLine: 3, avgFirstReplyMinutes: 84, prevAvgFirstReplyMinutes: 117, resolutionRate: 96.7, prevResolutionRate: 90.7, avgResolutionMinutes: 312, prevAvgResolutionMinutes: 310 } } })
   }
@@ -195,27 +197,28 @@ describe('画面', () => {
     expect(host.querySelector('textarea[aria-label="返信"]')).not.toBeNull()
   })
 
-  it('状態タブの件数・数値カード・一覧・内容と返信が出る', async () => {
+  it('状態タブの件数・集計の補足・一覧・内容と返信が出る', async () => {
     await act(async () => { root.render(<OpsSupportPage />) })
     await flush()
     const text = host.textContent ?? ''
+    const information = Array.from(host.querySelectorAll('[title]')).map(node => node.getAttribute('title')).join('\n')
     expect(text).toContain('すべて')
     expect(text).toContain('86')
-    expect(text).toContain('未対応のチケット')
-    expect(text).toContain('LINEから受付 3件')
-    expect(text).toContain('1時間24分')
-    expect(text).toContain('先月より 28% 早い')
-    expect(text).toContain('96.7%')
+    expect(information).toContain('未対応のチケット')
+    expect(information).toContain('LINEから受付 3件')
+    expect(information).toContain('1時間24分')
+    expect(information).toContain('先月より 28% 早い')
+    expect(information).toContain('96.7%')
     expect(text).toContain('#MB-0312')
     expect(text).toContain('回答フォームからタグが付かない')
-    expect(text).toContain('管理画面のお問い合わせ')
-    expect(text).toContain('6人中5人')
+    expect(information).toContain('管理画面のお問い合わせ')
+    expect(information).toContain('6人中5人')
     // m22d: 一覧の件数と重なる「○件」は出さない。未解決を先に言う。
-    expect(text).toContain('これまで12のうち未解決0件')
-    expect(text).toContain('musubo 運営 ／ 坂本 真人')
+    expect(information).toContain('これまで12のうち未解決0件')
+    expect(text).toContain('運営 坂本 真人')
     expect(text).toContain('a.png（契約先から）')
     expect(text).toContain('AIで下書きを作る')
-    expect(host.querySelector('[data-design-node="IjIFa"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="P0jhqO"]')).not.toBeNull()
   })
 
   it('AIで下書きを作ると案内と作成時刻が出て、送ると aiAssisted 付きで返信 API を呼ぶ', async () => {
@@ -227,7 +230,7 @@ describe('画面', () => {
     await flush()
     expect(host.textContent).toContain('お客様の状況・やり取りとナレッジをもとに作った下書きです')
     expect(host.textContent).toContain('作り直す')
-    expect(host.querySelector('[data-design-node="b2uv3"]')).not.toBeNull()
+    expect(host.querySelector('[title="2026-09-15 09:31 に作成"]')?.textContent).toBe('AI の下書き')
     const textarea = host.querySelector('textarea[aria-label="返信"]') as HTMLTextAreaElement
     expect(textarea.value).toContain('山田さま')
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '返信する')
@@ -236,10 +239,10 @@ describe('画面', () => {
     // 板 `GgP2d`「この返事を送りますか？」を見てから送る。
     const confirm = document.body.querySelector('[data-design-node="GgP2d"]')
     expect(confirm, '返事の確認の窓が出ない').not.toBeNull()
-    for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを削除', '戻って直す', '送って解決にする']) {
+    for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを削除', '戻って直す', '送信する']) {
       expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
     }
-    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('送って解決にする')) as HTMLButtonElement
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('送信する')) as HTMLButtonElement
     await act(async () => { sendInDialog.click() })
     await flush()
     const reply = calls.find((c) => c.url.endsWith('/reply'))

@@ -39,7 +39,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['予約メニュー', '../../app/booking/menus/page.tsx'],
   ['ウェビナー', '../../v8/webinars/list.tsx'],
   ['運営 監査ログ', '../../v8/ops/audit.tsx'],
-  ['運営 お問い合わせ', '../../app/ops/support/page.tsx'],
+  ['運営 お問い合わせ', '../../v8/ops/support.tsx'],
   ['自動化の実行記録', '../../v8/automations/runs.tsx'],
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
   ['Webhook のやり取り', '../../v8/webhooks/interactions.tsx'],
@@ -59,7 +59,12 @@ describe('ListRange 統一（監査6 #667）', () => {
     '$name は ListRange を呼ぶ',
     ({ path }) => {
       const source = read(path)
-      if (path === '../../v8/ops/audit.tsx') {
+      if (path === '../../v8/ops/support.tsx') {
+        expect(source).toContain('`${total}件中')
+        expect(source).toContain('tickets.length === 0 ? 0 : 1')
+        expect(source).toContain('setTotal(typeof res.total')
+        expect(source).toContain('offset: tickets.length')
+      } else if (path === '../../v8/ops/audit.tsx') {
         // 現役の絵は件数を脚注の補足で確認する。ページとAPIの全件数で計算する。
         expect(source).toContain('title={`${total}件中')
         expect(source).toContain('(page - 1) * PAGE + 1')

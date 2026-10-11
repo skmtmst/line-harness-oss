@@ -383,7 +383,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     })
     await renderPage(React.createElement(OpsSupportPage))
     expectNoDuplicateCounts()
-    expect(host.textContent).toContain('これまで2のうち未解決1件')
+    expect(host.querySelector('[title*="これまで2のうち未解決1件"]')).not.toBeNull()
   })
 
   it('/affiliates/new は「1件あたり」を注記と欄名で重ねない', async () => {

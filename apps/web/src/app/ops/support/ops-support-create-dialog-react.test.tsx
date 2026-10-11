@@ -2,10 +2,11 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { waitFor, screen } from '@testing-library/react'
 
 import OpsSupportPage from './page'
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('') }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams('') }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -24,6 +25,7 @@ beforeEach(() => {
   postedBody = null
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     const method = init?.method ?? 'GET'
     if (url.includes('/api/ops/support/summary')) {
       return new Response(JSON.stringify({
@@ -40,7 +42,7 @@ beforeEach(() => {
     if (url.includes('/api/ops/support/tickets') && method === 'GET') {
       return new Response(JSON.stringify({ success: true, data: [], total: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
-    if (url.endsWith('/api/ops/tenants')) {
+    if (url.includes('/api/ops/tenants')) {
       return new Response(JSON.stringify({ success: true, data: [{ id: 'c1', name: '検証商事', status: 'active' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (url.endsWith('/api/ops/support/tickets') && method === 'POST') {
@@ -104,6 +106,10 @@ describe('代わりに起票する小窓（板 Izau1）', () => {
     await flush()
     await act(async () => { openButton().click() })
     await flush()
+    await act(async () => { dialog()!.querySelector<HTMLButtonElement>('button[aria-label="契約先"]')!.click() })
+    await act(async () => { screen.getByRole('radio', { name: /検証商事/ }).click() })
+    await act(async () => { screen.getByRole('button', { name: '選ぶ', exact: true }).click() })
+    await waitFor(() => expect(screen.queryByRole('button', { name: '選ぶ', exact: true })).toBeNull())
     const subject = dialog()?.querySelector('input[aria-label="件名"]') as HTMLInputElement | null
     const body = dialog()?.querySelector('textarea[aria-label="内容"]') as HTMLTextAreaElement | null
     expect(subject, '件名の欄がない').not.toBeNull()
@@ -117,7 +123,7 @@ describe('代わりに起票する小窓（板 Izau1）', () => {
     await act(async () => { create?.click() })
     await flush()
     expect(postedBody).toMatchObject({ subject: '電話で受けた配信の相談', body: '9月から友だち追加が止まっているとのこと' })
-    expect(dialog(), '送ったのに小窓が残っている').toBeNull()
+    await waitFor(() => expect(dialog(), '送ったのに小窓が残っている').toBeNull())
     expect(host.textContent ?? '').toContain('#1047 を作りました')
   })
 })
