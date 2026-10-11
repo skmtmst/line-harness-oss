@@ -8,6 +8,7 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import Link from '@/components/shared/list-navigation'
+import Card from '@/components/shared/card'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -221,7 +222,7 @@ export default function NotificationsV8() {
           />
         ) : null}
 
-        <div className={styles.box}>
+        <Card padding="rows" surface="inset" overflow="hidden" aria-label="通知一覧">
           {listFailed ? (
             <ListState
               kind="error"
@@ -262,7 +263,7 @@ export default function NotificationsV8() {
             </ul>
           )}
           {loading ? <p className={styles.loading}>{STATE_TEXT.loading}…</p> : null}
-        </div>
+        </Card>
 
         <div className={styles.foot}>
           <p className={styles.note}>
