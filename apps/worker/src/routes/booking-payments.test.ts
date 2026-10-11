@@ -101,6 +101,13 @@ describe('予約の支払いの共通口', () => {
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM booking_payments').get()).toEqual({ n: 1 });
   });
 
+  it('REM3-04 未設定の仮押さえの既定は10分', async () => {
+    seedBooking();
+    const response = await app().request('/api/booking/admin/payment-config?account_id=account-a', {}, env());
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ data: { holdMinutes: 10 } });
+  });
+
   it('何も決めていない店はお支払いなしで鍵も入っていない', async () => {
     seedBooking();
     const response = await app().request(
