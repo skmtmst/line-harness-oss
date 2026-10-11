@@ -158,7 +158,7 @@ describe('★V7の足し分', () => {
 
   it('読み込み中の行は待つ旨だけ', () => {
     renderTable(<TableStateRow colSpan={2} kind="loading" />)
-    expect(screen.getByText('読み込んでいます')).not.toBeNull()
+    expect(screen.getByLabelText('読み込んでいます').getAttribute('aria-busy')).toBe('true')
     expect(screen.queryByRole('button')).toBeNull()
   })
 
