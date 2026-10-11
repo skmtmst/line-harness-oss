@@ -22,3 +22,4 @@
 |REM3-01|本物FloorEditor+MapのAPI実名fields.tablesで欄エラー欠落、試験失敗|共通の保存エラーを座席図に結び付け、赤枠・説明・焦点の口を渡す|saveFloor呼出は1編集部品、店内の共通利用へ適用|実図の卓移動→400→tables理由とaria-invalid・describedby・入力保持|
 |REM3-06|実スタッフ新規・編集で登録メディア選択ボタンなし、両試験失敗|ImageUploaderのonMediaPickを共通MediaPickerDialogへ接続、公開URLを保存|現行の予約スタッフImageUploader2箇所を両方修正|実新規・編集の共通メディア選択→保存payloadに選択URL|
 |DP-02|地図全613板の写し検査で消えたsAnyyのHTML/TSV欠落、試験失敗|sAnyy除外、板数612。別名aRvrhの既存QX56l写しへTSV口も補完|全地図検査の追加欠落1（aRvrh別名）も修正|外部html置場がある時は全板のHTML・TSVを確認、無い環境だけskip|
+|DC-UI-05|V8実SkeletonRowsが即時、共通ListStateは300msで試験失敗|共通のタブ骨組みをDelayedSkeletonへ統一、二重の待ちを除去|タブ4種類（ルール・時間・休業日・担当）と時間内1、settingsの遅延import8口。rgで他のV8タブは共通ListState/DelayedSkeleton経由|実共通部品をfake時計で0ms/299ms/300ms確認|
