@@ -1,3 +1,4 @@
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -834,7 +835,6 @@ const MILEAGE_ENTRY_TYPES = new Set<MileageEntryType>([
 ]);
 const MILEAGE_ENTRY_STATUSES = new Set<MileageEntryStatus>(['pending', 'available', 'void']);
 const MILEAGE_MODES = new Set(['automatic', 'manual'] as const);
-const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
@@ -869,7 +869,7 @@ scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), asyn
     if (modeValue && !MILEAGE_MODES.has(modeValue as 'automatic' | 'manual')) {
       return c.json({ success: false, error: 'mode is invalid' }, 400);
     }
-    if ((fromValue && !DATE_ONLY.test(fromValue)) || (toValue && !DATE_ONLY.test(toValue))) {
+    if ((fromValue && !isExistingCalendarDate(fromValue)) || (toValue && !isExistingCalendarDate(toValue))) {
       return c.json({ success: false, error: 'from and to must be YYYY-MM-DD' }, 400);
     }
     if (fromValue && toValue && fromValue > toValue) {

@@ -1,3 +1,4 @@
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { getPublicationThirtyDayViews } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
@@ -141,8 +142,7 @@ async function currentFriend(c: Context<Env>): Promise<FriendRow | null> {
 }
 
 function dateOnly(value: unknown): string | null {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
-    && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) ? value : null;
+  return isExistingCalendarDate(value) ? value : null;
 }
 
 function feedingGuide(animalType: string, weightKg: number) {
@@ -967,6 +967,9 @@ nenMembers.post('/api/liff/nen/health-logs', inputJsonBoundary(), async (c) => {
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const pet = await c.env.DB.prepare(`SELECT id FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(String(body?.petId || ''), friend.id).first();
+  if (body?.loggedOn != null && body.loggedOn !== '' && !dateOnly(body.loggedOn)) {
+    return inputError(c, { success: false, error: '日付が正しくありません' }, 400, ['loggedOn']);
+  }
   const loggedOn = dateOnly(body?.loggedOn) || new Date().toISOString().slice(0, 10);
   const stool = ['normal', 'soft', 'hard', 'diarrhea', 'bloody', 'other'].includes(String(body?.stoolStatus)) ? String(body?.stoolStatus) : '';
   const appetite = ['good', 'normal', 'poor'].includes(String(body?.appetite)) ? String(body?.appetite) : '';

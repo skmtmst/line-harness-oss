@@ -1814,3 +1814,8 @@ describe('飲食4 系列の管理と権限',()=>{
   expect((await request('/api/restaurant-test/store-groups'+query,{name:'越境',members:[{storeId:'store-ginza',referralEnabled:true,maxDistance:5},{storeId:'not-owned',referralEnabled:true,maxDistance:5}]})).status).toBe(404);
  });
 });
+
+it.each(['reservationFrom','reservationTo'])('API-02 %s rejects impossible dates',async key=>{
+ seedRestaurantFixture();
+ expect((await request(`/api/restaurant-test/snapshot?account_id=account-1&${key}=2026-02-30`)).status).toBe(400);
+});

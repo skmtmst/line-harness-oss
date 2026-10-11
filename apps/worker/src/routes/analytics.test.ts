@@ -1197,3 +1197,7 @@ describe('R454 1回送信の履歴と送り直し', () => {
     expect((await req(`/api/analytics/report-schedules/once-1/retry?${ACCOUNT}`, 'POST', {})).status).toBe(422);
   });
 });
+
+it.each(['messages','link-clicks','tracked-links','broadcasts'])('API-02 %s rejects a non-existent date',async path=>{
+ expect((await req(`/api/analytics/${path}?${ACCOUNT}&from=2026-02-30&to=2026-03-01`)).status).toBe(400);
+});

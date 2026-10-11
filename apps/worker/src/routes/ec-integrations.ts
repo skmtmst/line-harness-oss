@@ -1,3 +1,4 @@
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { savePublicationDailyViews } from '@line-crm/db';
 import type { PublicationViewSample } from '@line-crm/shared';
 import { Hono } from 'hono';
@@ -202,8 +203,7 @@ export function validateEvent(value: unknown): value is EcEvent {
       if (!pet || typeof pet !== 'object' || typeof pet.name !== 'string' || !pet.name.trim() || pet.name.length > 80) return false;
       if (pet.animal_type && !['dog', 'cat', 'other'].includes(pet.animal_type)) return false;
       if (pet.gender && !['male', 'female', 'unknown'].includes(pet.gender)) return false;
-      if (pet.birthday != null && (typeof pet.birthday !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(pet.birthday)
-        || !Number.isFinite(Date.parse(`${pet.birthday}T00:00:00Z`)))) return false;
+      if (pet.birthday != null && !isExistingCalendarDate(pet.birthday)) return false;
     }
   }
   return true;
