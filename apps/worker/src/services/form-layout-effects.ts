@@ -128,6 +128,7 @@ export interface FormCapacitySlot {
   /** `form_capacity_claims.slot_key`。全体は固定値、選択肢は `choice:ブロック名:ラベル`。 */
   key: string;
   limit: number;
+  choice?: { fieldName: string; label: string; isOther: boolean; labels: string[] };
   /** 確保できなかったときに利用者へ見せる文言。 */
   message: string;
 }
@@ -171,6 +172,7 @@ export function collectCapacitySlots(layout: FormLayout, answers: FormAnswers): 
       slots.push({
         key: `choice:${block.name}:${choice.label}`,
         limit: choice.capacity!.limit!,
+        choice: { fieldName: block.name, label: choice.label, isOther: !!choice.isOther, labels: (block.choices ?? []).map(c => c.label) },
         message: `「${choice.label}」は定員に達しました`,
       });
     }

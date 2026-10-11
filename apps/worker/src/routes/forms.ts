@@ -2938,7 +2938,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
       }
       let rejectedMessage: string | null = null;
       for (const slot of slots) {
-        const ok = await claimFormCapacitySlot(c.env.DB, formId, slot.key, claimCtx.submissionId, slot.limit);
+        const ok = await claimFormCapacitySlot(c.env.DB, formId, slot.key, claimCtx.submissionId, slot.limit, slot.choice);
         if (!ok) {
           rejectedMessage = slot.message;
           break;
