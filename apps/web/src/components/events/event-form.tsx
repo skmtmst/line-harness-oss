@@ -2,7 +2,6 @@
 
 import { jstDate } from '@/lib/jst-datetime'
 import { RowActions } from '@/components/shared/row-actions'
-import { X } from 'lucide-react'
 import { RowMenu } from '@/components/shared/row-actions'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -18,7 +17,6 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Dialog from '@/components/shared/dialog'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -679,23 +677,17 @@ function SlotsTab({
   }
 
   return (
-    <div>
-      <div className="flex flex-wrap gap-2 mb-4 items-center justify-between">
-        <div className="text-sm text-ink-secondary">{slots.length} 件の予約枠</div>
-        <div className="flex gap-2">
+    <FormSection id="ev-form-slots" title="予約枠" description={`${slots.length} 件の予約枠`} action={<>
           <Button onClick={() => setShowAdd(true)}>
             ＋ 枠を追加する
           </Button>
           <Button onClick={() => setShowBulk(true)}>
             一括追加する
           </Button>
-        </div>
-      </div>
-      {err && <div className="bg-danger-bg border border-status-danger-border text-danger p-3 rounded-control mb-3 text-sm">{err}</div>}
+        </>}>
+      {err ? <Notice tone="danger" message={err} /> : null}
       {slots.length === 0 ? (
-        <div className="text-center py-12 text-ink-faint text-sm border border-dashed border-hairline rounded-control">
-          予約枠がありません。「＋ 枠を追加」または「一括追加」から作成してください。
-        </div>
+        <ListState kind="empty" title="予約枠がありません。" description="「＋ 枠を追加」または「一括追加」から作成してください。" />
       ) : (
         <DataTable>
             <thead>
@@ -716,28 +708,22 @@ function SlotsTab({
                   <Td>{s.capacity ?? '無制限'}</Td>
                   <Td>{s.active_count ?? 0}</Td>
                   <Td>
-                    <button
+                    <Button
                       onClick={() => toggleActive(s)}
                       disabled={busy}
-                      className={`text-xs px-2 py-1 rounded-pill font-medium ${
-                        s.is_active === 1 ? 'bg-accent-soft text-success' : 'bg-shell text-ink-secondary'
-                      }`}
                     >
                       {s.is_active === 1 ? '有効' : '停止'}
-                    </button>
+                    </Button>
                   </Td>
                   <ActionCell>
-                    <div className="flex items-center justify-end gap-3">
                       <RowActions edit={{ onClick: () => setEditSlotTarget(s), disabled: busy }} />
-                      <button
+                      <Button variant="danger"
                         onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
                         disabled={busy || (s.active_count ?? 0) > 0}
                         title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
-                        className="text-xs text-danger hover:underline disabled:opacity-30 disabled:no-underline"
                       >
                         削除する
-                      </button>
-                    </div>
+                      </Button>
                   </ActionCell>
                 </Tr>
               ))}
@@ -832,7 +818,7 @@ function SlotsTab({
           setBulkPreview(null)
         }}
       />
-    </div>
+    </FormSection>
   )
 }
 
@@ -851,7 +837,6 @@ function AddSlotDialog({
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
-  const panelRef = useOverlayFocus(true, onClose, busy)
 
   async function submit() {
     setBusy(true)
@@ -870,73 +855,15 @@ function AddSlotDialog({
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を追加" className="bg-canvas rounded-control shadow-float p-6 w-full max-w-md mx-4">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-lg font-bold text-ink">予約枠を追加</h3>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        {err && <div className="bg-danger-bg border border-status-danger-border text-danger p-2 rounded-control mb-3 text-sm">{err}</div>}
-        <div className="space-y-3">
-          <label className="block">
-            <span className="text-sm font-medium text-ink-secondary">日付（JST）</span>
-            <DateField
-              value={date}
-              onChange={setDate}
-              aria-label="日付（JST）"
-              className="mt-1"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label>
-              <span className="text-sm font-medium text-ink-secondary">開始</span>
-              <TimeField
-                value={startTime}
-                onChange={setStartTime}
-                aria-label="開始"
-                className="mt-1"
-              />
-            </label>
-            <label>
-              <span className="text-sm font-medium text-ink-secondary">終了</span>
-              <TimeField
-                value={endTime}
-                onChange={setEndTime}
-                aria-label="終了"
-                className="mt-1"
-              />
-            </label>
-          </div>
-          <label className="block">
-            <span className="text-sm font-medium text-ink-secondary">定員（空欄=無制限）</span>
-            <input
-              type="number"
-              min={1}
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
-              className="mt-1 w-full border border-hairline rounded-control px-3 py-2 text-sm"
-            />
-          </label>
-        </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <Button onClick={onClose}>
-            キャンセル
-          </Button>
-          <button
-            onClick={submit}
-            disabled={busy}
-            className="px-4 py-2 text-sm bg-action text-on-accent rounded-control hover:bg-action-hover disabled:opacity-50"
-          >
-            追加する
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+  return <Dialog open title="予約枠を追加" onCancel={onClose} onConfirm={submit} confirmLabel="追加する" busy={busy} error={err ?? undefined}>
+    
+    <Field label="日付（JST）"><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></Field>
+    <Field label="開始"><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></Field>
+    <Field label="終了"><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></Field>
+    <Field label="定員（空欄=無制限）"><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></Field>
+  </Dialog>
 }
+
 
 /*
  * 入口29: 既存の予約枠の日時・定員を直す窓。
@@ -989,79 +916,17 @@ function EditSlotDialog({
   }
 
   // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
-  const panelRef = useOverlayFocus(true, onClose, busy)
 
   // 新しい部品はデザイントークンで書く（このファイルの古い生色クラスを増やさない）。
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}
-    >
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を編集" className="bg-canvas rounded-card mx-4 w-full max-w-md p-6 shadow-float">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-ink text-lg font-bold">予約枠を編集</h3>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        {err && <Notice tone="danger" className="mb-3">{err}</Notice>}
-        {booked > 0 && (
-          <Notice tone="warn" className="mb-3">
-            この枠には{booked}件の予約が入っています。日時を変えると、確定している予約のリマインド予定も新しい日時へ合わせて動きます。定員は{booked}以上にしてください。
-          </Notice>
-        )}
-        <div className="space-y-3">
-          <label className="block">
-            <span className="text-ink-secondary text-sm font-medium">日付（JST）</span>
-            <DateField
-              value={date}
-              onChange={setDate}
-              aria-label="日付（JST）"
-              className="mt-1"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label>
-              <span className="text-ink-secondary text-sm font-medium">開始</span>
-              <TimeField
-                value={startTime}
-                onChange={setStartTime}
-                aria-label="開始"
-                className="mt-1"
-              />
-            </label>
-            <label>
-              <span className="text-ink-secondary text-sm font-medium">終了</span>
-              <TimeField
-                value={endTime}
-                onChange={setEndTime}
-                aria-label="終了"
-                className="mt-1"
-              />
-            </label>
-          </div>
-          <label className="block">
-            <span className="text-ink-secondary text-sm font-medium">定員（空欄=無制限）</span>
-            <TextInput
-              type="number"
-              min={1}
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
-              className="mt-1"
-            />
-          </label>
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            キャンセル
-          </Button>
-          <Button variant="primary" onClick={submit} disabled={busy} busy={busy} busyLabel="保存中...">保存する
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
+  return <Dialog open title="予約枠を編集" onCancel={onClose} onConfirm={submit} confirmLabel="保存する" busy={busy} error={err ?? undefined}>
+    {booked > 0 ? <Notice tone="warn" message={`この枠には${booked}件の予約が入っています。日時を変えると、確定している予約のリマインド予定も新しい日時へ合わせて動きます。定員は${booked}以上にしてください。`} /> : null}
+    <Field label="日付（JST）"><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></Field>
+    <Field label="開始"><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></Field>
+    <Field label="終了"><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></Field>
+    <Field label="定員（空欄=無制限）"><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></Field>
+  </Dialog>
 }
+
 
 /*
  * R84: 予約枠の一括追加の窓は共通 Dialog を使う。

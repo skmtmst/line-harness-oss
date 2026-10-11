@@ -10,7 +10,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EventItem, EventSlot } from '@/lib/api'
 
@@ -149,7 +149,7 @@ function setInput(input: HTMLInputElement, value: string) {
 }
 
 function dialog(): HTMLElement | null {
-  return document.querySelector('.fixed.inset-0')
+  return screen.queryByRole('dialog', { name: '予約枠を編集' })
 }
 
 function dialogInput(kind: string, index = 0): HTMLInputElement {
@@ -200,7 +200,7 @@ describe('予約枠の編集（入口29）', () => {
     await click(tabButton('2. 予約枠')!)
     await click(host.querySelector<HTMLButtonElement>('button[aria-label="そのほかの操作"]')!)
     await click(document.querySelector<HTMLButtonElement>('[role="menuitem"]')!)
-    expect(host.textContent).toContain('予約枠を編集')
+    expect(dialog()).toBeTruthy()
   }
 
   it('「編集」で保存済みの日時・定員が入った窓が開く', async () => {
@@ -210,7 +210,7 @@ describe('予約枠の編集（入口29）', () => {
     expect(dialogTimeTriggers()[1].textContent).toContain('15:30')
     expect(dialogInput('number').value).toBe('8')
     // 予約が入っているので、動かすとリマインドも動くことを先に伝える。
-    expect(host.textContent).toContain('3件の予約')
+    expect(document.body.textContent).toContain('3件の予約')
   })
 
   it('定員を直して保存すると、既存の更新口へ送る', async () => {
@@ -243,7 +243,7 @@ describe('予約枠の編集（入口29）', () => {
     await act(async () => { setInput(dialogInput('number'), '2') })
     await click(dialogSaveButton())
     expect(updateSlot).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('定員は3以上にしてください')
+    expect(document.body.textContent).toContain('定員は3以上にしてください')
   })
 
   it('開始が終了以降のままでは保存できない', async () => {
@@ -251,7 +251,7 @@ describe('予約枠の編集（入口29）', () => {
     await pickTime(dialogTimeTriggers()[0], '16:00')
     await click(dialogSaveButton())
     expect(updateSlot).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('開始時刻 < 終了時刻')
+    expect(document.body.textContent).toContain('開始時刻 < 終了時刻')
   })
 
   it('競合（409）では窓に最新の差分を出し、一覧を読み直す（m26g R577）', async () => {
@@ -264,8 +264,8 @@ describe('予約枠の編集（入口29）', () => {
     )
     await click(dialogSaveButton())
     // 敗者に差分（最新の枠）を見せる。窓は開いたまま、一覧は裏で読み直す。
-    expect(host.textContent).toContain('ほかの画面でこの枠が更新されました')
-    expect(host.textContent).toContain('定員12')
+    expect(document.body.textContent).toContain('ほかの画面でこの枠が更新されました')
+    expect(document.body.textContent).toContain('定員12')
     expect(listSlots).toHaveBeenCalledTimes(2)
   })
 })
