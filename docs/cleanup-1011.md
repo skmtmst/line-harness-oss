@@ -14,7 +14,7 @@
 
 指定枝からの保護パス変更は `.github/workflows/required-pr-gate.yml` の「Protect command-center owned documents」が拒否する。ゲートや許可ブランチを変更して回避しない。移記が必要な報告は下表の理由どおり保持し、保護対象の具体的な差分案は別途司令塔へ渡す。移記完了後に当該報告を削除する。
 
-司令塔用の具体的な差分案: `~/lh-work/design/v8/review/docsclean-1011/command-center-documents.patch`（9ファイル、18,340 bytes）。`git apply --check` 合格。リポジトリには適用していないため、正本への移記は未実施。
+司令塔用の具体的な差分案: `~/lh-work/design/v8/review/docsclean-1011/command-center-documents.patch`（9ファイル、18,340 bytes）。`git apply --check` 合格。列車20で9ファイルへ適用済み。rulesdoc2の節番号と新しい寸法・正本順位を保ち、操作契約を各節へ追記した。
 
 | 移す先 | 残す中身 |
 | --- | --- |
@@ -2182,3 +2182,23 @@ API URLは全試験・型検査・ビルドで `NEXT_PUBLIC_API_URL=https://nen-
 | `docs/v8-screen-playbook.md` | 7625 | 0 | なし | 残す | 現在の運用・契約・仕様・調査・設定資料。今回の削除対象外。 |
 | `docs/v8-where-to-change.md` | 6894 | 2 | `docs/v8-board-to-code.md:5`<br>`scripts/visual-qa/build-v8-board-to-code.mjs:133` | 残す | 現在の運用・契約・仕様・調査・設定資料。今回の削除対象外。 |
 | `tools/v8-pr-check.sh` | 3453 | 1 | `scripts/visual-qa/v8-pr-boards.mjs:2` | 消す | 未使用の撮影/引継ぎ成果または呼出しのない薄い比較道具。参照はコメントのみ。 |
+
+## 列車20での移記完了（2026-10-11）
+
+9ファイルの移記パッチを適用。行60は一覧の骨組みの現在の実装契約として一般の表の行56（§6.5）と役割を分けて保持。左右16は後の決定の左右24を優先し、数の帯116/90も§6.29のまま。共通操作の追記は§6.10・6.11・6.19・6.23・6.28・6.31にまとめ、§6.26〜6.42の番号を保持。外部REVIEW-GUIDE-V8.mdは変更していない。カードの影の例外台帳 docs/v8-card-shadow-audit.md は保持する。
+
+移記後に削除した13報告：
+
+- `docs/b169-actions-handoff.md`
+- `docs/codex-handoff-b177-dest-1010.md`
+- `docs/del36b-1010-report.md`
+- `docs/list-flow-1010.md`
+- `docs/perf3-1010-handoff.md`
+- `docs/pickers-1010-handoff.md`
+- `docs/qa-tooling-1010-handoff.md`
+- `docs/restaurant-fusion3-1011-report.md`
+- `docs/restaurant-fusion4-1011-report.md`
+- `docs/skeleton-1010-validation.md`
+- `docs/speed2-1010-handoff.md`
+- `docs/stgfix17-verification.md`
+- `docs/v8-pendec-1010-validation.md`
