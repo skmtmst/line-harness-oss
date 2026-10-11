@@ -7,9 +7,9 @@ const createTemplate = (kind) => ({
 })
 
 export const BOARD_STATE_PROFILES = {
-  iN6np: { url: '/broadcasts/new?step=message' },
-  pIHp3: { url: '/hq/broadcasts/new?step=message' },
-  M2tJM: { url: '/hq/broadcasts/detail?id=hq-run-sent' },
+  iN6np: { url: '/broadcasts/new?step=message&draft=visual-compose' },
+  pIHp3: { url: '/hq/broadcasts/new?step=message&id=hq-visual-compose' },
+  M2tJM: { url: '/hq/broadcasts/detail?id=hq-visual-sent' },
   HfK0O: createTemplate('メッセージ'),
   SDSsr: createTemplate('カルーセル'),
   IY3nx: createTemplate('質問'),
