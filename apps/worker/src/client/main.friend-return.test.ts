@@ -65,3 +65,11 @@ test.each([['book&connectionId=calendar1', 'book'], ['form&id=form1', 'form']] a
     expect(window.location.search).toContain(query);
   },
 );
+
+test.each(['/booking?waitlist=person1', '/booking?seat_waitlist=seat1&action=decline', '/booking/history'])('B-247 E3: 実際に案内する%sが現役の予約入口に届く', async path => {
+  window.history.replaceState(null, '', `${path}${path.includes('?') ? '&' : '?'}liffId=store1`);
+  vi.mocked((globalThis as unknown as { liff: { getFriendship: ReturnType<typeof vi.fn> } }).liff.getFriendship).mockResolvedValue({ friendFlag: true });
+  await import('./main.js');
+  await vi.waitFor(() => expect(opened.salon).toHaveBeenCalledTimes(1));
+  expect(document.body.textContent).not.toContain('登録完了');
+});

@@ -35,6 +35,7 @@ import {
   zonedToday,
   type DayChip,
 } from '../../lib/seat-reserve.js';
+import SeatWaitlistSheet from '../../components/SeatWaitlistSheet.js';
 import SeatPick, { type DaySlots } from './SeatPick.js';
 import SeatConfirm from './SeatConfirm.js';
 import SeatDone from './SeatDone.js';
@@ -99,6 +100,7 @@ export default function SeatReserve() {
   const requestId = useRef<string | null>(null);
   const generation = useRef(0);
 
+  const [waitlistSlot, setWaitlistSlot] = useState<{ startsAt: string; guestCount: number } | null>(null);
   const currentSlots=Array.isArray(days[date]) ? days[date] as import('@line-crm/shared').RestaurantCustomerSlot[] : null;
   const fullStartsAt=currentSlots?.find(s=>!s.available)?.startsAt;
   const canRefer=!!currentSlots && (!!fullStartsAt || !hasOpenSlot(currentSlots));
@@ -432,6 +434,8 @@ export default function SeatReserve() {
               onTime={pickTime}
               onRetry={() => void fetchDay(store, date, guestCount, generation.current)}
             />
+            {currentSlots?.filter(s => !s.available && (!s.unavailableReason || s.unavailableReason === 'full') && !reasons[date]?.includes('closed') && reasons[date] !== 'private_event' && Date.parse(s.startsAt) > Date.now() + 3600000).map(s => <Button key={s.startsAt} variant="notify" aria-label={`${zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる`} onClick={() => setWaitlistSlot({ startsAt: s.startsAt, guestCount })}>{zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる</Button>)}
+            {waitlistSlot && <SeatWaitlistSheet storeId={store.id} storeName={store.name} startsAt={waitlistSlot.startsAt} guestCount={waitlistSlot.guestCount} onClose={() => setWaitlistSlot(null)} />}
             {canRefer && <section className="space-y-3" aria-label="系列店の案内">
               {referrals.length>0 && <h2 className="text-[13px] leading-5 font-bold text-ink">近くの系列店なら空いています</h2>}
               {referralError && <><FieldError tone="inherit">空きを読み込めませんでした。</FieldError><Button variant="restaurant-control" disabled={busy} onClick={async()=>{

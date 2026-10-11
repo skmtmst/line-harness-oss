@@ -70,6 +70,7 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
 function getPage(): string | null {
   const path = window.location.pathname.replace(/^\/+/, '');
   if (path === 'book') return 'book';
+  if (path === 'booking' || path === 'booking/history') return 'salon-book';
   if (/^restaurant\/reserve\/[^/]+$/.test(path)) return 'restaurant';
   const params = new URLSearchParams(window.location.search);
   return params.get('page');
