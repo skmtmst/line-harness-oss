@@ -55,6 +55,7 @@ import MediaSlot from '@/components/shared/media-slot'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { CanvasEditor, areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentLabelOf, intentOf } from '@/components/rich-menus/area-properties'
+import { pruneStaleAreaTags, pruneStaleAreaTemplates } from '@/components/rich-menus/action-drafts'
 import {
   NEW_MENU_INTENTS_WITH_SWITCH,
 } from '@/components/rich-menus/rich-menu-create-form'
@@ -557,6 +558,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const staffRole = useStaffRole()
   const [loadError, setLoadError] = useState<unknown>(null)
   const [loadFailedKinds, setLoadFailedKinds] = useState<string[]>([])
+  const [candidateScope, setCandidateScope] = useState<{
+    accountId: string | null; tags: Set<string> | null; templates: Set<string> | null
+  } | null>(null)
+  const candidateLoadGeneration = useRef(0)
+  const candidateAccountRef = useRef<string | null>(null)
+  const [candidatePruneNotice, setCandidatePruneNotice] = useState('')
 
   /* 状態 */
   const [saving, setSaving] = useState(false)
@@ -576,6 +583,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [done, setDone] = useState<'published' | 'scheduled' | null>(null)
 
   const accountId = selectedAccount?.id ?? null
+  candidateAccountRef.current = accountId
   const aggregateOnly = staffRole === 'staff' || staffRole === 'viewer'
   const storeCanOperate = useFeatureAccess('richMenus')
   const canOperate = host ? host.canOperate : storeCanOperate
@@ -655,6 +663,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* ---------- 読み込み ---------- */
 
   const load = useCallback(async () => {
+    const generation = ++candidateLoadGeneration.current
     setLoadError(null)
     setLoadFailedKinds([])
     if (host) {
@@ -676,6 +685,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         api.trackedLinks.list(),
         accountId ? api.richMenuGroups.list(accountId) : Promise.resolve({ success: true as const, data: [] }),
       ])
+    if (generation !== candidateLoadGeneration.current || candidateAccountRef.current !== accountId) return
+    setCandidateScope({
+      accountId,
+      tags: tagRes.status === 'fulfilled' && tagRes.value.success ? new Set(tagRes.value.data.map(({ id }) => id)) : null,
+      templates: templateRes.status === 'fulfilled' && templateRes.value.success ? new Set(templateRes.value.data.map(({ id }) => id)) : null,
+    })
     const failed: string[] = []
     let firstError: unknown = null
     const noteFailure = (label: string, res: unknown) => {
@@ -720,6 +735,17 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (host || !candidateScope || candidateScope.accountId !== accountId) return
+    const drafts = Object.fromEntries(pages.map((page) => [page.id, page.areas]))
+    const tagsPruned = candidateScope.tags ? pruneStaleAreaTags(drafts, candidateScope.tags) : { next: drafts, removed: 0 }
+    const templatesPruned = candidateScope.templates ? pruneStaleAreaTemplates(tagsPruned.next, candidateScope.templates) : { next: tagsPruned.next, removed: 0 }
+    const removed = tagsPruned.removed + templatesPruned.removed
+    if (!removed) return
+    setPages(pages.map((page) => ({ ...page, areas: templatesPruned.next[page.id] })))
+    setCandidatePruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+  }, [accountId, candidateScope, host, pages])
 
   /* 統括：直すときは保存してある中身を、画面の中の下書きにする（サーバーの下書きは作らない）。 */
   const hostSeeded = useRef(false)
@@ -1000,6 +1026,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   async function persistDraft(): Promise<void> {
     if (!group) throw new Error('下書きがまだ作られていません')
     if (host) return
+    if (group.accountId !== accountId) throw new Error('この下書きのアカウントへ戻してから保存してください。')
     const condition = audience === 'targeted' ? pruneCondition(targetingCondition) : null
     if (audience === 'targeted' && !condition) {
       throw new Error('出す相手の条件を設定してください。')
@@ -1880,6 +1907,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         />
       ) : null}
       {notice ? <Notice tone="success" message={notice} className="mb-1" onClose={() => setNotice('')} /> : null}
+      {candidatePruneNotice ? <Notice tone="warn" message={candidatePruneNotice} onClose={() => setCandidatePruneNotice('')} /> : null}
 
 
           {step === 'shape' ? renderShape() : null}

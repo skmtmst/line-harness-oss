@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import NewRichMenuPage from './page'
+import NewRichMenuPage from './create-v8'
 
 ;
 import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
@@ -31,7 +31,7 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }));
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }));
@@ -41,6 +41,7 @@ vi.mock('next/navigation', () => ({
 let host: HTMLDivElement
 let root: Root
 const fetchUrls: string[] = []
+const writes: string[] = []
 
 const TAGS_BY_ACCOUNT: Record<string, Array<{ id: string; name: string }>> = {
   'acc-1': [{ id: 'tag-a1', name: '会員' }],
@@ -49,10 +50,15 @@ const TAGS_BY_ACCOUNT: Record<string, Array<{ id: string; name: string }>> = {
 
 function stubFetch() {
   fetchUrls.length = 0
-  vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
+  writes.length = 0
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (init?.method === 'PATCH') writes.push(String(url))
     const text = String(url)
     fetchUrls.push(text)
     const parsed = new URL(text, 'http://localhost')
+    if (parsed.pathname === '/api/rich-menu-groups') return { ok: true, status: 200, json: async () => ({ success: true, data: { items: [], total: 0, page: 1, limit: 200 } }) }
+    if (parsed.pathname === '/api/staff/me') return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } }) }
+    if (parsed.pathname === '/api/rich-menu-groups/scope-draft') return { ok: true, status: 200, json: async () => ({ success: true, data: {"id":"scope-draft","accountId":"acc-1","name":"scope-test","chatBarText":"メニュー","size":"large","isDefaultForAll":true,"status":"draft","targetingPriority":0,"targetingEnabled":false,"targetingCondition":null,"folderId":null,"defaultOpen":true,"version":1,"defaultPageId":"p-1","pages":[{"id":"p-1","orderIndex":0,"name":"トップ","aliasId":"","lineRichmenuId":null,"imageR2Key":null,"imageContentType":null,"areas":[{"id":"area-1","boundsX":0,"boundsY":0,"boundsWidth":2500,"boundsHeight":1686,"actionType":"message","actionData":{"text":"hello"},"intent":"text","label":"ボタン","tagIds":[],"scoreChange":null,"templateId":null,"formId":null,"trackedLinkId":null}]}]} }) }
     if (parsed.pathname === '/api/tags') {
       const accountId = parsed.searchParams.get('lineAccountId')
       return { ok: true, status: 200, json: async () => ({ success: true, data: accountId ? (TAGS_BY_ACCOUNT[accountId] ?? []) : [] }) }
@@ -70,6 +76,8 @@ async function settle(milliseconds: number) {
 describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
   beforeEach(() => {
     accountState.id = 'acc-1'
+    document.documentElement.dataset.theme = 'v8'
+    window.history.replaceState({}, '', '/rich-menus/new?id=scope-draft&step=buttons')
     stubFetch()
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -82,6 +90,7 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     })
     host.remove()
     vi.unstubAllGlobals()
+    delete document.documentElement.dataset.theme
   })
 
   it('タグ一覧の取得に選択accountが付く', async () => {
@@ -101,24 +110,13 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
       root.render(<NewRichMenuPage />)
     })
     await settle(100)
-    // 1面目の動きを開き、acc-1 のタグ「会員」を選んで保存する
-    const setup = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '設定する')
-    expect(setup).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(setup!)
-    })
-    await settle(50)
+    // V8 keeps the active area editor open after resuming the draft.
+
     await act(async () => fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })))
     await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: /タグを付ける/ })))
     const dialog = screen.getByRole('dialog', { name: 'タグを選ぶ' })
     await act(async () => fireEvent.click(within(dialog).getByRole('checkbox', { name: '会員' })))
     await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'この 1件にする' })))
-    await settle(50)
-    const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存する')
-    expect(save).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(save!)
-    })
     await settle(50)
     // acc-2（タグ「予約」だけ）へ切り替える
     accountState.id = 'acc-2'
@@ -129,5 +127,10 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     const tagUrls = fetchUrls.filter((url) => new URL(url, 'http://localhost').pathname === '/api/tags')
     expect(tagUrls.some((url) => url.includes('lineAccountId=acc-2'))).toBe(true)
     expect(host.textContent).toContain('1件は、今のアカウントにないため外しました')
+    const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '下書きを保存')!
+    expect(save).toBeTruthy()
+    await act(async () => fireEvent.click(save))
+    await settle(50)
+    expect(writes).toHaveLength(0)
   })
 });
