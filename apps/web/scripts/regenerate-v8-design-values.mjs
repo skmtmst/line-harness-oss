@@ -113,26 +113,26 @@ export function regenerate() {
   }
   const green = find(docs[0], '絞り込みの札/オン')
   add('v8-filter-chip', 'filter-chip', 'XGJDa', [
-    ['v6-filter-chip', 'background', green, 'background-color', "[data-theme='v8'] .v6-filter-chip[aria-pressed='true']"],
-    ['v6-filter-chip', 'color', green.querySelector('[data-pencil-name="文字"]'), 'color', "[data-theme='v8'] .v6-filter-chip[aria-pressed='true']"],
-    ['v6-filter-chip', 'outline-color', green, 'outline-color', "[data-theme='v8'] .v6-filter-chip[aria-pressed='true']"],
+    ['v6-filter-chip', 'background', green, 'background-color', ":root .v6-filter-chip[aria-pressed='true']"],
+    ['v6-filter-chip', 'color', green.querySelector('[data-pencil-name="文字"]'), 'color', ":root .v6-filter-chip[aria-pressed='true']"],
+    ['v6-filter-chip', 'outline-color', green, 'outline-color', ":root .v6-filter-chip[aria-pressed='true']"],
   ])
   const root = find(docs[0], '切り替え（3つ）')
   const selected = root.children[0]
   add('v8-segmented-selected', 'segmented', 'dtJVi', [
-    ['selected', 'background', selected, 'background-color', "[data-theme='v8'] .selected"],
-    ['selected', 'color', selected.firstElementChild, 'color', "[data-theme='v8'] .selected"],
+    ['selected', 'background', selected, 'background-color', ":root .selected"],
+    ['selected', 'color', selected.firstElementChild, 'color', ":root .selected"],
   ])
   add('v8-text-link', 'text-link', 'g5Db8', [['root', 'color', link]])
   const table = find(docs[1], '表の見出し（B-178）')
-  add('v8-table-spacing', 'table', 'ASVsl', [['headRow', 'padding', table, 'padding', "[data-theme='v8'] .headRow[data-table-layout='columns']"]])
+  add('v8-table-spacing', 'table', 'ASVsl', [['headRow', 'padding', table, 'padding', ":root .headRow[data-table-layout='columns']"]])
   const steps = find(docs[0], aliases.Fa8ED)
   const dot = steps.querySelector('[data-pencil-name="丸"]')
   add('v8-step-circle', 'steps', 'Fa8ED', [['dot', 'width', dot], ['dot', 'height', dot]])
   const on = find(docs[0], 'ラジオ/オン').querySelector('[data-pencil-name="丸"]')
   add('v8-radio', 'radio', 'y4YQSB', [
     ['input', 'width', on], ['input', 'height', on],
-    ['input', 'outline-width', on, 'outline-width', "[data-theme='v8'] .input:checked"],
+    ['input', 'outline-width', on, 'outline-width', ":root .input:checked"],
   ])
   for (const [id, file, cls] of [['fNPdg', 'radio-card', 'card'], ['w6uYMd', 'check-card', 'card']]) {
     const el = find(docs[1], parts[id].name)
