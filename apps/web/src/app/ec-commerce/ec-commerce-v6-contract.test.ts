@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 const tabs = readFileSync(join(import.meta.dirname, 'ec-tabs.ts'), 'utf8')
 const tabsView = readFileSync(join(import.meta.dirname, 'ec-tabs-view.tsx'), 'utf8')
-const identity = readFileSync(join(import.meta.dirname, 'identity-candidates', 'page.tsx'), 'utf8')
+const identity = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/identity.tsx'), 'utf8')
 const subscriptions = readFileSync(join(import.meta.dirname, 'subscriptions-panel.tsx'), 'utf8')
 const connector = readFileSync(join(import.meta.dirname, 'connector-panel.tsx'), 'utf8')
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
@@ -49,7 +49,7 @@ describe('V6 EC integration screens', () => {
     expect(page).toContain('formatNumber(order.totalAmount')
     expect(identity).toContain('operations?.summary.linked')
     expect(identity).toContain('operations?.summary.potentialRevenue')
-    expect(identity).toContain('過去のLINE送信は再送しません')
+    expect(identity).toContain('過去の LINE 送信は再送しません')
   })
 
   it('uses state-specific feedback and never turns missing values into zero', () => {
