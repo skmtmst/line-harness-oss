@@ -15,7 +15,11 @@ async function ownedImage(c: Context<Env>, key: string) {
   const object = await c.env.IMAGES.head(key);
   const accountId = object?.customMetadata?.lineAccountId;
   const tenantId = object?.customMetadata?.tenantId;
-  if (!accountId || tenantId !== (c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID)) return null;
+  if (tenantId !== (c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID)) return null;
+  if (!accountId) {
+    // アカウントを渡さない既存のアップロードは作成者本人だけが管理する。
+    return object?.customMetadata?.ownerStaffId === c.get('staff')?.id ? object : null;
+  }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return null;
   const requested = c.req.query('account_id');
   return requested && requested !== accountId ? null : object;
@@ -29,8 +33,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoun
     const scope = await getVisibleLineAccountScope(c.env.DB, staff);
     const accountId = c.req.query('account_id') ?? c.req.header('X-Line-Account-Id')
       ?? (scope.ids.length === 1 ? scope.ids[0] : null);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, staff, [accountId])) {
+    if (accountId && !await canAccessAllLineAccounts(c.env.DB, staff, [accountId])) {
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
     const contentType = c.req.header('Content-Type') || '';
@@ -100,7 +103,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoun
 
     await c.env.IMAGES.put(key, data, {
       httpMetadata: { contentType: mimeType },
-      customMetadata: { originalFilename: filename ?? key, lineAccountId: accountId, tenantId: staff.tenantId ?? DEFAULT_TENANT_ID },
+      customMetadata: { originalFilename: filename ?? key, lineAccountId: accountId ?? '', ownerStaffId: staff.id, tenantId: staff.tenantId ?? DEFAULT_TENANT_ID },
     });
 
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
