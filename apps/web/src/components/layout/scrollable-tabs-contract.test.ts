@@ -12,7 +12,7 @@ const NEN_HEALTH = readFileSync(join(SRC, 'app', 'nen', 'health', 'page.tsx'), '
 // 入口は V8 の画面を出すだけになった（2026-10-09 V7 削除）。V8 の本体を見る。
 const HQ_MEMBERS = readFileSync(join(SRC, 'v8', 'hq', 'members.tsx'), 'utf8')
 const HQ_NAV = readFileSync(join(SRC, 'app', 'hq', 'hq-settings-nav-v8.tsx'), 'utf8')
-const HQ_NAV_CSS = readFileSync(join(SRC, 'app', 'hq', 'hq-settings-nav-v8.css'), 'utf8')
+const HQ_NAV_CSS = readFileSync(join(SRC, 'v8', 'hq', 'settings-nav.module.css'), 'utf8')
 
 /*
  * #975 U091: タブが右にはみ出す画面（/analytics、/search-console、
@@ -67,7 +67,7 @@ describe('右に隠れたタブへ届く（#975 U091）', () => {
     expect(HQ_MEMBERS).toContain('<HqSettingsNavV8 active="members"')
     expect(HQ_NAV).toContain('aria-label="統括の設定"')
     expect(HQ_NAV).toContain("aria-current={key === active ? 'page' : undefined}")
-    expect(HQ_NAV_CSS).toMatch(/\.hq-settings-nav__list\s*\{[^}]*flex-direction:\s*column/s)
+    expect(HQ_NAV_CSS).toMatch(/\.list\s*\{[^}]*flex-direction:\s*column/s)
     for (const href of ['/hq/members', '/hq/settings', '/hq/billing', '/hq/support']) {
       expect(HQ_NAV).toContain(href)
     }

@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const FEATURE = readFileSync(join(HERE, 'feature-settings-v8.tsx'), 'utf8')
 const MANUAL = readFileSync(join(HERE, 'manual-links', 'manual-links-v8.tsx'), 'utf8')
 const SCAN = readFileSync(join(HERE, 'file-scan', 'file-scan-v8.tsx'), 'utf8')
-const CSS = readFileSync(join(HERE, 'settings-v8.module.css'), 'utf8')
+const CSS = readFileSync(join(HERE, '../../components/templates/page-templates.module.css'), 'utf8')
 const START = readFileSync(join(HERE, '..', 'getting-started', 'page.tsx'), 'utf8')
 
 /*
@@ -34,7 +34,8 @@ describe('設定の残り板', () => {
   })
 
   it('1152（bKipf）は板1100px未満で1列に畳む', () => {
-    expect(CSS).toContain('@media (max-width: 1100px)')
+    expect(CSS).toContain('@container v8-page (max-width: 1099px)')
+    expect(CSS).toContain('.folders { display: none; }')
   })
 
   it('はじめの設定の順路に板IDを付ける（xuJ7D）', () => {

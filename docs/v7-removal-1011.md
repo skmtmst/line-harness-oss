@@ -3161,3 +3161,26 @@
 
 - 本番の利用先0の7部品とCSS2本を削除。描画16ケースを現役タブと詳細窓へ移し、現役の共通外枠へアカウントを渡す。取得失敗/上限超過/未確定報酬/集計の差分/書き出しの入口/Escapeと焦点復帰を保持。現役の集計期間は過去30日なので、前の期間の標本は45日前とした。説明は現役の説明ボタンを開いて読む。
 - 関連219件全件成功、web型検査・差分検査成功。旧部品の利用先7行と、到達しなくなった旧の角丸規則の例外10行を外した。試験削除0件（累計8件）。現役の画面コードは変更なし。旧tabsなどの残り6部品は次の区切りで動作試験を移す。
+
+## 2026-10-11 使われない旧CSSと外枠を削除
+
+本番の入口からの到達0を確認。宣言数は試験ファイル全体で重複を含む。
+
+|機能・旧ファイル|試験読者 / 宣言数|
+|---|---:|
+|統括 hq-settings-nav-v8.css|1 / 7|
+|統括 readonly-v8.css|1 / 7|
+|設定 settings-v8.module.css|2 / 9|
+|友だち friend-detail-v8.module.css|1 / 3|
+|自動応答 publish/publish.css|1 / 7|
+|contents/leaving.module.css、getting-started/getting-started.module.css|各0 / 0|
+|no-permission/no-permission-v8.module.css、search-console/search-console-v8.module.css|各0 / 0|
+|auto-replies/edit/issue481-height.css、friends/identity-candidates/issue481-height.css|各0 / 0|
+|friend-add-settings/publish/done-v8.module.css、runs/runs-v8.module.css、runs/detail/detail-v8.module.css|各0 / 0|
+|hq/banners/hq-banners-v8.css、billing/hq-billing-v8.css、members/hq-members-v8.css、settings/hq-settings-v8.css|各0 / 0|
+|scenarios/mode/scenario-mode.css|0 / 0|
+|booking/menus/new/menu-form-v8.module.css、menus/staff/assign-v8.module.css、staff/new/staff-new-v8.module.css|各0 / 0|
+|hq/readonly-header-v8.tsx、notifications/readonly-header-v8.tsx、settings/settings-nav-v8.tsx、friend-add-settings/runs/detail/detail-v8.tsx|各0 / 0（旧入口の静的参照は現役へ解決済み）|
+
+- CSS22本と外枠4本を削除。幅の条件は旧CSSから現役の型へ移し、板が1100px未満なら列を畳む条件、友だち詳細の最小幅、タブの折り返し/内部スクロール、統括の縦の設定メニューと行き先を保持。不要になった予算/利用先/角丸例外の行だけ外した。
+- 関連43件全件成功、web型検査・差分検査成功。試験削除0件（累計8件）。現役の画面/CSSは変更なし。

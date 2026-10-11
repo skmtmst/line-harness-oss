@@ -14,30 +14,15 @@
     "height": 4,
     "font": 17
   },
-  "app/booking/menus/new/menu-form-v8.module.css": {
-    "spacing": 17,
-    "height": 8,
-    "font": 14
-  },
   "app/booking/menus/settings-v8.module.css": {
     "spacing": 69,
     "height": 33,
     "font": 69
   },
-  "app/booking/menus/staff/assign-v8.module.css": {
-    "spacing": 12,
-    "height": 5,
-    "font": 11
-  },
   "app/booking/prepay-badge-v8.module.css": {
     "spacing": 6,
     "height": 1,
     "font": 4
-  },
-  "app/booking/staff/new/staff-new-v8.module.css": {
-    "spacing": 11,
-    "height": 9,
-    "font": 7
   },
   "app/booking/staff/shifts/staff-detail-v8.module.css": {
     "spacing": 24,
@@ -64,40 +49,15 @@
     "height": 5,
     "font": 10
   },
-  "app/friend-add-settings/publish/done-v8.module.css": {
-    "spacing": 11,
-    "height": 5,
-    "font": 8
-  },
   "app/friend-add-settings/publish/publish.module.css": {
     "spacing": 4,
     "height": 7,
     "font": 0
   },
-  "app/friend-add-settings/runs/detail/detail-v8.module.css": {
-    "spacing": 18,
-    "height": 5,
-    "font": 15
-  },
-  "app/friend-add-settings/runs/runs-v8.module.css": {
-    "spacing": 25,
-    "height": 7,
-    "font": 24
-  },
-  "app/friends/detail/friend-detail-v8.module.css": {
-    "spacing": 14,
-    "height": 2,
-    "font": 3
-  },
   "app/friends/friends-v8.module.css": {
     "spacing": 65,
     "height": 22,
     "font": 45
-  },
-  "app/getting-started/getting-started.module.css": {
-    "spacing": 9,
-    "height": 5,
-    "font": 0
   },
   "app/hq/templates/template-console.module.css": {
     "spacing": 43,
@@ -123,11 +83,6 @@
     "spacing": 37,
     "height": 10,
     "font": 30
-  },
-  "app/no-permission/no-permission-v8.module.css": {
-    "spacing": 9,
-    "height": 6,
-    "font": 6
   },
   "app/ops/knowledge/article-v8.module.css": {
     "spacing": 2,
@@ -243,16 +198,6 @@
     "spacing": 6,
     "height": 3,
     "font": 0
-  },
-  "app/search-console/search-console-v8.module.css": {
-    "spacing": 9,
-    "height": 2,
-    "font": 5
-  },
-  "app/settings/settings-v8.module.css": {
-    "spacing": 59,
-    "height": 7,
-    "font": 50
   },
   "app/webhooks/apitokens-v8.module.css": {
     "spacing": 16,
