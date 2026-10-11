@@ -176,7 +176,7 @@ export default function ManagedFolderPanel({
   unfiledCount = null,
   countOf,
   createAction,
-  reserveCreateSpace = true,
+  reserveCreateSpace = canManage && Boolean(createAction),
   onDeleted,
   error,
   placeholder,
