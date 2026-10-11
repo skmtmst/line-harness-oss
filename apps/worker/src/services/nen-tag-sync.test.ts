@@ -322,8 +322,8 @@ describe('NEN bulk refresh scope', () => {
 
     await refreshAllNenTags(db, ['account-1', 'account-2', null], 500);
 
-    expect(queries[0].sql).toContain('line_account_id IN (?,?)');
+    expect(queries[0].sql).toContain('line_account_id IN (SELECT value FROM json_each(?))');
     expect(queries[0].sql).toContain('OR line_account_id IS NULL');
-    expect(queries[0].bindings).toEqual(['account-1', 'account-2', 500]);
+    expect(queries[0].bindings).toEqual([JSON.stringify(['account-1', 'account-2']), 500]);
   });
 });

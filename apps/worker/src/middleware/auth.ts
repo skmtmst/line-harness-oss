@@ -703,7 +703,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // must continue through the normal admin authentication below.
   const isPublicFormDefinition =
     method === 'GET' && /^\/api\/forms\/[^/]+$/.test(path);
-  if (isPublicFormDefinition) {
+  if (isPublicFormDefinition && !c.req.query('account_id')) {
     const bearer = bearerToken(c);
     const cookie = adminSessionTokenFromCookie(c);
     const staff = bearer
@@ -716,7 +716,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // 公開境界(LIFF・webhook・署名検証の入口)は認証より手前へ通す。
   // 判定の中身は isPublicApiBoundary に集約し、契約テストと共有する。
   // (LIFF の回答系は route 側で LINE 署名を見るため管理認証の対象外)
-  if (isPublicApiBoundary(method, path)) return next();
+  if (isPublicApiBoundary(method, path) && !(isPublicFormDefinition && c.req.query('account_id'))) return next();
 
   const bearer = bearerToken(c);
   const cookie = adminSessionTokenFromCookie(c);

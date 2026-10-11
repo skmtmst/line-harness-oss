@@ -116,7 +116,10 @@ export function createTestD1(
   const db = {
     prepare: (sql: string) => ({
       // batch が SELECT へ .all() を振り分けられるよう、元の SQL を残しておく。
-      bind: (...args: unknown[]) => ({ ...wrap(raw, sql, args), sql }),
+      bind: (...args: unknown[]) => {
+        if (args.length > 100) throw new Error(`D1 bind limit exceeded: ${args.length} > 100`)
+        return { ...wrap(raw, sql, args), sql }
+      },
       sql,
       ...(isSelect(sql) ? wrap(raw, sql, []) : wrap(raw, sql, [])),
     }),

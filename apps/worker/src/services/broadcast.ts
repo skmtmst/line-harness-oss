@@ -613,15 +613,10 @@ export async function processScheduledBroadcasts(
   const activeByAccount = new Map(
     accountsWithStatus.map((account) => [account.id, Boolean(account.is_active)]),
   );
-  const allBroadcasts = await getBroadcasts(db);
-
   const nowMs = Date.now();
-  const scheduled = allBroadcasts.filter(
-    (b) =>
-      b.status === 'scheduled' &&
-      b.scheduled_at !== null &&
-      new Date(b.scheduled_at).getTime() <= nowMs,
-  );
+  const scheduled = await getBroadcasts(db, undefined, undefined, {
+    status: 'scheduled', dueAt: new Date(nowMs).toISOString(),
+  });
 
   /*
    * 二者承認（m12a）。予約時刻を過ぎても承認されなかった依頼は、

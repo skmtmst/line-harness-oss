@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 /**
  * 飲食店向け（テスト）「デリバリー受注」。
  *
@@ -402,7 +403,7 @@ async function itemsForOrders(
 ): Promise<Map<string, DeliveryOrderItemRow[]>> {
   const byOrder = new Map<string, DeliveryOrderItemRow[]>();
   if (orderIds.length === 0) return byOrder;
-  const placeholders = orderIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(orderIds).sql;
   const rows = await dbFor(c.env, store.id)
     .prepare(
       `SELECT id, order_id, position, name, note, quantity, amount
@@ -410,7 +411,7 @@ async function itemsForOrders(
         WHERE order_id IN (${placeholders})
         ORDER BY order_id, position`,
     )
-    .bind(...orderIds)
+    .bind(...(orderIds.length ? sqlIdSet(orderIds).binds : []))
     .all<DeliveryOrderItemRow>();
   for (const row of rows.results ?? []) {
     const list = byOrder.get(row.order_id);
@@ -1198,7 +1199,7 @@ async function menuItemsFor(
     return rows.results ?? [];
   }
   if (ids.length === 0) return [];
-  const placeholders = ids.map(() => '?').join(',');
+  const placeholders = sqlIdSet(ids).sql;
   const rows = await db
     .prepare(
       `SELECT id, store_id, name, category, price, sold_out, sold_out_at,
@@ -1206,7 +1207,7 @@ async function menuItemsFor(
          FROM rt_delivery_menu_items WHERE store_id = ? AND id IN (${placeholders})
         ORDER BY sort_order, name`,
     )
-    .bind(store.id, ...ids)
+    .bind(store.id, ...(ids.length ? sqlIdSet(ids).binds : []))
     .all<DeliveryMenuItemRow>();
   return rows.results ?? [];
 }

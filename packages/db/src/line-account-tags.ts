@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 
@@ -55,8 +56,8 @@ export async function getLineAccountTagsByAccountIds(db: D1Database, tenantId: s
     JOIN line_account_tag_links l ON l.tag_id = t.id AND l.tenant_id = t.tenant_id
     JOIN line_accounts a ON a.id = l.line_account_id
     WHERE t.tenant_id = ? AND COALESCE(a.tenant_id, ?) = ?
-      AND l.line_account_id IN (${accountIds.map(() => '?').join(',')})
-    ORDER BY t.display_order, t.name, t.id`).bind(tenantId, DEFAULT_TENANT_ID, tenantId, ...accountIds)
+      AND l.line_account_id IN (${sqlIdSet(accountIds).sql})
+    ORDER BY t.display_order, t.name, t.id`).bind(tenantId, DEFAULT_TENANT_ID, tenantId, ...(accountIds.length ? sqlIdSet(accountIds).binds : []))
     .all<LineAccountTag & { line_account_id: string }>();
   for (const tag of results) (out[tag.line_account_id] ??= []).push(serializeLineAccountTag(tag));
   return out;
@@ -95,8 +96,8 @@ export async function attachLineAccountRegistrationTags(db: D1Database, tenantId
 export async function listLineAccountFolders(db: D1Database, tenantId: string, accountIds: string[]) {
   const rows = await listLineAccountTags(db, tenantId);
   const counts = accountIds.length ? (await db.prepare(`SELECT folder_id,COUNT(*) AS count FROM line_accounts
-    WHERE id IN (${accountIds.map(() => '?').join(',')}) AND COALESCE(tenant_id,?)=? AND archived_at IS NULL
-    GROUP BY folder_id`).bind(...accountIds,DEFAULT_TENANT_ID,tenantId).all<{folder_id:string|null;count:number}>()).results : [];
+    WHERE id IN (${sqlIdSet(accountIds).sql}) AND COALESCE(tenant_id,?)=? AND archived_at IS NULL
+    GROUP BY folder_id`).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : []),DEFAULT_TENANT_ID,tenantId).all<{folder_id:string|null;count:number}>()).results : [];
   return { folders: rows.map(row => ({ ...serializeLineAccountTag(row),kind:'line_account',parentId:null,
     itemCount:counts.find(count => count.folder_id===row.id)?.count ?? 0 })),
     total:counts.reduce((n,row)=>n+row.count,0),unclassifiedCount:counts.find(row=>row.folder_id===null)?.count ?? 0 };
@@ -106,8 +107,8 @@ export async function getLineAccountFoldersByAccountIds(db: D1Database, tenantId
   if (!accountIds.length) return out;
   const rows = (await db.prepare(`SELECT t.*,a.id AS account_id FROM line_accounts a
     LEFT JOIN line_account_tags t ON t.id=a.folder_id AND t.tenant_id=COALESCE(a.tenant_id,?)
-    WHERE COALESCE(a.tenant_id,?)=? AND a.id IN (${accountIds.map(()=>'?').join(',')})`)
-    .bind(DEFAULT_TENANT_ID,DEFAULT_TENANT_ID,tenantId,...accountIds).all<LineAccountTag & {account_id:string}>()).results;
+    WHERE COALESCE(a.tenant_id,?)=? AND a.id IN (${sqlIdSet(accountIds).sql})`)
+    .bind(DEFAULT_TENANT_ID,DEFAULT_TENANT_ID,tenantId,...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<LineAccountTag & {account_id:string}>()).results;
   for(const row of rows) out[row.account_id]=row.id ? {...serializeLineAccountTag(row),kind:'line_account',parentId:null} : null;
   return out;
 }

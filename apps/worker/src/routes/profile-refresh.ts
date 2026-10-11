@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
@@ -243,7 +244,7 @@ profileRefresh.post('/api/admin/tag-leak-check', requireRole('owner'), inputJson
   const db = c.env.DB;
 
   const buildIdentSql = (tagNames: string[]) => {
-    const placeholders = tagNames.map(() => '?').join(',');
+    const placeholders = sqlIdSet(tagNames).sql;
     return `
       SELECT DISTINCT COALESCE(
         CASE

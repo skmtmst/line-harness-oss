@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -56,7 +57,7 @@ function audienceLabel(a: PlatformAnnouncement, tenantNames: Map<string, string>
 async function tenantNameMap(db: D1Database, ids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (ids.length === 0) return out;
-  const { results } = await db.prepare(`SELECT id, name FROM tenants WHERE id IN (${ids.map(() => '?').join(',')})`).bind(...ids).all<{ id: string; name: string }>();
+  const { results } = await db.prepare(`SELECT id, name FROM tenants WHERE id IN (${sqlIdSet(ids).sql})`).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; name: string }>();
   for (const r of results ?? []) out.set(r.id, r.name);
   return out;
 }

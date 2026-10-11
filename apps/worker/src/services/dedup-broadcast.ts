@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 
 export interface DedupPreviewPerAccount {
@@ -47,7 +48,7 @@ interface RankedRow {
  *
  * Filters: is_following=1 AND line_account_id IS NOT NULL.
  * identity_key: COALESCE(URL_TOKEN_SQL, 'uid:'||user_id, 'solo:'||id).
- * Tie-breaking: priority CASE first, created_at ASC second.
+ * Tie-breaking: priority JSON array order first, created_at ASC second.
  */
 export async function computeDedupBroadcastPreview(
   db: D1Database,
@@ -61,12 +62,12 @@ export async function computeDedupBroadcastPreview(
 
   const priority = dedupPriority.filter((id) => accountIds.includes(id));
 
-  const inPlaceholders = accountIds.map(() => '?').join(', ');
+  const inPlaceholders = sqlIdSet(accountIds).sql;
 
-  const caseWhens = priority.map((_, i) => `WHEN ? THEN ${i}`).join(' ');
   const caseExpr = priority.length === 0
     ? '999'
-    : `CASE line_account_id ${caseWhens} ELSE 999 END`;
+    : `COALESCE((SELECT CAST(key AS INTEGER) FROM json_each(?)
+        WHERE value = line_account_id ORDER BY CAST(key AS INTEGER) LIMIT 1), 999)`;
 
   // Tag filter — applied identically to both selectedCount and ranked queries
   // so the "selected" denominator and the dedup numerator share the same
@@ -90,8 +91,8 @@ export async function computeDedupBroadcastPreview(
     GROUP BY line_account_id
   `;
   const selectedCountBinds = hasTagFilter
-    ? [...accountIds, targetTagId]
-    : [...accountIds];
+    ? [...sqlIdSet(accountIds).binds, targetTagId]
+    : [...sqlIdSet(accountIds).binds];
   const selectedCounts = await db
     .prepare(selectedCountSql)
     .bind(...selectedCountBinds)
@@ -133,11 +134,11 @@ export async function computeDedupBroadcastPreview(
     ORDER BY line_account_id, created_at
   `;
   // Bind order matches placeholder order in the SQL: accountIds (for IN), then
-  // tag filter (if any) inside the `selected` CTE, then priority (for the CASE
+  // tag filter (if any) inside the `selected` CTE, then priority JSON (for the subquery
   // in ORDER BY of the `ranked` CTE).
   const rankedBinds = hasTagFilter
-    ? [...accountIds, targetTagId, ...priority]
-    : [...accountIds, ...priority];
+    ? [...sqlIdSet(accountIds).binds, targetTagId, ...(priority.length ? [JSON.stringify(priority)] : [])]
+    : [...sqlIdSet(accountIds).binds, ...(priority.length ? [JSON.stringify(priority)] : [])];
   const rankedRows = await db
     .prepare(rankedSql)
     .bind(...rankedBinds)
@@ -159,7 +160,7 @@ export async function computeDedupBroadcastPreview(
   const accountMetaSql = `SELECT id, name, country FROM line_accounts WHERE id IN (${inPlaceholders})`;
   const metaRows = await db
     .prepare(accountMetaSql)
-    .bind(...accountIds)
+    .bind(...sqlIdSet(accountIds).binds)
     .all<{ id: string; name: string; country: string | null }>();
   const metaByAccount = new Map<string, { name: string; country: string | null }>();
   for (const r of metaRows.results ?? []) {

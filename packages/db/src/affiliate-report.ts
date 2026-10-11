@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { ATTRIBUTION_WINDOW_DAYS } from './affiliate-attribution.js';
 import { boundedListLimit, nonNegativeListOffset } from './utils.js';
 
@@ -849,7 +850,7 @@ export async function getConversionApprovalQueue(
   const limit = boundedListLimit(opts.limit, 200);
   const offset = nonNegativeListOffset(opts.offset);
   const scopeCondition = opts.scope.allowedAccountIds.length > 0
-    ? `(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`
+    ? `(cp.line_account_id IN (${sqlIdSet(opts.scope.allowedAccountIds).sql})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`
     : opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0';
 
   // dup_keys: identity_keys shared by >=2 distinct attributed-conversion friends
@@ -966,7 +967,7 @@ export async function getConversionApprovalQueue(
       ORDER BY julianday(ce.created_at) DESC, ce.id DESC
       LIMIT ? OFFSET ?`,
     )
-    .bind(status, ...opts.scope.allowedAccountIds, limit, offset)
+    .bind(status, ...(opts.scope.allowedAccountIds.length ? sqlIdSet(opts.scope.allowedAccountIds).binds : []), limit, offset)
     .all<{
       event_id: string;
       created_at: string;

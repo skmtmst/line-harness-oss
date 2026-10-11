@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import * as dbPackage from '@line-crm/db';
 import type { NenRankSetting } from '@line-crm/db';
 import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
@@ -392,10 +393,10 @@ async function syncManagedTags(
   const uniqueManaged = [...new Set(managed)];
   let currentIds = prefetchedCurrentIds;
   if (!currentIds) {
-    const placeholders = uniqueManaged.map(() => '?').join(',');
+    const placeholders = sqlIdSet(uniqueManaged).sql;
     const current = await db.prepare(
       `SELECT tag_id FROM friend_tags WHERE friend_id = ? AND tag_id IN (${placeholders})`,
-    ).bind(friendId, ...uniqueManaged).all<{ tag_id: string }>();
+    ).bind(friendId, ...(uniqueManaged.length ? sqlIdSet(uniqueManaged).binds : [])).all<{ tag_id: string }>();
     currentIds = new Set(current.results.map((row) => row.tag_id));
   }
   let added = 0;
@@ -713,14 +714,14 @@ export async function refreshAllNenTags(
   const allowedAccountIds = scope;
   const assignedIds = allowedAccountIds.filter((id): id is string => id !== null);
   const accountWhere = assignedIds.length
-    ? `(line_account_id IN (${assignedIds.map(() => '?').join(',')})${allowedAccountIds.includes(null) ? ' OR line_account_id IS NULL' : ''})`
+    ? `(line_account_id IN (${sqlIdSet(assignedIds).sql})${allowedAccountIds.includes(null) ? ' OR line_account_id IS NULL' : ''})`
     : allowedAccountIds.includes(null) ? 'line_account_id IS NULL' : '1 = 0';
   const friends = await db.prepare(
     `SELECT id, user_id, line_account_id FROM friends
       WHERE is_following = 1 AND user_id IS NOT NULL AND user_id <> ''
         AND ${accountWhere}
       ORDER BY updated_at DESC LIMIT ?`,
-  ).bind(...assignedIds, Math.max(1, Math.min(limit, 1000))).all<{ id: string }>();
+  ).bind(...(assignedIds.length ? sqlIdSet(assignedIds).binds : []), Math.max(1, Math.min(limit, 1000))).all<{ id: string }>();
   let added = 0;
   let removed = 0;
   for (const friend of friends.results) {

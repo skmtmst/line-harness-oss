@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { GoogleCalendarClient, type BusyInterval } from './google-calendar.js';
 import {
   getGoogleServiceAccountToken,
@@ -397,11 +398,11 @@ export async function processPendingCalendarDeleteOperations(
   // ここで 0 行になり、二重に外部を呼ばない。
   const claimed = await db.prepare(
     `UPDATE booking_operation_runs SET opened_at = ?, updated_at = ?
-      WHERE id IN (${runnableIds.map(() => '?').join(', ')})
+      WHERE id IN (${sqlIdSet(runnableIds).sql})
         AND ${dueWhere}
         AND NOT ${bookingOff}
       RETURNING id, booking_id, line_account_id`,
-  ).bind(nowIso, nowIso, ...runnableIds, staleCutoff)
+  ).bind(nowIso, nowIso, ...(runnableIds.length ? sqlIdSet(runnableIds).binds : []), staleCutoff)
     .all<{ id: string; booking_id: string; line_account_id: string }>();
   for (const op of claimed.results ?? []) {
     result.processed++;
