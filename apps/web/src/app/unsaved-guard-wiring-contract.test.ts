@@ -237,6 +237,8 @@ const EXEMPTIONS: Record<string, string> = {
     '下書き保存式の編集画面。番兵の扱いは別途検討',
   'components/friend-fields/tags-page-v4.tsx':
     '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
+  'components/friend-fields/tag-editor-v4.tsx':
+    '遡及の人数と合計を確認する短い確認窓。dirty=false/confirmationで確認のチェックだけを取り消し、元の編集の入力は親の番兵が保持する',
   /* ★V8 の新しい画面（src/v8）。古い画面ファイルの理由をそのまま写した（2026-10-06）。 */
   'v8/broadcasts/list.tsx':
     '★V8 の一斉配信一覧（l5V9a）。一覧と絞り込みが中心。フォルダ・並び替え・保存した検索など一覧上の操作は押した直後に即時保存し、配信の作成は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',

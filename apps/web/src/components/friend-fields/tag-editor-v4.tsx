@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Coins, X } from 'lucide-react'
+import { Coins } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagDefinitionAction, type TagRetroactivePreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
@@ -99,10 +99,6 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
   const [accepted, setAccepted] = useState(referenceState)
   const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
   const [previewError, setPreviewError] = useState('')
-  // alertdialog にも共通の約束を合わせる: Escapeで戻る・Tabは窓の中・
-  // 閉じたら起点へ戻す・背面はスクロールしない。
-  const panelRef = useOverlayFocus(true, onCancel)
-
   const fetchPreview = () => {
     if (!tagId || !accountId) return
     setPreviewError('')
@@ -127,16 +123,15 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
   const referralTargets = preview ? preview.referralTargets : Math.min(count, 34)
   const rewardTotal = preview ? preview.selfMiles : selfTargets * values.rewardMiles
   const referralTotal = preview ? preview.referralMiles : referralTargets * values.referralRewardMiles
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4">
-      <section ref={panelRef} className="relative w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-overlay" role="alertdialog" aria-modal="true" aria-labelledby="tag-retroactive-title">
-        <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-          <X aria-hidden="true" className="h-5 w-5" />
-        </button>
-        <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-pill bg-warning-bg text-warning" aria-hidden="true">
-          <Coins size={21} strokeWidth={2} />
-        </span>
-        <h2 id="tag-retroactive-title" className="text-xl font-bold text-ink">{selfTargets + referralTargets}人にさかのぼってマイルを積みますか？</h2>
+  return <Dialog open size="large" tone="destructive" confirmation dirty={false}
+    onCancel={onCancel} title={`${selfTargets + referralTargets}人にさかのぼってマイルを積みますか？`}
+    titleIcon={<Coins aria-hidden="true" />}
+    footer={<>
+
+          <Button variant="secondary" type="button" onClick={onSaveWithoutApplying}>反映しないで保存する</Button>
+          <Button variant="primary" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
+            </>}
+  >
         <p className="mt-2 text-sm leading-6 text-ink-secondary">「{values.name || 'このタグ'}」の変更を、いまこのタグが付いている人にも適用します。人数はサーバーで再計算した値です。</p>
         <div className="mt-4 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">
@@ -158,12 +153,6 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
           </p>
         )}
         <SaveErrorField names={["accepted"]}><Checkbox className="mt-3" checked={accepted} onCheckedChange={setAccepted}>人数と合計マイルを確認しました</Checkbox></SaveErrorField>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" className="px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onSaveWithoutApplying}>反映しないで保存する</Button>
-          <Button variant="primary" className="px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
-        </div>
         <p className="mt-3 whitespace-nowrap text-xs leading-4 text-ink-faint">新規作成のときはこのダイアログは出ません。まだ誰にもタグが付いていないため、送信やマイル付与も起きません。</p>
-      </section>
-    </div>
-  )
+  </Dialog>
 }

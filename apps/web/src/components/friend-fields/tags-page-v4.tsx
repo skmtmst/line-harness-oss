@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import { formatDay, formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -27,17 +27,6 @@ export const FOLDER_FALLBACK_COLOR = '#8b938d'
 /* ---- 4-1 の表のための小物。設計 `HrwyW` の値をそのまま持つ ---- */
 
 /** 並び替えのつまみ。設計 `DaXeY`（lucide grip-vertical・16px・hairline）。 */
-function TrashIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 6h18" /><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
-      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-      <path d="M10 11v6" /><path d="M14 11v6" />
-    </svg>
-  )
-}
-
-
 /**
  * 連動の札。設計 `B9QCB3`（緑）／`IoiWQ`（黄）／`Ws7fo`（灰）。
  *
@@ -319,14 +308,6 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
     return () => { cancelled = true }
   }, [accountId, tag.id])
 
-  /*
-    共通の作法に寄せる。Escapeで閉じ、Tabが外へ出ず、**背景がスクロールしない**。
-    自前で組むと毎回どれかが抜ける。実際、背景が裏で動いていた。
-  */
-  const dialogRef = useOverlayFocus(true, onCancel, false)
-  /* R138: 確認窓の名前として見出しを読ませる（共通 Dialog と同じ作法）。 */
-  const titleId = useId()
-
   const blocked = impactStatus !== 'ready' || !impact || !accountId || saving
   const blockedReason = impactStatus === 'loading'
     ? '影響を確認しています'
@@ -334,25 +315,42 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
       ? '影響を確認できませんでした。時間をおいて開き直してください'
       : ''
 
-  return (
-    <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-overlay" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
-        <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-          <X aria-hidden="true" className="h-5 w-5" />
-        </button>
-        <div>
-          {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-danger-bg text-danger">
-            <TrashIcon />
-          </span>
-          <div className="mt-5 min-w-0">
-            {/* R190: 実行するのは保管（アーカイブ）。削除と書くと消えたように読める。 */}
-            <h2 id={titleId} className="text-xl font-bold text-ink">「{tag.name}」を保管しますか？</h2>
-            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。</p>
-          </div>
-        </div>
+  const archive = async () => {
+              if (!impact || !accountId) return
+              setSaving(true); setSaveError('')
+              try {
+                await api.tags.archive(tag.id, accountId, {
+                  expectedVersion: impact.tag.version,
+                  impactRevision: impact.revision,
+                }, crypto.randomUUID())
+                onArchived()
+              } catch (reason) {
+                /*
+                 * 「もう整理済み」は失敗ではない。着きたかった状態にはもう着いている
+                 * ので、赤い失敗ではなく、成功と同じ通知で見せて一覧を読み直す。
+                 * 409 をそのまま失敗として出すと、利用者からは「押したのに何が
+                 * 起きたか分からない」に見える（#708 の裁定）。
+                 */
+                if (reason instanceof ApiError && reason.code === 'already_archived') {
+                  onArchived('このタグはすでに保管済みです。')
+                  return
+                }
+                setSaveError('保管できませんでした。影響を読み直して、もう一度お試しください。')
+                setSaving(false)
+              }
 
-        {/* 設計 `X3Lkr`。名前・値・結果の3列。 */}
+  }
+  return <Dialog open size="large" tone="destructive" confirmation dirty={false}
+    busy={saving} onCancel={onCancel} title={`「${tag.name}」を保管しますか？`}
+    titleIcon={<Trash2 aria-hidden="true" />} error={saveError || undefined}
+    footerLead={blockedReason}
+    footer={<>
+      <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
+      <Button variant="danger" disabled={blocked || text !== tag.name} busy={saving} onClick={() => void archive()}>このタグを保管する</Button>
+    </>}
+  >
+    <div data-qa-dialog="tag-delete" data-impact={impactStatus}>
+      <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。</p>
         <dl className="mt-5 divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">
           {deleteImpactRows(tag, impact).map((row) => (
             <div key={row.name} className="flex items-baseline gap-3 px-4 py-3">
@@ -379,37 +377,6 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
           <SaveErrorField names={["text"]}><input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></SaveErrorField>
         </label>
-        {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
-        <div className="mt-5 flex items-center justify-end gap-3">
-          {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
-          <Button variant="secondary" className="shrink-0 px-4 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onCancel}>キャンセル</Button>
-          {saveError ? <p role="alert" className="min-w-0 flex-1 text-xs text-danger">{saveError}</p> : null}
-          <Button variant="danger" className="shrink-0 px-4 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={blocked || text !== tag.name} onClick={async () => {
-              if (!impact || !accountId) return
-              setSaving(true); setSaveError('')
-              try {
-                await api.tags.archive(tag.id, accountId, {
-                  expectedVersion: impact.tag.version,
-                  impactRevision: impact.revision,
-                }, crypto.randomUUID())
-                onArchived()
-              } catch (reason) {
-                /*
-                 * 「もう整理済み」は失敗ではない。着きたかった状態にはもう着いている
-                 * ので、赤い失敗ではなく、成功と同じ通知で見せて一覧を読み直す。
-                 * 409 をそのまま失敗として出すと、利用者からは「押したのに何が
-                 * 起きたか分からない」に見える（#708 の裁定）。
-                 */
-                if (reason instanceof ApiError && reason.code === 'already_archived') {
-                  onArchived('このタグはすでに保管済みです。')
-                  return
-                }
-                setSaveError('保管できませんでした。影響を読み直して、もう一度お試しください。')
-                setSaving(false)
-              }
-            }}>{saving ? '保管中…' : 'このタグを保管する'}</Button>
-        </div>
-      </section>
     </div>
-  )
+  </Dialog>
 }
