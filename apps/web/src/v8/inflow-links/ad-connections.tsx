@@ -19,6 +19,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import AdMappingDialog from './ad-mapping-dialog'
 
 /*
  * ★V8 広告とのつなぎ（Pencil `FDBsG`・`/inflow-links?tab=connections`）。
@@ -53,6 +54,7 @@ export default function AdConnectionsV8() {
   const [mapping, setMapping] = useState<MappingState>({ kind: 'loading' })
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [saveError, setSaveError] = useState('')
+  const [editing, setEditing] = useState<AdEventMapping | null>(null)
   const generationRef = useRef(0)
 
   const loadMappings = useCallback(async () => {
@@ -89,7 +91,27 @@ export default function AdConnectionsV8() {
   useEffect(() => {
     setSavingKey(null)
     setSaveError('')
+    setEditing(null)
   }, [accountId])
+
+  const saveMapping = async (item: AdEventMapping, values: Pick<AdEventMapping, 'mode' | 'eventName' | 'googleActionId'>) => {
+    if (!accountId || !manage || savingKey) return false
+    const accountAtStart = accountId
+    setSavingKey(`${item.pointId}:${item.provider}`)
+    try {
+      const result = await api.adPlatforms.saveMapping(item.pointId, {
+        account_id: accountId, provider: item.provider, ...values, expectedVersion: item.version,
+      })
+      if (accountRef.current !== accountAtStart) return false
+      if (!result.success) throw new Error(result.error ?? '対応を保存できませんでした。読み直してからもう一度お試しください。')
+      await loadMappings()
+      if (accountRef.current !== accountAtStart) return false
+      setEditing(null)
+      return true
+    } finally {
+      if (accountRef.current === accountAtStart) setSavingKey(null)
+    }
+  }
 
   /* 結びつけない ⇔ 自動で返す（口が出す自動の名前）。版が合わないと 409（ほかの人が先に変えた）。 */
   const saveMode = async (item: AdEventMapping, mode: 'auto' | 'off') => {
@@ -120,7 +142,9 @@ export default function AdConnectionsV8() {
   }
 
   const nameCell = (item: AdEventMapping | null, label: string) => {
-    if (adMappingReturns(item)) return <span className={styles.cellText} title={item!.eventName ?? ''}>{item!.eventName}</span>
+    if (adMappingReturns(item)) return manage
+      ? <button type="button" className={styles.cellText} title={item!.eventName ?? ''} aria-label={`${item!.pointName} ${item!.provider}の対応を編集`} onClick={() => setEditing(item)}>{item!.eventName}</button>
+      : <span className={styles.cellText} title={item!.eventName ?? ''}>{item!.eventName}</span>
     if (item && manage && item.automaticEventName) {
       return (
         <Select
@@ -128,15 +152,18 @@ export default function AdConnectionsV8() {
           value={item.mode === 'off' ? 'off' : 'auto'}
           width={180}
           disabled={savingKey !== null}
-          onChange={(value) => void saveMode(item, value === 'auto' ? 'auto' : 'off')}
+          onChange={(value) => value === 'manual' ? setEditing(item) : void saveMode(item, value === 'auto' ? 'auto' : 'off')}
           options={[
             { value: 'off', label: '結びつけない' },
             { value: 'auto', label: `自動で返す（${item.automaticEventName}）` },
+            { value: 'manual', label: '名前を指定する' },
           ]}
         />
       )
     }
-    return <span className={styles.cellFaint}>{emptyValue('unknown')}</span>
+    return item && manage
+      ? <button type="button" className={styles.cellFaint} aria-label={`${item.pointName} ${item.provider}の対応を編集`} onClick={() => setEditing(item)}>{emptyValue('unknown')}</button>
+      : <span className={styles.cellFaint}>{emptyValue('unknown')}</span>
   }
 
   if (!accountId) {
@@ -185,6 +212,7 @@ export default function AdConnectionsV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={adsStyles.board} data-design-node="FDBsG">
+      {editing && manage ? <AdMappingDialog key={`${accountId}:${editing.pointId}:${editing.provider}`} item={editing} onClose={() => setEditing(null)} onSave={(values) => saveMapping(editing, values)} /> : null}
       <PageHeading title={<>広告とのつなぎ</>}
         help={<>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</>}
         actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>} />
