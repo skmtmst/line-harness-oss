@@ -63,7 +63,6 @@ shared-button-importer app/common-actions/edit/page.tsx
 shared-button-importer app/duplicates/duplicates-v8.tsx
 shared-button-importer app/ec-commerce/connector-panel.tsx
 shared-button-importer app/ec-commerce/ec-connector-v8.tsx
-shared-button-importer app/ec-commerce/order-detail-drawer.tsx
 shared-button-importer app/ec-commerce/subscriptions-panel.tsx
 shared-button-importer app/emergency/control-v8.tsx
 shared-button-importer v8/events/preview.tsx

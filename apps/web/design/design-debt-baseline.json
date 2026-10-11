@@ -92,9 +92,6 @@
   "app/duplicates/duplicates-v8.tsx": {
     "direct-th": 12
   },
-  "app/ec-commerce/order-detail-drawer.tsx": {
-    "unresolved-classname": 2
-  },
   "app/ec-commerce/page.tsx": {
     "unresolved-classname": 1
   },

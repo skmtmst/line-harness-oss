@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
  *  - 「もう一度やる」は一覧と同じ retry を使い、成功済みの処理は重ねない。
  */
 const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
-const drawer = readFileSync(join(import.meta.dirname, 'order-detail-drawer.tsx'), 'utf8')
+const drawer = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/order-drawer.tsx'), 'utf8')
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('IDEA-23 注文の状況パネルの配線', () => {
@@ -50,7 +50,7 @@ describe('IDEA-23 注文の状況パネルの配線', () => {
   it('再実行は一覧の retry を引き継ぎ、終わったら詳細を読み直す', () => {
     expect(page).toContain('onRetryAction={retry}')
     expect(drawer).toContain('await onRetryAction(action)')
-    expect(drawer).toContain('await load(false)')
+    expect(drawer).toContain('await loadRef.current(false)')
     // 二重実行しない約束を操作の隣に書く
     expect(drawer).toContain('重ねません')
   })
