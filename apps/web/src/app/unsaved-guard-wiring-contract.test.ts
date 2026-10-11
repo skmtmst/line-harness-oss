@@ -70,7 +70,6 @@ const GUARDED = [
   'app/tags/mark-editor-v8.tsx',
   'app/tags/search-editor-v8.tsx',
   'app/tags/searches/edit/page.tsx',
-  'app/templates/carousel/page.tsx',
   'app/templates/editor-v8.tsx',
   'v8/webhooks/create.tsx',
   'v8/conversions/create.tsx',
