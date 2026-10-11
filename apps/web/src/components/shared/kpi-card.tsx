@@ -220,7 +220,7 @@ export default function KpiCard({
             .join(' ')}
         >
           <span data-kpi-number className={styles.number}>{numberText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{numberText !== undefined ? numberText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
-          {numberText !== undefined || statusText ? null : <span className={styles.unit}>{unit}</span>}
+          {(numberText !== undefined && !valueTextWithUnit) || statusText ? null : <span className={styles.unit}>{unit}</span>}
         </p>
       )}
 
