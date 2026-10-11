@@ -114,10 +114,12 @@ describe('予約の支払いの共通口', () => {
     }, env());
     sqlite.exec(`UPDATE bookings SET requested_at='2099-01-01T00:00:00.000Z';
       UPDATE booking_payments SET hold_until='2099-01-01T00:10:00.000Z';`);
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM booking_slot_allocations WHERE id='booking-a'").get()).toEqual({n:1});
     const sender = vi.fn();
     await runExpirer(db, { now: new Date('2099-01-01T00:11:00.000Z'), sender });
     expect(sqlite.prepare("SELECT status FROM booking_payments WHERE booking_id='booking-a'").get()).toEqual({ status: 'expired' });
     expect(sqlite.prepare("SELECT status FROM bookings WHERE id='booking-a'").get()).toEqual({ status: 'expired' });
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM booking_slot_allocations WHERE id='booking-a'").get()).toEqual({n:0});
     expect(sender).not.toHaveBeenCalled();
   });
 

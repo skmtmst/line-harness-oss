@@ -195,13 +195,13 @@ describe('予約のルール approvalMode', () => {
     const response = await liffCreate('paid-auto');
     expect(response.status).toBe(201);
     const body = await response.json() as { booking_id: string; status: string };
-    expect(body.status).toBe('requested');
-    expect(getBooking(body.booking_id).decided_at).toBeNull();
     const started = await app.request('/api/liff/booking/payments/start?liffId=liff-am-1', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fake' },
       body: JSON.stringify({ bookingId: body.booking_id }),
     }, { ...env, STRIPE_TEST_WEBHOOK_SECRET: 'fake-secret' }, execCtx);
     expect(started.status).toBe(201);
+    expect(body.status).toBe('requested');
+    expect(getBooking(body.booking_id).decided_at).toBeNull();
   });
 
   test('manual の店は今までどおり requested で作られる', async () => {
