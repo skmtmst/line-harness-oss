@@ -63,7 +63,7 @@ DC-UI-03追加：本物HolidaysTabで理由入力後の取消・×・Esc・背�
 
 B-241追加・保存した検索：本物の検索編集で主要一覧success:falseを再現。取得失敗なのに重複名なしとして編集できていた。主要一覧とタグの成功を確認してから入力へ渡し、既存の失敗と再取得へ。補助5種類はreferenceErrorsを欄に渡すため個別許可。旧写し1は入口なし。実画面1試験合格。
 
-B-241見張り：本線の全app・v8をASTで走査すると212枝。再現した問題の47枝を除去、現在165枝は全件TSVに記録。個別許可は53（現行14は失敗表示済み・本人権限による省略・未使用補助、旧写し39はV8固定で表示なし）。新規枝・既存枝の書換・コピー増・理由欠落・不要許可をCIで失敗にする。悪い実構文6種類と対照、全画面計10試験合格。
+B-241見張り：本線の全app・v8をASTで走査すると212枝。再現した問題の47枝を除去、現在165枝は全件TSVに記録。個別許可は53（現行14は失敗表示済み・本人権限による省略・未使用補助、旧写し39はV8固定で表示なし）。新規枝・既存枝の書換・コピー増・理由欠落・不要許可をCIで失敗にする。悪い実構文6種類と対照、全画面計10試験合格（最後に抜け道の対照を追加し11試験。下記参照）。
 
 人工データ限定：画面試験の共通準備で、差し替え漏れのHTTPをloopback以外拒否する。API_URLは依頼指定のstaging URLのまま、実通信は人工応答だけに限定。直近の回帰試験で確認済み。
 
@@ -86,3 +86,27 @@ OP-R02 最終全試験で媒体リンクの人工応答漏れを検出。読み�
 UI-K01 型検査：共通入力確認を呼んだ後も保存境界でアカウント有りを確認し、通信引数の型を狭める。重複した定員変数を除去。型検査と実イベント6試験合格。
 
 B-241見張りの対照で、setErrorという変数名だけで新しい空変換を許可していた抜け道を再現。確認済み112枝もファイル・枝の指紋・分類・個数・理由を固定し、新規・書換・コピー増を拒否する。個別例外53件は増やさない。悪い対照が修正前に失敗、修正後の全画面を含む11試験・web型検査・lintが合格。
+
+## 最終検証（2026-10-12、日本時間）
+
+最新本線の取り込みSHAは `593eb582966b41ec035df086bc04568e4c98016e`。画面実装の最終SHAは `33c2ed898026c070e916a7f1333744a9f5ac4ad4`、AST見張り強化は `7e297241af`。その後は検証記録だけの更新。API_URLは全試験で `https://nen-line-stg.skmtmst.workers.dev`、ブラウザ検査はローカル人工応答へ差し替え、loopback以外への実通信を拒否した。
+
+|検証|結果|証拠（このPC）|
+|---|---|---|
+|全workspace試験|全パッケージを実行。Webの最終全試験は2154ファイル、12562成功・1skip・1todo。最後のAST変更は対象11試験を追加確認|`/tmp/revfixb-web-all-final.log`、`/tmp/revfixb-ast-final.log`|
+|Worker|931ファイル、11055成功・30skip|`/tmp/revfixb-worker-tests.log`|
+|DB|377ファイル、2250件。全実行で1件だけ30秒の時間切れ。他の負荷が終わってから当該ファイル26件を単独実行し全成功、当該試験820ms|`/tmp/revfixb-remaining-tests.log`、`/tmp/revfixb-db-solo.log`|
+|その他のパッケージ|docs6・sdk53・shared368・update-engine160・liff425・create52・mcp68成功|`/tmp/revfixb-all-tests.log`、`/tmp/revfixb-tools-tests.log`|
+|型検査|全workspace成功。最終変更後のweb型検査・対象lintも成功|`/tmp/revfixb-all-types.log`、`/tmp/revfixb-types-guard-last.log`、`/tmp/revfixb-lint-guard-last.log`|
+|scripts|tsc成功、test:scriptsは104ファイル928件成功|`/tmp/revfixb-script-types.log`、`/tmp/revfixb-script-tests-final.log`|
+|全ビルド|全パッケージ成功。Webは指定API_URLとCI同様の飲食有効フラグで203ページを生成|`/tmp/revfixb-build-verified.log`、`/tmp/revfixb-other-builds.log`|
+|V8・設計値・持ち主|設計値の見張り成功。持ち主の新規候補0・一時許可0・未許可0。負の対照25件も成功|`/tmp/revfixb-design-verified.log`、`/tmp/revfixb-pattern-last.log`、`/tmp/revfixb-v8-guard-unit.log`|
+|V8・実ブラウザ|本線593eb58と比較。1152/1440/1920のはみ出し0。崩れ198ケースで新規0・測定失敗0|`/tmp/revfixb-runtime/layout.json`、`/tmp/revfixb-runtime/defects.json`|
+|一覧・読み込み・タイトル|行129ケース、骨組み93ケースと負の対照、184ページのタイトル検査を通過|`/tmp/revfixb-runtime/list-rows.json`、`/tmp/revfixb-runtime/list-skeleton.json`、`/tmp/revfixb-runtime/title-audit.tsv`|
+|失敗/再試行・プレビュー|待ち順番の失敗・競合・再試行、流入の操作、1152の右欄折り畳み・1440/1920の日時タブを実ブラウザで確認|`/tmp/revfixb-runtime/stgfix17/results.json`、`/tmp/revfixb-runtime/stgfix18/results.json`|
+
+同類の場所は上のID表と機能別記録、全212枝は `revfix-b-load-failures.tsv`、全116取消口は `revfix-b-overlay-inventory.tsv` に記録。今回の担当IDはすべて再現して修正した。ASTの残存165枝のうち、例外53枝は現行14（権限・明示済み失敗・実行されない補助）と入口のない旧写し39に限定。理由は `apps/web/scripts/load-failure-allowlist.json` とTSV。確認済みの正常112枝も `load-failure-reviewed.json` に個別固定し、新規枝や書換を自動許可しない。
+
+既存の設計値例外25件と本線の既存崩れは増やしていない。このCI検査は462枚のPencil照合の代用とは扱わない。移行ファイル・DB更新・実送信・実決済・push・PR・配備は実施していない。元の点検報告と親リポジトリは変更していない。
+
+最終検証結果・残す枝の理由・仲間の所在を上表に集約。機能ごとのコミットまでで司令塔へ返す。
