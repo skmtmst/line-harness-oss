@@ -527,6 +527,12 @@
   padding-inline-end: var(--tpl-list-inset);
 }
 
+/* 選択＋並び替えの列は、端24・選択16・列間の半分8を確保する。
+   古い40pxのcol指定で名前の開始位置を8px左へ詰めない。 */
+[data-theme='v8'] :global([data-list-skeleton]) .table:has(> tbody > tr > td:first-child input[type='checkbox']):has([data-reorder-handle], [data-reorder-disabled]) > colgroup > col:first-child {
+  width: calc(var(--tpl-list-inset) + var(--polish-icon-control) + var(--tpl-cell-gap-half));
+}
+
 /* 列型も同じ行高。縦の余白は行が持ち、セルの高さを二重に足さない。 */
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] { padding-block: 0; box-sizing: border-box; }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] > :is(th, td) { height: auto; padding-inline: 0; }

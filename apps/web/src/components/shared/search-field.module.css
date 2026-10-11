@@ -138,7 +138,7 @@
 [data-theme='v8'] .input:focus-visible { outline: none; }
 
 [data-theme='v8'] .input {
-  font-size: var(--text-label);
+  font-size: var(--text-body);
 }
 
 /*

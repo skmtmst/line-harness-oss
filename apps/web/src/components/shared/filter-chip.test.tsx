@@ -78,10 +78,10 @@ describe('絞り込み札 FilterChip（m13i）', () => {
     expect((container.querySelector('button') as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('v8 の札は板どおり（高36・内側0/10・間5・角丸999・枠control-border＋薄い影。I3L41O）', () => {
+  it('v8 の札は固定絵の共通寸法を使う（高36・内側0/12・間4・角丸999・枠control-border＋薄い影）', () => {
     expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
-    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*padding:\s*0 10px/s)
-    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*gap:\s*5px/s)
+    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*padding:\s*0 var\(--polish-space-field\)/s)
+    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*gap:\s*calc\(var\(--tpl-toolbar-gap\) \/ 2\)/s)
     expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{\s*[^}]*border-radius:\s*999px/s)
     expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*outline:\s*1px solid var\(--color-control-border\)/s)
   })
