@@ -19,6 +19,10 @@ export function assertStressTargets(result, policy = speedPolicy('local')) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const sample = assertStressTargets(JSON.parse(readFileSync(process.argv[2], 'utf8')), speedPolicy())
+  const result=JSON.parse(readFileSync(process.argv[2], 'utf8'))
+  // 同じ結果を読む場所のCI環境変数で、50ms/65msを入れ替えない。
+  const policy=result.policy?speedPolicy(result.policy.profile):speedPolicy()
+  if(result.policy && (result.policy.timeFactor!==policy.timeFactor || result.policy.sampleCount!==policy.sampleCount)) throw new Error('保存した測定条件が不正です')
+  const sample = assertStressTargets(result, policy)
   console.log(`2,000行: 表示 ${sample.showMs}ms・最大長時間処理 ${sample.longTaskMs}ms・描画 ${sample.renderedRows}行`)
 }
