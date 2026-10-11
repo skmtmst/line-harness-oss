@@ -1,3 +1,4 @@
+import { webhookDemoTargets } from '../services/webhook-demo-targets.js';
 import { parseRestaurantConfirmationPostback, respondToRestaurantConfirmation } from '../services/restaurant-confirmations.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { handleResearchTap } from '../services/research-tap.js';
@@ -1588,11 +1589,9 @@ async function handleEvent(
         const friendRecord = await db.prepare('SELECT user_id FROM friends WHERE id = ?').bind(friend.id).first<{ user_id: string | null }>();
         if (friendRecord?.user_id) {
           // Find the same user on other accounts
-          const otherFriends = await db.prepare(
-            'SELECT f.line_user_id, f.line_account_id, la.channel_access_token, la.channel_access_token_encrypted FROM friends f INNER JOIN line_accounts la ON la.id = f.line_account_id WHERE f.user_id = ? AND f.line_account_id != ? AND f.is_following = 1'
-          ).bind(friendRecord.user_id, lineAccountId).all<{ line_user_id: string; line_account_id: string; channel_access_token: string; channel_access_token_encrypted: string | null }>();
+          const otherFriends = await webhookDemoTargets(db, friendRecord.user_id, lineAccountId);
 
-          for (const other of otherFriends.results) {
+          for (const other of otherFriends) {
             const accessToken = await resolveLineCredential(
               other.channel_access_token_encrypted,
               other.channel_access_token,
