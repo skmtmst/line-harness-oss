@@ -80,7 +80,7 @@ describe('運営メンバーの読み込み失敗', () => {
     expect(host.querySelector('[data-list-state="loading"]')).toBeNull()
     expect(host.querySelector('[data-list-state="empty"]')).toBeNull()
     expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()
-    expect(host.textContent).toContain('運営メンバーを表示できませんでした')
+    expect(host.textContent).toContain('運営メンバーを読み込めませんでした')
     expect(host.textContent).not.toContain('運営メンバーがいません')
   })
 

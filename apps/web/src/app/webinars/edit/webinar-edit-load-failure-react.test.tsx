@@ -102,7 +102,7 @@ describe('ウェビナー編集の読み込み失敗の出し分け（D004）', 
     await render()
 
     // 一覧と同じ共通の通信文面（webinarLoadFailure のその他文）。
-    expect(host.textContent).toContain('ウェビナーを表示できませんでした')
+    expect(host.textContent).toContain('ウェビナーを読み込めませんでした')
     expect(host.textContent).toContain('通信状態を確認して、もう一度読み込んでください')
     expect(retryButton()).not.toBeUndefined()
   })
@@ -139,7 +139,7 @@ describe('ウェビナー編集の読み込み失敗の出し分け（D004）', 
     await act(async () => { retryButton()!.click() })
     await flush()
 
-    expect(host.textContent).not.toContain('ウェビナーを表示できませんでした')
+    expect(host.textContent).not.toContain('ウェビナーを読み込めませんでした')
     expect(host.textContent).not.toContain('通信状態を確認して、もう一度読み込んでください')
     expect(retryButton()).toBeUndefined()
     // 読み直した中身（編集の段）が戻る。

@@ -49,7 +49,7 @@ describe('NEN配信 ゼロ件の表示', () => {
     expect(host.querySelector('nav[aria-label="ページ送り"]')).toBeNull()
     expect(host.querySelector('button[aria-label="次のページ"]')).toBeNull()
     expect(host.textContent).not.toContain('0 件中')
-    expect(host.textContent).toContain('送った履歴を読み込んでいます')
+    expect(host.querySelector('[aria-busy="true"][aria-label="送った履歴を読み込んでいます"]')).toBeTruthy()
   })
   it('履歴のチップは取れない数を「—」で出す', () => {
     const host = draw({ tab: 'history' })

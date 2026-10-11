@@ -122,11 +122,11 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     handler = async (path) => path.startsWith('/api/ad-platforms/logs') ? logs() : pending.promise
 
     await act(async () => { root.render(<AdIntegration />) })
-    expect(host.textContent).toContain('広告連携を読み込んでいます')
+    expect(host.querySelector('[aria-busy="true"][aria-label="広告連携を読み込んでいます"]')).toBeTruthy()
 
     pending.resolve({ success: false, error: { code: 'unavailable', message: 'failed' } })
     await settle()
-    expect(host.textContent).toContain('広告との接続状況を表示できませんでした')
+    expect(host.textContent).toContain('広告との接続状況を読み込めませんでした')
     expect(host.textContent).not.toContain('今月の広告費')
   })
 

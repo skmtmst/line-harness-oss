@@ -227,7 +227,7 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     window.history.replaceState({}, '', '/contents?id=media-a')
     fixture.pendingDetail = { resolve: () => undefined }
     await renderPage()
-    expect(host.textContent).toContain('メディアの詳細を読み込んでいます')
+    expect(host.querySelector('[aria-busy="true"][aria-label="メディアの詳細を読み込んでいます"]')).toBeTruthy()
 
     const pending = fixture.pendingDetail
     fixture.accountId = 'account-b'

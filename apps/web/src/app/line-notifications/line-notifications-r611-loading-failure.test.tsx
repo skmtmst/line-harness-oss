@@ -129,7 +129,7 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
     render(<LineNotificationsPage />)
 
     // 一覧は失敗と再読み込み。
-    await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせを読み込めませんでした')).toBeTruthy())
     // 上部の件数・送信枠は「取得中」のままではなく、取れなかったことを示す。
     await waitFor(() => expect(screen.getByText(/お知らせの件数は取得失敗です/)).toBeTruthy())
     // 板 g3iDs の4枚のうち3枚（今日送った・この30日・今月の送信枠）が取得失敗を示す。
@@ -144,7 +144,7 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせを読み込めませんでした')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => expect(fixture.settings).toHaveBeenCalledTimes(2))

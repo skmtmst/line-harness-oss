@@ -124,7 +124,7 @@ describe('サイトスクリプトの計測状況', () => {
   it('読み込み中は未接続とも失敗とも出さない', async () => {
     gated = true
     await act(async () => { root.render(<SiteScript />) })
-    expect(text()).toContain('サイトの計測状況を読み込んでいます')
+    expect(host.querySelector('[aria-busy="true"][aria-label="サイトの計測状況を読み込んでいます"]')).toBeTruthy()
     expect(text()).not.toContain('未接続')
     expect(text()).not.toContain('読み込めませんでした')
     gated = false

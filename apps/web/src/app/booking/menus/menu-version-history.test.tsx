@@ -74,7 +74,7 @@ describe('版の履歴の引き出し', () => {
   test('読み込み中はその旨を出す', () => {
     fixture.listMenuVersions = () => new Promise(() => {})
     renderHistory()
-    expect(screen.getByText('版の履歴を読み込んでいます')).toBeTruthy()
+    expect(screen.getByLabelText('版の履歴を読み込んでいます').getAttribute('aria-busy')).toBe('true')
   })
 
   test('正常時は版・札・ひとことが並ぶ', async () => {

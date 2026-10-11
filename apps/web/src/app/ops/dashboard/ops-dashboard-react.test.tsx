@@ -241,7 +241,7 @@ describe('画面', () => {
     expect(host.querySelectorAll('[data-list-state="error"]')).toHaveLength(1)
     expect(host.querySelectorAll('[data-list-state="loading"]')).toHaveLength(0)
     expect(host.querySelectorAll('[data-list-state="empty"]')).toHaveLength(0)
-    expect(host.textContent).toContain('ダッシュボードを表示できませんでした')
+    expect(host.textContent).toContain('ダッシュボードを読み込めませんでした')
     // 再読み込みで復帰する。
     fail = false
     const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
@@ -270,7 +270,7 @@ describe('画面', () => {
     await act(async () => { guide!.click() })
     await flush()
     // ダイアログは「読み込んでいます」のままにせず、エラーと再読み込みを出す。
-    expect(document.body.textContent).toContain('未登録の人を表示できませんでした')
+    expect(document.body.textContent).toContain('未登録の人を読み込めませんでした')
     const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     fail = false
