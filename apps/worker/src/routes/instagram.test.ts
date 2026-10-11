@@ -575,6 +575,72 @@ it('模擬応答の種別名・権限名に秘密値のような値が混ざっ�
   );
 });
 
+/**
+ * Meta から応答が返らなかった場合。これまでは `meta_unavailable` だけで、
+ * **どの要求で止まったのか**も**時間切れなのか接続不可なのか**も分からなかった。
+ * 要求の宛先と呼び名を残す（呼び名は許可一覧のみ。自由文の `message` は読まない）。
+ */
+it.each([
+  // 時間切れ（Meta が遅い／通信が出られない）
+  ['TimeoutError', 'TimeoutError'],
+  // つなげなかった（名前が引けない・接続できない・許していない転送）
+  ['TypeError', 'TypeError'],
+  // 許可一覧に無い呼び名は中身を出さない
+  ['abcdefabcdefabcdefabcdefabcdefab', 'other'],
+])(
+  '折り返しの最初の要求で応答が返らないとき、どの要求で止まったかと呼び名（%s）を戻り先URLへ残す',
+  async (thrownName, expected) => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: URL | string, init?: RequestInit) => {
+        if (new URL(String(url)).pathname.endsWith('/oauth/access_token')) {
+          // 応答を返さず投げる。自由文には秘密値のような値を入れておく。
+          const e = new Error(`secret=${thrownName}`);
+          e.name = thrownName;
+          throw e;
+        }
+        return original(url, init);
+      }),
+    );
+    const logged: string[] = [];
+    const spy = vi
+      .spyOn(console, 'error')
+      .mockImplementation((...args: unknown[]) => {
+        logged.push(args.map(String).join(' '));
+      });
+    let location = '';
+    try {
+      const start = await read(await req('/api/instagram/oauth/start', {})),
+        state = new URL(start.data.url).searchParams.get('state')!;
+      const callback = await req(
+        '/api/instagram/oauth/callback?' +
+          new URLSearchParams({ state, code: 'mock_code' }),
+      );
+      expect(callback.status).toBe(302);
+      location = callback.headers.get('location') ?? '';
+    } finally {
+      spy.mockRestore();
+    }
+    const back = new URL(location);
+    expect(back.searchParams.get('instagram')).toBe('failed');
+    expect(back.searchParams.get('instagram_code')).toBe('meta_unavailable');
+    expect(back.searchParams.get('instagram_detail')).toBe(
+      `GET v24.0/oauth/access_token fetch=${expected}`,
+    );
+    // 自由文（`message`）は記録にも戻り先URLにも出さない。
+    const returned = `${location}\n${decodeURIComponent(location)}`;
+    expect(logged.join('\n')).not.toContain('secret=');
+    expect(returned).not.toContain('secret');
+    // 境目でも同じ許可一覧で絞り直す。
+    expect(
+      instagramUrlDetail(
+        'GET v24.0/oauth/access_token fetch=abcdefabcdefabcdefabcdefabcdefab',
+      ),
+    ).toBe('GET v24.0/oauth/access_token fetch=other');
+  },
+);
+
 it('写真DMと受信時刻の順、別アカウントのカーソルを守る', async () => {
   await connect();
   const messages = [
