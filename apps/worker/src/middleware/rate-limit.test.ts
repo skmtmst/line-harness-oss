@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { Hono } from 'hono';
-import { rateLimitMiddleware } from './rate-limit.js';
+import { rateLimitMiddleware, authenticatedRateLimitMiddleware } from './rate-limit.js';
 import type { Env } from '../index.js';
 
 function app() {
@@ -55,6 +55,12 @@ test('SEC-03 forged Bearer sharing a prefix cannot consume another IP bucket',as
  expect((await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.201',Authorization:'Bearer shared-prefix-16-victim'}},env)).status).toBe(200);
 });
 test('unverified credential cannot mint a new IP allowance',async()=>{
- const a=app();for(let i=0;i<1000;i++)await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.202'}},env);
+ const a=app();for(let i=0;i<3000;i++)await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.202'}},env);
  expect((await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.202',Authorization:'Bearer rotated-bogus'}},env)).status).toBe(429);
+});
+
+test('shared NAT retains independent verified staff allowances',async()=>{
+ const a=new Hono<Env>();a.use('*',rateLimitMiddleware);a.use('*',async(c,next)=>{c.set('staff',{id:c.req.header('x-test-staff')!,name:'Test',role:'admin',readOnly:false,tenantId:'tenant'});await next()});a.use('*',authenticatedRateLimitMiddleware);a.get('/api/protected',c=>c.json({success:true}));
+ for(const [id,n] of [['a',600],['b',1000]] as const)for(let i=0;i<n;i++)expect((await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.203','x-test-staff':id}},env)).status).toBe(200);
+ expect((await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.203','x-test-staff':'b'}},env)).status).toBe(429);
 });

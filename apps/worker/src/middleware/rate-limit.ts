@@ -121,7 +121,7 @@ export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<
   } else {
     // 認証前は資格情報の文字列に触れずIPだけで分ける。
     key = `pre-auth-ip:${getClientIp(c)}`;
-    max = AUTHENTICATED_MAX;
+    max = 3000; // 同じ店内ネットワークの複数利用者を合わせた従来の天井。
     windowMs = AUTHENTICATED_WINDOW;
   }
 
