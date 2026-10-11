@@ -13,7 +13,6 @@
  */
 import {
   addTagToFriend,
-  removeTagFromFriend,
   enrollFriendInScenario,
   getFriendFieldById,
   isResourceInScenarioAccount,
@@ -23,6 +22,7 @@ import {
   validateFriendFieldValue,
   type PinnedScenarioAction,
 } from '@line-crm/db'
+import { detachTagAndFireSideEffects } from './friend-tag-attach.js'
 import { executeConfiguredAction } from './action-execution-context.js'
 import type { AutomationActionExecutorDependencies } from './automation-action-executors.js'
 import { runEventBookingAction, validEventBookingAction } from './event-booking-action.js'
@@ -446,7 +446,7 @@ async function executeAction(
       const c = config as TagActionConfig
       const tagIds = await resolveTagIds(db, c, accountId)
       for (const tagId of tagIds) {
-        if (c.op === 'remove') await removeTagFromFriend(db, friendId, tagId)
+        if (c.op === 'remove') await detachTagAndFireSideEffects(db, friendId, tagId, numericEffectKey ? `${numericEffectKey}:remove:${tagId}` : undefined)
         else await addTagToFriend(db, friendId, tagId)
       }
       return false
