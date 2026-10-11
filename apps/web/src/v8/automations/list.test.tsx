@@ -129,6 +129,18 @@ const buttons = () => [...host.querySelectorAll('button, a')] as HTMLElement[]
 const named = (text: string) => buttons().filter((element) => (element.textContent ?? '').trim() === text)
 
 describe('V8 オートメーションのルール一覧（LWQXd）', () => {
+  it('旧一覧の削減時間は現在の説明へ残し、未取得を0時間にしない', async () => {
+    vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: automations, summary: null })
+    await render(<AutomationListV8 />)
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="オートメーションの説明"]')!.click() })
+    expect(host.textContent).toContain('削減時間はまだ数えられていません')
+    expect(host.textContent).not.toContain('およそ0時間')
+    account.id = 'account-b'
+    await render(<AutomationListV8 />)
+    expect(host.textContent).toContain('およそ3時間の削減')
+    expect(host.textContent).toContain('1回30秒として計算しています')
+  })
+
   async function chooseRowAction(label: string) {
     await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')!.click() })
     const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((node) => node.textContent?.trim() === label)!
