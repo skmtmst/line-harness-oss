@@ -2,6 +2,7 @@
 
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import React from 'react'
+import { useTableActionWidth } from './use-table-action-width'
 import { useListUrlState } from './list-url-state'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import TruncatedText from './truncated-text'
@@ -94,11 +95,12 @@ export function Th({
     .join(' ')
 
   const hasHelp = help !== undefined && help !== null
+  const actionHeading = children === '操作'
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
 
   return (
     <th className={classes} data-align={align} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
-      {truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
+      {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
           {help}
@@ -129,8 +131,8 @@ export function DataTable({
   children: ReactNode
   className?: string
   'data-design'?: string
-  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表。指定した表だけに適用する。 */
-  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list'
+  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
@@ -142,10 +144,11 @@ export function DataTable({
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
   grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
 }) {
+  const actionWidthRef = useTableActionWidth<HTMLDivElement>()
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <div ref={actionWidthRef} data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -232,7 +235,7 @@ export function Tr({ children, className, selected, interactive, href, onOpen, d
 
 /** 名前はその物のページへ。件数等のリンクはこの印を付けない。 */
 export function RowNameLink({ onOpen, onClick, ...props }: React.ComponentProps<typeof PageLink> & { onOpen?: () => void }) {
-  return <PageLink {...props} data-row-link="" data-row-local-open={onOpen ? '' : undefined} onClick={event => {
+  return <PageLink {...props} className={[props.className, styles.rowNameLink].filter(Boolean).join(' ')} data-row-link="" data-row-local-open={onOpen ? '' : undefined} onClick={event => {
     onClick?.(event)
     if (!onOpen || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
     event.preventDefault()
@@ -279,7 +282,7 @@ export function HandleCell({ children }: { children?: ReactNode }) {
 
 /** 行の右端に置く操作列。 */
 export function ActionCell({ children, className }: { children?: ReactNode; className?: string }) {
-  return <td className={[shell.bodyCell, shell.actionCell, className].filter(Boolean).join(' ')}>{children}</td>
+  return <td data-list-action-cell="" className={[shell.bodyCell, shell.actionCell, className].filter(Boolean).join(' ')}>{children}</td>
 }
 
 export type SortDirection = 'asc' | 'desc' | 'none'

@@ -60,7 +60,7 @@ export default function LinePreview({
    */
 
     return (
-      <section aria-label="LINEでの見え方" className={styles.phoneRoot} data-fit={fit || undefined}>
+      <section aria-label="LINEでの見え方" className={styles.phoneRoot} data-line-preview-part="phone" data-fit={fit || undefined}>
         {/* 題は列の左、スマホはその下の真ん中。テンプレートでは「届き方」や外側の題を使う。 */}
         {title !== null ? <p className={styles.phoneTitle}>
           <span>{title}</span>

@@ -570,8 +570,10 @@ jobs:
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "compare=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "compare=true" >> "$GITHUB_OUTPUT"
           if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
             | grep -qE '^(apps/web/|packages/shared/|scripts/visual-qa/|pnpm-lock\.yaml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -593,6 +595,16 @@ jobs:
           pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
           pnpm --filter web build
           mv apps/web/out /tmp/head-out
+      - name: Build the base admin against the same mock API
+        if: steps.scope.outputs.run == 'true' && steps.scope.outputs.compare == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add /tmp/base "$BASE_SHA"
+          cd /tmp/base
+          pnpm install --frozen-lockfile
+          pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
+          pnpm --filter web build
       - name: Install Chromium for the V8 screen guard
         if: steps.scope.outputs.run == 'true'
         run: pnpm exec playwright install --with-deps chromium
@@ -601,10 +613,14 @@ jobs:
         run: |
           node scripts/visual-qa/mock-api.mjs > /tmp/mock-api.log 2>&1 &
           node apps/web/scripts/v8-guard/serve-out.mjs /tmp/head-out 4310 > /tmp/serve-head.log 2>&1 &
+          if [ "${{ steps.scope.outputs.compare }}" = "true" ]; then
+            node apps/web/scripts/v8-guard/serve-out.mjs /tmp/base/apps/web/out 4311 > /tmp/serve-base.log 2>&1 &
+          fi
           ready=false
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:4310/friends > /dev/null \
-              && curl -sf 'http://127.0.0.1:8788/api/friends?account_id=visual-qa-account' > /dev/null; then
+              && curl -sf 'http://127.0.0.1:8788/api/friends?account_id=visual-qa-account' > /dev/null \
+              && { [ "${{ steps.scope.outputs.compare }}" != "true" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
               ready=true
               break
             fi
@@ -621,10 +637,16 @@ jobs:
       # B-191/192 と B-187 はここに一本化。blank-gap.mjs を別ステップで重ねない。
       - name: Broken fixtures must fail the V8 layout guard
         if: steps.scope.outputs.run == 'true'
-        run: node --test apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs
-      - name: No new overlap, wrap, squash, clipping, touching or blank space on V8
+        run: node --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs
+      - name: Train 17 waitlist failure and inflow mouse regressions
         if: steps.scope.outputs.run == 'true'
-        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json
+        run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
+      - name: Booking preview date agrees through settings and preview tabs
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
+      - name: No new V8 layout or owner-rule defects (B-191 through B-218)
+        if: steps.scope.outputs.run == 'true'
+        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
       - name: List row rules (B-190/193/194/195/198, with negative controls)
         if: steps.scope.outputs.run == 'true'
         run: |
@@ -642,13 +664,14 @@ jobs:
       # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
       # 道具の対照は speed-budget.mjs の頭に書いた。
       - name: Speed measurement and reference policy controls
-        if: steps.scope.outputs.run == 'true'
-        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs
-      - name: Speed budget on V8 (10 screens on a real browser)
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
+      - name: Common V8 speed checks (11 scenes, five medians)
         id: speed_budget
         # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
         continue-on-error: true
-        if: steps.scope.outputs.run == 'true'
+        # 画面の必須検査が落ちても、速度は別に測って原因を分ける。
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
         env:
           V8_SPEED_PROFILE: ci
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -660,7 +683,11 @@ jobs:
             allow_js=1
             echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
           fi
-          ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+          ALLOW_JS_BASELINE_UPDATE="$allow_js" pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
+      - name: Train 17 absolute targets (reference)
+        continue-on-error: true
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        run: node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json
       - name: 2000 friends meet absolute speed targets (reference)
         id: stress_speed
         # 速度だけ参考。測れなかったときも失敗を残し、次の工程で警告する。
@@ -694,6 +721,15 @@ jobs:
             /tmp/v8-guard/
             /tmp/mock-api.log
             /tmp/serve-head.log
+          retention-days: 7
+
+      - name: Upload separate speed diagnosis traces
+        if: always() && steps.scope.outputs.run == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v8-speed-diagnosis
+          path: /tmp/v8-guard/speed.json.diagnosis/
+          if-no-files-found: ignore
           retention-days: 7
 
   required-pr-gate:

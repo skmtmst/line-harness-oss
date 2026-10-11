@@ -3,6 +3,7 @@
 import React, { forwardRef, useEffect, useId, useState, useRef } from 'react'
 import type {
   ComponentPropsWithoutRef,
+  CSSProperties,
   ReactNode,
 } from 'react'
 import { FieldContext } from './field-context'
@@ -72,6 +73,7 @@ export function Field({
   density,
   grow,
   fill,
+  contentGap,
   children,
 }: {
   label?: ReactNode
@@ -111,6 +113,12 @@ export function Field({
    * 読み上げは欄の説明（aria-describedby）につなぐ。
    */
   count?: { value: number; max: number }
+  /**
+   * 題と中身の間を絵の値（px）にする。既定は 14（題の下 8＋段の間 6）で、
+   * 絵の間がそれと違う欄だけ渡す。渡さない欄はいままでの 14 のまま。
+   * 画面CSSから共通の欄を上書きしないための任意の引数（★V8 設計の決まり §2）。
+   */
+  contentGap?: number
   children: ReactNode
 }) {
   const baseId = useId()
@@ -123,7 +131,7 @@ export function Field({
     if (!fieldRef.current || typeof fieldRef.current.querySelector !== 'function') return
     const control = fieldRef.current.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type=number]):not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]),textarea')
     if (control) { if (!control.id) control.id = controlId; setDetectedId(control.id); if (!control.hasAttribute('aria-label') && typeof shownLabel === 'string') control.setAttribute('aria-label', shownLabel) }
-    const next = control && control.maxLength >= 0 ? { value: control.value.length, max: control.maxLength } : undefined
+    const next = control && !fieldRef.current.querySelector('[data-message-character-count]') && control.maxLength >= 0 ? { value: control.value.length, max: control.maxLength } : undefined
     setAutoCount(previous => previous?.value === next?.value && previous?.max === next?.max ? previous : next)
     setAutoRequired(Boolean(control?.required || control?.getAttribute('aria-required') === 'true'))
   }
@@ -168,6 +176,8 @@ export function Field({
       data-field-size={size}
       data-field-fill={fill || undefined}
       data-field-quiet={quiet && error ? '' : undefined}
+      data-field-content-gap={contentGap === undefined ? undefined : ''}
+      style={contentGap === undefined ? undefined : ({ '--field-content-gap': `${contentGap}px` } as CSSProperties)}
       onInput={() => { syncControl(); if (error && !quiet) setQuiet(true) }}
       onBlur={quiet ? () => setQuiet(false) : undefined}
     >

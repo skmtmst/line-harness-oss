@@ -15,7 +15,7 @@
 
 ## 呼ぶ口（今の画面と同じ `restaurantGoogleApi`）
 - 接続：`connection`（＋店舗を選ぶ欄のために `restaurantTestApi.snapshot` の店舗）。店舗を選ぶと、その店舗の LINE アカウントへ切り替える。
-- 口コミ：`listReviews`（評価・状態・並び・検索 300ms・20件ずつ）、`syncReviews`（最終同期が古いと開いたとき1回）、`review`・`generateDraft(new|shorter|polite)`・`saveDraft`・`publishReply`（409 already_replied・502 の扱いも同じ）。
+- 口コミ：`listReviews`（評価・状態・並び・検索 300ms・20件ずつ）、`syncReviews`（最終同期が古いと開いたとき1回）、`review`・`generateDraft`（押すだけ。長さや調子の指定は無い）・`saveDraft`・`publishReply`（409 already_replied・502 の扱いも同じ）。
 - 投稿：`posts`（状態・種類で絞る）・`syncPosts`・`cancelPost`・`removePost`（確認の小窓）・`post`・`createPost`・`savePost`・`publishPost`。画像は登録メディアから選ぶか、端末からアップロード（道具は入口が渡す。src/v8 から @/app を読まないため）。
 - パフォーマンス：`performance(7|28|90)`（既定28日）。
 - プロフィール：`profile`・`syncProfile`・`proposeHours`（今日を休みにする・今日は早く閉める → 変更の確認へ）。

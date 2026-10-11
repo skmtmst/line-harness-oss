@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDayStartIso } from '@/lib/jst-datetime'
+
+
 /*
  * ★V8 店舗ダッシュボード（Pencil `CHz31`）。
  *
@@ -101,7 +104,7 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
 
 export default function StoresDashboardV8() {
   /* 今の画面と同じ「今日以降の有効予約」の取り方（R103/R104）。 */
-  const [todayStartIso] = useState(() => { const day = new Date(); day.setHours(0, 0, 0, 0); return day.toISOString() })
+  const [todayStartIso] = useState(() => jstDayStartIso())
   const query = useMemo(() => ({ from: todayStartIso, status: 'pending,confirmed,seated,visited', limit: 500, offset: 0 }), [todayStartIso])
   return (
     <RestaurantFrame

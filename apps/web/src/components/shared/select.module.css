@@ -123,8 +123,8 @@
 :root .invalid .trigger { outline-color: var(--color-danger); }
 :root .chevron { flex-basis: 14px; }
 }
-/* ★V8 表示件数の選ぶ欄は幅96（c4n9Kr「選ぶ 表示件数」）。司令塔 2026-10-06 */
-:root .pageSize { width: 96px; min-width: 96px; }
+/* B-192: 表示件数は文字と矢印の幅を保つ。96では「20 件表示」が切れる。 */
+:root .pageSize { width: 100px; min-width: 100px; flex-shrink: 0; }
 
 /*
  * ★V8「枠なしの並び替え」（x6QsVz：枠なし文字＋上下矢印）。
@@ -177,6 +177,17 @@
  * 決まった幅の箱（会話の頭・よく使う絞り込み）は今のまま。
  */
 :root .full .leadingIcon + .value {
+  flex: 1;
+  text-align: left;
+}
+
+/*
+ * 決まった幅の箱でも、絵が「図柄のすぐ右から文字」と描いているときは
+ * `valueAlign="start"` を渡して同じ寄せ方にする
+ * （★V8 デリバリー受注の注文履歴 OzHLO：余白12・印15・間6で文字は x1120 から）。
+ * 渡さない箱は上の両端寄せのまま。
+ */
+:root .trigger[data-value-align='start'] .leadingIcon + .value {
   flex: 1;
   text-align: left;
 }

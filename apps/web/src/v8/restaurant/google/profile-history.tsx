@@ -1,4 +1,6 @@
 'use client'
+
+import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -84,7 +86,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       const a = document.createElement('a')
       a.href = url
-      a.download = `google-business-changes-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `google-business-changes-${jstDate()}.csv`
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {

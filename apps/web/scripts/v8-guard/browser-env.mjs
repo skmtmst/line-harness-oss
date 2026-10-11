@@ -10,7 +10,7 @@
 export const ROUTES = {
   dashboard: '/',
   friends: '/friends',
-  'friend-detail': '/friends/detail?id=f-1',
+  'friend-detail': '/friends/detail?id=friend-1',
   'scenario-detail': '/scenarios/detail?id=scenario-0-paused',
   inbox: '/chats',
   'broadcast-new': '/broadcasts/new',
@@ -33,19 +33,25 @@ const SESSION = {
   lh_selected_account: 'visual-qa-account',
 }
 
-export async function openPage(browser, { baseUrl, route, width, stable = false, settleMs = 2500, onPageError }) {
+export async function openPage(browser, { baseUrl, route, width, stable = false, settleMs = 2500, onPageError, requireSuccess = false }) {
   const page = await browser.newPage({
     viewport: { width, height: 900 },
     ...(stable ? { reducedMotion: 'reduce' } : {}),
   })
   try {
+    if (process.env.V8_GUARD_STUB_API === '1') {
+      const { stubApi } = await import('./speed-budget.mjs')
+      const { mockFetch } = await import('./mock-local.mjs')
+      await stubApi(page, mockFetch)
+    }
     if (onPageError) page.on('pageerror', onPageError)
     if (stable) await page.clock.setFixedTime(new Date('2026-10-01T05:00:00Z'))
     await page.addInitScript((session) => {
       for (const [k, v] of Object.entries(session)) localStorage.setItem(k, v)
       localStorage.setItem('lh_auth_selection_cleared', '1')
     }, SESSION)
-    await page.goto(new URL(route, baseUrl).toString())
+    const response = await page.goto(new URL(route, baseUrl).toString())
+    if (requireSuccess && (!response || !response.ok())) throw new Error(`指定画面のHTTP応答が正常ではありません: ${response?.status() ?? 'なし'}`)
     if (stable) {
       await page.addStyleTag({
         /*

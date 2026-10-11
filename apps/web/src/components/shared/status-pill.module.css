@@ -57,3 +57,8 @@
 :root .pill[data-tone='neutral'] { --status-dot: var(--polish-status-neutral-dot); --status-bg: var(--polish-status-neutral-bg); --status-ink: var(--polish-status-neutral-ink); }
 :root .pill .dot { width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); background: var(--status-dot); }
 :root .pill.control[data-tone] { background: var(--status-bg); color: var(--status-ink); }
+
+/* B-191/192：4文字の状態を数文字に切らない。列の中で縮めない。 */
+html:root .pill { flex-shrink: 0; min-width: max-content; }
+/* 状態の隣の短い対応マークも、札の幅を確保した分だけ切らない。 */
+html:root .pill + [title^='対応マーク：'] { flex-shrink: 0; }

@@ -18,6 +18,7 @@ export type DrawerProps = {
   title: string
   titleAccessory?: ReactNode
   description?: ReactNode
+  contentSpacing?: 'sections'
   dirty?: boolean
   busy?: boolean
   error?: string
@@ -51,6 +52,7 @@ export default function Drawer({
   title,
   titleAccessory,
   description,
+  contentSpacing,
   dirty,
   busy = false,
   error,
@@ -124,7 +126,7 @@ export default function Drawer({
           {closeButton}
         </header>
       )}
-      <div className={`${styles.body} ${modal ? '' : styles.inlineBody}`}>
+      <div className={`${styles.body} ${modal ? '' : styles.inlineBody}`} data-content-spacing={contentSpacing}>
         {details ? <dl className={styles.rows}>{details.map((detail) => <div className={styles.row} key={detail.label}><dt>{detail.label}</dt><dd className={styles.rowValue}>{detail.value}</dd></div>)}</dl> : children}
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}

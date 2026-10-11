@@ -55,7 +55,7 @@ export default function BookingHistory() {
           onClick={() => setTab('upcoming')}
           className="py-3 text-sm font-semibold transition-colors"
           style={{
-            background: tab === 'upcoming' ? '#06C755' : '#fff',
+            background: tab === 'upcoming' ? 'var(--customer-primary, #06C755)' : '#fff',
             color: tab === 'upcoming' ? '#fff' : '#6b7280',
           }}
         >
@@ -65,7 +65,7 @@ export default function BookingHistory() {
           onClick={() => setTab('past')}
           className="py-3 text-sm font-semibold transition-colors"
           style={{
-            background: tab === 'past' ? '#06C755' : '#fff',
+            background: tab === 'past' ? 'var(--customer-primary, #06C755)' : '#fff',
             color: tab === 'past' ? '#fff' : '#6b7280',
           }}
         >

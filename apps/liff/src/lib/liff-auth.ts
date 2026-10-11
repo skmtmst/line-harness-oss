@@ -1,11 +1,13 @@
 import { mergeLiffStateSearch } from '@line-crm/shared';
 import liff from '@line/liff';
+import { setCustomerLiffRuntime, type CustomerLiffRuntime } from './liff-runtime.js';
 
 let _liffId: string | null = null;
 let _lineUserId: string | null = null;
 let _idToken: string | null = null;
 
 export async function initLiff(): Promise<void> {
+  setCustomerLiffRuntime(null);
   const search = mergeLiffStateSearch(window.location.search);
   if (search !== window.location.search) window.history.replaceState(window.history.state, '', `${window.location.pathname}${search}${window.location.hash}`);
   const url = new URL(window.location.href);
@@ -41,7 +43,8 @@ export function getIdToken(): string {
 }
 
 /** Worker の既存LIFF入口で認証済みの文脈を、共用画面へ渡す。 */
-export function setLiffContext(context: { liffId: string; lineUserId: string; idToken: string }): void {
+export function setLiffContext(context: { liffId: string; lineUserId: string; idToken: string; sdk?: CustomerLiffRuntime }): void {
+  setCustomerLiffRuntime(context.sdk ?? null);
   _liffId = context.liffId;
   _lineUserId = context.lineUserId;
   _idToken = context.idToken;

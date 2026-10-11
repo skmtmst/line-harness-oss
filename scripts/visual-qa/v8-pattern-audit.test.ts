@@ -70,6 +70,61 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('LIFFの正の手順のimportだけを認め、同名の自作と隣の違反は止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/liff/src/pages/seat/reserve.tsx'
+    put(root, 'apps/liff/src/components/ui/Stepper.tsx', 'export default function Stepper() { return null }')
+    const audit = () => run({ code: root, only: ['steps', 'field-error', 'date-time', 'toggle'] })
+    put(root, rel, "import Stepper from '../../components/ui/Stepper.js';\nexport const P = () => <Stepper appearance=\"restaurant\" steps={[]} current={0} />")
+    expect(audit().code.a.steps).toEqual([])
+    put(root, rel, 'function Stepper() { return null }; export const P = () => <Stepper />')
+    expect(audit().code.a.steps.map((h: { signal: string }) => h.signal)).toEqual(['old-stepper'])
+    put(root, rel, "import Stepper from './Stepper.js';\nexport const P = () => <Stepper />")
+    expect(audit().code.a.steps.map((h: { signal: string }) => h.signal)).toEqual(['old-stepper'])
+    put(root, rel, "import Stepper from '../../components/ui/Stepper.js';\nexport const P = () => <><Stepper /><p role=\"alert\">失敗</p><input type=\"date\" /><div role=\"radiogroup\" /></>")
+    const result = audit()
+    expect(result.code.a['field-error'].some((h: { signal: string }) => h.signal === 'raw-alert')).toBe(true)
+    expect(result.code.a['date-time'].some((h: { signal: string }) => h.signal === 'native')).toBe(true)
+    expect(result.code.a.toggle.some((h: { signal: string }) => h.signal === 'switch')).toBe(true)
+  })
+
+  it('共通のFieldとFormFieldを認識しても、隣の手書きエラーは止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/demo/error.tsx'
+    const audit = () => run({ code: root, only: ['field-error'] })
+    for (const component of ['Field', 'FormField']) {
+      put(root, rel, `export const P = () => <${component} error={error}><TextField /></${component}>`)
+      expect(audit().code.reach['field-error'].files).toBe(1)
+      expect(audit().code.a['field-error']).toEqual([])
+      put(root, rel, `export const P = () => <><${component} error={error}><TextField /></${component}><p role="alert">失敗</p></>`)
+      expect(audit().code.a['field-error'].map((h: { signal: string }) => h.signal)).toEqual(['raw-alert'])
+    }
+  })
+
+  it('共通の表への動きの追加・改行は通し、上書きの変更・増殖は止める', () => {
+    const { root } = fixture()
+    const rel = 'apps/web/src/v8/demo/table.tsx'
+    const css = 'apps/web/src/v8/demo/table.module.css'
+    const beforeSource = "import styles from './table.module.css'\nexport const P = () => <Tr key={row.id} className={styles.row}><Td className={styles.cell}>名前</Td></Tr>"
+    const afterSource = "import styles from './table.module.css'\nexport const P = () => <Tr key={row.id} className={styles.row} detailKey=\"affiliate\" onOpen={() => { open(row.id) }}>\n<Td className={styles.cell}>別の名前</Td>\n</Tr>"
+    const goodCss = '.row { color: var(--color-ink); display: grid; }\n.cell { font-size: var(--text-caption); }'
+    put(root, rel, beforeSource)
+    put(root, css, goodCss)
+    const audit = () => run({ code: root, only: ['table'] })
+    const before = audit()
+    put(root, rel, afterSource)
+    expect(newCodeFindings(before, audit())).toEqual([])
+    put(root, css, goodCss.replace('--color-ink', '--color-danger'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:className')).toBe(true)
+    put(root, css, goodCss)
+    put(root, rel, afterSource.replace('className={styles.row}', 'className="text-red-500"'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:className')).toBe(true)
+    put(root, rel, `${afterSource}\nexport const Extra = () => <Tr className={styles.row} />`)
+    expect(newCodeFindings(before, audit()).filter((h: { kind: string }) => h.kind === 'prop:className')).toHaveLength(1)
+    put(root, rel, afterSource.replace('className={styles.row}', 'style={{ color: "var(--color-danger)" }}'))
+    expect(newCodeFindings(before, audit()).some((h: { kind: string }) => h.kind === 'prop:style')).toBe(true)
+  })
+
   it('CLIはbaseとの比較で違反を拒否し、行移動と持ち主への委譲は許可する', () => {
     const { root, pen } = fixture()
     execFileSync('git', ['init', '-q'], { cwd: root })
@@ -190,4 +245,17 @@ describe('型の対応表の点検', () => {
     expect(judgePenInstances([], ['border-radius'])).toEqual([])
     expect(readFileSync(DEFAULT_CATALOG, 'utf8')).toContain('"owner"')
   })
+})
+
+it('顧客欄とLIFF外枠は共通部品の利用を認識し、同じ名前の自作は引き続き止める', () => {
+  const root = mkdtempSync(join(tmpdir(), 'pattern-canonical-'))
+  const file = 'apps/web/src/v8/demo/panel.tsx'
+  put(root, file, 'export function FriendInfoSidebar() { return <CustomerInfoPanel /> }\nexport function FormPhone() { return <LiffPhoneFrame /> }\nexport function OverviewTab() { return <CustomerInfoRail><aside /></CustomerInfoRail> }')
+  const good = run({code:root,only:['customer-info','phone-preview','detail-panel']})
+  expect(Object.values(good.code.a).flat()).toEqual([])
+  put(root, file, 'export function FriendInfoSidebar() { return <div>顧客情報をすべて表示</div> }\nexport function FormPhone() { return <div /> }\nexport function OverviewTab() { return <aside /> }')
+  const broken = run({code:root,only:['customer-info','phone-preview','detail-panel']})
+  expect(broken.code.a['customer-info'].length).toBeGreaterThan(0)
+  expect(broken.code.a['phone-preview'].length).toBeGreaterThan(0)
+  expect(broken.code.a['detail-panel'].length).toBeGreaterThan(0)
 })

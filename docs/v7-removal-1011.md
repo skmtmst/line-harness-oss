@@ -3367,3 +3367,87 @@
 - 共通部品所有検査は最終版でも184候補・未許可184・終了1。列車17とのファイル移動、テーマ指定を外した同じCSS、JSXの分岐除去、試験の土台、旧だけの動作の移植を含む。生の候補一覧と読み取りだけの来歴調査を証拠フォルダへ保存。候補を共有部品へ直す/同じ表示の移動として扱う判断は司令塔が行う。通常V8の中身や並びを変える修正、検査の無効化/基準や一時許可の追加による通過はしていない。
 - 司令塔の所有パス検査では `docs/brain/rules/corrections.md`（再開時の修正指示の記録）と `docs/v8-board-to-code.md`（消した旧写し5行の現役パスへの訂正）が対象になる。laneのまま統合せず、司令塔の正規経路で扱う。保護ゲートは変更していない。
 - 残る判断は機能の削除漏れではなく、上記の所有検査と本文の最小移植の入口の確認。完全完了/必須CI全件合格とは報告しない。コミットまでで止め、push/PR/D1/配備は行わない。
+
+## v7rm3 本線の取り込み（2026-10-12 依頼）
+
+- 検証する本線: `aba7e15838abccb4f8d1f8ab417139be66f420ac`（150コミット）。開始時: `30e04bd594b3ef8be891f4fffdd86735b45aa371`。`--no-ff` の取り込み。
+- 競合69ファイル（内容42・削除/変更27）。本線の動作と新しい試験を残し、古い入口への修正をV8の実際の入口へ移した。
+- 個々の取り込み差分は `~/lh-work/design/v8/codex-handoff/v7rm3-1012-evidence/` に保存。
+
+| ファイル | 残した側・解き方 | 移した修正・確認 |
+| --- | --- | --- |
+| `.github/workflows/required-pr-gate.yml` | 本線の追加ゲート＋この枝のV8固定 | base比較・速さ・重なり等の新しい検査を残し、V7への切り替えを除いた |
+| `apps/web/scripts/v8-guard/browser-env.mjs` | 本線のAPIスタブ・HTTP成功検査＋V8固定 | テーマの保存処理だけ除いた |
+| `apps/web/src/app/affiliates/tabs.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/affiliates/v8-drawer.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/automations/automation-load-state-contract.test.ts` | 本線の動作・試験＋V8固定 | 古い分岐や旧参照を戻さず、同じ動作をV8の入口で残した |
+| `apps/web/src/app/automations/page.tsx` | V8だけの入口 | 一覧の操作失敗を再取得で消さない本線の修正をv8/automations/list.tsxへ移した |
+| `apps/web/src/app/booking/menus/liff-phone-v8.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/booking/menus/menu-version-history.test.tsx` | 本線の追加試験をV8へ | 409の通知が再取得成功で消えないことを、読み直し済みのV8の文言で確かめる |
+| `apps/web/src/app/booking/menus/menu-version-history.tsx` | 旧ファイルは削除を継続 | V8の版の履歴へ、useActionErrorと再取得時に失敗理由を残す修正を移した |
+| `apps/web/src/app/booking/staff/shifts/staff-detail-v8.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/booking/staff/shifts/staff-detail.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/conversions/conversion-points-v8.react.test.tsx` | 本線の動作・試験＋V8固定 | 古い分岐や旧参照を戻さず、同じ動作をV8の入口で残した |
+| `apps/web/src/app/conversions/conversion-points-v8.tsx` | 旧ファイルは削除を継続 | 本線で直した確認画面の表現がV8にあることを確認 |
+| `apps/web/src/app/friends/identity-candidates/identity-candidates-v8.tsx` | 旧ファイルは削除を継続 | 本線で直した確認画面の表現がV8にあることを確認 |
+| `apps/web/src/app/globals.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/app/inflow-links/ad-integration.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/line-notifications/operator-notification-rules.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/mileage/action-score-tab.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/mileage/friends/detail/v8-friend-detail.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/mileage/mileage-history-tab.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/mileage/page.tsx` | 本線の動作・試験＋V8固定 | 古い分岐や旧参照を戻さず、同じ動作をV8の入口で残した |
+| `apps/web/src/app/mileage/v8-balances-tab.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/mileage/v8-earning-rules-tab.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/mileage/v8-history-tab.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/nen-members/photo-policy-history-v8.tsx` | 旧ファイルは削除を継続 | 本線の共通の規約履歴をV8の写真確認が直接参照している |
+| `apps/web/src/app/nen-members/photo-review-v8.test.tsx` | 本線の日本時刻＋V8試験 | 日本時間00:09・共通の日時選択・共通の規約履歴を残した |
+| `apps/web/src/app/nen/health/health-v8.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/nen/pets/page.tsx` | 本線の動作・試験＋V8固定 | 古い分岐や旧参照を戻さず、同じ動作をV8の入口で残した |
+| `apps/web/src/app/ops/audit/page.tsx` | 本線の動作・試験＋V8固定 | 古い分岐や旧参照を戻さず、同じ動作をV8の入口で残した |
+| `apps/web/src/app/restaurant-test/google/google-business.tsx` | 旧ファイルは削除を継続 | V8の口コミへ、下書きAPIの引数を本線と同じ形で残した |
+| `apps/web/src/app/restaurant-test/google/google-format.ts` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/app/restaurant-test/google/google-profile.tsx` | 旧ファイルは削除を継続 | V8の店舗情報の履歴へ、CSVの日付を日本時間にする修正を移した |
+| `apps/web/src/app/restaurant-test/v8/reservations.tsx` | 旧ファイルは削除を継続 | V8の今日の予約は本線のReservationBoardを使う。古い時刻線の手書き処理は使わない |
+| `apps/web/src/app/rich-menus/edit/publish-step-v8-react.test.tsx` | 本線の動作・試験＋V8固定 | 古い分岐や旧参照を戻さず、同じ動作をV8の入口で残した |
+| `apps/web/src/app/settings/settings-nav-v8.tsx` | 旧ファイルは削除を継続 | 本線の設定ナビ共通部品とV8の設定入口を残した |
+| `apps/web/src/app/tags/mark-editor-v8.tsx` | 旧ファイルは削除を継続 | 本線で直した確認画面の表現がV8にあることを確認 |
+| `apps/web/src/app/webhooks/api-tokens-panel.tsx` | 旧ファイルは削除を継続 | V8のAPIキー管理に、操作失敗の保持と更新開始時の初期化があることを確認 |
+| `apps/web/src/app/webhooks/apitokens-v8.tsx` | 旧ファイルは削除を継続 | 日本時間の日付・月の範囲・CSV名等の本線の修正がV8または共通日時処理にあることを確認 |
+| `apps/web/src/components/chats/friend-info-sidebar.tsx` | 本線の顧客情報共通部品・表示 | 古いプロフィールの二重表示を除き、相対日時・購入欄・タグ件数を残した |
+| `apps/web/src/components/friend-fields/tags-page-v4.tsx` | 旧一覧は削除・再利用中の確認欄のみ残す | アカウント変更時の操作失敗初期化をv8/tags/tags-tab.tsxへ移した |
+| `apps/web/src/components/scenarios/insert-toolbar.tsx` | 本線のMessageInsertRow/Button | V8固定にした共通の挿入操作を残した |
+| `apps/web/src/components/shared/button.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/button.tsx` | 本線の幅予約＋V8固定 | 旧テーマで止める条件だけ除いた |
+| `apps/web/src/components/shared/card.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/check-card.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/data-table.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/dialog.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/filter-chip.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/folder-dot.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/grid-table.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/kpi-band-v8.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/kpi-card.tsx` | 本線の説明有無の印＋V8固定 | data-kpi-detail-presentを残し、説明欄のV8クラスを使用 |
+| `apps/web/src/components/shared/notice.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/pagination.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/radio-card-contract.test.tsx` | 本線の動作・試験＋V8固定 | 古い分岐や旧参照を戻さず、同じ動作をV8の入口で残した |
+| `apps/web/src/components/shared/radio-card.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/row-actions.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/segmented.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/select.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/select.tsx` | 本線の値の配置＋V8固定 | data-value-alignを残した |
+| `apps/web/src/components/shared/status-badge.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/status-pill.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/shared/toast.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/components/templates/page-templates.module.css` | 本線の値＋この枝のV8固定 | テーマの指定を:rootへそろえて三者比較。色・大きさ・余白等の本線の修正を残した |
+| `apps/web/src/lib/design-structure.json` | この枝の削除 | 旧見た目だけの対応表。実行時の参照がないことを確認 |
+| `apps/web/src/v8/form-edit/appearance-tab.tsx` | 両方 | 本線のお客様向け見た目の選択と、この枝の読みやすさの案内を残した |
+| `apps/web/src/v8/form-edit/content-tab.tsx` | 両方 | 本線の保存エラー共通部品と、この枝のページ移動の処理を残した |
+| `apps/web/src/v8/nen-campaigns/edit.tsx` | 両方 | 本線の常時挿入欄と、古い側から移した特別なマイルの入力を残した |
+| `docs/brain/rules/corrections.md` | 両方の記録 | どちらの修正指示も欠落させない |
+
+### 取り込み後の初回検証
+
+- V8固定の検査: 合格。Web型検査: 合格。
+- 競合箇所のReact/契約試験: 初回52件中51件合格。版の履歴の追加試験はV8の読み直し済みの通知に合わせ、再実行8件すべて合格。合計52件合格。
+- 本線との所有の比較: 修正前403候補（手書き79・上書き322・直書き2）。指定された元の184候補とは別に数え、修正後は両方を照合する。

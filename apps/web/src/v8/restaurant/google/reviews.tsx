@@ -263,13 +263,12 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
 
   useEffect(() => { void load() }, [load])
 
-  const generate = async (mode: 'new' | 'shorter' | 'polite') => {
+  const generate = async () => {
     setBusy('generate')
     setActionError('')
     setSaved('')
     try {
-      // 書き換えは、保存前に画面で直した内容をそのまま元にする。
-      const response = await restaurantGoogleApi.generateDraft(accountId, reviewId, mode, text)
+      const response = await restaurantGoogleApi.generateDraft(accountId, reviewId)
       setText(response.draft)
       setAiGenerated(true)
     } catch (err) {
@@ -403,11 +402,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
               /></SaveErrorField>
               <div className={styles.draftTools}>
                 {data.aiAvailable ? (
-                  <>
-                    <Button onClick={() => void generate('new')} disabled={busy !== null} busy={busy === 'generate'} busyLabel="作成中…"><Sparkles aria-hidden className={styles.icon15} />AIで下書きを作る</Button>
-                    <Button onClick={() => void generate('shorter')} disabled={busy !== null || !text} busy={Boolean(busy !== null)} busyLabel="処理中…">短くする</Button>
-                    <Button onClick={() => void generate('polite')} disabled={busy !== null || !text} busy={Boolean(busy !== null)} busyLabel="処理中…">丁寧にする</Button>
-                  </>
+                  <Button onClick={() => void generate()} disabled={busy !== null} busy={busy === 'generate'} busyLabel="作成中…"><Sparkles aria-hidden className={styles.icon15} />AIで下書きを作る</Button>
                 ) : <span className={styles.muted}>この環境ではAI下書きは使えません。</span>}
                 <span className={styles.spacer} aria-hidden="true" />
                 <span className={textLength > 4096 ? styles.countOver : styles.count}>{`${polishFormatNumber(textLength)} / 4,096`}</span>

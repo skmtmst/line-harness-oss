@@ -107,6 +107,11 @@
   font-size: var(--text-callout);
 }
 
+/* 題の下の補足（titleNote を渡した窓だけ出る）。渡さない窓の並びは変わらない。 */
+.titleNote {
+  margin: 0;
+}
+
 /* 見出しの左に絵を置くとき（危険な操作の確認）だけ使う行。 */
 .titleRow {
   display: flex;
@@ -336,6 +341,37 @@
 :root .panel[data-design-header-height] > .headerRow { height: var(--dialog-design-header-height); min-height: 0; box-sizing: border-box; }
 :root .headerContent { gap: 2px; }
 :root .title { font-size: var(--tpl-dialog-title-size); font-weight: var(--tpl-dialog-title-weight); line-height: 24px; }
+/*
+ * 題の下の補足（絵 hjdqV「12:02 受信・受け取り希望 12:15」）。
+ * 絵は題 y120-147・補足 y151-169 で間4。共通の題は行の高さ24で y120-144 なので、
+ * 段の間2＋ここの5＝7 を足して補足の上端を y151 にそろえる。
+ */
+:root .titleNote {
+  margin-top: 5px;
+  font-size: var(--text-caption);
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+}
+/*
+ * 題の段の形を絵の値にする窓だけ（designTitleRow="mark"）。
+ * 絵（dgeTy・XCVGd）は左の丸い印と題が縦の中央でそろい、間は12（左24＋印36＋間12＝題72）。
+ * 題は 18/700。渡さない窓は上の既定（上そろえ・間8・太さ600）のまま。
+ */
+:root .panel[data-design-title-row='mark'] .titleRow {
+  align-items: center;
+  gap: 12px;
+}
+
+:root .panel[data-design-title-row='mark'] .titleIcon {
+  padding-top: 0;
+}
+
+:root .panel[data-design-title-row='mark'] .title {
+  font-size: var(--text-lead);
+  font-weight: 700;
+}
+
 :root .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
 :root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
 :root .close svg { width: 16px; height: 16px; }
@@ -403,3 +439,8 @@
 :root .panel[data-layout='account-inset'] > .content { padding: 0; }
 :root .panel[data-layout='account-inset'] .title { font-size: var(--tpl-acd-dlg-title-size); line-height: var(--tpl-acd-dlg-title-lh); }
 :root .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }
+
+html:root .stepCurrent { background: var(--color-selection-border); color: var(--color-canvas); }
+
+/* 入力を含む確認窓は、欄を本文幅にそろえる。 */
+html:root .content[data-content-layout='form'] { align-items: stretch; }

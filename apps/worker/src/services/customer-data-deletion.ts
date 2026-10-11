@@ -37,6 +37,9 @@ export function friendDeletionCondition(table: string, seen = new Set<string>())
   const conditions = rel.friendColumns.map(col => `${q(table)}.${q(col)} = ?1`);
   if (rel.lineUserColumn) conditions.push(`(${q(table)}.line_user_id = ?2 AND ${q(table)}.line_account_id IS ?3)`);
   for (const ref of rel.references) {
+    // These are the customer's own outcome/attribution, not the referrer's data.
+    // Their nullable affiliate references are detached in the final atomic batch.
+    if (ref.parent === 'affiliates' && ['conversion_events', 'affiliate_attribution_decisions'].includes(table)) continue;
     const inner = friendDeletionCondition(ref.parent, next);
     if (inner !== '0') conditions.push(`EXISTS (SELECT 1 FROM ${q(ref.parent)} WHERE ${inner} AND ${ref.columns.map(col => `${q(ref.parent)}.${q(col.parentColumn)} = ${q(table)}.${q(col.column)}`).join(' AND ')})`);
   }
@@ -82,7 +85,23 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   if (prior?.action === 'deleted') return { deleted: true, replayed: true };
   const conditions = conditionsFor(target);
   const params = target.kind === 'friend_data' ? [target.id, target.lineUserId ?? '', target.accountId] : [target.id];
+  // Fail closed on an unapplied/partial migration, before intent or R2 changes.
+  // SQL identifiers are only from the reviewed 13-table/15-reference manifest.
+  if (target.kind === 'friend_data') {
+    for (const [table, refs] of Object.entries(protectedRelations)) {
+      const columns = (await db.prepare(`PRAGMA table_info(${q(table)})`).all<{ name: string; notnull: number }>()).results;
+      const foreignKeys = (await db.prepare(`PRAGMA foreign_key_list(${q(table)})`).all<{ from: string; table: string; on_delete: string }>()).results;
+      for (const ref of refs) for (const col of ref.columns) {
+        if (!columns.some(c => c.name === `${col.column}_history`)
+          || !columns.some(c => c.name === col.column && c.notnull === 0)
+          || !foreignKeys.some(f => f.from === col.column && f.table === ref.parent && f.on_delete === 'SET NULL')) {
+          throw new DeletionFailure(409, 'deletion_schema_approval_required');
+        }
+      }
+    }
+  }
   const protectedChecks = Object.entries(protectedRelations).flatMap(([table, refs]) => refs.flatMap(ref => {
+    if (target.kind === 'friend_data') return [];
     const condition = conditions[ref.parent];
     if (!condition) return [];
     return [{ table, condition: `EXISTS (SELECT 1 FROM ${q(ref.parent)} WHERE ${condition} AND ${ref.columns.map(col => `${q(ref.parent)}.${q(col.parentColumn)} = ${q(table)}.${q(col.column)}`).join(' AND ')})` }];
@@ -162,6 +181,24 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
         [JSON.stringify(snapshot.rows.map(row => ({ rowid: row._delete_rowid, values: Object.fromEntries(columns.map(col => [col, row[col] ?? null])) })))]));
     }
     const byTable = new Map(snapshots.map(snapshot => [snapshot.table, snapshot]));
+    if (target.kind === 'friend_data') {
+      const affiliateCondition = conditions.affiliates;
+      // No new schema outside the approved retained tables: both existing
+      // references are already nullable. Remove referrer names/codes as well.
+      statements.push(db.prepare(`UPDATE conversion_events SET affiliate_id = NULL, affiliate_code = NULL
+        WHERE affiliate_id IN (SELECT id FROM affiliates WHERE ${affiliateCondition})`).bind(...(affiliateCondition.includes('?3') ? params : [params[0]])));
+      const removed = `SELECT id FROM affiliates WHERE ${affiliateCondition}`;
+      statements.push(db.prepare(`UPDATE affiliate_attribution_decisions
+        SET affiliate_id = CASE WHEN affiliate_id IN (${removed}) THEN NULL ELSE affiliate_id END,
+            ref_code = CASE WHEN affiliate_id IN (${removed}) THEN NULL ELSE ref_code END,
+            candidates_json = (SELECT json_group_array(json(CASE
+              WHEN json_extract(candidate.value, '$.affiliateId') IN (${removed})
+              THEN json_set(candidate.value, '$.affiliateName', '削除済みのお客さま', '$.refCode', '')
+              ELSE candidate.value END)) FROM json_each(candidates_json) candidate)
+        WHERE affiliate_id IN (${removed}) OR EXISTS (SELECT 1 FROM json_each(candidates_json) candidate
+          WHERE json_extract(candidate.value, '$.affiliateId') IN (${removed}))`)
+        .bind(...(affiliateCondition.includes('?3') ? params : [params[0]])));
+    }
     for (const table of childFirst(Object.keys(conditions))) {
       const snapshot = byTable.get(table)!;
       if (snapshot.rows.length) statements.push(db.prepare(`DELETE FROM ${q(table)} WHERE rowid IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(snapshot.rows.map(row => row._delete_rowid))));

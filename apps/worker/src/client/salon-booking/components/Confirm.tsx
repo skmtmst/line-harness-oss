@@ -82,7 +82,7 @@ export default function Confirm({
         onClick={handleSubmit}
         disabled={submitting}
         className="w-full text-white py-3.5 rounded-xl font-bold disabled:opacity-50"
-        style={{ background: '#06C755', boxShadow: '0 1px 3px rgba(6, 199, 85, 0.3)' }}
+        style={{ background: 'var(--customer-primary, #06C755)', boxShadow: '0 1px 3px rgba(6, 199, 85, 0.3)' }}
       >
         {submitting ? '送信中…' : '予約をリクエスト'}
       </button>

@@ -2,17 +2,19 @@
 import { chromium } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { measureScreen, measureStress, median } from './speed-budget.mjs'
+import { measureScreen, measureStress, median, SPEED_ROUTES } from './speed-budget.mjs'
 import { mockFetch } from './mock-local.mjs'
 
 const [base = 'http://127.0.0.1:4393', out = '/tmp/perf3-before', rateArg = '1'] = process.argv.slice(2)
 const rate = Number(rateArg)
+const names=(process.env.PERF3_SCREENS??'tags,friends-2000').split(',')
+if(names.some(name=>name!=='friends-2000' && !SPEED_ROUTES[name])) throw new Error('未知の診断画面')
 mkdirSync(out, { recursive: true })
 const browser = await chromium.launch()
 const target = { stub: true, mockFetch, url: route => new URL(route, base).href }
 const results = []
 const phases = process.env.PERF3_DIAGNOSE === '0' ? [false] : process.env.PERF3_DIAGNOSE === 'only' ? [true] : [false, true]
-const checkpoint = () => writeFileSync(join(out, 'results.json'), `${JSON.stringify({ complete: results.length === phases.length * 2, rate, viewport: [1440,900], samples: 3, results }, null, 2)}\n`)
+const checkpoint = () => writeFileSync(join(out, 'results.json'), `${JSON.stringify({ complete: results.length === phases.length * names.length, rate, viewport: [1440,900], samples: 3, results }, null, 2)}\n`)
 checkpoint()
 function unionMs(events) {
   const spans = events.filter(e => e.ph === 'X' && e.dur > 0).map(e => [e.ts, e.ts + e.dur]).sort((a, b) => a[0] - b[0])
@@ -44,7 +46,7 @@ function summarize(events, profile) {
 }
 try {
   for (const diagnostic of phases) {
-    for (const name of ['tags', 'friends-2000']) {
+    for (const name of names) {
       const samples = []
       for (let i = 0; i < 3; i++) {
         let diagnosis
@@ -94,7 +96,7 @@ try {
           }
           return page
         } }
-        const metrics = name === 'tags' ? await measureScreen(wrapped, target, 'tags', '/tags') : await measureStress(wrapped, target)
+        const metrics = name === 'friends-2000' ? await measureStress(wrapped, target) : await measureScreen(wrapped, target, name, SPEED_ROUTES[name])
         samples.push({ ...metrics, ...(diagnosis ? { diagnosis } : {}) })
         console.log(`${diagnostic ? 'diagnosis' : 'clean'} ${name} ${i + 1}: ${JSON.stringify(metrics)}`)
       }

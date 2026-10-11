@@ -1,3 +1,5 @@
+import { parseRestaurantConfirmationPostback, respondToRestaurantConfirmation } from '../services/restaurant-confirmations.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { handleResearchTap } from '../services/research-tap.js';
 import { handleExtraPostback } from '../services/tap-extras.js';
 import { sendEntryRouteCoupon } from '../services/entry-route-coupon.js';
@@ -1337,6 +1339,12 @@ async function handleEvent(
      * 記録も向こうで取る（押した回数を数えるのに、記録より先に読む必要が
      * あるため）。
      */
+    const restaurantReply = parseRestaurantConfirmationPostback(postbackData);
+    if(restaurantReply && operatorMailEnv && restaurantTestEnabled(operatorMailEnv) && lineAccountId) {
+      const confirmation=await db.prepare('SELECT reservation_version FROM rt_reservation_confirmations WHERE request_id=? AND friend_id=?').bind(restaurantReply.requestId,friend.id).first<{reservation_version:number}>();
+      if(confirmation)await replay('restaurant_confirmation',()=>respondToRestaurantConfirmation(execution?.db??db,{...restaurantReply,friendId:friend.id,accountId:lineAccountId,expectedVersion:confirmation.reservation_version}));
+      return;
+    }
     const questionHit = parseQuestionPostback(postbackData);
     if (questionHit) {
       const answered = await replay('handleQuestionAnswer:0',()=>handleQuestionAnswer(execution?.db ?? db,

@@ -6,6 +6,7 @@ import { getFriendUpcomingItems } from '../services/friend-upcoming-items.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getFriends,
+  getFriendListFieldValues,
   getFriendById,
   getFriendWithFirstTrackedLinkName,
   getFriendAddBreakdown,
@@ -33,12 +34,12 @@ import {
   SAVED_SEARCH_LIMIT,
 } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag, SavedSearch, SavedSearchAccess, FriendFormSubmission } from '@line-crm/db';
-import type { SavedSearchConditions } from '@line-crm/shared';
+import { BASIC_FRIEND_FIELDS, DEFAULT_TENANT_ID, type SavedSearchConditions } from '@line-crm/shared';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { denyReadOnly, requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
+import { denyReadOnly, requireIrreversibleConfirmation, requireRole, hasStaffPermission } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import { listResponse } from '../lib/list-etag.js';
@@ -329,6 +330,15 @@ friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'),
 // GET /api/friends - list with pagination
 friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    const requestedColumns = c.req.query('fieldColumns');
+    let fieldColumns: string[] = [];
+    if (requestedColumns) {
+      if (requestedColumns.length > 2_000) return c.json({success:false,error:'表示項目が多すぎます'},422);
+      try { const parsed: unknown = JSON.parse(requestedColumns);
+        if (!Array.isArray(parsed) || parsed.length > 7 || parsed.some(key => typeof key !== 'string' || !(BASIC_FRIEND_FIELDS.some(field => key === `fixed:${field.key}`) || /^field:[a-zA-Z0-9_-]{1,128}$/.test(key)))) throw new Error();
+        fieldColumns = [...new Set(parsed)];
+      } catch { return c.json({success:false,error:'表示項目の指定を確認してください'},422); }
+    }
     const rawConditions = c.req.query('conditions');
     let directConditions: SavedSearchConditions | undefined;
     if (rawConditions) {
@@ -711,6 +721,9 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     }
     const listResult = await listStmt.bind(...listBinds).all<DbFriend>();
     const items = listResult.results;
+    const fieldValues = await getFriendListFieldValues(db, {friendIds:items.map(friend => friend.id),columns:fieldColumns,
+      tenantId:c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID,
+      canSeePersonal:hasStaffPermission(c,'attribute.personal_info.view') || hasStaffPermission(c,'attribute.personal_info.edit')});
 
     // 表示ページ分のタグを1回で取得する。友だちごとの問い合わせは行わない。
     // includeTags=false のオートコンプリート経路では、この1回も省略する。
@@ -720,6 +733,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     let itemsWithTags = items.map((friend) => ({
       ...serializeFriendListRow(friend, includeChatStatus),
       tags: (tagsByFriendId.get(friend.id) ?? []).map(serializeTag),
+      ...(fieldColumns.length ? {fieldValues:fieldValues.get(friend.id) ?? {}} : {}),
     }));
 
     // Optional: hydrate chat status (latest in/out message, active scenario,

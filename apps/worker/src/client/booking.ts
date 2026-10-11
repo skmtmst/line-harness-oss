@@ -1,3 +1,4 @@
+import { jstCalendar, jstDate, jstTime } from '@line-crm/shared';
 /**
  * LIFF Booking Page — Calendar-based slot booking
  *
@@ -42,8 +43,8 @@ interface BookingState {
 }
 
 const state: BookingState = {
-  currentYear: new Date().getFullYear(),
-  currentMonth: new Date().getMonth(),
+  currentYear: jstCalendar().getUTCFullYear(),
+  currentMonth: jstCalendar().getUTCMonth(),
   selectedDate: null,
   slots: [],
   selectedSlot: null,
@@ -70,14 +71,13 @@ function apiCall(path: string, options?: RequestInit): Promise<Response> {
 }
 
 function formatTime(isoString: string): string {
-  const d = new Date(isoString);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return jstTime(new Date(isoString));
 }
 
 function formatDateJa(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(dateStr + 'T00:00:00Z');
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${weekdays[d.getDay()]})`;
+  return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日(${weekdays[d.getUTCDay()]})`;
 }
 
 function getApp(): HTMLElement {
@@ -87,23 +87,19 @@ function getApp(): HTMLElement {
 // ========== Calendar Rendering ==========
 
 function getDaysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
 function getFirstDayOfWeek(year: number, month: number): number {
-  return new Date(year, month, 1).getDay();
+  return new Date(Date.UTC(year, month, 1)).getUTCDay();
 }
 
 function isToday(year: number, month: number, day: number): boolean {
-  const now = new Date();
-  return now.getFullYear() === year && now.getMonth() === month && now.getDate() === day;
+  return dateToString(year, month, day) === jstDate();
 }
 
 function isPast(year: number, month: number, day: number): boolean {
-  const now = new Date();
-  const target = new Date(year, month, day);
-  now.setHours(0, 0, 0, 0);
-  return target < now;
+  return dateToString(year, month, day) < jstDate();
 }
 
 function dateToString(year: number, month: number, day: number): string {

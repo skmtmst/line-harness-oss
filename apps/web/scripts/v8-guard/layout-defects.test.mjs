@@ -3,11 +3,15 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { spawnSync, execFile } from 'node:child_process'
+import { createServer } from 'node:http'
+import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
-import { assess, record, measurePage, validateAllowances } from './layout-defects.mjs'
+import { assess, assessAgainstBase, record, measurePage, validateAllowances } from './layout-defects.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
 const cases = {
+  'control-overlap': '<div data-list-row style="display:flex"><button style="width:100px;height:36px">コピー</button><button style="width:36px;height:36px;margin-left:-30px">…</button></div>',
+  'control-blocked': '<div data-list-row style="position:relative"><button style="width:80px;height:36px">…</button><span style="position:absolute;left:20px;top:0;width:36px;height:36px;background:#fff"></span></div>',
   wrap: '<span style="display:block;width:50px">短い名前の折り返し</span>',
   squash: '<button style="width:24px;word-break:break-all">20件表示</button>',
   clip: '<div style="overflow:hidden;width:100px"><span style="white-space:nowrap">横にはみ出した短い文字列です</span></div>',
@@ -19,6 +23,8 @@ const cases = {
   blank: '<section style="width:300px;height:300px;border:1px solid"><p>中身</p></section><footer style="margin-top:900px">画面の続き</footer>',
 }
 const repairs = {
+  'control-overlap': cases['control-overlap'].replace('margin-left:-30px', 'margin-left:16px'),
+  'control-blocked': cases['control-blocked'].replace('left:20px', 'left:120px'),
   wrap: cases.wrap.replace('width:50px','width:300px;white-space:nowrap'),
   squash: cases.squash.replace('width:24px;word-break:break-all','width:100px;white-space:nowrap'),
   clip: cases.clip.replace('overflow:hidden;width:100px','overflow:visible;width:500px'),
@@ -29,6 +35,23 @@ const repairs = {
   'blank-horizontal': cases['blank-horizontal'].replace('width:240px','width:1000px').replace('height:320px','height:auto'),
   'blank-kpi': cases['blank-kpi'].replaceAll('min-height:160px','min-height:0'),
 }
+test('実物の表CSS：窓内のコンテナ幅を壊すと取消が押せず、修復後は押せる', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const css = readFileSync(new URL('../../src/components/shared/data-table.module.css', import.meta.url), 'utf8')
+    const html = style => `<html data-theme="v8"><style>${style}</style><body><div style="display:flex;flex-direction:column;align-items:flex-start;width:560px"><div class="frame" data-shared-part="list-table"><table class="table"><tbody><tr><td><button>取り消す</button></td></tr></tbody></table></div></div></body></html>`
+    const hit = () => page.locator('button').evaluate(el => {
+      const r = el.getBoundingClientRect()
+      return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
+    })
+    await page.setContent(html(css.replace('width: 100%; min-width: 0; container-type: inline-size;', 'container-type: inline-size;')))
+    assert.equal(await hit(), false, '幅の指定を外すと子の操作が隠れる')
+    await page.setContent(html(css))
+    assert.equal(await page.locator('.frame').evaluate(el => el.getBoundingClientRect().width), 560)
+    assert.equal(await hit(), true, '実物CSSで取消の中央を押せる')
+  } finally { await browser.close() }
+})
 test('種類ごとに実物を壊し、検出・終了コード1・修復後0を確認する', async () => {
   const browser = await chromium.launch()
   const dir = mkdtempSync(join(tmpdir(),'v8-defects-'))
@@ -114,12 +137,84 @@ test('既存だけ許可し、新しい場所・幅・種類・文字・件数�
   assert.throws(()=>validateAllowances([allow[0],allow[0]]))
 })
 
+test('同じ検出器の統合先実測だけを土台にし、新規・件数増加・悪化は止める', () => {
+  const f = {kind:'tight', target:'section.card', text:'本文', measure:{topDeficit:2, bottomDeficit:3}}
+  const compare = findings => assessAgainstBase(findings, [f], '/friends', 1152)
+  assert.equal(compare([f]).existing.length, 1)
+  assert.deepEqual(compare([]).failures, [])
+  for (const newer of [{...f,target:'section.other'}, {...f,kind:'cardbottom'}, {...f,text:'別の本文'}, {...f,measure:{topDeficit:2,bottomDeficit:4}}]) {
+    assert.equal(compare([newer]).failures.length, 1)
+  }
+  assert.equal(compare([f,f]).failures.length, 1)
+  const allow = record([f], '/friends', 1152, '固定の既存許可')
+  assert.equal(assessAgainstBase([f,f], [f], '/friends', 1152, allow).failures.length, 1, '固定許可と土台を二重に足さない')
+  assert.equal(assessAgainstBase([{...f,measure:{topDeficit:2,bottomDeficit:4}}], [{...f,measure:{topDeficit:2,bottomDeficit:8}}], '/friends',1152,allow).failures.length, 1, '固定許可の上限も書き換えない')
+  const touch = {...f,kind:'touch',measure:{gap:6}}
+  assert.equal(assessAgainstBase([{...touch,measure:{gap:2}}],[touch],'/friends',1152).failures.length,1)
+  const empty = {...f,kind:'empty-blank-ok',measure:{count:1}}
+  assert.equal(assessAgainstBase([empty],[empty],'/friends',1152).failures.length,1, '理由なしの除外は既存でも止める')
+})
+
+test('CLIは新しい検出種類をbaseにも当て、既存は通すが新しい黒い箱とbaseの測定失敗は終了1', async () => {
+  let baseBody = '<h2>題</h2>', headBody = baseBody, baseStatus = 200
+  const dark = '<div style="background:#111;color:white;width:200px;height:36px">黒い札</div>'
+  const server = createServer((request, response) => {
+    response.setHeader('content-type', 'text/html; charset=utf-8')
+    response.end(shell(headBody))
+  })
+  await new Promise(resolve => server.listen(0,'127.0.0.1',resolve))
+  const dir = mkdtempSync(join(tmpdir(),'v8-base-compare-'))
+  try {
+    const url = `http://127.0.0.1:${server.address().port}`
+    const out = join(dir,'result.json')
+    // 同じ/friendsを、それぞれの書き出しを配る別サーバーで開く。
+    const baseServer = createServer((request, response) => {
+      response.statusCode = baseStatus
+      response.setHeader('content-type', 'text/html; charset=utf-8')
+      response.end(shell(baseBody))
+    })
+    await new Promise(resolve => baseServer.listen(0,'127.0.0.1',resolve))
+    const compareUrl = `http://127.0.0.1:${baseServer.address().port}`
+    const runCompare = async () => {
+      try {
+        const result = await promisify(execFile)(process.execPath,['apps/web/scripts/v8-guard/layout-defects.mjs',url,out,'--compare-url',compareUrl,'--route','/friends'],{timeout:60000})
+        return {status:0,...result}
+      } catch (error) { return {status:error.code,stdout:error.stdout,stderr:error.stderr} }
+    }
+    try {
+      headBody += dark
+      assert.equal((await runCompare()).status,1)
+      baseBody += dark
+      assert.equal((await runCompare()).status,0)
+      assert.equal(Object.values(JSON.parse(readFileSync(out,'utf8'))).every(r=>r.existing.some(f=>f.kind==='dark')),true)
+      headBody += dark
+      assert.equal((await runCompare()).status,1)
+      baseBody = '<h2>画面を表示できませんでした</h2>'
+      assert.equal((await runCompare()).status,1)
+      const result = JSON.parse(readFileSync(out,'utf8'))
+      assert.equal(Object.values(result).every(r=>r.error),true, JSON.stringify(result))
+      baseStatus = 404
+      baseBody = '<h2>見つかりません</h2>'
+      assert.equal((await runCompare()).status,1)
+      assert.equal(Object.values(JSON.parse(readFileSync(out,'utf8'))).every(r=>/HTTP.*404/.test(r.error)),true)
+    } finally { await new Promise(resolve=>baseServer.close(resolve)) }
+  } finally {
+    await new Promise(resolve=>server.close(resolve))
+    rmSync(dir,{recursive:true,force:true})
+  }
+})
+
 test('空白検査はCIで一度だけ実行し、既存V8 guardと同じ必須扱い',()=>{
   const yaml = readFileSync('.github/workflows/required-pr-gate.yml','utf8')
   const job = yaml.split('  v8-screen-guard:')[1].split('  required-pr-gate:')[0]
   assert.equal((job.match(/run: node apps\/web\/scripts\/v8-guard\/layout-defects\.mjs /g)||[]).length,1)
   assert.doesNotMatch(job,/run:.*blank-gap\.mjs/,'blankfixの空白検査を別ステップで重ねない')
-  const step=job.split('      - name: No new overlap')[1].split('      - name:')[0]
+  const step=job.split('      - name:').find(step => step.includes('run: node apps/web/scripts/v8-guard/layout-defects.mjs'))
+  assert.ok(step, '実画面の崩れ検査のステップが必要')
   assert.doesNotMatch(step,/continue-on-error/)
   assert.match(step,/steps.scope.outputs.run == 'true'/)
+  assert.match(step,/--compare-url/)
+  const baseBuild = job.split('      - name:').find(step => step.includes('Build the base admin'))
+  assert.match(baseBuild,/steps.scope.outputs.compare == 'true'/)
+  assert.doesNotMatch(baseBuild,/steps.scope.outputs.diff/,'v7の画素を飛ばしても崩れの土台を測る')
 })

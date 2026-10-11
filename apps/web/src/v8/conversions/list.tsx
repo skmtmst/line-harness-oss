@@ -1,9 +1,10 @@
 'use client'
 
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
-import { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import TruncatedText from '@/components/shared/truncated-text'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 
 
 
@@ -29,10 +30,11 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/shared/table';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
@@ -68,7 +70,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「成果地点を作る」）・
  * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「使う場所を足す」と「…」。
- * 行を押すと表の下に詳細の小窓、「止める」は表の下の止める小窓（3択＋理由）。
+ * 行はURLに残る右の詳細パネル、「止める」は3択と理由を持つ確認画面。
  *
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
@@ -192,11 +194,11 @@ function TableHead({ selection }: { selection?: ReactNode } = {}) {
     <thead>
       <TableHeadRow className={styles.headRow} data-table-layout="columns">
         <Th className={styles.colName}>{selection}成果地点</Th>
-        <Th>状態</Th>
-            <Th className={styles.colTrigger}>何が起きたら数えるか</Th>
+        <Th className={styles.colState}>状態</Th>
+            <Th className={styles.colTrigger} collapseAt="narrow">何が起きたら数えるか</Th>
         <Th className={styles.colCount} align="right">この30日</Th>
         <Th className={styles.colValue} align="right">金額</Th>
-        <Th className={styles.colUsage}>使われている場所</Th>
+        <Th className={styles.colUsage} collapseAt="narrow">使われている場所</Th>
         <Th className={styles.colOps}>操作</Th>
       </TableHeadRow>
     </thead>
@@ -216,12 +218,12 @@ function ListSkeleton() {
               {[0, 1, 2, 3, 4].map((index) => (
                 <Tr key={index} className={styles.row} data-table-layout="columns">
                   <Td className={styles.colName}><Skeleton className={styles.skeletonName} /></Td>
-                  <Td><Skeleton className={styles.skeletonName} /></Td>
-                    <Td className={styles.colTrigger}><Skeleton className={styles.skeletonName} /></Td>
+                  <Td className={styles.colState}><Skeleton className={styles.skeletonName} /></Td>
+                    <Td className={styles.colTrigger} collapseAt="narrow"><Skeleton className={styles.skeletonName} /></Td>
                   <Td className={styles.colCount}><Skeleton className={styles.skeletonNum} /></Td>
                   <Td className={styles.colValue}><Skeleton className={styles.skeletonNum} /></Td>
-                  <Td className={styles.colUsage}><Skeleton className={styles.skeletonName} /></Td>
-                  <Td className={styles.colOps}><Skeleton className={styles.skeletonNum} /></Td>
+                  <Td className={styles.colUsage} collapseAt="narrow"><Skeleton className={styles.skeletonName} /></Td>
+                  <ActionCell className={styles.colOps}><Skeleton className={styles.skeletonNum} /></ActionCell>
                 </Tr>
               ))}
             </tbody>
@@ -272,7 +274,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const accountIdRef = useRef(accountId)
   accountIdRef.current = accountId
 
-  /* 表の下の詳細の小窓（行を押すと開く）と、止める小窓。 */
+  /* 行の詳細パネルと、停止の確認画面。 */
   const [panelId, setPanelId] = useDetailPanelUrl('point')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [stopTarget, setStopTarget] = useState<ConversionDefinitionListItem | null>(null)
@@ -896,7 +898,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       <ListToolbarRow>
         <div className={styles.narrowChips}>{filterChips}</div>
         <span className={styles.spacer} aria-hidden="true" />
-        {savedBox}
+        <ListToolbarOptional compact label="保存した絞り込み">{savedBox}</ListToolbarOptional>
         {perPageBox}
       </ListToolbarRow>
     </ListToolbarFrame>
@@ -919,11 +921,11 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
     setPage(1)
   }
 
-  /* ===== 表の下の小窓（詳細・止める） ===== */
+  /* ===== 右の詳細パネルと停止の確認 ===== */
   const detailCard = panelPoint ? (
-    <Card variant="panel" aria-label="詳細の小窓">
+    <DetailPanel open contentSpacing="sections" title={panelPoint.name} onClose={() => setPanelId(null)}>
       <div className={styles.panelHead}>
-        <h2 className={styles.panelTitle}>{`詳細の小窓：${panelPoint.name}`}</h2>
+
         <RowMenu className={styles.panelMore} label={`詳細「${panelPoint.name}」のその他の操作`} size="row" items={[
           ...(canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.ingest.configured && panelPoint.status !== 'stopped' ? [{
             id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
@@ -937,6 +939,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         <StatePill point={panelPoint} />
         <span title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</span>
       </p>
+      <p className={styles.panelText}>{`今月の成果：${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・¥${formatNumber(panelPoint.metrics.netValue)}`}`}</p>
       <p className={styles.panelText}>{`使われている場所：${usageLabel(panelPoint)}`}</p>
       {panelPoint.measureMethod === 'webhook' ? (
         <p className={styles.panelText}>
@@ -962,12 +965,23 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           <Button variant="danger" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button>
         </div>
       ) : null}
-    </Card>
+    </DetailPanel>
   ) : null
 
   const stopCard = stopTarget ? (
-    <Card variant="panel" aria-label="止めるときの小窓">
-      <h2 className={styles.panelTitle} title={`対象：${stopTarget.name}`}>止めるときの小窓（3択）</h2>
+    <Dialog open contentLayout="form" title={`${stopTarget.name}を止めますか？`} designWidth={480} busy={stopping} onCancel={() => setStopTarget(null)} footer={<DialogActions>
+        <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
+        <Button
+          variant="primary"
+          disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
+          onClick={() => void runStop()}
+          busy={stopping || stopImpactLoading}
+          busyLabel="止めています"
+        >
+          {stopAction === 'delete' ? '削除する' : '止める'}
+        </Button>
+      </DialogActions>}>
+
       <p className={styles.stopDescription}>
         {stopImpactLoading
           ? '利用先と影響を読み込んでいます。'
@@ -1028,25 +1042,13 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
         /></SaveErrorField>
       </Field>
       {stopError ? <Notice tone="danger" >{stopError}</Notice> : null}
-      <div className={styles.panelActions}>
-        <Button onClick={() => setStopTarget(null)} disabled={stopping}>キャンセル</Button>
-        <Button
-          variant="primary"
-          disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
-          onClick={() => void runStop()}
-          busy={stopping || stopImpactLoading}
-          busyLabel="止めています"
-        >
-          {stopAction === 'delete' ? '削除する' : '止める'}
-        </Button>
-      </div>
       <Disclosure title="操作の影響を確認する" size="compact">
         <p className={styles.panelText}>対象：{stopTarget.name}</p>
         <p className={styles.panelText}>止める：これから先は数えません。過去の記録と分析は残します。</p>
         <p className={styles.panelText}>差し替える：利用先を別の成果地点へ切り替え、過去の数字を残します。</p>
         <p className={styles.panelText}>削除する：成果0件・利用先0件のときに、この成果地点だけを削除できます。</p>
       </Disclosure>
-    </Card>
+    </Dialog>
   ) : null
 
   /* ===== 表 ===== */
@@ -1117,8 +1119,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                       </FolderDotName>
 
                     </Td>
-                    <Td><StatePill point={point} /></Td>
-                    <Td className={styles.colTrigger}>
+                    <Td className={styles.colState}><StatePill point={point} /></Td>
+                    <Td className={styles.colTrigger} collapseAt="narrow">
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
                       <span className={styles.cellSub} title={rowSub(point)}>{rowSub(point)}</span>
                     </Td>
@@ -1126,11 +1128,11 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                     <Td className={styles.colValue}>
                       <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
-                    <Td className={styles.colUsage}>
-                      <span className={styles.usageMain} title={usageLabel(point)}>{usage.main}</span>
+                    <Td className={styles.colUsage} collapseAt="narrow">
+                      <span className={styles.usageMain} title={usageLabel(point)}><TruncatedText value={usage.main} /></span>
                       {usage.sub ? <span className={styles.cellSub} title={usage.sub}>{usage.sub}</span> : null}
                     </Td>
-                    <Td className={styles.colOps}>
+                    <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
                         {canEdit
                           ? <Button href={addUsageHref(point)}>使う場所を足す</Button>
@@ -1142,14 +1144,14 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                           items={rowMenuItems(point).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect?.() } }))}
                         />
                       </div>
-                    </Td>
+                    </ActionCell>
                   </Tr>
                 )
               })}
             </tbody>
           </DataTable>
         </div>
-        {detailCard || stopCard ? <div className={styles.panels}>{detailCard}{stopCard}</div> : null}
+        {detailCard}{stopCard}
       </>
     )
   }

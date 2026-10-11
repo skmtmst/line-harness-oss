@@ -1,6 +1,6 @@
 import type { TapExtras } from './tap-extras.js';
 import type { ResearchAnswerAction, ResearchGate } from './research-form.js';
-import { FIXED_FRIEND_FIELDS, ageFromBirthday, type FixedFriendFieldKey } from "./fixed-friend-fields";
+import { FIXED_FRIEND_FIELDS, ageFromBirthday, validateAllergyValues, type FixedFriendFieldKey } from "./fixed-friend-fields.js";
 
 /**
  * 回答フォームの中身（レイアウト）。
@@ -146,6 +146,9 @@ export type FormAction =
  * 予約は「未承認」で入り、店が承認する（すぐ確定は作らない）。
  */
 export interface FormBookingConfig {
+  kind?: 'people' | 'seats';
+  storeId?: string;
+  courseId?: string | null;
   menuId: string;
   staffId?: string | null;
   daysAhead?: number;
@@ -157,6 +160,10 @@ export interface FormBookingConfig {
  * ここでは「どの枠を選んだか」だけを持ち、形だけを検査する。
  */
 export interface FormBookingValue {
+  kind?: 'people' | 'seats';
+  storeId?: string;
+  courseId?: string | null;
+  guestCount?: number;
   menuId: string;
   staffId: string;
   startsAt: string;
@@ -299,7 +306,11 @@ export interface FormOptions {
   researchGate?: ResearchGate;
   /** 回答者に見せるフォームの色・書体・角丸。任意のCSSは保存しない。 */
   theme?: FormTheme;
+  customerDesign?: {mode: 'account' | 'fixed'; preset: CustomerDesignPreset};
 }
+
+export const CUSTOMER_DESIGN_IDS = ['natural', 'modern', 'gentle', 'night', 'line', 'custom'] as const;
+export type CustomerDesignPreset = typeof CUSTOMER_DESIGN_IDS[number];
 
 export type FormFontFamily = "sans" | "serif";
 export type FormCornerRadius = "none" | "medium" | "round";
@@ -963,6 +974,11 @@ export function isAsciiBlank(value: string): boolean {
 export function normalizeBookingValue(value: unknown): FormBookingValue | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
+  if (v.kind === 'seats') {
+    if (typeof v.storeId !== 'string' || !v.storeId || !Number.isSafeInteger(v.guestCount) || Number(v.guestCount)<1 || Number(v.guestCount)>100 || typeof v.startsAt !== 'string' || !Number.isFinite(Date.parse(v.startsAt)) || (v.courseId!=null && typeof v.courseId!=='string')) return null;
+    return {kind:'seats',storeId:v.storeId,courseId:v.courseId as string|null|undefined,guestCount:Number(v.guestCount),startsAt:v.startsAt,menuId:'',staffId:''};
+  }
+  if (v.kind !== undefined && v.kind !== 'people') return null;
   if (typeof v.menuId !== "string" || v.menuId.trim() === "") return null;
   if (typeof v.staffId !== "string" || v.staffId.trim() === "") return null;
   if (typeof v.startsAt !== "string" || Number.isNaN(Date.parse(v.startsAt))) return null;
@@ -1086,6 +1102,10 @@ export function validateAnswer(
   if (isEmpty) return null;
 
   if (block.fixedField) {
+    if (block.fixedField === "allergy") {
+      const checked = validateAllergyValues(value);
+      if (!checked.ok) return checked.error;
+    }
     if (block.fixedField === "birthday" && ageFromBirthday(String(value)) === null) return `${block.label} は過去の存在する日付で入力してください`;
     if (block.fixedField === "age" && (!/^\d{1,3}$/.test(String(value)) || Number(value) > 150)) return `${block.label} は0〜150の整数で入力してください`;
     const spec = FIXED_FRIEND_FIELDS.find(f => f.key === block.fixedField);
@@ -1260,7 +1280,7 @@ export function formBlockTypeError(input: unknown): string | null {
       if (b.kind === "input" && !FORM_INPUT_TYPES.includes(b.type as FormInputType)) return "この入力欄の種類は保存できません";
       if (b.fixedField !== undefined) {
         const spec = FIXED_FRIEND_FIELDS.find(f => f.key === b.fixedField);
-        if (b.kind !== "input" || !spec || b.type !== spec.type) return "決まった答えの種類を確認してください";
+        if (b.kind !== "input" || !spec || (b.type !== spec.type && !(b.fixedField === 'allergy' && b.type === 'text'))) return "決まった答えの種類を確認してください";
       }
     }
   }
@@ -1268,6 +1288,8 @@ export function formBlockTypeError(input: unknown): string | null {
 }
 
 export function validateFormDefinition(layout: FormLayout): string | null {
+  const design = layout.options.customerDesign;
+  if (design !== undefined && (!design || !['account','fixed'].includes(design.mode) || !CUSTOMER_DESIGN_IDS.includes(design.preset))) return 'デザインの型を選び直してください';
   const typeError = formBlockTypeError(layout);
   if (typeError) return typeError;
   const seenNames = new Set<string>();
@@ -1592,7 +1614,7 @@ export function validateFormForPublish(layout: FormLayout): string | null {
     validateFormBranchGraph(layout) ??
     validateFormDefaultValues(layout) ??
     validateFormBookingReady(layout) ??
-    formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+    (layout.options.customerDesign && (layout.options.customerDesign.mode === 'account' || layout.options.customerDesign.preset !== 'custom') ? null : formThemeContrastError(normalizeFormTheme(layout.options?.theme)))
   );
 }
 
@@ -1607,6 +1629,10 @@ export function validateFormBookingReady(layout: FormLayout): string | null {
     for (const block of blocks) {
       if (block.kind !== "input" || block.type !== "booking") continue;
       const at = `「${block.label.trim() || block.name}」`;
+      if (block.booking?.kind === 'seats') {
+        if (!block.booking.storeId) return `${at}のお店が選ばれていません`;
+        continue;
+      }
       if (!block.booking?.menuId) {
         return `${at}の予約メニューが選ばれていません`;
       }

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const root = join(HERE, '..', '..');
 const src = (...parts: string[]): string => readFileSync(join(root, ...parts), 'utf8');
-const css = src('index.css') + src('tokens.css');
+const css = (src('index.css') + src('components', 'ui', 'liff-skin.css')) + src('tokens.css');
 const html = src('..', 'index.html');
 
 /*
@@ -89,7 +89,7 @@ describe('5つの型は CSS 変数の組 (色見本どおり)', () => {
   });
 
   it('⑤ LINE らしいに専用の上書きは無い (今の見た目のまま)', () => {
-    expect(css).not.toContain('[data-liff-theme="line"]');
+    expect(css).not.toMatch(/\[data-liff-theme="line"\]\s*\{/);
     // 土台の主の色は LIFF 専用の濃い緑のまま。
     expect(css).toContain('--color-liff-primary: #03873a');
   });

@@ -1,5 +1,9 @@
+@import "./card-surface.css";
 /* Workerの既存入口へ共通部品を載せる。全体のpreflightは適用しない。 */
 @import "tailwindcss/theme.css";
 @import "tailwindcss/utilities.css";
 @import "./tokens.css";
+@import "./components/ui/liff-skin.css";
 @source "./";
+
+body.sb-active { margin:0; line-height:normal; color:var(--color-ink); background:var(--color-canvas); font-family:"Noto Sans JP", "Inter", system-ui, sans-serif; }

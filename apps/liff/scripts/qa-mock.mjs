@@ -126,7 +126,7 @@ const SEAT_QA_NOW = Date.parse('2026-10-07T00:00:00Z');
 const SEAT_STORE = { id: 'qa-store', name: '然 - NEN - 本店', timezone: 'Asia/Tokyo' };
 const seatBookings = new Map();
 /** 1日の席：17:00〜21:00 を 30 分ごと。19:00 は残り1席、19:30・21:00 は満席。10/12 は臨時休業で全部満席。 */
-function seatSlots(date) {
+function seatSlots(date, durationMinutes = 120) {
   if (date < '2026-10-07') return null;
   const closed = date === '2026-10-12';
   return ['17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00'].map((hm) => {
@@ -134,7 +134,7 @@ function seatSlots(date) {
     const full = closed || hm === '19:30' || hm === '21:00';
     return {
       startsAt,
-      endsAt: new Date(Date.parse(startsAt) + 120 * 60000).toISOString(),
+      endsAt: new Date(Date.parse(startsAt) + durationMinutes * 60000).toISOString(),
       available: !full,
       remainingTables: full ? 0 : hm === '19:00' ? 1 : 4,
       // API-11：空いている候補卓の種類と、空いていない理由（10/12 は臨時休業）。
@@ -146,12 +146,14 @@ function seatSlots(date) {
 /** 店の遅れたときの決まり（API-11 の lateArrivalPolicy）。 */
 const SEAT_LATE = { cancelAfterMinutes: 15, message: '15分を過ぎてご連絡がない場合は、取り消しになることがあります' };
 function seatMock(method, pathname, url, body) {
+  if (method==='GET' && pathname==='/api/liff/restaurant/courses') return [200,{success:true,timezone:'Asia/Tokyo',data:[{id:'qa-course',name:'秋の鹿肉コース',durationMinutes:90,price:5000,allergens:[]}]}];
+  if (method==='GET' && pathname==='/api/liff/restaurant/referrals') return [200,{success:true,data:[{storeId:'qa-other-store',storeName:'然 恵比寿店',distanceKm:1.2,startsAt:new Date(`${url.searchParams.get('date')}T19:30:00+09:00`).toISOString(),endsAt:new Date(`${url.searchParams.get('date')}T21:30:00+09:00`).toISOString(),bookingUrl:'https://liff.line.me/qa?page=restaurant&token=qa-other'}]}];
   if (method === 'GET' && pathname.startsWith('/api/liff/restaurant/link/')) {
     return pathname.endsWith('/qa-seat') ? [200, { success: true, data: SEAT_STORE }] : [404, { success: false, error: 'not_found' }];
   }
   if (method === 'GET' && pathname === '/api/liff/restaurant/availability') {
     const date = url.searchParams.get('date') ?? '';
-    const slots = seatSlots(date);
+    const slots = seatSlots(date, url.searchParams.get('courseId') ? 90 : 120);
     if (!slots) return [400, { success: false, error: 'invalid_date_or_unconfigured_hours' }];
     const closed = date === '2026-10-12';
     return [200, { success: true, data: { storeId: SEAT_STORE.id, date, guestCount: Number(url.searchParams.get('guestCount')), slots, ...(closed ? { unavailableReason: 'temporary_closed' } : {}), lateArrivalPolicy: SEAT_LATE, cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 } }];
@@ -161,8 +163,9 @@ function seatMock(method, pathname, url, body) {
       id: `qa-seat-${seatBookings.size + 1}`,
       storeId: SEAT_STORE.id,
       startsAt: body.startsAt,
-      endsAt: new Date(Date.parse(body.startsAt) + 120 * 60000).toISOString(),
+      endsAt: new Date(Date.parse(body.startsAt) + (body.courseId ? 90 : 120) * 60000).toISOString(),
       guestCount: body.guestCount,
+      courseId: body.courseId??null,courseName:body.courseId?'秋の鹿肉コース':null,
       status: 'pending',
       version: 1,
       holdExpiresAt: new Date(SEAT_QA_NOW + 10 * 60000).toISOString(),

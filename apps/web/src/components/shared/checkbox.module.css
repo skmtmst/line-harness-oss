@@ -185,3 +185,6 @@
 :root .root { gap: 8px; }
 :root .box { gap: 0; }
 }
+
+/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+html:root .control, html:root .input { width: var(--choice-size); height: var(--choice-size); }

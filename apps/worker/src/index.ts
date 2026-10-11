@@ -1,3 +1,4 @@
+import { processScenarioSourceJobs } from './services/scenario-source-jobs.js';
 import { formDocuments } from './routes/form-documents.js';
 import { purgeExpiredFormDocuments } from './services/form-documents.js';
 import { autoReplyUnmatched } from './routes/auto-reply-unmatched.js';
@@ -185,6 +186,7 @@ import { tiktokPnl } from './routes/tiktok-pnl.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { restaurantGooglePosts } from './routes/restaurant-google-posts.js';
 import { restaurantGooglePerformance } from './routes/restaurant-google-performance.js';
+import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
@@ -271,6 +273,21 @@ export type Env = {
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
     RESTAURANT_TEST_ENABLED?: string;
+    /**
+     * デリバリー受注（Uber Eats・出前館・ロケットナウ）の接続設定。
+     * 送信は 'true' のときだけ行う。未設定の環境では台帳へ記録して送らない。
+     * 受信の合言葉は32文字以上でないと受け取らない（短い鍵は使わない）。
+     */
+    RT_DELIVERY_SEND_ENABLED?: string;
+    RT_DELIVERY_UBEREATS_API_BASE_URL?: string;
+    RT_DELIVERY_UBEREATS_API_TOKEN?: string;
+    RT_DELIVERY_UBEREATS_WEBHOOK_SECRET?: string;
+    RT_DELIVERY_DEMAECAN_API_BASE_URL?: string;
+    RT_DELIVERY_DEMAECAN_API_TOKEN?: string;
+    RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET?: string;
+    RT_DELIVERY_ROCKETNOW_API_BASE_URL?: string;
+    RT_DELIVERY_ROCKETNOW_API_TOKEN?: string;
+    RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
     RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;
@@ -331,6 +348,8 @@ export type Env = {
     GOOGLE_BUSINESS_WRITE_ENABLED?: string;
     /** 口コミ返信の下書きに使う Workers AI のモデル。未設定なら OPS_SUPPORT_AI_MODEL → 既定値。 */
     GOOGLE_BUSINESS_AI_MODEL?: string;
+    /** 口コミ返信の下書きに使う OpenAI のモデル。未設定なら既定値。OPENAI_API_KEY が無い環境では Workers AI を使う。 */
+    GOOGLE_BUSINESS_TEXT_MODEL?: string;
     /** Google Sheets連携(#838)：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
     GOOGLE_SHEETS_OAUTH_CLIENT_ID?: string;
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
@@ -349,6 +368,10 @@ export type Env = {
     X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
     META_APP_ID?: string;
     META_APP_SECRET?: string;
+    // Instagram API with Instagram Login (no Facebook Page). Separate credentials
+    // from META_APP_*: App Dashboard > Instagram > API setup with Instagram login.
+    INSTAGRAM_APP_ID?: string;
+    INSTAGRAM_APP_SECRET?: string;
     META_REDIRECT_URI?: string;
     META_GRAPH_API_VERSION?: string;
     META_TOKEN_ENCRYPTION_KEY?: string;
@@ -647,6 +670,7 @@ app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
 app.route('/', restaurantGooglePerformance);
+app.route('/', restaurantDelivery);
 app.route('/', googleSheets);
 app.route('/', tiktokPnl);
 app.route('/', tenants);
@@ -1728,6 +1752,7 @@ async function runFrequentHeavyJobs(
     },
     { name: 'visit stamps', run: () => processVisitStampQueue(env) },
     { name: 'restaurant events', run: () => processRestaurantEvents(env) },
+    { name: 'restaurant followup jobs', run: async () => { await processScenarioSourceJobs(env); } },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',

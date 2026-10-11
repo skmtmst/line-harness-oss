@@ -46,6 +46,8 @@
 
 ## 型の一覧（2026-10-09 の点検の数）
 
+10-09の数は当時の記録。10-11に確認した持ち主と追加の決まりは各節の追記を読む。機械の表と点検スクリプトは列車16〜18の本線の新版を保ち、今回の文書追記で検出範囲まで更新済みとは扱わない。
+
 数は `~/lh-work/lh-train-12`（本線＋列車11・12）と Pen の板 632 枚。(a) の括弧は v8 の置き場だけの数。
 
 | 型 | 持ち主 | (a) | (b) | (c) | (d) 手描き／写し | 効く範囲（ファイル／機能／Pen 板） |
@@ -77,7 +79,7 @@
 | [viewer-band](#viewer-band) 閲覧のみの帯 | 未定：Pen | 248（239） | 0 | 10 | 8／0 | 0／0／0 |
 | [notice](#notice) 知らせ（トースト・Notice） | 決まっている | 195（62） | 0 | 20 | 23／0 | 394／112／23 |
 | [save-conflict](#save-conflict) ぶつかりの帯 | 未定：Pen | 223（131） | 2 | 8 | 0／0 | 12／11／0 |
-| [customer-info](#customer-info) 顧客情報の欄 | 未定：コード | 20（9） | 0 | 0 | 20／0 | 0／0／0 |
+| [customer-info](#customer-info) 顧客情報の欄 | 決まっている | 20（9） | 0 | 0 | 20／0 | 0／0／0 |
 | [phone-preview](#phone-preview) スマホのプレビュー | 決まっている | 76（37） | 3 | 88 | 29／0 | 58／31／2 |
 | [period](#period) 期間の選択 | 未定：コード・Pen | 166（95） | 0 | 3 | 73／0 | 0／0／0 |
 | [chart](#chart) グラフ | 未定：Pen | 16（7） | 0 | 22 | 108／0 | 2／1／0 |
@@ -113,6 +115,8 @@
 - **見張り**：なし／**要る試験**：画面の .module.css に「角丸がカードの値・枠だけ・--card-shadow なし」の規則を新しく書いたら落ちる試験（例外は一覧に理由つき。B-168）
 - **10-09 の数**：(a) 45（v8 37）・(b) 22・(c) 204・(d) 手描き 186（73 板）／写し 0・効く範囲 63 ファイル／37 機能／Pen 0 板
 
+- **10-11の追加**：[§6.31](v8-design-rules.md)・[§6.37](v8-design-rules.md)・B-208・B-222・B-224・B-233。箱の中は16以上（小さい箱12）、固定高さではみ出させず下の余白も守る。LIFFの白い中身カードも共通影。選ぶカード・入力欄・ボタンは影の対象外。
+
 <a id="kpi-band"></a>
 ## kpi-band 数の帯
 
@@ -132,6 +136,8 @@
 - **決まり**：[§6.7](v8-design-rules.md)・[§6.1](v8-design-rules.md)・B-149・B-153・B-145
 - **見張り**：`apps/web/src/components/shared/kpi-band-contract.test.tsx`・`apps/web/src/components/shared/kpi-card-migration-contract.test.tsx`・`apps/web/src/components/shared/list-kpis-contract.test.ts`
 - **10-09 の数**：(a) 163（v8 113）・(b) 55・(c) 270・(d) 手描き 0（0 板）／写し 0・効く範囲 149 ファイル／64 機能／Pen 15 板
+
+- **10-11の追加**：[§6.29](v8-design-rules.md)・B-195・B-220。状態語は数字にせず状態札へ。帯の全マスに補足・行き先が無ければ高さ90、1つでもあれば全マスをそろえる。持ち主は同じ KpiBand＋KpiCard。既存の見張りに `kpi-card-description-react.test.tsx`、画面の余白の見張り `apps/web/scripts/v8-guard/pendec2-rules.test.mjs`（補足の空白の検出）をつなぐ。
 
 <a id="page-head"></a>
 ## page-head 一覧・画面の頭
@@ -233,6 +239,8 @@
 - **見張り**：`apps/web/src/components/shared/table.test.tsx`・`apps/web/src/components/shared/v8-table-row-line-contract.test.ts`・`apps/web/src/components/shared/table-header-migration-contract.test.ts`
 - **10-09 の数**：(a) 546（v8 458）・(b) 581・(c) 204・(d) 手描き 4（2 板）／写し 20・効く範囲 223 ファイル／81 機能／Pen 86 板
 
+- **10-11の追加**：[§6.28](v8-design-rules.md)・B-217・B-218。一覧は外枠・角丸・影の無い平らな表、線と色付き行は領域いっぱい、中身は左右24。名前は黒の太字1行＋フォルダ丸。旧いv19Ivv基準・左右16は B-217、名前の緑は B-218 で置き換え。`apps/web/scripts/list-row-audit.mjs`・`apps/web/scripts/v8-guard/list-skeleton-audit.mjs` が既存の見張り。
+
 <a id="row-menu"></a>
 ## row-menu 行の右端「…」
 
@@ -253,6 +261,8 @@
 - **決まり**：[§2](v8-design-rules.md)・[§6.8](v8-design-rules.md)・B-143
 - **見張り**：`apps/web/src/components/shared/row-actions-contract.test.tsx`・`apps/web/src/v8/row-menu-contract.test.ts`
 - **10-09 の数**：(a) 109（v8 53）・(b) 31・(c) 9・(d) 手描き 0（0 板）／写し 0・効く範囲 132 ファイル／68 機能／Pen 0 板
+
+- **10-11の追加**：[§6.28](v8-design-rules.md)・[§6.39](v8-design-rules.md)・B-193・B-199・B-200・B-232。一覧の主操作は1つまで、編集の専用ボタン列を置かない。操作がある全行に同じxの「…」。閲覧のみで操作が無い板と読むだけの履歴表は対象外。
 
 <a id="pagination"></a>
 ## pagination ページ送り
@@ -275,6 +285,8 @@
 - **決まり**：[§2](v8-design-rules.md)・[§6.8](v8-design-rules.md)・B-143
 - **見張り**：`apps/web/src/components/ui/list-range-contract.test.ts`／**要る試験**：ページ送りのある一覧で件数の切り替え（10・20・50）が無い・定数を画面で持つと落ちる試験
 - **10-09 の数**：(a) 222（v8 126）・(b) 0・(c) 12・(d) 手描き 8（6 板）／写し 0・効く範囲 155 ファイル／71 機能／Pen 56 板
+
+- **10-11の追加**：[§6.30](v8-design-rules.md)・B-211・B-231。番号と次の矢印は同じ枠、今のページだけ薄い緑。部品 jX2Uw の番号・枠を画面の上書きで消さない。
 
 <a id="detail-panel"></a>
 ## detail-panel 詳細のパネル・引き出し
@@ -315,6 +327,8 @@
 - **決まり**：[§5](v8-design-rules.md)・[§6.8](v8-design-rules.md)・[§6.12-8](v8-design-rules.md)・B-145・B-146
 - **見張り**：`apps/web/src/components/shared/dialog-design-size-contract.test.tsx`・`apps/web/src/components/shared/confirm-dialog-design-size.test.tsx`・`apps/web/src/components/shared/dialog-design-header.react.test.tsx`／**要る試験**：窓の題の終わりが半角「?」・記号なしで落ちる試験
 - **10-09 の数**：(a) 109（v8 32）・(b) 18・(c) 41・(d) 手描き 6（6 板）／写し 0・効く範囲 354 ファイル／109 機能／Pen 0 板
+
+- **10-11の追加**：[§6.42](v8-design-rules.md)・B-180・B-240。確かめの窓は480／560／720／960の段、既定480。絵の520等を正にしない。選ぶ窓640は [picker-dialog](#picker-dialog) の例外、引き出し480／540は [detail-panel](#detail-panel)。既存の幅の試験と照合で区別する。
 
 <a id="picker-dialog"></a>
 ## picker-dialog 選ぶ窓
@@ -633,10 +647,10 @@
 <a id="customer-info"></a>
 ## customer-info 顧客情報の欄
 
-- **役目**：受信箱の右の欄と友だちの詳細の概要の左を同じ部品で（段ごとの見出し＋編集する・決まった7つの欄・タグ・マイル…）
-- **持ち主（コード）**：**未実装**
+- **役目**：受信箱の右の欄と友だちの詳細の概要の左を同じ部品で（段ごとの見出し＋編集・決まった8つの欄・タグ・マイル…）
+- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`）。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
 - **持ち主（Pen）**：`GBTyR`「顧客情報の欄（B-167）」
-  - 注：コードは未実装（受信箱 v8/inbox-chat/customer-panel と友だちの詳細 v8/friend-detail/overview-tab が別々）
+  - 2026-10-11確認：両画面の入口は別でも欄の持ち主は CustomerInfoPanel。取得・保存・権限は呼び出す側が渡す。
   - 部品の板の html に書き出されていない ID：`GBTyR`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：
   - two-panels：`\b(CustomerPanel|FriendInfoSidebar|OverviewTab|customerPanel|friendInfo)\b` — 顧客情報の欄を画面ごとに作る
@@ -645,8 +659,8 @@
   - 除くもの：試験・モック・`app/visual-qa/`・`globals.css`・コメントの行・持ち主のファイル（表の `global.code`）
 - **見つけ方（Pen）**：
   - hand-customer：名前 `顧客(情報|カルテ)|右の列|概要の左`・名前が `B-167` でない — 顧客情報の欄の手描き（GBTyR でない）
-- **決まり**：B-167・B-166
-- **見張り**：なし／**要る試験**：部品を作ったら：受信箱と友だちの詳細が同じ部品を読む試験
+- **決まり**：B-167・B-166（7つは B-235 で置き換え）・[§6.33](v8-design-rules.md)・[§6.40](v8-design-rules.md)・B-212・B-219・B-234・B-235・B-238
+- **見張り**：`apps/web/src/components/shared/customer-info-panel.test.tsx`。顔32・見出し72・出どころの印・タグ2つ＋+N・［表示項目を編集］を共通で出す。列と固定8つの動作は下の [display-items](#display-items) も読む。
 - **10-09 の数**：(a) 20（v8 9）・(b) 0・(c) 0・(d) 手描き 20（15 板）／写し 0・効く範囲 0 ファイル／0 機能／Pen 0 板
 
 <a id="phone-preview"></a>
@@ -882,3 +896,35 @@
 - **決まり**：[§2](v8-design-rules.md)・[§6.13](v8-design-rules.md)・B-127・B-147
 - **見張り**：`apps/web/src/components/shared/folder-select.react.test.tsx`・`apps/web/src/components/shared/folder-select-rollout-contract.test.ts`
 - **10-09 の数**：(a) 61（v8 45）・(b) 0・(c) 0・(d) 手描き 0（0 板）／写し 0・効く範囲 25 ファイル／18 機能／Pen 0 板
+
+
+<a id="message-insert-row"></a>
+## message-insert-row 本文の差し込みの行（2026-10-11追加）
+
+- **役目**：本文枠の内側の下端で、差し込む項目と文字数を同じ形で見せる。
+- **持ち主（コード）**：`apps/web/src/components/shared/message-insert-row.tsx`・`message-insert-row.module.css`（`MessageBody`・`MessageInsertRow`・`MessageInsertButton`）。本文中の札は `insert-text-field.tsx`・`insert-tokens.ts`、統括の種類の受け渡しは `hq-message-inserts.tsx`。
+- **持ち主（Pen）**：リマインダの採用形（B-221）。共通の部品IDは司令塔の確定待ち。V6xAo・U5rxyH・Bb8xi・pIHp3 等は画面の板のIDで、部品IDと混同しない。
+- **決まり**：[§6.34](v8-design-rules.md)・B-221・B-238。「差し込む」11px＋印付き文字ボタン＋右端の文字数。狭い時はその他にまとめ文字数は枠下。統括の項目は店名／電話／予約ページ／名前＋固定8つ。
+- **見つけ方**：枠外の「＋ 名前」の札・「差し込み：」・古い編集部品・同じ役目の自前行を探す。本文中の札と保存する {{…}} は違反ではない。
+- **見張り**：`message-insert-row.test.tsx`・`hq-message-inserts.test.tsx`・`insert-text-field.test.tsx`、V8の崩れ検査。機械の対応表への新型登録は次の道具更新で行う。
+
+<a id="choice-card"></a>
+## choice-card 選ぶカード（2026-10-11追加）
+
+- **役目**：カード全体を押して1つを選び、右上のラジオでも選択状態を示す。
+- **持ち主（コード）**：`apps/web/src/components/shared/radio-card.tsx`・`radio-card.module.css`（`RadioCard`・`RadioCardGroup`）。複数は共通 Checkbox。デザインの型は `customer-design-picker.tsx` が同じカードを使う。
+- **持ち主（Pen）**：B-203案A・B-229。共通の部品IDは司令塔の確定待ち。
+- **決まり**：[§6.30](v8-design-rules.md)。選択＝緑2px枠・薄い緑地・右上16のラジオ、未選択＝灰1px枠・白地。LIFFの素のラジオと見本は18＋点9（B-223）。ブロック追加と卓の表はこの型ではない。
+- **見つけ方**：ラジオ無しの選ぶ箱・青枠・灰枠の選択・説明へ重なる丸・カード型の上書きを探す。
+- **見張り**：`radio-card-contract.test.tsx`・`apps/web/scripts/v8-guard/pendec2-rules.test.mjs`（選ぶ箱の右上ラジオ）。機械の表では既存 toggle の対象だが、この文書では選ぶカードの役目を分けて示す。
+
+<a id="display-items"></a>
+## display-items 顧客情報と友だち一覧の表示項目（2026-10-11追加）
+
+- **役目**：決まった8つと、お店が実際に作った情報欄を選び、出す・隠す・並べ替える。
+- **持ち主（コード）**：`apps/web/src/components/shared/display-items-dialog.tsx`・`display-items-dialog.module.css`（共通の窓）、`fixed-friend-field-values.ts`（決まった値）、`allergy-field.tsx`。受信箱と概要は CustomerInfoPanel、友だち一覧は `apps/web/src/v8/friends/list/list.tsx`、情報欄タブは `apps/web/src/v8/friend-detail/info-tab.tsx` がデータと保存する設定を渡す。
+- **持ち主（Pen）**：CustomerInfoPanelの部品GBTyRとB-234〜B-238の採用板。表示項目の窓の共通部品IDは司令塔の確定待ち。
+- **決まり**：[§6.33](v8-design-rules.md)・[§6.40](v8-design-rules.md)。名前以外の列は1440で7・1152で4。お店の情報欄は固定の例ではなく実際の項目数、検索と縦送り・管理へのリンクを出す。列は鍵で保存、新項目を次の開き直しで反映、削除済み項目を列から外す。
+- アレルギーは固定8つ目・複数の札・店の選択肢＋自由入力。フォームの「書いてもらう」3行目で、保存先を変えない（B-235・B-238）。
+- **見つけ方**：固定7つ・1152で5列・仮の「お店の情報欄」の固定候補・一覧に無制限の列・横送り・アレルギー1行テキストを探す。
+- **見張り**：`customer-info-panel.test.tsx`・`display-items-dialog.test.tsx`、V8の列数・はみ出し検査。**要る動作確認**：追加・削除した項目、列上限、並べ替え、値の出どころ、複数アレルギー、店と統括のフォームの継承。文書の掲載だけで実装合格とはしない。

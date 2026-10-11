@@ -76,4 +76,13 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
     expect(response.status).toBe(status)
     await expect(response.json()).resolves.toMatchObject({ success: true })
   })
+
+  it('お客さまの画面のデザインは版と型を返し、保存は許可しない', async () => {
+    const url = `${baseUrl}/api/account-settings/customer-look?accountId=visual-qa-account`
+    const response = await fetch(url)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({success:true,data:{version:1,look:{preset:'line',primaryColor:null,backgroundColor:null,headingFont:'default'}}})
+    const write = await fetch(url,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({accountId:'visual-qa-account',expectedVersion:1,look:{preset:'warm'}})})
+    expect(write.status).toBe(405)
+  })
 })

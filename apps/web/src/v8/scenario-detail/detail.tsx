@@ -28,6 +28,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
+import { MessageBody } from '@/components/shared/message-insert-row'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview';
 import type { StepMessageKind } from '@/components/scenarios/message-type-tabs';
@@ -1906,16 +1907,7 @@ export default function ScenarioDetailV8({
                 }}
               />
             ) : (
-              <div><Field label="メッセージ内容" required>{stepForm.messageType === 'text' && (
-                  <div className="mb-2">
-                    <InsertToolbar
-                      targetRef={stepBodyRef}
-                      value={stepForm.messageContent}
-                      onChange={(next) => setStepForm((prev) => ({ ...prev, messageContent: next }))}
-                    />
-                  </div>
-                )}
-<SaveErrorField names={["messageContent","stepForm.messageContent","message_content","step_form.message_content","step_form"]}><InsertTextField
+              <div><Field label="メッセージ内容" required><MessageBody><SaveErrorField names={["messageContent","stepForm.messageContent","message_content","step_form.message_content","step_form"]}><InsertTextField
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
@@ -1924,7 +1916,9 @@ export default function ScenarioDetailV8({
                   onValueChange={(next) => setStepForm({ ...stepForm, messageContent: next })}
                   aria-invalid={stepFields.invalid('content') || undefined}
                   aria-describedby={stepFields.invalid('content') ? 'step-content-error' : undefined}
-                /></SaveErrorField></Field></div>
+                /></SaveErrorField>
+                  {stepForm.messageType === 'text' ? <InsertToolbar targetRef={stepBodyRef} value={stepForm.messageContent} onChange={(next) => setStepForm(prev => ({ ...prev, messageContent: next }))} count={`${formatNumber(stepForm.messageContent.length)} / 5,000`} /> : null}
+                </MessageBody></Field></div>
             )}
             <FieldError id="step-content-error">{stepFields.error('content')}</FieldError>
             </div>

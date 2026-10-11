@@ -24,7 +24,8 @@ describe('一覧の行の決まり（B-190/193/194/195/198）', () => {
     expect(row).not.toHaveBeenCalled()
     cleanup()
     render(<RowActions subjectName="閲覧のみ" />)
-    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.getByRole('button', { name: '閲覧のみのその他操作' })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: '編集する' })).toBeNull()
   })
   it('名前は丸＋名前1行。全文とフォルダ名を確認できる', () => {
     const html = renderToStaticMarkup(<table><tbody><tr><NameCell name="長い名前" folder={{ name: 'フォルダ', color: '#123456' }} /></tr></tbody></table>)

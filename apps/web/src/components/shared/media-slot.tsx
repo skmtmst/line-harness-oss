@@ -538,6 +538,7 @@ export default function MediaSlot({
         aria-busy={busy || undefined}
         aria-invalid={state === 'error' || undefined}
         data-design-node="Z7vd2"
+        data-media-slot=""
         data-state={state}
         data-size={size}
         data-kind={kind}

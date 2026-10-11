@@ -7,7 +7,7 @@ import { Window } from 'happy-dom'
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DESIGN = process.env.V8_DESIGN_DIR ?? '/Users/kentakenta/lh-work/design/v8'
-const DATE = '2026-10-10'
+const DATE = '2026-10-11'
 const aliases = {
   ASVsl: '表の見出し（B-178）', JpOg0: '表の行（B-178）',
   NUOgw: '手順', Fa8ED: '手順（共通・題と説明の下・左寄せ）',
@@ -75,7 +75,7 @@ export function regenerate() {
     parts[id] = { name: el.getAttribute('data-pencil-name'), export: `html/${doc.file}.html`, nodes: walk(el) }
   }
   const snapshot = {
-    frozenAt: '2026-10-10 19:37 JST', generatedBy: 'apps/web/scripts/regenerate-v8-design-values.mjs',
+    frozenAt: '2026-10-11 03:10 JST', generatedBy: 'apps/web/scripts/regenerate-v8-design-values.mjs',
     exports: Object.fromEntries(docs.map(doc => [`html/${doc.file}.html`, doc.sha256])),
   }
   const checks = []
@@ -83,8 +83,8 @@ export function regenerate() {
   const path = join(WEB, 'design/design-parts.json')
   const contract = JSON.parse(readFileSync(path, 'utf8'))
   contract.$snapshot = snapshot
-  const provenance = '2026-10-10 19:37 JST 固定HTML'
-  if (!contract['$説明'].some(line => line.startsWith(provenance))) contract['$説明'].push(`${provenance}からB-198・B-203・B-211・B-217・B-218の色・余白・番号の丸を再生成。実装が古ければ落とす。既存の本番部品の棚卸し・未変更の契約も残す。`)
+  const provenance = '2026-10-11 03:10 JST 固定HTML'
+  if (!contract['$説明'].some(line => line.startsWith(provenance))) contract['$説明'].push(`${provenance}からB-219〜B-238を含む共通部品の色・余白・枠・文字を再生成。実装が古ければ落とす。既存の本番部品の棚卸し・未変更の契約も残す。`)
   // 本番側にも同じ役目の宣言があるものは、古い色を残さず写し直す。
   const update = (key, cls, prop, value, source) => {
     const d = contract.parts[key].declarations.find(d => d.class === cls && d.prop === prop)

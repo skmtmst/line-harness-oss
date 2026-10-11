@@ -1,5 +1,7 @@
 'use client'
 
+import { useActionError } from '@/lib/use-action-error'
+
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFolderMove } from '@/components/shared/use-folder-move'
@@ -186,7 +188,7 @@ export default function AutomationListV8() {
   const onlyArchived = view.archived === '1'
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rowBusyId, setRowBusyId] = useState<string | null>(null)
-  const [actionError, setActionError] = useState('')
+  const { error: actionError, setError: setActionError } = useActionError(selectedAccountId ?? '')
   const [pending, setPending] = useState<{ kind: 'toggle' | 'archive' | 'restore'; item: Automation; accountId: string | null } | null>(null)
   const [working, setWorking] = useState(false)
   const [testing, setTesting] = useState<Automation | null>(null)
@@ -203,7 +205,6 @@ export default function AutomationListV8() {
   const load = useCallback(async () => {
     const requestId = ++requestRef.current
     setLoadStatus('loading')
-    setActionError('')
     try {
       const [listRes, runsRes] = await Promise.all([
         api.automations.list({ accountId: selectedAccountId || undefined, includeArchived: true }),

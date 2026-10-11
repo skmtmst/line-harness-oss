@@ -10,6 +10,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import {TextField} from '@/components/shared/text-field'
+import {Field as FormField} from '@/components/shared/form-controls'
 import QrDialog from '@/components/dashboard/qr-dialog'
 import {qrToDataURL} from '@/lib/qr-image'
 import {visitStampsApi} from '@/lib/visit-stamps-api'
@@ -109,7 +110,7 @@ export function StaffQr({card,accountId,shop,onClose}: {card:VisitStampCard;acco
   if(view==='input')return <Dialog open designNode={mode==='amount'?'pYdrv':'l3wpv'} designWidth={560} title="QR を出す" description="友だちは選びません。QR を読んだ人に押します" confirmLabel="QR を出す" confirmIcon={<QrCode size={15} aria-hidden="true"/>} busy={busy} error={error||undefined} onCancel={close} onConfirm={()=>void open()}>
     <div className={styles.dialogBody}><div className={styles.field}><span>押し方</span><div><SegmentedControl aria-label="押し方" value={mode} onChange={v=>{setMode(v);pending.current=null;setFieldError('')}} disabled={busy} options={[{value:'count',label:'個数で'},{value:'amount',label:'会計の金額で'}]}/></div></div>
       {mode==='count'?<div className={styles.field}><span>押す個数</span><div className={styles.actions}><IconButton aria-label="1個へらす" disabled={count<=1} onClick={()=>{setCount(n=>n-1);pending.current=null}}><Minus size={16}/></IconButton><strong className={styles.count}>{`${count} 個`}</strong><IconButton aria-label="1個ふやす" disabled={count>=card.settings.maxPerVisit} onClick={()=>{setCount(n=>n+1);pending.current=null}}><Plus size={16}/></IconButton><span className={styles.sub}>{`1 から ${card.settings.maxPerVisit} 個まで`}</span></div></div>
-        :<label className={styles.field}><span>会計の金額</span><div className={styles.actions}><TextField ref={input} aria-label="会計の金額" inputMode="numeric" value={amount} invalid={!!fieldError} onChange={e=>{setAmount(e.target.value);pending.current=null;setFieldError('')}}/><span>円</span><ArrowRight size={16} aria-hidden="true"/><strong className={styles.count}>{`${preview} 個`}</strong></div>{fieldError?<span role="alert" className={styles.fieldError}>{fieldError}</span>:null}<span className={styles.sub}>{`${card.settings.amountUnit.toLocaleString('ja-JP')} 円ごとに 1 個・1回の上限 ${card.settings.maxPerVisit} 個（② たまる決まり）`}</span></label>}
+        :<FormField label="会計の金額" optional={false} error={fieldError}><div className={styles.actions}><TextField ref={input} aria-label="会計の金額" inputMode="numeric" value={amount} onChange={e=>{setAmount(e.target.value);pending.current=null;setFieldError('')}}/><span>円</span><ArrowRight size={16} aria-hidden="true"/><strong className={styles.count}>{`${preview} 個`}</strong></div><span className={styles.sub}>{`${card.settings.amountUnit.toLocaleString('ja-JP')} 円ごとに 1 個・1回の上限 ${card.settings.maxPerVisit} 個（② たまる決まり）`}</span></FormField>}
     </div>
   </Dialog>
   return <QrDialog open onClose={close} accountName={`${shop}・${card.name}`} baseLink={qr?.url??''} routes={[]} direct={{title:'来店スタンプのQR',description:'LINEのカメラで読み取ってください。1回読まれると使えなくなります。',downloads:false,

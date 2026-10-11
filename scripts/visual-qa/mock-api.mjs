@@ -1,4 +1,5 @@
 import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
+import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js'
 /**
  * 画面確認だけのための、Workerの代わりになる小さなAPI。
  *
@@ -1590,6 +1591,67 @@ const RESTAURANT_INTAKE_ADDRESSES = [
   { id: 'ia-1', storeId: 'store-sby', localPart: 'r-sby01', address: 'r-sby01@intake.example.jp', status: 'active', createdAt: restaurantAt(9, 0, -30), revokedAt: null },
 ]
 
+/*
+ * 飲食店向け デリバリー受注（`restaurantDeliveryApi`・`/api/restaurant-test/delivery/*`）。
+ * ★V8 の板 `kDQHr`（注文一覧）・`OzHLO`（注文履歴）・`h7OeT`（品切れ一括）と
+ * 窓 `hjdqV`・`dgeTy`・`XCVGd`。
+ *
+ * 無いと既定の器（`EMPTY_PAGE`）が返り、`success` が真なので画面は例外を捕まえられず、
+ * `data.store.id`・`data.services`・`data.orders` が回せずに
+ * 「画面を表示できませんでした」になっていた（`/restaurant-test/delivery`）。
+ * 返事の形は本物（`apps/worker/src/routes/restaurant-delivery.ts`）と同じく
+ * `data` で包まない平らな形にする（`apps/web/src/lib/restaurant-delivery-api.ts` の型）。
+ *
+ * 測定専用の `scripts/visual-qa/delivery-fixtures.mjs`（絵との画素比べ用）とは
+ * 別に持つ。あちらは絵に合わせて件数や文字を動かすので、ここから読み込むと
+ * 184画面の共通の仮サーバーが絵の調整につられて壊れる。
+ */
+const DELIVERY_STORE = { id: 'store-sby', name: '然 渋谷店' }
+const DELIVERY_SERVICE_LABELS = { ubereats: 'Uber Eats', demaecan: '出前館', rocketnow: 'ロケットナウ' }
+const DELIVERY_SERVICES = [
+  { service: 'ubereats', label: 'Uber Eats', connectionStatus: 'connected', intakeStatus: 'open', stopUntil: null, todayCount: 14, todayAmount: 39600 },
+  { service: 'demaecan', label: '出前館', connectionStatus: 'connected', intakeStatus: 'open', stopUntil: null, todayCount: 11, todayAmount: 28800 },
+  { service: 'rocketnow', label: 'ロケットナウ', connectionStatus: 'connected', intakeStatus: 'stopped', stopUntil: restaurantAt(13, 0), todayCount: 7, todayAmount: 18000 },
+]
+const deliveryOrder = (id, service, orderNumber, status, statusLabel, totalAmount, itemCount, itemSummary, urgency, urgencyReason, receivedAt, wantedAt) => ({
+  id, service, serviceLabel: DELIVERY_SERVICE_LABELS[service], orderNumber, status, statusLabel,
+  totalAmount, itemCount, itemSummary, urgency, urgencyReason, receivedAt, wantedAt,
+})
+const DELIVERY_ORDERS = [
+  deliveryOrder('ord-ue-1042', 'ubereats', 'UE-1042', 'new', '新着', 3480, 4, '唐揚げ弁当×2 ほか3点', 'urgent', '受け取り希望まで13分・品数4点のため、先に調理を始めるのがおすすめです', restaurantAt(12, 2), restaurantAt(12, 15)),
+  deliveryOrder('ord-dm-8821', 'demaecan', 'DM-8821', 'new', '新着', 1180, 1, '天丼セット×1', 'normal', null, restaurantAt(12, 4), restaurantAt(12, 25)),
+  deliveryOrder('ord-rn-310', 'rocketnow', 'RN-310', 'cooking', '調理中', 2560, 4, 'バターチキンカレー×2 ナン×2', 'urgent', '受け取り希望まで8分です', restaurantAt(12, 6), restaurantAt(12, 16)),
+  deliveryOrder('ord-ue-1041', 'ubereats', 'UE-1041', 'cooking', '調理中', 2180, 2, '海鮮丼×1 みそ汁×1', 'normal', null, restaurantAt(12, 9), restaurantAt(12, 30)),
+  deliveryOrder('ord-dm-8820', 'demaecan', 'DM-8820', 'cooking', '調理中', 4140, 3, 'ハンバーグ定食×3', 'watch', '品数が多く調理に時間がかかります', restaurantAt(12, 12), restaurantAt(12, 35)),
+  deliveryOrder('ord-ue-1039', 'ubereats', 'UE-1039', 'handed_over', '受け渡し済み', 1160, 1, '唐揚げ弁当×1', 'normal', null, restaurantAt(11, 48), restaurantAt(12, 5)),
+  deliveryOrder('ord-rn-309', 'rocketnow', 'RN-309', 'canceled', 'キャンセル', 980, 1, 'チキンカレー×1', 'normal', null, restaurantAt(11, 40), restaurantAt(12, 0)),
+]
+/* 表の選び取り（`tab`）は本物と同じく Worker 側で絞る。`all` は全部。 */
+const deliveryOrdersByTab = (tab) => (tab === 'all' ? DELIVERY_ORDERS : DELIVERY_ORDERS.filter((row) => row.status === tab))
+const DELIVERY_ORDER_ITEMS = {
+  'ord-ue-1042': [
+    { name: '唐揚げ弁当', note: '特製タレ増量（無料）', quantity: 2, amount: 2160 },
+    { name: 'ポテトサラダ', note: null, quantity: 1, amount: 380 },
+    { name: '緑茶（500ml）', note: null, quantity: 2, amount: 440 },
+  ],
+}
+const DELIVERY_HISTORY = DELIVERY_ORDERS.map((row) => ({
+  id: row.id, service: row.service, serviceLabel: row.serviceLabel, orderNumber: row.orderNumber,
+  status: row.status, statusLabel: row.statusLabel, totalAmount: row.totalAmount, itemCount: row.itemCount,
+  itemSummary: row.itemSummary, receivedAt: row.receivedAt,
+  handedOverAt: row.status === 'handed_over' ? restaurantAt(12, 0) : null,
+  canceledAt: row.status === 'canceled' ? restaurantAt(11, 44) : null,
+}))
+const DELIVERY_MENU_SERVICE_TAGS = DELIVERY_SERVICES.map(({ service, label }) => ({ service, label }))
+const DELIVERY_MENU_ITEMS = [
+  { id: 'dm-1', name: '唐揚げ弁当', category: '弁当', price: 1080, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-2', name: '日替わり弁当', category: '弁当', price: 980, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-3', name: '親子丼セット', category: '丼もの', price: 1180, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-4', name: '焼き魚定食', category: '定食', price: 1180, soldOut: true, soldOutAt: restaurantAt(11, 10), services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-5', name: 'ポテトサラダ', category: '副菜', price: 380, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+  { id: 'dm-6', name: '緑茶（500ml）', category: 'ドリンク', price: 220, soldOut: false, soldOutAt: null, services: DELIVERY_MENU_SERVICE_TAGS },
+]
+
 /**
  * パスごとの形。ここに無いものは `EMPTY_PAGE` になる。
  *
@@ -2950,6 +3012,75 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/terms-agreement') {
     return { success: true, data: { documentKey: 'musubo-terms', agreedVersion: null, agreedAt: null } }
   }
+  /*
+   * デリバリー受注の読み口。`data` で包まない（`DELIVERY_*` の注記のとおり）。
+   * 状態の進み・品切れの一括・受付の停止は書き込みなので従来どおり405。
+   */
+  if (method === 'GET' && pathname === '/api/restaurant-test/delivery/orders') {
+    const tab = ['all', 'new', 'cooking', 'handed_over'].includes(query.get('tab')) ? query.get('tab') : 'new'
+    const service = query.get('service')
+    const rows = deliveryOrdersByTab(tab).filter((row) => !service || row.service === service)
+    return {
+      success: true,
+      store: DELIVERY_STORE,
+      services: DELIVERY_SERVICES,
+      kpis: {
+        todayCount: 32, todayCountDelta: 4, handedOverCount: 24, todaySales: 86400,
+        todaySalesDeltaPercent: 8, averageAmount: 2700, urgentCount: 2,
+        averagePrepMinutes: 12, averagePrepMinutesDelta: -2,
+      },
+      tab,
+      tabCounts: {
+        all: DELIVERY_ORDERS.length,
+        new: deliveryOrdersByTab('new').length,
+        cooking: deliveryOrdersByTab('cooking').length,
+        handed_over: deliveryOrdersByTab('handed_over').length,
+      },
+      orders: rows,
+    }
+  }
+  const deliveryOrderDetail = method === 'GET' ? /^\/api\/restaurant-test\/delivery\/orders\/([^/]+)$/.exec(pathname) : null
+  if (deliveryOrderDetail) {
+    const id = decodeURIComponent(deliveryOrderDetail[1])
+    const row = DELIVERY_ORDERS.find((item) => item.id === id) ?? DELIVERY_ORDERS[0]
+    return {
+      success: true,
+      order: {
+        ...row,
+        currency: 'JPY',
+        pickupMethod: `配達（${row.serviceLabel} 配達員）`,
+        customerNote: row.urgency === 'urgent' ? 'タレ多めでお願いします' : null,
+        cancelReasonCode: row.status === 'canceled' ? 'store_closed' : null,
+        canceledBy: row.status === 'canceled' ? 'store' : null,
+        acceptedAt: row.status === 'new' ? null : restaurantAt(12, 7),
+        readyAt: row.status === 'handed_over' ? restaurantAt(11, 58) : null,
+        handedOverAt: row.status === 'handed_over' ? restaurantAt(12, 0) : null,
+        canceledAt: row.status === 'canceled' ? restaurantAt(11, 44) : null,
+      },
+      items: DELIVERY_ORDER_ITEMS[row.id] ?? [{ name: row.itemSummary, note: null, quantity: row.itemCount, amount: row.totalAmount }],
+    }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/delivery/history') {
+    const service = query.get('service')
+    const status = query.get('status')
+    const rows = DELIVERY_HISTORY.filter((row) => (!service || row.service === service) && (!status || row.status === status))
+    const date = storeYmd(QA_CLOCK, RESTAURANT_STORES[0].timezone)
+    return {
+      success: true,
+      range: { from: query.get('from') || date, to: query.get('to') || date },
+      filter: { service: service || null, status: status || null },
+      totals: {
+        count: 32,
+        amount: 86400,
+        canceledCount: 2,
+        byService: DELIVERY_SERVICES.map(({ service: key, label, todayCount, todayAmount }) => ({ service: key, label, count: todayCount, amount: todayAmount })),
+      },
+      orders: rows,
+    }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/delivery/menu-items') {
+    return { success: true, store: DELIVERY_STORE, items: DELIVERY_MENU_ITEMS }
+  }
 
   if (pathname === '/api/auth/session') {
     /*
@@ -4051,6 +4182,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
+  }
+  if (method === 'GET' && pathname === '/api/account-settings/customer-look') {
+    return { success: true, data: { version: 1, look: { ...DEFAULT_CUSTOMER_LOOK } } }
   }
   if (pathname === '/api/account-settings/test-recipient-login-users') {
     /*

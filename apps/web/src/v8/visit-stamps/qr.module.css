@@ -9,8 +9,7 @@
 .dialogBody { font-size:var(--tpl-e78-label-size); line-height:var(--tpl-e78-label-lh); display:flex; flex-direction:column; gap:var(--tpl-e78-card-gap-s); }
 .dialogBody p { margin:var(--tpl-e78-qr-zero); }
 .field { display:flex; flex-direction:column; gap:var(--tpl-e78-field-gap); font-size:var(--tpl-e78-label-size); line-height:var(--tpl-e78-label-lh); }
-.field input { flex:1; min-width:0; }
-.fieldError { color:var(--color-danger); }
+.actions input { flex:1; min-width:0; }
 .count { font-size:var(--text-xl); white-space:nowrap; }
 .largeCount { font-size:var(--tpl-e78-qr-count); line-height:var(--leading-normal); font-variant-numeric:tabular-nums; }
 .timer { width:100%; }

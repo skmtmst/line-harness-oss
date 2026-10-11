@@ -19,11 +19,15 @@ const CLOSE_OTHERS_EVENT = 'help-tip-open'
 export default function HelpTip({
   label,
   className,
+  icon,
+  hover = false,
   children,
 }: {
   /** 読み上げ名（例：「今月の完了率の説明」）。吹き出しとは aria-describedby でつなぐ。 */
   label: string
   className?: string
+  icon?: ReactNode
+  hover?: boolean
   /**
    * 1〜2文の補足。長い説明がある場所への「くわしく」リンクも
    * ここへ一緒に渡す（`<a href="...">くわしく</a>`）。
@@ -75,6 +79,8 @@ export default function HelpTip({
   return (
     <span
       ref={wrapRef}
+      onMouseEnter={hover ? () => { window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpen(true) } : undefined}
+      onMouseLeave={hover ? () => setOpen(false) : undefined}
       className={[styles.wrap, className].filter(Boolean).join(' ')}
       onBlur={(event) => {
         if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpen(false)
@@ -93,7 +99,7 @@ export default function HelpTip({
           ★V7 `LYs5d`「？ 補足の印」：18px の正円の中に「?」。
           角丸の正方形・楕円・枠なしは使わない（2026-09-28 オーナー指示）。
         */}
-        <span aria-hidden="true" className={styles.mark}>?</span>
+        <span aria-hidden="true">{icon ? <span className={styles.sourceMark}>{icon}</span> : <span className={styles.mark}>?</span>}</span>
       </button>
       {open ? (
         <span role="note" id={tipId} className={styles.tip}>

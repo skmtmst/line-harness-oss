@@ -117,7 +117,7 @@ describe('飲食店の本人予約', () => {
     await request(`/api/liff/restaurant/reservations/${data.id}/confirm`, {
       expectedVersion: 1,
     });
-    expect(mocks.send).toHaveBeenCalledTimes(1);
+    expect(mocks.send).not.toHaveBeenCalled(); // 未承認の予約入りは送らない
     const change = await request(
       `/api/liff/restaurant/reservations/${data.id}/reschedule`,
       { expectedVersion: 2, startsAt: '2027-10-01T04:00:00Z', guestCount: 2 },
@@ -287,7 +287,6 @@ describe('飲食店の本人予約', () => {
     expect((await hold()).status).toBe(401);
   });
   it('通知失敗で予約を戻さず、同じ鍵で再試行する', async () => {
-    mocks.send.mockRejectedValueOnce(new Error('mock failure'));
     const { data } = await read(await hold());
     expect(
       (
@@ -299,6 +298,8 @@ describe('飲食店の本人予約', () => {
     expect(db.raw.prepare('SELECT status FROM rt_reservations').get()).toEqual({
       status: 'confirmed',
     });
+    mocks.send.mockRejectedValueOnce(new Error('mock failure'));
+    expect((await request(`/api/liff/restaurant/reservations/${data.id}/reschedule`,{expectedVersion:2,startsAt:'2027-10-01T04:00:00Z',guestCount:2})).status).toBe(200);
     db.raw.exec('UPDATE rt_customer_notice_outbox SET lease_until=NULL');
     expect(
       await processRestaurantCustomerNotices({ DB: db.db } as Env['Bindings']),
@@ -386,4 +387,144 @@ it('営業時間があって受付終了した日は、定休と表示しない'
     const body=await (await request('/api/liff/restaurant/availability?storeId=store&date=2027-10-01&guestCount=2')).json() as any;
     expect(body.data).toMatchObject({slots:[],unavailableReason:'full'});
   } finally {now.mockRestore();}
+});
+
+it('来店の返事はLIFF本人・予約版で受け、未認証・他人・型違いを拒否する',async()=>{
+ const id=crypto.randomUUID();
+ db.raw.prepare("INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status) VALUES('confirmed','store','phone','本人','Uone',2,?,?,'confirmed')").run(start,'2027-10-01T04:30:00.000Z');
+ db.raw.prepare("INSERT INTO rt_reservation_confirmations(request_id,reservation_id,reservation_version,friend_id,requested_at,expires_at) VALUES(?,'confirmed',1,'f1',?,?)").run(id,new Date().toISOString(),start);
+ const path='/api/liff/restaurant/confirmations/'+id+'/respond';
+ expect((await request(path,{expectedVersion:1,response:'going'},'two')).status).toBe(404);
+ expect((await request(path,{expectedVersion:'1',response:'going'})).status).toBe(400);
+ expect((await request(path,{expectedVersion:2,response:'going'})).status).toBe(409);
+ const accepted=await request(path,{expectedVersion:1,response:'going'});expect(accepted.status).toBe(200);
+ expect(await accepted.json()).toMatchObject({success:true,data:{response:'going',version:1}});
+ expect(db.raw.prepare("SELECT customer_version,status FROM rt_reservations WHERE id='confirmed'").get()).toEqual({customer_version:1,status:'confirmed'});
+ const unauthenticated=await app().request(path+'?liffId=liff1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:1,response:'going'})});
+ expect(unauthenticated.status).toBe(401);
+});
+
+describe('飲食4：コース・フォーム・系列店',()=>{
+ function course(){db.raw.exec(`INSERT INTO rt_menu_items(id,store_id,kind,name,price,duration_minutes,allergens_json) VALUES('c90','store','course','90分コース',5000,90,'["乳"]'),('c180','store','course','180分コース',8000,180,'[]'),('foreign','other','course','他店',1000,60,'[]')`);}
+ it('同じ店の公開コースと所要時間で空き・hold・確定・変更を通す。別店と卓の指定は採用しない',async()=>{
+  course();
+  const r=await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,courseId:'c90',tableId:'foreign',requestId:'course_hold'});
+  expect(r.status).toBe(201);const h=(await read(r)).data;
+  expect(h.endsAt).toBe('2027-10-01T04:30:00.000Z');expect(h.courseId).toBe('c90');
+  expect(db.raw.prepare('SELECT table_id,dining_snapshot_json FROM rt_reservations WHERE id=?').get(h.id)).toMatchObject({table_id:'table1',dining_snapshot_json:expect.stringContaining('乳')});
+  expect((await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:1})).status).toBe(200);
+  const changed=await request(`/api/liff/restaurant/reservations/${h.id}/reschedule`,{expectedVersion:2,startsAt:start,guestCount:2,courseId:'c180'});
+  expect(changed.status).toBe(200);expect((await read(changed)).data.endsAt).toBe('2027-10-01T06:00:00.000Z');
+  expect((await request(`/api/liff/restaurant/reservations/${h.id}/reschedule`,{expectedVersion:2,startsAt:start,guestCount:2,courseId:'c90'})).status).toBe(409);
+  expect((await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,courseId:'foreign',requestId:'foreign_hold'})).status).toBe(400);
+  expect(mocks.send).toHaveBeenCalledTimes(1); // 日時変更の既存結果通知だけ
+ });
+ it('コースの長い滞在は隣の在庫と閉店時刻まで確認する。確定前の改版も拒否する',async()=>{
+  course();db.raw.exec(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,line_capacity,total_capacity) VALUES('closed','store','2027-10-01T05:30:00Z',0,8)`);
+  expect((await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,courseId:'c180',requestId:'inventory_hold'})).status).toBe(409);
+  const r=await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,courseId:'c90',requestId:'changed_course'});expect(r.status).toBe(201);
+  const h=(await read(r)).data;db.raw.exec("UPDATE rt_menu_items SET duration_minutes=60 WHERE id='c90'");
+  expect((await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:1})).status).toBe(409);
+  expect((await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:'2027-10-01T05:00:00Z',guestCount:2,courseId:'c180',requestId:'late_course'})).status).toBe(409);
+ });
+ it('最後の1卓のコース確保は同時に1件だけ。同じ受付番号でコースを変えない',async()=>{
+  course();db.raw.exec("UPDATE rt_tables SET is_active=0 WHERE id='table2'");
+  const bodies=['one','two'].map((x)=>({storeId:'store',startsAt:start,guestCount:2,courseId:'c90',requestId:'course_race_'+x}));
+  const result=await Promise.all(bodies.map((b,i)=>request('/api/liff/restaurant/holds',b,i===0?'one':'two')));
+  expect(result.map(r=>r.status).sort()).toEqual([201,409]);
+  const winner=result[0]!.status===201?0:1;
+  expect((await request('/api/liff/restaurant/holds',{...bodies[winner],courseId:'c180'},winner===0?'one':'two')).status).toBe(409);
+ });
+ function referralSetup(){
+  db.raw.exec(`UPDATE rt_stores SET latitude=35,longitude=139;
+   INSERT INTO booking_settings(id,line_account_id,booking_window_days,cutoff_minutes_before) VALUES('other-bs','a2',365,0);
+   INSERT INTO rt_tables(id,store_id,code,label,seat_type,max_capacity) VALUES('other-table','other','1','卓','table',4);
+   INSERT INTO rt_reservation_links(store_id,token) VALUES('other','target-link');
+   INSERT INTO rt_store_groups(id,organization_id,name) VALUES('group','org','系列');
+   INSERT INTO rt_store_group_members(group_id,store_id,referral_enabled,max_distance) VALUES('group','store',1,10),('group','other',1,10);
+   UPDATE rt_tables SET is_active=0 WHERE store_id='store';`);
+  db.raw.prepare("INSERT INTO rt_opening_hours_settings(store_id,hours_json,updated_by) SELECT 'other',hours_json,'staff' FROM rt_opening_hours_settings WHERE store_id='store'").run();
+ }
+ it('満席から許可した系列店だけを案内。入口に顧客のID・情報を含めず案内先で本人確認',async()=>{
+  referralSetup();
+  const rows=await (await request('/api/liff/restaurant/referrals?storeId=store&date=2027-10-01&guestCount=2')).json() as {data:Array<{storeId:string;bookingUrl:string}>};
+  expect(rows.data.map(r=>r.storeId)).toEqual(['other']);
+  expect(rows.data[0]!.bookingUrl).toContain('page=restaurant');expect(rows.data[0]!.bookingUrl).not.toMatch(/Uone|f1|lineUser|friendId/);
+  const offered=await request('/api/liff/restaurant/referrals',{storeId:'store',targetStoreId:'other',date:'2027-10-01',startsAt:start,guestCount:2});
+  expect(offered.status).toBe(200);
+  expect((await request('/api/liff/restaurant/link/target-link')).status).toBe(404);
+  db.raw.exec("UPDATE rt_store_group_members SET referral_enabled=0 WHERE store_id='other'");
+  expect((await (await request('/api/liff/restaurant/referrals?storeId=store&date=2027-10-01&guestCount=2')).json() as {data:unknown[]}).data).toEqual([]);
+  expect((await request('/api/liff/restaurant/referrals',{storeId:'store',targetStoreId:'other',date:'2027-10-01',startsAt:start,guestCount:2})).status).toBe(409);
+ });
+ it('座標未確認・距離超過・別組織・未許可・満席の案内先を返さない',async()=>{
+  referralSetup();
+  db.raw.exec("UPDATE rt_stores SET latitude=NULL WHERE id='other'");
+  expect((await (await request('/api/liff/restaurant/referrals?storeId=store&date=2027-10-01&guestCount=2')).json() as {data:unknown[]}).data).toEqual([]);
+  db.raw.exec("UPDATE rt_stores SET latitude=40 WHERE id='other'");
+  expect((await (await request('/api/liff/restaurant/referrals?storeId=store&date=2027-10-01&guestCount=2')).json() as {data:unknown[]}).data).toEqual([]);
+  db.raw.exec("INSERT INTO rt_organizations(id,account_id,name) VALUES('foreign-org','a2','別組織'); INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('third','foreign-org','別店','f',NULL)");
+  expect(()=>db.raw.exec("INSERT INTO rt_store_group_members(group_id,store_id,referral_enabled) VALUES('group','third',1)")).toThrow('referral_organization_conflict');
+ });
+ function savedAnswer(){
+  const layout={version:1,header:[],sections:[{id:'section',blocks:[{id:'seat-block',kind:'input',type:'booking',name:'seat',label:'予約',booking:{kind:'seats',storeId:'store',menuId:''}}]}],options:{}};
+  db.raw.prepare("INSERT INTO forms(id,name,fields,layout,is_active) VALUES('form','フォーム','[]',?,1)").run(JSON.stringify(layout));
+  const version=db.raw.prepare("SELECT current_published_version_id v FROM forms WHERE id='form'").get() as {v:string};
+  db.raw.prepare("INSERT INTO form_submissions(id,form_id,friend_id,data,form_version_id) VALUES('answer','form','f1',?,?)").run(JSON.stringify({seat:{kind:'seats',storeId:'store',guestCount:2,startsAt:start}}),version.v);
+  db.raw.exec(`INSERT INTO form_submit_claims(tenant_id,line_account_id,form_id,friend_id,idempotency_key,request_hash,status,submission_id,owner,created_at,updated_at,expires_at) VALUES('t1','a1','form','f1','submission-key','hash','completed','answer','owner',datetime('now'),datetime('now'),datetime('now','+1 day'))`);
+ }
+ it('保存済みフォームの公開版から既存台帳へ予約。同時再試行で回答と予約を増やさず下書き変更を使わない',async()=>{
+  savedAnswer();
+  db.raw.exec("UPDATE forms SET layout='{}' WHERE id='form'");
+  const body={formId:'form',blockId:'seat-block',submissionKey:'submission-key'};
+  const first=await request('/api/liff/restaurant/form-booking',body);expect(first.status).toBe(200);
+  const again=await request('/api/liff/restaurant/form-booking',body);expect(again.status).toBe(200);
+  expect((await read(first)).data.id).toBe((await read(again)).data.id);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:1});expect(db.raw.prepare('SELECT COUNT(*) n FROM form_submissions').get()).toEqual({n:1});
+  expect((await request('/api/liff/restaurant/form-booking',body,'two')).status).toBe(404);
+  expect((await request('/api/liff/restaurant/form-booking',{...body,blockId:'other'})).status).toBe(400);
+  expect(mocks.send).not.toHaveBeenCalled();
+ });
+ it('フォームの回答は残し、満席失敗後に同じキーで席を確保し直せる',async()=>{
+  savedAnswer();db.raw.exec("UPDATE rt_tables SET is_active=0");
+  const body={formId:'form',blockId:'seat-block',submissionKey:'submission-key'};
+  expect((await request('/api/liff/restaurant/form-booking',body)).status).toBe(409);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:0});
+  db.raw.exec("UPDATE rt_tables SET is_active=1");
+  expect((await request('/api/liff/restaurant/form-booking',body)).status).toBe(200);
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM form_submissions').get()).toEqual({n:1});
+ });
+ it('回答保存後の期限切れholdを同じ予約で取り直し、取消済みの回答再試行では再予約しない',async()=>{
+  savedAnswer();
+  const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('answer:seat-block'));
+  const requestId='form_'+Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('');
+  const initial=await read(await hold(requestId));
+  db.raw.prepare("UPDATE rt_reservations SET hold_expires_at=datetime('now','-1 minute') WHERE id=?").run(initial.data.id);
+  const body={formId:'form',blockId:'seat-block',submissionKey:'submission-key'};
+  const retried=await request('/api/liff/restaurant/form-booking',body);expect(retried.status).toBe(200);
+  const confirmed=(await read(retried)).data;
+  expect(confirmed.id).toBe(initial.data.id);expect(confirmed.status).toBe('confirmed');
+  expect((await request(`/api/liff/restaurant/reservations/${confirmed.id}/cancel`,{expectedVersion:confirmed.version})).status).toBe(200);
+  expect((await read(await request('/api/liff/restaurant/form-booking',body))).data.status).toBe('cancelled');
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:1});
+  expect((await request('/api/liff/restaurant/form-booking',{})).status).toBe(400);
+ });
+ it('紹介先の再認証後に確定と受諾を同時保存。途中失敗を戻し、再試行も通知を増やさない',async()=>{
+  referralSetup();
+  const offer=await (await request('/api/liff/restaurant/referrals',{storeId:'store',targetStoreId:'other',date:'2027-10-01',startsAt:start,guestCount:2})).json() as {data:{bookingUrl:string}};
+  const referralId=new URL(offer.data.bookingUrl).searchParams.get('referralId')!;
+  db.raw.exec("INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('target-friend','a2','Utarget','本人')");
+  const target=(path:string,body:unknown)=>app().request(path+'?liffId=liff2',{method:'POST',headers:{Authorization:'Bearer target','Content-Type':'application/json'},body:JSON.stringify(body)});
+  const held=await read(await target('/api/liff/restaurant/holds',{storeId:'other',startsAt:start,guestCount:2,requestId:'target_request'}));
+  db.raw.exec("CREATE TRIGGER referral_write_failure BEFORE UPDATE ON rt_reservation_referrals BEGIN SELECT RAISE(ABORT,'fixture_failure'); END");
+  const body={expectedVersion:held.data.version,referralId};
+  expect((await target(`/api/liff/restaurant/reservations/${held.data.id}/confirm`,body)).status).toBe(500);
+  expect(db.raw.prepare('SELECT status FROM rt_reservations WHERE id=?').get(held.data.id)).toEqual({status:'pending'});
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_customer_notice_outbox').get()).toEqual({n:0});
+  db.raw.exec('DROP TRIGGER referral_write_failure');
+  expect((await target(`/api/liff/restaurant/reservations/${held.data.id}/confirm`,body)).status).toBe(200);
+  expect((await target(`/api/liff/restaurant/reservations/${held.data.id}/confirm`,body)).status).toBe(200);
+  expect(db.raw.prepare('SELECT accepted_at FROM rt_reservation_referrals WHERE id=?').get(referralId)).toEqual({accepted_at:expect.any(String)});
+  expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_customer_notice_outbox').get()).toEqual({n:1});
+ });
 });
