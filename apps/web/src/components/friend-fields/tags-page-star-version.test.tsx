@@ -1,98 +1,67 @@
 // @vitest-environment happy-dom
-/*
- * ★切替の版付き化(#715)を本物のReactで動かす試験。
- *
- * 見るのは3つだけ: 版と担当を送ること、返った版へ進むこと（2回目は
- * 進んだ版で送る）、409では元に戻して理由を出すこと。
- * Required PR gate の `pnpm --filter web test` で必ず実行される。
- */
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+/* #715: 友だち一覧への表示は現役の編集で保存し、版と担当を送る。
+ * 一覧の星は2026-10-09に廃止。保存済みの版への進行と409の扱いを編集で守る。 */
+import React from 'react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const update = vi.hoisted(() => vi.fn())
-
-vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
-  const actual = await importOriginal()
-  return {
-    ...actual,
-    api: { ...actual.api, tags: { ...actual.api.tags, update } },
-  }
+const fx = vi.hoisted(() => ({ version: 1, isStarred: false, update: vi.fn() }))
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  useSearchParams: () => new URLSearchParams('id=t1'),
+}))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a1' }) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/api', async original => {
+  const actual = await original<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api,
+    tags: { ...actual.api.tags,
+      definition: async () => ({ success: true, data: { tag: {
+        id: 't1', name: '通常タグ', color: '#9ca3af', createdAt: '2026-09-01T00:00:00+09:00',
+        lineAccountId: 'a1', status: 'active', version: fx.version, isStarred: fx.isStarred,
+      }, automation: null } }),
+      dependencies: async () => ({ success: true, data: { friendCount: 0, referenceCounts: {}, references: [], referenceItems: [] } }),
+      retroactivePreview: async () => ({ success: true, data: null }),
+      updateDefinition: fx.update,
+    },
+    tagGroups: { ...actual.api.tagGroups, list: async () => ({ success: true, data: [] }) },
+  } }
 })
-
-vi.mock('next/link', () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
-    React.createElement('a', { href }, children),
-}))
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
-  useSearchParams: () => new URLSearchParams(''),
-}))
-
-import TagsPageV4 from './tags-page-v4'
+import TagEdit from '@/v8/tag-edit/edit'
 import { ApiError } from '@/lib/api'
 
-;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
-let host: HTMLDivElement
-let root: Root
-
-const item = {
-  id: 't1',
-  name: '通常タグ',
-  color: '#9ca3af',
-  createdAt: '2026-09-01T00:00:00+09:00',
-  lineAccountId: 'a1',
-  version: 1,
-  isStarred: false,
-}
-
-async function render() {
-  await act(async () => {
-    root.render(React.createElement(TagsPageV4, { fixture: { items: [item], groups: [] } }))
-  })
-}
-
-function starButton(): HTMLButtonElement {
-  const el = host.querySelector('button[aria-label="友だち一覧に表示する"], button[aria-label="友だち一覧に表示しない"]')
-  if (!el) throw new Error('★ボタンが見つかりません')
-  return el as HTMLButtonElement
-}
-
-async function click(element: HTMLElement) {
-  await act(async () => { element.click() })
-}
-
 beforeEach(() => {
-  vi.clearAllMocks()
-  update.mockResolvedValue({ success: true, data: { version: 2 } })
-  host = document.createElement('div')
-  document.body.appendChild(host)
-  root = createRoot(host)
+  fx.version = 1; fx.isStarred = false; fx.update.mockReset()
+  fx.update.mockImplementation(async (_id: string, _account: string, _version: number, payload: { isStarred: boolean }) => {
+    fx.version += 1; fx.isStarred = payload.isStarred
+    return { success: true, data: { queued: 0 } }
+  })
 })
+afterEach(cleanup)
+const setting = () => screen.getByRole('checkbox', { name: '友だち一覧に出す' }) as HTMLInputElement
 
-afterEach(async () => {
-  await act(async () => { root.unmount() })
-  host.remove()
-})
-
-describe('タグ一覧の★切替は版付き(#715)', () => {
-  it('版と担当を送り、返った版へ進む', async () => {
-    await render()
-    await click(starButton())
-    expect(update).toHaveBeenCalledWith('t1', { lineAccountId: 'a1', expectedVersion: 1, isStarred: true })
-    // 返った版へ進んでいれば、2回目は版2で送る。進んでいなければ版1のまま。
-    await click(starButton())
-    expect(update).toHaveBeenLastCalledWith('t1', { lineAccountId: 'a1', expectedVersion: 2, isStarred: false })
+describe('友だち一覧への表示設定は版付きで保存する(#715)', () => {
+  it('版と担当を送り、読み直した新しい版で次の保存を送る', async () => {
+    render(<TagEdit />)
+    await screen.findByRole('checkbox', { name: '友だち一覧に出す' })
+    fireEvent.click(setting()); fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
+    await waitFor(() => expect(fx.update).toHaveBeenCalledWith('t1', 'a1', 1, expect.objectContaining({ isStarred: true }), expect.any(String)))
+    await waitFor(() => expect((screen.getByRole('button', { name: 'タグを保存する' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(setting()); fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
+    await waitFor(() => expect(fx.update).toHaveBeenLastCalledWith('t1', 'a1', 2, expect.objectContaining({ isStarred: false }), expect.any(String)))
   })
 
-  it('409では元に戻して理由を出す', async () => {
-    await render()
-    update.mockRejectedValueOnce(new ApiError(409, '別の人が先にタグを更新しました'))
-    await click(starButton())
-    // 押した瞬間の楽観表示が取り消され、押す前の表示に戻る
-    expect(starButton().getAttribute('aria-label')).toBe('友だち一覧に表示する')
-    expect(host.textContent).toContain('別の人が先にタグを更新しました')
+  it('409は保存成功とせず入力を残し、最新を読み込むと保存済みの設定へ戻る', async () => {
+    fx.update.mockRejectedValueOnce(new ApiError(409, '別の人が先にタグを更新しました'))
+    render(<TagEdit />)
+    await screen.findByRole('checkbox', { name: '友だち一覧に出す' })
+    fireEvent.click(setting()); fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
+    await screen.findByText('ほかの人がタグ「通常タグ」を先に保存しました')
+    expect(setting().checked).toBe(true)
+    expect(fx.isStarred).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: '最新を読み込んで続ける' }))
+    await waitFor(() => expect(setting().checked).toBe(false))
+    expect(screen.queryByText('ほかの人がタグ「通常タグ」を先に保存しました')).toBeNull()
   })
 })
