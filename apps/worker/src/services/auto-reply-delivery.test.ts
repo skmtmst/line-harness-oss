@@ -82,6 +82,12 @@ describe('SEND-S03: 中断した遅延応答の回収',()=>{
   expect(test.raw.prepare('SELECT status,error_code FROM auto_reply_deliveries').get()).toEqual({status:'failed',error_code:'delayed_delivery_unknown'});
   expect(mocks.finish).toHaveBeenCalledWith(test.db,expect.objectContaining({status:'failed',errorCode:'delayed_delivery_unknown'}));
  });
+ it('遅延設定を外した後も、1人1回の不明結果は新しい返信で上書きしない',async()=>{
+  test.raw.exec("INSERT INTO auto_reply_versions(id,auto_reply_id,version_number,status,definition_snapshot,created_at) VALUES('v','r',1,'published','{}','2026-10-06T00:00:00Z')");
+  await interrupted(true);await processAutoReplyDeliveries({DB:test.db} as Env['Bindings'],now,vi.fn());
+  const {hasAlreadyRepliedOnce}=await import('./auto-reply-conditions.js');
+  expect(await hasAlreadyRepliedOnce(test.db,{id:'r',once_per_friend:1,reply_delay_seconds:0},'f')).toBe(true);
+ });
  it('旧い期限無しclaimも黙って残さず、要確認にする',async()=>{
   test.raw.exec("UPDATE auto_reply_deliveries SET status='claimed',due_at='2026-10-06T00:00:00Z',created_at='2026-10-06T00:00:00Z'");
   await processAutoReplyDeliveries({DB:test.db} as Env['Bindings'],now,vi.fn());

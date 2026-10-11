@@ -163,7 +163,7 @@ export async function hasAlreadyRepliedOnce(
     WHERE winning_auto_reply_id=? AND friend_id=? AND status='completed' AND reply_status='accepted' LIMIT 1`)
     .bind(rule.id,friendId).first();
   if(completed) return true;
-  if (!rule.reply_delay_seconds) return false;
+  // 旧版の待機・不明行も守る。今の設定から遅延を外しても忘れない。
   const row = await db.prepare(`SELECT 1 FROM auto_reply_deliveries d JOIN auto_reply_versions v ON v.id=d.version_id
     WHERE d.friend_id=? AND v.auto_reply_id=? AND (d.status IN ('pending','claimed') OR (d.status='accepted' AND COALESCE(json_extract(d.action_summary,'$.failed'),0)=0) OR d.error_code='delayed_delivery_unknown') LIMIT 1`).bind(friendId,rule.id).first();
   return row != null;
