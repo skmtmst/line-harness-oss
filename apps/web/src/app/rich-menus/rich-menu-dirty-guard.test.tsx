@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // @vitest-environment-options { "url": "http://localhost/rich-menus/" }
 import React, { act } from 'react'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -15,7 +15,7 @@ const richMenuPublish = vi.hoisted(() => vi.fn())
 const richMenuPreviewTargets = vi.hoisted(() => vi.fn())
 const richMenuDuplicate = vi.hoisted(() => vi.fn())
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: routerPush, replace: () => {}, refresh: () => {},
     back: () => {}, forward: () => {}, prefetch: () => {},
@@ -55,7 +55,7 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -118,7 +118,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-import NewRichMenuPage from './new/page'
+import NewRichMenuPage from './new/create-v8'
 import RichMenuEditPage from './edit/page'
 
 async function flush() {
@@ -220,11 +220,13 @@ afterEach(() => {
 })
 
 describe('リッチメニュー新規作成の未保存ガード (N-162)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   test('未入力のまま一覧リンクを押しても確認は出ない', async () => {
     render(<NewRichMenuPage />)
     await flush()
 
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
     expect(routerPush).not.toHaveBeenCalled()
@@ -234,8 +236,8 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
     render(<NewRichMenuPage />)
     await flush()
 
-    await type(screen.getByLabelText('メニュー名'), '季節メニュー')
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    await type(screen.getByLabelText('メニュー名（友だちには見えません）'), '季節メニュー')
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
 
     // 確認窓が出て遷移は止まる
@@ -245,17 +247,17 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
     // 「編集を続ける」で閉じる
     fireEvent.click(screen.getByText('編集を続ける'))
     await flush()
-    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+    await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
     // 入力は残る
-    expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('季節メニュー')
+    expect((screen.getByLabelText('メニュー名（友だちには見えません）') as HTMLInputElement).value).toBe('季節メニュー')
   })
 
   test('確認で「保存せずに移る」を選ぶと遷移する', async () => {
     render(<NewRichMenuPage />)
     await flush()
 
-    await type(screen.getByLabelText('メニュー名'), '季節メニュー')
-    fireEvent.click(screen.getByText('リッチメニュー'))
+    await type(screen.getByLabelText('メニュー名（友だちには見えません）'), '季節メニュー')
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await flush()
     fireEvent.click(screen.getByText('保存せずに移る'))
     await flush()
@@ -266,7 +268,7 @@ describe('リッチメニュー新規作成の未保存ガード (N-162)', () =>
     render(<NewRichMenuPage />)
     await flush()
 
-    await type(screen.getByLabelText('メニュー名'), '季節メニュー')
+    await type(screen.getByLabelText('メニュー名（友だちには見えません）'), '季節メニュー')
     const event = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)
