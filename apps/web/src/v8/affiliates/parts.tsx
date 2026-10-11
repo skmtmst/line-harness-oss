@@ -35,8 +35,8 @@ export function SavedSelect({
 }) {
   return (
     <ListToolbarOptional compact label="保存した絞り込み"><div className={styles.savedBox}>
-      <Bookmark size={15} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["value"]}><Select aria-label="よく使う絞り込み" value={value} options={options} onChange={onChange} /></SaveErrorField>
+
+      <SaveErrorField names={["value"]}><Select icon={<Bookmark size={15} aria-hidden="true" />} aria-label="よく使う絞り込み" value={value} options={options} onChange={onChange} /></SaveErrorField>
     </div></ListToolbarOptional>
   )
 }

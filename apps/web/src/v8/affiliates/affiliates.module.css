@@ -44,7 +44,6 @@
 .cellNum {
   display: block;
   color: var(--color-ink);
-  font-size: inherit;
   line-height: normal;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -166,18 +165,6 @@
 
 /* 道具の段の右：よく使う絞り込み（左に印）。 */
 .savedBox { position: relative; width: var(--tpl-af-saved-w); }
-.savedBox :global(*) { max-width: 100%; }
-.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }
-.savedBox :global(button) > svg:last-child { display: none; }
-.savedIcon {
-  position: absolute;
-  top: 50%;
-  left: var(--tpl-rule-row-gap);
-  z-index: 1;
-  color: var(--color-ink-secondary);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
 
 /* 1152 の板：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {

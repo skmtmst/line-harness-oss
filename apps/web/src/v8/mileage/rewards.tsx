@@ -1,5 +1,10 @@
 'use client'
 
+import StatusBadge from '@/components/shared/status-badge'
+import { mileageStatusTone } from './parts'
+
+import { ListToolbarOptional } from '@/components/shared/list-toolbar'
+
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -33,7 +38,7 @@ import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ListPagePagination } from '@/components/templates'
 import { formatMileageDate, formatMileageNumber } from './display'
-import { CreateButton, MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, CreateButton, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
@@ -553,12 +558,20 @@ export default function RewardsTab() {
    * 左の列は共通の ManagedFolderPanel。使い道のフォルダの口（mileage_reward_folders）はまだ使えるようになっていないので
    * 「すべて」だけ。口ができたら kind を渡すだけで、追加・「…」（名前・色・並べ替え・消す）・未分類が出る。
    */
+  const createButton = (full: boolean) => (
+    <CreateButton href="/mileage/rewards/edit" readonly={readonly} full={full}>
+      <Plus size={15} aria-hidden="true" /> 使い道を作る
+    </CreateButton>
+  )
+
   const folderPanel = (
     <ManagedFolderPanel
       kind={null}
       folders={[]}
       onChanged={() => undefined}
       canManage={!readonly}
+      createAction={createButton(true)}
+      reserveCreateSpace={false}
       itemLabel="使い道"
       activeId="all"
       onSelect={() => undefined}
@@ -576,11 +589,7 @@ export default function RewardsTab() {
     </div>
   )
 
-  const createButton = (full: boolean) => (
-    <CreateButton href="/mileage/rewards/edit" readonly={readonly} full={full}>
-      <Plus size={15} aria-hidden="true" /> 使い道を作る
-    </CreateButton>
-  )
+
 
   const chips = (
     <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
@@ -625,7 +634,7 @@ export default function RewardsTab() {
           if (!value) { setSearch(''); setPage(1) }
         },
       }}
-      chips={narrow ? chips : <>{kindSelect}{chips}</>}
+      chips={<><ListToolbarOptional compact label="種類">{kindSelect}</ListToolbarOptional>{chips}</>}
       narrowLead={<>
         {createButton(false)}
         {kindSelect}
@@ -701,13 +710,13 @@ export default function RewardsTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>使い道</Th>
-            <Th className={`${styles.colNeed} ${styles.num}`}>必要なマイル</Th>
-            <Th className={styles.colGives}>交換すると渡るもの</Th>
-            <Th className={`${styles.colMonth} ${styles.num}`}>今月 交換された</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>使い道</Th>
+            <Th align="right" className={styles.colNeed}>必要なマイル</Th>
+            <Th collapseAt="narrow" className={styles.colGives}>交換すると渡るもの</Th>
+            <Th align="right" collapseAt="narrow" className={styles.colMonth}>今月 交換された</Th>
             <Th className={styles.colStateWide}>状態</Th>
             <Th className={styles.colOpsWide}>操作</Th>
           </TableHeadRow>
@@ -718,31 +727,28 @@ export default function RewardsTab() {
             const reach = reachMetrics.find((metric) => metric.rewardId === reward.id)
             const sub = benefitSub(reward)
             return (
-              <Tr key={reward.id} className={styles.row} data-table-layout="columns" data-row-id={reward.id}>
-                <Td className={styles.colName}>
+              <Tr key={reward.id} data-table-layout="columns" data-row-id={reward.id}>
+                <Td grow>
                   {/* 名前の前にフォルダの丸（左のフォルダの列と同じ分け方。未分類は輪）。補足は名前の頭にそろえる。 */}
                   <FolderDotName folder={null}>
-                    <span className={styles.rowName} ><TruncatedText value={String(reward.name ?? '')} /></span>
+                    <span  ><TruncatedText value={String(reward.name ?? '')} /></span>
                   </FolderDotName>
 
                 </Td>
-                <Td className={`${styles.colNeed} ${styles.num}`}>
+                <Td align="right" className={styles.colNeed}>
                   <span className={styles.cellMain}>{formatMileageNumber(reward.currentVersion?.requiredMiles)}</span>
                 </Td>
-                <Td className={styles.colGives}>
+                <Td collapseAt="narrow" className={styles.colGives}>
                   <span className={styles.cellMain}>
                     {reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind]}
                   </span>
                   {sub ? <span className={styles.cellSub}>{sub}</span> : null}
                 </Td>
-                <Td className={`${styles.colMonth} ${styles.num}`}>
+                <Td align="right" collapseAt="narrow" className={styles.colMonth}>
                   <span className={styles.cellMain}>{`${formatMileageNumber(reward.exchangedThisMonth)} 件`}</span>
                 </Td>
                 <Td className={styles.colStateWide}>
-                  <span className={styles.pill} data-tone={pill.tone}>
-                    <span className={styles.pillDot} aria-hidden="true" />
-                    {pill.text}
-                  </span>
+                  <StatusBadge tone={mileageStatusTone(pill.tone)}>{pill.text}</StatusBadge>
                 </Td>
                 <Td className={styles.colOpsWide}>
                   <span className={styles.rowActions}>
@@ -773,21 +779,21 @@ export default function RewardsTab() {
           onRetry={redemptionsLoad === 'error' ? () => void loadFailed(redemptionsPage) : undefined}
         />
       ) : (
-        <DataTable className={styles.table}>
+        <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
           <thead>
-            <TableHeadRow className={styles.headRow} data-table-layout="columns">
-              <Th className={styles.colName}>使い道</Th>
+            <TableHeadRow data-table-layout="columns">
+              <Th grow>使い道</Th>
               <Th className={styles.colStateWide}>状態</Th>
-              <Th className={styles.colGives}>届かなかった理由</Th>
-              <Th className={`${styles.colMonth} ${styles.num}`}>試した回数</Th>
-              <Th className={styles.colGives}>最後の更新</Th>
+              <Th collapseAt="narrow" className={styles.colGives}>届かなかった理由</Th>
+              <Th align="right" collapseAt="narrow" className={styles.colMonth}>試した回数</Th>
+              <Th collapseAt="narrow" className={styles.colGives}>最後の更新</Th>
               <Th className={styles.colOpsWide}>操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
             {failed.map((item) => (
-              <Tr data-row-id={item.id} key={item.id} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}><FolderDotName><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></FolderDotName></Td>
+              <Tr data-row-id={item.id} key={item.id} data-table-layout="columns">
+                <Td grow><FolderDotName><span className={styles.cellMain} title={item.rewardName}>{item.rewardName}</span></FolderDotName></Td>
                 <Td className={styles.colStateWide}>
                   {item.status === 'delivering' ? (
                     <span className={styles.cellMain}>
@@ -800,9 +806,9 @@ export default function RewardsTab() {
                     <span className={styles.cellMain}>届いていない</span>
                   )}
                 </Td>
-                <Td className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
-                <Td className={`${styles.colMonth} ${styles.num}`}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
-                <Td className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
+                <Td collapseAt="narrow" className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
+                <Td align="right" collapseAt="narrow" className={styles.colMonth}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
+                <Td collapseAt="narrow" className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
                 <Td className={styles.colOpsWide}>
                   {!readonly ? (
                     <Button
@@ -875,8 +881,8 @@ export default function RewardsTab() {
         </Button>
       }
       stats={stats}
-      folders={<>{createButton(true)}{folderPanel}</>}
-      folderNav={narrow ? undefined : { rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
+      folders={folderPanel}
+      folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
       toolbar={toolbar}
       pagination={pager}
     >

@@ -217,9 +217,9 @@ describe('たまる決めごとの表の器収め', () => {
     expect(cells.map((cell) => cell.textContent)).toEqual([
       '何をしてくれたら', '対象の行動', 'たまるマイル', '有効期間・失効', 'この30日', '状態', '操作',
     ])
-    /* 先頭は伸び縮みの列（colName）、ほかは固定の列。 */
-    expect(cells[0].className).toContain('colName')
-    expect(cells.slice(1).every((cell) => !cell.className.includes('colName'))).toBe(true)
+    /* 先頭の伸縮は共通表の口へ任せ、ほかは固定の列。 */
+    expect(cells[0].getAttribute('data-cell-grow')).toBe('true')
+    expect(cells.slice(1).every((cell) => !cell.hasAttribute('data-cell-grow'))).toBe(true)
   })
 })
 
