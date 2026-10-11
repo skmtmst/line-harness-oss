@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 // 検証本体はNodeで直接実行する.mjs。公開型はこの回帰試験で固定する。
 // @ts-expect-error .mjs用の宣言ファイルは持たない
-import { builtRuleBody, frozenSelectorBody, normalize, resolveVars } from '../apps/web/scripts/verify-design-values.mjs'
+import { builtRuleBody, frozenSelectorBody, normalize, resolveVars, v8EffectiveBody } from '../apps/web/scripts/verify-design-values.mjs'
 
 describe('ビルド後CSSの設計照合', () => {
   it('最適化でカンマ結合された共通宣言も対象部品の宣言として読む', () => {
@@ -57,6 +57,20 @@ describe('未利用の部品のトークン照合', () => {
 })
 
 describe('固定HTMLとV8の選択状態の照合', () => {
+  it('html上のV8指定を読み、親のある別状態と別テーマは読み込まない', () => {
+    const css = '.selected{color:black}html[data-theme="v8"] .selected{color:green}.parent html[data-theme="v8"] .selected{color:red}html[data-theme="v7"] .selected{color:blue}html .selected{color:purple}'
+    const body = frozenSelectorBody(css, '[data-theme="v8"] .selected')
+    expect(body).toContain('color:green')
+    expect(body).not.toMatch(/red|blue|purple/)
+  })
+
+  it('合成した状態のV8指定をCSSの順番で読み、通常状態には混ぜない', () => {
+    const css = '.card{outline:1px solid gray}html[data-theme="v8"] .card.checked{outline:2px solid green}.checked:hover{outline:9px solid red}'
+    expect(v8EffectiveBody(css, ['card', 'checked'])).toContain('outline:2px solid green')
+    expect(v8EffectiveBody(css, 'card')).not.toContain('2px solid green')
+    expect(v8EffectiveBody(css, ['card', 'checked'])).not.toContain('red')
+  })
+
   it('選択中の合成クラスを読み、hover・未選択・別テーマの色を混ぜない', () => {
     const css = '.card{background:white}[data-theme="v8"] .checked{background:#e8f5ec}.checked:hover{background:black}[data-theme="v7"] .checked{background:blue}.parent .checked{background:red}'
     const body = frozenSelectorBody(css, '.card.checked')
