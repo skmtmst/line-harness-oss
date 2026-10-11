@@ -142,12 +142,6 @@
   "app/inflow-links/_components/create-genre-modal.tsx": {
     "arbitrary-value": 1
   },
-  "app/inflow-links/ad-integration-v8.tsx": {
-    "unresolved-classname": 1
-  },
-  "app/inflow-links/ad-integration.tsx": {
-    "arbitrary-value": 2
-  },
   "app/layout.tsx": {
     "unresolved-classname": 1
   },

@@ -216,8 +216,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V7: 方式選択はラジオの即時確定で未保存を持たない。名前・フォルダ欄は新規時は確定時に同送、既存時は欄内の保存で確定する小さな操作のため番兵を付けない',
   'components/scenarios/trigger-editor.tsx':
     'ダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
-  'app/inflow-links/ad-integration.tsx':
-    '費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
   'components/shared/dialog.tsx':
@@ -256,8 +254,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 の友だち情報欄一覧。詳細パネルの項目名はその場書き換えでEnter確定の即時保存、削除・フォルダ操作は確認窓か即時保存で確定し、画面に残る下書きを持たない',
   'components/inflow-links/site-script.tsx':
     'サイトの追加・編集・停止理由の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
-  'app/inflow-links/ad-integration-v8.tsx':
-    '★V8-B 広告連携（qSTVR）。費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/inflow-links/site-script-v8.tsx':
     '★V8-B サイトスクリプト（XjOte）。サイトの追加・編集の入力はすべてDialog内。閉じると入力は戻る仕様で、画面離脱ガードの対象外',
   /* ★V8 の新しい画面（src/v8）。古い画面ファイルの理由をそのまま写した（2026-10-06）。 */

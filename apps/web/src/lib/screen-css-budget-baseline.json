@@ -124,11 +124,6 @@
     "height": 6,
     "font": 15
   },
-  "app/inflow-links/ad-integration-v8.module.css": {
-    "spacing": 37,
-    "height": 13,
-    "font": 26
-  },
   "app/mileage/earning-rules/new/v8-create-form.module.css": {
     "spacing": 32,
     "height": 6,

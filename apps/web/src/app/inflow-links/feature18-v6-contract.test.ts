@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const ROOT = import.meta.dirname
 const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
-const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
+const ADS = ['ads.tsx', 'ad-connections.tsx', 'ad-history.tsx', 'ad-shared.ts'].map(file => readFileSync(join(ROOT, '../../v8/inflow-links', file), 'utf8')).join('\n')
 const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
 const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
@@ -33,9 +33,9 @@ describe('V6 機能18の画面契約', () => {
 
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {
     expect(SITE).toContain('data-design-node="XjOte"')
-    expect(ADS).toContain('data-design-node="qSTVR"')
-    expect(ADS).toContain('data-design-node="BuVDB"')
-    expect(ADS).toContain('data-design-node="Im2b1"')
+    expect(ADS).toContain('boardId="qSTVR"')
+    expect(ADS).toContain('data-design-node="FDBsG"')
+    expect(ADS).toContain('data-design-node="p0kA3"')
     expect(CREATE).toContain('boardId="KMaMk"')
     expect(DETAIL).toContain('boardId="Q5le3"')
     expect(ADS).toContain('成果地点と、広告に返す名前の対応')

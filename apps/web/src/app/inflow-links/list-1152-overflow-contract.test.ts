@@ -34,11 +34,14 @@ describe("inflow-links 一覧の1152幅", () => {
 });
 
 describe("inflow-links 広告費の表の1152幅（板 y1ztx の横展開）", () => {
-  const ADS = readFileSync(resolve(__dirname, "ad-integration.tsx"), "utf-8");
+  const ADS = readFileSync(resolve(__dirname, "../../v8/inflow-links/ads.tsx"), "utf-8");
 
-  it("費用の表も横送りの殻に入れる", () => {
-    expect(ADS).toContain("data-scroll-x");
-    expect(ADS).toContain("min-w-[760px]");
+  it("費用の表も幅の中に収める", () => {
+    expect(ADS).toContain('role="table"');
+    expect(ADS).not.toContain("data-scroll-x");
+    const css = readFileSync(resolve(__dirname, "../../v8/inflow-links/ads.module.css"), "utf8");
+    expect(css).toContain("min-width: 0");
+    expect(css).toContain("text-overflow: ellipsis");
   });
 
   it("列を削らない（7列すべて出す）", () => {

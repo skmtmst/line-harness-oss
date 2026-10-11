@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const ROOT = import.meta.dirname
 const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
-const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
+const ADS = ['ads.tsx', 'ad-connections.tsx', 'ad-history.tsx', 'ad-shared.ts'].map(file => readFileSync(join(ROOT, '../../v8/inflow-links', file), 'utf8')).join('\n')
 const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
 // 削除の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
@@ -27,7 +27,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
     expect(ADS).toContain('LOG_PAGE_SIZE')
     expect(ADS).toContain('Pagination')
     expect(ADS).toContain('api.adPlatforms.logsPage')
-    expect(ADS).toContain('setLogTotal(logResponse.data.total)')
+    expect(ADS).toContain('setTotal(logRes.data.total)')
     expect(ADS).not.toContain('response.data.map((platform) => api.adPlatforms.logs')
   })
 
@@ -46,7 +46,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
     expect(DETAIL).not.toContain("conversion ?? '取得できません'")
     // 広告履歴は口の無い friendName・conversionName・nextRetryAt を読まない。
     expect(ADS).not.toContain('extraText')
-    expect(ADS).toContain('nextScheduleText')
+    expect(ADS).toContain("log.status === 'pending' ? '送信待ち'")
     expect(ADS).not.toContain('11:35 に送ります')
   })
 
@@ -86,7 +86,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
       expect(ADS).not.toContain(dead)
     }
     // 失敗理由は口の errorMessage を開いて見せる。
-    expect(ADS).toContain('理由を見る')
+    expect(ADS).toContain('断られた理由：${log.errorMessage}')
     expect(ADS).toContain('log.errorMessage')
   })
 
@@ -94,7 +94,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
     for (const fixed of ['1545', '11476', '前月 ¥438,000', '8/25 11:20 に同期', '8/25 06:00 に取り込みました', '夏キャンペーン（検索）', '体験申込フォームの送信\',\'Lead']) {
       expect(ADS).not.toContain(fixed)
     }
-    expect(ADS).toContain('未接続のため表示できません')
+    expect(ADS).toContain("emptyValue('unknown')")
   })
 
   it('#514-14: 計測先ホストとパスを口から受け取って表示する', () => {

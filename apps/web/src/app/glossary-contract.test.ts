@@ -104,8 +104,8 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     'app/common-actions/versions/page.tsx',
     'app/ec-commerce/connector-panel.tsx',
     'app/emergency/page.tsx',
-    'app/inflow-links/ad-integration-v8.tsx',
-    'app/inflow-links/ad-integration.tsx',
+
+
     'app/line-notifications/page.tsx',
     'app/mileage/page.tsx',
     'v8/nen-campaigns/list.tsx',
