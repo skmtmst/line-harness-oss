@@ -120,11 +120,11 @@ function EventsCreateV8Inner() {
   const dirty = snapshot !== initialRef.current
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
-  async function save(publish: boolean) {
-    if (saving || !canEdit) return
+  function validateInput() {
+    if (saving || !canEdit) return false
     if (!selectedAccountId) {
       setError('上のバーでLINE公式アカウントを選んでください')
-      return
+      return false
     }
     const errors: Record<string, string> = {}
     if (!draft.name.trim()) errors['ev-new-name'] = 'イベント名を入れてください'
@@ -146,7 +146,12 @@ function EventsCreateV8Inner() {
     setError(null)
     focusTarget.current = Object.keys(errors)[0] ?? null
     setFieldErrors(errors)
-    if (focusTarget.current) return
+    return !focusTarget.current
+  }
+
+  async function save(publish: boolean) {
+    if (!validateInput()) return
+    const cap = Number(capacity)
     setSaving(true)
     setError(null)
     let saved = createdRef.current?.accountId === selectedAccountId ? createdRef.current.event : null
@@ -258,7 +263,7 @@ function EventsCreateV8Inner() {
         <>
           <Button href="/events">キャンセル</Button>
           <Button disabled={saving} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
-          <Button variant="primary" disabled={saving} busy={saving} onClick={() => setPublishOpen(true)}><Globe size={15} aria-hidden="true" />公開する</Button>
+          <Button variant="primary" disabled={saving} busy={saving} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={15} aria-hidden="true" />公開する</Button>
         </>
       )} dirty={false}
     >
