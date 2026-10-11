@@ -35,7 +35,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...rest}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: navigation.push }),
   usePathname: () => '/nen-campaigns',
   useSearchParams: () => new URLSearchParams(),
@@ -180,6 +180,7 @@ async function setInputReact(input: HTMLInputElement, value: string) {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
   // 監査実測どおり: 自動配信4件・コラム5件。
   network.settings.mockResolvedValue({
@@ -210,7 +211,7 @@ beforeEach(() => {
   network.createColumn.mockResolvedValue({ success: true, data: { id: 'new-id', queued: 0 } })
 })
 
-afterEach(async () => { await unmount() })
+afterEach(async () => { await unmount(); delete document.documentElement.dataset.theme })
 
 describe('NEN新規作成入口（#618）', () => {
   it('コラムが5件あっても未選択でも、ヘッダーから「コラムを書く」へ届く', async () => {
@@ -230,13 +231,13 @@ describe('NEN新規作成入口（#618）', () => {
     await mount(React.createElement(NewNenColumnPage))
     const inputs = Array.from(container.querySelectorAll('input'))
     const byPlaceholder = (text: string) => inputs.find((i) => i.placeholder.includes(text))
-    const titleInput = inputs[0]
+    const titleInput = container.querySelector<HTMLInputElement>('input[aria-label="題名"]')
     const urlInput = byPlaceholder('https://example.com/columns/')
     if (!titleInput || !urlInput) throw new Error('題名または記事URLの入力欄が見つかりません')
     await setInputReact(titleInput, '専用データの題名618')
     await setInputReact(urlInput, 'https://example.com/columns/618-draft')
 
-    // 配信日時（日本時間）に未来の日時を入れる（日時の選択★V7。実行日から60日先）。
+    // 現役の日時選択で60日先の日本時間を記録する。
     const ahead = new Date()
     ahead.setDate(ahead.getDate() + 60)
     const future = {
@@ -268,11 +269,13 @@ describe('NEN新規作成入口（#618）', () => {
     )
     if (!day) throw new Error('未来の日が見つかりません')
     await click(day as HTMLElement)
-    // 時刻は 10:30 のまま（日付を選ぶと時刻 10:00 になるので分だけ 30 にする）。
+    // 時刻は文字を入れ、blurで確定する。
     await act(async () => {
-      const minute = document.querySelector('select[aria-label="分"]') as HTMLSelectElement
-      minute.value = '30'
-      minute.dispatchEvent(new Event('change', { bubbles: true }))
+      const time = picker.querySelector<HTMLInputElement>('input[type="text"]')!
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+      setter.call(time, '10:30')
+      time.dispatchEvent(new Event('input', { bubbles: true }))
+      time.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
     })
     await settle()
 
@@ -286,7 +289,7 @@ describe('NEN新規作成入口（#618）', () => {
     expect(body.title).toBe('専用データの題名618')
     // 日時あり: 日本時間として +09:00 で送る（再読込で日本時間に読める）。
     expect(body.scheduledAt).toBe(`${future.iso}:00+09:00`)
-    expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns')
+    expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns&highlight=new-id')
 
     // 保存後の再読込: 一覧にその下書きが並ぶ。
     await unmount()
