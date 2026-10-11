@@ -49,7 +49,6 @@ function collect(dir: string, found: Record<string, number> = {}): Record<string
 
 /* 2026-10-07 時点の持ち越し（173 ファイル・304 か所）。直したら数を減らす。 */
 const BASELINE: Record<string, number> = {
-  'app/affiliates/payment-tab.tsx': 4,
   'app/affiliates/tabs.tsx': 9,
   'app/analytics/page.tsx': 1,
   'app/analytics/reports/new/page.tsx': 1,

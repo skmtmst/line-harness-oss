@@ -29,7 +29,6 @@ native-table-header-exception app/affiliates/tabs.tsx
 button-migration-target app/reminders/list-v8.tsx
 shared-button-importer app/accounts/migration.tsx
 shared-button-importer app/accounts/uid-migration-v8.tsx
-shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
 shared-button-importer app/analytics/page.tsx
 shared-button-importer app/analytics/reports/new/page.tsx
