@@ -37,7 +37,7 @@
 
 # 流入と計測の詳細（V8・detail.tsx・板 Q5le3）
 
-入口：`app/inflow-links/detail/page.tsx`（V8 のときだけ `src/v8/inflow-links/detail.tsx`。v7 は同じファイルのまま）。写し元：同じ page.tsx（import はしない）。
+入口：`app/inflow-links/detail/page.tsx`（`src/v8/inflow-links/detail.tsx` に固定）。
 
 ## 受け付ける URL
 - `/inflow-links/detail?id=<経路ID>`。`id` が無ければ `?ref=<refCode>` を一覧から引いて決める。どちらも無ければ「見る流入経路が指定されていません」。404 は「見つかりません」、それ以外の失敗は「読み込めませんでした」＋もう一度。

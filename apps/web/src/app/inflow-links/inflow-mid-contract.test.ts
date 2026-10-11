@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest'
 const ROOT = import.meta.dirname
 const PAGE = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
 const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
-const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
-const DETAIL = readFileSync(join(ROOT, 'detail', 'page.tsx'), 'utf8')
+const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
+const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
 // 削除の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
 // 削除の窓は詳細の画面（detail/page.tsx）の中にある。古い _components/inflow-delete-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
-const DELETE_DIALOG = readFileSync(join(ROOT, 'detail', 'page.tsx'), 'utf8')
+const DELETE_DIALOG = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
 const MODAL = readFileSync(join(ROOT, '_components', 'edit-route-modal.tsx'), 'utf8')
 const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
 const LIFF = readFileSync(join(ROOT, '..', '..', '..', '..', 'worker', 'src', 'routes', 'liff.ts'), 'utf8')
@@ -40,8 +40,8 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
   it('#514-8: 口の返す欄だけ読み、無い欄は「—」にする', () => {
     // 口は currentStatus を返す(友だち中・ブロック済み)。firstPage・conversion・miles は返さない。
     expect(LIFF).toContain("currentStatus: f.is_following === 0 ? 'ブロック済み' : '友だち中'")
-    expect(DETAIL).toContain("friend.currentStatus ?? '—'")
-    expect(DETAIL).toContain("friend.conversion ?? '—'")
+    expect(DETAIL).toContain("friend.currentStatus ?? emptyValue('unknown')")
+    expect(DETAIL).toContain("friend.conversion ?? emptyValue('unknown')")
     expect(DETAIL).not.toContain("currentStatus ?? '取得できません'")
     expect(DETAIL).not.toContain("conversion ?? '取得できません'")
     // 広告履歴は口の無い friendName・conversionName・nextRetryAt を読まない。
@@ -74,7 +74,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
   it('#514-12: 段階の失敗は文と再読み込みで返し、読み込み中のままにしない', () => {
     expect(DETAIL).toContain('funnelError')
     expect(DETAIL).toContain('段階を再読み込み')
-    expect(DETAIL).toContain('段階を取得できませんでした')
+    expect(DETAIL).toContain('段階を読み込めませんでした')
   })
 
   it('#514-13: 押しても何も起きないボタンを出さない', () => {

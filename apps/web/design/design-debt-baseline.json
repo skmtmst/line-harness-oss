@@ -148,9 +148,6 @@
   "app/inflow-links/ad-integration.tsx": {
     "arbitrary-value": 2
   },
-  "app/inflow-links/detail/page.tsx": {
-    "direct-secondary-button": 1
-  },
   "app/inflow-links/page.tsx": {
     "arbitrary-value": 8
   },

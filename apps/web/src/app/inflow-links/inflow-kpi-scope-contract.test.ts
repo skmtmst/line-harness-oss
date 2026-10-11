@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const NEW = fs.readFileSync(path.join(__dirname, 'new', 'page.tsx'), 'utf8')
+const NEW = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 
 function band(): string {
   const at = PAGE.indexOf('aria-label="流入と計測の概要"')

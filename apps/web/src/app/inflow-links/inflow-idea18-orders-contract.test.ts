@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const DETAIL = fs.readFileSync(path.join(__dirname, 'detail/page.tsx'), 'utf8')
+const DETAIL = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/detail.tsx'), 'utf8')
 const PANEL = fs.readFileSync(path.join(__dirname, '_components/ref-orders.tsx'), 'utf8')
 
 /**
