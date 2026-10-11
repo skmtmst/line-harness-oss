@@ -241,3 +241,6 @@
     flex: 1;
   }
 }
+
+/* 運営の板も固定絵の外側24を共通の外枠が持つ。 */
+[data-theme='v8'] .content[data-content-layout='ops'] { padding: var(--polish-space-section); }

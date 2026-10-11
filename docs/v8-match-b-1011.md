@@ -49,12 +49,16 @@
 - スマホ枠: 下端の印を重ねて置き、本文・ボタンから余分に20pxを引かない。上の帯44px。
 - テンプレート一覧: 共通DataTableの指定型で行52、種類の列160。種類・公開の札はTagPill・StatusBadgeへ統一。
 - TagPill: 通常の札は固定絵の文字13・点8・左右12・間8。高さ24は維持。
+- 運営の頭: PageHeadingで題・説明の「？」・右の操作を組む。運営の外側24、段の間16、カード内16へそろえる。数の帯は4枚の手書きの並びをKpiBandへ統一。
 
 ## 検証
 
 - 初期の持ち主監査: 新しい候補0（開始SHAとの比較）。
 - 共通修正: 表・型・フォーム一覧の既存試験28件成功。持ち主監査は新しい候補0。決まりの値43件・参照26件一致、差分検査成功。
 - 予約設定: 既存15ファイル・35試験成功。未モックの外部読み込みについてstderrにCORS/AbortErrorが出るが、試験失敗・未処理エラーの集計はない。
+- スマホ枠・フォーム: 既存3ファイル・18試験成功。テンプレート: 既存22試験成功。
+- 全試験の最初の回はdesign-debtが1件失敗したため中断。統括側が店のkindBadgeを参照していた。削除した宣言を復元し、失敗した見張りを含む25試験成功。全試験が通ったとは扱わない。
+- 運営: 既存の操作・返信と持ち主の負債検査の計26試験成功。
 - 変更後の型検査・ビルド・全試験・3幅の崩れの検査は未実施。
 - 一時許可25件: 未変更。verify:designと照合して担当分だけ外す。
 
@@ -68,148 +72,148 @@
 
 | 板ID | 幅 | route | 前 | 後 | 状態 |
 |---|---:|---|---:|---:|---|
-| V7vn3 | 1440 | `/accounts` | 51% (33/65) | — | 初期値・修正待ち |
-| CFAyf | 1440 | `/accounts/detail` | 7% (4/60) | — | 初期値・修正待ち |
-| Msb1j | 1440 | `/accounts/detail` | 11% (7/65) | — | 初期値・修正待ち |
-| WOfBN | 1440 | `/accounts/detail` | 7% (4/60) | — | 初期値・修正待ち |
-| ihjfd | 1440 | `/accounts/detail` | 27% (15/55) | — | 初期値・修正待ち |
-| n9Z2P | 1440 | `/accounts/detail` | 22% (15/67) | — | 初期値・修正待ち |
-| x2dSNv | 1440 | `/accounts/handover` | 20% (8/40) | — | 初期値・修正待ち |
-| GwKE2 | 1440 | `/accounts/new` | 6% (1/18) | — | 初期値・修正待ち |
-| JYfda | 1440 | `/accounts/new` | 5% (1/19) | — | 初期値・修正待ち |
-| TvXII | 1440 | `/accounts/new` | 7% (1/15) | — | 初期値・修正待ち |
-| v2KMj | 1440 | `/accounts/new` | 4% (1/27) | — | 初期値・修正待ち |
-| xj3zz | 1440 | `/accounts/new` | 5% (1/20) | — | 初期値・修正待ち |
-| GcyTr | 1440 | `/booking/bookings` | 47% (9/19) | — | 初期値・修正待ち |
-| O2Z8u | 1152 | `/booking/bookings` | 47% (9/19) | — | 初期値・修正待ち |
-| R8tlbw | 1440 | `/booking/bookings` | 33% (1/3) | — | 初期値・修正待ち |
+| V7vn3 | 1440 | `/accounts` | 51% (33/65) | 51% (33/65) | 初期値・修正待ち |
+| CFAyf | 1440 | `/accounts/detail` | 7% (4/60) | 7% (4/60) | 初期値・修正待ち |
+| Msb1j | 1440 | `/accounts/detail` | 11% (7/65) | 11% (7/65) | 初期値・修正待ち |
+| WOfBN | 1440 | `/accounts/detail` | 7% (4/60) | 7% (4/60) | 初期値・修正待ち |
+| ihjfd | 1440 | `/accounts/detail` | 27% (15/55) | 27% (15/55) | 初期値・修正待ち |
+| n9Z2P | 1440 | `/accounts/detail` | 22% (15/67) | 22% (15/67) | 初期値・修正待ち |
+| x2dSNv | 1440 | `/accounts/handover` | 20% (8/40) | 20% (8/40) | 初期値・修正待ち |
+| GwKE2 | 1440 | `/accounts/new` | 6% (1/18) | 6% (1/18) | 初期値・修正待ち |
+| JYfda | 1440 | `/accounts/new` | 5% (1/19) | 5% (1/19) | 初期値・修正待ち |
+| TvXII | 1440 | `/accounts/new` | 7% (1/15) | 7% (1/15) | 初期値・修正待ち |
+| v2KMj | 1440 | `/accounts/new` | 4% (1/27) | 4% (1/27) | 初期値・修正待ち |
+| xj3zz | 1440 | `/accounts/new` | 5% (1/20) | 5% (1/20) | 初期値・修正待ち |
+| GcyTr | 1440 | `/booking/bookings` | 47% (9/19) | 47% (9/19) | 初期値・修正待ち |
+| O2Z8u | 1152 | `/booking/bookings` | 47% (9/19) | 47% (9/19) | 初期値・修正待ち |
+| R8tlbw | 1440 | `/booking/bookings` | 33% (1/3) | 33% (1/3) | 初期値・修正待ち |
 | acRIl | 1440 | `/booking/bookings` | 未測 | — | 部品・まとめ板（除外） |
 | If9Mh | 1440 | `/booking/bookings/new` | 未測 | — | 部品・まとめ板（除外） |
-| C9fv7A | 1440 | `/booking/menus` | 68% (49/72) | — | 初期値・修正待ち |
-| KRgTQ | 1440 | `/booking/menus` | 88% (76/86) | — | 初期値・修正待ち |
-| P6EdLW | 1152 | `/booking/menus` | 62% (28/45) | — | 初期値・修正待ち |
-| VFxWU | 1152 | `/booking/menus` | 15% (8/52) | — | 初期値・修正待ち |
-| VLEaj | 1440 | `/booking/menus` | 40% (19/48) | — | 初期値・修正待ち |
-| ZyDd6 | 1440 | `/booking/menus` | 3% (2/61) | — | 初期値・修正待ち |
-| owaS3 | 1440 | `/booking/menus` | 69% (50/72) | — | 初期値・修正待ち |
-| x1OZS6 | 1440 | `/booking/menus` | 74% (40/54) | — | 初期値・修正待ち |
+| C9fv7A | 1440 | `/booking/menus` | 68% (49/72) | 76% (55/72) | 再測定・90%未満 |
+| KRgTQ | 1440 | `/booking/menus` | 88% (76/86) | 93% (80/86) | 数える候補・目視 未 |
+| P6EdLW | 1152 | `/booking/menus` | 62% (28/45) | 71% (32/45) | 再測定・90%未満 |
+| VFxWU | 1152 | `/booking/menus` | 15% (8/52) | 23% (12/52) | 再測定・90%未満 |
+| VLEaj | 1440 | `/booking/menus` | 40% (19/48) | 52% (25/48) | 再測定・90%未満 |
+| ZyDd6 | 1440 | `/booking/menus` | 3% (2/61) | 3% (2/61) | 再測定・90%未満 |
+| owaS3 | 1440 | `/booking/menus` | 69% (50/72) | 78% (56/72) | 再測定・90%未満 |
+| x1OZS6 | 1440 | `/booking/menus` | 74% (40/54) | 74% (40/54) | 再測定・90%未満 |
 | xCoDe | 1440 | `/booking/menus` | 未測 | — | 部品・まとめ板（除外） |
-| yRPxl | 1440 | `/booking/menus` | 34% (34/100) | — | 初期値・修正待ち |
-| QqER7 | 1440 | `/booking/menus/new` | 28% (17/60) | — | 初期値・修正待ち |
-| v5L19Z | 1440 | `/booking/menus/new` | 29% (18/63) | — | 初期値・修正待ち |
-| ooufy | 1440 | `/booking/menus/staff` | 48% (10/21) | — | 初期値・修正待ち |
-| CcA4k | 1440 | `/booking/staff/new` | 5% (2/41) | — | 初期値・修正待ち |
-| E3YDK | 1440 | `/booking/staff/shifts` | 5% (4/81) | — | 初期値・修正待ち |
-| d5fmnM | 1440 | `/booking/staff/shifts` | 4% (4/93) | — | 初期値・修正待ち |
-| wvGke | 1440 | `/booking/staff/shifts` | 60% (3/5) | — | 初期値・修正待ち |
-| O7hUt7 | 1440 | `/contents` | 34% (15/44) | — | 初期値・修正待ち |
-| FM94M | 1440 | `/contents/vars` | 37% (19/51) | — | 初期値・修正待ち |
-| Hhl9M | 1440 | `/contents/vars` | 33% (19/57) | — | 初期値・修正待ち |
-| OxSw8 | 1440 | `/contents/vars` | 20% (10/49) | — | 初期値・修正待ち |
+| yRPxl | 1440 | `/booking/menus` | 34% (34/100) | 17% (17/100) | 再測定・90%未満 |
+| QqER7 | 1440 | `/booking/menus/new` | 28% (17/60) | 8% (5/60) | 再測定・90%未満 |
+| v5L19Z | 1440 | `/booking/menus/new` | 29% (18/63) | 8% (5/63) | 再測定・90%未満 |
+| ooufy | 1440 | `/booking/menus/staff` | 48% (10/21) | 71% (15/21) | 再測定・90%未満 |
+| CcA4k | 1440 | `/booking/staff/new` | 5% (2/41) | 5% (2/41) | 初期値・修正待ち |
+| E3YDK | 1440 | `/booking/staff/shifts` | 5% (4/81) | 5% (4/81) | 初期値・修正待ち |
+| d5fmnM | 1440 | `/booking/staff/shifts` | 4% (4/93) | 4% (4/93) | 初期値・修正待ち |
+| wvGke | 1440 | `/booking/staff/shifts` | 60% (3/5) | 60% (3/5) | 初期値・修正待ち |
+| O7hUt7 | 1440 | `/contents` | 34% (15/44) | 34% (15/44) | 初期値・修正待ち |
+| FM94M | 1440 | `/contents/vars` | 37% (19/51) | 37% (19/51) | 初期値・修正待ち |
+| Hhl9M | 1440 | `/contents/vars` | 33% (19/57) | 33% (19/57) | 初期値・修正待ち |
+| OxSw8 | 1440 | `/contents/vars` | 20% (10/49) | 20% (10/49) | 初期値・修正待ち |
 | RqO7O | 1440 | `/contents/vars` | 未測 | — | 部品・まとめ板（除外） |
-| XIzkJ | 1152 | `/contents/vars` | 45% (17/38) | — | 初期値・修正待ち |
-| xxKtW | 1440 | `/contents/vars` | 29% (19/66) | — | 初期値・修正待ち |
-| AYc6O | 1440 | `/contents/vars/edit` | 17% (11/65) | — | 初期値・修正待ち |
-| C67dE | 1152 | `/contents/vars/edit` | 24% (9/38) | — | 初期値・修正待ち |
-| piWhz | 1440 | `/contents/vars/edit` | 7% (3/43) | — | 初期値・修正待ち |
-| p82v9 | 1440 | `/contents/vars/new` | 14% (7/50) | — | 初期値・修正待ち |
-| I2V65v | 1440 | `/emergency` | 40% (12/30) | — | 初期値・修正待ち |
-| OHwbU | 1440 | `/emergency` | 32% (13/41) | — | 初期値・修正待ち |
-| Y4LkX1 | 1440 | `/emergency` | 27% (17/64) | — | 初期値・修正待ち |
-| Mu8qW | 1440 | `/events` | 2% (2/87) | — | 初期値・修正待ち |
-| e2ekFu | 1440 | `/events` | 33% (19/58) | — | 初期値・修正待ち |
-| hmr2P | 1440 | `/events/change-review` | 10% (4/39) | — | 初期値・修正待ち |
-| qUdNh | 1440 | `/events/change-review` | 13% (6/47) | — | 初期値・修正待ち |
-| d4adD4 | 1440 | `/events/new` | 10% (4/39) | — | 初期値・修正待ち |
-| GVizd | 1440 | `/form-submissions` | 41% (30/74) | — | 初期値・修正待ち |
-| GrnO4 | 1152 | `/form-submissions` | 19% (9/47) | — | 初期値・修正待ち |
-| I3L41O | 1440 | `/form-submissions` | 47% (30/64) | — | 初期値・修正待ち |
-| JV2oR | 1440 | `/form-submissions` | 49% (31/63) | — | 初期値・修正待ち |
+| XIzkJ | 1152 | `/contents/vars` | 45% (17/38) | 45% (17/38) | 初期値・修正待ち |
+| xxKtW | 1440 | `/contents/vars` | 29% (19/66) | 29% (19/66) | 初期値・修正待ち |
+| AYc6O | 1440 | `/contents/vars/edit` | 17% (11/65) | 17% (11/65) | 初期値・修正待ち |
+| C67dE | 1152 | `/contents/vars/edit` | 24% (9/38) | 24% (9/38) | 初期値・修正待ち |
+| piWhz | 1440 | `/contents/vars/edit` | 7% (3/43) | 7% (3/43) | 初期値・修正待ち |
+| p82v9 | 1440 | `/contents/vars/new` | 14% (7/50) | 14% (7/50) | 初期値・修正待ち |
+| I2V65v | 1440 | `/emergency` | 40% (12/30) | 40% (12/30) | 初期値・修正待ち |
+| OHwbU | 1440 | `/emergency` | 32% (13/41) | 32% (13/41) | 初期値・修正待ち |
+| Y4LkX1 | 1440 | `/emergency` | 27% (17/64) | 27% (17/64) | 初期値・修正待ち |
+| Mu8qW | 1440 | `/events` | 2% (2/87) | 2% (2/87) | 初期値・修正待ち |
+| e2ekFu | 1440 | `/events` | 33% (19/58) | 33% (19/58) | 初期値・修正待ち |
+| hmr2P | 1440 | `/events/change-review` | 10% (4/39) | 10% (4/39) | 初期値・修正待ち |
+| qUdNh | 1440 | `/events/change-review` | 13% (6/47) | 13% (6/47) | 初期値・修正待ち |
+| d4adD4 | 1440 | `/events/new` | 10% (4/39) | 10% (4/39) | 初期値・修正待ち |
+| GVizd | 1440 | `/form-submissions` | 41% (30/74) | 41% (30/74) | 初期値・修正待ち |
+| GrnO4 | 1152 | `/form-submissions` | 19% (9/47) | 19% (9/47) | 初期値・修正待ち |
+| I3L41O | 1440 | `/form-submissions` | 47% (30/64) | 61% (39/64) | 再測定・90%未満 |
+| JV2oR | 1440 | `/form-submissions` | 49% (31/63) | 94% (59/63) | 数える候補・目視 未 |
 | i2ZAS | 1440 | `/form-submissions` | 未測 | — | 部品・まとめ板（除外） |
-| ITBAB | 1152 | `/form-submissions/edit` | 3% (2/71) | — | 初期値・修正待ち |
-| J1pdB | 1440 | `/form-submissions/edit` | 3% (3/87) | — | 初期値・修正待ち |
-| SwGrd | 1440 | `/form-submissions/edit` | 2% (2/90) | — | 初期値・修正待ち |
-| WOPjZ | 1440 | `/form-submissions/edit` | 0% (0/0) | — | 初期値・修正待ち |
-| XXFT4 | 1440 | `/form-submissions/edit` | 6% (2/33) | — | 初期値・修正待ち |
-| Z9wXm | 1440 | `/form-submissions/edit` | 4% (2/55) | — | 初期値・修正待ち |
-| cJwtF | None | `/form-submissions/edit` | 0% (0/0) | — | 参考・候補に数えない |
-| e875x | 1440 | `/form-submissions/edit` | 4% (2/51) | — | 初期値・修正待ち |
-| ijxur | 1440 | `/form-submissions/edit` | 2% (2/93) | — | 初期値・修正待ち |
-| jjUEK | 1440 | `/form-submissions/edit` | 4% (2/46) | — | 初期値・修正待ち |
-| m1cWEy | 1440 | `/form-submissions/edit` | 2% (2/82) | — | 初期値・修正待ち |
-| tpRRT | 1440 | `/form-submissions/edit` | 5% (2/38) | — | 初期値・修正待ち |
-| MKQyJ | 1440 | `/form-submissions/responses` | 6% (2/34) | — | 初期値・修正待ち |
-| v0SbYR | 1440 | `/form-submissions/responses` | 11% (2/19) | — | 初期値・修正待ち |
+| ITBAB | 1152 | `/form-submissions/edit` | 3% (2/71) | 3% (2/71) | 初期値・修正待ち |
+| J1pdB | 1440 | `/form-submissions/edit` | 3% (3/87) | 3% (3/87) | 初期値・修正待ち |
+| SwGrd | 1440 | `/form-submissions/edit` | 2% (2/90) | 2% (2/90) | 初期値・修正待ち |
+| WOPjZ | 1440 | `/form-submissions/edit` | 0% (0/0) | 0% (0/0) | 初期値・修正待ち |
+| XXFT4 | 1440 | `/form-submissions/edit` | 6% (2/33) | 6% (2/33) | 初期値・修正待ち |
+| Z9wXm | 1440 | `/form-submissions/edit` | 4% (2/55) | 4% (2/55) | 初期値・修正待ち |
+| cJwtF | None | `/form-submissions/edit` | 0% (0/0) | 0% (0/0) | 参考・候補に数えない |
+| e875x | 1440 | `/form-submissions/edit` | 4% (2/51) | 4% (2/51) | 初期値・修正待ち |
+| ijxur | 1440 | `/form-submissions/edit` | 2% (2/93) | 2% (2/93) | 初期値・修正待ち |
+| jjUEK | 1440 | `/form-submissions/edit` | 4% (2/46) | 4% (2/46) | 初期値・修正待ち |
+| m1cWEy | 1440 | `/form-submissions/edit` | 2% (2/82) | 2% (2/82) | 初期値・修正待ち |
+| tpRRT | 1440 | `/form-submissions/edit` | 5% (2/38) | 5% (2/38) | 初期値・修正待ち |
+| MKQyJ | 1440 | `/form-submissions/responses` | 6% (2/34) | 6% (2/34) | 初期値・修正待ち |
+| v0SbYR | 1440 | `/form-submissions/responses` | 11% (2/19) | 11% (2/19) | 初期値・修正待ち |
 | BOj1a | 1440 | `/getting-started` | 未測 | — | 部品・まとめ板（除外） |
-| xuJ7D | 1440 | `/getting-started` | 29% (9/31) | — | 初期値・修正待ち |
-| DrwMm | 1440 | `/line-notifications` | 23% (11/47) | — | 初期値・修正待ち |
-| PZBVb | 1440 | `/line-notifications` | 4% (2/48) | — | 初期値・修正待ち |
-| g3iDs | 1440 | `/line-notifications` | 15% (11/73) | — | 初期値・修正待ち |
-| u8xibp | 1440 | `/line-notifications` | 27% (14/51) | — | 初期値・修正待ち |
-| gjUz3 | 1440 | `/line-notifications/operator/new` | 42% (16/38) | — | 初期値・修正待ち |
-| sDXNy | 1440 | `/line-notifications/operator/new` | 32% (16/50) | — | 初期値・修正待ち |
-| y8QQV | 1440 | `/notifications` | 43% (9/21) | — | 初期値・修正待ち |
-| TJUUl | 1440 | `/ops/announcements` | 3% (1/36) | — | 初期値・修正待ち |
-| tQ2MJ | 1440 | `/ops/announcements` | 3% (1/38) | — | 初期値・修正待ち |
-| e7ljE | 1440 | `/ops/audit` | 0% (0/22) | — | 初期値・修正待ち |
-| CyW0E | 1440 | `/ops/dashboard` | 0% (0/50) | — | 初期値・修正待ち |
-| tVaUh | 1440 | `/ops/invite` | 9% (1/11) | — | 初期値・修正待ち |
-| R5ckwJ | 1440 | `/ops/knowledge` | 0% (0/16) | — | 初期値・修正待ち |
-| h114s | 1440 | `/ops/knowledge` | 2% (1/50) | — | 初期値・修正待ち |
-| D9JALJ | 1440 | `/ops/login` | 0% (0/11) | — | 初期値・修正待ち |
-| FvbHW | 1440 | `/ops/members` | 3% (1/34) | — | 初期値・修正待ち |
-| VUyYu | 1440 | `/ops/members` | 5% (2/37) | — | 初期値・修正待ち |
-| Izau1 | 1440 | `/ops/support` | 23% (9/40) | — | 初期値・修正待ち |
-| P0jhqO | 1440 | `/ops/support` | 0% (0/29) | — | 初期値・修正待ち |
-| XWtYC | 1440 | `/ops/tenants` | 2% (1/65) | — | 初期値・修正待ち |
-| i0FTN | 1440 | `/ops/tenants` | 1% (1/73) | — | 初期値・修正待ち |
-| Oub6x | 1440 | `/ops/tenants/detail` | 0% (0/41) | — | 初期値・修正待ち |
-| okXoi | 1440 | `/ops/tenants/detail` | 2% (1/43) | — | 初期値・修正待ち |
-| qod6X | 1440 | `/ops/two-factor` | 10% (1/10) | — | 初期値・修正待ち |
-| Y9ASp | 1152 | `/rich-menus` | 36% (16/45) | — | 初期値・修正待ち |
-| ZoKow | 1440 | `/rich-menus` | 35% (18/51) | — | 初期値・修正待ち |
+| xuJ7D | 1440 | `/getting-started` | 29% (9/31) | 29% (9/31) | 初期値・修正待ち |
+| DrwMm | 1440 | `/line-notifications` | 23% (11/47) | 23% (11/47) | 初期値・修正待ち |
+| PZBVb | 1440 | `/line-notifications` | 4% (2/48) | 4% (2/48) | 初期値・修正待ち |
+| g3iDs | 1440 | `/line-notifications` | 15% (11/73) | 15% (11/73) | 初期値・修正待ち |
+| u8xibp | 1440 | `/line-notifications` | 27% (14/51) | 27% (14/51) | 初期値・修正待ち |
+| gjUz3 | 1440 | `/line-notifications/operator/new` | 42% (16/38) | 42% (16/38) | 初期値・修正待ち |
+| sDXNy | 1440 | `/line-notifications/operator/new` | 32% (16/50) | 32% (16/50) | 初期値・修正待ち |
+| y8QQV | 1440 | `/notifications` | 43% (9/21) | 43% (9/21) | 初期値・修正待ち |
+| TJUUl | 1440 | `/ops/announcements` | 3% (1/36) | 3% (1/36) | 初期値・修正待ち |
+| tQ2MJ | 1440 | `/ops/announcements` | 3% (1/38) | 3% (1/38) | 初期値・修正待ち |
+| e7ljE | 1440 | `/ops/audit` | 0% (0/22) | 0% (0/22) | 初期値・修正待ち |
+| CyW0E | 1440 | `/ops/dashboard` | 0% (0/50) | 0% (0/50) | 初期値・修正待ち |
+| tVaUh | 1440 | `/ops/invite` | 9% (1/11) | 9% (1/11) | 初期値・修正待ち |
+| R5ckwJ | 1440 | `/ops/knowledge` | 0% (0/16) | 0% (0/16) | 初期値・修正待ち |
+| h114s | 1440 | `/ops/knowledge` | 2% (1/50) | 2% (1/50) | 初期値・修正待ち |
+| D9JALJ | 1440 | `/ops/login` | 0% (0/11) | 0% (0/11) | 初期値・修正待ち |
+| FvbHW | 1440 | `/ops/members` | 3% (1/34) | 3% (1/34) | 初期値・修正待ち |
+| VUyYu | 1440 | `/ops/members` | 5% (2/37) | 5% (2/37) | 初期値・修正待ち |
+| Izau1 | 1440 | `/ops/support` | 23% (9/40) | 23% (9/40) | 初期値・修正待ち |
+| P0jhqO | 1440 | `/ops/support` | 0% (0/29) | 0% (0/29) | 初期値・修正待ち |
+| XWtYC | 1440 | `/ops/tenants` | 2% (1/65) | 2% (1/65) | 初期値・修正待ち |
+| i0FTN | 1440 | `/ops/tenants` | 1% (1/73) | 1% (1/73) | 初期値・修正待ち |
+| Oub6x | 1440 | `/ops/tenants/detail` | 0% (0/41) | 0% (0/41) | 初期値・修正待ち |
+| okXoi | 1440 | `/ops/tenants/detail` | 2% (1/43) | 2% (1/43) | 初期値・修正待ち |
+| qod6X | 1440 | `/ops/two-factor` | 10% (1/10) | 10% (1/10) | 初期値・修正待ち |
+| Y9ASp | 1152 | `/rich-menus` | 36% (16/45) | 36% (16/45) | 初期値・修正待ち |
+| ZoKow | 1440 | `/rich-menus` | 35% (18/51) | 35% (18/51) | 初期値・修正待ち |
 | f3SoAm | 1440 | `/rich-menus` | 未測 | — | 部品・まとめ板（除外） |
-| rZEGN | 1440 | `/rich-menus` | 42% (22/52) | — | 初期値・修正待ち |
-| yOyCg | 1440 | `/rich-menus` | 37% (22/60) | — | 初期値・修正待ち |
-| wxIQ7 | 1440 | `/rich-menus/connections` | 19% (4/21) | — | 初期値・修正待ち |
-| hKr8f | 1440 | `/rich-menus/edit` | 12% (3/26) | — | 初期値・修正待ち |
-| r8dGXT | 1440 | `/rich-menus/edit` | 13% (6/47) | — | 初期値・修正待ち |
-| F4gELj | 1440 | `/rich-menus/new` | 16% (5/32) | — | 初期値・修正待ち |
-| JeINq | 1440 | `/rich-menus/new` | 18% (11/60) | — | 初期値・修正待ち |
-| OxEMM | 1440 | `/rich-menus/new` | 19% (5/26) | — | 初期値・修正待ち |
-| Z0uO6 | 1440 | `/rich-menus/new` | 16% (7/45) | — | 初期値・修正待ち |
-| kmTab | 1152 | `/rich-menus/new` | 9% (4/43) | — | 初期値・修正待ち |
-| rE0ML | 1440 | `/rich-menus/new` | 14% (2/14) | — | 参考・候補に数えない |
-| bKipf | 1152 | `/settings` | 23% (13/57) | — | 初期値・修正待ち |
+| rZEGN | 1440 | `/rich-menus` | 42% (22/52) | 42% (22/52) | 初期値・修正待ち |
+| yOyCg | 1440 | `/rich-menus` | 37% (22/60) | 37% (22/60) | 初期値・修正待ち |
+| wxIQ7 | 1440 | `/rich-menus/connections` | 19% (4/21) | 19% (4/21) | 初期値・修正待ち |
+| hKr8f | 1440 | `/rich-menus/edit` | 12% (3/26) | 12% (3/26) | 初期値・修正待ち |
+| r8dGXT | 1440 | `/rich-menus/edit` | 13% (6/47) | 13% (6/47) | 初期値・修正待ち |
+| F4gELj | 1440 | `/rich-menus/new` | 16% (5/32) | 16% (5/32) | 初期値・修正待ち |
+| JeINq | 1440 | `/rich-menus/new` | 18% (11/60) | 18% (11/60) | 初期値・修正待ち |
+| OxEMM | 1440 | `/rich-menus/new` | 19% (5/26) | 19% (5/26) | 初期値・修正待ち |
+| Z0uO6 | 1440 | `/rich-menus/new` | 16% (7/45) | 16% (7/45) | 初期値・修正待ち |
+| kmTab | 1152 | `/rich-menus/new` | 9% (4/43) | 9% (4/43) | 初期値・修正待ち |
+| rE0ML | 1440 | `/rich-menus/new` | 14% (2/14) | 14% (2/14) | 参考・候補に数えない |
+| bKipf | 1152 | `/settings` | 23% (13/57) | 23% (13/57) | 初期値・修正待ち |
 | bR6a1 | 1440 | `/settings` | 未測 | — | 部品・まとめ板（除外） |
-| ywFJT | 1440 | `/settings` | 22% (13/58) | — | 初期値・修正待ち |
-| ziYCN | 1440 | `/settings` | 8% (5/60) | — | 初期値・修正待ち |
-| ztgRD | 1440 | `/settings` | 23% (16/69) | — | 初期値・修正待ち |
-| VsZ25 | 1440 | `/settings/customer-look` | 14% (7/49) | — | 初期値・修正待ち |
-| ewM7i | 1440 | `/settings/customer-look` | 17% (7/41) | — | 初期値・修正待ち |
-| PfA4o | 1440 | `/settings/file-scan` | 29% (9/31) | — | 初期値・修正待ち |
-| cIdA2 | 1440 | `/settings/manual-links` | 30% (11/37) | — | 初期値・修正待ち |
-| y3GGTs | 1440 | `/settings/sns` | 50% (2/4) | — | 初期値・修正待ち |
-| A35Gh | 1440 | `/staff` | 13% (5/40) | — | 初期値・修正待ち |
-| bMpC5 | 1440 | `/staff` | 29% (2/7) | — | 初期値・修正待ち |
-| nku0f | 1440 | `/staff` | 18% (10/57) | — | 初期値・修正待ち |
-| wbDHy | 1152 | `/staff` | 30% (10/33) | — | 初期値・修正待ち |
-| L7zA7C | 1152 | `/templates` | 44% (22/50) | — | 初期値・修正待ち |
-| R9XUMr | 1440 | `/templates` | 38% (44/116) | — | 初期値・修正待ち |
-| RHvRP | None | `/templates` | 0% (0/84) | — | 参考・候補に数えない |
-| V6JFnd | 1440 | `/templates` | 31% (27/87) | — | 初期値・修正待ち |
-| hEDTK | 1440 | `/templates` | 26% (21/82) | — | 初期値・修正待ち |
+| ywFJT | 1440 | `/settings` | 22% (13/58) | 22% (13/58) | 初期値・修正待ち |
+| ziYCN | 1440 | `/settings` | 8% (5/60) | 8% (5/60) | 初期値・修正待ち |
+| ztgRD | 1440 | `/settings` | 23% (16/69) | 23% (16/69) | 初期値・修正待ち |
+| VsZ25 | 1440 | `/settings/customer-look` | 14% (7/49) | 14% (7/49) | 初期値・修正待ち |
+| ewM7i | 1440 | `/settings/customer-look` | 17% (7/41) | 17% (7/41) | 初期値・修正待ち |
+| PfA4o | 1440 | `/settings/file-scan` | 29% (9/31) | 29% (9/31) | 初期値・修正待ち |
+| cIdA2 | 1440 | `/settings/manual-links` | 30% (11/37) | 30% (11/37) | 初期値・修正待ち |
+| y3GGTs | 1440 | `/settings/sns` | 50% (2/4) | 50% (2/4) | 初期値・修正待ち |
+| A35Gh | 1440 | `/staff` | 13% (5/40) | 13% (5/40) | 初期値・修正待ち |
+| bMpC5 | 1440 | `/staff` | 29% (2/7) | 29% (2/7) | 初期値・修正待ち |
+| nku0f | 1440 | `/staff` | 18% (10/57) | 18% (10/57) | 初期値・修正待ち |
+| wbDHy | 1152 | `/staff` | 30% (10/33) | 30% (10/33) | 初期値・修正待ち |
+| L7zA7C | 1152 | `/templates` | 44% (22/50) | 82% (41/50) | 再測定・90%未満 |
+| R9XUMr | 1440 | `/templates` | 38% (44/116) | 38% (44/116) | 初期値・修正待ち |
+| RHvRP | None | `/templates` | 0% (0/84) | 0% (0/84) | 参考・候補に数えない |
+| V6JFnd | 1440 | `/templates` | 31% (27/87) | 31% (27/87) | 初期値・修正待ち |
+| hEDTK | 1440 | `/templates` | 26% (21/82) | 73% (60/82) | 再測定・90%未満 |
 | susGP | 1440 | `/templates` | 未測 | — | 部品・まとめ板（除外） |
-| v19Ivv | 1440 | `/templates` | 33% (27/83) | — | 初期値・修正待ち |
-| J60utH | 1440 | `/templates/carousel` | 33% (18/55) | — | 初期値・修正待ち |
-| fBSdY | 1440 | `/templates/carousel` | 32% (15/47) | — | 初期値・修正待ち |
-| UTbi1 | 1440 | `/templates/detail` | 10% (5/50) | — | 初期値・修正待ち |
-| Z0g3si | 1440 | `/templates/detail` | 12% (7/59) | — | 初期値・修正待ち |
-| cuR8I | 1440 | `/templates/detail` | 11% (7/64) | — | 初期値・修正待ち |
-| EFV8l | 1440 | `/templates/edit` | 14% (6/42) | — | 初期値・修正待ち |
-| EsYo4 | 1440 | `/templates/edit` | 9% (4/46) | — | 初期値・修正待ち |
-| NCbYn | 1440 | `/templates/edit` | 19% (6/32) | — | 初期値・修正待ち |
-| S6FEuB | 1440 | `/templates/edit` | 30% (14/46) | — | 初期値・修正待ち |
-| a1k3d | 1152 | `/templates/edit` | 14% (3/21) | — | 初期値・修正待ち |
-| u5YC6 | 1440 | `/templates/edit` | 21% (6/28) | — | 初期値・修正待ち |
-| l87p1J | 1440 | `/templates/questions/new` | 18% (6/34) | — | 初期値・修正待ち |
+| v19Ivv | 1440 | `/templates` | 33% (27/83) | 86% (71/83) | 再測定・90%未満 |
+| J60utH | 1440 | `/templates/carousel` | 33% (18/55) | 33% (18/55) | 初期値・修正待ち |
+| fBSdY | 1440 | `/templates/carousel` | 32% (15/47) | 32% (15/47) | 初期値・修正待ち |
+| UTbi1 | 1440 | `/templates/detail` | 10% (5/50) | 10% (5/50) | 初期値・修正待ち |
+| Z0g3si | 1440 | `/templates/detail` | 12% (7/59) | 12% (7/59) | 初期値・修正待ち |
+| cuR8I | 1440 | `/templates/detail` | 11% (7/64) | 11% (7/64) | 初期値・修正待ち |
+| EFV8l | 1440 | `/templates/edit` | 14% (6/42) | 14% (6/42) | 初期値・修正待ち |
+| EsYo4 | 1440 | `/templates/edit` | 9% (4/46) | 9% (4/46) | 初期値・修正待ち |
+| NCbYn | 1440 | `/templates/edit` | 19% (6/32) | 19% (6/32) | 初期値・修正待ち |
+| S6FEuB | 1440 | `/templates/edit` | 30% (14/46) | 30% (14/46) | 初期値・修正待ち |
+| a1k3d | 1152 | `/templates/edit` | 14% (3/21) | 14% (3/21) | 初期値・修正待ち |
+| u5YC6 | 1440 | `/templates/edit` | 21% (6/28) | 21% (6/28) | 初期値・修正待ち |
+| l87p1J | 1440 | `/templates/questions/new` | 18% (6/34) | 18% (6/34) | 初期値・修正待ち |

@@ -8,7 +8,7 @@ import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState } from '@/comp
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
+import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
@@ -109,12 +109,12 @@ export default function OpsKnowledgeV8() {
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
       />
       <div className={parts.stack}>
-        <div className={`${parts.kpis} ${kpiStyles.strip}`} aria-label="このページの記事の状況">
+        <KpiBand aria-label="このページの記事の状況">
           <KpiCard presentation="cell" icon={<BadgeCheck size={13} aria-hidden="true" />} title="承認済み" value={count((row) => knowledgeState(row).label === '承認済み')} unit="件" detail="AI の返信に使う" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<Clock size={13} aria-hidden="true" />} title="承認待ち" value={count((row) => row.reviewState === 'pending')} unit="件" detail="根拠が揃った下書き" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<CircleHelp size={13} aria-hidden="true" />} title="要確認" value={count((row) => row.reviewState === 'needs_review')} unit="件" detail="運営の回答がない" help={pageHelp} loading={!loaded} />
           <KpiCard presentation="cell" icon={<MessageSquareText size={13} aria-hidden="true" />} title="使われた回数" value={ready ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail={ready ? `役に立った ${rows.reduce((sum, row) => sum + row.helpfulCount, 0)}` : emptyValue('unknown')} help="このページの記事の累計です。" loading={!loaded} />
-        </div>
+        </KpiBand>
 
         <div className={styles.tools}>
           <div className={styles.search}>

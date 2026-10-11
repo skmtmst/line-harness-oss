@@ -33,7 +33,7 @@
 .panelTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-body);
+  font-size: var(--polish-text-section);
   font-weight: 700;
   line-height: var(--tpl-op-panel-title-lh);
 }
