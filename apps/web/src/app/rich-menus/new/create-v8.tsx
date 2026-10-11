@@ -670,6 +670,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     busy: saving || publishing,
   })
 
+  function confirmLeaveAndDiscard() {
+    if (group && !host) clearPublishPlanDraft(group.id)
+    setPublishPlan(DEFAULT_PUBLISH_PLAN)
+    setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+    setEndEnabled(false)
+    confirmLeave()
+  }
+
   /* ---------- 読み込み ---------- */
 
   const load = useCallback(async () => {
@@ -1464,16 +1472,17 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   useEffect(() => {
     if (!groupId || planLoadedRef.current === groupId) return
     planLoadedRef.current = groupId
-    const saved = loadPublishPlanDraft(groupId)
-    if (saved) {
-      setPublishPlan(saved)
-      setPublishBaseline(saved)
-      setEndEnabled(saved.mode === 'period')
-    }
+    const saved = loadPublishPlanDraft(groupId) ?? DEFAULT_PUBLISH_PLAN
+    setPublishPlan(saved)
+    setPublishBaseline(DEFAULT_PUBLISH_PLAN)
+    setEndEnabled(saved.mode === 'period')
   }, [groupId])
-  useEffect(() => {
-    if (groupId && !host) savePublishPlanDraft(groupId, publishPlan)
-  }, [groupId, publishPlan, host])
+
+  // 入力したメニューの控えだけを更新する。切替の途中の古い入力を別のIDへ書かない。
+  function updatePublishPlan(next: PublishPlanInput) {
+    setPublishPlan(next)
+    if (groupId && !host) savePublishPlanDraft(groupId, next)
+  }
 
   async function validateWithLine() {
     if (!group || validating) return
@@ -1811,7 +1820,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
   return (
     <SaveErrorScope errors={saveErrors}><fieldset disabled={busy} className="contents">
-    <CreatePage boardId={
+    <CreatePage dirty={false} boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
       } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conflict ? (
@@ -1987,7 +1996,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           <p>手順②で画像の上から面を選び、押したときの動きを設定します。公開前に「LINEでの見え方」と実際のスマートフォンで確認してください。</p>
         </div>
       </Dialog>
-      <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
 
       {/* ★V8 `r8dGXT`「違いを比べる」の窓。最新と入力中の設定の要約を比べる。 */}
       <Dialog
@@ -2532,7 +2541,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onChange={() => {
                 // 「すぐ出す」に終わりは関係しない。選び直したら期間の設定も外す。
                 setEndEnabled(false)
-                setPublishPlan({ ...publishPlan, mode: 'now' })
+                updatePublishPlan({ ...publishPlan, mode: 'now' })
               }}
               title="すぐ公開する"
               icon={<Zap aria-hidden="true" />}
@@ -2542,7 +2551,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               name="timing"
               value="scheduled"
               checked={timingIsScheduled}
-              onChange={() => setPublishPlan({ ...publishPlan, mode: endEnabled ? 'period' : 'scheduled' })}
+              onChange={() => updatePublishPlan({ ...publishPlan, mode: endEnabled ? 'period' : 'scheduled' })}
               title="日時を決めて公開する"
               icon={<CalendarClock aria-hidden="true" />}
               note="キャンペーンの始まりに合わせる"
@@ -2553,7 +2562,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               <span className={styles.fieldLabel}>始める日時</span>
               <SaveErrorField names={["startsAt","publishPlan.startsAt","starts_at","publish_plan.starts_at","publish_plan"]}><DateTimeField
                 value={publishPlan.startsAt}
-                onChange={(v) => setPublishPlan({ ...publishPlan, startsAt: v })}
+                onChange={(v) => updatePublishPlan({ ...publishPlan, startsAt: v })}
                 aria-label="公開を始める日時"
               /></SaveErrorField>
             </div>
@@ -2567,7 +2576,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 checked={endEnabled}
                 onChange={(on) => {
                   setEndEnabled(on)
-                  setPublishPlan({
+                  updatePublishPlan({
                     ...publishPlan,
                     mode: on ? 'period' : publishPlan.mode === 'now' ? 'now' : 'scheduled',
                   })
@@ -2578,7 +2587,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               <span className={styles.endDate}>
                 <SaveErrorField names={["endsAt","publishPlan.endsAt","ends_at","publish_plan.ends_at","publish_plan"]}><DateTimeField
                   value={publishPlan.endsAt}
-                  onChange={(v) => setPublishPlan({ ...publishPlan, endsAt: v })}
+                  onChange={(v) => updatePublishPlan({ ...publishPlan, endsAt: v })}
                   aria-label="終わる日時"
                   disabled={!endEnabled}
                 /></SaveErrorField>
@@ -2587,7 +2596,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               <SaveErrorField names={["restoreGroupId","publishPlan.restoreGroupId","restore_group_id","publish_plan.restore_group_id","publish_plan"]}><EntitySelect kind="rich_menu"
                 aria-label="終わったらどうする"
                 value={publishPlan.restoreGroupId}
-                onChange={(v) => setPublishPlan({ ...publishPlan, restoreGroupId: v })}
+                onChange={(v) => updatePublishPlan({ ...publishPlan, restoreGroupId: v })}
                 disabled={!endEnabled}
                 options={[
                   { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
