@@ -26,8 +26,7 @@
   cursor: pointer;
 }
 
-.trigger:focus-visible,
-.option:focus-visible {
+.trigger:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
@@ -56,92 +55,12 @@
   color: var(--color-ink-faint);
 }
 
-.listbox {
-  position: absolute;
-  z-index: 50;
-  top: calc(100% - 1px);
-  left: 0;
-  width: 100%;
-  overflow: hidden;
-  border: 1px solid var(--card-edge);
-  border-top: 0;
-  border-radius: 0 0 var(--radius-control) var(--radius-control);
-  background: var(--color-canvas);
-}
-
-/*
- * ★V8 の開いた中身は共通部品 select-menu（StFE7）が描き、開く動き（150ms）もそちらが持つ。
- * ここの .listbox・.option・.check は v7 だけ。
- */
-
-.option {
-  display: flex;
-  width: 100%;
-  height: 38px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  border: 0;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: inherit;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-
 /* #976 U079/U083: タッチ端末は文字16px・高さ44px（入力欄と同じ規定）。 */
 @media (pointer: coarse) {
   .trigger {
     height: 44px;
     font-size: var(--text-lead);
   }
-
-  .option {
-    font-size: var(--text-lead);
-  }
-}
-
-.option:hover,
-.option[data-active='true'] {
-  background: var(--color-canvas-sunken);
-}
-
-.option:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.selectedBackground {
-  background: var(--color-select-picked);
-}
-
-.selected {
-  font-weight: 500;
-}
-
-.selectedBackground:hover,
-.selectedBackground[data-active='true'] {
-  background: var(--color-accent-soft);
-}
-
-.check {
-  box-sizing: border-box;
-  display: inline-flex;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-checkbox-mark);
-}
-
-/*
- * 選んでいる行。**白文字が乗るので `$accent-deep`。**
- * `$accent`(#06c755) に白文字は 2.26:1 で読めない。枠は緑のまま。
- */
-.checked {
-  border-color: var(--color-success);
 }
 
 .error {
@@ -192,16 +111,8 @@
   filter: brightness(0.97);
 }
 
-:root .option {
-  transition: background-color var(--motion-fast) var(--motion-ease-out);
-}
-
 :root .invalid .trigger {
   border-color: var(--color-danger);
-}
-
-:root .option {
-  font-size: var(--text-label);
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
@@ -258,23 +169,6 @@
 :root .leadingIcon svg {
   width: 15px;
   height: 15px;
-}
-
-/*
- * 1つだけ選ぶプルダウンに四角い箱は出さない（オーナー 2026-10-07「複数選択できないのにチェックボックス」）。
- * 選んでいる行は薄い緑の地と ✓ だけで示す。複数選びは multi-select の箱のまま。v8 だけ。
- */
-:root .check,
-:root .checked {
-  border: 0;
-  background: transparent;
-  color: var(--color-accent-deep);
-}
-
-:root .checkIcon {
-  width: 16px;
-  height: 16px;
-  stroke-width: 2.5;
 }
 
 /*
