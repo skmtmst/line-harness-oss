@@ -19,11 +19,6 @@
     "radius": 2,
     "shadow": 0
   },
-  "app/inflow-links/new/inflow-create-v8.module.css": {
-    "color": 0,
-    "radius": 2,
-    "shadow": 0
-  },
   "app/ops/support/format.ts": {
     "color": 0,
     "radius": 5,

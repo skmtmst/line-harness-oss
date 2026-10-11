@@ -129,20 +129,10 @@
     "height": 13,
     "font": 26
   },
-  "app/inflow-links/detail/inflow-detail-v8.module.css": {
-    "spacing": 26,
-    "height": 5,
-    "font": 21
-  },
   "app/inflow-links/inflow-list-v8.module.css": {
     "spacing": 13,
     "height": 5,
     "font": 14
-  },
-  "app/inflow-links/new/inflow-create-v8.module.css": {
-    "spacing": 26,
-    "height": 4,
-    "font": 21
   },
   "app/mileage/earning-rules/new/v8-create-form.module.css": {
     "spacing": 32,
