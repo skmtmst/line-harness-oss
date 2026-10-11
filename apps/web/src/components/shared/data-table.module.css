@@ -233,6 +233,47 @@
 [data-theme='v8'] .frame[data-density='sample'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }
 
 [data-theme='v8'] .frame[data-density='reviews'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }
+
+/*
+ * ★V8 デリバリー受注の表（承認 v02 の kDQHr・OzHLO・h7OeT）。
+ * presentation="delivery" を渡した表だけに効く。既定の表と他の画面は変えない。
+ *
+ * 1) 端の欄の外側の余白を0にする。板がすでに外側の余白を持っているので、端の欄で
+ *    もう一度 24 を付けると左右で48の二重取りになる。使える幅が 264〜1404 から
+ *    288〜1380 に縮み、前半の列が右へ・後半の列が左へずれていた（2026-10-10 実測）。
+ *    その24は列の幅（globals.css の kc/oc/hc）へ戻している。欄の間（片側8）はそのまま。
+ *    行が1つの欄だけのとき（読み込み中・0件の案内）は最初と最後が同じ欄なので両側残す。
+ * 2) 行の高さを中身まかせ（auto）にして、絵の下の線1pxを下の余白へ足す。絵（kDQHr）の
+ *    行の間は 53・53・53・53・50・47 と行ごとに違い、「上下の余白12＋中身＋下の線1」で
+ *    決まる。既定の決め打ち（.row の 52px）ではどの行も合わない。画面の線は影で引いていて
+ *    場所を取らないので、足さないと1px足りない。これで 行＝12＋中身＋13 になる。
+ * 3) 欄の中身を上そろえにする。札は字の下そろえで置かれるため、欄の見えない字の下の分だけ
+ *    中身が 22→23 にのびる。札そのものの高さではないので札や共通の帯は触らない。
+ *    上そろえで22へ戻り、札だけの行＝12+22+13＝47 と絵に合う。
+ *
+ * 4) 右そろえの欄（金額）の次の欄の左の余白を、他と同じ片側8へ戻す。この下の B-152 に
+ *    「右そろえの次の欄は左を24あける」決まりがあり、OzHLO の「状態」の欄だけ左が
+ *    8→24 になっていた。そのぶん中の札が右へ16ずれる（絵 1313 に対し画面 1332 ＝
+ *    ずれ19 のうち16がこれ。残り3は札の点と間）。見出しの「状態」は右そろえの指定が
+ *    ないので8のままで、絵と合っていた（2026-10-11 実測）。
+ *    絵（OzHLO）の欄の間は全部16（片側8）で、数字の列だけ広げる指定はない。
+ *
+ * 上下の余白は `.row` を挟んで書く。この下の B-152（`.frame .row .bodyCell` の
+ * `padding-block: 0`）と強さが同じだと、あとに書いたそちらが勝って余白が0になり、
+ * 行が 22 のまま潰れていた（2026-10-11 実測）。`.row` を1つ足して強くしてある。
+ * 簡単に見えても外さない。
+ */
+[data-theme='v8'] .frame[data-table-presentation='delivery'] tr :is(th, .bodyCell):first-child:not(:last-child) { padding-left: 0; }
+[data-theme='v8'] .frame[data-table-presentation='delivery'] tr :is(th, .bodyCell):last-child:not(:first-child) { padding-right: 0; }
+[data-theme='v8'] .frame[data-table-presentation='delivery'] .row { height: auto; }
+[data-theme='v8'] .frame[data-table-presentation='delivery'] .row .bodyCell {
+  padding-block: var(--tpl-row-pad-block) calc(var(--tpl-row-pad-block) + var(--tpl-rt-dlv-row-line));
+}
+[data-theme='v8'] .frame[data-table-presentation='delivery'] .row .bodyCell > * { vertical-align: top; }
+[data-theme='v8'] .frame[data-table-presentation='delivery'] tr :is(th, td)[data-align='right'] + :is(th, td) {
+  padding-inline-start: var(--tpl-cell-gap-half);
+}
+
 /* 飲食店のカード内の表（Y8SjT2・hQQlt）。既定の表は変えない。 */
 [data-theme='v8'] .frame[data-table-presentation='inventory'],
 [data-theme='v8'] .frame[data-table-presentation='channels'] {

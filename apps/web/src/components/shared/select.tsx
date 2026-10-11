@@ -70,6 +70,13 @@ export interface SelectProps {
    */
   icon?: ReactNode
   /**
+   * 先頭の図柄と値の並べ方。既定は箱の両端へ寄せる（会話の頭・よく使う絞り込みの絵どおり、
+   * 値が図柄と上下矢印の間で釣り合う）。`'start'` を渡すと値を図柄のすぐ右へ寄せる
+   * （★V8 デリバリー受注の注文履歴 `OzHLO`：余白12・印15・間6で文字が x1120 から始まる絵）。
+   * 渡さない箱は今までどおり。
+   */
+  valueAlign?: 'start'
+  /**
    * ★V8 だけ：開いた中身の一番下に区切りと「＋ 〇〇」を置き、押すと同じ板で作れるようにする
    * （dLffh・iBuZH。ふつうは FolderSelect が渡す）。渡さなければ出ない（閲覧のみ・権限なし）。
    */
@@ -102,6 +109,7 @@ export default function Select({
   name,
   onChange,
   icon,
+  valueAlign,
   options,
   size = 'standard',
   value,
@@ -301,6 +309,7 @@ export default function Select({
         type="button"
         className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' && v8 ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
         data-tone={treatment === 'pill' && v8 ? selected?.tone ?? 'neutral' : undefined}
+        data-value-align={valueAlign}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}

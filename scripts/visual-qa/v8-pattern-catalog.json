@@ -328,6 +328,7 @@
       },
       "code": {
         "selectorHint": "toolbar|toolBar|controls\\b|filters?Row|searchRow",
+        "canonicalUse": "<ListToolbar(?:Frame|Row|SearchSlot|End|Optional|Sort)?\\b",
         "overrideSelectors": [
           "toolbar"
         ],

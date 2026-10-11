@@ -125,6 +125,11 @@
   font-size: var(--text-callout);
 }
 
+/* 題の下の補足（titleNote を渡した窓だけ出る）。渡さない窓の並びは変わらない。 */
+.titleNote {
+  margin: 0;
+}
+
 /* 見出しの左に絵を置くとき（危険な操作の確認）だけ使う行。 */
 .titleRow {
   display: flex;
@@ -361,6 +366,37 @@
 [data-theme='v8'] .panel[data-design-header-height] > .headerRow { height: var(--dialog-design-header-height); min-height: 0; box-sizing: border-box; }
 [data-theme='v8'] .headerContent { gap: 2px; }
 [data-theme='v8'] .title { font-size: var(--tpl-dialog-title-size); font-weight: var(--tpl-dialog-title-weight); line-height: 24px; }
+/*
+ * 題の下の補足（絵 hjdqV「12:02 受信・受け取り希望 12:15」）。
+ * 絵は題 y120-147・補足 y151-169 で間4。共通の題は行の高さ24で y120-144 なので、
+ * 段の間2＋ここの5＝7 を足して補足の上端を y151 にそろえる。
+ */
+[data-theme='v8'] .titleNote {
+  margin-top: 5px;
+  font-size: var(--text-caption);
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+}
+/*
+ * 題の段の形を絵の値にする窓だけ（designTitleRow="mark"）。
+ * 絵（dgeTy・XCVGd）は左の丸い印と題が縦の中央でそろい、間は12（左24＋印36＋間12＝題72）。
+ * 題は 18/700。渡さない窓は上の既定（上そろえ・間8・太さ600）のまま。
+ */
+[data-theme='v8'] .panel[data-design-title-row='mark'] .titleRow {
+  align-items: center;
+  gap: 12px;
+}
+
+[data-theme='v8'] .panel[data-design-title-row='mark'] .titleIcon {
+  padding-top: 0;
+}
+
+[data-theme='v8'] .panel[data-design-title-row='mark'] .title {
+  font-size: var(--text-lead);
+  font-weight: 700;
+}
+
 [data-theme='v8'] .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
 [data-theme='v8'] .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
 [data-theme='v8'] .close svg { width: 16px; height: 16px; }

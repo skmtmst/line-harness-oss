@@ -143,3 +143,19 @@
 [data-theme='v8'] .danger { background: var(--color-badge-danger-bg); color: var(--color-badge-danger); }
 [data-theme='v8'] .info { background: var(--color-badge-info-bg); color: var(--color-badge-info); }
 @layer components { [data-theme='v8'] .badge[data-size='dining']{--badge-padding:2px 14px;} }
+
+/* デリバリー受注の承認 v02（kDQHr・hjdqV・OzHLO・h7OeT）の札。
+ * 絵の実測（2026-10-11）では、点のある札は 左8・点6・間5・字 で字の始まりが左から19。
+ * 共通の既定は間8なので、字が3右へずれていた。印（いなずま等）を持つ札は絵が間3〜4。
+ * 画面CSSから共通の札を削る（★V8 §24で禁止）代わりに、渡したときだけ効く大きさにする。 */
+@layer components {
+  /* 余白は共通の `--badge-padding` を作り直さず直に書く（この部品はここで新しい変数を
+   * 持たない決まり＝v5-b2-parts-contract）。上の .badge と同じ強さで後に出るので勝つ。 */
+  [data-theme='v8'] .badge[data-size='delivery'] {
+    padding: var(--tpl-rt-dlv-badge-pad);
+    gap: var(--tpl-rt-dlv-badge-gap);
+  }
+  [data-theme='v8'] .badge[data-size='delivery']:has(> svg) {
+    gap: var(--tpl-rt-dlv-badge-mark-gap);
+  }
+}

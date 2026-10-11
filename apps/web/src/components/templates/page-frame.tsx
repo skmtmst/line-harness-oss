@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
 import styles from './page-templates.module.css'
@@ -14,6 +14,20 @@ export interface PageHeadingProps {
   inset?: 'none'
   /** 題はすべて22/700/32。compact は題の周りの余白・間隔だけを詰める。 */
   headingSize?: 'regular' | 'compact' | 'large'
+  /** 頭の上の余白を絵の値にする。渡さないときは共通の 24（`--tpl-head-pad-top`）のまま。 */
+  padTop?: number
+  /** 題と説明の間を絵の値にする。渡さないときは共通の 8（`--tpl-head-gap`）のまま。 */
+  textGap?: number
+  /*
+   * 題を小さくする。`'sub'` は 18/700/27。
+   * 決まりの板（`docs/v8-design-rules.md` 「文字の段」）はページの題を 22/700 と書くが、
+   * ★V8 の絵では板の中の小さな板（例 デリバリー受注の「注文履歴・売上」「品切れ・在庫」）を
+   * 18/700/27 で描いている。正本の順位は 使いやすさ → 絵 → 決まりの板 → 共通部品 なので
+   * 絵に合わせる。渡さない画面はこれまでどおり 22/700/32 のまま。
+   */
+  titleSize?: 'sub'
+  /** 説明の文字を本文の大きさ（13/20）にする。渡さないときは補足の 12/19 のまま。 */
+  subtitleSize?: 'body'
   /** 詳細の説明とタブを詰める口。指定しない画面には効かない。 */
   bottomSpacing?: 'compact'
   help?: ReactNode
@@ -47,9 +61,21 @@ export function PageTitle({ children, as: Tag = 'h2', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', titleId, titleTabIndex, help, titleAccessory, actions, crumbs, steps, tabs, headingSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', titleId, titleTabIndex, help, titleAccessory, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
-  return <header className={styles.heading} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
+  /*
+   * 絵の値を渡された分だけ、この頭の中だけに効く変数で下へ流す。`.heading`・`.title` は
+   * すでにこの変数を読んでいるので、新しい選び方（セレクタ）は増えない。渡さない画面は
+   * 共通の値のままで、他の板の見え方は変わらない。
+   */
+  const headStyle = padTop === undefined && textGap === undefined && titleSize === undefined
+    ? undefined
+    : ({
+        ...(padTop === undefined ? null : { '--tpl-head-pad-top': `${padTop}px` }),
+        ...(textGap === undefined ? null : { '--tpl-head-gap': `${textGap}px` }),
+        ...(titleSize === 'sub' ? { '--tpl-title-size': '18px', '--tpl-title-lh': '27px' } : null),
+      } as CSSProperties)
+  return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     <div className={styles.headingText}>
       <div className={styles.titleRow}><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}
         {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}
