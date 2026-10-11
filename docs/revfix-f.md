@@ -132,3 +132,5 @@ NEXT_PUBLIC_API_URL=https://nen-line-stg.skmtmst.workers.dev pnpm -r --workspace
 NEXT_PUBLIC_API_URL=https://nen-line-stg.skmtmst.workers.dev pnpm run typecheck:scripts
 NEXT_PUBLIC_API_URL=https://nen-line-stg.skmtmst.workers.dev pnpm -r --workspace-concurrency=1 run build
 ```
+
+最終のブランチ全体差分検査では、先に取り込んだrevfix-dのbroadcast-audience-snapshot.ts末尾の余分な空行1件も指摘された。空行だけを除去して再検査。動作は変わらず、試験・型・ビルドの対象コードの意味は同一。専用・元の両作業ツリーは最終クリーン。
