@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
 import type { MenuPortalRect } from './menu-portal'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
+import ActionMenu, { type ActionMenuItem } from './action-menu'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import styles from './top-bar.module.css'
 
@@ -102,6 +103,8 @@ export interface TopBarProps {
    * ★V8 の管理画面は左下の自分のメニューへ移したので `false` を渡す（オーナー 2026-10-07）。
    */
   showIdentity?: boolean
+  /** 運営の自分の操作。省いたときの名前と配置は変えない。 */
+  identityActions?: ActionMenuItem[]
   className?: string
 }
 
@@ -134,9 +137,12 @@ export default function TopBar({
   titleHref,
   hqReturn = null,
   showIdentity = true,
+  identityActions,
   className,
 }: TopBarProps) {
   const [switchOpen, setSwitchOpen] = useState(false)
+  const [identityOpen, setIdentityOpen] = useState(false)
+  const identityRef = useRef<HTMLButtonElement>(null)
   const switchRef = useRef<HTMLButtonElement>(null)
   const rootRef = useRef<HTMLElement>(null)
   const bellRef = useRef<HTMLButtonElement>(null)
@@ -363,7 +369,10 @@ export default function TopBar({
             {userName.trim().slice(0, 1)}
           </span>
           <span className={styles.identityText}>
-            <span className={styles.user} title={userName}>{userName}</span>
+            {identityActions?.length ? <>
+              <button type="button" ref={identityRef} className={styles.user} title={userName} aria-label="自分のメニュー" aria-haspopup="menu" aria-expanded={identityOpen} onClick={() => setIdentityOpen((open) => !open)}>{userName}</button>
+              <ActionMenu open={identityOpen} items={identityActions} anchorRef={identityRef} onClose={() => setIdentityOpen(false)} ariaLabel="自分の操作" />
+            </> : <span className={styles.user} title={userName}>{userName}</span>}
             {onRoleClick
               ? <button type="button" className={styles.roleButton} onClick={onRoleClick}>{roleLabel}</button>
               : <span className={styles.role}>{roleLabel}</span>}
