@@ -355,7 +355,7 @@ export default function TagsTab({
       })
     } else {
       setItems((current) => mergeVisibleOrder(current, order.map((id) => current.find((tag) => tag.id === id)).filter((tag): tag is Tag => Boolean(tag))))
-      setActionError(null)
+      setActionError('')
     }
   }
 
