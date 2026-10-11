@@ -35,7 +35,7 @@ Tabで窓をまたぐ行を飛ばさず、選択した行が描画から外れ�
 
 2026-10-10 13:58 JSTに結果を記録。標準CLIを11場面×3回、計33回完走しexit 0。
 以下は3回の中央値。固定の見本APIによるローカル測定であり、検証・本番の実APIの値ではない。
-結果は `docs/speed2-1010-results.json`。
+結果は整理前のGit履歴から取得する（`git show ec971ed64783737a515f00ae6f8e7838c14024d2:docs/speed2-1010-results.json`）。
 
 | 指標 | 前のspeed | speed2 | 依頼の上限 |
 |---|---:|---:|---:|
@@ -56,7 +56,7 @@ Tabで窓をまたぐ行を飛ばさず、選択した行が描画から外れ�
 - 2,000行分の高さ118,000px、実際の各行59px。上20・中25・下19行を描き、スクロール全長を維持。
 - 最終行の選択・解除、描画から外れた後の選択保持、Space、メニュー開閉、離れた位置のフォーカス保持、120回のShift+Tabで窓をまたぐ移動が合格。
 
-操作・配置の結果：`docs/speed2-1010-table-results.json`。
+操作・配置の結果は整理前のGit履歴から取得する（`git show ec971ed64783737a515f00ae6f8e7838c14024d2:docs/speed2-1010-table-results.json`）。
 画像：`/tmp/lh-speed2-browser-final/{1440,1152,1920}-{top,middle,bottom}.png`。
 ログ：`/tmp/lh-speed2-{tests-final,script-tests-final,typecheck-final,worker-typecheck,build-final,final-speed,browser-final}.log`。
 

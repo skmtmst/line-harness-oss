@@ -4,7 +4,7 @@
 
 - 作業枝：`codex/kenta-del36b-1010`、作業場所：`~/lh-work/lh-pages-del36b`。
 - 列車17の `32a3a3ac3755471e854d4d84c7815437068e5024` から作成。開始時のDoctorは合格、作業ツリーはクリーン。
-- オーナー承認：`~/lh-work/design/v8/APPROVED-MIGRATIONS` の634の行。保持範囲は `docs/del36-1010-report.md` の13表・15参照。
+- オーナー承認：`~/lh-work/design/v8/APPROVED-MIGRATIONS` の634の行。保持範囲は整理前の報告の13表・15参照（`git show ec971ed64783737a515f00ae6f8e7838c14024d2:docs/del36-1010-report.md`）。
 - 作成前と試験前にfetch。確認した本線SHAは `d797a14673e742f261a314568ccbef850653d66c`。依頼どおり本線は取り込んでいない。
 - migration番号は **634**。本線は最大624、列車17は最大633、公開PR全38件は最大627。538ファイルのPR #1689はGraphQLの100件切りで見えないため、RESTの全ページも確認した。630〜632は飲食の承認枠であり、今回の634の承認行どおり633の次を使用。
 
