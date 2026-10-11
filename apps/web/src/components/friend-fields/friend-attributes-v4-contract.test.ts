@@ -16,7 +16,7 @@ describe('タグ V4 contract', () => {
 
   it('タグ編集の遡及付与は初期OFFで専用確認を通す', () => {
     const editor = read('components/friend-fields/tag-editor-v4.tsx')
-    const page = read('components/friend-fields/edit-tag-page-v4.tsx')
+    const page = read('v8/tag-edit/edit.tsx')
     expect(editor).toContain("useState(initialValues?.applyToExisting ?? initialApplyToExisting)")
     expect(editor).toContain('すでに付いている人への反映')
     expect(editor).toContain('さかのぼってマイルを積みますか？')
@@ -203,7 +203,7 @@ describe('タグ V4 contract', () => {
      * 編集画面の「所属フォルダ」で変える。絞りは編集画面の読み込み時に行う。
      */
     expect(source).not.toContain('<FolderSelect')
-    const edit = read('components/friend-fields/edit-tag-page-v4.tsx')
+    const edit = read('v8/tag-edit/edit.tsx')
     expect(edit).toContain('folders.data.filter((group) => group.accountId === selectedAccountId)')
     expect(source).toContain("if (!tag.usedIn) return 'なし'")
     /*
@@ -334,7 +334,7 @@ describe('タグ V4 contract', () => {
   })
 
   it('タグ編集の削除確認は参照件数の実値を出し、取れなければ押せなくする', () => {
-    const source = read('components/friend-fields/edit-tag-page-v4.tsx')
+    const source = read('components/friend-fields/edit-tag-page-v4.tsx') + read('v8/tag-edit/edit.tsx')
     // `load()` で取った `dependencies` を窓へ渡す。固定値を書かない。
     expect(source).toContain('api.tags.dependencies(tagId, selectedAccountId)')
     expect(source).toContain('dependencies={dependencies} dependenciesStatus={dependenciesStatus}')
