@@ -16,6 +16,8 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 import SiteScript from './site-script'
+import SiteScriptV8 from '@/v8/inflow-links/site-script'
+import { fireEvent, screen } from '@testing-library/react'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -269,3 +271,34 @@ it('V8でサイトごとの受信時刻と未受信を分ける', async () => {
   expect(text()).toContain('最後に受け取った時刻: まだ受け取っていません');
  } finally { document.documentElement.dataset.theme = 'v7'; }
 });
+
+
+describe('V8 計測サイトの共通メニューからの停止・再開', () => {
+  const site = { id: 'site-1', label: '公式ショップ', domains: ['shop.example.com'], createdAt: '2026-09-01T00:00:00.000Z', rejectedCount: 0, lastRejectedHost: null, lastRejectedAt: null, stoppedAt: null, stoppedReason: null }
+  const postedTo = (suffix: string) => vi.mocked(fetch).mock.calls.filter(([input, init]) => String(input).endsWith(`/measurement-sites/site-1/${suffix}`) && init?.method === 'POST')
+
+  it('理由がない停止は送らず、理由を入れた停止だけ送る', async () => {
+    staffRole = 'owner'; sites = [{ ...site }]
+    await act(async () => { root.render(<SiteScriptV8 />) }); await settle(); await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '「公式ショップ」の操作' })) }); await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '止める' })) }); await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '計測を止める', exact: true })) }); await settle()
+    expect(postedTo('stop')).toHaveLength(0)
+    expect(document.body.textContent).toContain('止める理由を入れてください')
+    await act(async () => { fireEvent.change(document.getElementById('site-stop-reason')!, { target: { value: 'サイトを閉じたため' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '計測を止める', exact: true })) }); await settle()
+    expect(postedTo('stop')).toHaveLength(1)
+    expect(JSON.parse(String(postedTo('stop')[0][1]?.body))).toEqual({ reason: 'サイトを閉じたため' })
+  })
+
+  it('停止中の再開は確認した後だけ送る', async () => {
+    staffRole = 'owner'; sites = [{ ...site, stoppedAt: '2026-09-27T00:00:00.000Z', stoppedReason: 'サイトを閉じたため' }]
+    await act(async () => { root.render(<SiteScriptV8 />) }); await settle(); await settle()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '「公式ショップ」の操作' })) }); await settle()
+    expect(screen.queryByRole('menuitem', { name: '止める' })).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '再開する' })) }); await settle()
+    expect(postedTo('resume')).toHaveLength(0)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '再開する', exact: true })) }); await settle()
+    expect(postedTo('resume')).toHaveLength(1)
+  })
+})

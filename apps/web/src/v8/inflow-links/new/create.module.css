@@ -2,51 +2,8 @@
  * ★V8 流入リンクを作る（KMaMk・競合 vWJEm・競合の比べ E14GFm）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここは段のカード（枠1・角12・余白20・間14）と、右の列（進む順・スマホ）の中身だけ。
  */
-.conflictBand {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-cn-conflict-gap);
-  padding: var(--tpl-cn-conflict-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft);
-}
-.conflictIcon {
-  flex-shrink: 0;
-  color: var(--color-status-warn-deep);
-}
-.conflictText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: var(--tpl-compact-gap);
-  min-width: 0;
-}
-.conflictTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-cn-name-lh);
-}
-.conflictNote {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-cn-main-lh);
-}
 
 /* 段のカード。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-cn-card-gap);
-  padding: var(--tpl-cn-card-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
 .cardHead {
   display: flex;
   flex-direction: column;
@@ -139,9 +96,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.actionPick {
-  padding: var(--tpl-cn-action-pick-pad);
-}
 
 /* 発行される URL：薄い地の箱（角8・余白 10/12・間8）。右に小さく「発行するとできます」。 */
 .urlBox {
@@ -190,14 +144,10 @@
 .steps {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-cn-ops-gap);
+  gap: var(--tpl-body-gap);
   margin: 0;
-  padding: var(--tpl-cn-steps-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
+  padding: 0;
   list-style: none;
-  box-shadow: var(--card-shadow);
 }
 .step {
   display: flex;
