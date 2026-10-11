@@ -1119,6 +1119,11 @@ export async function insertFormSubmissionRecord(
       db.prepare(`UPDATE form_submission_files SET submission_id = ? WHERE id IN (${placeholders}) AND submission_id IS NULL
         AND EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
         .bind(id, ...fileIds, id),
+      // Only a conclusively absent answer releases capacity. This transaction also
+      // excludes a concurrent successful save; transport failures keep the reservation.
+      db.prepare(`DELETE FROM form_capacity_claims WHERE form_id = ? AND submission_id = ?
+        AND NOT EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
+        .bind(input.formId, id, id),
     ]);
     if (results[0].meta.changes !== 1 || results[1].meta.changes !== fileIds.length) throw new Error('document_attachment_conflict');
     return (await db.prepare('SELECT * FROM form_submissions WHERE id = ?').bind(id).first<FormSubmission>())!;

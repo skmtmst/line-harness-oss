@@ -2929,7 +2929,8 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     // Webhook より前に置くのは、どうせ断る回答のために外部へ問い合わせを
     // 投げないため。工程(capacity)は一度きり: 再開時に二重に消費しない。
     const ensureCapacity = async (): Promise<string | null> => {
-      if (!claimCtx || claimDone('capacity') || !layout) return null;
+      if (!claimCtx || !layout) return null;
+      if (claimDone('capacity') && await getFormSubmissionById(c.env.DB, claimCtx.submissionId)) return null;
       const slots = collectCapacitySlots(layout, submissionData);
       if (slots.length === 0) {
         const lost = await claimCheckpoint('capacity');
