@@ -12,6 +12,7 @@
 | NORMAL3-04 | 現役入口が4つの店設定を無視して4件失敗 | 共通日時選択が週先・月先・週だけ・月だけを反映 | 旧日時選択と週カレンダーを共通へ統一 | 店の全4設定を実入口で確認 |
 | REM3-03 | 元Booking＋本物Stepperで支払い応答を渡すと4段、1 failed / 1 passed | 支払いが返ったとき5段・現在は5を選択。店払いは4段 | 固定4段のサロン2実装は共通化済み、現在1か所 | Booking.payment-steps 2件（決済部品は差し替え、実決済なし） |
 | B-241 仲間 | 実際のWorker/LIFFの紹介案件HTTP503が2件・紙の申請の通信拒否1件で失敗 | 案件と申請を失敗＋再試行へ。登録後の再試行は登録を増やさない | 紹介案件2実装の7か所（HTTP失敗2・catch4・紙の申請1）。webinarの空配列3件は成功時/巻戻しの正当なリセット | 実部品4＋紙の履歴1、AST7（両ソース全件・catch/HTTP失敗の空置換禁止） |
+| UI-N05 | 本線のFunnelV8実importで404/500の拒否、2 failed / 1 passed / unhandled 2 | 先行bのefbc652ae9で同じ3試験pass・unhandled 0を確認。cへの取り込みは旧文書の削除/変更競合で中止、判断待ち | 本線の結果読込1か所（bが修正済み） | 先行bの実FunnelV8＋ApiError3件。cは未取り込み |
 | REM3-02 | 仕様と絵の寸法が不一致で判定保留 | 修正しない | 共通枠1か所、絵2種を比較 | 寸法の正本の統一待ち |
 
 ## B-247 E3 調査（画面接続前）
@@ -56,3 +57,7 @@ F-6の人・席のキャンセル待ちを対象。イベントの待ちとは�
 - B-241仲間: `/tmp/revfixc-b241-sibling-red.log` 3 failed / 15 passed。修正後、登録後の既存API再試行を加え20 passed。ASTは正しい失敗状態と成功時リセットを区別する負例・正例6件＋全ソース1件、root test:scriptsでCI実行。
 
 - 全件検索で旧CSS参照は席入口・スタンプ入口・pendec2-rulesの3か所にもあった。全試験の実入口3件失敗とV8検査のENOENTを再現し、共通CSSへ接続。外側の幅/中央寄せ/素のボタン枠も実ブラウザで1 failed→1 passed、保持に必要なresetだけ共通CSSに移した（旧の色・影は移さない）。
+
+- E3実配備bundleのブラウザ検査: 375/414×LINE/夜の4組。短い予約操作が2行となる失敗を確認後、板ggPZt E3の並び（共通ボタンを縦に）と「この枠で予約する」に合わせ、全部1行・48px・横はみ出し0・例外0・想定外API0。CIのworker-buildに同じ実bundle検査を接続。夜の案内文もdata-liff-themeの文字色で読む。
+
+- UI-N05: `/tmp/revfixc-uin05-red.log` と `/tmp/revfixc-uin05-green.log`。先行修正efbc652ae9はコード・試験で競合しないが、本線で削除済みの `docs/qa/revfix-b-1011.md` と `docs/release-log/unreleased/0000-kenta-revfix-b.md` がmodify/delete競合となり、cherry-pick --abortして戻した。AGENTSの競合停止により、旧文書を復元せずコードと試験だけ引き継ぐ判断を依頼中。

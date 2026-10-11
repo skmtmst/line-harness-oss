@@ -16,13 +16,13 @@ test.each([false, true])('E3: 本物の案内部品で%sの残り時間を示し
   render(<WaitlistOfferSheet id="w" seat={seat} onClose={() => {}} />);
   await screen.findByText(/残り30分00秒/);
   vi.setSystemTime(new Date('2026-10-11T00:31:00Z'));
-  await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'この時間で予約する' })).toBeNull(), { timeout: 1500 });
+  await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'この枠で予約する' })).toBeNull(), { timeout: 1500 });
 });
 test('E3: 案内の読込失敗を空にせず、もう一度で復旧する', async () => {
   vi.mocked(api.bookingWaitlists).mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ waitlist: [offered()] } as never);
   render(<WaitlistOfferSheet id="w" onClose={() => {}} />);
   fireEvent.click(await screen.findByRole('button', { name: 'もう一度' }));
-  await screen.findByRole('button', { name: 'この時間で予約する' });
+  await screen.findByRole('button', { name: 'この枠で予約する' });
 });
 test('E3: 人数枠の登録前照会が失敗したら、空き扱いせずやり直す', async () => {
   vi.mocked(api.waitlistMine).mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ entry: null } as never);
@@ -35,7 +35,7 @@ test.each([false, true])('E3: %sの案内から既存の確定と見送りAPIに
   vi.mocked(api.acceptWaitlist).mockResolvedValue({ booking_id: 'b', status: 'confirmed' } as never);
   vi.mocked(api.acceptSeatWaitlist).mockResolvedValue({} as never);
   const { unmount } = render(<WaitlistOfferSheet id="w" seat={seat} onClose={() => {}} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'この時間で予約する' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'この枠で予約する' }));
   await screen.findByText('予約が確定しました。');
   const accept = seat ? api.acceptSeatWaitlist : api.acceptWaitlist;
   expect(accept).toHaveBeenCalledTimes(1);

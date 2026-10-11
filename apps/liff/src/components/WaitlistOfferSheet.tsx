@@ -22,7 +22,7 @@ if (!entry || !active || busy.current) return; busy.current = true; setWorking(t
     } catch (e) { const code = (e as { body?: { error?: string ;} ;}).body?.error; setError(code === 'offer_expired' ? '仮押さえの期限が切れました。' : code === 'slot_conflict' || code === 'slot_not_available' ? 'この枠は予約できなくなりました。' : '予約できませんでした。期限内にもう一度お試しください。'); } finally { busy.current = false; setWorking(false); }
 }
   async function cancel() { if (busy.current) return; busy.current = true; setWorking(true); setError(null); try { if (seat) await api.cancelSeatWaitlist(id); else await api.cancelWaitlist(id); setMessage('取り消しました。次の方へ案内します。'); } catch { setError('取り消せませんでした。もう一度お試しください。'); } finally { busy.current = false; setWorking(false); } }
-  return <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
+  return <div className="fixed inset-0 z-50 text-ink" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
     <Button variant="overlay" aria-label="閉じる" onClick={onClose} />
     <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-(--liff-radius-lg) bg-canvas p-4 pb-8">
       <h2 className="text-[15px] font-bold text-ink">{decline ? '今回は見送る' : '空きが出ました'}</h2>
@@ -31,7 +31,7 @@ if (!entry || !active || busy.current) return; busy.current = true; setWorking(t
       {active && !message && !paymentBooking && <p className="mt-3 text-[13px] text-ink" role="timer">残り{Math.floor(remaining / 60)}分{String(remaining % 60).padStart(2, '0')}秒</p>}
       {error && !entry && <Button variant="secondary" onClick={() => setReadAttempt(n => n + 1)}>もう一度</Button>}
       {error && <p className="mt-3 text-[13px] text-danger" role="alert">{error}</p>}
-      <div className="mt-4 flex gap-2">{!message && !paymentBooking && active && !decline && <Button disabled={working} onClick={accept}>この時間で予約する</Button>}{!message && !paymentBooking && (entry?.status === 'waiting' || active) && <Button variant="secondary" disabled={working} onClick={cancel}>{decline ? '今回は見送る' : '待ちを取り消す'}</Button>}<Button variant="secondary" onClick={onClose}>閉じる</Button></div>
+      <div className="mt-4 flex flex-col gap-2">{!message && !paymentBooking && active && !decline && <Button disabled={working} onClick={accept}>この枠で予約する</Button>}{!message && !paymentBooking && (entry?.status === 'waiting' || active) && <Button variant="secondary" disabled={working} onClick={cancel}>{active ? '今回は見送る' : '待ちを取り消す'}</Button>}<Button variant="secondary" onClick={onClose}>閉じる</Button></div>
     </div>
   </div>;
 }

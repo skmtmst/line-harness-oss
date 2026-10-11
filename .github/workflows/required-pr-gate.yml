@@ -367,6 +367,10 @@ jobs:
           VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
         run: pnpm --filter worker build
+      - name: Install browser for deployed LIFF entry guard
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Guard customer waitlist entry, theme and short actions (B-247 E3)
+        run: node scripts/codex/revfix-c-liff-browser.mjs
 
   web-checks:
     name: Admin lint, typecheck and tests

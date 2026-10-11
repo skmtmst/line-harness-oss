@@ -38,7 +38,7 @@ export default function SeatWaitlistSheet({ storeId, storeName, startsAt, guestC
         : '変更できませんでした。もう一度お試しください。');
     } finally { busy.current = false; setWorking(false); }
   }
-  return <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
+  return <div className="fixed inset-0 z-50 text-ink" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
     <Button variant="overlay" aria-label="閉じる" onClick={onClose} />
     <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-(--liff-radius-lg) bg-canvas p-4 pb-8">
       <h2 className="text-[15px] font-bold text-ink">空いたら知らせる</h2>
