@@ -31,7 +31,7 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-import MenuVersionHistory from './menu-version-history'
+import MenuVersionHistory from '@/v8/booking-menus/menu-version-history'
 
 afterEach(() => {
   cleanup()
