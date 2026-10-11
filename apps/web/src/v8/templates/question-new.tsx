@@ -40,7 +40,7 @@ import InlineSettings from '@/components/shared/inline-settings'
  *
  * 外枠はテンプレートの作る画面と同じ（src/v8/template-edit/frame）。左に段「名前とフォルダ」「質問」「選択肢」、
  * 右の列に「この質問を使う場所」と「届き方」（本物のスマホ）。下の帯はキャンセル・下書きを保存・保存して公開。
- * 読み込み・保存・公開（使用先があれば確認の窓）・離れる確認は今の V8（app/templates/questions/question-v8.tsx）と同じ。
+ * 読み込み・保存・公開（使用先があれば確認の窓）・離れる確認をこの現役の画面で扱う。
  * 見せ方を絵に合わせた：選択肢は横に並ぶカード（ボタンの文字・押されたら・押したときの返信）。
  * 「押されたら」は今の質問の部品（QuestionEditor）を窓で開いて決める（タグ・友だち情報・シナリオ・URL などの全部の設定が残る）。
  * 受け付ける URL：`/templates/questions/new`・`?id=<テンプレート>`（直す）。

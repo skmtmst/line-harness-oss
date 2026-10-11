@@ -93,7 +93,6 @@ const BASELINE: Record<string, number> = {
   'app/tags/searches-v8.tsx': 2,
   'app/tags/searches/edit/page.tsx': 3,
   'app/tags/tags-tab-v8.tsx': 4,
-  'app/templates/carousel/carousel-core.ts': 1,
   'app/templates/page.tsx': 1,
   'app/updates/page.tsx': 1,
   'app/webhooks/webhook-runtime.spec.ts': 1,

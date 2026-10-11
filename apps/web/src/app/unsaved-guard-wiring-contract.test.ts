@@ -153,8 +153,6 @@ const COVERED_BY_PARENT: Record<string, string> = {
   // リンクの見え方も含め、入力は親のスナップショットへ即時反映する。窓を閉じても残り、離脱は親の番兵が守る。
   'v8/form-edit/appearance-tab.tsx': 'v8/form-edit/edit.tsx',
   'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
-  'app/templates/carousel/carousel-v8.tsx': 'app/templates/editor-v8.tsx',
-  'app/templates/questions/question-v8.tsx': 'app/templates/editor-v8.tsx',
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
