@@ -50,9 +50,13 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
   })
 
   it('/affiliate-offers（案件タブ）：操作は右端にそろえる', () => {
-    const body = read('app', 'affiliates', 'tabs.tsx')
-    expect(body).toContain('<Th align="right">操作</Th>')
-    expect(body).toContain('px-4 py-3 text-right whitespace-nowrap')
+    const body = read('v8', 'affiliates', 'offers.tsx')
+    const css = read('v8', 'affiliates', 'affiliates.module.css')
+    expect(body).toContain('<Th className={styles.colOfferOps}>操作</Th>')
+    expect(body).toContain('<Td className={styles.colOfferOps}>')
+    expect(body).toContain('className={styles.rowActions}')
+    expect(css).toContain('.colOfferOps { width: var(--tpl-af-col-offer-ops); }')
+    expect(css).toMatch(/\.rowActions\s*\{[^}]*display: flex;[^}]*align-items: center;/)
   })
 
   it('/reminders：操作は右端にそろえる', () => {

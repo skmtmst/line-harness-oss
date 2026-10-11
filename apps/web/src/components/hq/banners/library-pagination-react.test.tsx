@@ -39,7 +39,10 @@ beforeEach(() => {
   flushListUrlState()
   window.history.replaceState({}, '', '/hq/banners?tab=library')
   nav.query = 'tab=library'
-  vi.spyOn(api.hqBanners, 'presets').mockResolvedValue({ success: true, data: { presets: [], usage: null } } as any)
+  vi.spyOn(api.hqBanners, 'presets').mockResolvedValue({ success: true, data: {
+    presets: [], maxCount: 10, engineReady: true,
+    usage: { month: { used: 0, limit: 100, remaining: 100 }, today: { used: 0, limit: 10, remaining: 10 }, paused: false, pausedReason: null },
+  } })
   vi.spyOn(api.hqBanners, 'stats').mockResolvedValue({ success: true, data: { projects: { active: 0, archived: 0 }, deliveredImages: 0, deliveredAccounts: 0 } })
   vi.spyOn(api.lineAccounts, 'list').mockResolvedValue({ success: true, data: [] })
   previousTheme = document.documentElement.dataset.theme

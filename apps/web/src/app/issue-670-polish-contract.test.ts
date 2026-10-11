@@ -21,7 +21,8 @@ const codeOf = (source: string) =>
 const CONTENTS = read('contents', 'page.tsx')
 const AUTOMATIONS = read('automations', 'page.tsx')
 const AUTO_REPLIES = read('auto-replies', 'page.tsx')
-const AFFILIATES = read('affiliates', 'tabs.tsx')
+const AFFILIATES = read('..', 'v8', 'affiliates', 'affiliators.tsx')
+const AFFILIATE_CSS = read('..', 'v8', 'affiliates', 'affiliates.module.css')
 const BOOKING = read('booking', 'bookings', 'page.tsx')
 const CHATS = read('chats', 'page.tsx')
 const FRIENDS = read('friends', 'page.tsx')
@@ -72,19 +73,20 @@ describe('#670 25/09 オートメーションの状態と行高・ページ送�
 })
 
 describe('#670 16/22 アフィリエイトの操作セルと緑文字', () => {
-  it('計測中・停止中は名前の下の札で出し、操作セルに置かない', () => {
-    expect(AFFILIATES).toContain("<Chip tone={row.isActive ? 'ok' : 'neutral'}>")
-    const toggleAt = AFFILIATES.indexOf('成果を見る')
-    const buttonAt = AFFILIATES.indexOf('<AffiliateButton', toggleAt)
-    expect(toggleAt).toBeGreaterThan(-1)
-    expect(buttonAt).toBeGreaterThan(toggleAt)
-    expect(AFFILIATES.slice(toggleAt, buttonAt)).not.toContain('計測中')
+  it('計測中・停止中は状態の札で出し、操作セルに置かない', () => {
+    expect(AFFILIATES).toContain("<StatusPill tone={row.isActive ? 'active' : 'neutral'}>")
+    const operationAt = AFFILIATES.indexOf('<Td className={styles.colOps}>')
+    const operationEnd = AFFILIATES.indexOf('</Td>', operationAt)
+    expect(operationAt).toBeGreaterThan(-1)
+    expect(operationEnd).toBeGreaterThan(operationAt)
+    expect(AFFILIATES.slice(operationAt, operationEnd)).not.toContain('計測中')
+    expect(AFFILIATES.slice(operationAt, operationEnd)).not.toContain('停止中')
   })
 
   it('AA未満の緑を使わない', () => {
     expect(AFFILIATES).not.toContain('text-green-600')
     expect(AFFILIATES).not.toContain('text-emerald-600')
-    expect(AFFILIATES).toContain('text-success')
+    expect(AFFILIATE_CSS).toMatch(/\.pill\[data-tone='active'\][^{]*\{[^}]*color: var\(--color-success\)/)
   })
 })
 

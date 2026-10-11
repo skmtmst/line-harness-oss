@@ -42,10 +42,14 @@ describe('表の外側の余白の洗い出し', () => {
     expect(css).toContain('.colMenu { flex: 0 0 var(--tpl-sa-acc-menu-w); }')
   })
 
-  it('/affiliates：外側は px-5、操作列は中身の幅で固定', () => {
-    const body = code(read('app', 'affiliates', 'tabs.tsx'))
-    expect(body).toContain('<Th className="pl-5">アフィリエイター</Th>')
-    expect(body).toContain('w-44 pr-5">操作')
+  it('/affiliates：外側はV8の板の余白、操作列は中身の幅で固定', () => {
+    const body = code(read('v8', 'affiliates', 'affiliators.tsx'))
+    const css = read('v8', 'affiliates', 'affiliates.module.css')
+    expect(body).toContain('<Th className={styles.colName}>アフィリエイター</Th>')
+    expect(body).toContain('<Th className={styles.colOps}>操作</Th>')
+    expect(css).toContain('padding: var(--tpl-af-head-pad)')
+    expect(css).toContain('padding: var(--tpl-af-row-pad)')
+    expect(css).toContain('.colOps { width: var(--tpl-af-col-ops); }')
   })
 
   it('/common-actions：操作列は中身の幅で固定＋右寄せ', () => {

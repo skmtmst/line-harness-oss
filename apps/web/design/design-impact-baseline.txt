@@ -49,15 +49,12 @@ shared-button-importer v8/events/preview.tsx
 shared-button-importer app/friends/friends-nav-v8.tsx
 shared-button-importer app/health/page.tsx
 shared-button-importer app/hq/open/page.tsx
-shared-button-importer app/inflow-links/referral-qr-modal.tsx
 shared-button-importer app/login/page.tsx
 shared-button-importer app/login/two-factor/setup/page.tsx
 shared-button-importer app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx
 shared-button-importer v8/mileage/score-rules.tsx
 shared-button-importer v8/nen-campaigns/column-intros.tsx
 shared-button-importer app/nen-campaigns/page.tsx
-shared-button-importer app/nen-members/photo-policy-history-v8.tsx
-shared-button-importer app/nen-members/photo-review-detail.tsx
 shared-button-importer app/password/forgot/page.tsx
 shared-button-importer app/password/reset/page.tsx
 shared-button-importer app/recipes/page.tsx
@@ -261,6 +258,7 @@ shared-button-importer v8/inbox-chat/template-picker-view.tsx
 shared-button-importer v8/affiliates/frame.tsx
 shared-button-importer v8/affiliates/parts.tsx
 shared-button-importer v8/affiliates/affiliators.tsx
+shared-button-importer v8/affiliates/monthly-flow.tsx
 shared-button-importer v8/affiliates/drawer.tsx
 shared-button-importer v8/affiliates/dialogs.tsx
 shared-button-importer v8/affiliates/offers.tsx

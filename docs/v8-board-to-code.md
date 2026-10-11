@@ -304,7 +304,7 @@
 | V8-B | Oub6x | 運営 契約先の詳細 V8 | /ops/tenants/detail | `app/ops/tenants/detail/page.tsx` | `v8/ops/tenant-detail.tsx` |
 | V8-B | okXoi | 運営 契約先を停止 V8 | /ops/tenants/detail?id=visual-tenant-1 | `app/ops/tenants/detail/page.tsx` | `v8/ops/tenant-detail.tsx` |
 | V8-B | qod6X | 運営 2要素認証を設定 V8 | /ops/two-factor | `app/ops/two-factor/page.tsx` | `v8/ops/two-factor.tsx` |
-| V8-B | u3iab3 | 設定 プール管理 V8 | /pools | `app/pools/page.tsx` | `v8/settings/pools/pools.tsx`<br>`app/settings/settings-nav-v8.tsx` |
+| V8-B | u3iab3 | 設定 プール管理 V8 | /pools | `app/pools/page.tsx` | `v8/settings/pools/pools.tsx`<br>`components/layout/settings-inner-nav.tsx` |
 | V8-B | D0AOyx | プール管理 プールを作る V8 | /pools/new | `app/pools/new/page.tsx` | `v8/settings/pools/create.tsx` |
 | V8 | a5C1p | リマインダ 一覧（閲覧のみ）V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
 | V8 | apLqS | リマインダ 一覧 V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
@@ -387,10 +387,10 @@
 | V8 | ztgRD | 設定 並びを変える V8 | /settings | `app/settings/page.tsx` | `v8/settings/features/screen.tsx` |
 | V8 | PfA4o | 設定 ファイルの検査 V8 | /settings/file-scan | `app/settings/file-scan/page.tsx` | `v8/settings/file-scan/screen.tsx` |
 | V8 | cIdA2 | 設定 マニュアルの正本表 V8 | /settings/manual-links | `app/settings/manual-links/page.tsx` | `v8/settings/manual-links/screen.tsx` |
-| V8 | A35Gh | 設定 ログインユーザー（閲覧のみ）V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`app/settings/settings-nav-v8.tsx` |
-| V8 | nku0f | 設定 ログインユーザー（管理者・権限） V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`app/settings/settings-nav-v8.tsx` |
-| V8 | wbDHy | ログインユーザー（1152）V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`app/settings/settings-nav-v8.tsx` |
-| V8-B | bMpC5 | 組織・権限 ユーザーの停止 V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`app/settings/settings-nav-v8.tsx` |
+| V8 | A35Gh | 設定 ログインユーザー（閲覧のみ）V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`components/layout/settings-inner-nav.tsx` |
+| V8 | nku0f | 設定 ログインユーザー（管理者・権限） V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`components/layout/settings-inner-nav.tsx` |
+| V8 | wbDHy | ログインユーザー（1152）V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`components/layout/settings-inner-nav.tsx` |
+| V8-B | bMpC5 | 組織・権限 ユーザーの停止 V8 | /staff | `app/staff/page.tsx` | `v8/settings/staff/staff.tsx`<br>`components/layout/settings-inner-nav.tsx` |
 | V8 | aPeD8 | 友だち属性 一覧（1152）V8 | /tags | `app/tags/page.tsx` | `v8/tags/list.tsx` |
 | V8 | fkGUR | 友だち属性 タグ（閲覧のみ）V8 | /tags | `app/tags/page.tsx` | `v8/tags/list.tsx` |
 | V8 | I1E7Bt | 友だち属性 タグ V8 | /tags | `app/tags/page.tsx` | `v8/tags/list.tsx` |
