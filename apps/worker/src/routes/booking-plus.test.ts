@@ -415,3 +415,14 @@ describe('8 無断キャンセルの印と前払いのみ', () => {
     expect(json.prepayNotice).toBeTruthy();
   });
 });
+
+describe('API-01/02 日本時間の暦日境界',()=>{
+ it('月初00:30を含め、翌月初00:30を含めない',async()=>{
+  seedBase();sqlite.exec("DELETE FROM bookings WHERE id NOT IN ('b-confirmed-1','b-confirmed-2'); UPDATE bookings SET starts_at='2026-10-31T15:30:00.000Z',price_at_booking=1000 WHERE id='b-confirmed-1'; UPDATE bookings SET starts_at='2026-11-30T15:30:00.000Z',price_at_booking=9000 WHERE id='b-confirmed-2'");
+  const res=await staffApp(bookingPlus).request('/api/booking/admin/sales-summary?account_id=account-a&from=2026-11-01&to=2026-12-01',{},env());
+  expect(res.status).toBe(200);const body:any=await res.json();expect(body.data.total.revenue).toBe(1000);expect(body.data.total.bookings).toBe(1);
+ });
+ it.each(['2026-02-30','2026-02-29','2026-04-31','2026-13-01','2026-00-01'])('存在しない日付 %s は400',async from=>{
+  const res=await staffApp(bookingPlus).request(`/api/booking/admin/sales-summary?account_id=account-a&from=${from}&to=2027-01-01`,{},env());expect(res.status).toBe(400);
+ });
+});
