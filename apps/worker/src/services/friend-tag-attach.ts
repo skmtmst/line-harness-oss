@@ -11,7 +11,7 @@ import {
   listUnfinishedFriendTagSideEffectRuns,
   markFriendTagSideEffectCompleted,
   markFriendTagSideEffectFailed,
-  openFriendTagSideEffectRuns,
+  friendTagSideEffectOpenStatements,
   FRIEND_TAG_SIDE_EFFECT_STEPS,
   type FriendTagSideEffectStep,
 } from '@line-crm/db';
@@ -209,7 +209,6 @@ async function claimAndRunStep(
   step: FriendTagSideEffectStep,
   assignedAt: string,
   push: ImmediatePushContext | undefined,
-  options: { runWhenLedgerMissing: boolean },
 ): Promise<{ outcome: StepOutcome; error: unknown | null }> {
   let claim;
   try {
@@ -221,17 +220,12 @@ async function claimAndRunStep(
       `tag side effect claim failed (step=${step} friend=${friendId} tag=${tagId}):`,
       error,
     );
-    return { outcome: 'skipped', error: null };
+    return { outcome: 'failed', error };
   }
 
   if (claim === 'not_claimable') return { outcome: 'skipped', error: null };
   if (claim === 'missing') {
-    if (!options.runWhenLedgerMissing) return { outcome: 'skipped', error: null };
-    // 台帳が開けなかった。ここで止めると付与だけが残って以前より悪くなるので、
-    // 従来どおり走らせる。予約なしなので、記録を残しておく。
-    console.error(
-      `tag side effect ledger row missing; running unfenced (step=${step} friend=${friendId} tag=${tagId})`,
-    );
+    return { outcome: 'failed', error: new Error('タグ付与後の工程記録が見つかりません。処理を確認してください') };
   }
 
   try {
@@ -296,7 +290,6 @@ export async function retryFriendTagSideEffects(
       run.step_key,
       run.assigned_at,
       push,
-      { runWhenLedgerMissing: false },
     );
     if (outcome === 'skipped') continue;
     result.retried += 1;
@@ -312,13 +305,13 @@ export async function attachTagAndFireSideEffects(
   push?: ImmediatePushContext,
 ): Promise<{ added: boolean }> {
   const assignedAt = jstNow();
-  const result = await db
-    .prepare(
-      `INSERT OR IGNORE INTO friend_tags (friend_id, tag_id, assigned_at)
-       VALUES (?, ?, ?)`,
-    )
-    .bind(friendId, tagId, assignedAt)
-    .run();
+  // 付与と工程宣言を1つのbatchへ入れる。中断・保存失敗で台帳なしの新規タグを残さない。
+  const results = await db.batch([
+    db.prepare(`INSERT OR IGNORE INTO friend_tags(friend_id,tag_id,assigned_at) VALUES (?,?,?)`)
+      .bind(friendId,tagId,assignedAt),
+    ...friendTagSideEffectOpenStatements(db,{friendId,tagId,assignedAt},true),
+  ]);
+  const result = results[0];
   const added = (result.meta?.changes ?? 0) > 0;
 
   if (!added) {
@@ -328,20 +321,11 @@ export async function attachTagAndFireSideEffects(
     return { added: false };
   }
 
-  // 副作用を1本も走らせる前に、工程を3本まとめて開く。1本目で落ちても
-  // 「何が未了か」が残る。台帳が書けなかった場合でも副作用は従来どおり
-  // 走らせる — ここで止めると付与だけが残り、以前より悪くなる。
-  await recordLedger('open', () =>
-    openFriendTagSideEffectRuns(db, { friendId, tagId, assignedAt }),
-  );
-
   // 1本落ちても残りは走らせる。工程どうしは独立していて、シナリオ登録が
   // 落ちたことを理由に tag_change まで止める必要はない。
   let propagated: unknown | null = null;
   for (const step of FRIEND_TAG_SIDE_EFFECT_STEPS) {
-    const { error } = await claimAndRunStep(db, friendId, tagId, step, assignedAt, push, {
-      runWhenLedgerMissing: true,
-    });
+    const { error } = await claimAndRunStep(db, friendId, tagId, step, assignedAt, push);
     if (error !== null && STEP_DEFINITIONS[step].propagatesFailure && propagated === null) {
       propagated = error;
     }
