@@ -104,7 +104,7 @@ const EVENTS: ReadonlyArray<{ value: Automation['eventType']; label: string; not
  */
 /* 並びは共有の正本 `AUTOMATION_DRAFT_TRIGGER_OPTIONS` と同じ順を保つ。 */
 const TRIGGER_EVENT_GROUPS: ReadonlyArray<{ id: string; label: string; values: readonly string[] }> = [
-  { id: 'people', label: '友だちやお客さんの動き', values: ['friend_add', 'message_received', 'tag_change', 'form_submitted', 'link_clicked', 'calendar_booked'] },
+  { id: 'people', label: '友だちやお客さんの動き', values: ['friend_add', 'message_received', 'tag_change', 'form_submitted', 'link_clicked', 'calendar_booked', ...AUTOMATION_DRAFT_TRIGGER_OPTIONS.filter(option => option.value.startsWith('restaurant.')).map(option => option.value)] },
   { id: 'schedule', label: '決めた時刻・曜日', values: ['datetime', 'daily', 'weekly'] },
   { id: 'ec', label: 'ECの出来事', values: ['ec.order.confirmed'] },
 ]
@@ -277,6 +277,8 @@ type ActionType = string
 interface ActionDraft {
   /** 行を取り違えないための、画面の中だけの番号。 */
   key: number
+  /** 読み込んだ処理のID。名前だけの保存や並べ替えで別の処理にしない。 */
+  sourceId?: string
   type: ActionType
   tagId: string
   message: string
@@ -510,23 +512,36 @@ const formSnapshotHasContent = (snapshot: FormSnapshot): boolean =>
   )
 
 /** 「すること」1行を、保存で送る形へ直す。指紋とも同じ形を使う。 */
-export const actionDraftToPayload = (row: ActionDraft, index: number): AutomationDraftAction => (
+export const actionDraftToPayload = (row: ActionDraft, index: number, rows?: ActionDraft[]): AutomationDraftAction => {
+  let id = row.sourceId ?? `step-${index + 1}`
+  if (!row.sourceId && rows) {
+    const used = new Set(rows.map(item => item.sourceId).filter(Boolean))
+    for (let position = 0; position <= index; position += 1) {
+      if (rows[position]?.sourceId) continue
+      let number = position + 1
+      while (used.has(`step-${number}`)) number += 1
+      id = `step-${number}`
+      used.add(id)
+    }
+  }
+  return (
   row.type === 'notify_staff'
     /* 担当へ知らせる：読んだときの知らせのルール・文面をそのまま戻す（口は F-14 で受け付ける）。 */
-    ? ({ id: `step-${index + 1}`, type: 'notify_staff', params: { ...(row.kept ?? {}) }, onFailure: 'stop' } as unknown as AutomationDraftAction)
+    ? ({ id, type: 'notify_staff', params: { ...(row.kept ?? {}) }, onFailure: 'stop' } as unknown as AutomationDraftAction)
     : row.type === 'add_tag'
-    ? { id: `step-${index + 1}`, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
+    ? { id, type: 'add_tag' as const, params: { tagId: row.tagId }, onFailure: 'stop' as const }
     : row.type === 'start_scenario'
-      ? { id: `step-${index + 1}`, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
+      ? { id, type: 'start_scenario' as const, params: { scenarioId: row.scenarioId }, onFailure: 'stop' as const }
       : row.type === 'common_action'
-        ? { id: `step-${index + 1}`, type: 'common_action' as const, params: { commonActionId: row.commonActionId }, onFailure: 'stop' as const }
+        ? { id, type: 'common_action' as const, params: { commonActionId: row.commonActionId }, onFailure: 'stop' as const }
         : {
-            id: `step-${index + 1}`,
+            id,
             type: 'send_message' as const,
             params: { messageType: 'text', content: row.message.trim() },
             onFailure: 'stop' as const,
           }
-)
+  )
+}
 
 /**
  * 「だれに」の条件を、保存で送る形へ直す（AUTOMATION-04）。
@@ -545,35 +560,41 @@ const normalizeTriggerConfigFor = (
   triggerConfig: Record<string, unknown>,
   keyword: string,
 ): Record<string, unknown> => {
-  if (eventType === 'message_received') return keyword.trim() ? { keyword: keyword.trim() } : {}
+  const plain = Object.fromEntries(Object.entries(triggerConfig).filter(([key]) => key !== 'friendNames'))
+  const managed = new Set(AUTOMATION_DRAFT_TRIGGER_OPTIONS.find(option => option.value === eventType)?.configKeys ?? [])
+  const kept = Object.fromEntries(Object.entries(plain).filter(([key]) => !managed.has(key)))
+  if (eventType === 'message_received') return { ...kept, ...(keyword.trim() ? { keyword: keyword.trim() } : {}) }
   if (eventType === 'tag_change') return {
+    ...kept,
     tagId: String(triggerConfig.tagId ?? ''),
     action: triggerConfig.action === 'remove' ? 'remove' : 'add',
   }
   if (eventType === 'datetime') {
     const local = String(triggerConfig.at ?? '')
-    return { at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: normalizeFriendIds(triggerConfig.friendIds) }
+    return { ...kept, at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: normalizeFriendIds(triggerConfig.friendIds) }
   }
   if (eventType === 'daily' || eventType === 'weekly') return {
+    ...kept,
     time: String(triggerConfig.time ?? ''),
     friendIds: normalizeFriendIds(triggerConfig.friendIds),
     ...(eventType === 'weekly' ? { weekdays: normalizeWeekdays(triggerConfig.weekdays) } : {}),
   }
   if (eventType === 'link_clicked') {
     const trackedLinkId = String(triggerConfig.trackedLinkId ?? '').trim()
-    return trackedLinkId ? { trackedLinkId } : {}
+    return { ...kept, ...(trackedLinkId ? { trackedLinkId } : {}) }
   }
   if (eventType === 'calendar_booked') {
     const bookingType = String(triggerConfig.bookingType ?? '')
     const menuId = String(triggerConfig.menuId ?? '').trim()
     const eventId = String(triggerConfig.eventId ?? '').trim()
     return {
+      ...kept,
       ...(bookingType === 'salon' || bookingType === 'event' ? { bookingType } : {}),
       ...(menuId ? { menuId } : {}),
       ...(eventId ? { eventId } : {}),
     }
   }
-  return triggerConfig
+  return plain
 }
 
 /**
@@ -626,38 +647,42 @@ export const draftDetailToForm = (detail: AutomationDraftDetail): {
     switch (detail.eventType) {
       case 'tag_change':
         return {
+          ...config,
           tagId: String(config.tagId ?? ''),
           action: config.action === 'remove' ? 'remove' : 'add',
         }
       case 'form_submitted':
-        return { formId: String(config.formId ?? '') }
+        return { ...config, formId: String(config.formId ?? '') }
       case 'link_clicked':
-        return { trackedLinkId: String(config.trackedLinkId ?? '') }
+        return { ...config, trackedLinkId: String(config.trackedLinkId ?? '') }
       case 'calendar_booked':
         return {
+          ...config,
           bookingType: String(config.bookingType ?? ''),
           menuId: String(config.menuId ?? ''),
           eventId: String(config.eventId ?? ''),
         }
       case 'datetime':
-        return { at: isoToDatetimeLocal(String(config.at ?? '')), friendIds: normalizeFriendIds(config.friendIds), friendNames }
+        return { ...config, at: isoToDatetimeLocal(String(config.at ?? '')), friendIds: normalizeFriendIds(config.friendIds), friendNames }
       case 'daily':
-        return { time: String(config.time ?? ''), friendIds: normalizeFriendIds(config.friendIds), friendNames }
+        return { ...config, time: String(config.time ?? ''), friendIds: normalizeFriendIds(config.friendIds), friendNames }
       case 'weekly':
         return {
+          ...config,
           time: String(config.time ?? ''),
           friendIds: normalizeFriendIds(config.friendIds),
           friendNames,
           weekdays: normalizeWeekdays(config.weekdays),
         }
       default:
-        return {}
+        return { ...config }
     }
   })()
   const actions: ActionDraft[] = detail.actions.length === 0
     ? [newActionDraft()]
     : detail.actions.map((step) => ({
         key: ++actionKeySeed,
+        sourceId: step.id,
         type: step.type,
         tagId: String(step.params.tagId ?? ''),
         message: String(step.params.content ?? ''),
@@ -1275,8 +1300,7 @@ export function NewAutomationV8({
   }).join('、')
 
   /** 保存で送る「すること」。確認画面とのずれを見るときも同じ形を使う。 */
-  const draftActions = (): AutomationDraftAction[] => actions.map((row, index) =>
-    actionDraftToPayload(row, index))
+  const draftActions = (): AutomationDraftAction[] => actions.map(actionDraftToPayload)
 
   /**
    * 共通アクションの版の中身を、確認画面向けの一文へたたむ（R486）。
@@ -1465,6 +1489,7 @@ export function NewAutomationV8({
       return message
     }
     if (!name.trim()) return invalid('v8-rule-name', 'ルール名を入力してください')
+    if (eventType === 'tag_change' && !String(triggerConfig.tagId ?? '').trim()) return invalid('v8-trigger-tag', 'きっかけのタグを選んでください')
     /*
      * 古い形で保存された条件を読めなかった下書きは、付け直すまで保存させない。
      * そのまま保存すると、読めなかった条件が黙って消えて全員へ届くルールに
@@ -2485,6 +2510,7 @@ export function NewAutomationV8({
         ? (
           <>
             見本に実データは入っていません。このアカウントで使うタグやシナリオを選び、下書きとして保存します。
+            保存しても自動では動きません。公開するまでは下書きのままです。
             {sourceBand}
           </>
         )
@@ -2613,7 +2639,7 @@ export function NewAutomationV8({
           <div className={styles.subBox}>
             <p className={styles.subTitle}>きっかけの詳しい設定</p>
             <div className={styles.formGrid}>
-              {eventType === 'tag_change' ? <SaveErrorField names={["tagId","triggerConfig.tagId","triggerConfig"]}><EntityKindField kind="tag" label="きっかけのタグ" placeholder="（どのタグか選ぶ）" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={tags} /></SaveErrorField> : null}
+              {eventType === 'tag_change' ? <SaveErrorField names={["tagId","triggerConfig.tagId","triggerConfig"]}><EntityKindField id="v8-trigger-tag" invalid={inputError?.target === 'v8-trigger-tag'} aria-describedby={inputError?.target === 'v8-trigger-tag' ? 'v8-trigger-error' : undefined} kind="tag" label="きっかけのタグ" placeholder="（どのタグか選ぶ）" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={tags} /></SaveErrorField> : null}
               {eventType === 'tag_change' ? <SaveErrorField names={["action","triggerConfig.action","trigger_config.action","trigger_config"]}><Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} size="full" /></SaveErrorField> : null}
               {eventType === 'form_submitted' ? <SaveErrorField names={["formId","triggerConfig.formId","form_id","trigger_config.form_id","trigger_config"]}><EntityRemoteField kind="form" label="回答フォーム" value={String(triggerConfig.formId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, formId: value })} /></SaveErrorField> : null}
               {eventType === 'link_clicked' ? <SaveErrorField names={["trackedLinkId","triggerConfig.trackedLinkId","tracked_link_id","trigger_config.tracked_link_id","trigger_config"]}><EntityRemoteField kind="tracked_link" label="計測リンク" value={String(triggerConfig.trackedLinkId ?? '')} accountId={selectedAccountId} emptyLabel="すべて" onChange={(value) => setTriggerConfig({ ...triggerConfig, trackedLinkId: value })} /></SaveErrorField> : null}
@@ -2640,7 +2666,7 @@ export function NewAutomationV8({
                 />
               ) : null}
             </div>
-            {inputError?.target === 'v8-trigger-at' || inputError?.target === 'v8-trigger-time' ? <p id="v8-trigger-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
+            {inputError?.target === 'v8-trigger-tag' || inputError?.target === 'v8-trigger-at' || inputError?.target === 'v8-trigger-time' ? <p id="v8-trigger-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
             <p className={styles.cardDesc}>{triggerConfigSummary}。保存後も設定を確認できます。</p>
           </div>
         ) : null}
