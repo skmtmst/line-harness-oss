@@ -9,8 +9,7 @@ import GoogleBusinessPage from './google-business'
 
 /*
  * ★V8 Googleビジネス（板 `j0Wcg`ほか6枚）。完全切り替え：画面は src/v8/restaurant/google。
- * 営業時間の変更・変更の確認・変更履歴・プロフィールの編集（?tab=profile&view=hours|confirm|history|edit）は
- * V8 の絵がまだ無いので、今の画面（google-business）で出す。
+ * 変更の確認は V8 の共通部品へ移した。営業時間・履歴・編集は旧入口を移行中。
  * 端末からの画像アップロードの道具は src/v8 から @/app を読めないので、ここで渡す。
  */
 const MEDIA_UPLOAD: MediaUploadHelpers = {
@@ -20,7 +19,7 @@ const MEDIA_UPLOAD: MediaUploadHelpers = {
   put: putMediaFile,
 }
 
-const PROFILE_SUB_VIEWS = new Set(['hours', 'confirm', 'history', 'edit'])
+const PROFILE_SUB_VIEWS = new Set(['hours', 'history', 'edit'])
 
 function GoogleEntry() {
   const searchParams = useSearchParams()

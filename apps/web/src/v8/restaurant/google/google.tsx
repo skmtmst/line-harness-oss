@@ -18,6 +18,7 @@ import { ReviewDraft, ReviewsBoard } from './reviews'
 import { PostEditor, PostConfirm, PostsBoard, type MediaUploadHelpers } from './posts'
 import PerformanceBoard from './performance'
 import ProfileBoard from './profile'
+import { ChangeConfirmScreen } from './profile-confirm'
 import SettingsBoard from './settings'
 import styles from './google.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
@@ -30,8 +31,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  *
  * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
  * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
- * 営業時間の変更・変更の確認・変更履歴・プロフィールの編集（?tab=profile&view=hours|confirm|history|edit）は
- * 入口の page.tsx が今の画面へ渡す（V8 の絵がまだ無い）。動きは BEHAVIOR.md。
+ * 変更の確認は共通の V8 部品で出す。営業時間・履歴・編集は旧入口を移行中。動きは BEHAVIOR.md。
  */
 
 export type { MediaUploadHelpers } from './posts'
@@ -183,6 +183,8 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           <PostsBoard accountId={accountId} go={go} />
         ) : tab === 'performance' ? (
           <PerformanceBoard accountId={accountId} />
+        ) : tab === 'profile' && view === 'confirm' && id ? (
+          <ChangeConfirmScreen key={`${accountId}-${id}`} accountId={accountId} ids={id.split(',').filter(Boolean)} go={go} />
         ) : tab === 'profile' ? (
           <ProfileBoard accountId={accountId} go={go} />
         ) : tab === 'settings' ? (

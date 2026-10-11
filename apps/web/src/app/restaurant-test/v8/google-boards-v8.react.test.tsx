@@ -21,6 +21,7 @@ vi.mock('@/v8/restaurant/google/reviews',()=>({ReviewDraft:()=> <div>現役の�
 vi.mock('@/v8/restaurant/google/posts',()=>({PostEditor:()=> <div>現役の子画面</div>,PostConfirm:()=> <div>現役の子画面</div>,PostsBoard:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/performance',()=>({default:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/profile',()=>({default:()=> <div>現役の子画面</div>}))
+vi.mock('@/v8/restaurant/google/profile-confirm',()=>({ChangeConfirmScreen:()=> <div>現役の子画面</div>}))
 vi.mock('@/v8/restaurant/google/settings',()=>({default:()=> <div>現役の子画面</div>}))
 import GoogleV8 from '@/v8/restaurant/google/google'
 
@@ -54,6 +55,7 @@ describe('Googleビジネス子板の印', () => {
     ['performance', null, 'SrmVs'],
     ['profile', null, 'JUTGz'],
     ['profile', 'hours', 'JUTGz'],
+    ['profile', 'confirm', 'JUTGz'],
     ['posts', null, 'Cfed0'],
     ['posts', 'new', 'T1j2Sw'],
     ['posts', 'confirm', 'T1j2Sw'],
