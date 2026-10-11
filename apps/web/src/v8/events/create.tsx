@@ -55,6 +55,11 @@ const WAITLIST_OPTIONS = [
   { value: '1', label: 'キャンセル待ちを受ける（空いたら順番に案内）' },
 ]
 
+function timeMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number)
+  return hour * 60 + minute
+}
+
 type QuestionDraft = { label: string; required: boolean }
 
 /* useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。 */
@@ -126,6 +131,8 @@ function EventsCreateV8Inner() {
     }
     const errors: Record<string, string> = {}
     if (!draft.name.trim()) errors['ev-new-name'] = 'イベント名を入れてください'
+    else if (draft.name.length > 255) errors['ev-new-name'] = 'イベント名は255字以内で入力してください'
+    if ((draft.description ?? '').length > 20000) errors['ev-new-desc'] = '詳細は20000字以内で入力してください'
     if (draft.venue_url) {
       try {
         const url = new URL(draft.venue_url)
@@ -139,6 +146,7 @@ function EventsCreateV8Inner() {
     if (!startTime) errors['ev-new-start'] = '開始の時刻を入れてください'
     if (!endTime) errors['ev-new-end'] = '終わりの時刻を入れてください'
     else if (startTime && endTime <= startTime) errors['ev-new-end'] = '終了は開始より後にしてください'
+    else if (startTime && (timeMinutes(endTime) - timeMinutes(startTime)) < 15) errors['ev-new-end'] = '開催時間は15分以上で入力してください'
     const cap = Number(capacity)
     if (!Number.isInteger(cap) || cap < 1) errors['ev-new-cap'] = '定員は1以上の数で入れてください'
     setError(null)
@@ -265,6 +273,11 @@ function EventsCreateV8Inner() {
             aria-invalid={Boolean(fieldErrors['ev-new-name']) || undefined}
             aria-describedby={fieldErrors['ev-new-name'] ? 'ev-new-name-error' : undefined}
             required
+            onBlur={() => {
+              const error = !draft.name.trim() ? 'イベント名を入れてください' : draft.name.length > 255 ? 'イベント名は255字以内で入力してください' : null
+              if (error) setFieldErrors((current) => ({ ...current, 'ev-new-name': error }))
+              else clearFieldError('ev-new-name')
+            }}
             onChange={(event) => {
               update('name', event.target.value)
               clearFieldError('ev-new-name')

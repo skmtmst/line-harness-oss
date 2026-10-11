@@ -10,6 +10,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
 import EventWizard from './event-wizard'
+import EventsCreate from '@/v8/events/create'
 import { EVENT_DEFAULT_DRAFT } from './event-draft-shared'
 import { EventSlotsPartialError } from '@/lib/api'
 
@@ -27,7 +28,9 @@ const st = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
 }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: st.push, replace: st.replace }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: st.push, replace: st.replace }) }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('next/link', () => ({
   default: ({ children, ...p }: { children?: React.ReactNode } & Record<string, unknown>) => (
     <a {...(p as React.AnchorHTMLAttributes<HTMLAnchorElement>)}>{children}</a>
@@ -37,7 +40,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...original,
-    api: { tags: { list: async () => ({ success: true, data: [] }) } },
+    api: { ...original.api, tags: { list: async () => ({ success: true, data: [] }) }, staff: { ...original.api.staff, me: vi.fn().mockResolvedValue({ success: true, data: { id: 'me', role: 'owner', isActive: true } }) } },
     eventsApi: st,
   }
 })
@@ -146,10 +149,10 @@ async function click(text: string) {
 }
 
 it('D08: 定員0では作成/更新APIを一切呼ばない', async () => {
-  await render(1, null)
-  await change('ev-name', 'Audit Event')
-  await change('first-slot-capacity', '0')
-  await click('概要を保存して次へ')
+  await act(async () => root.render(<EventsCreate />))
+  await change('ev-new-name', 'Audit Event')
+  await change('ev-new-cap', '0')
+  await click('下書きを保存')
   expect(host.textContent).toContain('定員は1以上')
   expect(st.createEvent).not.toHaveBeenCalled()
   expect(st.updateEvent).not.toHaveBeenCalled()
@@ -158,20 +161,22 @@ it('D08: 定員0では作成/更新APIを一切呼ばない', async () => {
 })
 
 it('D08: 日付が空でも作成/更新APIを呼ばない', async () => {
-  await render(1, null)
-  await change('ev-name', 'Audit Event')
-  await clearDate('first-slot-date')
-  await click('概要を保存して次へ')
-  expect(host.textContent).toContain('開催日と開始時刻を入力してください')
+  await act(async () => root.render(<EventsCreate />))
+  await change('ev-new-name', 'Audit Event')
+  await change('ev-new-cap', '10')
+  await clearDate('ev-new-date')
+  await click('下書きを保存')
+  expect(host.textContent).toContain('日付を選んでください')
   expect(st.createEvent).not.toHaveBeenCalled()
   expect(st.createSlots).not.toHaveBeenCalled()
 })
 
 it('D08: 所要時間が不正でも作成/更新APIを呼ばない', async () => {
-  await render(1, null)
-  await change('ev-name', 'Audit Event')
-  await change('first-slot-duration', '5')
-  await click('概要を保存して次へ')
+  await act(async () => root.render(<EventsCreate />))
+  await change('ev-new-name', 'Audit Event')
+  await change('ev-new-cap', '10')
+  await pickTime('ev-new-end', '14:05')
+  await click('下書きを保存')
   expect(host.textContent).toContain('開催時間は15分以上')
   expect(st.createEvent).not.toHaveBeenCalled()
   expect(st.createSlots).not.toHaveBeenCalled()

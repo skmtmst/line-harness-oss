@@ -17,14 +17,15 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
-    api: { ...actual.api, tags: { list: tagsList } },
+    api: { ...actual.api, tags: { list: tagsList }, staff: { ...actual.api.staff, me: vi.fn().mockResolvedValue({ success: true, data: { id: 'me', role: 'owner', isActive: true } }) } },
     eventsApi: { ...actual.eventsApi, getEvent: eventsGet, listSlots },
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
 }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
@@ -43,7 +44,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import EventWizard from './event-wizard'
+import EventsCreate from '@/v8/events/create'
 import EventForm from '@/v8/events/edit-form'
 
 let host: HTMLDivElement
@@ -74,17 +75,17 @@ async function renderNode(node: React.ReactNode) {
   })
 }
 
-describe('イベント作成（wizard）の名前欄を離れたときの確かめ', () => {
+describe('イベント作成の名前欄を離れたときの確かめ', () => {
   it('空のまま離れると保存前に直し方が出て、入れると消える', async () => {
-    await renderNode(<EventWizard accountId="acc-1" eventId={null} step={1} />)
-    const input = host.querySelector('#ev-name') as HTMLInputElement
-    if (!input) throw new Error('wizard name input not found')
+    await renderNode(<EventsCreate />)
+    const input = host.querySelector('#ev-new-name') as HTMLInputElement
+    if (!input) throw new Error('name input not found')
 
     await act(async () => { fireEvent.blur(input) })
-    expect(host.textContent).toContain('イベント名は必須です')
+    expect(host.textContent).toContain('イベント名を入れてください')
 
     await act(async () => { fireEvent.change(input, { target: { value: '夏の試食会' } }) })
-    expect(host.textContent).not.toContain('イベント名は必須です')
+    expect(host.textContent).not.toContain('イベント名を入れてください')
   })
 })
 
