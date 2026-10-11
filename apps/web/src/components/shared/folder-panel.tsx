@@ -204,7 +204,7 @@ export default function FolderPanel({
           const isActive = activeId === row.id
           const kind = row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')
           const menuRow = kind === 'all' && onAddFolder && !addFolderDisabled ? { ...row, leadingActions: [
-            ...(row.leadingActions ?? []), { id: 'add-folder', label: addFolderLabel, icon: <FolderPlus size={16} />, onSelect: onAddFolder },
+            ...(row.leadingActions ?? []), { id: 'add-folder', label: addFolderLabel, icon: <FolderPlus size={14} aria-hidden="true" />, onSelect: onAddFolder },
           ] } : row
           const hasActions = !readOnly && Boolean(menuRow.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
 

@@ -42,3 +42,6 @@
 /* B-218：名前は通常・乗せた・押した状態で黒の太字。 */
 html[data-theme='v8'] [data-list-name] .name,
 html[data-theme='v8'] [data-list-name] .name :is(a, button) { color: var(--color-ink); font-weight: 700; }
+
+.line[data-has-annotation] { width: max-content; }
+.line[data-has-annotation] > :last-child { flex: none; }

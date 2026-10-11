@@ -29,12 +29,6 @@
 }
 
 /* 一覧の箱：角丸12・細い枠。 */
-.box {
-  overflow: hidden;
-  border: 1px solid var(--card-edge);
-  border-radius: var(--tpl-nt-box-radius);
-  box-shadow: var(--card-shadow);
-}
 
 .list {
   margin: 0;
@@ -116,7 +110,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--polish-text-body);
   font-weight: 500;
   line-height: var(--tpl-nt-title-lh);
 }
@@ -130,7 +124,7 @@
   height: var(--tpl-nt-dot);
   flex-shrink: 0;
   border-radius: var(--radius-pill);
-  background: var(--color-action);
+  background: var(--color-status-info);
 }
 
 .time {

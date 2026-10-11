@@ -241,3 +241,5 @@
   border-bottom-color: var(--color-ink);
 }
 [data-theme='v8'] .list .items[data-sliding='true'] .current { border-bottom-color: transparent; }
+/* 通知の固定絵は文字を段の上へ置く。高さ36と切り替えの動きは共通。 */
+[data-theme='v8'] .list[data-size='notification'] .tab.tab { align-items: flex-start; }

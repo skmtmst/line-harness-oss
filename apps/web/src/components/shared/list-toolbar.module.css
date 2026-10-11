@@ -202,8 +202,8 @@
   flex-wrap: wrap; min-width: 0;
 }
 [data-theme='v8'] :global([data-list-skeleton]) .row1 > .search {
-  width: var(--tpl-list-search-w);
-  flex: 0 1 var(--tpl-list-search-w);
+  width: var(--list-search-width, var(--tpl-list-search-w));
+  flex: 0 1 var(--list-search-width, var(--tpl-list-search-w));
   min-width: min(var(--tpl-list-search-min), 100%);
 }
 [data-theme='v8'] :global([data-list-skeleton]) .search > * { width: 100%; min-width: 0; }
@@ -221,7 +221,7 @@
 
 .filterChoices, .filterWide { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
 .filterNarrow { display: none; }
-@container v8-page (max-width: 1100px) { .filterWide { display: none; } .filterNarrow { display: flex; } }
+
 
 /* B-191/205：札とほかの道具が入りきらない時だけ、共通の実寸判定で畳む。 */
 .toolbar, .slots { container-type: inline-size; container-name: v8-list-toolbar; }

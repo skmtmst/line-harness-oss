@@ -133,7 +133,7 @@ export function DataTable({
   className?: string
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
-  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery'
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
@@ -264,14 +264,16 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
 }
 
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, className }: {
+export function NameCell({ name, folder, annotation, className }: {
   name: ReactNode
+  /** 名前の横の状態札。名前やリンクの中には入れない。 */
+  annotation?: ReactNode
   folder?: FolderDotFolder | null
   className?: string
 }) {
   return (
     <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}><FolderDotName folder={folder}>{name}</FolderDotName></div>
+      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation}>{name}</FolderDotName></div>
     </td>
   )
 }

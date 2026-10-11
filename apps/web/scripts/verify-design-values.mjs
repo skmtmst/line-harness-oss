@@ -389,16 +389,12 @@ function splitSelectorGroups(css) {
 
 /** v8 での実効値：素の規定（base）＋ v8 上書き（後勝ち）。cls は合成可（同じ要素に付く複数クラス）。 */
 export function v8EffectiveBody(css, cls) {
-  const flat = splitSelectorGroups(css)
-  return (Array.isArray(cls) ? cls : [cls])
-    .flatMap((c) => [ruleBody(flat, c), v8ScopedBody(flat, c)])
-    .filter(Boolean)
-    .join(';')
+  return frozenSelectorBody(css, (Array.isArray(cls) ? cls : [cls]).map(c => `.${c}`).join(''))
 }
 
 /** 固定HTMLの色・選択状態の照合。同じ要素の合成クラスとv8上書きだけを読む。 */
 export function frozenSelectorBody(css, selector) {
-  const clean = s => s.trim().replace(/\[data-theme=["']?v8["']?\]\s*/g, '').replace(/["']/g, '')
+  const clean = s => s.trim().replace(/^(?:html)?\[data-theme=["']?v8["']?\]\s+/, '').replace(/["']/g, '')
   const wanted = clean(selector)
   const classes = [...wanted.matchAll(/\.([\w-]+)/g)].map(m => m[1])
   const rest = wanted.replace(/\.[\w-]+/g, '')

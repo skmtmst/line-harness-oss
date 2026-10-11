@@ -434,7 +434,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
         </Card>
       </TemplateEditFrame></SaveErrorScope>
@@ -476,7 +476,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
 
-        {host?.composer ? null : <Card padding="none" layout="vertical" className={styles.card}>
+        {host?.composer ? null : <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>名前とフォルダ</h2>
           </div>
@@ -499,7 +499,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           </div>
         </Card>}
 
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>面の分け方</h2>
             <p className={styles.cardNote}>選んだ形に合わせて、下の設定が増えます</p>
@@ -510,7 +510,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           />
         </Card>
 
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle}>画像</h2>
             <p className={styles.cardNote}>1040 × 1040px（正方形）がおすすめ</p>
@@ -557,7 +557,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
           </div>
         </Card>
 
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           {/* 採用案 Wmch0（リッチメニューと同じ部品）：画像の上で面を押して選ぶ＋右に一覧＋下に選んだ面の動き。 */}
           <TapAreaEditor
             framed={false}

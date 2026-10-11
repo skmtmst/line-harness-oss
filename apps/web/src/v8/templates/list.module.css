@@ -165,7 +165,7 @@
   padding-inline-start: var(--tpl-folder-dot-indent);
 }
 
-/* 種類の札（白い地・薄い枠・角6）。 */
+/* 統括の一覧もこのクラスを読む。店側を共通札へ移しても宣言を残す。 */
 .kindBadge {
   display: inline-block;
   padding: var(--tpl-tl-badge-pad);

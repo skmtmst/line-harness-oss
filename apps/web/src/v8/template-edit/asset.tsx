@@ -418,7 +418,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
         </Card>
       </TemplateEditFrame></SaveErrorScope>
@@ -426,7 +426,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   }
 
   const nameCard = (
-    <Card padding="none" layout="vertical" className={styles.card}>
+    <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
       <div className={styles.cardHead}>
         <h2 className={styles.cardTitle}>名前とフォルダ</h2>
       </div>
@@ -486,7 +486,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
         {kind === 'coupon' ? (
           <>
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
@@ -516,7 +516,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               </div>
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>使える期間と回数</h2>
                 <p className={styles.cardNote}>この管理画面の時刻（日本時間）で入ります</p>
@@ -548,7 +548,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               </div>
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>抽選</h2>
               </div>
@@ -571,7 +571,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
             <div {...fields.bind("tapExtras")}><TapExtrasField error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div>
             {host ? null : (
-              <Card padding="none" layout="vertical" className={styles.card}>
+              <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
                 <div className={styles.cardHead}>
                   <h2 className={styles.cardTitle}>使われたときに行うこと</h2>
                 </div>
@@ -581,7 +581,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
           </>
         ) : (
           <>
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>受付</h2>
               </div>
@@ -593,7 +593,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.field}><Field label="はじめのあいさつ" htmlFor="te-research-greeting"><SaveErrorField names={["description"]}><TextField id="te-research-greeting" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：いつもありがとうございます。3問だけ聞かせてください。" /></SaveErrorField></Field></div>
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>質問（上から順に出ます）</h2>
               </div>
@@ -689,7 +689,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
             {host ? null : (
             <>
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答え終わったときに行うこと</h2>
               </div>
@@ -697,7 +697,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <InlineActionRowsV8 actions={answerActions} onChange={setAnswerActions} {...actionOptions} />
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答えてもらう人</h2>
                 <p className={styles.cardNote}>タグで絞れます。選ばなければ全員が対象です。</p>

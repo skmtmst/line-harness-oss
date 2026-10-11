@@ -79,6 +79,25 @@ test('14種類を実寸で故障注入し、修正すれば検出0（ブラウ�
     assert.equal((await page.evaluate(scan)).some(f=>f.kind==='greenname'),false,'件数リンクは緑のまま')
   } finally { await browser.close() }
 })
+test('操作帯の前の余白は、印付きのボタンや入力の下端から測る', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    for (const control of [
+      '<a href="#" style="display:block;height:36px">手順を見る<svg width="16" height="16"><path d="M0 0 L16 16" /></svg></a>',
+      '<input aria-label="名前" value="入力した内容" style="display:block;height:36px">',
+    ]) {
+      const probe = gap => shell(`<p>説明</p><div style="margin-top:120px">${control}</div><div data-shared-part="sticky-bar" style="margin-top:${gap}px;height:56px">保存</div>`)
+      await page.setContent(probe(16))
+      assert.equal((await page.evaluate(scan)).some(f => f.kind === 'footgap'), false)
+      await page.setContent(probe(120))
+      assert.equal((await page.evaluate(scan)).some(f => f.kind === 'footgap'), true, '実際の120pxの空白は検出する')
+    }
+    await page.setContent(shell('<p>説明</p><input style="display:none"><div data-shared-part="sticky-bar" style="margin-top:120px;height:56px">保存</div>'))
+    assert.equal((await page.evaluate(scan)).some(f => f.kind === 'footgap'), true, '隠れた入力で空白を隠せない')
+  } finally { await browser.close() }
+})
+
 test('新規の故障をCLIが非0で止める。理由なしの除外は使えない', () => {
   const dir=mkdtempSync(join(tmpdir(),'pendec-guard-'))
   try {
@@ -191,5 +210,46 @@ test('窓の中のスクロールの続きを余白不足と誤判定せず、�
     assert.deepEqual((await page.evaluate(scan)).filter(f=>f.kind==='tight'),[])
     await page.locator('section').evaluate(el=>el.style.paddingBottom='0px')
     assert.ok((await page.evaluate(scan)).some(f=>f.kind==='tight'))
+  } finally { await browser.close() }
+})
+
+test('列で組む表も見出しと本文の右端・中央・左余白がそろう', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const read = name => readFileSync(new URL('../../src/' + name, import.meta.url), 'utf8')
+    await page.setContent(shell(`<style>${read('app/globals.css')}${read('components/shared/table.module.css')}</style>
+      <div class="headRow" data-table-layout="columns" role="row" style="width:600px">
+        <div class="cell" style="width:230px"><span id="head-name">名前</span></div>
+        <div class="cell right" style="width:160px"><span id="head-number">件数</span></div>
+        <div class="cell center" style="width:100px"><span id="head-state">状態</span></div>
+      </div>
+      <div role="row" style="display:flex;align-items:center;gap:16px;width:600px;height:56px;padding:0 24px">
+        <div style="width:230px"><span id="body-name">名前</span></div>
+        <div style="width:160px;text-align:right"><span id="body-number">件数</span></div>
+        <div style="width:100px;text-align:center"><span id="body-state">状態</span></div>
+      </div>`))
+    await page.evaluate(() => { document.documentElement.dataset.theme = 'v8' })
+    const positions = () => page.evaluate(() => {
+      const glyph = id => {
+        const range = document.createRange()
+        range.selectNodeContents(document.getElementById(id))
+        const r = range.getBoundingClientRect()
+        return { left: r.left, right: r.right, center: (r.left + r.right) / 2, middle: (r.top + r.bottom) / 2 }
+      }
+      const row = document.querySelector('.headRow').getBoundingClientRect()
+      return { name: glyph('head-name'), number: glyph('head-number'), state: glyph('head-state'),
+        bodyNumber: glyph('body-number'), bodyState: glyph('body-state'),
+        row: { left: row.left, height: row.height, middle: (row.top + row.bottom) / 2 } }
+    })
+    const good = await positions()
+    assert.ok(Math.abs(good.number.right - good.bodyNumber.right) <= 1, '数字の列の右端')
+    assert.ok(Math.abs(good.state.center - good.bodyState.center) <= 1, '状態の列の中央')
+    assert.equal(good.name.left - good.row.left, 24, '親とセルで端の余白を二重にしない')
+    assert.equal(good.row.height, 40)
+    assert.ok(Math.abs(good.name.middle - good.row.middle) <= 3, '文字を上下中央に置く')
+    await page.locator('.headRow .right').evaluate(el => { el.style.display = 'flex' })
+    const broken = await positions()
+    assert.ok(Math.abs(broken.number.right - broken.bodyNumber.right) > 20, 'text-alignが効かなくなる故障も検出する')
   } finally { await browser.close() }
 })

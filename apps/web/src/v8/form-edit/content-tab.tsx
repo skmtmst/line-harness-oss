@@ -1,4 +1,6 @@
 'use client'
+
+import Card from '@/components/shared/card'
 import {japaneseDetailOf} from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
@@ -80,7 +82,7 @@ export function ContentTab(props: Props) {
 
   return (
     <>
-      <section className={styles.card} aria-labelledby="fe-pages-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-pages-title">
         <div className={styles.cardHead}>
           <span className={styles.cardHeadText}>
             <h2 id="fe-pages-title" className={styles.cardTitle}>ページ</h2>
@@ -117,9 +119,9 @@ export function ContentTab(props: Props) {
             ページを足す
           </Button>}
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="fe-blocks-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>
           <h2 id="fe-blocks-title" className={styles.cardTitle}>{`ページ${page + 1} のブロック`}</h2>
           <p className={styles.cardNote}>つまみで並べ替え。押すと設定が開きます</p>
@@ -143,7 +145,7 @@ export function ContentTab(props: Props) {
           )
         )}
         {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
-      </section>
+      </Card>
 
       <RenameDialog
         value={props.readOnly ? null : renaming}
@@ -621,7 +623,7 @@ function AddGrid({ onAdd, hide }: { onAdd: (make: (count: number) => FormBlock) 
                   <span className={styles.addCardLabel}>{card.label}</span>
                   {card.fresh ? <span className={styles.newBadge}>新</span> : null}
                 </span>
-                <span className={styles.addCardHint}>{card.hint}</span>
+                <span className={styles.addCardHint} title={card.hint}>{card.hint}</span>
               </button>
             ))}
           </div>

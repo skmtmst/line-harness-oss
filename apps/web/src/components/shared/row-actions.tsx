@@ -117,8 +117,8 @@ export type RowMenuProps = {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   /**
-   * 見た目。'box' は ★V8 の行の「…」（KspUx の印ボタン＋横の3点）。
-   * 'plain' は枠の無い V5 の「…」（RowActions・v7 の一覧）。
+   * 見た目。'plain' は固定V8一覧の枠なしの「…」。
+   * 'box' は行内で行う操作など、枠付きの印ボタンが指定された場所。
    */
   appearance?: 'box' | 'plain'
   /**
@@ -150,7 +150,7 @@ export function RowMenu({
   note,
   open: openProp,
   onOpenChange,
-  appearance = 'box',
+  appearance = 'plain',
   size,
   className,
   title,

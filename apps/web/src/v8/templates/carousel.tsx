@@ -1,5 +1,7 @@
 'use client'
 
+
+import Card from '@/components/shared/card'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
@@ -466,7 +468,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         {saveFailed ? <Notice tone="warn" message="入力した内容はそのまま残っています。もう一度保存を押してください。" /> : null}
         {loading ? <ListState kind="loading" title="カルーセルを読み込んでいます" /> : (
           <>
-            {inline ? null : <section className={styles.card} aria-labelledby="cr-name">
+            {inline ? null : <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-name">
               <h2 className={styles.cardTitle} id="cr-name">名前とフォルダ</h2>
               <div className={styles.row}>
                 <div className={`${styles.field} ${styles.grow}`}><Field label="テンプレート名" htmlFor="cr-name-input"><SaveErrorField names={["name"]}><input {...fields.bind('name')} id="cr-name-input" className={styles.input} value={name} placeholder="例：夏の定番5点" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'cr-name-input-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
@@ -488,9 +490,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   /></SaveErrorField>
                 </div>
               </div>
-            </section>}
+            </Card>}
 
-            <section className={styles.card} aria-labelledby="cr-cards">
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-cards">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="cr-cards">カード</h2>
                 <p className={styles.note}>左から順に出ます。つまんで並べ替えられます。</p>
@@ -520,10 +522,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                 </Button>
                 <span className={own.count}>{`${panels.length} / ${MAX_COLUMNS} 枚`}</span>
               </div>
-            </section>
+            </Card>
 
             {panel ? (
-              <section className={styles.card} aria-labelledby="cr-panel">
+              <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-panel">
                 <h2 className={styles.cardTitle} id="cr-panel">{`カード ${selectedIndex + 1} の中身`}</h2>
                 <div className={own.panelRow}>
                   <div className={own.imageCol} {...fields.bind(`card-${selectedIndex}-image`)} aria-describedby={fields.invalid(`card-${selectedIndex}-image`) ? 'cr-image-error' : undefined}>
@@ -617,11 +619,11 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <Button type="button" variant="text" disabled={busy || panels.length <= 1} title={panels.length <= 1 ? 'カードは1枚必要です' : undefined} onClick={() => removePanel(selectedIndex)}><Trash2 size={15} aria-hidden="true" />このカードを消す</Button>
                 </div>
                 <p className={own.info}><TriangleAlert className={own.icon} aria-hidden="true" />画像は全部のカードに入れるか、全部入れないかにします。1枚だけ違うと、高さがそろわず崩れます。</p>
-              </section>
+              </Card>
             ) : null}
 
             {/* 絵に無いが今ある設定：押せる回数（「動きを実行する」ボタンだけが対象）。統括の入口は URL だけなので出さない。 */}
-            {hqHost || inline ? null : <section className={styles.card} aria-labelledby="cr-limit">
+            {hqHost || inline ? null : <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)" aria-labelledby="cr-limit">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle} id="cr-limit">押せる回数</h2>
                 <p className={styles.note}>「動きを実行する」ボタンだけが対象です。URLを開くボタンはLINEの外へ出るので数えられません。</p>
@@ -633,7 +635,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
               {tapLimitMode === 'once' ? (
                 <Field label="2回目に押されたときの返事空なら何も返さない"><SaveErrorField names={["tapLimitText","tap_limit_text"]}><input className={styles.input} value={tapLimitText} placeholder="例：こちらはすでに受け付けています。" onChange={(event) => setTapLimitText(event.target.value)} /></SaveErrorField></Field>
               ) : null}
-            </section>}
+            </Card>}
           </>
         )}
       </TemplateEditFrame>

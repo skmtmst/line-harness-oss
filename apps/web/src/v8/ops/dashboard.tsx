@@ -15,7 +15,6 @@ import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
 import ListState from '@/components/shared/list-state'
 import PeriodPicker from '@/components/shared/period-picker'
 import { OpsHead } from './shell'
@@ -124,12 +123,12 @@ export default function OpsDashboardV8() {
       ) : (
         <div className={parts.stack}>
           {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
-          <div className={`${parts.kpis} ${kpiStyles.strip}`}>
+          <KpiBand>
             <KpiCard presentation="cell" icon={<Wallet size={13} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? `契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）` : emptyValue('unknown')} loading={loading} />
             <KpiCard presentation="cell" icon={<Banknote size={13} aria-hidden="true" />} title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data ? `決済失敗 ${data.alerts.pastDue} 社` : emptyValue('unknown')} loading={loading} />
             <KpiCard presentation="cell" icon={<Hourglass size={13} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data ? `期限 3日以内 ${data.alerts.trialEndingSoon}` : emptyValue('unknown')} loading={loading} />
             <KpiCard presentation="cell" icon={<Sparkles size={13} aria-hidden="true" />} title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : emptyValue('unknown')} loading={loading} />
-          </div>
+          </KpiBand>
 
           <div className={parts.row}>
             <section aria-label="要対応" className={parts.panel}>
@@ -269,7 +268,7 @@ function AlertRow({ label, count, href }: { label: string; count: number; href: 
 
 /** 月ごとの売上の柱（千円）。いちばん高い月を柱の高さいっぱいにする。いまの月は濃い緑。 */
 function RevenueColumns({ rows }: { rows: Array<{ label: string; yen: number; current: boolean }> }) {
-  return <ValueBarChart label="月ごとの売上" unit="円" items={rows.map(r=>({key:r.label,label:r.label,value:r.yen,note:r.current?'今月':undefined}))} />
+  return <ValueBarChart label="月ごとの売上" unit="円" presentation="summary" items={rows.map(r=>({key:r.label,label:r.label,value:r.yen,note:r.current?'今月':undefined,emphasis:r.current}))} />
 }
 
 function revenueSourceLabel(pricing: 'stripe_actual' | 'list_price', lastSyncedAt: string | null): string {

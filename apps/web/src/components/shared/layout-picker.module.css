@@ -11,3 +11,8 @@
 .area { position: absolute; display: flex; align-items: center; justify-content: center; outline: 2px solid var(--color-canvas); outline-offset: -1px; color: var(--color-ink-secondary); font-size: 11px; font-weight: 600; line-height: 16px; }
 .tile:has(input:checked) .area { color: var(--color-accent-deep); }
 }
+
+/* リッチメッセージの6面を1段に置く。右上のラジオの下へ見本を置き、重ねない（B-203/229）。 */
+html[data-theme='v8'] .list[data-preview='message'] .tile {
+  width: 104px; padding-top: 40px;
+}

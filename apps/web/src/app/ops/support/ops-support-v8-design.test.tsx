@@ -87,7 +87,15 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     await settle()
     const body = text()
     // 頭
-    expect(body).toContain('統括の管理画面「お問い合わせ」から送られたものが新規として並びます')
+    // 見出し下の説明は共通の「？」から読む。説明の欠落と開閉の動きを検査する。
+    const help = host.querySelector<HTMLButtonElement>('button[aria-label="お問い合わせの説明"]')!
+    expect(help).toBeTruthy()
+    expect(help.getAttribute('aria-expanded')).toBe('false')
+    await act(async () => { help.click() })
+    expect(help.getAttribute('aria-expanded')).toBe('true')
+    expect(host.querySelector('[role="note"]')?.textContent).toContain('統括の管理画面「お問い合わせ」から送られたものが新規として並びます')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).toContain('代わりに起票する')
     // B-205：細い列に札を並べず、状態の選択で同じ取得口へ届く。
     expect(host.querySelector('.v6-filter-chip')).toBeNull()

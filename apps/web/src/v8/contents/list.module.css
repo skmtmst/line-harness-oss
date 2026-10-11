@@ -121,8 +121,7 @@
   align-items: center;
   gap: var(--tpl-toolbar-gap);
   min-width: 0;
-  padding-right: var(--tpl-fm-menu-size);
-  margin-bottom: var(--tpl-rule-row-gap);
+  margin-bottom: var(--tpl-row-sub-gap);
 }
 .nameDot {
   display: inline-flex;
@@ -167,11 +166,6 @@
 }
 .usageIdle { color: var(--color-ink-faint); }
 .usageUsed { color: var(--color-ink-secondary); }
-.cardFoot {
-  position: absolute;
-  top: var(--tpl-toolbar-gap);
-  right: var(--tpl-toolbar-gap);
-}
 .menuWrap {
   position: relative;
   display: inline-flex;

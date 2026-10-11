@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import styles from './copy-text-button.module.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
@@ -22,6 +22,7 @@ export default function CopyTextButton({
   getValue,
   role,
   label = 'コピー',
+  icon,
   'aria-label': ariaLabel,
   disabled = false,
 }: {
@@ -29,6 +30,7 @@ export default function CopyTextButton({
   value?: string
   getValue?: () => Promise<string>
   label?: string
+  icon?: ReactNode
   role?: 'button' | 'menuitem'
   disabled?: boolean
   /** 何をコピーするボタンか。一覧では行の名前を含めて特定できるようにする。 */
@@ -109,14 +111,14 @@ export default function CopyTextButton({
       onClick={(event) => { event.stopPropagation(); void copy() }}
       aria-label={ariaLabel}
       title={state === 'copied' ? 'コピーしました' : label}
-      style={v8 ? { width: 'calc(7em + 20px)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 } : undefined}
+      style={v8 ? { width: icon ? 'max-content' : 'calc(7em + 20px)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4 } : undefined}
       className={`${styles.button} w-16 shrink-0 cursor-pointer px-1 py-0.5 text-center text-xs ${
         state === 'copied'
           ? 'text-success font-semibold'
           : 'text-action hover:underline'
       }`}
     >
-      {state === 'copied' && v8 ? <Check size={14} aria-hidden /> : null}
+      {state === 'copied' && v8 ? <Check size={14} aria-hidden /> : icon}
       {state === 'copied' ? 'コピーしました' : label}
     </button>
   )

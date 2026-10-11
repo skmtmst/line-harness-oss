@@ -90,9 +90,9 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', title
 }
 
 export function PageFrame({ kind, children, boardId, layout, heightMode, standalone = false, hasFooter = false, skeleton = false }: {
-  kind: string; children: ReactNode; boardId?: string; layout?: string; heightMode?: 'content'; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean
+  kind: string; children: ReactNode; boardId?: string; layout?: string; heightMode?: 'viewport' | 'content'; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean
 }) {
-  return <div className={styles.frame} data-frame-height={heightMode} data-list-skeleton={skeleton ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+  return <div className={styles.frame} data-frame-height={heightMode} data-height-mode={heightMode} data-list-skeleton={skeleton ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
 }
 
 /** 型が保存帯の置き場所と追従を持つ。画面は操作と状態だけを渡す。 */

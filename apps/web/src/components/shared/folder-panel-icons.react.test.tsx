@@ -74,6 +74,7 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     expect(folder.classList.contains('lucide-folder')).toBe(true)
     expect(folder.style.color).toBe('rebeccapurple')
     expect(button.querySelector('[data-folder-dot]')).toBeNull()
+    expect(folder.getAttribute('fill')).toBe('currentColor')
     expect(button.querySelector('.v8-only [data-caller-icon]')).toBeNull()
   })
 

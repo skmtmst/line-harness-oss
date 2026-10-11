@@ -156,7 +156,7 @@ export function ListToolbarSort(props: ListToolbarSortProps) {
   return <span data-list-sort><Select {...props} label="並び" aria-label="並び" /></span>
 }
 
-/** B-205：札の集まりだけを状態の選ぶ欄へ畳む。日付・複数条件は元の操作を保つ。 */
+/** B-191/192/205：入らない札と狭い列だけを選ぶ欄へ畳む。 */
 function compactFilterGroups(node: ReactNode): ReactNode {
   const children = Children.toArray(node)
   if (children.length > 1 && children.every(child => isValidElement(child) && child.type === FilterChip))

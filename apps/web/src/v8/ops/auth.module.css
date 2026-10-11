@@ -47,15 +47,8 @@
 }
 
 .card {
-  display: flex;
   width: 100%;
   max-width: var(--tpl-op-auth-card-w);
-  flex-direction: column;
-  gap: var(--tpl-op-auth-card-gap);
-  border-radius: var(--radius-panel);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-board);
-  padding: var(--tpl-op-auth-card-pad);
 }
 
 .title {

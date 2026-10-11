@@ -68,6 +68,21 @@ test('入れ子のカードの余白は合算せず、カード自身の大き�
 
   } finally { await browser.close() }
 })
+test('追従バーの裏の文字と、実際に見える重なりを区別する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    const covered = '<div style="height:200px;overflow:auto"><div style="height:300px">本文の文字</div><footer style="position:sticky;bottom:0;background:white;height:40px;z-index:2">保存の操作</footer></div>'
+    // 追従した帯と本文を同じ位置へ置く。
+    const fixture = covered.replace('height:300px', 'height:180px;padding-top:160px')
+    await page.setContent(shell(fixture))
+    assert.equal((await measurePage(page)).some(f => f.kind === 'overlap'), false)
+    await page.locator('footer').evaluate(el => el.style.background = 'transparent')
+    assert.ok((await measurePage(page)).some(f => f.kind === 'overlap'), '透明な帯では両方の文字が見える')
+    await page.setContent(shell(fixture.replace('保存の操作', cases.overlap)))
+    assert.ok((await measurePage(page)).some(f => f.kind === 'overlap'), '不透明な帯の中の重なりは検出する')
+  } finally { await browser.close() }
+})
 test('種類ごとに実物を壊し、検出・終了コード1・修復後0を確認する', async () => {
   const browser = await chromium.launch()
   const dir = mkdtempSync(join(tmpdir(),'v8-defects-'))

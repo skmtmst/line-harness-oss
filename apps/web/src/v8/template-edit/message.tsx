@@ -441,7 +441,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={<SenderCard />}
       >
-        <Card padding="none" layout="vertical" className={styles.card}>
+        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
           <></>
         </Card>
@@ -534,7 +534,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         )}
       >
         {loading ? (
-          <Card padding="none" layout="vertical" className={styles.card}>
+          <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
             <p className={styles.cardNote} role="status">テンプレートを読み込んでいます…</p>
           </Card>
         ) : (
@@ -544,7 +544,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             {error || loadFailed ? <Notice tone="danger" >{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</Notice> : null}
             {exampleNote && !id ? <p role="status" className={styles.error}>{exampleNote}</p> : null}
             <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>名前とフォルダ</h2>
                 <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
@@ -568,7 +568,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               </div>
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>中身</h2>
               </div>
@@ -609,7 +609,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               ) : null}
             </Card>
 
-            <Card padding="none" layout="vertical" className={styles.card}>
+            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>本文の中のURL</h2>
               </div>

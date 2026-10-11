@@ -593,7 +593,6 @@ export default function EventsListV8() {
   const pager = !dataReady || items.length === 0 ? null : (
     <div className={styles.pagerBlock}>
 
-      {pageCount > 1 ? (
         <Pagination
           page={current}
           pageCount={pageCount}
@@ -601,7 +600,6 @@ export default function EventsListV8() {
           ariaLabel="イベントのページ送り"
           summary={<ListRange bare className={styles.pagerCount} total={listTotal} first={(current - 1) * perPage + 1} last={Math.min(current * perPage, listTotal)} />}
         />
-      ) : null}
     </div>
   )
 

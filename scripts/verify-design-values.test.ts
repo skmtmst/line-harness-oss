@@ -25,6 +25,12 @@ describe('ビルド後CSSの設計照合', () => {
     expect(builtRuleBody(css, 'breadcrumb', 'root')).toBe('gap:8px')
   })
 
+  it('ページ送りのV8選択色を、通常色・別テーマ・hoverから分けて読む', () => {
+    const css = '.pagination_current__A1{background:black}html[data-theme=v8] .pagination_current__A1{background:#e8f5ec}html[data-theme=v7] .pagination_current__A1{background:blue}html[data-theme=v8] .pagination_current__A1:hover{background:red}'
+    expect(builtRuleBody(css, 'pagination', 'current', "html[data-theme='v8'] .current")).toBe('background:#e8f5ec')
+    expect(builtRuleBody(css, 'pagination', 'current')).toBe('background:black')
+  })
+
   it('数の帯はビルド済みのV8指定で照合し、旧カードや狭い幅の別状態を混ぜない', () => {
     const css = [
       '.kpi-card_card__A1{box-shadow:var(--card-shadow)}',
@@ -66,6 +72,20 @@ describe('固定HTMLとV8の選択状態の照合', () => {
     expect(selected).toContain('outline:2px solid green')
     expect(selected).not.toContain('5px')
   })
+  it('html上のV8指定を読み、親のある別状態と別テーマは読み込まない', () => {
+    const css = '.selected{color:black}html[data-theme="v8"] .selected{color:green}.parent html[data-theme="v8"] .selected{color:red}html[data-theme="v7"] .selected{color:blue}html .selected{color:purple}html[data-theme="v8"].selected{color:orange}'
+    const body = frozenSelectorBody(css, '[data-theme="v8"] .selected')
+    expect(body).toContain('color:green')
+    expect(body).not.toMatch(/red|blue|purple|orange/)
+  })
+
+  it('合成した状態のV8指定をCSSの順番で読み、通常状態には混ぜない', () => {
+    const css = '.card{outline:1px solid gray}html[data-theme="v8"] .card.checked{outline:2px solid green}.checked:hover{outline:9px solid red}'
+    expect(v8EffectiveBody(css, ['card', 'checked'])).toContain('outline:2px solid green')
+    expect(v8EffectiveBody(css, 'card')).not.toContain('2px solid green')
+    expect(v8EffectiveBody(css, ['card', 'checked'])).not.toContain('red')
+  })
+
   it('選択中の合成クラスを読み、hover・未選択・別テーマの色を混ぜない', () => {
     const css = '.card{background:white}[data-theme="v8"] .checked{background:#e8f5ec}.checked:hover{background:black}[data-theme="v7"] .checked{background:blue}.parent .checked{background:red}'
     const body = frozenSelectorBody(css, '.card.checked')

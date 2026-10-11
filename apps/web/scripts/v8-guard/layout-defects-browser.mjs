@@ -45,6 +45,20 @@ export default function scanLayoutDefects() {
     }
     return { left, right, top, bottom, width: right - left, height: bottom - top }
   }).filter(r => r.width > 0 && r.height > 0)
+  // 不透明な追従バーの裏にある文字は同時には見えない。透明な帯や、
+  // 帯の中で重なる文字は引き続き検査する。重なった領域の四隅で前後も確認する。
+  const coveredBySticky = (front, back, rect) => {
+    for (let p = front; p && p !== root; p = p.parentElement) {
+      const c = css(p)
+      if (c.position !== 'sticky' || p.contains(back) || +c.opacity !== 1) continue
+      const rgba = c.backgroundColor.match(/[\d.]+/g)
+      if (!rgba || rgba.length < 3 || rgba.length > 3 && +rgba[3] < 1) continue
+      const points = [[rect.left + .5, rect.top + .5], [rect.right - .5, rect.top + .5],
+        [rect.left + .5, rect.bottom - .5], [rect.right - .5, rect.bottom - .5]]
+      if (points.every(([x,y]) => p.contains(document.elementFromPoint(x,y)))) return true
+    }
+    return false
+  }
   const leaves = []
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   while (walker.nextNode()) {
@@ -89,7 +103,11 @@ export default function scanLayoutDefects() {
     for (const ar of a.rects) for (const br of b.rects) {
       const x = Math.min(ar.right, br.right) - Math.max(ar.left, br.left)
       const y = Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top)
-      if (x > 2 && y > 3 && (!overlap || x * y > overlap.x * overlap.y)) overlap = { x, y }
+      if (x > 2 && y > 3) {
+        const rect = { left: Math.max(ar.left,br.left), right: Math.min(ar.right,br.right), top: Math.max(ar.top,br.top), bottom: Math.min(ar.bottom,br.bottom) }
+        if (coveredBySticky(a.el,b.el,rect) || coveredBySticky(b.el,a.el,rect)) continue
+        if (!overlap || x * y > overlap.x * overlap.y) overlap = { x, y }
+      }
     }
     if (overlap) add('overlap', a.el, a.text + ' ⟂ ' + b.text, { x: Math.ceil(overlap.x), y: Math.ceil(overlap.y) }, b.el)
   }

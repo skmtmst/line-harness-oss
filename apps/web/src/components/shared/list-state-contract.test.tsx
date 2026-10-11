@@ -74,6 +74,8 @@ describe('一覧の状態とページ送り', () => {
     expect(html).toContain('aria-label="前のページ"')
     expect(html).toContain('aria-label="次のページ"')
     expect(renderToStaticMarkup(<Pagination page={1} pageCount={0} onPageChange={vi.fn()} />)).toBe('')
+    expect(html.match(/disabled=""/g)).toHaveLength(2)
+    expect(renderToStaticMarkup(<Pagination page={1} pageCount={2} onPageChange={vi.fn()} />)).toContain('次へ')
   })
 
   it('取れなかった数を 0 と出さない', () => {

@@ -6552,6 +6552,30 @@ const server = createServer((req, res) => {
     return
   }
 
+  // 一覧は配信URLではなく認証付きの内容取得口を読む。同じ見本画像を返す。
+  const mediaContent = /^\/api\/media\/([^/]+)\/content$/.exec(url.pathname)
+  if (method === 'GET' && mediaContent) {
+    const item = MEDIA_ITEMS.find((row) => row.id === mediaContent[1])
+    if (item?.kind === 'image' && item.url.startsWith('data:image/svg+xml,')) {
+      const svg = decodeURIComponent(item.url.slice('data:image/svg+xml,'.length))
+      res.setHeader('Content-Type', 'image/svg+xml')
+      res.setHeader('Cache-Control', 'no-store')
+      res.writeHead(200).end(svg)
+      return
+    }
+  }
+
+  const richThumb = /^\/api\/rich-menu-images\/qa-thumb-(normal|gold|autumn|guide)$/.exec(url.pathname)
+  if (method === 'GET' && richThumb) {
+    const color = { normal: '#9bd4b1', gold: '#e8bf6b', autumn: '#f4d2be', guide: '#cbd9f1' }[richThumb[1]]
+    const compact = richThumb[1] === 'autumn'
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="44"><rect width="64" height="44" fill="${color}"/><path d="M21 0v44M43 0v44${compact ? '' : 'M0 22h64'}" stroke="white" stroke-width="2"/></svg>`
+    res.setHeader('Content-Type', 'image/svg+xml')
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(svg)
+    return
+  }
+
   if (method === 'GET' && (url.pathname.startsWith('/api/rich-menu-images/') || url.pathname === '/images/hq-templates/visual-tenant-1/menu-member.png')) {
     // 6面が見分けられる撮影専用画像。1px画像ではキャンバスが黒く見え、
     // 画像本体を取得できたか判定できないため、実際の比率に近いPNGを返す。

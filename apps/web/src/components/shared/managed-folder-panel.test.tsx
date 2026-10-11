@@ -96,6 +96,7 @@ describe('一覧の左のフォルダの列（共通）', () => {
     await act(async () => { root.render(<Screen kind="scenario" canManage />) })
     const icon = host.querySelector('button[title="会員"] svg.lucide-folder') as SVGElement
     expect(icon.style.color).not.toBe('')
+    expect(icon.getAttribute('fill')).toBe('currentColor')
   })
 
   it('「…」は 名前を変える・色を変える・並べ替える・消す。消すと DELETE を送り、選んでいたら「すべて」へ戻して読み直す', async () => {
