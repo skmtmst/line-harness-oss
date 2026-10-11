@@ -1,5 +1,6 @@
 'use client'
 import Card from '@/components/shared/card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { AlignLeft, Calendar, Check, CircleDot, Hash, ListChecks, Star, Type } from 'lucide-react';
@@ -460,29 +461,27 @@ export default function FieldEditor({
               {host ? '種類は作ったあと変えられません。別の種類は新しいひな形として作ってください。' : mode === 'edit' ? '種類は変えられません。別の種類にしたいときは一覧の「移行」から新しい項目へ移してください。' : '作ったあとは「移行」でだけ変えられます'}
             </p>
           </div>
-          <div className={styles.typeGrid} role="radiogroup" aria-label="項目の種類（よく使う）">
+          <RadioCardGroup className={styles.typeGrid} legend="項目の種類（よく使う）">
             {PRIMARY_TYPES.map((item) => {
               const Icon = TYPE_ICONS[item] ?? Type
               return (
-                <button
+                <RadioCard
                   key={item}
-                  type="button"
-                  role="radio"
-                  aria-checked={effectiveType === item}
+                  name="friend-field-primary-type"
+                  value={item}
+                  checked={effectiveType === item}
                   disabled={typeLocked}
-                  className={styles.typeCard}
-                  onClick={() => selectType(item)}
-                >
-                  <span className={styles.typeCardTop}>
-                    <Icon className={styles.wayIcon} aria-hidden="true" />
-                    <span className={styles.typeRadio} aria-hidden="true" />
-                  </span>
-                  <span className={styles.typeCardLabel}>{FIELD_TYPE_WORDS[item]}</span>
-                  <span className={styles.typeCardHint}>{TYPE_HINTS[item]}</span>
-                </button>
+                  icon={<Icon aria-hidden="true" />}
+                  contentPlacement="below-indicator"
+                  title={FIELD_TYPE_WORDS[item]}
+                  ariaLabel={FIELD_TYPE_WORDS[item]}
+                  note={TYPE_HINTS[item]}
+                  onChange={(value) => selectType(value as FriendFieldType)}
+                  onClick={() => { if (effectiveType === item) selectType(item) }}
+                />
               )
             })}
-          </div>
+          </RadioCardGroup>
         </Card>
       </CreatePage>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject={mode === 'edit' ? '項目への変更' : '入力した項目'} onConfirm={confirmLeave} onCancel={cancelLeave} />

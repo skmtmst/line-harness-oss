@@ -226,66 +226,6 @@ a.way:hover {
   gap: var(--tpl-tg2-ways-gap);
 }
 
-.typeCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-tg2-type-card-gap);
-  height: var(--tpl-tg2-type-card-h);
-  padding: var(--tpl-tg2-way-pad);
-  border: 0;
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  text-align: left;
-  cursor: pointer;
-  box-shadow: var(--card-shadow);
-}
-
-.typeCard[aria-checked='true'] {
-  outline: var(--tpl-tg2-ring-thin) solid var(--color-accent-deep);
-  background: var(--color-accent-soft);
-}
-
-.typeCard:disabled {
-  cursor: not-allowed;
-}
-
-.typeCard:disabled:not([aria-checked='true']) {
-  opacity: 0.6;
-}
-
-.typeCardTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.typeRadio {
-  width: var(--tpl-tg2-type-radio);
-  height: var(--tpl-tg2-type-radio);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--tpl-tg2-radio-off);
-  background: var(--color-canvas);
-}
-
-.typeCard[aria-checked='true'] .typeRadio {
-  box-shadow: var(--tpl-tg2-radio-on);
-}
-
-.typeCardLabel {
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-cn-label-lh);
-}
-
-.typeCardHint {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-tg2-chip-lh);
-}
-
 /* 右の列の箱（枠1・角12・余白16・間12）。 */
 .sideStack {
   display: flex;
