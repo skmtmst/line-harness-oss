@@ -14,8 +14,9 @@ const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 const TEMPLATES = read('templates/page.tsx')
 const TEMPLATES_CSS = read('templates/templates-v6.module.css')
-const CONVERSIONS = read('conversions/page.tsx')
-const HEALTH_TAB = read('nen/health/health-tab.tsx')
+const CONVERSIONS = read('../v8/conversions/list.tsx')
+const HEALTH_TAB = read('../v8/nen-health/health.tsx')
+const HEALTH_CSS = read('../v8/nen-health/health.module.css')
 const SHARED_CARD = read('../components/shared/mobile-table-cards.tsx')
 const SIDEBAR_CSS = read('../components/layout/sidebar.module.css')
 
@@ -55,31 +56,29 @@ describe('2: テンプレート・成果地点の一覧はこの形になる', (
     expect(TEMPLATES).toContain('onSelect: () => setDrawerId(t.id)')
   })
 
-  it('成果地点の一覧は表（768px以上）とカード（767px以下）を出し分ける', () => {
-    expect(CONVERSIONS).toContain('MobileTableCards')
-    expect(CONVERSIONS).toContain('hidden md:block')
-    expect(CONVERSIONS).toContain('この30日 ${formatNumber(point.metrics.netCount)}件')
-    expect(CONVERSIONS).toContain('使う場所を足す')
+  it('成果地点の現役一覧は共通の表と省略した全文を使う', () => {
+    expect(CONVERSIONS).toContain('<DataTable className={styles.table}>')
+    expect(CONVERSIONS).toContain('title={point.name}')
+    expect(CONVERSIONS).toContain('title={usageLabel(point)}')
+    expect(CONVERSIONS).toContain('<ListPage')
   })
 })
 
 describe('3: 健康日記は390pxではみ出さない', () => {
-  it('8列の表は768px以上だけ出し、767px以下は絞ったカードにする', () => {
-    expect(HEALTH_TAB).toContain('MobileTableCards')
-    expect(HEALTH_TAB).toContain('hidden md:block')
+  it('V8の狭い板では補足の列を見出しと行の両方で畳む', () => {
+    expect(HEALTH_CSS).toContain('@container v8-page (max-width: 1099px)')
+    expect(HEALTH_CSS).toMatch(/> th.colStool,[\s\S]*?> td.colStool \{\s*display: none/)
   })
 
-  it('カードは日付・ペット・状態・主な記録に絞る', () => {
-    expect(HEALTH_TAB).toContain('最終記録 ${row.lastLoggedLabel}')
-    expect(HEALTH_TAB).toContain('30日 ${row.count30d}件')
+  it('V8の一覧は日付・ペット・変化・主な記録を保持する', () => {
+    expect(HEALTH_TAB).toContain('row.lastLoggedLabel')
+    expect(HEALTH_TAB).toContain('row.count30d')
     expect(HEALTH_TAB).toContain('30日のまとめ')
   })
 
-  it('カード側に横はみ出しの種（固定の最小幅・横スクロール容器）を持ち込まない', () => {
-    const start = HEALTH_TAB.indexOf('<MobileTableCards')
-    const cardBlock = HEALTH_TAB.slice(start, HEALTH_TAB.indexOf('/>', start))
-    expect(cardBlock).not.toContain('min-w-')
-    expect(cardBlock).not.toContain('overflow-x-auto')
+  it('V8の名前と補足は省略表示し、全文も読める', () => {
+    expect(HEALTH_CSS).toMatch(/\.cell \{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis/)
+    expect(HEALTH_TAB).toContain('title={row.pet.callName || name}')
   })
 })
 

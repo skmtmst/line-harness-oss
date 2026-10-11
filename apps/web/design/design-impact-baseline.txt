@@ -101,9 +101,6 @@ shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/photo-policy-history-v8.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
 shared-button-importer app/nen-members/photo-review-v8.tsx
-shared-button-importer app/nen/health/health-v8.tsx
-shared-button-importer app/nen/health/page.tsx
-shared-button-importer app/nen/health/summary-drawer.tsx
 shared-button-importer app/nen/pets/feeding-tab.tsx
 shared-button-importer app/nen/pets/page.tsx
 shared-button-importer app/nen/pets/pet-editor.tsx

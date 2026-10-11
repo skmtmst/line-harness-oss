@@ -99,7 +99,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["app/affiliates/tabs.tsx", "className=\"bg-canvas rounded-card border-hairline mt-3 flex flex-wrap items-center gap-3 border p-3\"", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["app/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["app/nen-members/photo-review-detail.tsx", "className=\"mt-4 rounded-card border border-hairline bg-canvas p-4\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
-  ["app/nen/health/summary-drawer.tsx", "className=\"rounded-card border border-hairline bg-canvas p-3\"", "数の帯のマス。B-153に従い線で区切る。"],
   ["app/nen/pets/pets-tab.tsx", "className=\"divide-hairline divide-y rounded-card border-hairline border bg-canvas md:hidden\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["app/restaurant-test/google/google-business.tsx", "className=\"border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border\"", "画面全体の外枠。内側の中身のカードにだけ影を付ける。"],
   ["app/restaurant-test/google/google-business.tsx", "className=\"border-hairline mb-3 rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
