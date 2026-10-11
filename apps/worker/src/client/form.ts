@@ -1356,6 +1356,13 @@ export async function initForm(formId: string | null): Promise<void> {
       return;
     }
 
+    // 予約ブロックは共通の画面へ。通常のフォームの既存受付・再送は保つ。
+    if (json.data.layout && collectInputs(json.data.layout).some(block => block.type === 'booking')) {
+      const { initRestaurantForm } = await import('./main.js');
+      await initRestaurantForm();
+      return;
+    }
+
     state.formDef = json.data;
     applyCustomerFormTheme(json.data.layout?.options.theme);
     state.receptionHtml = json.data.availability ? (await import('./form-reception.js')).renderFormReception(json.data.availability) : '';

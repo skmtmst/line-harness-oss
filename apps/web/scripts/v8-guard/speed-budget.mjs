@@ -403,6 +403,10 @@ async function buildTarget({ stubDir, baseUrl }) {
       url: (route) => pathToFileURL(join(root, route === '/' ? 'index.html' : `${route.slice(1)}.html`)).href,
     }
   }
+  if (process.env.V8_GUARD_STUB_API === '1') {
+    const { mockFetch } = await import('./mock-local.mjs')
+    return { stub: true, mockFetch, url: (route) => new URL(route, baseUrl).toString() }
+  }
   return { stub: false, url: (route) => new URL(route, baseUrl).toString() }
 }
 

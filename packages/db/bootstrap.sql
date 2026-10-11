@@ -6874,6 +6874,17 @@ CREATE TABLE rt_reservation_links (
  created_at TEXT NOT NULL DEFAULT(datetime('now'))
 );
 
+CREATE TABLE rt_reservation_referrals (
+ id TEXT PRIMARY KEY,
+ source_store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+ target_store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+ source_reservation_id TEXT REFERENCES rt_reservations(id) ON DELETE SET NULL,
+ source_waitlist_id TEXT REFERENCES rt_seat_waitlist(id) ON DELETE SET NULL,
+ offered_at TEXT NOT NULL DEFAULT(datetime('now')),
+ accepted_at TEXT,
+ CHECK(source_store_id<>target_store_id)
+);
+
 CREATE TABLE rt_reservation_table_links (
  reservation_id TEXT NOT NULL REFERENCES rt_reservations(id) ON DELETE CASCADE,
  table_id TEXT NOT NULL REFERENCES rt_tables(id), PRIMARY KEY(reservation_id,table_id)
@@ -6977,6 +6988,20 @@ CREATE TABLE rt_store_followup_templates (
  approval_id TEXT REFERENCES rt_approval_requests(id)
 );
 
+CREATE TABLE rt_store_group_members (
+ group_id TEXT NOT NULL REFERENCES rt_store_groups(id) ON DELETE CASCADE,
+ store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+ referral_enabled INTEGER NOT NULL DEFAULT 0 CHECK(referral_enabled IN(0,1)),
+ max_distance REAL NOT NULL DEFAULT 5 CHECK(max_distance>=0 AND max_distance<=1000),
+ PRIMARY KEY(group_id,store_id)
+);
+
+CREATE TABLE rt_store_groups (
+ id TEXT PRIMARY KEY,
+ organization_id TEXT NOT NULL REFERENCES rt_organizations(id) ON DELETE CASCADE,
+ name TEXT NOT NULL
+);
+
 CREATE TABLE rt_store_media_links (
  store_id TEXT NOT NULL REFERENCES rt_stores(id), media_id TEXT NOT NULL REFERENCES rt_media(id),
  page_url TEXT, login_url TEXT, close_on_booking INTEGER NOT NULL DEFAULT 0 CHECK(close_on_booking IN (0,1)),
@@ -6996,7 +7021,7 @@ CREATE TABLE rt_stores (
   line_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (line_status IN ('connected', 'warning', 'error', 'unconfigured')),
   google_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (google_status IN ('connected', 'warning', 'error', 'unconfigured')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id), latitude REAL CHECK(latitude IS NULL OR latitude BETWEEN -90 AND 90), longitude REAL CHECK(longitude IS NULL OR longitude BETWEEN -180 AND 180),
   UNIQUE(organization_id, code)
 );
 
@@ -11107,6 +11132,14 @@ CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.s
 CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
 CREATE TRIGGER rt_notice_booking_change AFTER UPDATE OF starts_at,ends_at,guest_count,status ON rt_reservations WHEN NEW.starts_at IS NOT OLD.starts_at OR NEW.ends_at IS NOT OLD.ends_at OR NEW.guest_count IS NOT OLD.guest_count OR (NEW.status IN('cancelled','no_show') AND NEW.status IS NOT OLD.status) BEGIN UPDATE rt_customer_notice_outbox SET valid=0 WHERE reservation_id=NEW.id AND sent_at IS NULL; END;
+
+CREATE TRIGGER rt_referral_member_org BEFORE INSERT ON rt_store_group_members
+WHEN NOT EXISTS(SELECT 1 FROM rt_store_groups g JOIN rt_stores s ON s.organization_id=g.organization_id WHERE g.id=NEW.group_id AND s.id=NEW.store_id)
+BEGIN SELECT RAISE(ABORT,'referral_organization_conflict'); END;
+
+CREATE TRIGGER rt_referral_member_org_update BEFORE UPDATE ON rt_store_group_members
+WHEN NOT EXISTS(SELECT 1 FROM rt_store_groups g JOIN rt_stores s ON s.organization_id=g.organization_id WHERE g.id=NEW.group_id AND s.id=NEW.store_id)
+BEGIN SELECT RAISE(ABORT,'referral_organization_conflict'); END;
 
 CREATE TRIGGER rt_reservation_event_insert AFTER INSERT ON rt_reservations WHEN NEW.status IN('confirmed','seated','visited') BEGIN INSERT OR IGNORE INTO rt_reservation_events(id,reservation_id,store_id,event_type,reservation_version,occurred_at,request_id,line_account_id,friend_id,payload_json) SELECT 'rt:'||NEW.id||':'||NEW.customer_version||':restaurant.reservation.created',NEW.id,NEW.store_id,'restaurant.reservation.created',NEW.customer_version,strftime('%Y-%m-%dT%H:%M:%fZ','now'),NEW.id||':'||NEW.customer_version,s.line_account_id, (SELECT id FROM friends WHERE line_account_id=s.line_account_id AND line_user_id=NEW.line_uid), json_object('reservationId',NEW.id,'storeId',NEW.store_id,'startsAt',NEW.starts_at,'endsAt',NEW.ends_at,'status',NEW.status,'guestCount',NEW.guest_count) FROM rt_stores s WHERE s.id=NEW.store_id; END;
 

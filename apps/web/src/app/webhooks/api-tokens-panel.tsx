@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
+import { useActionError } from '@/lib/use-action-error'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -44,7 +45,7 @@ export default function ApiTokensPanel() {
   const [tokens, setTokens] = useState<IntegrationApiTokenInfo[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [loadError, setLoadError] = useState('')
-  const [actionError, setActionError] = useState('')
+  const { error: actionError, setError: setActionError } = useActionError(selectedAccountId ?? '')
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
@@ -62,7 +63,6 @@ export default function ApiTokensPanel() {
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
     const requestAccountId = selectedAccountId
-    setActionError('')
     if (!requestAccountId) {
       setTokens([])
       setStatus('ready')
@@ -160,6 +160,7 @@ export default function ApiTokensPanel() {
   }
 
   const handleRotate = async (stepUpToken?: string) => {
+    setActionError('')
     setDialogError('')
     const requestAccountId = selectedAccountId
     if (!requestAccountId || !rotateTarget) return

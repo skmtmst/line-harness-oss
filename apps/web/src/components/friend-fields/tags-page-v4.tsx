@@ -1,5 +1,7 @@
 'use client'
 
+import { useActionError } from '@/lib/use-action-error'
+
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -613,6 +615,7 @@ export default function TagsPageV4({
   // 操作の失敗（並び替え・★）。**読み込みの失敗とは別物**なので混ぜない。
   // フォルダの変更は一覧では行わない（編集画面の「所属フォルダ」で行う）。
   const [error, setError] = useState('')
+  const { error: actionError, setError: setActionError } = useActionError(accountId ?? '')
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('')
   const [usageFilter, setUsageFilter] = useState('all')
@@ -779,6 +782,7 @@ export default function TagsPageV4({
 
   /** 友だち一覧への表示（★）。設計 `zMlMX`。押した瞬間に切り替える。版付き(#715)。 */
   const toggleStar = async (tag: Tag) => {
+    setActionError('')
     const next = !tag.isStarred
     /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
     setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: next } : item))
@@ -799,7 +803,7 @@ export default function TagsPageV4({
 
       /* 失敗は元に戻して理由を出し、取り直す。黙って上書きしない。 */
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
-      { if (!fieldFailure) setError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。') }
+      { if (!fieldFailure) setActionError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。') }
       void load()
     }
   }
@@ -919,7 +923,7 @@ export default function TagsPageV4({
             <Button href="/tags/new" variant="primary">＋ タグを作る</Button>
           </div>
         )}
-        {error && <Notice className="mb-4" tone="danger" message={error} />}
+        {(error || actionError) && <Notice className="mb-4" tone="danger" message={error || actionError} />}
         {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
         <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
           {/*

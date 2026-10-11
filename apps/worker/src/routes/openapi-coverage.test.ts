@@ -44,6 +44,7 @@ function isCoveredRoute(method: string, path: string): boolean {
   if (method === 'ALL' || method === 'OPTIONS') return false;
   if (INFRASTRUCTURE_PATHS.has(path)) return false;
   if (path.startsWith('/api/restaurant-test') && ![
+    '/api/restaurant-test/store-groups', '/api/restaurant-test/store-groups/:id/members/:storeId', '/api/restaurant-test/stores/:id/referral-location',
     '/api/restaurant-test/closures', '/api/restaurant-test/closures/preview', '/api/restaurant-test/closures/:id',
     '/api/restaurant-test/availability', '/api/restaurant-test/google/hours/from-closure',
     '/api/restaurant-test/closures/:id/contact-status', '/api/restaurant-test/close-notification-settings',
@@ -146,6 +147,14 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/account-settings/customer-look',
   'PUT /api/account-settings/customer-look',
   'GET /api/liff/customer-look',
+  'GET /api/liff/restaurant/courses',
+  'GET /api/liff/restaurant/referrals',
+  'POST /api/liff/restaurant/referrals',
+  'POST /api/liff/restaurant/form-booking',
+  'GET /api/restaurant-test/store-groups',
+  'POST /api/restaurant-test/store-groups',
+  'PATCH /api/restaurant-test/store-groups/{id}/members/{storeId}',
+  'PUT /api/restaurant-test/stores/{id}/referral-location',
   'PATCH /api/restaurant-test/reservations/{id}',
   'GET /api/restaurant-test/followups/{storeId}',
   'GET /api/restaurant-test/followups/{storeId}/review-history',
@@ -1928,7 +1937,11 @@ describe('OpenAPIと公開APIの同期', () => {
       if (!entry) continue;
       const classification = routeClassification(entry.honoPath, method);
       const operation = spec.paths[path]?.[method.toLowerCase() as 'get'];
-      if (classification?.kind === 'public') {
+      // These LIFF handlers verify the account's LINE ID token themselves.
+      const verifiedLiff = ['/api/liff/restaurant/courses', '/api/liff/restaurant/referrals', '/api/liff/restaurant/form-booking'].includes(entry.honoPath);
+      if (verifiedLiff) {
+        if (JSON.stringify(operation?.security) !== '[{"liffIdToken":[]}]') problems.push(`${key}: LINE IDトークンの表示が無い`);
+      } else if (classification?.kind === 'public') {
         if (JSON.stringify(operation?.security ?? null) !== '[]') {
           problems.push(`${key}: 認証なし公開口なのに security: [] が無い`);
         }
