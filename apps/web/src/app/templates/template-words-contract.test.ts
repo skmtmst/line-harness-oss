@@ -13,7 +13,8 @@ const CAROUSEL_PAGE = readFileSync(join(HERE, '../../v8/templates/carousel.tsx')
 // 組み立て・保存の正本は core へ出した（page.tsx は自由な export を持てない）。
 // 契約は「画面が使う全体」を見るため、ページ＋共有モジュールをつなげて読む。
 const CAROUSEL_CORE = readFileSync(join(HERE, '../../v8/templates/carousel-core.ts'), 'utf8')
-const ASSET_EDITOR = readFileSync(join(HERE, 'template-asset-editor.tsx'), 'utf8')
+const ASSET_EDITOR = readFileSync(join(HERE, '../../v8/template-edit/asset.tsx'), 'utf8')
+  + readFileSync(join(HERE, '../../v8/template-edit/rich.tsx'), 'utf8')
 
 /**
  * テンプレート一覧（設計 `W7LBc` 11-1）に、内部の値を出さない。
@@ -93,10 +94,12 @@ describe('V8の作成画面', () => {
   })
 
   it('リッチメッセージ・クーポン・リサーチを保存APIへ接続する', () => {
-    expect(ASSET_EDITOR).toContain("'rich_message' | 'coupon' | 'research'")
+    expect(ASSET_EDITOR).toContain("kind: 'rich_message'")
+    expect(ASSET_EDITOR).toContain("kind === 'coupon'")
     expect(ASSET_EDITOR).toContain('api.broadcastMessageAssets.create')
-    expect(ASSET_EDITOR).toContain('面の分け方')
-    expect(ASSET_EDITOR).toContain('クーポンが使われたときに実行すること')
+    expect(ASSET_EDITOR).toContain('<LayoutPicker')
+    expect(ASSET_EDITOR).toContain('<TapAreaEditor')
+    expect(ASSET_EDITOR).toContain('使われたときに行うこと')
     expect(ASSET_EDITOR).toContain('回答フォームとの使い分け')
   })
 })

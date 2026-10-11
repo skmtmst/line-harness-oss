@@ -13,7 +13,7 @@ const QUESTION_NEW = fs.readFileSync(
   'utf8',
 )
 const ASSET_EDITOR = fs.readFileSync(
-  path.join(__dirname, 'template-asset-editor.tsx'),
+  path.join(__dirname, '../../v8/template-edit/asset.tsx'),
   'utf8',
 )
 
@@ -51,7 +51,7 @@ describe('点検・中: テンプレートの画面契約', () => {
     // 成功は共通 Notice のうまくいった帯（一覧へ戻る操作つき）で出す（★V7 共通部品その2 §1）。
     expect(ASSET_EDITOR).toContain('保存しました')
     expect(ASSET_EDITOR).toContain('setSaved(true)')
-    expect(ASSET_EDITOR).toContain('disabled={saving || saved}')
-    expect(ASSET_EDITOR).toContain('<Notice tone="success"')
+    expect(ASSET_EDITOR).toContain('disabled={busy || Boolean(blocked)}')
+    expect(ASSET_EDITOR).toContain("notifySaved('下書きを保存しました')")
   })
 })
