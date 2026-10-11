@@ -9,7 +9,7 @@ const index = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const storesPage = readFileSync(new URL('./stores/page.tsx', import.meta.url), 'utf8')
 const accountsPage = readFileSync(new URL('../accounts/page.tsx', import.meta.url), 'utf8')
 const accountsNewPage = readFileSync(new URL('../accounts/new/page.tsx', import.meta.url), 'utf8')
-const consolePage = readFileSync(new URL('./restaurant-console.tsx', import.meta.url), 'utf8')
+const consolePage = readFileSync(new URL('../../v8/restaurant/booking-kit/shell.tsx', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../lib/restaurant-test-api.ts', import.meta.url), 'utf8')
 const manualLinks = readFileSync(new URL('../../lib/manual-links.ts', import.meta.url), 'utf8')
 

@@ -59,7 +59,6 @@ const NOT_YET_MIGRATED = [
   'notifications/page.tsx',
   'reminders/edit/page.tsx',
   'reminders/page.tsx',
-  'restaurant-test/restaurant-console.tsx',
   'restaurant-test/terms/page.tsx',
   'scenarios/first-step/page.tsx',
   'scenarios/mode/page.tsx',
