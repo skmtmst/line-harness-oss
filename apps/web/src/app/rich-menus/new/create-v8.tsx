@@ -2657,7 +2657,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="公開の前の確認" />
-            <p className={styles.cardNote}>3つそろうと公開できます</p>
+            <p className={styles.cardNote} title={checks ? `ページ数: ${checks.pages.count} / ${checks.pages.max}${checks.pages.state === 'ng' ? '（上限を超えています）' : ''}` : undefined}>3つそろうと公開できます</p>
           </div>
           {checksError ? (
             <p className={styles.fieldError}>確認の状態を読み込めませんでした。</p>
