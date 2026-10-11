@@ -24,11 +24,6 @@
     "height": 4,
     "font": 17
   },
-  "app/automations/automations-v8.module.css": {
-    "spacing": 66,
-    "height": 21,
-    "font": 50
-  },
   "app/booking/menus/new/menu-form-v8.module.css": {
     "spacing": 17,
     "height": 8,
