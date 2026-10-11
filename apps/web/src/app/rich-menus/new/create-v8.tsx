@@ -88,7 +88,7 @@ import {
 } from '@/lib/segment-condition'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { orderTargetingGroups } from '@/app/rich-menus/targeting-order'
+import { orderTargetingGroups } from '@/v8/rich-menus/targeting-order'
 import { describeCondition } from '@/components/scenarios/scenario-dialogs'
 import { useScheduleSubmit } from '@/app/rich-menus/edit/schedule-submit'
 import { ManualPublishAttempt } from '@/app/rich-menus/edit/manual-publish-attempt'
