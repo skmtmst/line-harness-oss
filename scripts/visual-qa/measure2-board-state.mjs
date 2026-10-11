@@ -1,4 +1,6 @@
 /** 固定した絵の板IDで、撮影時に開く画面を選ぶ。製品の保存・権限は変えない。 */
+import { RICH_MENU_GROUPS, TAGS } from './fixtures.mjs'
+
 export const REFERENCE_REVISION = '2026-10-11 16:11 JST'
 
 const createTemplate = (kind) => ({
@@ -6,7 +8,26 @@ const createTemplate = (kind) => ({
   click: [kind, 'テンプレートを作る'],
 })
 
+// 普通の一覧の撮影だけを4行にする。削除確認で使う未使用の下書きは共通見本に残す。
+const richMenuItems = RICH_MENU_GROUPS.filter(group => group.id !== 'rich-menu-safe').map(group => ({
+  ...group,
+  ...(group.id === 'rmg-gold' ? { audienceCount: 182 } : {}),
+  // 10/5の予約が撮影日を過ぎても、予約状態の絵を再現する。
+  ...(group.id === 'rmg-autumn' ? { publishingAt: `${new Date().getUTCFullYear() + 1}-10-05T00:00:00.000+09:00` } : {}),
+})).sort((a, b) => a.targetingPriority - b.targetingPriority)
+const richMenuApi = [
+  { match: 'GET /api/rich-menu-groups$', body: { success: true, data: {
+    items: richMenuItems, total: richMenuItems.length, limit: 20,
+    sort: [{ field: 'targetingPriority', direction: 'asc' }, { field: 'createdAt', direction: 'asc' }, { field: 'id', direction: 'asc' }],
+    facets: { total: richMenuItems.length, published: richMenuItems.filter(group => group.status === 'published').length, targeting: richMenuItems.filter(group => group.targetingEnabled).length, folderCounts: Object.fromEntries(richMenuItems.reduce((counts, group) => {
+      const id = group.folderId ?? '__unfiled__'; counts.set(id, (counts.get(id) ?? 0) + 1); return counts
+    }, new Map())) },
+  } } },
+  { match: 'GET /api/tags$', body: { success: true, data: TAGS.map(tag => tag.id === 'tag-0' ? { ...tag, name: 'ゴールド会員' } : tag) } },
+]
+
 export const BOARD_STATE_PROFILES = {
+  rZEGN: { url: '/rich-menus', api: richMenuApi },
   HfK0O: createTemplate('メッセージ'),
   SDSsr: createTemplate('カルーセル'),
   IY3nx: createTemplate('質問'),
@@ -29,6 +50,7 @@ export function applyBoardStateProfiles(map) {
     }
     entry.url = profile.url
     if (profile.click) entry.state = { ...entry.state, click: [...profile.click] }
+    if (profile.api) entry.state = { ...entry.state, api: [...profile.api, ...(Array.isArray(entry.state?.api) ? entry.state.api : entry.state?.api ? [entry.state.api] : [])] }
   }
   return result
 }

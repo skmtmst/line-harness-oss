@@ -3,6 +3,20 @@ import { describe, expect, it } from 'vitest'
 import { applyBoardStateProfiles, BOARD_STATE_PROFILES } from './measure2-board-state.mjs'
 
 describe('板ごとの撮影条件', () => {
+  it('普通のリッチメニュー一覧の見本だけを4行にし、元のAPIと見本を保持する', () => {
+    const account = { match: 'GET /api/line-accounts$', body: { success: true, data: [] } }
+    const input = { boards: { rZEGN: { url: '/rich-menus', state: { api: account } } } }
+    const before = structuredClone(input)
+    const result = applyBoardStateProfiles(input)
+    expect(input).toEqual(before)
+    const rules = result.boards.rZEGN.state.api
+    expect(rules.at(-1)).toEqual(account)
+    const groups = rules.find(rule => rule.match === 'GET /api/rich-menu-groups$').body.data
+    expect(groups.total).toBe(groups.items.length)
+    expect(groups.facets.published).toBe(groups.items.filter(group => group.status === 'published').length)
+    expect(groups.items.some(group => group.id === 'rich-menu-safe')).toBe(false)
+    expect(groups.items.find(group => group.id === 'rmg-autumn').publishingAt > new Date().toISOString()).toBe(true)
+  })
   it('B-252: 状態を開くだけにし、名前・数・見本文を絵へ合わせない', () => {
     const clicks = Object.values(BOARD_STATE_PROFILES).flatMap(profile => profile.click ?? [])
     expect(clicks).not.toEqual([])

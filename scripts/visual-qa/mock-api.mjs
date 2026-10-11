@@ -115,7 +115,7 @@ import {
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_DETAIL_PUBLISHED, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_DETAIL_STOPPED, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
-  CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
+  CONVERSION_POINTS, CONVERSION_FOLDERS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY, OPERATION_ALERTS,
@@ -512,19 +512,19 @@ const OPS_TENANTS = [
 const OPS_TENANT_SUMMARY = { active: 3, trialing: 1, suspended: 1, pastDue: 1 }
 const OPS_AUDIT = [
   {
-    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '河野',
     tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
     action: 'impersonation.start', reason: '問い合わせの確認', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-10-01T15:20:00+09:00',
   },
   {
-    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '河野',
     tenant_id: 'visual-tenant-3', tenant_name: 'サンプル商店',
     action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"active","to":"suspended"}',
     ip: null, visible_to_tenant: 1, created_at: '2026-09-30T09:12:00+09:00',
   },
   {
-    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '見本 次郎',
+    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '河野',
     tenant_id: 'visual-tenant-2', tenant_name: '見本物産',
     action: 'impersonation.write', reason: '初期設定の代行（本人の依頼）', detail: null,
     ip: null, visible_to_tenant: 1, created_at: '2026-09-28T18:40:00+09:00',
@@ -556,7 +556,7 @@ const OPS_MEMBERS = [
     lastLoginAt: '2026-10-01T22:40:00+09:00', createdAt: '2026-05-01T10:00:00+09:00',
   },
   {
-    staffId: 'visual-ops-invited', name: '見本 花子', email: null, isActive: true,
+    staffId: 'visual-ops-invited', name: '山田 花子', email: null, isActive: true,
     totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
     invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
     lastLoginAt: null, createdAt: '2026-09-06T10:00:00+09:00',
@@ -1185,7 +1185,7 @@ const SUPPORT_INBOX_ITEMS = [
     id: 'inbox-1',
     channel: 'line',
     customerName: 'Kyohei Yamamoto',
-    preview: '🚕💐',
+    preview: '🚚💐',
     // 「6日前」と出したい。撮るときの時計は `VISUAL_QA_NOW` で止めてある。
     lastIncomingAt: '2026-08-13T12:00:00.000Z',
   },
@@ -4291,6 +4291,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 板 `NtCE3`：未分類は `folderId: null` の5件。
     return { success: true, data: BROADCAST_FOLDERS, unfiledCount: BROADCASTS.filter((broadcast) => !broadcast.folderId).length }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'conversion') {
+    return { success: true, data: CONVERSION_FOLDERS, unfiledCount: 0 }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'scenario') {
     // 板 `axFrW`：未分類は `folderId: null` の1件（会員更新リマインド）。
     return { success: true, data: SCENARIO_FOLDERS, unfiledCount: FRIEND_SCENARIOS.filter((scenario) => !scenario.folderId).length }
@@ -5836,8 +5839,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       metadata: null, isRead, createdAt,
     })
     const items = [
-      item('nc-3', 'ec.import_failed', 'error', 'EC連携の取り込みが 3 件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
-      item('nc-2', 'account_health_webhook_delay', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
+      item('nc-3', 'ec.import_failed', 'error', 'EC連携の取り込みが 3 件失敗しています', 'EC連携を開く', false, new Date(Date.now() - 2 * 3600_000).toISOString()),
+      item('nc-2', 'account_health_webhook_delay', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, new Date(Date.now() - 3 * 3600_000).toISOString()),
       item('nc-1', 'broadcast.send_failed', 'error', '一斉配信「8月号のご案内」で 12 件が送信失敗', '配信結果を開く', false, '2026-08-20T11:05:00.000Z'),
       item('nc-4', 'visual_qa.update', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', true, '2026-08-20T00:00:00.000Z'),
       item('nc-5', 'visual_qa.update', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
