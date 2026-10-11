@@ -14,7 +14,7 @@ import KnowledgeList from '@/components/ops/knowledge-list'
 import { qrToDataURL } from '@/lib/qr-image'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/ops/announcements',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }))
@@ -35,7 +35,7 @@ class MemoryStorage implements Storage {
 }
 
 const src = (...parts: string[]) => readFileSync(join(process.cwd(), 'src', ...parts), 'utf8')
-const ANN = src('app', 'ops', 'announcements', 'page.tsx')
+const ANN = src('v8', 'ops', 'announcements.tsx')
 const INV = src('v8', 'ops', 'invite.tsx')
 const LOG = src('v8', 'ops', 'login.tsx')
 const TEN = src('app', 'ops', 'tenants', 'page.tsx')
