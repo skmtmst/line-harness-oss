@@ -59,11 +59,6 @@
     "radius": 2,
     "shadow": 1
   },
-  "components/friend-fields/support-mark-editor.tsx": {
-    "color": 6,
-    "radius": 0,
-    "shadow": 0
-  },
   "components/friend-fields/tag-archived-edit.spec.mjs": {
     "color": 2,
     "radius": 0,

@@ -44,7 +44,7 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
       { file: 'v8/tag-edit/edit-form.tsx', kind: 'tag', label: 'タグ' },
       { file: 'app/tags/fields/new/page.tsx', kind: 'field', label: '項目' },
       { file: 'app/tags/fields/edit/page.tsx', kind: 'field', label: '項目' },
-      { file: 'components/friend-fields/support-mark-editor.tsx', kind: 'mark', label: '対応マーク' },
+      { file: 'v8/tags/mark-editor.tsx', kind: 'mark', label: '対応マーク' },
       { file: 'app/tags/searches/edit/page.tsx', kind: 'search', label: '保存した検索' },
     ]
     for (const { file, kind, label } of cases) {
@@ -132,7 +132,7 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
       'components/friend-fields/tag-editor-v4.tsx',
       'app/tags/fields/new/page.tsx',
       'app/tags/fields/edit/page.tsx',
-      'components/friend-fields/support-mark-editor.tsx',
+      'v8/tags/mark-editor.tsx',
       'app/tags/searches/edit/page.tsx',
       'components/friend-fields/attribute-kind-guide.tsx',
       'components/friend-fields/tags-page-v4.tsx',

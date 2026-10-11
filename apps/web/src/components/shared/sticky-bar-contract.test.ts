@@ -33,8 +33,8 @@ function pages(dir: string, out: string[] = []): string[] {
  * 画面が読み込んでいるものも一緒に見る（親フォルダの相対importも含む）。
  *
  * **帯は部品の中にあることがある。** `tags/edit` は
- * `components/friend-fields/edit-tag-page-v4.tsx` に、
- * `tags/marks/new` は `support-mark-editor.tsx` に本体がある。
+ * `v8/tag-edit/edit-form.tsx` に、
+ * `tags/marks/new` は `v8/tags/mark-editor.tsx` に本体がある。
  * `page.tsx` だけを読むと「帯が無い」ことになり、直しようがない。
  */
 function readWithParts(file: string, depth = 0, seen = new Set<string>()): string {

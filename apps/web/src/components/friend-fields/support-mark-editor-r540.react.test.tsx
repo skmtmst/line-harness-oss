@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
+import { navigationMock } from '@/test-utils/navigation-mock'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -24,13 +25,15 @@ const fixture = vi.hoisted(() => ({
 }))
 
 vi.mock('next/navigation', () => ({
+  ...navigationMock(),
   useRouter: () => ({ push: fixture.routerPush }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: accountStore.id }),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
     staff: { me: async () => ({ success: true, data: { role: identity.role } }) },
     supportMarks: {
@@ -46,7 +49,7 @@ vi.mock('./support-mark-rules-panel', () => ({
   default: () => null,
 }))
 
-import SupportMarkEditor from './support-mark-editor'
+import SupportMarkEditor from '@/v8/tags/mark-editor'
 
 function mark(id: string, name: string) {
   return {
@@ -102,7 +105,7 @@ describe('R540 切替中の古い一覧で作らない', () => {
 
     accountStore.id = 'account-B'
     view.rerender(<SupportMarkEditor />)
-    await screen.findByText('アカウントを切り替えています。一覧を読み込むまでお待ちください')
+    await waitFor(() => expect(createButton().title).toBe('アカウントを切り替えています。一覧を読み込むまでお待ちください'))
     expect(createButton().disabled).toBe(true)
     fireEvent.click(createButton())
     expect(fixture.marksCreate).not.toHaveBeenCalled()

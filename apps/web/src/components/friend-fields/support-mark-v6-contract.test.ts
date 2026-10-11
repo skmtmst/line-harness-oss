@@ -6,7 +6,7 @@ import { element } from './design-fit-slice'
 
 const ROOT = path.resolve(__dirname)
 const LIST = fs.readFileSync(path.join(ROOT, '../../v8/tags/marks-tab.tsx'), 'utf8') + fs.readFileSync(path.join(ROOT, 'mark-list.tsx'), 'utf8')
-const EDITOR = fs.readFileSync(path.join(ROOT, 'support-mark-editor.tsx'), 'utf8')
+const EDITOR = fs.readFileSync(path.join(ROOT, '../../v8/tags/mark-editor.tsx'), 'utf8')
 const TABS = fs.readFileSync(path.join(ROOT, '../../v8/tags/list.tsx'), 'utf8')
 
 describe('V8 対応マーク', () => {
@@ -24,7 +24,7 @@ describe('V8 対応マーク', () => {
   })
 
   it('追加編集画面は本文タイトルを置かず、トップバーへ画面名を渡す', () => {
-    expect(EDITOR).toContain('data-design-node="GMvBd"')
+    expect(EDITOR).toContain('boardId="ulq9Y"')
     expect(EDITOR).toContain("usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')")
     expect(EDITOR).not.toContain('<Header')
     expect(EDITOR).toContain('api.supportMarks.create')
@@ -32,7 +32,10 @@ describe('V8 対応マーク', () => {
     // R510: 一覧の取得は再試行できる形（load 関数）に切り出した。
     // 取得時のアカウントを退避し、その口を呼ぶ約束は変えない。
     expect(EDITOR).toContain('api.supportMarks.list(account)')
-    for (const label of ['マーク名', '色', '並び順', '新しい友だちに最初から付ける']) expect(EDITOR).toContain(label)
+    const basic = fs.readFileSync(path.join(ROOT, '../../v8/tags/mark-basic-fields.tsx'), 'utf8')
+    for (const label of ['マーク名', '色']) expect(basic).toContain(label)
+    expect(EDITOR).toContain('新しい友だちに最初から付ける')
+    expect(EDITOR).toContain('name: name.trim(), color, displayOrder, isDefault')
   })
 
   it('保存と保管の失敗で内部のAPI文言をそのまま表示しない', () => {

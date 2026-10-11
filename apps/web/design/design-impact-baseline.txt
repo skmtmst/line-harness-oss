@@ -125,7 +125,6 @@ shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/forms/options-dialog.tsx
 shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
-shared-button-importer components/friend-fields/support-mark-editor.tsx
 shared-button-importer components/friend-fields/support-mark-rules-panel.tsx
 shared-button-importer components/friend-fields/tag-csv-import-dialog.tsx
 shared-button-importer components/friend-fields/tag-editor-v4.tsx
