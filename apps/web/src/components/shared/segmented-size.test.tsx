@@ -19,7 +19,7 @@ const OPTIONS = [
 
 /*
  * 切替器の小型（d8X09 グラフ／表）。
- * 器 r8・項目 3/10・文 12/18・つまみ r6・全体の高さ 28。
+ * 器 r8・項目 3/12・文 12/18・つまみ r6・全体の高さ 28。
  * 箱型（dtJVi：項目 6/12・文 13・つまみ r8）の合格は変えない。
  */
 describe('切替器の小型（d8X09）', () => {
@@ -47,10 +47,10 @@ describe('切替器の小型（d8X09）', () => {
     expect(onChange).toHaveBeenCalledWith('table')
   })
 
-  it('小型は v8 だけで器 r8・項目 3/10・文 12/18・つまみ r6', () => {
+  it('小型は v8 だけで器 r8・項目 3/12・文 12/18・つまみ r6', () => {
     expect(CSS).toMatch(/\[data-theme='v8'\]\s*\.root\[data-size='small'\]\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s)
     expect(CSS).toMatch(
-      /\[data-theme='v8'\]\s*\.root\[data-size='small'\]\s*\.item\s*\{[^}]*padding:\s*3px 10px/s,
+      /\[data-theme='v8'\]\s*\.root\[data-size='small'\]\s*\.item\s*\{[^}]*padding:\s*3px var\(--polish-space-field\)/s,
     )
     expect(CSS).toMatch(
       /\[data-theme='v8'\]\s*\.root\[data-size='small'\]\s*\.item\s*\{[^}]*font-size:\s*var\(--text-caption\)/s,

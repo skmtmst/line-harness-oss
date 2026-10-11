@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { BarChart, BarChartEmpty, barChartTicks, toBarChartItems } from './bar-chart'
+import { BarChart, BarChartEmpty, BarChartLegend, barChartTicks, toBarChartItems, type BarChartLegendItem } from './bar-chart'
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const tsx = readFileSync(join(DIR, 'bar-chart.tsx'), 'utf8')
@@ -100,6 +100,21 @@ describe('色は2つまで（増えた=濃い緑・減った=灰色）', () => {
     expect(legend.textContent).toContain('登録')
     expect(legend.textContent).toContain('ブロック')
     expect(legend.textContent).not.toContain('増えた')
+  })
+
+  it('凡例を外へ置いても、日を選ぶ操作と読み上げる数を保つ', () => {
+    const legend: BarChartLegendItem[] = [{ label: '登録', tone: 'added' }, { label: 'ブロック', tone: 'removed' }]
+    const selected: string[] = []
+    render(<>
+      <BarChartLegend items={legend} layout="dashboard" />
+      <BarChart items={SAMPLE} layout="dashboard" showLegend={false} legend={legend} onSelect={key => selected.push(key)} />
+    </>)
+    expect(screen.getAllByRole('list', { name: '凡例' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '9月20日 登録6人・ブロック0人・朝の配信' }))
+    expect(selected).toEqual(['2026-09-20'])
+    const table = screen.getByRole('table', { name: '日ごとの増減' })
+    expect(table.textContent).toContain('6人')
+    expect(table.textContent).toContain('2人')
   })
 })
 

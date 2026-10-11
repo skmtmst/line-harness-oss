@@ -151,8 +151,13 @@
 /* 横並びの段も数の帯と同じ等分の格子（隙間0）。flex の配分だと線の太さ分ずれる。高さは中身（並ぶマスは同じ高さ）。 */
 :global([data-theme='v8']) .dashboardColumns { min-height: 200px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 :global([data-theme='v8']) .dashboardColumns .dashboardCell { padding-inline: 20px; }
+:global([data-theme='v8']) .dashboardColumns[data-layout='overview'] { min-height: var(--tpl-db-columns-min-h); }
+:global([data-theme='v8']) .dashboardColumns[data-layout='overview'] .dashboardCell { padding-inline: var(--polish-space-section); }
 :global([data-theme='v8']) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: var(--polish-space-field); }
-:global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: var(--polish-space-card) var(--polish-space-card); display: flex; flex-direction: column; gap: var(--polish-space-row); }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--polish-space-row); }
+:global([data-theme='v8']) .dashboardAsideSection { display: flex; flex-direction: column; gap: var(--polish-space-field); padding: var(--polish-space-card) var(--polish-space-section); }
+:global([data-theme='v8']) .dashboardAsideSection + .dashboardAsideSection { border-top: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardRow[data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: 0; }
 
 /* 入力側と各段は中身の高さを保つ。 */
 :global([data-theme='v8']) [data-page-template='create'] > .heading .headingText { flex: 1 1 auto; }

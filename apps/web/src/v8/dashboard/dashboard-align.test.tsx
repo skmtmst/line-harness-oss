@@ -169,8 +169,9 @@ describe('狭い幅でも題を「…」で切らない（1280・1152）', () =>
     expect(headerCss).toMatch(/\.root\[data-wrap\] \{\s*flex-wrap: wrap;/)
   })
 
-  it('右の列の余白は狭い板で詰め、1152 の板では題の箱の高さを中身に合わせる', () => {
-    expect(dashCss).toMatch(/@container v8-page \(max-width: 1099px\) \{\s*\.asideBlock \{ padding: var\(--tpl-db-aside-pad-narrow\); \}/)
+  it('右の列の余白は型でそろえ、1152 の板では題の箱の高さを中身に合わせる', () => {
+    expect(css).toMatch(/\.dashboardAsideSection \{[^}]*padding: var\(--polish-space-card\) var\(--polish-space-section\);/)
+    expect(dashCss).not.toContain('.asideBlock')
     expect(dashCss).toMatch(/@container v8-page \(max-width: 959px\) \{\s*\.head \{ height: auto; min-height: var\(--tpl-db-head-h\); \}/)
   })
 
@@ -180,7 +181,8 @@ describe('狭い幅でも題を「…」で切らない（1280・1152）', () =>
 
   it('送信枠の数字は比例幅、グラフの日付は棒の真ん中', () => {
     expect(dashCss).toMatch(/\.quotaNum \{[^}]*font-variant-numeric: normal;/)
-    expect(dashCss).toMatch(/\.day, \.dayLatest \{[^}]*text-align: center;/)
+    const chartCss = readFileSync(join(__dirname, '../../components/shared/bar-chart.module.css'), 'utf8')
+    expect(chartCss).toMatch(/\.axisLabel \{[^}]*text-align: center;/)
   })
 })
 

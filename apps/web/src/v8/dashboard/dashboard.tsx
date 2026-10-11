@@ -314,7 +314,7 @@ export default function DashboardV8() {
   ]
   for (let index = 0; index < columnIds.length; index += 4) {
     const chunk = columnIds.slice(index, index + 4)
-    rows.push(<DashboardColumns key={`cols-${index}`}>{chunk.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</DashboardColumns>)
+    rows.push(<DashboardColumns layout="overview" key={`cols-${index}`}>{chunk.map((id) => <Fragment key={id}>{rightCard(id)}</Fragment>)}</DashboardColumns>)
   }
 
   function trendOf() {

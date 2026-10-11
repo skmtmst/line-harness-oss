@@ -91,11 +91,11 @@
 [data-theme='v8'] .item { font-size: var(--text-body); line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 
 /*
- * 小型（d8X09 グラフ／表）。器 r8・項目 3/10・文 12/18・
+ * 小型のグラフ／表。器 r8・項目 3/12・文 12/18・
  * つまみ r6。箱型（dtJVi）の合格は変えない。v8 だけ。
  */
 [data-theme='v8'] .root[data-size='small'] { border-radius: var(--radius-segment); }
-[data-theme='v8'] .root[data-size='small'] .item { padding: 3px 10px; font-size: var(--text-caption); line-height: 18px; }
+[data-theme='v8'] .root[data-size='small'] .item { min-height: 0; padding: 3px var(--polish-space-field); font-size: var(--text-caption); line-height: 18px; }
 [data-theme='v8'] .root[data-size='small'] .thumb { border-radius: var(--radius-mini); }
 
 /* 詰めた形（ベルの小窓 mV28V の分類）。器・つまみの角丸は既定のまま。v8 だけ。 */
