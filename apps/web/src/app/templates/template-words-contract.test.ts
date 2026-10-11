@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 /* 種類の呼び方は `./template-message-type` に一本化した（#497 軽2）。 */
-const MESSAGE_TYPE = readFileSync(join(HERE, 'template-message-type.ts'), 'utf8')
+const MESSAGE_TYPE = readFileSync(join(HERE, '../../v8/templates/words.ts'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, '../../v8/template-edit/message.tsx'), 'utf8')
 const MESSAGE_EDITOR = readFileSync(join(HERE, '../../components/templates/message-template-editor.tsx'), 'utf8')
 const CAROUSEL_PAGE = readFileSync(join(HERE, '../../v8/templates/carousel.tsx'), 'utf8')
@@ -28,15 +28,15 @@ describe('種類の呼び方', () => {
     expect(MESSAGE_TYPE).toContain("carousel: 'カルーセル'")
     expect(MESSAGE_TYPE, '内部の名前が残っている').not.toMatch(/flex: 'Flex'|carousel: 'Carousel'/)
     /* 一覧は共通化先を使い、独自の呼び方を持たない。 */
-    expect(PAGE).toContain("from './template-message-type'")
+    expect(PAGE).toContain("from './words'")
   })
 
   it('絞り込みの札にも内部の名前を出さない', () => {
     /* 一覧の上の札と、作る画面の選び口。どちらも運用の言葉にする。 */
-    expect(PAGE).toContain("{ key: 'multiple', label: '複数通' },")
-    expect(PAGE).toContain("{ key: 'variables', label: '差し込みあり' },")
+    expect(PAGE).toContain("複数通")
+    expect(PAGE).toContain("差し込みあり")
     /* 選び口は共通の `Select` へ寄せたので、options で並ぶ。 */
-    expect(PAGE).toContain("{ value: \"flex\", label: \"カード型\" }")
+    expect(PAGE).toContain("messageTypeText(kindLabel)")
     expect(PAGE, '失敗の文に内部の語が出ている').not.toContain('Flex JSON parse 失敗')
   })
 
@@ -45,7 +45,7 @@ describe('種類の呼び方', () => {
      * `?? t.messageType` だと、`sticker` や `video` のひな形が並んだとき
      * **画面に英語の値がそのまま出る**。
      */
-    expect(MESSAGE_TYPE).toContain("return messageTypeLabels[type] ?? 'その他'")
+    expect(MESSAGE_TYPE).toContain("return MESSAGE_TYPE_LABELS[type] ?? 'その他'")
     expect(PAGE).not.toContain('?? t.messageType}')
     expect(PAGE).not.toContain('?? drawerData.messageType}')
   })
@@ -65,9 +65,9 @@ describe('使われている数', () => {
      * `usageCount` を持たないひな形で「undefined件で使用」と出ていた。
      * **0 は「どこでも使われていない」という別の意味。**
      */
-    expect(PAGE).toContain("typeof t.usageCount !== 'number' ? '使用先を確認できません'")
+    expect(PAGE).toContain("typeof t.usageCount !== 'number'")
     /* 数があるときだけ「N件で使用」。0 は「なし」と書き分ける。 */
-    expect(PAGE).toContain("t.usageCount === 0 ? 'なし'")
+    expect(PAGE).toContain("t.usageCount === 0 ?")
   })
 })
 

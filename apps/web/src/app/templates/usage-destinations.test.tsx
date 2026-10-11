@@ -61,6 +61,7 @@ vi.mock('@/lib/api', () => ({
     templates: {
       list: () => Promise.resolve({ success: true, data: TEMPLATES }),
       get: templateGet,
+      usages: () => Promise.resolve({ success: true, data: USED_BY }),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -132,6 +133,7 @@ function stubTemplateGet(usedBy = USED_BY, question: unknown = null, publishedVe
 }
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/templates')
   searchParams.value = new URLSearchParams()
   templateGet.mockReset()
   stubRole('owner')
@@ -211,11 +213,11 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     // U043: 副操作は行の「…」メニューへ。押してから項目を選ぶ。
     // メニューは最上層の器（MenuPortal）に出る。表とカードの両方の分が出るので
     // 先頭を選ぶ（どちらも同じ操作へつながる）。
-    fireEvent.click(table().getByLabelText('来店お礼のその他操作'))
-    fireEvent.click(screen.getAllByRole('menuitem', { name: '使用先を見る' })[0])
+    fireEvent.click(table().getByLabelText('テンプレート「来店お礼」の操作'))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    await screen.findByText('使用中のテンプレートは削除できません')
+    await screen.findByText('「来店お礼」はまだ消せません')
   }
 
   test('使用先の全行が個別のリンクで、1件目だけを開く導線はない', async () => {
@@ -223,18 +225,20 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
 
     const dialog = screen.getByRole('dialog')
     const links = Array.from(dialog.querySelectorAll('a')).map((a) => a.getAttribute('href'))
-    expect(links).toEqual([
-      '/scenarios/detail?id=sc-1',
-      '/auto-replies/edit?id=ar-1',
-      '/reminders/edit?id=re-1',
-      '/rich-menus/edit?id=rg-1',
-      '/inflow-links/detail?id=tl-1',
-    ])
-    // 旧形式オートメーションはリンクにせず「開けない」と伝える
-    expect(dialog.textContent).toContain('オートメーション「予約後フォロー」')
-    expect(dialog.textContent).toContain('旧形式')
+    // 採用済みのV8の窓は2行と残り件数。全件は「すべて見る」から詳細へ渡す。
+    expect(links).toEqual(['/auto-replies/edit?id=ar-1', '/scenarios/detail?id=sc-1'])
+    expect(within(dialog).getByRole('button', { name: '使っている所をすべて見る' })).toBeTruthy()
     // 「Nか所の差し替え画面を開きます」と言いながら1件目しか開かなかった退行
     expect(dialog.textContent).not.toContain('か所の差し替え画面を開きます')
+    fireEvent.click(within(dialog).getByRole('button', { name: '使っている所をすべて見る' }))
+    cleanup()
+    await renderDetailAndWait()
+    expect(screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))).toEqual([
+      '/auto-replies/edit?id=ar-1', '/scenarios/detail?id=sc-1', '/reminders/edit?id=re-1',
+      '/rich-menus/edit?id=rg-1', '/inflow-links/detail?id=tl-1',
+    ])
+    expect(screen.getByText('予約後フォロー').closest('a')).toBeNull()
+    expect(screen.getByText('開ける画面がありません')).toBeTruthy()
   })
 
   test('一覧ドロワーの使用先も個別の画面へ行く', async () => {
@@ -244,15 +248,16 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     await act(async () => { await Promise.resolve() })
     await within(await screen.findByRole('table')).findByText('来店お礼')
 
-    fireEvent.keyDown(table().getByRole('link', { name: '来店お礼の詳細を開く' }), { key: 'Enter' })
+    fireEvent.keyDown(table().getByText('来店お礼').closest('tr')!, { key: 'Enter' })
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    await screen.findByText(/使用箇所/)
+    const panel = await screen.findByRole('dialog')
+    await within(panel).findByText('予約')
 
-    expect(screen.getByText('自動返信: 予約', { exact: false }).closest('a')?.getAttribute('href'))
+    expect(within(panel).getByText('予約').closest('li')?.querySelector('a')?.getAttribute('href'))
       .toBe('/auto-replies/edit?id=ar-1')
     // 旧形式オートメーションはリンクにしない（別ID空間の画面へ飛ばさない）
-    const automationText = screen.getByText('オートメーション: 予約後フォロー', { exact: false })
+    const automationText = within(panel).getByText('予約後フォロー（旧形式・画面からは開けません）')
     expect(automationText.closest('a')).toBeNull()
     expect(automationText.textContent).toContain('旧形式')
   })

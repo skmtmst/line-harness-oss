@@ -26,10 +26,10 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
    * 「すべて」の行へ移し、母集団の正しさ（フォルダ数ではない）はそちらで守る。
    */
   it('テンプレートはテンプレート総件数（フォルダ数ではない）', () => {
-    const src = read('templates/page.tsx')
+    const src = read('../v8/templates/list.tsx')
     // ★V7 `x63W5x`：取れていない間は「—」。読めたときはテンプレート総件数。
-    expect(src).toContain("{ id: 'all', label: 'すべて'")
-    expect(src).toContain('? templates.length : null')
+    expect(src).toContain("id: 'all', label: 'すべて'")
+    expect(src).toContain('? tabItems.length : null')
     expect(src).not.toContain('`${templates.length} 件`')
     expect(src).not.toContain('total={`${folders.length} 件`}')
   })

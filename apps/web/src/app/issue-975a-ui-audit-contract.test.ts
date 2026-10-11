@@ -12,19 +12,19 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 describe('U043: テンプレート行の操作は「編集」と「…」メニューにまとめる', () => {
-  const page = read('templates/page.tsx')
+  const page = read('../v8/templates/list.tsx')
 
   it('副操作はメニュー項目として渡す', () => {
     expect(page).toContain("label: '一斉配信で使う'")
-    expect(page).toContain("label: '使用先を見る'")
-    expect(page).toContain("label: 'テンプレートを削除する'")
+    expect(page).toContain("label: '使っている所を見る'")
+    expect(page).toContain("label: '削除する'")
     expect(page).toContain("tone: 'danger'")
   })
 })
 
 describe('U044: 767px以下ではテンプレート一覧をカードへ畳む', () => {
-  const page = read('templates/page.tsx')
-  const styles = read('templates/templates-v6.module.css')
+  const page = read('../v8/templates/list.tsx')
+  const styles = read('../v8/templates/list.module.css')
 
   /*
    * ★V7 監査の直し A（`LD96g`・m18c）で書き換え。以前の「表のままCSSで
@@ -32,12 +32,12 @@ describe('U044: 767px以下ではテンプレート一覧をカードへ畳む',
    * 共通の一覧カード（`MobileTableCards`・767px以下だけ）に任せ、表は
    * 768px 以上だけ出す。見た目の固定の書き換えで、動きの約束は変えない。
    */
-  it('表のマークアップは残し、767px以下は共通カードに任せる', () => {
-    expect(page).toContain('MobileTableCards')
-    expect(page).toContain('hidden md:block')
+  it('V8の狭い板では表の名前と操作を残して補足列を畳む', () => {
+    expect(page).toContain('useNarrowViewport()')
+    expect(page).toContain('{!narrow && <Th className={styles.headCell}>使っている所</Th>}')
     expect(page).not.toContain('data-template-list')
     expect(styles).not.toContain('[data-template-list]')
-    expect(styles).not.toMatch(/^\s*:global\(/m)
+    expect(styles).not.toContain('[data-template-list]')
   })
 })
 

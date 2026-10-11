@@ -68,12 +68,12 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
   })
 
   it('テンプレートも同じ幅と欄内追加操作を使う', () => {
-    const page = readFileSync(resolve(APP, 'templates/page.tsx'), 'utf8')
-    const styles = readFileSync(resolve(APP, 'templates/templates-v6.module.css'), 'utf8')
-    expect(page).toContain('style={FOLDER_RAIL_STYLE}')
+    const page = readFileSync(resolve(SRC_V8, 'templates/list.tsx'), 'utf8')
+    const styles = readFileSync(resolve(import.meta.dirname, '../templates/page-templates.module.css'), 'utf8')
+    expect(page).toContain('folders={folderPanel}')
     expect(page).toContain('onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}')
-    expect(styles).toContain('width: var(--folder-rail-width)')
-    expect(styles).toContain('flex: 0 0 var(--folder-rail-width)')
+    expect(styles).toContain('width: var(--tpl-folder-width)')
+    expect(styles).toContain('flex-shrink: 0')
   })
 
   it('流入経路はCSSで共通幅を使い、追加操作には閲覧権限を適用する', () => {

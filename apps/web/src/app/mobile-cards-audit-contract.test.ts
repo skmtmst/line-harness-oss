@@ -12,8 +12,8 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
-const TEMPLATES = read('templates/page.tsx')
-const TEMPLATES_CSS = read('templates/templates-v6.module.css')
+const TEMPLATES = read('../v8/templates/list.tsx')
+const TEMPLATES_CSS = read('../v8/templates/list.module.css')
 const CONVERSIONS = read('../v8/conversions/list.tsx')
 const HEALTH_TAB = read('../v8/nen-health/health.tsx')
 const HEALTH_CSS = read('../v8/nen-health/health.module.css')
@@ -41,19 +41,19 @@ describe('1: 共通の表に「スマホではカード」の形がある', () =
 })
 
 describe('2: テンプレート・成果地点の一覧はこの形になる', () => {
-  it('テンプレート一覧は表（768px以上）とカード（767px以下）を出し分ける', () => {
-    expect(TEMPLATES).toContain('MobileTableCards')
-    expect(TEMPLATES).toContain("import MobileTableCards from '@/components/shared/mobile-table-cards'")
-    expect(TEMPLATES).toContain('hidden md:block')
+  it('テンプレート一覧は狭いV8の板でも名前と操作を残す', () => {
+    expect(TEMPLATES).toContain('useNarrowViewport()')
+    expect(TEMPLATES).toContain('<DataTable>')
+    expect(TEMPLATES).toContain('{!narrow && <Th className={styles.headCell}>使っている所</Th>}')
     // 名前欄の max-w-0 を残したCSS畳み込みは名前が消える原因。戻したら赤くなる。
     expect(TEMPLATES).not.toContain('data-template-list')
     expect(TEMPLATES_CSS).not.toContain('[data-template-list]')
   })
 
-  it('テンプレートのカードは名前・種別・要点・主な数字・編集・「…」を持つ', () => {
-    expect(TEMPLATES).toContain('summary: `${latestContentOf(t).slice(0, 60)}')
-    expect(TEMPLATES).toContain('件で使用')
-    expect(TEMPLATES).toContain('onSelect: () => setDrawerId(t.id)')
+  it('テンプレートの表と詳細パネルは名前・種別・本文・使用数・編集・操作を持つ', () => {
+    expect(TEMPLATES).toContain('latestContentOf(activeTemplate).slice(0, 120)')
+    expect(TEMPLATES).toContain('activeTemplate.usageCount}か所')
+    expect(TEMPLATES).toContain('onOpen={() => setActiveId(activeId === t.id ? null : t.id)}')
   })
 
   it('成果地点の現役一覧は共通の表と省略した全文を使う', () => {
@@ -86,9 +86,10 @@ describe('4: テンプレート詳細の×は固定の上の帯に隠れない',
   it('詳細面の重なり順は固定のモバイル帯より上（共通の最上層の器にそろえる）', () => {
     const headerZ = zIndexOf(SIDEBAR_CSS, '.mobileHeader')
     expect(headerZ).toBe(50)
-    expect(TEMPLATES).toContain('zIndex: 80')
+    expect(TEMPLATES).toContain('<DetailPanel')
+    expect(read('../components/shared/detail-panel.module.css')).toContain('z-index: var(--tpl-detail-panel-z, 70)')
     expect(TEMPLATES).not.toContain('bg-black/30 z-30')
     expect(TEMPLATES).not.toContain('border-hairline z-40 overflow-y-auto')
-    expect(80).toBeGreaterThan(headerZ)
+    expect(70).toBeGreaterThan(headerZ)
   })
 })

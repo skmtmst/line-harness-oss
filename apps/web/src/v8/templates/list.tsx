@@ -60,6 +60,7 @@ import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
+import { useTemplatePanelDetail } from './panel-detail'
 
 /*
  * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行）。
@@ -273,6 +274,7 @@ export default function TemplatesListV8() {
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
   const [moving, setMoving] = useState(false)
+  const moveLock = useRef(false)
   const [moveError, setMoveError] = useState('')
   /* 右から出る詳細パネル。URL（?row=）に今の行を残す。 */
   const [activeId, setActiveId] = useDetailPanelUrl('row')
@@ -657,7 +659,10 @@ export default function TemplatesListV8() {
    * 1件でも失敗したら元に戻して知らせる（「もう一度」で同じ移動をやり直せる）。
    */
   const runMove = async () => {
-    if (!moveIds) return
+    if (!moveIds || moveLock.current) return
+    moveLock.current = true
+    setMoving(true)
+    const requestAccountId = selectedAccountId
     const ids = moveIds
     const folderId = moveDraft === '' ? null : moveDraft
     const previous = templates
@@ -668,14 +673,20 @@ export default function TemplatesListV8() {
     setSelectedIds(new Set())
     setMoveError('')
     const send = async () => {
-      let failed = 0
-      for (const id of ids) {
-        const result = await api.templates.update(id, { folderId })
-        if (!result.success) failed += 1
+      try {
+        let failed = 0
+        for (const id of ids) {
+          const result = await api.templates.update(id, { folderId })
+          if (!result.success) failed += 1
+        }
+        return failed > 0 ? { success: false as const, error: `${failed} 件` } : { success: true as const }
+      } finally {
+        moveLock.current = false
+        setMoving(false)
       }
-      return failed > 0 ? { success: false as const, error: `${failed} 件` } : { success: true as const }
     }
     runOptimistic({
+      isCurrent: () => activeAccountRef.current === requestAccountId,
       request: send,
       revert: () => {
         setTemplates(previous)
@@ -815,6 +826,8 @@ export default function TemplatesListV8() {
 
   /* 右から出る詳細パネルの今の行。一覧に無ければ閉じる。 */
   const activeTemplate = activeId ? (templates.find((t) => t.id === activeId) ?? null) : null
+  const panelDetail = useTemplatePanelDetail(activeTemplate?.id ?? null, selectedAccountId, canMutateTemplates, load)
+  const panelUsageRows = panelDetail.detail?.usedBy ? usageRows(panelDetail.detail.usedBy) : []
   const navItems = activeTemplate && shownItems.some((t) => t.id === activeTemplate.id) ? shownItems : templates
   const activeIndex = activeTemplate ? navItems.findIndex((t) => t.id === activeTemplate.id) : -1
   const activeFolderName = activeTemplate
@@ -1550,6 +1563,7 @@ export default function TemplatesListV8() {
               </Button>
               {/* 閲覧のみ：変えるボタンは置かない（2026-10-06 オーナー決定） */}
               {canMutateTemplates ? <>
+                {panelDetail.detail?.hasDraft ? <Button type="button" variant="secondary" busy={panelDetail.publishing} onClick={() => void panelDetail.publish()}>公開する</Button> : null}
                 <Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))} busyLabel="移動中…">
                   編集する
                 </Button>
@@ -1606,6 +1620,14 @@ export default function TemplatesListV8() {
                   ? emptyValue('none')
                   : `${activeTemplate.usageCount}か所`}
             </p>
+            {panelDetail.error ? <Notice tone="danger">{panelDetail.error}</Notice> : null}
+            {panelUsageRows.length > 0 ? <div className={styles.usageList}><ul>
+              {panelUsageRows.map((row) => <li key={row.key} className={styles.usageRow}>
+                <span className={styles.usageKind}>{row.kind}</span>
+                <span className={styles.usageName}>{row.name}</span>
+                {row.href ? <Link href={row.href} className={styles.usageOpen}>開いて差し替える</Link> : null}
+              </li>)}
+            </ul></div> : null}
             {panelMove ? (
               <>
                 <p className={styles.panelLabel}>移動先のフォルダ</p>
