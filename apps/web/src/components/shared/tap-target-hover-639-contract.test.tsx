@@ -112,7 +112,8 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
     // 流入経路モーダル・プールは brightness で沈む（生の色を増やさない）。
     // 2026-09-25: 白字 3.77:1 の bg-emerald-600 を bg-success（5.61:1）へ。
     // 見張りはホバー変化の有無（意図は変えない）。
-    expect(readApp('inflow-links/_components/create-genre-modal.tsx')).toContain('bg-success px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-90')
+    expect(readApp('../v8/inflow-links/genre-dialog.tsx')).toContain('onConfirm={() => save()}')
+    expect(readShared('dialog.tsx')).toContain("'danger' : 'primary'")
     // ★V7 C5: 流入リンク編集窓は共通 Dialog＋Button primary へ寄せた。ホバー変化は共通 Button が持つ。
     expect(readApp('../v8/inflow-links/edit-route-dialog.tsx')).toContain('variant="primary"')
     expect(readApp('../v8/settings/pools/pools.tsx')).toContain('variant="primary"')

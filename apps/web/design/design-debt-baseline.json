@@ -139,9 +139,6 @@
   "app/hq/templates/template-definition-editor.tsx": {
     "unresolved-classname": 2
   },
-  "app/inflow-links/_components/create-genre-modal.tsx": {
-    "arbitrary-value": 1
-  },
   "app/layout.tsx": {
     "unresolved-classname": 1
   },
