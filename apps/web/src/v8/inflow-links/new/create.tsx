@@ -151,7 +151,6 @@ function InflowCreate() {
     })
     return () => { cancelled = true }
     // 候補はアカウントごとに違う。切替後に古い候補のまま保存しないよう取り直す（入力は残す）。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId,candidatesRetry])
 
   /* 新しい候補にない選択は外し、外したときだけ帯で知らせる。 */

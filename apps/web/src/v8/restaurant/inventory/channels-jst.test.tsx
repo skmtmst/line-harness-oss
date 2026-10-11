@@ -4,9 +4,9 @@ import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react'
 import {it,expect,vi,afterEach} from 'vitest'
 const calls=vi.hoisted(()=>({fetch:vi.fn()}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),replace:vi.fn()}),useSearchParams:()=>new URLSearchParams()}))
-vi.mock('@/lib/api',async(o)=>({...await o<any>(),fetchApi:calls.fetch}))
+vi.mock('@/lib/api',async(o)=>({...await o<typeof import('@/lib/api')>(),fetchApi:calls.fetch}))
 vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:{listIntakeAddresses:async()=>({data:[]})}}))
-vi.mock('@/components/shared/date-time-field',async(o)=>({...await o<any>(),default:({onChange,...props}:any)=><input {...props} onChange={e=>onChange(e.target.value)}/>}))
+vi.mock('@/components/shared/date-time-field',async(o)=>({...await o<typeof import('@/components/shared/date-time-field')>(),default:({onChange,...props}:React.ComponentProps<typeof import('@/components/shared/date-time-field').default>)=><input {...props} onChange={e=>onChange(e.target.value)}/>}))
 import ChannelsBoard from './channels'
 afterEach(cleanup)
 it('OP-R05 manual intake stores Japan local time regardless of device timezone',async()=>{

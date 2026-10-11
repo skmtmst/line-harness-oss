@@ -30,6 +30,6 @@ describe('B-241 failure versus empty AST guard',()=>{
   const allow=JSON.parse(readFileSync(new URL('../../scripts/load-failure-allowlist.json',import.meta.url),'utf8'))
   const rows=auditScreenLoads(root)
   expect(unapprovedLoadFailures(rows,allow)).toEqual([])
-  expect(allow.filter((a:any)=>!rows.some((r:any)=>r.filename===a.filename&&r.fingerprint===a.fingerprint))).toEqual([])
+  expect(allow.filter((a:{filename:string;fingerprint:string})=>!rows.some((r:{filename:string;fingerprint:string})=>r.filename===a.filename&&r.fingerprint===a.fingerprint))).toEqual([])
  })
 })

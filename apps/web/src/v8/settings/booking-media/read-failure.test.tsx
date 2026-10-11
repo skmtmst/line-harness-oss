@@ -7,7 +7,7 @@ vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),replace:vi.fn()}),u
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'a'})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{},useHideSettingsNav:()=>{}}))
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner',canManageRole:()=>true}))
-vi.mock('@/lib/api',async(o)=>({...await o<any>(),fetchApi:net.fetch}))
+vi.mock('@/lib/api',async(o)=>({...await o<typeof import('@/lib/api')>(),fetchApi:net.fetch}))
 vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:{
  reservationLink:async()=>({data:{url:'https://fixture.invalid/reserve'}}),listStores:async()=>({data:{stores:[{id:'s',name:'人工店舗'}]}}),storeContext:async()=>({data:{selectedStore:{id:'s'}}}),
  mediaLinks:async()=>({data:[]}),closeNotificationSettings:async()=>({data:{recipientMode:'responsible',membershipIds:[]}}),snapshot:net.snapshot,

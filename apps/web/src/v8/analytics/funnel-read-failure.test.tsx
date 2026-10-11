@@ -3,7 +3,7 @@ import React from 'react';
 import {render,screen,fireEvent,act,cleanup,waitFor} from '@testing-library/react';
 import {vi,it,expect,afterEach} from 'vitest';
 const m=vi.hoisted(()=>({latest:vi.fn(),list:vi.fn()}));
-vi.mock('@/lib/api',async(original)=>({...await original<any>(),api:{analytics:{v6Funnels:{list:m.list,latestRun:m.latest}}}}));
+vi.mock('@/lib/api',async(original)=>({...await original<typeof import('@/lib/api')>(),api:{analytics:{v6Funnels:{list:m.list,latestRun:m.latest}}}}));
 vi.mock('@/components/shared/list-navigation',()=>({useListNavigationRouter:()=>({push:vi.fn(),replace:vi.fn()})}));
 vi.mock('@/components/shared/period-picker',()=>({default:()=>null,useReportPeriod:()=>({days:30,setDays:vi.fn(),customRange:null,setRange:vi.fn()})}));
 import FunnelV8 from '@/v8/analytics/funnel';
