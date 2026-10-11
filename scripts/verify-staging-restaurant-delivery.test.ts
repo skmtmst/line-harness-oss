@@ -324,6 +324,41 @@ describe('staging delivery verification safety', () => {
     );
   });
 
+  test('keeps the chosen store by marking the post-auth clear as done', () => {
+    // AuthGuard は認証確認のあと一度だけ前回の選択を捨てる。印が無いと
+    // スクリプトが置いた店舗選択も消され、3画面とも店舗未選択の門で止まる。
+    const navigation = readFileSync(
+      new URL('../apps/web/src/lib/hq-navigation.ts', import.meta.url),
+      'utf8',
+    );
+    expect(navigation).toContain("ACCOUNT_SELECTION_KEY = 'lh_selected_account'");
+    expect(navigation).toContain("AUTH_SELECTION_CLEARED_KEY = 'lh_auth_selection_cleared'");
+    // 印があれば消さない、という実装と期待を結び付ける。
+    expect(navigation).toContain('if (local.getItem(AUTH_SELECTION_CLEARED_KEY) === \'1\') return false');
+    expect(navigation).toContain('if (session.getItem(AUTH_SELECTION_CLEARED_KEY) === \'1\') return false');
+    expect(navigation).toContain('local.removeItem(ACCOUNT_SELECTION_KEY)');
+    // その処理が認証確認の成功側で実際に呼ばれている。
+    const authGuard = readFileSync(
+      new URL('../apps/web/src/components/auth-guard.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(authGuard).toContain('clearSelectionAfterAuthentication(localStorage, sessionStorage)');
+
+    // スクリプトは正本の localStorage と、残存扱いにされる sessionStorage の
+    // 両方へ印を置く。どちらかの行が消えたらここで落ちる。
+    expect(script).toContain("localStorage.setItem('lh_auth_selection_cleared', '1')");
+    expect(script).toContain("sessionStorage.setItem('lh_auth_selection_cleared', '1')");
+    // 印は店舗選択より先に置く（後だと置く前に消される余地が残る）。
+    const markerAt = script.indexOf("localStorage.setItem('lh_auth_selection_cleared', '1')");
+    const selectionAt = script.indexOf("localStorage.setItem('lh_selected_account', accountId)");
+    expect(markerAt).toBeGreaterThan(-1);
+    expect(selectionAt).toBeGreaterThan(markerAt);
+    // 印も店舗選択も、画面が描かれる前に走る `addInitScript` の中にある。
+    const initAt = script.search(/await page\.addInitScript\(/);
+    expect(initAt).toBeGreaterThan(-1);
+    expect(markerAt).toBeGreaterThan(initAt);
+  });
+
   test('checks the real flat shape the three screens actually read', async () => {
     // 既定の器は `data` で包むので、包まれていないことが本物と同じ形の証。
     expect(inspectFlatBody(
