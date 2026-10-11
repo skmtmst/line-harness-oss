@@ -1054,7 +1054,7 @@ export const FORM_DETAIL = {
     { name: 'next_visit', label: '次回来店の希望日', type: 'date' },
   ],
   /* 編集画面（m1cWEy・ijxur・XXFT4・tpRRT・J1pdB・Z9wXm・ITBAB）の絵の中身。
-   * 1ページ目：店のロゴ・見出し・本文・ラジオ・5段階。2ページ目：見出し・予約を入れる・自由に書く。 */
+   * 1ページ目：店のロゴ・見出し・本文・ラジオ・5段階・本人確認書類。2ページ目：見出し・予約を入れる・自由に書く。 */
   contentRevision: 4,
   publishedVersionId: 'form-1-version-3',
   publishedContentRevision: 3,
@@ -1072,6 +1072,7 @@ export const FORM_DETAIL = {
           { id: 'purpose-3', label: 'ご相談' },
         ] },
         { id: 'form-staff-rating', kind: 'input', type: 'rating', name: 'staff_rating', label: '担当の対応はいかがでしたか？' },
+        { id: 'form-identity', kind: 'input', type: 'file', name: 'identity_documents', label: '本人確認書類（免許証など）を送ってください', fileKinds: ['image', 'pdf', 'identity'], fileBothSides: true, fileMaxCount: 2 },
       ],
     }, {
       id: 'form-section-next', name: '次回について', blocks: [
