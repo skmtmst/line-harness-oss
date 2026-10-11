@@ -23,7 +23,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: google }))
-vi.mock('@/lib/api', () => ({ fetchApi }))
+vi.mock('@/lib/api', async(o) => ({ ...await o<typeof import('@/lib/api')>(), fetchApi }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 
@@ -90,4 +90,14 @@ describe('hKRRF 今日のお店', () => {
     await screen.findByText('鈴木 美咲')
     for (const name of [/電話予約/, /ウォークイン/, /来店にする/, /枠を閉じた/]) expect(screen.queryByRole('button', { name })).toBeNull()
   })
+})
+
+it.each(['today','tasks','media-links','channels'])('B-241 dashboard %s read failure is visible and retryable',async(kind)=>{
+ const call=kind==='today'?api.reservationsDay:kind==='tasks'?api.channelCloseTasks:kind==='media-links'?api.mediaLinks:fetchApi
+ call.mockRejectedValueOnce(new Error('人工取得失敗'))
+ render(<RestaurantDashboardV8 />)
+ const error=await screen.findByText('お店の情報を読み込めませんでした')
+ const container=error.closest('[data-list-state="error"]')!
+ fireEvent.click(container.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText('お店の情報を読み込めませんでした')).toBeNull())
 })
