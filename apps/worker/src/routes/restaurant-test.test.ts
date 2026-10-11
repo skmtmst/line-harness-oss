@@ -1819,3 +1819,12 @@ it.each(['reservationFrom','reservationTo'])('API-02 %s rejects impossible dates
  seedRestaurantFixture();
  expect((await request(`/api/restaurant-test/snapshot?account_id=account-1&${key}=2026-02-30`)).status).toBe(400);
 });
+
+it('API-01 飲食台帳の暦日も日本の00:30を含めて翌日00:30を除く',async()=>{
+ seedRestaurantFixture();
+ testDb.raw.exec("UPDATE rt_reservations SET starts_at='2026-08-24T15:30:00.000Z',ends_at='2026-08-24T16:30:00.000Z' WHERE id='reservation-ginza'; INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,guest_count,starts_at,ends_at,table_id,status) VALUES('next-day','store-ginza','restaurant_board','NEXT-DAY','人工客',2,'2026-08-25T15:30:00.000Z','2026-08-25T16:30:00.000Z','table-ginza','confirmed')");
+ const res=await request('/api/restaurant-test/snapshot?account_id=account-1&reservationFrom=2026-08-25&reservationTo=2026-08-25');
+ expect(res.status).toBe(200);
+ const body=await res.json() as {data:{reservations:Array<{id:string}>}};
+ expect(body.data.reservations.map(row=>row.id)).toEqual(['reservation-ginza']);
+});
