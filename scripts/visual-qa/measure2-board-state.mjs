@@ -7,6 +7,7 @@ const createTemplate = (kind) => ({
 })
 
 export const BOARD_STATE_PROFILES = {
+  K7HWG: { url: '/auto-replies/edit?id=ar-new', click: ['fill:ルール名='] },
   iN6np: { url: '/broadcasts/new?step=message&draft=visual-compose' },
   pIHp3: { url: '/hq/broadcasts/new?step=message&id=hq-visual-compose' },
   M2tJM: { url: '/hq/broadcasts/detail?id=hq-visual-sent' },

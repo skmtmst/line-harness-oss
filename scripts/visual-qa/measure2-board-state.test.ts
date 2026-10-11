@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { applyBoardStateProfiles, BOARD_STATE_PROFILES } from './measure2-board-state.mjs'
 
 describe('板ごとの撮影条件', () => {
-  it('B-252: 状態を開くだけにし、名前・数・見本文を絵へ合わせない', () => {
+  it('B-252: 撮影状態だけを開き、入力を消す操作は保存しない', () => {
     const clicks = Object.values(BOARD_STATE_PROFILES).flatMap(profile => profile.click ?? [])
     expect(clicks).not.toEqual([])
-    expect(clicks.some(step => step.startsWith('fill:'))).toBe(false)
+    expect(clicks.filter(step => step.startsWith('fill:'))).toEqual(['fill:ルール名='])
+    expect(clicks.some(step => ['保存する', '送信する'].includes(step))).toBe(false)
     expect(BOARD_STATE_PROFILES.HfK0O.click).toEqual(['メッセージ', 'テンプレートを作る'])
   })
   it('固定表を変えず、対象外の状態と対象板のAPI・権限・幅を残す', () => {
