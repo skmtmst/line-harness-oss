@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { readFolderAssignment } from './folder-assignment.js';
 import { dbTableExists, jstNow } from './utils.js';
 import {
@@ -158,8 +159,8 @@ export async function listAffiliateOffers(
   if (opts.lineAccountIds) {
     const accountParts: string[] = [];
     if (opts.lineAccountIds.length > 0) {
-      accountParts.push(`line_account_id IN (${opts.lineAccountIds.map(() => '?').join(', ')})`);
-      binds.push(...opts.lineAccountIds);
+      accountParts.push(`line_account_id IN (${sqlIdSet(opts.lineAccountIds).sql})`);
+      binds.push(...(opts.lineAccountIds.length ? sqlIdSet(opts.lineAccountIds).binds : []));
     }
     if (opts.includeUnassigned) accountParts.push('line_account_id IS NULL');
     conditions.push(`(${accountParts.join(' OR ') || '0 = 1'})`);

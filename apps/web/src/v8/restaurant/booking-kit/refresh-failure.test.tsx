@@ -1,0 +1,18 @@
+// @vitest-environment happy-dom
+import React from 'react';
+import {render,screen,fireEvent,waitFor,cleanup} from '@testing-library/react';
+import {it,expect,vi,beforeEach,afterEach} from 'vitest';
+const fx=vi.hoisted(()=>({snapshot:vi.fn(),listStores:vi.fn(),storeContext:vi.fn(),channelCloseTasks:vi.fn(),reservationsDay:vi.fn(),customerHistory:vi.fn(),openingHours:vi.fn()}));
+const saved=vi.hoisted(()=>vi.fn());
+vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:fx}));
+vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'fixture-account',accounts:[]})}));
+vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),replace:vi.fn(),prefetch:vi.fn()}),usePathname:()=>'/restaurant-test',useSearchParams:()=>new URLSearchParams()}));
+vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}));
+vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner',canManageRole:()=>true}));
+vi.mock('@/lib/use-admin-theme',()=>({useAdminTheme:()=> 'v8'}));
+vi.mock('@/components/shared/toast',()=>({notifySaved:saved,notifyToast:vi.fn(),notifyError:vi.fn()}));
+import Shell from '@/v8/restaurant/booking-kit/shell';
+import {snapshotOf} from '@/v8/restaurant/booking-kit/test-data';
+beforeEach(()=>{vi.clearAllMocks();window.history.replaceState({},'','/restaurant-test');fx.snapshot.mockResolvedValue({data:snapshotOf()});fx.storeContext.mockResolvedValue({data:{}});fx.customerHistory.mockResolvedValue({data:{visitCount:0,visits:[]}})});
+afterEach(cleanup);
+it('OP-R03 保存成功後snapshot失敗でもtrue/成功通知/旧データ',async()=>{fx.snapshot.mockResolvedValueOnce({data:snapshotOf()}).mockRejectedValueOnce(new Error('fixture refresh failed')).mockResolvedValue({data:snapshotOf()});let result:boolean|undefined;const update=vi.fn().mockResolvedValue({});render(<Shell boardId="fixture" title="fixture" description="fixture">{ctx=><><span>{ctx.data.stores[0].name}</span><button onClick={async()=>{result=await ctx.mutate(update,'fixture saved')}}>fixture save</button></>}</Shell>);fireEvent.click(await screen.findByText('fixture save'));await screen.findByText(/保存しましたが、最新の表示を読み込めませんでした/);expect(saved).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'もう一度読み込む'}));await waitFor(()=>expect(fx.snapshot).toHaveBeenCalledTimes(3));expect(update).toHaveBeenCalledTimes(1);expect(result).toBe(true);expect(screen.queryByText('fixture refresh failed')).toBeNull();});

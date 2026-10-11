@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { issueStampQr, storefrontQr, stampQrStatus, revokeStampQr, redeemStampQr } from '../services/visit-stamp-qr.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { bodyLimit } from 'hono/body-limit';
@@ -38,7 +39,7 @@ visitStamps.get('/api/visit-stamps/cards',async c=>{
   const scope=await getVisibleLineAccountScope(dbFor(c.env),c.get('staff'));
   if(!scope.ids.length)return c.json({success:true,data:[]});
   const rows=(await dbFor(c.env).prepare(`SELECT DISTINCT c.id FROM visit_stamp_cards c JOIN visit_stamp_card_accounts a ON a.card_id=c.id
-    WHERE c.tenant_id=? AND a.line_account_id IN (${scope.ids.map(()=>'?').join(',')})`).bind(tenant(c),...scope.ids).all<{id:string}>()).results;
+    WHERE c.tenant_id=? AND a.line_account_id IN (${sqlIdSet(scope.ids).sql})`).bind(tenant(c),...sqlIdSet(scope.ids).binds).all<{id:string}>()).results;
   const data=[];for(const r of rows)data.push(await readStampCard(dbFor(c.env),await stampCard(dbFor(c.env),r.id,tenant(c))));
   return c.json({success:true,data});
 });

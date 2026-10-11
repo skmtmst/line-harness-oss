@@ -155,22 +155,26 @@ export default function RestaurantShell({ boardId, title, description, query, he
   const [loadError, setLoadError] = useState<unknown>(null)
 
   /* 見方・絞り込みを続けて変えたとき、先に出した古い問い合わせの返事が後から来て新しい結果を上書きしないように、最後の1件だけを使う。 */
+  const [savedButUnread, setSavedButUnread] = useState(false)
   const latest = useRef(0)
   const load = useCallback(async () => {
     const ticket = ++latest.current
-    if (!selectedAccountId) { setSnapshot(null); setLoadError(null); setLoading(false); return }
+    if (!selectedAccountId) { setSnapshot(null); setLoadError(null); setLoading(false); return false }
     setLoading(true)
     try {
       const res = await restaurantTestApi.snapshot(selectedAccountId, query)
-      if (ticket !== latest.current) return
+      if (ticket !== latest.current) return false
       setSnapshot(res.data)
       setLoadError(null)
+      setSavedButUnread(false)
       setSelectedStoreId((current) => (res.data.stores.some((item) => item.id === current)
         ? current
         : res.data.stores[0]?.id || ''))
+      return true
     } catch (caught) {
-      if (ticket !== latest.current) return
+      if (ticket !== latest.current) return false
       setLoadError(caught)
+      return false
     } finally {
       if (ticket === latest.current) setLoading(false)
     }
@@ -181,8 +185,9 @@ export default function RestaurantShell({ boardId, title, description, query, he
     setBusy(true)
     try {
       await action()
-      await load()
-      notifySaved(success)
+      const refreshed = await load()
+      if (refreshed) notifySaved(success)
+      else setSavedButUnread(true)
       return true
     } catch (error) {
       if (error instanceof QuietError) { setNotice(null); return false }
@@ -201,7 +206,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
     [snapshot, selectedStoreId],
   )
   const ctx: RestaurantV8Context | null = snapshot?.organization
-    ? { data: snapshot, store, selectedStoreId, busy, mutate, reload: load }
+    ? { data: snapshot, store, selectedStoreId, busy, mutate, reload: async () => { await load() } }
     : null
 
   const content = loading && !snapshot ? (
@@ -214,7 +219,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
     children(ctx)
   )
   const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect size="full" aria-label="店舗" noun="店舗" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
-  const noticeBand = notice ? (
+  const noticeBand = loadError !== null && snapshot?.organization ? <ListState kind="error" title={savedButUnread ? "保存しましたが、最新の表示を読み込めませんでした" : "最新の表示を読み込めませんでした"} error={loadError} onRetry={()=>void load()}/> : notice ? (
     <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null
 

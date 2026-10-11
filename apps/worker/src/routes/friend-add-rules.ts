@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -389,7 +390,7 @@ export async function validateReferences(
     }
   }
   if (definition.routeIds.length > 0) {
-    const placeholders = definition.routeIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(definition.routeIds).sql;
     const rows = await db.prepare(
       `SELECT id FROM entry_routes
         WHERE is_active = 1 AND id IN (${placeholders}) AND (
@@ -398,7 +399,7 @@ export async function validateReferences(
             AND tenant_id = (SELECT tenant_id FROM line_accounts WHERE id = ?)
           )
         )`,
-    ).bind(...definition.routeIds, accountId, accountId).all<{ id: string }>();
+    ).bind(...(definition.routeIds.length ? sqlIdSet(definition.routeIds).binds : []), accountId, accountId).all<{ id: string }>();
     if ((rows.results ?? []).length !== new Set(definition.routeIds).size) {
       push(friendKind, 'このLINEアカウントで使えない流入リンクが含まれています。');
     }
@@ -416,10 +417,10 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (tagIds.length > 0) {
     const unique = [...new Set(tagIds)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT id FROM tags WHERE line_account_id = ? AND id IN (${placeholders})`,
-    ).bind(accountId, ...unique).all<{ id: string }>();
+    ).bind(accountId, ...(unique.length ? sqlIdSet(unique).binds : [])).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'このLINEアカウントで使えないタグが含まれています。');
   }
   const actionScenarioIds = definition.actions
@@ -428,11 +429,11 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (actionScenarioIds.length > 0) {
     const unique = [...new Set(actionScenarioIds)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT id FROM scenarios
         WHERE line_account_id = ? AND is_active = 1 AND id IN (${placeholders})`,
-    ).bind(accountId, ...unique).all<{ id: string }>();
+    ).bind(accountId, ...(unique.length ? sqlIdSet(unique).binds : [])).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えないシナリオが含まれています。');
   }
   /*
@@ -448,13 +449,13 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (actionFieldIds.length > 0) {
     const unique = [...new Set(actionFieldIds)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT DISTINCT ff.id AS id FROM friend_fields ff
          LEFT JOIN friend_field_scopes ffs ON ffs.field_id = ff.id
         WHERE ff.id IN (${placeholders})
           AND (ffs.line_account_id = ? OR ffs.line_account_id IS NULL)`,
-    ).bind(...unique, accountId).all<{ id: string }>();
+    ).bind(...(unique.length ? sqlIdSet(unique).binds : []), accountId).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない友だち情報の項目が含まれています。');
   }
   const actionMarkIds = definition.actions
@@ -463,10 +464,10 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (actionMarkIds.length > 0) {
     const unique = [...new Set(actionMarkIds)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT id FROM support_marks WHERE id IN (${placeholders})`,
-    ).bind(...unique).all<{ id: string }>();
+    ).bind(...(unique.length ? sqlIdSet(unique).binds : [])).all<{ id: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない対応マークが含まれています。');
   }
   const actionVarKeys = definition.actions
@@ -475,12 +476,12 @@ export async function validateReferences(
     .filter((id): id is string => typeof id === 'string' && Boolean(id));
   if (actionVarKeys.length > 0) {
     const unique = [...new Set(actionVarKeys)];
-    const placeholders = unique.map(() => '?').join(',');
+    const placeholders = sqlIdSet(unique).sql;
     const rows = await db.prepare(
       `SELECT var_key FROM common_vars
         WHERE var_key IN (${placeholders})
           AND line_account_id = ? AND archived_at IS NULL`,
-    ).bind(...unique, accountId).all<{ var_key: string }>();
+    ).bind(...(unique.length ? sqlIdSet(unique).binds : []), accountId).all<{ var_key: string }>();
     if ((rows.results ?? []).length !== unique.length) push('actions', 'アクションに使えない共通情報が含まれています。');
   }
   if (definition.activeFrom && definition.activeUntil && definition.activeFrom > definition.activeUntil) {

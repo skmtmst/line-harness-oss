@@ -401,3 +401,8 @@ describe('管理画面のアカウント境界', () => {
     expect(await detail.json()).toMatchObject({ data: [{ host: 'shop.example.com', path: '/thanks' }] });
   });
 });
+
+it('API-02 rejects impossible date in page-view aggregation',async()=>{
+ const res=await app.request('/api/site/pages?account_id=account-a&from=2026-02-30&to=2026-03-01',{},env as any);
+ expect(res.status).toBe(400);expect(mocks.getPageViewSummary).not.toHaveBeenCalled();
+});

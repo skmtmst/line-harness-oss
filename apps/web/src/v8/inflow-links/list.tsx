@@ -115,6 +115,8 @@ export default function InflowListV8({
   const loadRequestRef = useRef(0)
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
+  const [auxiliaryError,setAuxiliaryError]=useState(false)
+  const [auxiliaryRetry,setAuxiliaryRetry]=useState(0)
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [templates, setTemplates] = useState<MessageTemplate[]>([])
@@ -167,8 +169,7 @@ export default function InflowListV8({
       const routeQuery = accountAtRequest ? `?account_id=${encodeURIComponent(accountAtRequest)}` : ''
       const [r, genreRes, sum, tl] = await Promise.all([
         fetchApi<{ success: boolean; data: EntryRoute[] }>(`/api/entry-routes${routeQuery}`),
-        // 古い Worker でもフォルダだけ空にして一覧は出す。
-        api.entryRouteGenres.list().catch(() => ({ success: false as const, data: [] as EntryRouteGenre[] })),
+        api.entryRouteGenres.list(),
         fetchApi<{ success: boolean; data: RefSummaryData }>(`/api/analytics/ref-summary${summaryQuery}`)
           .catch(() => ({ success: false, data: null })),
         api.trackedLinks.list().catch(() => ({ success: false, data: null })),
@@ -185,7 +186,8 @@ export default function InflowListV8({
       } else {
         setLoadFailed(true)
       }
-      if (genreRes.success) setGenres(genreRes.data)
+      if(!genreRes.success)throw new Error(genreRes.error)
+      setGenres(genreRes.data)
       if ('success' in sum && sum.success && isRefSummaryData(sum.data)) {
         setSummary(sum.data)
         setSummaryAvailable(true)
@@ -287,7 +289,6 @@ export default function InflowListV8({
       // プールは multi_store_hierarchy が有効と分かるときだけ呼ぶ（403 を出さない、#703）。
       const poolsDisabled = { success: false as const, error: 'feature_disabled' }
       const fetchPools = () => api.pools.list({ suppressFeatureDisabledEvent: true })
-        .catch((): ApiResponse<TrafficPool[]> => poolsDisabled)
       const poolsPromise: Promise<ApiResponse<TrafficPool[]>> = visibility.features != null
         ? (visibility.features['multi_store_hierarchy'] === true ? fetchPools() : Promise.resolve(poolsDisabled))
         : isPoolsFeatureAvailable(selectedAccountId ? [selectedAccountId] : null)
@@ -297,14 +298,15 @@ export default function InflowListV8({
       const [p, s, t, tagRes] = await Promise.all([
         poolsPromise,
         featureAllowed('scenarios')
-          ? api.scenarios.list(candidateParams).catch(() => ({ success: false as const, data: [] as Scenario[] }))
+          ? api.scenarios.list(candidateParams)
           : Promise.resolve({ success: false as const, data: [] as Scenario[] }),
         featureAllowed('templates')
-          ? api.messageTemplates.list().catch(() => ({ success: false as const, data: [] as MessageTemplate[] }))
+          ? api.messageTemplates.list()
           : Promise.resolve({ success: false as const, data: [] as MessageTemplate[] }),
-        api.tags.list(candidateParams).catch(() => ({ success: false, data: [] as Tag[] })),
+        api.tags.list(candidateParams),
       ])
       if (!isCurrent()) return
+      if(!tagRes.success || (featureAllowed('scenarios')&&!s.success) || (featureAllowed('templates')&&!t.success) || (!p.success && p.error!=='feature_disabled'))throw new Error('candidates unavailable')
       // 形の違う返事（古い Worker など）で行の描画ごと落ちないよう、配列のときだけ受け取る。
       if (p.success && Array.isArray(p.data)) setPools(p.data)
       if (s.success && Array.isArray(s.data)) setScenarios(s.data)
@@ -328,9 +330,10 @@ export default function InflowListV8({
         }
       }
     }
-    void loadAuxiliary()
+    setAuxiliaryError(false)
+    void loadAuxiliary().catch(()=>{if(isCurrent())setAuxiliaryError(true)})
     return () => { cancelled = true }
-  }, [selectedAccountId, visibility.status, visibility.features])
+  }, [selectedAccountId, visibility.status, visibility.features,auxiliaryRetry])
 
   /*
    * 行の受付・停止を切り替える（行の「…」から）。押した瞬間に札を変え、裏で保存する
@@ -802,7 +805,7 @@ export default function InflowListV8({
     </ListPagePagination>
   ) : null
 
-  const routeEditor = editing ? (<EditRouteDialog surface={editId !== undefined ? 'page' : 'dialog'}
+  const routeEditor = editing ? (auxiliaryError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>setAuxiliaryRetry(value=>value+1)}/>: <EditRouteDialog surface={editId !== undefined ? 'page' : 'dialog'}
             route={editing === 'new' || (typeof editing === 'object' && 'register' in editing) ? null : editing}
             initialRefCode={typeof editing === 'object' && editing !== null && 'register' in editing ? editing.register : undefined}
             initialGenre={editing === 'new' && selectedGenre !== UNCATEGORIZED ? selectedGenre : undefined}
@@ -926,7 +929,8 @@ export default function InflowListV8({
         </FolderPanel>
       </>}
       collapsedFolders={<>{createButton}{folderSelect}</>}
-      toolbar={toolbar}
+      toolbar={<>{auxiliaryError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>setAuxiliaryRetry(value=>value+1)}/>:null}{toolbar}</>}
+
       pagination={pager}
       overlays={<>
         <ConfirmDialog

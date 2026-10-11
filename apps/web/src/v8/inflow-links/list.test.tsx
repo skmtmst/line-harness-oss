@@ -239,3 +239,20 @@ describe('V8 流入と計測の一覧', () => {
     expect([...host.querySelectorAll('button')].some((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').includes('フォルダを追加'))).toBe(false)
   })
 })
+
+it.each(['/api/entry-route-genres','/api/scenarios','/api/message-templates','/api/tags'])('B-241：%sの拒否は空の候補として隠さず読み直す',async(path)=>{
+ const fixtureFetch=globalThis.fetch
+ let failed=true,reads=0
+ vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{
+  if(new URL(String(input)).pathname===path){reads++;if(failed)throw new Error('fixture failure')}
+  return fixtureFetch(input,init)
+ })
+ await render()
+ const error=[...host.querySelectorAll('[data-list-state="error"]')].find(el=>el.textContent?.includes('読み込めませんでした'))
+ expect(error).toBeTruthy()
+ failed=false
+ await act(async()=>{(error!.querySelector('button') as HTMLButtonElement).click()})
+ for(let i=0;i<8;i++)await act(async()=>{})
+ expect(host.querySelector('[data-list-state="error"]')).toBeNull()
+ expect(reads).toBeGreaterThanOrEqual(2)
+})

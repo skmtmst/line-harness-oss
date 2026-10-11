@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { CreateTrafficPoolRequest } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
@@ -88,10 +89,10 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
       return c.json({ success: false, error: 'ids must contain at most 200 traffic pools' }, 400);
     }
 
-    const placeholders = ids.map(() => '?').join(',');
+    const placeholders = sqlIdSet(ids).sql;
     const pools = await c.env.DB.prepare(
       `SELECT id, active_account_id FROM traffic_pools WHERE id IN (${placeholders})`,
-    ).bind(...ids).all<{ id: string; active_account_id: string }>();
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<{ id: string; active_account_id: string }>();
     if (pools.results.length !== ids.length
       || !await canAccessAllLineAccounts(
         c.env.DB,
@@ -112,7 +113,7 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
        JOIN line_accounts la ON la.id = pa.line_account_id
        WHERE pa.pool_id IN (${placeholders})
        ORDER BY pa.pool_id, pa.created_at, pa.id`,
-    ).bind(...ids).all<PoolAccountWithDetails>();
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<PoolAccountWithDetails>();
 
     return c.json({
       success: true,
@@ -150,8 +151,8 @@ trafficPools.post('/api/traffic-pools', requireRole('owner'), inputJsonBoundary(
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const accounts = await c.env.DB.prepare(`SELECT id FROM line_accounts
-      WHERE id IN (${accountIds.map(() => '?').join(',')}) AND is_active = 1 AND archived_at IS NULL`)
-      .bind(...accountIds).all<{ id: string }>();
+      WHERE id IN (${sqlIdSet(accountIds).sql}) AND is_active = 1 AND archived_at IS NULL`)
+      .bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ id: string }>();
     if (accounts.results.length !== accountIds.length) {
       return inputError(c, { success: false, error: '稼働中のアカウントを選んでください' }, 422, ["accountIds","activeAccountId"]);
     }

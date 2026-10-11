@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 /*
  * 友だちの絞り込み条件を SQL に組み立てる。
  *
@@ -179,8 +180,8 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     /* 選択したタグを全て含む人。 */
     case 'tag_all': {
       const ids = asStringArray(rule.value, 'tag_all')
-      const placeholders = ids.map(() => '?').join(', ')
-      bindings.push(...ids, ids.length)
+      const placeholders = sqlIdSet(ids).sql
+      bindings.push(...(ids.length ? sqlIdSet(ids).binds : []), ids.length)
       return {
         sql: `(SELECT COUNT(DISTINCT ft.tag_id) FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id IN (${placeholders})) = ?`,
         bindings,
@@ -190,8 +191,8 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     /* 選択したタグを全て含む人を除外。 */
     case 'tag_not_all': {
       const ids = asStringArray(rule.value, 'tag_not_all')
-      const placeholders = ids.map(() => '?').join(', ')
-      bindings.push(...ids, ids.length)
+      const placeholders = sqlIdSet(ids).sql
+      bindings.push(...(ids.length ? sqlIdSet(ids).binds : []), ids.length)
       return {
         sql: `(SELECT COUNT(DISTINCT ft.tag_id) FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id IN (${placeholders})) < ?`,
         bindings,
@@ -388,8 +389,8 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     case 'support_mark': {
       const v = asRecord(rule.value, 'support_mark')
       const ids = asStringArray(v.markIds, 'support_mark')
-      const placeholders = ids.map(() => '?').join(', ')
-      bindings.push(...ids)
+      const placeholders = sqlIdSet(ids).sql
+      bindings.push(...(ids.length ? sqlIdSet(ids).binds : []))
       const inClause = `f.support_mark_id IN (${placeholders})`
       return { sql: v.exclude === true ? `(f.support_mark_id IS NULL OR NOT ${inClause})` : inClause, bindings }
     }

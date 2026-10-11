@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow, jstDateString } from './utils.js';
 
 /**
@@ -290,7 +291,7 @@ export async function getReversedEventIds(
   eventIds: string[],
 ): Promise<Set<string>> {
   if (eventIds.length === 0) return new Set();
-  const placeholders = eventIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(eventIds).sql;
   const rows = await db
     .prepare(
       `SELECT conversion_event_id, kind FROM conversion_event_reversals r
@@ -302,7 +303,7 @@ export async function getReversedEventIds(
                  OR (newer.created_at = r.created_at AND newer.rowid > r.rowid))
           )`,
     )
-    .bind(...eventIds)
+    .bind(...(eventIds.length ? sqlIdSet(eventIds).binds : []))
     .all<{ conversion_event_id: string; kind: string }>();
   return new Set(
     rows.results.filter((r) => r.kind === 'reverse').map((r) => r.conversion_event_id),
@@ -364,7 +365,7 @@ export async function getReversalMetricsByPoint(
   pointIds: string[],
 ): Promise<Map<string, { count: number; value: number }>> {
   if (pointIds.length === 0) return new Map();
-  const placeholders = pointIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(pointIds).sql;
   const rows = await db
     .prepare(
       `SELECT ce.conversion_point_id, COUNT(*) AS cnt,
@@ -383,7 +384,7 @@ export async function getReversalMetricsByPoint(
           )
         GROUP BY ce.conversion_point_id`,
     )
-    .bind(...pointIds)
+    .bind(...(pointIds.length ? sqlIdSet(pointIds).binds : []))
     .all<{ conversion_point_id: string; cnt: number; val: number }>();
   return new Map(
     rows.results.map((r) => [r.conversion_point_id, { count: Number(r.cnt), value: Number(r.val) }]),

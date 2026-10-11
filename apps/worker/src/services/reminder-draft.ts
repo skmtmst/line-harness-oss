@@ -491,6 +491,9 @@ export async function testReminderDraft(
     };
   }
 
+  if (reservation.kind !== 'acquired' && reservation.kind !== 'retry') {
+    throw new Error('REMINDER_TEST_DELIVERY_UNCONFIRMED');
+  }
   const account = await getLineAccountById(db, settings.lineAccountId);
   if (!account) throw new Error('REMINDER_LINE_ACCOUNT_NOT_FOUND');
   const built = await buildReminderStepMessage(db, step, friend, new Date(), 'test_send');

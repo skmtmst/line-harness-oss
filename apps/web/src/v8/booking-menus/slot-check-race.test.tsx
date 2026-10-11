@@ -3,18 +3,18 @@
  * 監査 WEB054：空きを確かめている途中で条件を変えたら、古い条件の結果を出さない。
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BookingMenu } from '@/lib/api'
 
-const net = vi.hoisted(() => ({ resolve: null as null | ((v: unknown) => void) }))
+const net = vi.hoisted(() => ({ list:vi.fn().mockResolvedValue({staff:[]}), resolve: null as null | ((v: unknown) => void) }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
     bookingApi: {
       ...actual.bookingApi,
-      listStaff: async () => ({ staff: [] }),
+      listStaff: net.list,
       checkAvailability: () => new Promise((resolve) => { net.resolve = resolve }),
     },
   }
@@ -57,4 +57,12 @@ describe('空きを確かめる（WEB054）', () => {
     await act(async () => { net.resolve?.({ bookable: true, per_staff: [] }) })
     expect(screen.queryByText(/空いています/)).toBeNull()
   })
+})
+
+it('B-241 availability staff list failure is distinct from no designation and retryable',async()=>{
+ net.list.mockRejectedValueOnce(new Error('人工取得失敗'))
+ render(<SlotCheckV8 accountId="a" menus={menus}/>)
+ const error=await screen.findByText('担当を読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText('担当を読み込めませんでした')).toBeNull())
 })

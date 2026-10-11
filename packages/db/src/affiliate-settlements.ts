@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { dbTableExists } from './utils.js';
 
 export type AffiliateLifecycle = 'active' | 'paused' | 'archived';
@@ -711,7 +712,7 @@ export function settlementWriteStatements(
   const writtenDebits = debitIds.length > 0
     ? ` OR (SELECT COUNT(*) FROM affiliate_settlement_lines sl2
              WHERE sl2.settlement_id = ?
-               AND sl2.entry_id IN (${debitIds.map(() => '?').join(',')})) <> ?`
+               AND sl2.entry_id IN (${sqlIdSet(debitIds).sql})) <> ?`
     : '';
   const noLinesLeft =
     `NOT EXISTS (SELECT 1 FROM affiliate_settlement_lines sl WHERE sl.settlement_id = ?)`;
@@ -721,7 +722,7 @@ export function settlementWriteStatements(
         WHERE settlement_id = ? AND (${writtenEntries} <> ?${writtenDebits})`,
     ).bind(
       input.settlementId, entryKeyPrefix.length, entryKeyPrefix, input.targets.length,
-      ...(debitIds.length > 0 ? [input.settlementId, ...debitIds, debitIds.length] : []),
+      ...(debitIds.length > 0 ? [input.settlementId, ...sqlIdSet(debitIds).binds, debitIds.length] : []),
     ),
     db.prepare(
       `DELETE FROM affiliate_reward_entries

@@ -45,7 +45,8 @@ function handler(url: URL) {
   if (url.pathname === '/api/scenarios') {
     return response({ success: true, data: { items: [], total: 0, limit: 200, sort: [] } })
   }
-  if (url.pathname === '/api/message-templates') return response({ success: true, data: [] })
+  if (['/api/tag-groups','/api/entry-route-genres','/api/traffic-pools'].includes(url.pathname)) return response({success:true,data:[]})
+  if (url.pathname === '/api/templates') return response({ success: true, data: [] })
   return response({ success: false, error: 'not mocked', data: null })
 }
 

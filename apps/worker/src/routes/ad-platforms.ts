@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { auditLog } from '../lib/audit-log.js';
@@ -447,9 +448,9 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
       scopeBindings.push(lineAccountId);
     } else if (scope!.allowedAccountIds.length) {
       scopeClauses.push(scope!.canSeeUnassigned
-        ? `(line_account_id IN (${scope!.allowedAccountIds.map(() => '?').join(',')}) OR line_account_id IS NULL)`
-        : `line_account_id IN (${scope!.allowedAccountIds.map(() => '?').join(',')})`);
-      scopeBindings.push(...scope!.allowedAccountIds);
+        ? `(line_account_id IN (${sqlIdSet(scope!.allowedAccountIds).sql}) OR line_account_id IS NULL)`
+        : `line_account_id IN (${sqlIdSet(scope!.allowedAccountIds).sql})`);
+      scopeBindings.push(...(scope!.allowedAccountIds.length ? sqlIdSet(scope!.allowedAccountIds).binds : []));
     } else {
       scopeClauses.push(scope!.canSeeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }

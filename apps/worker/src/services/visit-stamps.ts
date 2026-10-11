@@ -369,7 +369,12 @@ export async function processVisitStampQueue(env:Env['Bindings']) {
   catch {console.error(JSON.stringify({event:'visit_stamp_queue_unavailable'}));return;}
   for(const q of queue) {
     try {await reconcileStampVisit(db,q.kind,q.visit_id);await db.prepare('DELETE FROM visit_stamp_visit_queue WHERE kind=? AND visit_id=? AND generation=?').bind(q.kind,q.visit_id,q.generation).run();}
-    catch {console.error(JSON.stringify({event:'visit_stamp_reconcile_pending'}));}
+    catch {
+      // 失敗を先頭に固定しない。並走して積まれた新しい世代は触らない。
+      await db.prepare("UPDATE visit_stamp_visit_queue SET updated_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE kind=? AND visit_id=? AND generation=?")
+        .bind(q.kind,q.visit_id,q.generation).run().catch(()=>undefined);
+      console.error(JSON.stringify({event:'visit_stamp_reconcile_pending'}));
+    }
   }
 }
 

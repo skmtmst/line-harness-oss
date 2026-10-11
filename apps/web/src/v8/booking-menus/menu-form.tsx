@@ -298,6 +298,9 @@ export default function MenuFormV8() {
         setEditError(menusResult.status === 'fulfilled'
           ? 'このメニューは見つかりませんでした。消されたか、別のアカウントのものです。'
           : bookingErrorText(menusResult.reason, '読み込み'))
+      } else if (matricesResult.status === 'rejected' || staffResult.status === 'rejected') {
+        setEditStatus('error')
+        setEditError('担当を読み込めませんでした。もう一度読み込んでください。')
       } else {
         const matrices: Record<string, StaffMenuMatrix[]> = {}
         if (matricesResult.status === 'fulfilled') {
@@ -750,7 +753,7 @@ export default function MenuFormV8() {
         setEditError('このメニューは見つかりませんでした。消されたか、別のアカウントのものです。')
         return
       }
-      const bulk = await bookingApi.listStaffMenusBulk(selectedAccountId).catch(() => null)
+      const bulk = await bookingApi.listStaffMenusBulk(selectedAccountId)
       const matrices: Record<string, StaffMenuMatrix[]> = {}
       if (bulk) for (const entry of bulk.staff) matrices[entry.staff_id] = entry.matrix
       setEditTarget(target)

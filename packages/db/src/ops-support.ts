@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { queueKnowledgeStatement } from './platform-knowledge.js';
 import type { HqSupportKind, HqSupportRequest, HqSupportStatus } from './hq-support-requests.js';
@@ -201,11 +202,11 @@ export async function listSupportMessages(db: D1Database, requestId: string): Pr
 export async function countRepliesForRequests(db: D1Database, requestIds: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (requestIds.length === 0) return out;
-  const marks = requestIds.map(() => '?').join(',');
+  const marks = sqlIdSet(requestIds).sql;
   const { results } = await db
     .prepare(`SELECT request_id, COUNT(*) AS n FROM hq_support_messages
                WHERE author_kind = 'ops' AND request_id IN (${marks}) GROUP BY request_id`)
-    .bind(...requestIds)
+    .bind(...sqlIdSet(requestIds).binds)
     .all<{ request_id: string; n: number }>();
   for (const row of results ?? []) out.set(row.request_id, row.n);
   return out;

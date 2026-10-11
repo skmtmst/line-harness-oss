@@ -8,7 +8,7 @@ import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-util
 import styles from './drawer.module.css'
 import Dialog from './dialog'
 import { useFormInputDirty } from './form-input-dirty'
-import { useOverlayDiscard } from './overlay-discard'
+import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { drawerWidth } from './destination-policy'
 
 export type DrawerDetail = { label: string; value: ReactNode }
@@ -95,7 +95,7 @@ export default function Drawer({
       ref={(element) => { panelRef.current = element; formInput.ref.current = element }}
       onChangeCapture={formInput.onChangeCapture}
       onInputCapture={formInput.onChangeCapture}
-      onClickCapture={formInput.onClickCapture}
+      onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
       className={`${styles.panel} ${modal ? '' : styles.inline}`}
       role="dialog"
       aria-modal={modal || undefined}
@@ -131,12 +131,7 @@ export default function Drawer({
       </div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {band ? <div className={styles.band}>{band}</div> : null}
-      {footer ? <footer className={styles.footer} onClickCapture={(event) => {
-        const button = (event.target as Element).closest?.('button')
-        if (isDirty && button && /^(閉じる|キャンセル)$/.test(button.textContent?.trim() ?? '')) {
-          event.preventDefault(); event.stopPropagation(); discard.requestClose()
-        }
-      }}>{footer}</footer> : null}
+      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </aside>
   )
   const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null

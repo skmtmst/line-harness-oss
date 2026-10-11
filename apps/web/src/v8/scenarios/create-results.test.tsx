@@ -8,7 +8,7 @@
  *   「…」は配信中・止まっている行だけ、閲覧のみには置かない。配信失敗の行だけ「失敗を再送」。
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -118,6 +118,12 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         ...api.scenarios,
         create: (...args: unknown[]) => create(...args),
         runs: () => Promise.resolve({ success: true, data: runs }),
+        friendPlan: () => Promise.resolve({ success: true, data: {
+          scenarioId: 'sc-1', lineAccountId: 'account-a', friendId: 'f-unknown', friendName: '確認対象',
+          computedAt: '2026-10-11T01:00:00Z', sideEffects: false, basis: 'pinned',
+          subscription: { id: 'unknown', status: 'paused', currentStepOrder: 1, startedAt: '2026-10-01T01:00:00Z', nextDeliveryAt: null, pauseReason: 'delivery_unconfirmed' },
+          start: { state: 'blocked', reasons: [] }, steps: [], warnings: [],
+        } }),
       },
     },
   }
@@ -277,6 +283,27 @@ describe('作る①：書きかけをシナリオの下書きの口へ残す（�
 })
 
 describe('配信結果（X4STXS）', () => {
+  test('B-248: 送達不明は要確認と確認方法を出し、再開・再送・移動を出さない', async () => {
+    const uncertain = sub('unknown', '確認対象', 'paused', 1, 'delivery_unconfirmed')
+    runs.subscriptions.push(uncertain)
+    try {
+      search = 'id=sc-1'
+      render(<ScenarioResultsV8 />)
+      await screen.findByText('要確認')
+      expect(screen.getByText(/届いたか確認できないため/)).toBeTruthy()
+      expect(screen.getByText(/相手に到着を確認/)).toBeTruthy()
+      expect(screen.getByText('—（要確認）')).toBeTruthy()
+      expect(screen.queryByRole('button', { name: '確認対象のその他の操作' })).toBeNull()
+      expect(screen.getByRole('link', { name: 'トークの送信記録を確認' })).toBeTruthy()
+      const row = screen.getAllByRole('row').find(row => row.textContent?.includes('確認対象'))!
+      fireEvent.click(within(row).getByRole('button', { name: '予定を見る' }))
+      const dialog = await screen.findByRole('dialog')
+      await waitFor(() => expect(within(dialog).getByText('要確認')).toBeTruthy())
+      expect(within(dialog).queryByText('画面からの停止')).toBeNull()
+      expect(within(dialog).getByRole('link', { name: 'トークの送信記録を確認' }).getAttribute('href')).toBe('/chats?friend=f-unknown')
+    } finally { runs.subscriptions.pop() }
+  })
+
   test('状態の札・何通目まで・次に届く', async () => {
     search = 'id=sc-1'
     render(<ScenarioResultsV8 />)

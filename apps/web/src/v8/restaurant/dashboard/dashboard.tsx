@@ -140,8 +140,8 @@ function TodayStore() {
   let body
   if (d.loading && !d.snapshot) {
     body = <div className={styles.state}><ListState kind="loading" /></div>
-  } else if (d.error && !d.snapshot) {
-    body = <div className={styles.state}><ListState kind="error" error={d.error} onRetry={() => window.location.reload()} /></div>
+  } else if (d.error) {
+    body = <div className={styles.state}><ListState kind="error" title="お店の情報を読み込めませんでした" error={d.error} onRetry={() => void d.reload()} /></div>
   } else if (!d.store) {
     body = <div className={styles.state}><ListState kind="empty" title="店舗が登録されていません" description="統括から店舗を登録してください。" /></div>
   } else {

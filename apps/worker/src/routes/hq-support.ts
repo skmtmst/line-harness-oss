@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -174,8 +175,8 @@ hqSupport.get('/api/hq/support/context', async (c) => {
     let accountRows: Array<{ id: string; name: string }> = [];
     if (accounts.length > 0) {
       const rows = await c.env.DB
-        .prepare(`SELECT id, name FROM line_accounts WHERE id IN (${accounts.map(() => '?').join(',')}) AND COALESCE(tenant_id, ?) = ? ORDER BY name, id`)
-        .bind(...accounts.map((account) => account.id), DEFAULT_TENANT_ID, tenantId)
+        .prepare(`SELECT id, name FROM line_accounts WHERE id IN (${sqlIdSet(accounts.map(account => account.id)).sql}) AND COALESCE(tenant_id, ?) = ? ORDER BY name, id`)
+        .bind(...sqlIdSet(accounts.map(account => account.id)).binds, DEFAULT_TENANT_ID, tenantId)
         .all<{ id: string; name: string }>();
       accountRows = rows.results ?? [];
     }

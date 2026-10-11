@@ -27,6 +27,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
 /*
@@ -303,13 +304,15 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   const closeMemberDialog = useCallback(() => { setShowMemberForm(false); setEditingMemberId('') }, [])
   const accountId = selectedAccountId || ''
   const { gate, prompt, cancel } = useStepUpGate()
+  const [loginsError,setLoginsError]=useState(false)
+  const [loginsRetry,setLoginsRetry]=useState(0)
   const [logins, setLogins] = useState<RestaurantLoginMember[]>([])
   useEffect(() => {
     let current = true
     setLogins([])
-    if (accountId) void restaurantTestApi.loginMembers(accountId).then((res) => { if (current) setLogins(res.data) }).catch(() => { if (current) setLogins([]) })
+    if (accountId) void restaurantTestApi.loginMembers(accountId).then((res) => { if (current) {setLogins(res.data);setLoginsError(false)} }).catch(() => { if (current) setLoginsError(true) })
     return () => { current = false; cancel() }
-  }, [accountId, cancel])
+  }, [accountId, cancel,loginsRetry])
 
   /* 役割・停止の変更は本人確認（step-up）を挟むことがある（今の画面と同じ）。 */
   const updateMember = async (id: string, body: Record<string, unknown>) => {
@@ -384,6 +387,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
 
   return (
     <SaveErrorScope errors={saveErrors}><>
+      {loginsError?<ListState kind="error" title="ログインメンバーを読み込めませんでした" onRetry={()=>setLoginsRetry(n=>n+1)}/>:null}
       {readOnly ? (
         <ReadOnlyNotice role="note" />
       ) : null}

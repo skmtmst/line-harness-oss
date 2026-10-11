@@ -211,3 +211,12 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(host.querySelector('[aria-label="お気に入りにする"]')).toBeNull()
   })
 })
+
+it.each([false,true])('B-241：ライブラリの案件取得success:false（保管=%s）を空の案件と扱わない',async archived=>{
+ nav.query='tab=library'
+ listProjects.mockImplementation(async(params?:{archived?:boolean})=>Boolean(params?.archived)===archived?{success:false,error:'fixture failure'}:{success:true,data:[]})
+ await act(async()=>{root.render(<HqBannersListV8/>)})
+ await flush()
+ expect(host.querySelector('[data-list-state="error"]')).toBeTruthy()
+ expect(host.querySelector('[data-list-state="empty"]')).toBeNull()
+})

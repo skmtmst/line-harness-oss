@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const createDraft = vi.hoisted(() => vi.fn())
+const listExisting = vi.hoisted(()=>vi.fn().mockResolvedValue({success:true,data:[]}))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account' }) }))
 vi.mock('@/components/automations/use-common-action-permission', () => ({ useCanManageCommonActions: () => true }))
@@ -12,7 +13,7 @@ vi.mock('@/lib/api', async importOriginal => {
   return { ...actual, api: { ...actual.api, automations: {
     ...actual.api.automations,
     createDraftFromTemplate: createDraft,
-    list: vi.fn().mockResolvedValue({ success: true, data: [] }),
+    list: listExisting,
     draftResources: vi.fn().mockResolvedValue({ success: true, data: { tags: [{ id: 'tag', name: '予約希望' }], scenarios: [], commonActions: [] } }),
   } } }
 })
@@ -59,4 +60,13 @@ it('WEB-120: 何も変えていないキャンセルは未保存の確認を出�
   render(<NewAutomationV8 />)
   fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
   expect(screen.queryByRole('alertdialog')).toBeNull()
+})
+
+it('B-241：既存ルールの取得失敗を重複なしとして隠さず、再取得する',async()=>{
+ listExisting.mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({success:true,data:[{id:'existing',eventType:'friend_added'}]})
+ render(<NewAutomationV8/>)
+ const error=await screen.findByText('既存のルールを読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText('既存のルールを読み込めませんでした')).toBeNull())
+ expect(listExisting).toHaveBeenCalledTimes(2)
 })

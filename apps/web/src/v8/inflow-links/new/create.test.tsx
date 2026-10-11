@@ -202,3 +202,22 @@ describe('V8 流入リンクを作る', () => {
   })
 
 })
+
+it('B-241：分類候補の取得失敗を隠さず、入力を残して再取得する',async()=>{
+ const fixtureFetch=globalThis.fetch
+ let failed=true,reads=0
+ vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{
+   if(new URL(String(input)).pathname==='/api/entry-route-genres'){reads++;if(failed)throw new Error('fixture failure')}
+   return fixtureFetch(input,init)
+ })
+ await mount()
+ expect(host.textContent).toContain('候補を読み込めませんでした')
+ fireEvent.change(document.getElementById('ir-name')!,{target:{value:'入力を保持'}})
+ failed=false
+ await act(async()=>{(host.querySelector('[data-list-state="error"] button') as HTMLButtonElement).click()})
+ await flush()
+ expect(host.textContent).not.toContain('候補を読み込めませんでした')
+ expect((document.getElementById('ir-name') as HTMLInputElement).value).toBe('入力を保持')
+ expect(reads).toBe(2)
+ expect(posted).toHaveLength(0)
+})
