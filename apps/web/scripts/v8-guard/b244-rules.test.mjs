@@ -36,6 +36,11 @@ test('B-244の6種類を故障注入し、修正後は0。白い板の幅で2段
     assert.deepEqual(await page.evaluate(scan), [], '型と道具の内側余白を件数の左寄りと誤認しない')
     await page.setContent(shell(nested.replace('flex-end', 'flex-start')))
     assert.ok((await page.evaluate(scan)).some(f => f.kind === 'toolbar-count-position'), '内側余白があっても左へ回った件数は止める')
+    const withoutSearch = '<div data-list-toolbar style="width:900px;display:flex;justify-content:flex-start"><select data-page-size><option>20 件</option></select></div>'
+    await page.setContent(shell(withoutSearch))
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'toolbar-count-position'), '検索欄がなくても左へ回った件数は止める')
+    await page.setContent(shell(withoutSearch.replace('flex-start', 'flex-end')))
+    assert.deepEqual(await page.evaluate(scan), [], '検索欄がない場合も右端の件数は通す')
     await page.setContent(shell(cases['toolbar-count-position']).replace('main{width:900px}','main{width:1200px}'))
     assert.deepEqual(await page.evaluate(scan), [], '広い板の道具は1段を許す')
   } finally { await browser.close() }

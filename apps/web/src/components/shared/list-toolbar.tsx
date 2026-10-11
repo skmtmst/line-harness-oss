@@ -5,13 +5,19 @@ import { Fragment, Children, isValidElement, cloneElement, createContext, useCon
 import Select, { type SelectProps } from './select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
+import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
 
 /** 一覧型が狭い板の「作る・フォルダ」を検索と同じ段へ渡す。 */
 const LeadingContext = createContext<ReactNode>(null)
 const FrameContext = createContext(false)
 export function ListToolbarLeading({ children, leading }: { children: ReactNode; leading: ReactNode }) {
-  return <LeadingContext.Provider value={leading}>{children}</LeadingContext.Provider>
+  // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
+  const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? Children.toArray(children.props.children) : null
+  const needsFrame = nodes && !nodes.some(node => isValidElement(node) && (node.type === ListToolbar || node.type === ListToolbarFrame))
+  const tools = needsFrame ? <ListToolbarFrame>{nodes.map((node, index) => isValidElement(node) && node.type === ListToolbarRow
+    ? node : <ListToolbarRow key={isValidElement(node) ? node.key ?? index : index}>{node}</ListToolbarRow>)}</ListToolbarFrame> : children
+  return <LeadingContext.Provider value={leading}>{tools}</LeadingContext.Provider>
 }
 
 export type ListToolbarSearch = {
@@ -124,6 +130,7 @@ export function ListToolbarRow({ children, as: Tag = 'div', ...props }: HTMLAttr
 function toolbarRole(node: ReactNode): 'search' | 'filter' | 'sort' | 'count' {
   if (!isValidElement<{ children?: ReactNode; 'aria-label'?: string; label?: string }>(node)) return 'filter'
   if (node.type === ListToolbarSearchSlot || node.type === SearchField) return 'search'
+  if (node.type === PageSizeSelect) return 'count'
   if (node.type === ListToolbarSort) return 'sort'
   if (/表示件数|1ページ|件表示/.test(node.props['aria-label'] ?? node.props.label ?? '')) return 'count'
   if (/並び/.test(node.props['aria-label'] ?? node.props.label ?? '')) return 'sort'

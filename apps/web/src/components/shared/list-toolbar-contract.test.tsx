@@ -5,7 +5,8 @@ const read = (name: string) => readFileSync(new URL(name, import.meta.url), 'utf
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from './list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from './list-toolbar'
+import PageSizeSelect from './page-size-select'
 
 afterEach(cleanup)
 
@@ -41,6 +42,27 @@ describe('B-178 共通の道具の段の操作', () => {
     fireEvent.change(screen.getByRole('combobox', { name: '表示件数' }), { target: { value: '50件' } })
     expect(filter).toHaveBeenCalledOnce()
     expect(size).toHaveBeenCalledOnce()
+  })
+
+  it('字ラベルを省略した表示件数も共通の件数の役目として右端へ渡す', () => {
+    render(<ListToolbarRow><button>よく使う絞り込み</button><PageSizeSelect label={null} value={20} onChange={vi.fn()} /></ListToolbarRow>)
+    const count = screen.getByRole('button', { name: '表示件数' })
+    expect(count.closest('[data-toolbar-role="count"]')).toBeTruthy()
+    expect(count.closest('[data-toolbar-role="filter"]')).toBeNull()
+  })
+
+  it('断片の道具も型の口でまとめ、作る・検索・件数の役目とフォーム送信を保つ', () => {
+    const submit = vi.fn((event: React.FormEvent) => event.preventDefault())
+    render(<ListToolbarLeading leading={<button>タグを作る</button>}><>
+      <ListToolbarSearchSlot><input aria-label="タグを探す" /></ListToolbarSearchSlot>
+      <ListToolbarRow as="form" onSubmit={submit}><PageSizeSelect label={null} value={20} onChange={vi.fn()} /><button type="submit">検索する</button></ListToolbarRow>
+    </></ListToolbarLeading>)
+    const search = screen.getByRole('textbox', { name: 'タグを探す' })
+    expect(search.closest('[data-toolbar-role="search"]')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '表示件数' }).closest('[data-toolbar-role="count"]')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'タグを作る' })).toHaveLength(1)
+    fireEvent.submit(screen.getByRole('button', { name: '検索する' }).closest('form')!)
+    expect(submit).toHaveBeenCalledOnce()
   })
 
   it('フォームを共通の段へ移しても検索の送信と条件操作を保つ', () => {

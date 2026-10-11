@@ -43,11 +43,11 @@ export default function scanB244Rules() {
     if (board.getBoundingClientRect().width >= 1100) continue
     const search = toolbar.querySelector('[data-toolbar-search]')
     const counts = [...toolbar.querySelectorAll('[data-page-size], [data-per-page-select], [data-toolbar-role=count]')].filter(visible)
-    if (search && visible(search)) for (const count of counts) {
-      const c = count.getBoundingClientRect(), s = search.getBoundingClientRect(), t = toolbar.getBoundingClientRect()
+    for (const count of counts) {
+      const c = count.getBoundingClientRect(), s = search && visible(search) ? search.getBoundingClientRect() : null, t = toolbar.getBoundingClientRect()
       const style = getComputedStyle(toolbar)
       const right = t.right - (parseFloat(style.paddingRight) || 0) - (parseFloat(style.borderRightWidth) || 0)
-      if (c.top < s.bottom - 4 || right - c.right > 8) add('toolbar-count-position', count, '狭い板の表示件数は2段目の右端', { leftGap: Math.max(0, Math.ceil(right - c.right)), rowDeficit: Math.max(0, Math.ceil(s.bottom - c.top)) })
+      if (s && c.top < s.bottom - 4 || right - c.right > 8) add('toolbar-count-position', count, '狭い板の表示件数は2段目の右端', { leftGap: Math.max(0, Math.ceil(right - c.right)), rowDeficit: s ? Math.max(0, Math.ceil(s.bottom - c.top)) : 0 })
     }
     for (const button of toolbar.querySelectorAll('button')) if (visible(button) && /^(…|\.\.\.)$/.test(button.textContent.trim())) add('toolbar-unnamed-menu', button, '道具の名前を省略しない')
   }
