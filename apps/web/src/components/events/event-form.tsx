@@ -974,93 +974,25 @@ export function BulkSlotDialog({
     }
   }
 
-  return (
-    <Dialog
-      open
-      title="予約枠の一括追加"
-      onCancel={onClose}
-      onConfirm={() => void submit()}
-      confirmLabel="生成"
-      cancelLabel="キャンセル"
-      busy={busy}
-      error={err ?? undefined}
-    >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <label>
-              <span className="text-sm font-medium text-ink-secondary">開始日</span>
-              <DateField value={start} onChange={setStart} aria-label="開始日" className="mt-1" />
-            </label>
-            <label>
-              <span className="text-sm font-medium text-ink-secondary">終了日</span>
-              <DateField value={end} onChange={setEnd} aria-label="終了日" className="mt-1" />
-            </label>
-          </div>
-          <div>
-            <span className="text-sm font-medium text-ink-secondary block mb-1.5">曜日</span>
-            {/* R218: 色だけでなく aria-pressed で選択状態を読み上げに伝える。 */}
-            <div className="flex gap-1.5" role="group" aria-label="枠を作る曜日">
-              {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
-                <Button variant="secondary" className={(`flex-1 px-2 py-2 text-sm border rounded-control ${
-                    weekdays.includes(i)
-                      ? 'bg-action text-on-accent border-action'
-                      : 'border-hairline text-ink-secondary hover:bg-surface-pearl'
-                  }`) + ' h-auto whitespace-normal'} key={i} type="button" aria-pressed={weekdays.includes(i)} onClick={() => toggleWeekday(i)}>
-                  {d}
-                </Button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <span className="text-sm font-medium text-ink-secondary block mb-1.5">時刻パターン</span>
-            {patterns.map((p, i) => (
-              <div key={i} className="flex gap-2 mb-1.5 items-center">
-                <TimeField
-                  value={p.start}
-                  onChange={(v) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, start: v } : x)))}
-                  aria-label={`${i + 1}件目の開始`}
-                  className="flex-1"
-                />
-                <span className="text-ink-faint">〜</span>
-                <TimeField
-                  value={p.end}
-                  onChange={(v) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, end: v } : x)))}
-                  aria-label={`${i + 1}件目の終了`}
-                  className="flex-1"
-                />
-                {patterns.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setPatterns((ps) => ps.filter((_, j) => j !== i))}
-                    className="text-danger px-2"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => setPatterns((ps) => [...ps, { start: '14:00', end: '15:00' }])}
-              className="text-sm text-action hover:underline"
-            >
-              ＋ パターンを追加する
-            </button>
-          </div>
-          <label className="block">
-            <span className="text-sm font-medium text-ink-secondary">定員（各枠共通・空欄=無制限）</span>
-            <input
-              type="number"
-              min={1}
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
-              className="mt-1 w-full border border-hairline rounded-control px-3 py-2 text-sm"
-            />
-          </label>
-        </div>
-    </Dialog>
-  )
+  return <Dialog open title="予約枠の一括追加" onCancel={onClose} onConfirm={submit} confirmLabel="生成" cancelLabel="キャンセル" busy={busy} error={err ?? undefined}>
+    <Field label="開始日"><DateField value={start} onChange={setStart} aria-label="開始日" /></Field>
+    <Field label="終了日"><DateField value={end} onChange={setEnd} aria-label="終了日" /></Field>
+    <Field label="曜日">
+      <div role="group" aria-label="枠を作る曜日">
+        {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => <Button key={index}
+          variant={weekdays.includes(index) ? 'primary' : 'secondary'} aria-pressed={weekdays.includes(index)} onClick={() => toggleWeekday(index)}>{day}</Button>)}
+      </div>
+    </Field>
+    {patterns.map((pattern, index) => <FormSection key={index} id={`ev-form-pattern-${index}`} title={`${index + 1}件目の時刻パターン`}
+      action={patterns.length > 1 ? <Button variant="danger" aria-label={`${index + 1}件目のパターンを削除`} onClick={() => setPatterns((items) => items.filter((_, position) => position !== index))}>×</Button> : null}>
+      <Field label="開始"><TimeField value={pattern.start} aria-label={`${index + 1}件目の開始`} onChange={(value) => setPatterns((items) => items.map((item, position) => position === index ? { ...item, start: value } : item))} /></Field>
+      <Field label="終了"><TimeField value={pattern.end} aria-label={`${index + 1}件目の終了`} onChange={(value) => setPatterns((items) => items.map((item, position) => position === index ? { ...item, end: value } : item))} /></Field>
+    </FormSection>)}
+    <Button onClick={() => setPatterns((items) => [...items, { start: '14:00', end: '15:00' }])}>＋ パターンを追加する</Button>
+    <Field label="定員（各枠共通・空欄=無制限）"><TextInput type="number" min={1} value={capacity} onChange={(event) => setCapacity(event.target.value)} /></Field>
+  </Dialog>
 }
+
 
 // ----------------------------------------------------------------
 // Tab 3: Publish settings
@@ -1085,236 +1017,53 @@ function PublishTab({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tags])
-  return (
-    <div className="space-y-5">
-      <Checkbox
-        className="flex w-full gap-3 rounded-control border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
-        checked={draft.requires_approval === 1}
-        onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
-        description={<>ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />OFF: 定員空きがあれば即時確定</>}
-      >
-        承認制
-      </Checkbox>
-
-      <Field
-        label="承認の期限"
-        htmlFor="ev-approval-deadline"
-        note="期限を過ぎた申請は自動で期限切れになり、席を戻します。"
-      >
-        <Select
-          id="ev-approval-deadline"
-          aria-label="承認の期限"
-          value={String(draft.approval_deadline_hours)}
-          disabled={draft.requires_approval !== 1}
-          onChange={(value) => update('approval_deadline_hours', Number(value))}
-          options={APPROVAL_DEADLINE_OPTIONS}
-          size="full"
-        />
+  return <>
+    <FormSection id="ev-form-publish" title="公開設定">
+      <Checkbox checked={draft.requires_approval === 1} onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
+        description={<>ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />OFF: 定員空きがあれば即時確定</>}>承認制</Checkbox>
+      <Field label="承認の期限" htmlFor="ev-approval-deadline" note="期限を過ぎた申請は自動で期限切れになり、席を戻します。">
+        <Select id="ev-approval-deadline" aria-label="承認の期限" value={String(draft.approval_deadline_hours)} disabled={draft.requires_approval !== 1}
+          onChange={(value) => update('approval_deadline_hours', Number(value))} options={APPROVAL_DEADLINE_OPTIONS} size="full" />
       </Field>
-
-      <Checkbox
-        className="flex w-full gap-3 rounded-control border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
-        checked={draft.waitlist_enabled === 1}
-        onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
-        description={<>ON: 定員に達したあとも申込を受け、待ちとして記録する<br />OFF: 定員に達したら締め切る<br />待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。</>}
-      >
-        キャンセル待ちを受ける
-      </Checkbox>
-
-      <div>
-        {tagPruned ? (
-          <Notice
-            tone="warn"
-            message="選んでいたタグは、今のアカウントにないため外しました。選び直してください。"
-            onClose={() => setTagPruned(false)}
-            className="mb-2"
-          />
-        ) : null}
-        <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-ink-secondary">
-          公開対象
-        </label>
-        <EntitySelect kind="tag"
-          aria-label="公開対象"
-          id="ev-visible-tag"
-          value={draft.visible_tag_id ?? ''}
-          onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
-          options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ ...entityOptionMetadata(t), value: t.id, label: `${t.name} を持つ人だけ` }))]}
-        />
-        <p className="mt-1 text-xs text-ink-faint">
-          絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。
-          URL を直接開いても表示されません。
-        </p>
-      </div>
-
-      <div>
-        <label htmlFor="ev-entry-cutoff" className="mb-1.5 block text-sm font-medium text-ink-secondary">
-          申込の締め切り
-        </label>
-        {/*
-          EVENT-04: 選択肢は作成画面と同じ一覧(event-draft-shared)を使う。
-          保存値が選択肢に無いときは「保存済み：…」として出し、
-          先頭項目を選んだように見せない・別値へ無断変換しない。
-        */}
-        <Select
-          aria-label="申込の締め切り"
-          id="ev-entry-cutoff"
-          value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
-          onChange={(value) =>
-            update('entry_cutoff_hours_before', parseDeadlineSelect(value))
-          }
-          options={deadlineOptionsWithSaved(
-            EVENT_ENTRY_CUTOFF_OPTIONS,
-            draft.entry_cutoff_hours_before,
-          )}
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
-          キャンセル期限（友だち側）
-        </label>
-        {/*
-          EVENT-03: 保存値の意味は作成画面・Worker と同じ。
-          null=不可、0=開始直前まで、正数=開始N時間前。
-        */}
-        <Select
-          aria-label="キャンセル期限（友だち側）"
-          value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
-          onChange={(value) =>
-            update('cancel_deadline_hours_before', parseDeadlineSelect(value))
-          }
-          options={deadlineOptionsWithSaved(
-            EVENT_CANCEL_DEADLINE_OPTIONS,
-            draft.cancel_deadline_hours_before,
-          )}
-        />
-      </div>
-
-      <Checkbox
-        className="flex w-full gap-3 rounded-control border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
-        checked={draft.reminder_day_before_enabled === 1}
-        onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
-        description="前日 18:00 JST に LINE で通知"
-      >
-        前日リマインダ
-      </Checkbox>
-
-      <div>
-        <label className="text-ink mb-1.5 block text-sm font-medium">
-          開始 N 時間前リマインダ
-        </label>
-        <Select
-          aria-label="開始 N 時間前リマインダ"
-          value={draft.reminder_hours_before == null ? 'off' : String(draft.reminder_hours_before)}
-          onChange={(value) =>
-            update('reminder_hours_before', value === 'off' ? null : Number(value))
-          }
-          options={[
-            { value: 'off', label: '送信しない' },
-            { value: '1', label: '1 時間前' },
-            { value: '2', label: '2 時間前' },
-            { value: '3', label: '3 時間前' },
-            { value: '6', label: '6 時間前' },
-            { value: '24', label: '24 時間前' },
-          ]}
-        />
-      </div>
-
-      {/* 予約者向けカスタムメッセージ追記 */}
-      <div className="border-t border-hairline pt-5 space-y-4">
-        <div>
-          <div className="text-sm font-medium text-ink mb-1">予約者向けカスタムメッセージ</div>
-          <p className="text-xs text-ink-faint">
-            予約者だけに届く LINE 通知の末尾に追加されます（Zoom URL など）。空欄ならデフォルト文言のみ。
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-ink-secondary mb-1.5">
-            ✉️ 予約確定メッセージへの追記
-            <span className="ml-2 text-xs text-ink-faint">
-              {(draft.confirmation_message_extra ?? '').length} / 2,000
-            </span>
-          </label>
-          <textarea
-            value={draft.confirmation_message_extra ?? ''}
-            onChange={(e) => update('confirmation_message_extra', e.target.value || null)}
-            rows={3}
-            maxLength={2000}
-            placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/..."
-            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
-          />
-          <p className="text-xs text-ink-faint mt-1">確定通知（即時 / 後追い承認）の末尾に追加</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-ink-secondary mb-1.5">
-            リマインドメッセージへの追記
-            <span className="ml-2 text-xs text-ink-faint">
-              {(draft.reminder_message_extra ?? '').length} / 2,000
-            </span>
-          </label>
-          <textarea
-            value={draft.reminder_message_extra ?? ''}
-            onChange={(e) => update('reminder_message_extra', e.target.value || null)}
-            rows={3}
-            maxLength={2000}
-            placeholder="例: 開始 10 分前に同じ URL からご入室ください"
-            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
-          />
-          <p className="text-xs text-ink-faint mt-1">前日 / N 時間前のリマインド末尾に追加</p>
-        </div>
-      </div>
-
-      <hr className="border-hairline" />
-
-      <div>
-        <div className="text-sm font-medium text-ink-secondary mb-2">公開状態</div>
-        {/*
-          R218: 下書き/公開は二者択一なので、素のボタンではなく
-          共通の RadioCard（本物の input[type=radio]）にする。
-          読み上げとキーボードで選択状態が伝わる。
-        */}
-        <RadioCardGroup legend="公開状態" className="grid grid-cols-2 gap-2">
-          <RadioCard
-            name="event-publish-state"
-            value="draft"
-            checked={draft.is_published === 0}
-            onChange={() => update('is_published', 0)}
-            title="下書き"
-            note="友だちには見えない"
-          />
-          <RadioCard
-            name="event-publish-state"
-            value="published"
-            checked={draft.is_published === 1}
-            onChange={() => update('is_published', 1)}
-            title="公開する"
-            note="予約 URL が有効になる"
-          />
-        </RadioCardGroup>
-        <p className="text-xs text-ink-faint mt-2">
-          {draft.is_published === 1
-            ? '✓ 保存後、友だちに「予約 URL」を案内できます。'
-            : '保存しても友だちには表示されません。'}
-        </p>
-      </div>
-
-      <OgEditor
-        value={{
-          ogTitle: draft.og_title,
-          ogDescription: draft.og_description,
-          ogImageUrl: draft.og_image_url,
-        }}
-        onChange={(v) => {
-          update('og_title', v.ogTitle)
-          update('og_description', v.ogDescription)
-          update('og_image_url', v.ogImageUrl)
-        }}
-        autoTitle={draft.name || undefined}
-        autoDescription={draft.description ?? undefined}
-        autoImageUrl={draft.image_url ?? undefined}
-      />
-    </div>
-  )
+      <Checkbox checked={draft.waitlist_enabled === 1} onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+        description={<>ON: 定員に達したあとも申込を受け、待ちとして記録する<br />OFF: 定員に達したら締め切る<br />待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。</>}>キャンセル待ちを受ける</Checkbox>
+      {tagPruned ? <Notice tone="warn" message="選んでいたタグは、今のアカウントにないため外しました。選び直してください。" onClose={() => setTagPruned(false)} /> : null}
+      <Field label="公開対象" htmlFor="ev-visible-tag" note="絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。URL を直接開いても表示されません。">
+        <EntitySelect kind="tag" aria-label="公開対象" id="ev-visible-tag" value={draft.visible_tag_id ?? ''} onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
+          options={[{ value: '', label: '友だち全員' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `${tag.name} を持つ人だけ` }))]} />
+      </Field>
+      <Field label="申込の締め切り" htmlFor="ev-entry-cutoff">
+        <Select aria-label="申込の締め切り" id="ev-entry-cutoff" value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
+          onChange={(value) => update('entry_cutoff_hours_before', parseDeadlineSelect(value))} options={deadlineOptionsWithSaved(EVENT_ENTRY_CUTOFF_OPTIONS, draft.entry_cutoff_hours_before)} />
+      </Field>
+      <Field label="キャンセル期限（友だち側）">
+        <Select aria-label="キャンセル期限（友だち側）" value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
+          onChange={(value) => update('cancel_deadline_hours_before', parseDeadlineSelect(value))} options={deadlineOptionsWithSaved(EVENT_CANCEL_DEADLINE_OPTIONS, draft.cancel_deadline_hours_before)} />
+      </Field>
+      <Checkbox checked={draft.reminder_day_before_enabled === 1} onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)} description="前日 18:00 JST に LINE で通知">前日リマインダ</Checkbox>
+      <Field label="開始 N 時間前リマインダ">
+        <Select aria-label="開始 N 時間前リマインダ" value={draft.reminder_hours_before == null ? 'off' : String(draft.reminder_hours_before)}
+          onChange={(value) => update('reminder_hours_before', value === 'off' ? null : Number(value))}
+          options={[{ value: 'off', label: '送信しない' }, { value: '1', label: '1 時間前' }, { value: '2', label: '2 時間前' }, { value: '3', label: '3 時間前' }, { value: '6', label: '6 時間前' }, { value: '24', label: '24 時間前' }]} />
+      </Field>
+    </FormSection>
+    <FormSection id="ev-form-messages" title="予約者向けカスタムメッセージ" description="予約者だけに届く LINE 通知の末尾に追加されます（Zoom URL など）。空欄ならデフォルト文言のみ。">
+      <Field label="予約確定メッセージへの追記" count={{ value: (draft.confirmation_message_extra ?? '').length, max: 2000 }} note="確定通知（即時 / 後追い承認）の末尾に追加">
+        <TextArea value={draft.confirmation_message_extra ?? ''} onChange={(event) => update('confirmation_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/..." />
+      </Field>
+      <Field label="リマインドメッセージへの追記" count={{ value: (draft.reminder_message_extra ?? '').length, max: 2000 }} note="前日 / N 時間前のリマインド末尾に追加">
+        <TextArea value={draft.reminder_message_extra ?? ''} onChange={(event) => update('reminder_message_extra', event.target.value || null)} rows={3} maxLength={2000} placeholder="例: 開始 10 分前に同じ URL からご入室ください" />
+      </Field>
+    </FormSection>
+    <FormSection id="ev-form-publication" title="公開状態">
+      <RadioCardGroup legend="公開状態">
+        <RadioCard name="event-publish-state" value="draft" checked={draft.is_published === 0} onChange={() => update('is_published', 0)} title="下書き" note="友だちには見えない" />
+        <RadioCard name="event-publish-state" value="published" checked={draft.is_published === 1} onChange={() => update('is_published', 1)} title="公開する" note="予約 URL が有効になる" />
+      </RadioCardGroup>
+      <p>{draft.is_published === 1 ? '✓ 保存後、友だちに「予約 URL」を案内できます。' : '保存しても友だちには表示されません。'}</p>
+      <OgEditor value={{ ogTitle: draft.og_title, ogDescription: draft.og_description, ogImageUrl: draft.og_image_url }}
+        onChange={(value) => { update('og_title', value.ogTitle); update('og_description', value.ogDescription); update('og_image_url', value.ogImageUrl) }}
+        autoTitle={draft.name || undefined} autoDescription={draft.description ?? undefined} autoImageUrl={draft.image_url ?? undefined} />
+    </FormSection>
+  </>
 }
