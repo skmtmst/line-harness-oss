@@ -30,6 +30,8 @@ import { withPermissionFailure } from '@/components/shared/api-error-message';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Card from '@/components/shared/card'
 
 /*
  * ★V8 共通情報を作る（板 `p82v9`）。
@@ -459,7 +461,7 @@ export default function NewCommonVarV8() {
         <Notice tone="warn" message="共通情報を登録するLINEアカウントを選択してください。" />
       )}
 
-      <section className={styles.card} aria-labelledby="cv-new-name-heading">
+      <Card variant="form" gap="normal" aria-labelledby="cv-new-name-heading">
         <div className={styles.cardHead}>
           <h2 id="cv-new-name-heading" className={styles.cardTitle}>名前と差し込み名</h2>
         </div>
@@ -529,38 +531,36 @@ export default function NewCommonVarV8() {
           </div>
 <VarFieldError message={keyFieldError} />
 </Field></div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="cv-new-type-heading">
+      <Card variant="form" gap="normal" aria-labelledby="cv-new-type-heading">
         <div className={styles.cardHead}>
           <h2 id="cv-new-type-heading" className={styles.cardTitle}>種別と中身</h2>
           <p className={styles.cardNote}>種別は作ったあと変えられません</p>
         </div>
-        <div className={styles.typeGrid} role="radiogroup" aria-label="種別">
+        <RadioCardGroup legend="種別" className={styles.typeGrid}>
           {TYPES.map((entry) => {
             const Icon = entry.icon
             const checked = type === entry.key
             return (
-              <button
+              <RadioCard
                 key={entry.key}
-                type="button"
-                role="radio"
-                aria-checked={checked}
-                onClick={() => {
+                variant="form"
+                name="common-var-type"
+                value={entry.key}
+                checked={checked}
+                title={entry.label}
+                note={entry.desc}
+                icon={<Icon size={14} aria-hidden="true" />}
+                onChange={() => {
                   setType(entry.key)
                   setValue('')
                 }}
-                className={styles.typeCard}
-              >
-                <span className={styles.typeTop}>
-                  <Icon size={14} aria-hidden="true" />
-                  <span className={styles.typeLabel}>{entry.label}</span>
-                </span>
-                <span className={styles.typeDesc} title={entry.desc}>{entry.desc}</span>
-              </button>
+                onClick={() => setValue('')}
+              />
             )
           })}
-        </div>
+        </RadioCardGroup>
         <div className={styles.field}><Field density="input" label="中身" htmlFor="cv-value">{type === 'boolean' ? (
             <SaveErrorField names={["value"]}><Select size="full" aria-label="中身" id="cv-value" error={valueFieldError || undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
           ) : type === 'long_text' ? (
@@ -607,9 +607,9 @@ export default function NewCommonVarV8() {
             /></SaveErrorField>
           )}
 <VarFieldError message={valueFieldError} /></Field></div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="cv-new-period-heading">
+      <Card variant="form" gap="normal" aria-labelledby="cv-new-period-heading">
         <div className={styles.cardHead}>
           <h2 id="cv-new-period-heading" className={styles.cardTitle}>使える期間</h2>
           <p className={styles.cardNote}>空なら期間を決めません。予約した配信は、送り始める時刻で判断します</p>
@@ -642,7 +642,7 @@ export default function NewCommonVarV8() {
             )}
 <VarFieldError message={fallbackFieldError} /></Field></div>
         )}
-      </section>
+      </Card>
 
       <div className={styles.field}><Field density="input" label="社内メモ" htmlFor="cv-memo"><SaveErrorField names={["memo"]}><input
           id="cv-memo"
