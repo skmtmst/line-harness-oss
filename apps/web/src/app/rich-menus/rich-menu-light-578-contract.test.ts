@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const EDIT = readFileSync(new URL('./edit/page.tsx', import.meta.url), 'utf8')
-const CONNECTIONS = readFileSync(new URL('./connections/page.tsx', import.meta.url), 'utf8')
+const CONNECTIONS = readFileSync(new URL('../../v8/rich-menus/connections.tsx', import.meta.url), 'utf8')
 const CANVAS = readFileSync(
   new URL('../../components/rich-menus/canvas-editor.tsx', import.meta.url),
   'utf8',
