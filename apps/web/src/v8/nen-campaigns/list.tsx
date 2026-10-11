@@ -613,6 +613,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
     return [...counts.entries()].sort((a, b) => b[1] - a[1])
   }, [columns])
   const topCategory = categories[0] ?? null
+  const columnSetting = props.settings.find((setting) => setting.campaignKey === 'column')
   const publishedCount = columns.filter((c) => c.publishedAt != null).length
   const metricById = useMemo(() => new Map((columnMetrics?.columns ?? []).map((row) => [row.id, row])), [columnMetrics])
 
@@ -673,6 +674,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
                   items={[
                     ...categories.map(([name, count]) => ({ id: name, label: `${name} ${count}`, onSelect: () => { setCategory(name); setPage(1); setSavedOpen(false) } })),
                     ...(category ? [{ id: 'clear', label: '絞り込みを外す', onSelect: () => { setCategory(''); setPage(1); setSavedOpen(false) } }] : []),
+                    ...(canEdit && columnSetting ? [{ id: 'toggle-column', label: columnSetting.isEnabled ? 'コラム配信を止める' : 'コラム配信を動かす', disabled: props.saving === columnSetting.campaignKey, onSelect: () => { props.onToggleSetting(columnSetting); setSavedOpen(false) } }] : []),
                   ]}
                 />
               </span>
@@ -743,6 +745,7 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
         </>
       )}
       <SelectedColumn {...props} />
+      {columnSetting?.isEnabled === false && !props.selectedColumnId ? <Notice tone="warn" message="コラムの配信が停止中のため、いまは送れません。" /> : null}
     </div>
   )
 }
@@ -860,6 +863,7 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
   const limit = deliveryList?.pagination.limit ?? 20
   const total = deliveryList?.pagination.total ?? 0
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (searchTimer.current) clearTimeout(searchTimer.current) }, [])
 
   const changeQuery = (value: string) => {
     setQuery(value)
