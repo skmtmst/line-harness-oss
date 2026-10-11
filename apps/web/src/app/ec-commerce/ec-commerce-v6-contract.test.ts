@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const page = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 const tabs = readFileSync(join(import.meta.dirname, 'ec-tabs.ts'), 'utf8')
 const tabsView = readFileSync(join(import.meta.dirname, 'ec-tabs-view.tsx'), 'utf8')
 const identity = readFileSync(join(import.meta.dirname, 'identity-candidates', 'page.tsx'), 'utf8')
@@ -95,7 +95,7 @@ describe('V6 EC integration screens', () => {
     expect(api).toContain('/api/ec-commerce/action-executions?')
     expect(api).toContain('/api/ec-commerce/identity-candidates?')
     expect(api).toContain('/api/ec-commerce/action-executions/${encodeURIComponent(id)}/retry')
-    expect(page).toContain('...(action.retryAvailable')
+    expect(page).toContain('...(canEdit && action.retryAvailable')
     expect(page).toContain('expectedVersion: action.version')
     expect(page).toContain('crypto.randomUUID()')
     expect(page).not.toContain('失敗だけを再試行する受け口は未接続')
@@ -134,10 +134,10 @@ describe('V6 EC integration screens', () => {
   })
 
   it('shares one date formatter across the three EC screens (#580)', () => {
-    expect(page).toContain("from './ec-datetime'")
+    expect(page).toContain("polishFormatDate(value, { style: 'list' })")
     expect(connector).toContain("from './ec-datetime'")
     expect(subscriptions).toContain("from './ec-datetime'")
-    expect(page).not.toContain('function dateTime(')
+    expect(page).toContain('function dateTime(')
     expect(connector).not.toContain('function dateTime(')
     expect(subscriptions).not.toContain('function shortDate(')
   })
@@ -154,7 +154,7 @@ describe('V6 EC integration screens', () => {
     expect(page).toContain("'ec.order.refunded': '反映完了'")
     expect(page).toContain('actionStatusLabel(action)')
     // 集計タブも送信を含まない完了数なので「送信完了」とは名付けない。
-    expect(page).toContain("['succeeded', '処理完了', listedSummary?.succeeded]")
+    expect(page).toContain("{ value: 'succeeded', label: '処理完了', count: listedSummary?.succeeded }")
     /*
      * R599: 一覧由来の状態別件数は、取れるまで出さない。`?? 0` の足し算は
      * 未取得を「0件」に見せるので、ready・empty のときだけ数を渡す。

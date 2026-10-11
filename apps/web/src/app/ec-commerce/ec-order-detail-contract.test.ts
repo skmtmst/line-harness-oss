@@ -12,13 +12,13 @@ import { describe, expect, it } from 'vitest'
  *    を読み、権限なし・読み込み失敗を別々に出す。
  *  - 「もう一度やる」は一覧と同じ retry を使い、成功済みの処理は重ねない。
  */
-const page = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 const drawer = readFileSync(join(import.meta.dirname, 'order-detail-drawer.tsx'), 'utf8')
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('IDEA-23 注文の状況パネルの配線', () => {
   it('新しいページやタブを増やさず、行からDrawerを開く', () => {
-    expect(page).toContain("import OrderDetailDrawer from './order-detail-drawer'")
+    expect(page).toContain("import OrderDrawer from './order-drawer'")
     // #670 23: 隣の「中身を見る」と繋がって読めないよう動詞付きにする
     expect(page).toContain("label: '注文の状況を見る'")
     expect(page).not.toContain("label: '注文の状況'")

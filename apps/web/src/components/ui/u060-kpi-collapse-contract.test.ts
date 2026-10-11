@@ -80,7 +80,7 @@ describe('KPI折りたたみの適用（#975 U060）', () => {
     ['app/automations/runs/page.tsx', 'KpiBand'],
     // app/hq/page.tsx は V8 のホーム（v8/hq/home.tsx・絵どおりの数の帯）を出すだけになったので外した（2026-10-09 V7 削除）。
     ['v8/nen-campaigns/list.tsx', 'KpiBand'],
-    ['app/ec-commerce/page.tsx', 'KpiCollapse'],
+    ['v8/settings/ec-commerce/screen.tsx', 'KpiBand'],
     ['v8/settings/emergency/history-details.tsx', 'KpiBand'],
     ['v8/nen-members/members.tsx', 'KpiBand'],
     ['v8/nen-members/members.tsx', 'KpiBand'],

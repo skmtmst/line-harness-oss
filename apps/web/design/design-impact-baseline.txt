@@ -28,7 +28,6 @@ native-table-header-exception app/affiliates/tabs.tsx
 # ★V8 登録メディア一覧（O7hUt7）。札の操作・窓の確定・ページ送りの操作に共通Button。
 button-migration-target app/reminders/list-v8.tsx
 shared-button-importer app/accounts/migration.tsx
-shared-button-importer app/accounts/new/page.tsx
 shared-button-importer app/accounts/uid-migration-v8.tsx
 shared-button-importer app/affiliate-offers/new-offer-v8.tsx
 shared-button-importer app/affiliates/action-dialogs.tsx
@@ -66,7 +65,6 @@ shared-button-importer app/ec-commerce/connector-panel.tsx
 shared-button-importer app/ec-commerce/ec-connector-v8.tsx
 shared-button-importer app/ec-commerce/identity-candidates/page.tsx
 shared-button-importer app/ec-commerce/order-detail-drawer.tsx
-shared-button-importer app/ec-commerce/page.tsx
 shared-button-importer app/ec-commerce/subscriptions-panel.tsx
 shared-button-importer app/emergency/control-v8.tsx
 shared-button-importer v8/events/preview.tsx

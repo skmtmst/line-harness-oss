@@ -33,7 +33,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['運営へのお知らせ', '../../v8/settings/line-notifications/operator-tab.tsx'],
   ['NENキャンペーン 送った履歴', '../../v8/nen-campaigns/list.tsx'],
   ['コンバージョン', '../../v8/conversions/list.tsx'],
-  ['EC連携 取り込みの記録', '../../app/ec-commerce/page.tsx'],
+  ['EC連携 取り込みの記録', '../../v8/settings/ec-commerce/screen.tsx'],
   ['EC連携 会員のつき合わせ', '../../app/ec-commerce/identity-candidates/page.tsx'],
   ['EC連携 定期便', '../../app/ec-commerce/subscriptions-panel.tsx'],
   ['予約メニュー', '../../app/booking/menus/page.tsx'],
