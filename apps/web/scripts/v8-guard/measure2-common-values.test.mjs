@@ -16,3 +16,14 @@ test('本物の共通CSS: 通常ボタンは600、文字だけの操作は400。
   }
  }finally{await browser.close()}
 })
+
+test('本物の数の帯CSS: 単位は補足の18px。文字の大きさと数字は保つ',async()=>{
+ const css=readFileSync(new URL('../../src/components/shared/kpi-card.module.css',import.meta.url),'utf8')
+ const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
+ const browser=await chromium.launch()
+ try{
+  const page=await browser.newPage();await page.setContent(`<html data-theme="v8"><style>${globals}\n${css}</style><body><div class="card"><span class="number">12</span><span class="unit">件</span></div></body></html>`)
+  const values=await page.locator('.unit').evaluate(el=>{const s=getComputedStyle(el);return [s.fontSize,s.lineHeight,s.fontWeight]})
+  assert.deepEqual(values,['12px','18px','400'])
+ }finally{await browser.close()}
+})

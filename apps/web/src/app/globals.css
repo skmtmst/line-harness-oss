@@ -1399,7 +1399,7 @@
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: var(--polish-table-row); --tpl-ar-narrow-head-h: 34px;
   --tpl-badge-h: 22px; --tpl-badge-dot: 6px;
   --tpl-ro-band-pad: 12px 16px; --tpl-ro-band-gap: 12px; --tpl-ro-band-bg: #e9f1ff; --tpl-ro-band-radius: var(--polish-radius-control); --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
-  --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px;
+  --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px; --tpl-band-unit-lh: 18px;
   /* 外部連携（ZSbFY・AsfFB・l5SRfT・gW0F2・DxAAA・Uv9AA・SAUCs・hsD8e）。 */
   --tpl-wh-ro-row-pad: 12px 24px; --tpl-wh-notice-after: 6px; --tpl-wh-saved-w: 153px; --tpl-wh-create-w: 135px; --tpl-wh-create-after: 16px; --tpl-wh-add-space: 31px; --tpl-wh-note-lh: 17px;
   --tpl-wh-col-gap: 16px; --tpl-wh-head-h: var(--polish-table-head); --tpl-wh-head-pad: 13px 20px; --tpl-wh-row-h: var(--polish-table-row); --tpl-wh-row-pad: 9px 20px; --tpl-wh-num-pad-end: 8px;
