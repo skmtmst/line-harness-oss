@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const fx = vi.hoisted(() => ({ redeemQr: vi.fn(), closeWindow: vi.fn() }));
 vi.mock('../lib/api.js', () => ({
-  api: { bookingSettings: vi.fn().mockResolvedValue({ data: {} }), liffConfig: vi.fn().mockResolvedValue({ data: { accountId: 'acc-1', accountName: '店舗', botBasicId: '@shop' } }) },
+  api: { customerLook: vi.fn().mockResolvedValue({ success: true, data: { settings: { liff_theme: "line" } } }), bookingSettings: vi.fn().mockResolvedValue({ data: {} }), liffConfig: vi.fn().mockResolvedValue({ data: { accountId: 'acc-1', accountName: '店舗', botBasicId: '@shop' } }) },
   visitStampsApi: { redeemQr: fx.redeemQr },
 }));
 vi.mock('@line/liff', () => ({ default: { isInClient: () => true, closeWindow: fx.closeWindow } }));

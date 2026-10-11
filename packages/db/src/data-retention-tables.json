@@ -4331,5 +4331,39 @@
       "by": "lineAccount",
       "column": "line_account_id"
     }
+  },
+  "rt_reservation_confirmations": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_store_followup_templates": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_store_followup_step_bindings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_store_followup_templates",
+      "parentColumn": "store_id"
+    }
+  },
+  "scenario_source_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
   }
 }

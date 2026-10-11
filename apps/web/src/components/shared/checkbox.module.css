@@ -199,3 +199,6 @@
 [data-theme='v8'] .root { gap: 8px; }
 [data-theme='v8'] .box { gap: 0; }
 }
+
+/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+html[data-theme='v8'] .control, html[data-theme='v8'] .input { width: var(--choice-size); height: var(--choice-size); }

@@ -245,8 +245,8 @@
 [data-theme='v8'] .invalid .trigger { outline-color: var(--color-danger); }
 [data-theme='v8'] .chevron { flex-basis: 14px; }
 }
-/* ★V8 表示件数の選ぶ欄は幅96（c4n9Kr「選ぶ 表示件数」）。司令塔 2026-10-06 */
-[data-theme='v8'] .pageSize { width: 96px; min-width: 96px; }
+/* B-192: 表示件数は文字と矢印の幅を保つ。96では「20 件表示」が切れる。 */
+[data-theme='v8'] .pageSize { width: 100px; min-width: 100px; flex-shrink: 0; }
 
 /*
  * ★V8「枠なしの並び替え」（x6QsVz：枠なし文字＋上下矢印）。

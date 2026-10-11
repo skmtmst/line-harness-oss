@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
+
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
@@ -154,7 +157,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `mileage-history-${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }

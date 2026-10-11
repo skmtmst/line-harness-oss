@@ -69,7 +69,7 @@ export interface PreflightItem {
 }
 export interface Preflight {
   preflightId: string; expiresAt: string
-  stores: ({ accountId: string; accountName: string; items: PreflightItem[]; textOverride?: string } & import('@line-crm/shared').HqTemplatePreflightDisplay)[]
+  stores: ({ accountId: string; accountName: string; items: PreflightItem[]; warnings?: string[]; textOverride?: string } & import('@line-crm/shared').HqTemplatePreflightDisplay)[]
 }
 export interface Resolution { accountId: string; sourceId: string; mode: DistributionMode }
 export interface DistributionResult {

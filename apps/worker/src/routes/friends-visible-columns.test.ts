@@ -1,0 +1,42 @@
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { Hono } from 'hono';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { getFriendListFieldValues } from '@line-crm/db';
+import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { authMiddleware } from '../middleware/auth';
+import { friends } from './friends';
+import type { Env } from '../index';
+let f: SqliteD1, app: Hono<Env>;
+beforeEach(()=>{
+  f=createTestD1({foreignKeys:true});
+  for(const id of ['a','b']) f.raw.prepare('INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES(?,?,?,\'t\',\'s\',?)').run(id,id,id,DEFAULT_TENANT_ID);
+  f.raw.prepare("INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope) VALUES('owner','店長','owner','owner-key',?,'all'),('viewer','閲覧','staff','viewer-key',?,'all')").run(DEFAULT_TENANT_ID,DEFAULT_TENANT_ID);
+  f.raw.exec("UPDATE staff_members SET view_permission_keys='[\"/friends\"]' WHERE id='viewer'");
+  insertFriend(f.raw,'a-f',{line_account_id:'a'}); insertFriend(f.raw,'b-f',{line_account_id:'b'});
+  f.raw.exec(`INSERT INTO friend_fields(id,name,field_key,type,is_personal,status) VALUES('own','ペット','pet','text',0,'active'),('other','他店','other','text',0,'active'),('gone','削除済み','gone','text',0,'archived');
+    INSERT INTO friend_field_scopes(field_id,tenant_id,line_account_id,created_at) VALUES('own','${DEFAULT_TENANT_ID}','a','now'),('other','${DEFAULT_TENANT_ID}','b','now');
+    INSERT INTO friend_field_values(friend_id,field_id,value) VALUES('a-f','own','犬'),('a-f','other','漏らさない'),('a-f','gone','消された値'),('a-f','fixed-allergy','["卵","乳"]'),('a-f','fixed-name','秘密の名前');`);
+  app=new Hono<Env>();app.use('*',authMiddleware);app.route('/',friends);
+});
+afterEach(()=>{vi.restoreAllMocks();f.raw.close()});
+test('選んだ欄だけ・担当店だけ・非削除だけ返し、個人情報の権限を守る',async()=>{
+  const columns=['field:own','field:other','field:gone','fixed:allergy'];
+  const request=(key:string,cols=columns)=>app.request('/api/friends?lineAccountId=a&fieldColumns='+encodeURIComponent(JSON.stringify(cols)),{headers:{Authorization:'Bearer '+key}},{DB:f.db} as Env['Bindings']);
+  const owner=await request('owner-key'); expect(owner.status).toBe(200);
+  const body=await owner.json() as {data:{items:Array<{fieldValues:unknown}>}};
+  expect(body.data.items[0].fieldValues).toEqual({'field:own':'犬','fixed:allergy':'卵・乳'});
+  expect(await (await request('viewer-key')).json()).toMatchObject({data:{items:[{fieldValues:{'field:own':'犬'}}]}});
+  expect((await request('owner-key',Array(8).fill('fixed:name'))).status).toBe(422);
+  expect((await request('owner-key',['fixed:anniversary'])).status).toBe(422);
+  const bare=await app.request('/api/friends?lineAccountId=a',{headers:{Authorization:'Bearer owner-key'}},{DB:f.db} as Env['Bindings']);
+  expect(JSON.stringify(await bare.json())).not.toContain('fieldValues');
+});
+test('2,000件・7欄を一括取得し、bindは固定数・問い合わせは1回',async()=>{
+  const ids=Array.from({length:2000},(_,i)=>'perf-'+i);
+  f.raw.transaction(()=>{for(const id of ids){insertFriend(f.raw,id,{line_account_id:'a'});f.raw.prepare("INSERT INTO friend_field_values(friend_id,field_id,value) VALUES(?,'fixed-allergy','[\"卵\",\"乳\"]')").run(id)}})();
+  const prepare=vi.spyOn(f.db,'prepare');const started=performance.now();
+  const result=await getFriendListFieldValues(f.db,{friendIds:ids,columns:['fixed:name','fixed:kana','fixed:birthday','fixed:age','fixed:email','fixed:tel','fixed:allergy'],tenantId:DEFAULT_TENANT_ID,canSeePersonal:true});
+  const elapsed=performance.now()-started;
+  expect(prepare).toHaveBeenCalledOnce();expect(result.size).toBe(2000);expect(result.get(ids[1999])?.['fixed:allergy']).toBe('卵・乳');
+  expect(elapsed).toBeLessThan(1500);console.info(`2,000件 / 7欄: ${elapsed.toFixed(1)}ms / 1 query`);
+});

@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
+
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import Button from '@/components/shared/button'
@@ -83,7 +86,7 @@ function PetsInner() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `nen-pets-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `nen-pets-${jstDate()}.csv`
       a.click()
       URL.revokeObjectURL(url)
     } catch {

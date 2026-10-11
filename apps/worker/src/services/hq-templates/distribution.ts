@@ -15,7 +15,7 @@ import { type HqTemplateAuthority, type HqTemplateResolution, type HqTemplateAda
 import { getHqTemplateAdapter } from './registry.js';
 import { boundedText, HqTemplateError, inspectTags, parseTagDefinition, planTags, tagSnapshot } from './tag.js';
 import { parseMessageTemplateDefinition } from './template.js';
-import { FormTemplateError, inspectFormTemplate, inspectFormTemplateReferences, parseFormTemplateDefinition } from './form.js';
+import { formTemplateWarnings, FormTemplateError, inspectFormTemplate, inspectFormTemplateReferences, parseFormTemplateDefinition } from './form.js';
 import { parseRichMenuTemplateDefinition } from './rich-menu.js';
 import { executeFormStore, HqRuntimeError } from './runtime.js';
 import { executeR2RuntimeStore, HqR2RuntimeError, inspectR2RuntimeStore, reconcileFailedOwnedImages } from './runtime-r2.js';
@@ -220,7 +220,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
       statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, fixedRichReferenceMode, item.targetId, item.expectedRevision] });
     }
     const targetVersion = await targetDistributionVersion(db, authority.tenantId, id, account.id, latest.version);
-    stores.push({ accountId: account.id, accountName: account.name, items, targetVersion, ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
+    stores.push({ accountId: account.id, accountName: account.name, items, targetVersion, ...(form ? {warnings: await formTemplateWarnings(db, account.id, input)} : {}), ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
   }
   for (const account of accounts) statements.unshift(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [account.id, authority.tenantId]));
   await batch(db, statements);

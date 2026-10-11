@@ -111,7 +111,7 @@ export async function saveBookingPaymentMenuSetting(
 export interface BookingPaymentRecord {
   id: string;
   line_account_id: string;
-  booking_id: string;
+  booking_id: string | null;
   amount: number;
   currency: string;
   status: BookingPaymentStatus;

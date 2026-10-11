@@ -36,13 +36,13 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     expect(html).toContain('aria-expanded="false"')
   })
 
-  it('権限で許可されない操作は呼び出し側が渡さず、行は詰まる', () => {
+  it('権限で許可されない編集は出さず、全行にその他操作の入口を残す', () => {
     const html = renderToStaticMarkup(
       <RowActions subjectName="閲覧のみ" detail={{ href: '/x' }} />,
     )
     expect(html).toContain('詳細')
     expect(html).not.toContain('編集')
-    expect(html).not.toContain('その他操作')
+    expect(html).toContain('その他操作')
   })
 
   it('行き先が役割と違うときはラベルを明記できる', () => {
@@ -108,35 +108,12 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     expect(buttonCss).toMatch(/\.compact\s*{[^}]*height:\s*32px/s)
   })
 
-  it('「⋯」が無い行でも同じ幅の場所を取り、主ボタンの位置を全行でそろえる', () => {
-    /*
-     * 一斉配信の送信済み行は「⋯」が無く、主ボタン「詳細」だけが
-     * 右へずれて行ごとにそろわなかった。メニュー無しでも「⋯」
-     * と同じ幅の場所取りを置き、詳細の位置をそろえる。
-     * （CSSは実ブラウザで効く。vitestはCSSを読まないため、
-     * 場所取りの有無は描画結果・大きさはCSS文面で見る。）
-     */
-    const without = renderToStaticMarkup(
-      <RowActions subjectName="送信済みの配信" detail={{ href: '/broadcasts/detail?id=s1' }} />,
-    )
-    const withMenu = renderToStaticMarkup(
-      <RowActions
-        subjectName="下書きの配信"
-        detail={{ href: '/broadcasts/detail?id=d1' }}
-        menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]}
-      />,
-    )
-    // メニュー無しでも場所取りがある（見せない・読ませない）。
-    expect(without).toContain('data-more-placeholder')
-    expect(without).toContain('aria-hidden="true"')
-    // 本物の「⋯」がある行には場所取りを置かない（二重に幅を取らない）。
-    expect(withMenu).toContain('その他操作')
-    expect(withMenu).not.toContain('data-more-placeholder')
-    // 場所取りは「⋯」ボタンと同じ大きさ（32px・指では44px）。
-    const css = read('row-actions.module.css')
-    expect(css).toMatch(/\.morePlaceholder\s*{[^}]*width:\s*32px/s)
-    expect(css).toMatch(/\.morePlaceholder\s*{[^}]*height:\s*32px/s)
-    expect(css).toMatch(/@media \(pointer: coarse\)\s*{[\s\S]*?\.morePlaceholder\s*{[^}]*width:\s*44px/s)
-    expect(css).toMatch(/@media \(pointer: coarse\)\s*{[\s\S]*?\.morePlaceholder\s*{[^}]*height:\s*44px/s)
+  it('B-199：項目がない行も同じその他操作の入口を持つ', () => {
+    const without = renderToStaticMarkup(<RowActions subjectName="送信済み" detail={{ href: '/broadcasts/detail?id=s1' }} />)
+    const withMenu = renderToStaticMarkup(<RowActions detail={{ href: '/broadcasts/detail?id=d1' }} menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]} />)
+    for (const html of [without, withMenu]) {
+      expect(html).toContain('data-row-menu')
+      expect(html).not.toContain('data-more-placeholder')
+    }
   })
 })

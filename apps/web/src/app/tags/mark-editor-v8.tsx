@@ -27,7 +27,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、保管の小窓は `fy5dz`）。
+ * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、確認画面は `fy5dz`）。
  *
  * v7（components/friend-fields/support-mark-editor.tsx）と動きは同じで、
  * 置き場だけを V8 の絵へ合わせる。段は「基本」「自動で変えるきまり」。
@@ -561,7 +561,7 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
                 <section className={styles.infoBand}>
                   <Archive size={14} aria-hidden="true" className={styles.infoBandIcon} />
                   <p>
-                    保管すると、新しく付けられなくなります。いま付いている人は、保管の小窓で選ぶマークへ置き換わり、履歴に残ります。
+                    保管すると、新しく付けられなくなります。いま付いている人は、確認画面で選ぶマークへ置き換わり、履歴に残ります。
                   </p>
                 </section>
               ) : null}

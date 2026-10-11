@@ -38,7 +38,7 @@ const MAX_GUESTS = 100
 
 function addDays(day: Date, days: number): Date {
   const next = new Date(day)
-  next.setDate(next.getDate() + days)
+  next.setTime(next.getTime() + days * 86_400_000)
   return next
 }
 

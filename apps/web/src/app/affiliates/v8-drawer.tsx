@@ -1,5 +1,7 @@
 'use client'
 
+import { jstMonthRange } from '@/lib/jst-datetime'
+
 /*
  * ★V8-B アフィリエイターの明細の引き出し（右から出る480px）。
  * 「成果を見る」で開き、リンク・案件別・友だちの動線・報酬の約束を中で見る。
@@ -170,11 +172,7 @@ export default function AffiliateDrawerV8({
   const loadSettlement = useCallback(async (id: string) => {
     if (!accountId) { setSettlement(null); return }
     try {
-      const now = new Date()
-      const period = {
-        periodFrom: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString(),
-        periodTo: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(),
-      }
+      const period = jstMonthRange()
       const res = await api.affiliates.settlementPreview(accountId, period)
       if (!res.success || !Array.isArray(res.data.affiliates)) { setSettlement(null); return }
       const mine = res.data.affiliates.find((item) => item.affiliateId === id) ?? null

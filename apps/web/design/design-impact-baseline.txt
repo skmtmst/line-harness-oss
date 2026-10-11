@@ -194,7 +194,6 @@ shared-button-importer app/nen-campaigns/edit/page.tsx
 shared-button-importer app/nen-campaigns/nen-campaigns-v8.tsx
 shared-button-importer app/nen-campaigns/nen-overview.tsx
 shared-button-importer app/nen-campaigns/page.tsx
-shared-button-importer app/nen-members/photo-policy-history-v8.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx
 shared-button-importer app/nen-members/photo-review-v8.tsx
 shared-button-importer app/nen/health/health-v8.tsx
@@ -471,7 +470,6 @@ shared-button-importer v8/inflow-links/coupon-settings.tsx
 shared-button-importer v8/inflow-links/bulk-dialog.tsx
 shared-button-importer v8/inflow-links/edit-route-dialog.tsx
 shared-button-importer v8/inflow-links/list.tsx
-shared-button-importer v8/inflow-links/qr-dialog.tsx
 shared-button-importer v8/inflow-links/ad-connection-dialog.tsx
 shared-button-importer v8/inflow-links/ads.tsx
 shared-button-importer v8/inflow-links/detail.tsx
@@ -770,3 +768,6 @@ shared-button-importer components/shared/reservation-board.tsx
 shared-button-importer components/shared/restaurant-floor-editor.tsx
 shared-button-importer v8/visit-stamps/qr.tsx
 shared-button-importer v8/restaurant/reservations/waitlist.tsx
+# B-234〜238：アレルギー・統括本文・お客さまデザインの共通操作。
+shared-button-importer components/shared/allergy-field.tsx
+shared-button-importer v8/settings/customer-look/screen.tsx

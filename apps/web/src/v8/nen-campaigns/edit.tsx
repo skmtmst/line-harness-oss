@@ -19,6 +19,7 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import TimeField from '@/components/shared/time-field-v8'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
+import { MessageBody } from '@/components/shared/message-insert-row'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -119,7 +120,6 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [testTarget, setTestTarget] = useState('')
   const [testing, setTesting] = useState(false)
   const [pendingCount, setPendingCount] = useState<number | null>(null)
-  const [insertOpen, setInsertOpen] = useState(false)
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
   const staffRole = useStaffRole()
@@ -524,12 +524,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <SaveErrorField names={["nen-message-kind"]}><Radio name="nen-message-kind" checked={!kindIsRich} readOnly disabled={kindIsRich}>文字だけ</Radio></SaveErrorField>
         </div>
         <div className={styles.field}>
-          <span className={styles.labelRow}>
-
-            <span className={styles.labelNote}>差し込み：友だち情報欄「ペットの名前」・注文の「商品名」</span>
-            {canEdit ? <button type="button" className={styles.labelAside} aria-expanded={insertOpen} onClick={() => setInsertOpen((current) => !current)}>{insertOpen ? '差し込みを閉じる' : '差し込む'}</button> : null}
-          </span>
-          <Field label="配信本文" htmlFor="nen-edit-body"><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><InsertTextField
+          <Field label="配信本文" htmlFor="nen-edit-body"><MessageBody><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><InsertTextField
             id="nen-edit-body"
             aria-invalid={Boolean((validationSubmitted || !bodyCheck.fits) && bodyError)}
             aria-describedby={(validationSubmitted || !bodyCheck.fits) && bodyError ? 'nen-edit-body-error' : undefined}
@@ -539,10 +534,11 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             onValueChange={(next) => setDraft((previous) => ({ ...previous, bodyText: next }))}
             aria-label="配信本文"
             compact
-          /></SaveErrorField></Field>
-          {insertOpen && canEdit ? (
-            <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
+          /></SaveErrorField>
+          {canEdit ? (
+            <InsertToolbar targetRef={bodyRef} value={merged.bodyText} count={`${formatNumber(merged.bodyText.length)} / ${bodyLimitLabel}`} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
           ) : null}
+          </MessageBody></Field>
           <FieldError id="nen-edit-body-error">{(validationSubmitted || !bodyCheck.fits) ? bodyError : undefined}</FieldError>
           {!bodyError && bodyRemaining <= BODY_NOTICE_REMAINING ? (
             <p className={styles.muted}>あと{formatNumber(bodyRemaining)}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
