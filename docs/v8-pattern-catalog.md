@@ -928,3 +928,40 @@
 - アレルギーは固定8つ目・複数の札・店の選択肢＋自由入力。フォームの「書いてもらう」3行目で、保存先を変えない（B-235・B-238）。
 - **見つけ方**：固定7つ・1152で5列・仮の「お店の情報欄」の固定候補・一覧に無制限の列・横送り・アレルギー1行テキストを探す。
 - **見張り**：`customer-info-panel.test.tsx`・`display-items-dialog.test.tsx`、V8の列数・はみ出し検査。**要る動作確認**：追加・削除した項目、列上限、並べ替え、値の出どころ、複数アレルギー、店と統括のフォームの継承。文書の掲載だけで実装合格とはしない。
+
+<a id="b244"></a>
+## B-244 必須・任意、行の組、狭い板の道具
+
+- **持ち主**：`shared/form-controls`のField・RequiredBadge、`lib/form-requirement`と`use-form-errors`の検査定義。行の組は`shared/action-menu`（RowMenuも同じ順を使う）、道具は`shared/list-toolbar`とListPageBodyが渡す先頭の口。
+- **決まり**：§6.43・B-244。必須と検査を共有、欄下の理由と読み上げ、見る→整理→停止・削除と線・5項目から見出し、狭い白い板の2段と右端の件数。
+- **見張り**：`b244-behavior.test.tsx`、`action-menu-v7-contract.test.tsx`（V8へ更新）、`list-toolbar-contract.test.tsx`、`scripts/v8-guard/b244-rules-browser.mjs`。既存の頭・道具・表の値はmatch2が持ち、新しい口だけを追加する。
+
+<a id="screen-explanation"></a>
+## screen-explanation この画面の説明（B-245）
+
+- **持ち主**：`shared/screen-explanation.tsx`・CSS、型のPageHeading（一覧・作る・詳細・設定・分析から共通に使う）。画面はhelpと必要ならexplanationKeyだけを渡す。
+- **形と動き**：題の横に青い文字と矢印、下に灰色・角8・12pxの文。初回は開き、担当者IDと画面・タブごとに開閉を保存。今だけの知らせと危ない操作の確認は残す。
+- **Pen**：B-245採用見本pkrzG。部品IDと合格の記録は司令塔。
+- **見張り**：`b244-behavior.test.tsx`、`page-heading-rules.test.tsx`、verify:design。
+
+<a id="save-feedback"></a>
+## save-feedback 保存の4つの状態（B-246 D1）
+
+- **持ち主**：`shared/save-feedback.tsx`。useSaveFeedbackが二重開始と状態、SaveFeedbackが結果とやり直しの口を持つ。画面は工程の完了記録と最新の版を持ち、入力を残して残りだけ送る。
+- **見張り**：共通動作試験、予約ルールのpartial-save、イベントcreate-recovery、マイルreward-partial-save。成功分のAPIを再送しないことを実行回数と版で確かめる。
+- **Pen**：B-246採用見本y45k2。今回の対象はD1。
+
+<a id="friend-filter-band"></a>
+## friend-filter-band お客さまで絞った一覧の帯（B-247 E1）
+
+- **持ち主**：`shared/friend-filter-band.tsx`・CSS。顔・絞り込み対象・全員を見る・右端の友だち詳細へ戻る。名前は表示だけ、URLはIDだけ。
+- **適用**：取得済みの登録IDで全ページから絞るリマインダ。APIの無い一覧は機能待ち表へ。API・DBは作らない。
+- **見張り**：共通動作試験と`lib/friend-reminder-list`の全ページ・途中失敗の試験。
+- **Pen**：B-247採用見本ggPZt。共通部品IDは司令塔。
+
+<a id="aggregation-status"></a>
+## aggregation-status 集計の状態（B-247 E2）
+
+- **持ち主**：`shared/aggregation-status.tsx`。未集計・集計中・失敗・完成、開始時刻・データの時点と再試行。ファネル・クロス分析・成果レポートは状態と実行の口だけを渡す。
+- **見張り**：共通動作試験、分析の404と同時開始の試験。データの時点が無い応答は未取得と表示し、時刻を捏造しない。
+- **Pen**：B-247採用見本ggPZt。共通部品IDと合格の記録は司令塔。
