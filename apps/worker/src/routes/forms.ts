@@ -1,3 +1,4 @@
+import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
@@ -518,7 +519,7 @@ function expectedSubmitStepNames(input: {
     && (webhookData as Record<string, unknown>).join_url) {
     steps.push('meet_link');
   }
-  steps.push('reply', 'destination_status');
+  steps.push('automation', 'reply', 'destination_status');
   return steps;
 }
 
@@ -2960,7 +2961,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     const updateDestinationWriteResult = async (result: FormDestinationWriteResult): Promise<void> => {
       if (claimCtx && claimDone('destination_status')) {
         const current = await getFormSubmissionById(c.env.DB, submission.id);
-        if (current && current.destination_write_status !== 'pending') return;
+        if (current && ['succeeded','not_requested'].includes(current.destination_write_status)) return;
       }
       try {
         const status = await updateFormSubmissionDestinationWriteResult(c.env.DB, submission.id, result);
@@ -3177,13 +3178,6 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
           subjectKey: formId,
           occurredAt: submission.created_at,
         }),
-        dispatchAutomationEventWithLogging(c.env.DB, {
-          lineAccountId: identity.lineAccountId,
-          eventType: 'form_submitted',
-          sourceEventId: submission.id,
-          friendId,
-          eventData: { formId, submissionId: submission.id },
-        }),
         // R150: 送信Webhookの購読対象としても発火する。回答の中身は
         // 個人情報を含むので送らず、識別子とフォーム名だけ渡す。
         fireOutgoingWebhooks(c.env.DB, 'form_submitted', {
@@ -3313,6 +3307,7 @@ async function runFormPostEffects(input: {
   const claim = input.claim;
   const now = jstNow();
   const done = (step: string) => claim?.done(step) ?? false;
+  let registrationsReady = true;
 
   if (!done('mileage')) {
     // 付与の呼び出しは失敗を握らない。DB が落ちていれば投げて、
@@ -3402,6 +3397,7 @@ async function runFormPostEffects(input: {
     // 実行した分だけを数えても重ならない。
     let layoutStats: Record<string, { attempted: number; succeeded: number; failed: number }> = {};
     if (claim) layoutStats = await claim.readLayoutStats();
+    const completedThisRun = { attempted: 0, succeeded: 0, failed: 0 };
     effectRuns.push({
       step: 'layout_effects',
       run: () => applyFormLayoutEffects({
@@ -3421,6 +3417,7 @@ async function runFormPostEffects(input: {
         skipEffect: (effectId) => done(`layout:${effectId}`),
         onEffectComplete: async (effectId, delta) => {
           if (!claim) return;
+          for (const key of ['attempted','succeeded','failed'] as const) completedThisRun[key] += delta[key];
           const prev = layoutStats[effectId] ?? { attempted: 0, succeeded: 0, failed: 0 };
           const merged = {
             attempted: prev.attempted + delta.attempted,
@@ -3477,6 +3474,9 @@ async function runFormPostEffects(input: {
           totals.succeeded += stats.succeeded;
           totals.failed += stats.failed;
         }
+        for (const key of ['attempted','succeeded','failed'] as const) {
+          totals[key] += result.destinationWrites[key] - completedThisRun[key];
+        }
         destinationWriteResult = totals;
         // 欠落した工程があれば完了にせず、再送・再実行で補完する。
         if (result.failedEffects.length > 0) {
@@ -3498,11 +3498,28 @@ async function runFormPostEffects(input: {
   if (!layout) {
     effectRuns.push({
       step: 'legacy_fields',
-      run: () => writeLegacyFriendFields(db, form as DbForm, submissionData, friendId).then((result) => {
-        destinationWriteResult = result;
-      }),
+      run: async () => {
+        await writeFormDestinationsOnce({ db, friendId, sourceKey: `form-submit:${submission.id}`, blockId: 'legacy',
+          stats: destinationWriteResult,
+          write: async (ownedDb, stats) => { Object.assign(stats, await writeLegacyFriendFields(ownedDb, form as DbForm, submissionData, friendId)); },
+        });
+      },
     });
   }
+
+  // B-249: evaluate conditions only after every customer registration succeeded.
+  // This checkpoint also gives both resubmission and staff retry the same recovery path.
+  effectRuns.push({
+    step: 'automation',
+    run: async () => {
+      if (!registrationsReady) throw new Error('form_registration_incomplete');
+      await dispatchAutomationEventWithLogging(db, {
+        lineAccountId: input.expectedLineAccountId, eventType: 'form_submitted',
+        sourceEventId: submission.id, friendId,
+        eventData: { formId: input.formId, submissionId: submission.id },
+      });
+    },
+  });
 
   // Add tag — guarded attach so a tag_added-triggered scenario fires on
   // first-time submit (and never re-fires on duplicate submits).
@@ -3686,6 +3703,7 @@ async function runFormPostEffects(input: {
       await effect.run();
     } catch (error) {
       if (error instanceof ClaimOwnershipLost) throw error;
+      if (['metadata','layout_effects','legacy_fields'].includes(effect.step)) registrationsReady = false;
       console.error('Form side-effect failed:', error);
       continue;
     }
@@ -3696,7 +3714,7 @@ async function runFormPostEffects(input: {
   const recordDestinationWrite = async (): Promise<void> => {
     if (claim?.done('destination_status')) {
       const current = await getFormSubmissionById(db, submission.id);
-      if (current && current.destination_write_status !== 'pending') return;
+      if (current && ['succeeded','not_requested'].includes(current.destination_write_status)) return;
     }
     try {
       const status = await updateFormSubmissionDestinationWriteResult(db, submission.id, destinationWriteResult);
