@@ -16,7 +16,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TargetMissing from '@/components/shared/target-missing'
-import { richMenuError, richMenuErrorAll } from '@/v8/rich-menus/errors';
+import { richMenuError, richMenuErrorAll, unpublishWarningText } from '@/v8/rich-menus/errors';
 import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model';
 import styles from './detail.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
@@ -259,6 +259,11 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     try {
       const res = await api.richMenuGroups.unpublish(groupId)
       if (!res.success) throw new Error(res.error)
+      const warningTexts = [...new Set((res.data?.warnings ?? []).map(unpublishWarningText))]
+      if (warningTexts.length > 0) {
+        setDialogError(`LINE上のメニュー登録を取り下げました。ただし、${warningTexts.join(' / ')}。最新の状態を確認して、もう一度お試しください。`)
+        return
+      }
       setUnpublishOpen(false)
       router.push('/rich-menus')
     } catch (caught) {

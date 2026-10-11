@@ -245,6 +245,14 @@ type Group = {
   pages: Page[]
 }
 
+/** 古い口や途中の応答を、そのまま編集用の型に断定しない。 */
+function isGroupResponse(value: unknown): value is Group {
+  if (!value || typeof value !== 'object') return false
+  return 'id' in value && typeof value.id === 'string'
+    && 'name' in value && typeof value.name === 'string'
+    && 'pages' in value && Array.isArray(value.pages)
+}
+
 type CheckState = 'ok' | 'ng' | 'yet'
 type PrepublishState = {
   self: { state: 'ok' | 'ng'; message: string | null }
@@ -537,6 +545,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [audience, setAudience] = useState<'all' | 'targeted' | 'none'>('all')
   const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
   const [targetingPriority, setTargetingPriority] = useState(0)
+  const [priorityOpen, setPriorityOpen] = useState(false)
+  const [priorityInput, setPriorityInput] = useState('1')
   const [defaultOpen, setDefaultOpen] = useState(true)
 
   /* 手順④ */
@@ -586,7 +596,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false)
 
   const accountId = selectedAccount?.id ?? null
-  useEffect(() => { setPublishConfirmOpen(false) }, [accountId, group?.id])
+  useEffect(() => { setPublishConfirmOpen(false); setPriorityOpen(false) }, [accountId, group?.id])
   candidateAccountRef.current = accountId
   const pendingMediaAccountRef = useRef(accountId)
   useEffect(() => {
@@ -785,11 +795,11 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setEditLoad('loading')
     try {
       const res = await api.richMenuGroups.get(editGroupId)
-      if (!res.success || !res.data || !Array.isArray((res.data as Group).pages)) {
+      if (!res.success || !isGroupResponse(res.data)) {
         setEditLoad('missing')
         return
       }
-      hydrate(res.data as Group)
+      hydrate(res.data)
       setEditLoad('ready')
     } catch (caught) {
       saveErrors.capture(caught)
@@ -2030,6 +2040,13 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         </div>
       </Dialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="メニューの入力" onConfirm={confirmLeaveAndDiscard} onCancel={cancelLeave} />
+      <Dialog open={priorityOpen} title="出す順番" description="一覧で上にあるメニューが優先されます。1がいちばん先です。"
+        confirmLabel="順番を変える" onConfirm={() => {
+          setTargetingPriority(Math.max(0, (parseInt(priorityInput, 10) || 1) - 1))
+          setPriorityOpen(false)
+        }} onCancel={() => setPriorityOpen(false)}>
+        <Field label="出す順番" htmlFor="rm-edit-priority"><NumberInput numericText id="rm-edit-priority" inputMode="numeric" min={1} step={1} unit="番目" value={priorityInput} onChange={event => setPriorityInput(event.target.value)} /></Field>
+      </Dialog>
       <ConfirmDialog
         open={publishConfirmOpen}
         title="公開の確認"
@@ -2503,7 +2520,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         ) : null}
         {host ? null : <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <div className={`flex flex-col ${styles.stackCompact}`}>
-            <SectionHeader title="出す順番" />
+            <SectionHeader title="出す順番" actions={editGroupId && canOperate ? <Button type="button" variant="text" size="inline" onClick={() => {
+              setPriorityInput(String(targetingPriority + 1)); setPriorityOpen(true)
+            }}>順番を変える</Button> : undefined} />
             <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます</p>
           </div>
           {orderRows.length > 0 ? (

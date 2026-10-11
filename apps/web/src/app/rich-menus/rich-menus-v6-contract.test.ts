@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 // 「LINE上にあるメニュー」の取り込み画面は external-import.tsx（★V7・★V8 で共有）。
 const PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
   + readFileSync(join(HERE, '../../v8/rich-menus/external-import.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const EDIT_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const PUBLISHER = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'lib', 'rich-menu-publisher.ts'),
   'utf8',
@@ -71,10 +71,10 @@ describe('V6リッチメニューの画面契約', () => {
 
   it('編集画面も一覧と同じ1番始まりの出す順番を案内する', () => {
     expect(EDIT_PAGE).toContain('出す順番')
-    expect(EDIT_PAGE).toContain('一覧で上にあるメニューが優先されます。現在は')
-    expect(EDIT_PAGE).toContain('{targetingPriority + 1}番目です。')
-    expect(EDIT_PAGE).toContain('value={targetingPriority + 1}')
-    expect(EDIT_PAGE).toContain("Math.max(0, (parseInt(e.target.value, 10) || 1) - 1)")
+    expect(EDIT_PAGE).toContain('一覧で上にあるメニューが優先されます。1がいちばん先です。')
+    expect(EDIT_PAGE).toContain('setPriorityInput(String(targetingPriority + 1))')
+    expect(EDIT_PAGE).toContain('value={priorityInput}')
+    expect(EDIT_PAGE).toContain("Math.max(0, (parseInt(priorityInput, 10) || 1) - 1)")
     expect(EDIT_PAGE).not.toContain('数が小さいほうが先に出ます。')
   })
 })
