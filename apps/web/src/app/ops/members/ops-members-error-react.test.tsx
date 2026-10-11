@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsMembersPage from './page'
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 /**
  * #1058: メンバー管理の初回読み込み。
  * `fetchApi` は 4xx/5xx を例外で投げる。生の `Promise.all` だと拒否がそのまま

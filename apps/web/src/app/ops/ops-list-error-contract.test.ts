@@ -17,7 +17,7 @@ const LIST_PAGES = [
   { name: 'tenants', path: 'tenants/page.tsx', empty: '該当する契約先がありません' },
   { name: 'announcements', path: 'announcements/page.tsx', empty: 'まだお知らせはありません' },
   { name: 'audit', path: 'audit/page.tsx', empty: '記録がありません' },
-  { name: 'members', path: 'members/page.tsx', empty: '運営メンバーがいません' },
+  { name: 'members', path: '../../v8/ops/members.tsx', empty: '運営メンバーがいません' },
 ]
 
 describe.each(LIST_PAGES)('$name の一覧', ({ path, empty }) => {
@@ -38,7 +38,7 @@ describe.each(LIST_PAGES)('$name の一覧', ({ path, empty }) => {
 
 describe('例外を投げる API の受け方', () => {
   it('メンバー管理は Promise.all の中でも opsCall を通す', () => {
-    const page = read('members/page.tsx')
+    const page = read('../../v8/ops/members.tsx')
     expect(page).toContain('Promise.all([opsCall(api.ops.members()), opsCall(api.ops.me())])')
     expect(page).not.toContain('Promise.all([api.ops.members()')
   })

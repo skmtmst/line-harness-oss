@@ -60,17 +60,18 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('<Td align="right">')
   })
 
-  it('/ops/members：名前・メールは幅を切らずに吸収する', () => {
-    const body = code(read('app', 'ops', 'members', 'page.tsx'))
-    expect(body).not.toContain('<Th className="w-72">名前</Th>')
-    expect(body).not.toContain('<Th className="w-52">メール</Th>')
+  it('/ops/members：名前は残りの幅を使い、名前とメールの全文を確認できる', () => {
+    const body = code(read('v8', 'ops', 'members.tsx'))
+    expect(body).toContain('className={parts.grow} role="cell" title={m.name}')
+    expect(body).toContain('styles.colMail}`} role="cell" title={m.email')
+    expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.grow\s*\{[^}]*min-width: 0;[^}]*flex: 1;/)
   })
 
   it('/ops/dashboard：契約先で吸収し、使用率は右へ寄せる', () => {
-    const body = code(read('app', 'ops', 'dashboard', 'page.tsx'))
-    expect(body).toContain('<Th>上限に近い契約先</Th>')
-    expect(body).toContain('<Th className="w-28" align="right">使用率</Th>')
-    expect(body).toContain('<Td align="right">')
+    const body = code(read('v8', 'ops', 'dashboard.tsx'))
+    expect(body).toContain('className={parts.grow}>契約先</span>')
+    expect(body).toContain('parts.num} ${styles.colRate}')
+    expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.num\s*\{[^}]*text-align: right;/)
   })
 
   it('/nen-campaigns：操作列はボタンがはみ出さない幅にする', () => {
@@ -132,7 +133,8 @@ describe('表の外側の余白の洗い出し', () => {
   })
 
   it('/ops/members：自分自身の行にも「—」を置き、右端を空にしない', () => {
-    const body = code(read('app', 'ops', 'members', 'page.tsx'))
-    expect(body).toContain('<span className="text-ink-faint text-xs">—</span>')
+    const body = code(read('v8', 'ops', 'members.tsx'))
+    expect(body).toContain('self || readOnly ? (')
+    expect(body).toContain('<span className={styles.faint}>{emptyValue(\'unknown\')}</span>')
   })
 })
