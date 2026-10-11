@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { readFolderAssignment } from './folder-assignment.js';
 import { jstNow } from './utils.js';
 import { FRIEND_ADD_WINNER_SUBQUERY } from './affiliate-report.js';
@@ -44,9 +45,9 @@ function affiliateScopeSql(scope: AffiliateScope, alias = ''): {
   const binds: unknown[] = [scope.tenantId];
   if (scope.allowedLineAccountIds.length > 0) {
     accountParts.push(
-      `${column('line_account_id')} IN (${scope.allowedLineAccountIds.map(() => '?').join(', ')})`,
+      `${column('line_account_id')} IN (${sqlIdSet(scope.allowedLineAccountIds).sql})`,
     );
-    binds.push(...scope.allowedLineAccountIds);
+    binds.push(...(scope.allowedLineAccountIds.length ? sqlIdSet(scope.allowedLineAccountIds).binds : []));
   }
   if (scope.includeUnassigned) accountParts.push(`${column('line_account_id')} IS NULL`);
   return {

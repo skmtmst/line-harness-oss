@@ -84,8 +84,8 @@ describe('Meet consultation account boundary', () => {
 
     expect(response.status).toBe(200);
     const query = queries.find((item) => item.sql.includes('FROM meet_consultations c'))!;
-    expect(query.sql).toContain('f.line_account_id IN (?)');
-    expect(query.binds).toEqual(['confirmed', 'confirmed', 'account-a']);
+    expect(query.sql).toContain('f.line_account_id IN (SELECT value FROM json_each(?))');
+    expect(query.binds).toEqual(['confirmed', 'confirmed', JSON.stringify(['account-a'])]);
   });
 
   test('rejects another-account registration before changing reminders', async () => {

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 /**
  * account_settings table helpers.
  *
@@ -44,9 +45,9 @@ export async function getAccountSettings(
   const result = await db
     .prepare(
       `SELECT key, value FROM account_settings
-       WHERE line_account_id = ? AND key IN (${unique.map(() => '?').join(',')})`,
+       WHERE line_account_id = ? AND key IN (${sqlIdSet(unique).sql})`,
     )
-    .bind(accountId, ...unique)
+    .bind(accountId, ...(unique.length ? sqlIdSet(unique).binds : []))
     .all<{ key: string; value: string }>();
   return Object.fromEntries(result.results.map((row) => [row.key, row.value]));
 }

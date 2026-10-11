@@ -7,6 +7,7 @@ import type {
   FriendBulkRunSummary,
   FriendBulkSelection,
 } from '@line-crm/shared';
+import { idChunks } from './id-queries.js';
 
 interface RunRow {
   id: string;
@@ -174,8 +175,8 @@ export async function createFriendBulkRun(
       (id, run_id, actor_staff_id, action, created_at) VALUES (?, ?, ?, 'requested', ?)`)
       .bind(crypto.randomUUID(), runId, input.createdBy, input.now));
   }
-  for (let offset = 0; offset < input.targets.length; offset += 50) {
-    const chunk = input.targets.slice(offset, offset + 50);
+  let offset = 0;
+  for (const chunk of idChunks(input.targets, 0, 7)) {
     const values: unknown[] = [];
     const rows = chunk.map((target, index) => {
       const ordinal = offset + index;
@@ -190,6 +191,7 @@ export async function createFriendBulkRun(
          (id, run_id, friend_id, line_account_id, ordinal, status, idempotency_key, updated_at)
        VALUES ${rows.join(',')}`,
     ).bind(...values));
+    offset += chunk.length;
   }
   statements.push(db.prepare(
     `UPDATE friend_bulk_runs SET status = ?, target_count = ?, updated_at = ?

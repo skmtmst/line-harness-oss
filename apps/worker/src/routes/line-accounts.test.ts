@@ -1403,7 +1403,7 @@ describe('GET /api/line-accounts/summary', () => {
     const res = await app.request('/api/line-accounts/summary');
 
     expect(res.status).toBe(200);
-    expect(bind).toHaveBeenCalledWith('acc-1');
+    expect(bind).toHaveBeenCalledWith(JSON.stringify(['acc-1']));
     await expect(res.json()).resolves.toMatchObject({
       success: true,
       data: { uniqueFriendCount: 37 },

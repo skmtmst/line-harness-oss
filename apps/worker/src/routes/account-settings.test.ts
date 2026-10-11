@@ -250,7 +250,7 @@ describe('PUT /api/account-settings/test-recipients', () => {
 
     expect(response.status).toBe(400);
     expect(prepare).toHaveBeenCalledTimes(1);
-    expect(bind).toHaveBeenCalledWith('line-account-1', 'friend-1', 'friend-other');
+    expect(bind).toHaveBeenCalledWith('line-account-1', JSON.stringify(['friend-1', 'friend-other']));
   });
 
   test('空配列は友だち照合をせず保存できる', async () => {

@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { BROADCAST_APPROVE_KEY } from '@line-crm/shared';
 import { createNotification, type Broadcast } from '@line-crm/db';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
@@ -62,8 +63,8 @@ export async function getBroadcastApprovalThreshold(
   if (accountIds.length === 0) return BROADCAST_APPROVAL_THRESHOLD_DEFAULT;
   try {
     const rows = await db.prepare(
-      `SELECT value FROM account_settings WHERE key = ? AND line_account_id IN (${accountIds.map(() => '?').join(',')})`,
-    ).bind(BROADCAST_APPROVAL_THRESHOLD_KEY, ...accountIds)
+      `SELECT value FROM account_settings WHERE key = ? AND line_account_id IN (${sqlIdSet(accountIds).sql})`,
+    ).bind(BROADCAST_APPROVAL_THRESHOLD_KEY, ...(accountIds.length ? sqlIdSet(accountIds).binds : []))
       .all<{ value: string }>();
     const values = (rows.results ?? [])
       .map((row) => Number(row.value))

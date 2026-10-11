@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 // Booking availability calculation.
 // `computeSlots` is a pure function over Interval[]; `getAvailability`
 // is the high-level entry point that fetches working hours, busy intervals,
@@ -647,7 +648,7 @@ async function loadAvailabilityData(
   if (!staffRows.results.length) return { kind: 'no_staff' };
 
   const staffIds = staffRows.results.map((s) => s.id);
-  const placeholders = staffIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(staffIds).sql;
 
   const [businessHours, menuResources, exceptionsResult, settingsRow] = await Promise.all([
     db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
@@ -717,7 +718,7 @@ async function loadAvailabilityData(
         WHERE staff_id IN (${placeholders})
           AND work_date BETWEEN ? AND ?`,
     )
-    .bind(...staffIds, params.from, params.to)
+    .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []), params.from, params.to)
     .all<{ staff_id: string; work_date: string; start_time: string; end_time: string }>();
 
   const rules = await db
@@ -726,7 +727,7 @@ async function loadAvailabilityData(
          FROM staff_availability_rules
         WHERE staff_id IN (${placeholders}) AND is_active = 1`,
     )
-    .bind(...staffIds)
+    .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []))
     .all<{ staff_id: string; weekday: number; start_time: string; end_time: string }>();
 
   // R164: 曜日指定・日付指定の休憩。勤務区間から差し引くため、
@@ -737,7 +738,7 @@ async function loadAvailabilityData(
          FROM staff_breaks
         WHERE staff_id IN (${placeholders})`,
     )
-      .bind(...staffIds)
+      .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []))
       .all<BreakRow>(),
     db.prepare(
       `SELECT staff_id, work_date, start_time, end_time
@@ -745,7 +746,7 @@ async function loadAvailabilityData(
         WHERE staff_id IN (${placeholders})
           AND work_date BETWEEN ? AND ?`,
       )
-      .bind(...staffIds, params.from, params.to)
+      .bind(...(staffIds.length ? sqlIdSet(staffIds).binds : []), params.from, params.to)
       .all<BreakDateRow>(),
   ]);
   const breaks = weeklyBreaks.results ?? [];

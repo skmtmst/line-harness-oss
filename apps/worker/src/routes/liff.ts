@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import {accountCustomerLook} from '../services/customer-look.js';
 import {customerLookPublicSettings,DEFAULT_CUSTOMER_LOOK} from '@line-crm/shared';
@@ -102,11 +103,11 @@ async function analyticsAccountScope(c: Context<Env>, lineAccountId?: string) {
       return { where: `AND ${alias}.line_account_id = ?`, binds: [lineAccountId] };
     }
     const where = scope.allowedAccountIds.length
-      ? `AND (${alias}.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${alias}.line_account_id IS NULL` : ''})`
+      ? `AND (${alias}.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ` OR ${alias}.line_account_id IS NULL` : ''})`
       : scope.canSeeUnassigned
         ? `AND ${alias}.line_account_id IS NULL`
         : 'AND 1 = 0';
-    return { where, binds: scope.allowedAccountIds };
+    return { where, binds: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [] };
   };
   return { ...forAlias('f'), for: forAlias };
 }

@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -18,7 +19,7 @@ meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', '
   }
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const accountWhere = scope.allowedAccountIds.length
-    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    ? `AND (f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
     : scope.canSeeUnassigned
       ? 'AND f.line_account_id IS NULL'
       : 'AND 1 = 0';
@@ -38,7 +39,7 @@ meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', '
         GROUP BY c.id
         ORDER BY c.starts_at ASC`,
     )
-    .bind(status, status, ...scope.allowedAccountIds)
+    .bind(status, status, ...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []))
     .all();
   return c.json({ success: true, data: result.results ?? [] });
 });

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { applyMediaUsageMutation } from './media.js';
 // テンプレート管理クエリヘルパー
@@ -952,8 +953,8 @@ export async function getTemplatesWithUsageCount(
     if (filter.folderIds.length === 0) {
       filters.push('1 = 0');
     } else {
-      filters.push(`folder_id IN (${filter.folderIds.map(() => '?').join(',')})`);
-      values.push(...filter.folderIds);
+      filters.push(`folder_id IN (${sqlIdSet(filter.folderIds).sql})`);
+      values.push(...(filter.folderIds.length ? sqlIdSet(filter.folderIds).binds : []));
     }
   }
   if (filter?.quick === 'reservation' || filter?.quick === 'ec') {
@@ -964,9 +965,9 @@ export async function getTemplatesWithUsageCount(
   if (scope) {
     if (scope.accountIds.length > 0) {
       filters.push(
-        `(line_account_id IN (${scope.accountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
+        `(line_account_id IN (${sqlIdSet(scope.accountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
       );
-      values.push(...scope.accountIds);
+      values.push(...(scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : []));
     } else {
       filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }
@@ -1134,9 +1135,9 @@ export async function getTemplateFolderCounts(
   if (scope) {
     if (scope.accountIds.length > 0) {
       filters.push(
-        `(line_account_id IN (${scope.accountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
+        `(line_account_id IN (${sqlIdSet(scope.accountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
       );
-      values.push(...scope.accountIds);
+      values.push(...(scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : []));
     } else {
       filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }

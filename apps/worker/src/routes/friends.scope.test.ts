@@ -143,7 +143,7 @@ describe('A-8 friends tenant scope', () => {
     const prepared: Array<{ sql: string; binds: unknown[] }> = [];
     expect((await createApp(prepared).request(path)).status).toBe(200);
     expect(mocks.getScope).toHaveBeenCalled();
-    expect(prepared.some(({ sql, binds }) => sql.includes('line_account_id IN (?)') && binds.includes('own'))).toBe(true);
+    expect(prepared.some(({ sql, binds }) => sql.includes('line_account_id IN (SELECT value FROM json_each(?))') && binds.includes(JSON.stringify(['own'])))).toBe(true);
   });
 
   test('own-tenant friend remains available', async () => {

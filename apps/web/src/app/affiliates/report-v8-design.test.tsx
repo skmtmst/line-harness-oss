@@ -7,11 +7,21 @@
  * - 行：いちばん多い案件、成果・売上、報酬（先月より）の差分、操作の見出しなし
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+
+// 見本を作る前に時計を固定。日付以外の待ち合わせは実時間で動かす。
+vi.hoisted(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-11T15:09:00Z'))
+})
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-11T15:09:00Z'))
+})
+afterEach(() => vi.useRealTimers())
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-const now = new Date()
-const thisMonth = now.toISOString()
-const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15).toISOString()
+const thisMonth = '2026-10-12T00:09:00+09:00'
+const lastMonth = '2026-09-15T12:00:00+09:00'
 
 const ITEMS = [
   {

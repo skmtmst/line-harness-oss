@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import {
   captureStoppedDefinitions,
   holdExpiredBroadcasts,
@@ -581,8 +582,8 @@ export async function listOperationIncidents(
   const binds: unknown[] = [];
   if (options.includeGlobal) clauses.push("scope_key = '*'");
   if (options.accountIds.length > 0) {
-    clauses.push(`line_account_id IN (${options.accountIds.map(() => '?').join(',')})`);
-    binds.push(...options.accountIds);
+    clauses.push(`line_account_id IN (${sqlIdSet(options.accountIds).sql})`);
+    binds.push(...(options.accountIds.length ? sqlIdSet(options.accountIds).binds : []));
   }
   if (clauses.length === 0) return [];
   const limit = Math.max(1, Math.min(Math.floor(options.limit ?? 100), 200));

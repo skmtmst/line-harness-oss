@@ -8,7 +8,7 @@
  *   - 宛先台帳: 人の言葉の札・一時的な失敗だけの絞り込み・旧配信の捏造禁止。
  *   - 記録: 操作と承認を時刻順に混ぜて返す。追記だけ（消さない）。
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index';
 import type { AuthenticatedStaff } from '../middleware/auth';
@@ -169,6 +169,37 @@ describe('10の状態（#816）', () => {
     seedClaim(testDb, 'f1', 'failed', { errorCode: 'line_http_400' });
     seedClaim(testDb, 'f2', 'failed', { errorCode: 'line_http_429' });
     expect(await displayStatusOf(testDb, 'b1')).toMatchObject({ displayStatus: 'failed', label: '失敗' });
+  });
+
+  it('SCALE-01 配信本文と宛先台帳は表示ページの分だけを読む', async () => {
+    for(let i=0;i<250;i++) seedBroadcast(testDb, `synthetic-${i}`, { status: 'draft' });
+    let hydrated=0;
+    const ledgerBindings:number[]=[];
+    const original=testDb.db.prepare.bind(testDb.db);
+    vi.spyOn(testDb.db,'prepare').mockImplementation(sql=>{
+      const wrap=(stmt:D1PreparedStatement):D1PreparedStatement=>new Proxy(stmt,{
+        get(target,key,receiver){
+          if(key==='bind')return(...args:unknown[])=>{
+            if(sql.includes('GROUP BY broadcast_id'))ledgerBindings.push(args.length);
+            return wrap(target.bind(...args));
+          };
+          if(key==='all')return async()=>{const result=await target.all<Record<string,unknown>>();
+            hydrated+=result.results.filter(row=>'message_content' in row).length;
+            return result;
+          };
+          return Reflect.get(target,key,receiver);
+        },
+      });
+      return wrap(original(sql));
+    });
+    const res=await app(testDb.db).request('/api/broadcasts?limit=20');
+    expect(res.status).toBe(200);
+    const body=await res.json() as {data:unknown[];pagination:{total:number;nextCursor:string};statusCounts:{all:number;draft:number}};
+    expect(body.data).toHaveLength(20);
+    expect(body.pagination).toMatchObject({total:250,nextCursor:'20'});
+    expect(body.statusCounts).toMatchObject({all:250,draft:250});
+    expect(hydrated).toBe(20);
+    expect(Math.max(...ledgerBindings)).toBeLessThanOrEqual(20);
   });
 
   it('一覧にも10の状態が載る', async () => {

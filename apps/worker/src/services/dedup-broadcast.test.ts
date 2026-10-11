@@ -1115,3 +1115,13 @@ describe('processMultiAccountDedupBroadcast per-account common vars (N-184)', ()
     }
   });
 });
+
+it('SCALE-02 仲間: 201店舗と201件の優先順でも変数上限を超えない', async () => {
+  const seed = createTestD1();
+  try {
+    const ids = Array.from({ length: 201 }, (_, i) => `synthetic-${i}`);
+    const result = await computeDedupBroadcastPreview(seed.db, ids, [...ids].reverse());
+    expect(result.totalSelected).toBe(0);
+    expect(result.perAccount).toHaveLength(201);
+  } finally { seed.raw.close(); }
+});

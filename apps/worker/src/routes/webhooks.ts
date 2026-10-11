@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
@@ -786,10 +787,10 @@ webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin
       safeJson<string[]>(item.candidate_friend_ids_json, [])))];
     const candidateNames = new Map<string, string | null>();
     if (candidateIds.length > 0) {
-      const placeholders = candidateIds.map(() => '?').join(', ');
+      const placeholders = sqlIdSet(candidateIds).sql;
       const rows = await c.env.DB.prepare(
         `SELECT id, display_name FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`,
-      ).bind(lineAccountId, ...candidateIds).all<{ id: string; display_name: string | null }>();
+      ).bind(lineAccountId, ...(candidateIds.length ? sqlIdSet(candidateIds).binds : [])).all<{ id: string; display_name: string | null }>();
       for (const row of rows.results ?? []) candidateNames.set(row.id, row.display_name);
     }
     return c.json({

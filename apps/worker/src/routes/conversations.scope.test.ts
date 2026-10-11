@@ -49,8 +49,8 @@ test('default tenant list filters its accounts and includes unassigned rows', as
   const run = requestList();
   expect((await run.response).status).toBe(200);
   const listQuery = run.sqlCalls.find((call) => call.sql.includes('SELECT\n        f.id AS friend_id'));
-  expect(listQuery?.sql).toMatch(/line_account_id IN \(\?\).*line_account_id IS NULL/s);
-  expect(listQuery?.bindings).toContain('a1');
+  expect(listQuery?.sql).toMatch(/line_account_id IN \(SELECT value FROM json_each\(\?\)\).*line_account_id IS NULL/s);
+  expect(listQuery?.bindings).toContain(JSON.stringify(['a1']));
 });
 
 test('non-default tenant list filters its accounts and excludes unassigned rows', async () => {
@@ -60,9 +60,9 @@ test('non-default tenant list filters its accounts and excludes unassigned rows'
   const run = requestList();
   expect((await run.response).status).toBe(200);
   const listQuery = run.sqlCalls.find((call) => call.sql.includes('SELECT\n        f.id AS friend_id'));
-  expect(listQuery?.sql).toMatch(/line_account_id IN \(\?\)/);
+  expect(listQuery?.sql).toContain('line_account_id IN (SELECT value FROM json_each(?))');
   expect(listQuery?.sql).not.toMatch(/line_account_id IS NULL/);
-  expect(listQuery?.bindings).toContain('b1');
+  expect(listQuery?.bindings).toContain(JSON.stringify(['b1']));
 });
 
 test('tenant with no accounts receives an empty list filter without errors', async () => {

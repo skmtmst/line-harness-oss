@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { queueMappedAdConversion } from './ad-event-mappings.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { boundedListLimit, jstNow, nonNegativeListOffset, toJstString } from './utils.js';
@@ -88,7 +89,7 @@ export async function getConversionPoints(
   const accountWhere = !scope
     ? ''
     : scope.allowedLineAccountIds.length > 0
-      ? `WHERE (line_account_id IN (${scope.allowedLineAccountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+      ? `WHERE (line_account_id IN (${sqlIdSet(scope.allowedLineAccountIds).sql})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`
       : scope.includeUnassigned
         ? 'WHERE line_account_id IS NULL'
         : 'WHERE 1 = 0';
@@ -96,7 +97,7 @@ export async function getConversionPoints(
     `SELECT * FROM conversion_points ${accountWhere} ORDER BY created_at DESC`,
   );
   const result = scope?.allowedLineAccountIds.length
-    ? await statement.bind(...scope.allowedLineAccountIds).all<ConversionPoint>()
+    ? await statement.bind(...(scope.allowedLineAccountIds.length ? sqlIdSet(scope.allowedLineAccountIds).binds : [])).all<ConversionPoint>()
     : await statement.all<ConversionPoint>();
   return result.results;
 }
@@ -862,8 +863,8 @@ export async function getConversionEvents(
   const values: unknown[] = [];
 
   if (opts.scope.allowedAccountIds.length > 0) {
-    conditions.push(`(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`);
-    values.push(...opts.scope.allowedAccountIds);
+    conditions.push(`(cp.line_account_id IN (${sqlIdSet(opts.scope.allowedAccountIds).sql})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`);
+    values.push(...(opts.scope.allowedAccountIds.length ? sqlIdSet(opts.scope.allowedAccountIds).binds : []));
   } else {
     conditions.push(opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0');
   }
