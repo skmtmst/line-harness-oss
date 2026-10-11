@@ -80,3 +80,44 @@ it.each(['line','email'] as const)('SEND-S05: %s の途中失敗後も成功済�
  expect(f.raw.prepare('SELECT status,last_error FROM operation_notification_outbox').get()).toEqual({status:channel==='line'?'sent':'failed',last_error:channel==='line'?null:'notification_delivery_unknown'});
  f.raw.close();
 });
+
+it('B-241/SEND-S05: 通知の完了保存が0件なら成功を返さず、補完でも二度送らない', async () => {
+  const f = createTestD1();
+  try {
+    pushMessage.mockReset().mockResolvedValue({});
+    f.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','人工','fixture','fixture'); INSERT INTO staff_members(id,name,role,api_key,line_user_id) VALUES('a','人工','owner','fixture','U-a')");
+    const stopped = await stopOperationCapabilities(f.db, { lineAccountId: 'a', capabilities: ['broadcast_dispatch'], expectedVersion: 0, actorId: 'a', reason: 'fixture' });
+    if (stopped.status !== 'changed') throw new Error('fixture');
+    await enqueueOperationNotifications(f.db, { incidentId: stopped.incident.id, eventKind: 'stopped', payload: { reason: 'fixture' } });
+    f.raw.exec("DELETE FROM operation_notification_outbox WHERE channel='email'; CREATE TRIGGER ignore_completion BEFORE UPDATE ON operation_notification_outbox WHEN NEW.status='sent' BEGIN SELECT RAISE(IGNORE); END");
+    const env = { DB: f.db, LINE_CHANNEL_ACCESS_TOKEN: 'fixture' } as Env['Bindings'];
+    await expect(processOperationNotificationOutbox(env)).resolves.toEqual({ sent: 0, failed: 1 });
+    expect(f.raw.prepare('SELECT status,last_error FROM operation_notification_outbox').get()).toEqual({ status: 'failed', last_error: 'notification_delivery_unknown' });
+    f.raw.exec("DROP TRIGGER ignore_completion; UPDATE operation_notification_outbox SET next_attempt_at='2000'");
+    await expect(processOperationNotificationOutbox(env)).resolves.toEqual({ sent: 1, failed: 0 });
+    expect(pushMessage).toHaveBeenCalledTimes(1);
+  } finally {
+    f.raw.close();
+  }
+});
+
+it('B-241/SEND-S05: 宛先の固定を保存できなければ送信を始めない', async () => {
+  const f = createTestD1();
+  try {
+    pushMessage.mockReset().mockResolvedValue({});
+    f.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','人工','fixture','fixture'); INSERT INTO staff_members(id,name,role,api_key,line_user_id) VALUES('a','人工','owner','fixture','U-a')");
+    const stopped = await stopOperationCapabilities(f.db, { lineAccountId: 'a', capabilities: ['broadcast_dispatch'], expectedVersion: 0, actorId: 'a', reason: 'fixture' });
+    if (stopped.status !== 'changed') throw new Error('fixture');
+    await enqueueOperationNotifications(f.db, { incidentId: stopped.incident.id, eventKind: 'stopped', payload: { reason: 'fixture' } });
+    f.raw.exec("DELETE FROM operation_notification_outbox WHERE channel='email'; CREATE TRIGGER ignore_recipients BEFORE UPDATE ON operation_notification_outbox WHEN NEW.payload_json<>OLD.payload_json BEGIN SELECT RAISE(IGNORE); END");
+    const env = { DB: f.db, LINE_CHANNEL_ACCESS_TOKEN: 'fixture' } as Env['Bindings'];
+    await expect(processOperationNotificationOutbox(env)).resolves.toEqual({ sent: 0, failed: 1 });
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(f.raw.prepare('SELECT status,last_error FROM operation_notification_outbox').get()).toEqual({ status: 'failed', last_error: 'notification_delivery_failed' });
+    f.raw.exec("DROP TRIGGER ignore_recipients; UPDATE operation_notification_outbox SET next_attempt_at='2000'");
+    await expect(processOperationNotificationOutbox(env)).resolves.toEqual({ sent: 1, failed: 0 });
+    expect(pushMessage).toHaveBeenCalledTimes(1);
+  } finally {
+    f.raw.close();
+  }
+});

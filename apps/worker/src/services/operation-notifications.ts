@@ -71,8 +71,9 @@ export async function processOperationNotificationOutbox(
       const frozen=Array.isArray(payload.notificationRecipients)?payload.notificationRecipients.filter((v):v is string=>typeof v==='string'):null;
       const targets=frozen??[...new Set((recipients.results??[]).map(r=>row.channel==='line'?r.line_user_id:r.email).filter((v):v is string=>Boolean(v)))];
       if(!frozen){
-        await env.DB.prepare("UPDATE operation_notification_outbox SET payload_json=? WHERE id=? AND status='sending' AND attempt_count=?")
+        const saved = await env.DB.prepare("UPDATE operation_notification_outbox SET payload_json=? WHERE id=? AND status='sending' AND attempt_count=?")
           .bind(JSON.stringify({...payload,notificationRecipients:targets}),row.id,row.attempt_count+1).run();
+        if (Number(saved.meta?.changes ?? 0) !== 1) throw new NotificationDeliveryIncomplete('failed');
       }
       const client=row.channel==='line'?new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN):null;
       const failures: Array<'failed' | 'unknown'> = [];
@@ -88,10 +89,11 @@ export async function processOperationNotificationOutbox(
         }
       }
       if(failures.length)throw new NotificationDeliveryIncomplete(failures.includes('unknown') ? 'unknown' : 'failed');
-      await env.DB.prepare(
+      const completed = await env.DB.prepare(
         `UPDATE operation_notification_outbox
             SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND status='sending' AND attempt_count=?`,
       ).bind(now, now, row.id,row.attempt_count+1).run();
+      if (Number(completed.meta?.changes ?? 0) !== 1) throw new NotificationDeliveryIncomplete('unknown');
       sent += 1;
     } catch (error) {
       const message = error instanceof NotificationDeliveryIncomplete&&error.deliveryStatus==='failed'?'notification_delivery_failed':'notification_delivery_unknown';
