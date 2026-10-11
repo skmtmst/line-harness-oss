@@ -58,6 +58,8 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import TagPill from '@/components/shared/tag-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 
@@ -1075,7 +1077,7 @@ export default function TemplatesListV8() {
         shouldOpen={(event) => Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))}
       >
         <div className={styles.tableWrap}>
-          <DataTable>
+          <DataTable presentation="template-list">
             <colgroup>
               <col className={styles.colSelect} />
               <col />
@@ -1144,13 +1146,12 @@ export default function TemplatesListV8() {
                       } folder={folderDotOf(t)}
                     />
                     <Td>
-                      <span className={styles.kindBadge}>{isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}</span>
+                      <TagPill name={isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)} color={folderDotOf(t)?.color} />
                     </Td>
                     <Td>
-                      <span className={styles.publishPill} data-tone={publish.tone}>
-                        <span className={styles.publishDot} aria-hidden="true" />
+                      <StatusBadge tone={publish.tone === 'live' ? 'success' : publish.tone === 'changes' ? 'warning' : 'neutral'}>
                         {publish.label}
-                      </span>
+                      </StatusBadge>
                     </Td>
                     {!narrow && (
                       <Td>

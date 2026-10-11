@@ -463,6 +463,9 @@
 
 
 /* B-178：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
+[data-theme='v8'] .frame[data-table-presentation='template-list'] {
+  --tpl-list-row-h: var(--tpl-tl-row-h);
+}
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr {
   height: var(--tpl-list-head-h);
 }

@@ -96,3 +96,12 @@
   --tag-pill-pad: 0 8px;
   --tag-pill-gap: 6px;
 }
+
+/* 固定した札の通常寸法。高さ24はB-180、小さい札の寸法は保つ。 */
+[data-theme='v8'] .pill[data-size='md'] {
+  --tag-pill-font: var(--polish-text-body);
+  --tag-pill-dot: 8px;
+  --tag-pill-pad: 0 12px;
+  --tag-pill-gap: 8px;
+  line-height: 20px;
+}
