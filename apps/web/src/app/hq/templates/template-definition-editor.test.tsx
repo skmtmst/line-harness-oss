@@ -19,7 +19,7 @@ describe('TemplateDefinitionEditor', () => {
 
     render(<TemplateDefinitionEditor type="template" value={value} disabled={false} onChange={onChange} />)
 
-    expect(screen.getByText('LINEプレビュー')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'LINEでの見え方' })).toBeTruthy()
     expect(screen.getByText('本文に入れたURLの扱い')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '名前' }))
 
