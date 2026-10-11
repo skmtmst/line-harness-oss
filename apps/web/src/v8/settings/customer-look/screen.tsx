@@ -6,7 +6,7 @@ import {SettingsNavV8} from '@/components/layout/settings-nav-v8'
 import {usePageTitle,usePageCrumbs,useHideSettingsNav} from '@/components/shell/page-chrome'
 import {useAccount} from '@/contexts/account-context'
 import {useStaffRole,canManageRole} from '@/lib/staff-role'
-import {api} from '@/lib/api'
+import {api,ApiError} from '@/lib/api'
 import {japaneseDetailOf} from '@/components/shared/api-error-message'
 import {useUnsavedGuard} from '@/lib/use-unsaved-guard'
 import {UnsavedLeaveDialog} from '@/lib/unsaved-leave-dialog'
@@ -27,9 +27,10 @@ export default function CustomerLookScreen() {
  const {selectedAccountId,selectedAccount}=useAccount();const role=useStaffRole();const canEdit=canManageRole(role)
  const [saved,setSaved]=useState<CustomerLook | null>(null),[draft,setDraft]=useState<CustomerLook>({...DEFAULT_CUSTOMER_LOOK})
  const [version,setVersion]=useState(0),[status,setStatus]=useState<'loading'|'ready'|'error'>('loading'),[error,setError]=useState(''),[saving,setSaving]=useState(false),[retry,setRetry]=useState(0)
+ const [conflict,setConflict]=useState(false)
  const saveErrors=useSaveFormErrors()
  const generation=useRef(0)
- useEffect(()=>{const request=++generation.current;setStatus('loading');setSaved(null);setError('');setSaving(false)
+ useEffect(()=>{const request=++generation.current;setStatus('loading');setSaved(null);setError('');setSaving(false);setConflict(false)
   if(!selectedAccountId)return
   api.accountSettings.getCustomerLook(selectedAccountId).then(result=>{if(request!==generation.current)return;if(!result.success)throw new Error(result.error);setSaved(result.data.look);setDraft(result.data.look);setVersion(result.data.version);setStatus('ready')}).catch(()=>{if(request===generation.current){setStatus('error');setError('デザインを読み込めませんでした')}})
   return()=>{generation.current++}
@@ -38,18 +39,25 @@ export default function CustomerLookScreen() {
  const guard=useUnsavedGuard({dirty,busy:saving})
  const patch=(next:Partial<CustomerLook>)=>{if(canEdit&&!saving)setDraft(current=>({...current,...next}))}
  const save=async()=>{
-  if(!canEdit||saving||!selectedAccountId||!saved)return false
+  if(!canEdit||saving||conflict||!selectedAccountId||!saved)return false
   const invalid=customerLookError(draft);if(invalid){setError(invalid);return false}
   const request=generation.current;setSaving(true);setError('')
   try {const result=await api.accountSettings.saveCustomerLook(selectedAccountId,draft,version);if(request!==generation.current)return false;
    if(!result.success||!result.data)throw new Error(result.error??'保存できませんでした');setSaved(result.data.look);setDraft(result.data.look);setVersion(result.data.version);guard.disarm();notifyToast('保存しました');return true
-  }catch(failure){if(request===generation.current && !saveErrors.capture(failure))setError(japaneseDetailOf(failure)||'保存できませんでした');return false}
+  }catch(failure){if(request===generation.current){if(failure instanceof ApiError&&failure.status===409)setConflict(true);if(!saveErrors.capture(failure))setError(japaneseDetailOf(failure)||'保存できませんでした')}return false}
+  finally{if(request===generation.current)setSaving(false)}
+ }
+ const reloadLatest=async()=>{
+  if(saving||!selectedAccountId)return
+  const request=generation.current;setSaving(true)
+  try{const result=await api.accountSettings.getCustomerLook(selectedAccountId);if(request!==generation.current)return;if(!result.success)throw new Error(result.error);setSaved(result.data.look);setVersion(result.data.version);setConflict(false);setError('');saveErrors.reset()}
+  catch(failure){if(request===generation.current)setError(japaneseDetailOf(failure)||'最新のデザインを読み込めませんでした')}
   finally{if(request===generation.current)setSaving(false)}
  }
  return <SaveErrorScope errors={saveErrors}><SettingsPage title="お客さまの画面のデザイン" layout="customer-look" navigation={<SettingsNavV8/>}
   preview={status==='ready'?<CustomerLookPreview look={draft} accountName={selectedAccount?.name??'公式アカウント'}/>:undefined}
-  saveStatus={error?<FieldError id="customer-look-save-error">{error}</FieldError>:undefined}
-  saveActions={canEdit&&status==='ready'?<><Button disabled={saving||!dirty} onClick={()=>guard.guarded(()=>{if(saved)setDraft(saved);setError('')})}>キャンセル</Button><Button variant="primary" disabled={!dirty} busy={saving} onClick={()=>void save()}>保存する</Button></>:undefined}>
+  saveStatus={error?<><FieldError id="customer-look-save-error">{error}</FieldError>{conflict?<Button disabled={saving} onClick={()=>void reloadLatest()}>最新を読み直す</Button>:null}</>:undefined}
+  saveActions={canEdit&&status==='ready'?<><Button disabled={saving||!dirty} onClick={()=>guard.guarded(()=>{if(saved)setDraft(saved);setError('')})}>キャンセル</Button><Button variant="primary" disabled={!dirty||conflict} busy={saving} onClick={()=>void save()}>保存する</Button></>:undefined}>
    {!selectedAccountId?<ListState kind="empty" title="店を選んでください"/>:status==='loading'?<ListState kind="loading" title="デザインを読み込んでいます"/>:status==='error'?<ListState kind="error" title={error} action={<Button onClick={()=>setRetry(current=>current+1)}>もう一度読み込む</Button>}/>:<>
     {!canEdit?<ReadOnlyNotice/>:null}
     <Card padding="roomy" layout="vertical" gap="normal"><SectionHeader title="デザインの型" description="型を押すと、右の見本がすぐ変わります"/>

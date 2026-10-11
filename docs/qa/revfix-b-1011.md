@@ -9,3 +9,4 @@
 |OP-R02|実CloseTasksの再試行でlistStoresが1回のまま、試験失敗|初期取得と再試行を同じloadへ統合|useStoreTodayもrgで確認、loadSnapshotの別入口あり。媒体取得失敗の空変換1箇所も削除|初回失敗→店と知らせを再取得→空成功の回帰|
 |OP-R03|実共通Shellで保存成功後のsnapshot拒否、試験失敗|保存と表示更新を区別、保存済みはtrueで二重保存を防ぎ、失敗表示と読込再試行|共通Shell利用画面全体。旧app/restaurant-test/v8/shellは不使用の写し1|保存1回・読込失敗表示・再試行で読込だけ計3回の回帰|
 |OP-R04|実InventoryPageで配分変更→タブ移動の確認が無く試験失敗|共通useUrlTabを既存の未保存確認イベントへ接続|同じhook利用5ファイル：restaurant/close-tasks、restaurant/inventory、ops/tenant-detail、ops/members、affiliates/drawer。dirtyのある画面だけ確認|実在庫タブの取消時入力保持・破棄確定・保存API0回|
+|REQ-F01|既存の旧版再送を成功とする試験を反転し失敗確認|409後の保存を止め、入力を保って最新版を取得|saveCustomerLookの画面呼出は1箇所|実画面で409→版3から4の読込→入力保持→版4で保存|
