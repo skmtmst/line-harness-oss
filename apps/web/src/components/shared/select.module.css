@@ -246,7 +246,7 @@
 [data-theme='v8'] .chevron { flex-basis: var(--polish-icon-control); }
 }
 /* B-192：左右12・間8・矢印16を含め、件数の文字を省略しない幅を共通で確保する。 */
-[data-theme='v8'] .pageSize { width: var(--tpl-select-page-size); min-width: var(--tpl-select-page-size); flex-shrink: 0; }
+[data-theme='v8'] .pageSize { width: var(--tpl-select-page-size); min-width: var(--tpl-select-page-size); flex-shrink: 0; display: flex; justify-content: flex-end; }
 
 /*
  * ★V8「枠なしの並び替え」（x6QsVz：枠なし文字＋上下矢印）。

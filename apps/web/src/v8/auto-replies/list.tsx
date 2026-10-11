@@ -1728,6 +1728,7 @@ export default function AutoRepliesListV8() {
           {folderPanel}
         </>}
         collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
+        noticeSpacing={narrow ? undefined : 'section'}
         toolbar={narrow ? narrowToolbar : <>
           {/* 案内の帯は表の上の主列に置く（板 uE9gf）。左のフォルダの列を押し下げないよう toolbar 枠の先頭に置き、一行を取る。 */}
           <div style={{ flexBasis: '100%' }}><Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice></div>
@@ -1735,7 +1736,7 @@ export default function AutoRepliesListV8() {
           <ListToolbar
             search={{
               placeholder: 'ルール名・言葉で探す',
-              width: 200,
+              width: 160,
               value: query,
               onChange: (value) => {
                 setQuery(clampSearchQuery(value))
