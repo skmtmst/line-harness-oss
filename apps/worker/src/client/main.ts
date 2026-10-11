@@ -466,6 +466,7 @@ async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-cou
     liffId: LIFF_ID,
     lineUserId: profile.userId,
     idToken,
+    sdk: liff,
   });
 }
 

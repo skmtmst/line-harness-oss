@@ -10,11 +10,11 @@ import type { Area } from '@/components/rich-menus/canvas-editor'
 import { bubbleLegacyMessage, bubblesForSave, messageTemplateToBubble } from './broadcast-template'
 
 // 監査と同じ方法で、実際のLIFF受け取り関数を変更せずに実行する。
-const file = '../../apps/worker/src/client/salon-booking/main.tsx'
+const file = '../../apps/liff/src/lib/salon-url-state.ts'
 const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const readUrlState = source.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === 'readUrlState')
 if (!readUrlState) throw new Error('LIFF readUrlState not found')
-const code = ts.transpileModule(`${readUrlState.getText(source)}\nreadUrlState()`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+const code = ts.transpileModule(`${readUrlState.getText(source).replace(/^export /, "")}\nreadUrlState()`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
 const recipientMenu = (uri: string): string | null => runInNewContext(code, { URLSearchParams, window: { location: { search: new URL(uri).search } } }).menuId
 
 it('作った予約リンクをLIFFが読み、選んだメニューに届く', () => {
