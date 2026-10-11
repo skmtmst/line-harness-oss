@@ -178,6 +178,11 @@
   font-weight: 700;
 }
 
+/* 詳しい設定の操作が1列分に収まらない幅では、選択肢を縦に並べる。 */
+@media (max-width: 1279.98px) {
+  .choices { flex-direction: column; }
+}
+
 /* 「押されたら」：選ぶ欄の形のボタン（押すと動きを決める窓）。 */
 .pick {
   display: inline-flex;
