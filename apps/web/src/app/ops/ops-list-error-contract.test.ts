@@ -16,7 +16,7 @@ const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 const LIST_PAGES = [
   { name: 'tenants', path: 'tenants/page.tsx', empty: '該当する契約先がありません' },
   { name: 'announcements', path: 'announcements/page.tsx', empty: 'まだお知らせはありません' },
-  { name: 'audit', path: 'audit/page.tsx', empty: '記録がありません' },
+  { name: 'audit', path: '../../v8/ops/audit.tsx', empty: '記録がありません' },
   { name: 'members', path: '../../v8/ops/members.tsx', empty: '運営メンバーがいません' },
 ]
 

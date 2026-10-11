@@ -38,7 +38,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['EC連携 定期便', '../../app/ec-commerce/subscriptions-panel.tsx'],
   ['予約メニュー', '../../app/booking/menus/page.tsx'],
   ['ウェビナー', '../../v8/webinars/list.tsx'],
-  ['運営 監査ログ', '../../app/ops/audit/page.tsx'],
+  ['運営 監査ログ', '../../v8/ops/audit.tsx'],
   ['運営 お問い合わせ', '../../app/ops/support/page.tsx'],
   ['自動化の実行記録', '../../v8/automations/runs.tsx'],
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
@@ -59,7 +59,13 @@ describe('ListRange 統一（監査6 #667）', () => {
     '$name は ListRange を呼ぶ',
     ({ path }) => {
       const source = read(path)
-      if (path === '../../app/rich-menus/page.tsx') {
+      if (path === '../../v8/ops/audit.tsx') {
+        // 現役の絵は件数を脚注の補足で確認する。ページとAPIの全件数で計算する。
+        expect(source).toContain('title={`${total}件中')
+        expect(source).toContain('(page - 1) * PAGE + 1')
+        expect(source).toContain('Math.min(page * PAGE, total)')
+        expect(source).toContain('pageCount > 1')
+      } else if (path === '../../app/rich-menus/page.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + 1')
         expect(source).toContain('Math.min(currentPage * pageSize, groupTotal)')
         expect(source).toContain('formatNumber(groupTotal)')

@@ -54,10 +54,11 @@ describe('表の外側の余白の洗い出し', () => {
     expect(read('v8', 'automations', 'common-actions.module.css')).toContain('.colOps')
   })
 
-  it('/ops/audit：IP は右へ寄せる', () => {
-    const body = code(read('app', 'ops', 'audit', 'page.tsx'))
-    expect(body).toContain('<Th className="w-36" align="right">IP</Th>')
-    expect(body).toContain('<Td align="right">')
+  it('/ops/audit：IPを理由の補足で確認し、右端の欄は残りの幅を使う', () => {
+    const body = code(read('v8', 'ops', 'audit.tsx'))
+    expect(body).toContain('className={parts.grow} role="cell" title={')
+    expect(body).toContain('IP ${row.ip')
+    expect(read('v8', 'ops', 'parts.module.css')).toMatch(/\.grow\s*\{[^}]*min-width: 0;[^}]*flex: 1;/)
   })
 
   it('/ops/members：名前は残りの幅を使い、名前とメールの全文を確認できる', () => {

@@ -318,7 +318,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     })
     await renderPage(React.createElement(OpsAuditPage))
     expectNoDuplicateCounts()
-    expect(host.textContent).toContain('2件中 1〜2件を表示')
+    expect(host.querySelector('[title="2件中 1〜2件を表示"]')).not.toBeNull()
   })
 
   it('/ops/dashboard はプラン別の行を割合だけにする', async () => {

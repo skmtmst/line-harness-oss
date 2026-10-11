@@ -116,7 +116,6 @@ describe('共通部品の影響範囲', () => {
       'app/nen/members/members-tab.tsx',
       'app/nen/pets/pets-tab.tsx',
       // ★V8-B マイペット一覧（wTIej）の古い pets-v8.tsx は描かれなくなった。入口は src/v8/nen-pets（ページ送りは型が持つ）。
-      'app/ops/audit/page.tsx',
       // mainB: リマインダ詳細・登録者の旧本体は描かれなくなった。V8本体の利用先だけを下に残す。
       // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
       'app/reminders/list-v8.tsx',
