@@ -61,3 +61,5 @@ F-6の人・席のキャンセル待ちを対象。イベントの待ちとは�
 - E3実配備bundleのブラウザ検査: 375/414×LINE/夜の4組。短い予約操作が2行となる失敗を確認後、板ggPZt E3の並び（共通ボタンを縦に）と「この枠で予約する」に合わせ、全部1行・48px・横はみ出し0・例外0・想定外API0。CIのworker-buildに同じ実bundle検査を接続。夜の案内文もdata-liff-themeの文字色で読む。
 
 - UI-N05: `/tmp/revfixc-uin05-red.log` と `/tmp/revfixc-uin05-green.log`。先行修正efbc652ae9はコード・試験で競合しないが、本線で削除済みの `docs/qa/revfix-b-1011.md` と `docs/release-log/unreleased/0000-kenta-revfix-b.md` がmodify/delete競合となり、cherry-pick --abortして戻した。AGENTSの競合停止により、旧文書を復元せずコードと試験だけ引き継ぐ判断を依頼中。
+
+- E3のSDK経由: 直接の道だけでなく、本物の初期化が読む `liff.state=/booking?...` / `/booking/history` でもWorker3件・LIFF3件が失敗。queryだけの復元を道とqueryの共通復元に直し、両入口でpass。OAuth値と明示したpageは優先、外部URL/未知の道は移動しない（共有の12試験）。実配布bundleのCIも直URL/SDK経由を含む8組にした。

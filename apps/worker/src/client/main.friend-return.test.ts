@@ -73,3 +73,11 @@ test.each(['/booking?waitlist=person1', '/booking?seat_waitlist=seat1&action=dec
   await vi.waitFor(() => expect(opened.salon).toHaveBeenCalledTimes(1));
   expect(document.body.textContent).not.toContain('登録完了');
 });
+
+test.each(['/booking?waitlist=person1', '/booking?seat_waitlist=seat1&action=decline', '/booking/history'])('E3: SDKがliff.stateに包んだ%sからも本物のmainが予約を開く', async path => {
+  window.history.replaceState(null, '', `/?liffId=store1&liff.state=${encodeURIComponent(path)}`);
+  vi.mocked((globalThis as unknown as { liff: { getFriendship: ReturnType<typeof vi.fn> } }).liff.getFriendship).mockResolvedValue({ friendFlag: true });
+  await import('./main.js');
+  await vi.waitFor(() => expect(opened.salon).toHaveBeenCalledTimes(1));
+  expect(window.location.pathname).toBe(path.split('?')[0]);
+});

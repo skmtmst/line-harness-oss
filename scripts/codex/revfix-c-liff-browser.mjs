@@ -21,7 +21,7 @@ const index = readFileSync(resolve('apps/worker/dist/client/index.html'), 'utf8'
 const browser = await chromium.launch();
 const results = [];
 try {
-  for (const width of [375, 414]) for (const theme of ['line', 'night']) {
+  for (const width of [375, 414]) for (const theme of ['line', 'night']) for (const entryCase of ['direct', 'sdk-state']) {
     const page = await browser.newPage({ viewport: { width, height: 896 }, reducedMotion: 'reduce' });
     const errors = [], unexpected = [], posts = [];
     page.on('pageerror', e => errors.push(e.message));
@@ -50,7 +50,7 @@ try {
       else { unexpected.push(url.pathname); return route.fulfill({ status: 500, json: { error: 'unexpected artificial API' } }); }
       return route.fulfill({ json: data });
     });
-    await page.goto(`${base}/booking?liffId=fixture&waitlist=w`);
+    await page.goto(entryCase === 'direct' ? `${base}/booking?liffId=fixture&waitlist=w` : `${base}/?liffId=fixture&liff.state=${encodeURIComponent('/booking?waitlist=w')}`);
     try { await page.getByRole('timer').waitFor({ timeout: 15000 }); } catch (cause) { await page.screenshot({ path: join(out, 'failure.png'), fullPage: true }); console.error(JSON.stringify({ errors, unexpected, posts, body: await page.locator('body').innerText() })); throw cause; }
     await page.locator(`#app [data-liff-theme="${theme}"]`).first().waitFor();
     const button = page.getByRole('button', { name: /この(?:時間|枠)で予約する/ });
@@ -59,11 +59,11 @@ try {
       return { pageWidth: document.documentElement.scrollWidth, viewport: innerWidth, button: { width: rect.width, height: rect.height }, lines: range.getClientRects().length };
     });
     if (layout.pageWidth > width) { await page.screenshot({ path: join(out, 'overflow.png'), fullPage: true }); console.error(JSON.stringify({ layout, hits: await page.locator('.liff-hit').evaluateAll(nodes => nodes.map(el => ({ text: el.textContent, rect: el.getBoundingClientRect().toJSON(), pseudo: { width: getComputedStyle(el, '::after').width, left: getComputedStyle(el, '::after').left } }))), over: await page.locator('*').evaluateAll(nodes => nodes.filter(el => el.getBoundingClientRect().right > innerWidth + 1).map(el => ({ tag: el.tagName, class: el.className, text: el.textContent?.slice(0, 80), width: el.getBoundingClientRect().width }))) })); throw new Error(`横はみ出し ${width}/${theme}`); }
-    await page.screenshot({ path: join(out, `${width}-${theme}-offer.png`), fullPage: true });
+    await page.screenshot({ path: join(out, `${width}-${theme}-${entryCase}-offer.png`), fullPage: true });
     if (layout.lines !== 1) throw new Error(`短い予約操作の折り返し ${width}/${theme}: ${layout.lines}行`);
     await button.click(); await page.getByText('予約が確定しました。', { exact: true }).waitFor();
     if (posts.filter(p => p.path.endsWith('/requests')).length !== 1 || unexpected.length || errors.length) throw new Error(JSON.stringify({ posts, unexpected, errors }));
-    results.push({ width, theme, layout, errors, unexpected });
+    results.push({ width, theme, entryCase, layout, errors, unexpected });
     await page.close();
   }
 } finally { await browser.close(); server?.kill(); writeFileSync(join(out, 'results.json'), JSON.stringify(results, null, 2)); }
