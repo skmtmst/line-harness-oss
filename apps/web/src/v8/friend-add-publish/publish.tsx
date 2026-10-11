@@ -110,12 +110,11 @@ function FriendAddPublish() {
       api.friendAddRules.conflicts(accountId, rule.friendKind),
     ])
     if (!isCurrent()) return
+    if(!validationRes.success || !conflictRes.success)throw new Error('checks unavailable')
     const matched = conflictRes.success
       ? conflictRes.data.rules.find((item) => item.id === rule.id)?.matchedLast28Days ?? 0
       : null
-    const conflicts = conflictRes.success
-      ? conflictRes.data.conflicts.filter((item) => item.ruleIds.length === 0 || item.ruleIds.includes(rule.id))
-      : []
+    const conflicts = conflictRes.data.conflicts.filter((item) => item.ruleIds.length === 0 || item.ruleIds.includes(rule.id))
     setOverlapNotes(conflicts.map((item) => item.message))
     if (validationRes.success) {
       setValidation({

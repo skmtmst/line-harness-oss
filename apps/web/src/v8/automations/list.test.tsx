@@ -191,3 +191,23 @@ describe('V8 オートメーションの共通アクション（LnGNw）', () =>
     expect(host.textContent).toContain('閲覧のみで見ています')
   })
 })
+
+ it.each([['ルール',AutomationListV8],['共通アクション',CommonActionsV8]])('B-241：%sのフォルダ取得失敗と空を分け、読込だけやり直す', async (_label,Component) => {
+   const fetchFixture=globalThis.fetch
+   let folderReads=0
+   vi.stubGlobal('fetch', async (input: RequestInfo|URL,init?:RequestInit) => {
+     if(new URL(String(input)).pathname==='/api/folders') {
+       folderReads++
+       if(folderReads===1) return new Response(JSON.stringify({success:false,error:'fixture failure'}),{status:500,headers:{'Content-Type':'application/json'}})
+       return json({success:true,data:[{id:'folder1',name:'再取得した分類',kind:'automation',color:'#777777',sortOrder:0,parentId:null}]})
+     }
+     return fetchFixture(input,init)
+   })
+   await render(<Component />)
+   await waitFor(()=>Boolean(host.textContent?.includes('フォルダを読み込めませんでした')),'フォルダ失敗表示')
+   const error=host.querySelector('[data-list-state="error"]')!
+   expect(error).not.toBeNull()
+   await act(async()=>{(error.querySelector('button') as HTMLButtonElement).click()})
+   await waitFor(()=>Boolean(host.textContent?.includes('再取得した分類')),'フォルダ復帰')
+   expect(folderReads).toBe(2)
+ })

@@ -13,7 +13,7 @@ import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import { api, type AnalyticsFunnelRunResult } from '@/lib/api'
+import { api, ApiError, type AnalyticsFunnelRunResult } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { RangePickerV8, StatePill } from './common'
 import { downloadCsv, formatAnalyticsDate, formatAnalyticsDateTime, rangeFor, useRegisterExport } from './parts'
@@ -145,6 +145,10 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       if (res.success) { setRun(res.data); setGroupKey(res.data.groups[0]?.key ?? 'all') }
       else if (res.error === 'Not found') setNoRun(true)
       else setRunError(res.error)
+    }).catch((error) => {
+      if (!active) return
+      if (error instanceof ApiError && error.status === 404) setNoRun(true)
+      else setRunError('最新の集計を読み込めませんでした。もう一度お試しください。')
     })
     return () => { active = false }
   }, [accountId, selected, runReload])

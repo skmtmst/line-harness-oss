@@ -234,3 +234,12 @@ describe('休業日・貸切の数え方', () => {
     expect(inputError({ ...base, allDay: false, startTime: '22:00', endTime: '18:00' }, '2026-10-07')).toContain('始まりより後')
   })
 })
+
+it.each(['tasks','media'])('B-241 closure auxiliary %s failure is visible and retryable',async(kind)=>{
+ const call=kind==='tasks'?fixture.channelCloseTasks:fixture.mediaLinks
+ call.mockRejectedValueOnce(new Error('人工取得失敗'))
+ render(<InventoryPage />)
+ const error=await screen.findByText(kind==='tasks'?'枠を閉じる知らせを読み込めませんでした':'予約媒体を読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText(kind==='tasks'?'枠を閉じる知らせを読み込めませんでした':'予約媒体を読み込めませんでした')).toBeNull())
+})
