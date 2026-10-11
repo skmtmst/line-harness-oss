@@ -150,8 +150,7 @@ function EventsCreateV8Inner() {
   }
 
   async function save(publish: boolean) {
-    if (!validateInput()) return
-    const cap = Number(capacity)
+    if (!validateInput() || !selectedAccountId) return
     setSaving(true)
     setError(null)
     let saved = createdRef.current?.accountId === selectedAccountId ? createdRef.current.event : null
