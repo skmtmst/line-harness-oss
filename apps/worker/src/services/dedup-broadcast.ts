@@ -1,4 +1,5 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
+import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 
 export interface DedupPreviewPerAccount {
@@ -295,6 +296,7 @@ const MAX_RUN_MS = 10_000;
  */
 interface DedupProgress {
   sentIdentKeys: string[];
+  audience?: DedupPreviewResult;
 }
 
 function parseProgress(raw: string | null | undefined): DedupProgress {
@@ -304,6 +306,7 @@ function parseProgress(raw: string | null | undefined): DedupProgress {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { sentIdentKeys?: unknown }).sentIdentKeys)) {
       return {
+        ...(parsed.audience ? { audience: parsed.audience as DedupPreviewResult } : {}),
         sentIdentKeys: (parsed as { sentIdentKeys: unknown[] }).sentIdentKeys
           .filter((s): s is string => typeof s === 'string'),
       };
@@ -351,16 +354,26 @@ export async function processMultiAccountDedupBroadcast(
   const accountIds = (broadcast.account_ids ? JSON.parse(broadcast.account_ids) : []) as string[];
   const dedupPriority = (broadcast.dedup_priority ? JSON.parse(broadcast.dedup_priority) : []) as string[];
 
-  const preview = await computeDedupBroadcastPreview(
-    db,
-    accountIds,
-    dedupPriority,
-    broadcast.target_tag_id ?? null,
-  );
-
-  // resume 用の進捗を読み込む。crash した前回の途中状態が入っていれば、
-  // identKey ベースで既送ぶんを除外して残差だけ送る。
   const progress = parseProgress(broadcast.dedup_progress);
+  if (!progress.audience) {
+    const ledger=await db.prepare('SELECT COUNT(*) AS n FROM broadcast_send_claims WHERE broadcast_id=?')
+      .bind(broadcast.id).first<{n:number}>();
+    if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:0,known:0,
+      started:progress.sentIdentKeys.length>0 || Number(ledger?.n ?? 0)>0})) {
+      return {totalCount:progress.sentIdentKeys.length,successCount:progress.sentIdentKeys.length,
+        failedAccountIds:[],complete:false,stopped:true};
+    }
+  }
+  const preview = progress.audience ?? await computeDedupBroadcastPreview(
+    db, accountIds, dedupPriority, broadcast.target_tag_id ?? null,
+  );
+  if (!progress.audience) {
+    // 当選した友だちと正規IDを、最初の外部送信より先に固定する。
+    progress.audience = preview;
+    await db.prepare('UPDATE broadcasts SET dedup_progress=? WHERE id=?')
+      .bind(JSON.stringify(progress),broadcast.id).run();
+  }
+
   const sentSet = new Set(progress.sentIdentKeys);
 
   /*
@@ -685,12 +698,8 @@ export async function processMultiAccountDedupBroadcast(
     await updateBroadcastLineRequestId(db, broadcast.id, null, unit);
   }
 
-  // dedup_progress の clear は意図的にここでは行わない。caller (processQueuedBroadcastBatches
-  // など) が updateBroadcastStatus(broadcast.id, 'sent', ...) を呼ぶときに同一 UPDATE で
-  // clear される設計 (db/broadcasts.ts: updateBroadcastStatus 参照)。
-  // この関数の return 後・status='sent' 確定前に Worker crash した場合は dedup_progress
-  // が残ったままで status='sending', batch_offset=-1 になり、recoverStalledBroadcasts が
-  // 再投入して resume → 完走済みアカは batchOffset >= recipients.length で skip → 重複なし。
+  // 完了後も開始時の宛先・既送IDを保持し、失敗した相手の再試行に使う。
+  // status='sent' は回復対象外。送信完了の前に落ちても同じ snapshot で再開する。
   //
   // complete=false (timeExceeded) のときは caller が status='sent' にせず batch_offset=0 に
   // 戻し、次の cron tick が getQueuedBroadcasts で拾って残りを送る (= 分割送信)。

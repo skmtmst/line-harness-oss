@@ -118,6 +118,7 @@ const SKIP_LABELS: Record<string, string> = {
   outside_active_window: '応答する時間帯の外でした',
   weekday_not_allowed: '応答しない曜日でした',
   operator_handling: '担当者が対応中のため何もしませんでした',
+  partial_failure_requires_retry: '前の返信は受理済みです。前の実行結果から失敗した処理だけを再実行してください',
   already_replied_once: '1人1回の設定により何もしませんでした',
   cooldown_active: '連続返信を防ぐため何もしませんでした',
   friend_conditions_not_met: '友だちの条件に合いませんでした',
@@ -138,8 +139,11 @@ function detail(row: AutoReplyRunListRow, status: AutoReplyEvaluationStatus): st
     } catch {
       candidateReason = null;
     }
-    return SKIP_LABELS[candidateReason ?? row.skip_reason ?? ''] ?? '条件に合わず何もしませんでした';
+    const reason = row.candidate_result === 'skipped'
+      ? candidateReason ?? row.skip_reason : row.skip_reason ?? candidateReason;
+    return SKIP_LABELS[reason ?? ''] ?? '条件に合わず何もしませんでした';
   }
+  if (row.error_code === 'delayed_delivery_unknown') return '届いたか分からないため要確認です。自動では送り直しません';
   if (row.status === 'reply_failed') return 'LINEへの返信を受け付けてもらえませんでした';
   if (row.status === 'partial_failed') return '返信または一部の処理だけ完了しました';
   if (row.status === 'failed') return '自動応答を完了できませんでした';
