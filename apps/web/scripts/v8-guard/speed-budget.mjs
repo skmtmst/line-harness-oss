@@ -88,7 +88,6 @@ async function newPage(browser) {
       for (const [k, v] of Object.entries(session)) localStorage.setItem(k, v)
       localStorage.setItem('lh_auth_selection_cleared', '1')
       /* V8 だけで測る（layout.tsx の THEME_BOOT がこれを読む）。 */
-      localStorage.setItem('lh-admin-theme', 'v8')
     } catch {
       /* ファイル直開きで置き場が無いときは何もしない */
     }
