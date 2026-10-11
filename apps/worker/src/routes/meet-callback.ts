@@ -1,7 +1,7 @@
 import { acquireWorkflow } from '../services/workflow-execution.js';
 import { sendRecordedNotification } from '../services/recorded-notification-send.js';
-import { prepareWorkflowStep, getWorkflowStep } from '@line-crm/db';
-import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { prepareWorkflowStep, getWorkflowStep,ensureWorkflowStep,claimWorkflowStep,finishWorkflowStep,failWorkflowStep } from '@line-crm/db';
+import { patchFriendMetadata,friendMetadataPatchStatement } from '../services/friend-metadata.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
@@ -97,12 +97,22 @@ app.post('/api/meet-callback', async (c) => {
     return finished?.status==='succeeded'?c.json({success:true,duplicate:true}):c.json({success:false,code:'MEET_PROCESSING_INCOMPLETE'},202);
   }
   try {
-    await execution.step('metadata',async()=>{
-      if(!await patchFriendMetadata(execution.mutationDb('metadata'),friend.id,{meet_hearing:{
-        session_id:body.session_id,status:body.status,context:body.context,transcripts:body.transcripts,
-        requirements_doc:body.requirements_doc,completed_at:body.completed_at,
-      }}))throw new Error('friend_metadata_unavailable');
-    });
+    const metadataRef={...execution.ref,stepKey:'metadata'};
+    const priorMetadata=await ensureWorkflowStep(execution.db,metadataRef,{maxAttempts:50});
+    if(priorMetadata.status!=='succeeded'){
+      const owned=await claimWorkflowStep(execution.db,metadataRef);
+      if(!owned)throw new Error('metadata_processing_incomplete');
+      try{
+        await finishWorkflowStep(execution.db,metadataRef,owned.lease_owner!,{statements:[
+          execution.db.prepare("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM friends WHERE id=?) THEN 'true' ELSE 'friend_unavailable' END)").bind(friend.id),
+          friendMetadataPatchStatement(execution.db,friend.id,{meet_hearing:{
+            session_id:body.session_id,status:body.status,context:body.context,transcripts:body.transcripts,
+            requirements_doc:body.requirements_doc,completed_at:body.completed_at,
+          }}),
+        ]});
+      }catch(error){await failWorkflowStep(execution.db,metadataRef,owned.lease_owner!,{delayMs:0});throw error;}
+    }
+
 
   // Resolve LINE access token (multi-account support)
   let accountToken: string | null = null;
