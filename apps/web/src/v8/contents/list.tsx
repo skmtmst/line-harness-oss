@@ -1795,6 +1795,51 @@ function MediaCardV8({
       : item.usageCount > 0
         ? '使用先から外すまで削除できません'
         : undefined
+  const mediaMenu = (
+    <span className={styles.menuWrap} title={canManageMedia ? undefined : managementPermissionReason}>
+      <RowMenu
+        appearance="plain"
+        label={`${item.filename}のその他操作`}
+        menuLabel={`${item.filename}の操作`}
+        open={menuOpen}
+        onOpenChange={(next) => (next ? onToggleMenu() : onCloseMenu())}
+        triggerProps={{ 'data-qa-open': 'YfTfJ' }}
+        items={[
+          {
+            id: 'preview',
+            label: 'プレビュー',
+            onSelect: onPreview,
+          },
+          ...(canManageMedia
+            ? [{ id: 'detail', label: '使用箇所を見る', onSelect: onDetail }]
+            : []),
+          ...(canManageMedia && !item.archivedAt
+            ? [{ id: 'rename', label: '名前を変える', onSelect: onRenameStart }]
+            : []),
+          ...(canManageMedia && !item.archivedAt
+            ? [{ id: 'move', label: 'フォルダへ移す', onSelect: onMoveStart }]
+            : []),
+          {
+            id: 'download',
+            label: 'ダウンロード',
+            disabled: downloading,
+            disabledReason: downloading ? 'ファイルを取り出しています' : undefined,
+            onSelect: onDownload,
+          },
+          ...(canManageMedia
+            ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: onArchiveStart }]
+            : []),
+          // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
+          ...(canManageMedia && !item.archivedAt
+            ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: onDeleteStart }]
+            : []),
+          ...(canManageMedia && !item.archivedAt
+            ? [{ id: 'replace', label: '別のメディアに差し替える', onSelect: onReplaceStart }]
+            : []),
+        ]}
+      />
+    </span>
+  )
   return (
     <div className={view === 'grid' ? styles.card : styles.row}>
       <button
@@ -1825,6 +1870,7 @@ function MediaCardV8({
             {renameError && (
               <p className={styles.renameError} role="alert">{renameError}</p>
             )}
+            {mediaMenu}
             <div className={styles.renameActions}>
               <Button variant="secondary" onClick={onRenameCancel} disabled={renamingBusy}>
                 キャンセル
@@ -1860,6 +1906,7 @@ function MediaCardV8({
               <span className={styles.fileName} >
                 <TruncatedText value={String(item.filename ?? '')} />
               </span>
+              {mediaMenu}
             </span>
             <p className={styles.meta} title={formatMediaDetails(item)}>
               {`${kindLabel}・${formatMediaSize(item.sizeBytes)}`}
@@ -1873,52 +1920,6 @@ function MediaCardV8({
             </p>
           </>
         )}
-
-        <div className={styles.cardFoot}>
-          <span className={styles.menuWrap} title={canManageMedia ? undefined : managementPermissionReason}>
-            <RowMenu
-              appearance="plain"
-              label={`${item.filename}のその他操作`}
-              menuLabel={`${item.filename}の操作`}
-              open={menuOpen}
-              onOpenChange={(next) => (next ? onToggleMenu() : onCloseMenu())}
-              triggerProps={{ 'data-qa-open': 'YfTfJ' }}
-              items={[
-                {
-                  id: 'preview',
-                  label: 'プレビュー',
-                  onSelect: onPreview,
-                },
-                ...(canManageMedia
-                  ? [{ id: 'detail', label: '使用箇所を見る', onSelect: onDetail }]
-                  : []),
-                ...(canManageMedia && !item.archivedAt
-                  ? [{ id: 'rename', label: '名前を変える', onSelect: onRenameStart }]
-                  : []),
-                ...(canManageMedia && !item.archivedAt
-                  ? [{ id: 'move', label: 'フォルダへ移す', onSelect: onMoveStart }]
-                  : []),
-                {
-                  id: 'download',
-                  label: 'ダウンロード',
-                  disabled: downloading,
-                  disabledReason: downloading ? 'ファイルを取り出しています' : undefined,
-                  onSelect: onDownload,
-                },
-                ...(canManageMedia
-                  ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: onArchiveStart }]
-                  : []),
-                // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
-                ...(canManageMedia && !item.archivedAt
-                  ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: onDeleteStart }]
-                  : []),
-                ...(canManageMedia && !item.archivedAt
-                  ? [{ id: 'replace', label: '別のメディアに差し替える', onSelect: onReplaceStart }]
-                  : []),
-              ]}
-            />
-          </span>
-        </div>
       </div>
     </div>
   )

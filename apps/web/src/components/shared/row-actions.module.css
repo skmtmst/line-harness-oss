@@ -174,3 +174,11 @@
 
 /* B-199：同じ列の主操作は最長の文字に合わせた同じ幅。 */
 html[data-theme='v8'] .rowButton, html[data-theme='v8'] .quickAction { width: var(--row-action-width, max-content); min-width: max-content; justify-content: center; }
+
+/* V8：枠を外しても、既定の「…」は共通 IconButton と同じ36角。 */
+@media (pointer: fine) {
+  [data-theme='v8'] .action[data-row-menu]:not([data-size]) {
+    width: var(--tpl-icon-btn-row-hit);
+    height: var(--tpl-icon-btn-row-hit);
+  }
+}
