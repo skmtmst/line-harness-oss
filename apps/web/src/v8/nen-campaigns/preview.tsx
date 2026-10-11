@@ -12,7 +12,7 @@ export function replaceCampaignSamples(value: string): string {
 }
 
 /** 旧一覧の紹介文→記事カードの見本を、共通のLINE表示へ引き継ぐ。送信はしない。 */
-export default function ColumnPreview({ column, introText, buttonLabel }: { column: NenColumn; introText: string; buttonLabel: string }) {
+export function ColumnPreviewCard({ column, buttonLabel }: { column: Pick<NenColumn, 'imageUrl' | 'category' | 'title' | 'excerpt' | 'articleUrl'>; buttonLabel: string }) {
   const content = JSON.stringify({
     type: 'bubble',
     ...(column.imageUrl ? { hero: { type: 'image', url: column.imageUrl, size: 'full', aspectRatio: '16:9', aspectMode: 'cover' } } : {}),
@@ -23,8 +23,12 @@ export default function ColumnPreview({ column, introText, buttonLabel }: { colu
     ] },
     ...(buttonLabel ? { footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', action: { type: 'uri', label: buttonLabel, uri: column.articleUrl } }] } } : {}),
   })
+  return <LinePreviewFlex content={content} />
+}
+
+export default function ColumnPreview({ column, introText, buttonLabel }: { column: NenColumn; introText: string; buttonLabel: string }) {
   return <LinePreview fit>
     {introText.trim() ? <LinePreviewMessage accountName="NEN" avatar={null} time="">{replaceColumnSamples(introText)}</LinePreviewMessage> : null}
-    <LinePreviewFlex content={content} />
+    <ColumnPreviewCard column={column} buttonLabel={buttonLabel} />
   </LinePreview>
 }

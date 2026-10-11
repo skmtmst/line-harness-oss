@@ -2,12 +2,12 @@
 
 対象：`list.tsx`（一覧：自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・誕生日クーポンの決めごと `oqSJP`）、
 `edit.tsx`（配信を直す `w5pwG`）、`column-new.tsx`（コラムを書く `yRDwW`）。
-写し元：`app/nen-campaigns/nen-campaigns-v8.tsx`・`nen-overview.tsx`・`edit/campaign-editor-v8.tsx`・`columns/new/column-new-v8.tsx`。
+旧側の一覧/概要/配信編集/コラム作成の動作と情報は現役へ移し、旧の写しは削除済み（2026-10-11）。
 
 ## 入口
 - `app/nen-campaigns/page.tsx`：常に `list.tsx`。取得・保存は page.tsx が持ったまま（props で受け取る）。
 - `app/nen-campaigns/edit/page.tsx`：`?key=` があれば `edit.tsx`、無ければ共通の詳細画面を使う `column-intros.tsx`。
-- `app/nen-campaigns/columns/new/page.tsx`：`theme === 'v8'` のときだけ `column-new.tsx`。
+- `app/nen-campaigns/columns/new/page.tsx`：常に `column-new.tsx`。
 - 旧側の動作試験は現役へ移し、読者が無くなった旧の写しから削除する（2026-10-11）。
 
 ## 受け付ける URL と指定
@@ -49,6 +49,7 @@
 - 配信対象は1つの欄：「友だち全員」か「タグで絞る：〇〇」（このアカウントのタグだけ）。届く人数を欄の右上に出す。アカウントを替えてタグが無くなったら外して知らせる。
 - 公開日時（任意）は「公開日時も記録する」で開く。題名が20字を超えたら題名の右に知らせ。
 - 届く形：画像の URL があれば写真つき、無ければ文字だけ。「文字だけ」を選ぶと画像の URL を外す。
+- 画像か分類を指定した見本は右欄で一覧と同じ共通の記事カードを出す。未指定の見本は現在の文字の吹き出し。見本は保存や配信を行わない。
 - 保存：`createColumn` → `/nen-campaigns?tab=columns`。足りないまま押すと保存せず欄の下に理由。失敗は 403／400・413／409／その他で言い分ける。
 
 ## 閲覧のみ（変える権限が無い人）
