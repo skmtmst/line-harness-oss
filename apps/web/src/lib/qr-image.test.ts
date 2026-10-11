@@ -22,7 +22,7 @@ describe('QRライブラリの表示時読み込み(PERF-09)', () => {
   it('流入リンク作成は発行した行へ戻り、QRはWorkerの画像を使う', () => {
     const create = fs.readFileSync(path.join(SRC, 'v8/inflow-links/new/create.tsx'), 'utf8')
     expect(create).toContain("router.push(createPageReturnHref('/inflow-links', res.data.id))")
-    const dialog = fs.readFileSync(path.join(SRC, 'app/inflow-links/referral-qr-modal.tsx'), 'utf8')
+    const dialog = fs.readFileSync(path.join(SRC, 'v8/inflow-links/qr-dialog.tsx'), 'utf8')
     expect(dialog).toContain('/api/qr?size=320x320')
     expect(dialog).not.toMatch(/from\s+['"]qrcode['"]/)
   })
