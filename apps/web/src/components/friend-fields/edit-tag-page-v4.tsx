@@ -5,6 +5,9 @@ import type { Tag } from '@line-crm/shared'
 import { api, describeSaveFailure, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import { CreatePage } from '@/components/templates/create-page'
+import { Field, TextInput } from '@/components/shared/form-controls'
+import { TextArea } from '@/components/shared/text-field'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -137,18 +140,18 @@ export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><div className="mx-auto max-w-[680px] space-y-4 p-6">
+    <SaveErrorScope errors={saveErrors}><CreatePage title="保管済みタグを直す" busy={saving} dirty={false}
+      footerActions={<>
+        <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
+        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
+      </>}>
       <Notice tone="warn">
         <p className="font-bold">このタグは保管済みです</p>
         <p className="mt-1 text-xs leading-5">保管済みのタグは、あとから元に戻す機能がありません。誤字などの表示名の訂正だけできます。フォルダ・付与のしかた・マイル・連動アクションなどの設定は変更できません。</p>
       </Notice>
       {error && <Notice tone="danger">{error}</Notice>}
-      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><SaveErrorField names={["name"]}><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></SaveErrorField></label>
-      <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><SaveErrorField names={["description"]}><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></SaveErrorField></label>
-      <div className="flex justify-end gap-2">
-        <Button onClick={onCancel}>キャンセル</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
-      </div>
-    </div></SaveErrorScope>
+      <Field label="タグ名" htmlFor="archived-tag-name"><SaveErrorField names={["name"]}><TextInput id="archived-tag-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} /></SaveErrorField></Field>
+      <Field label="説明" htmlFor="archived-tag-description"><SaveErrorField names={["description"]}><TextArea id="archived-tag-description" value={description} onChange={(event) => setDescription(event.target.value)} rows={3} /></SaveErrorField></Field>
+    </CreatePage></SaveErrorScope>
   )
 }

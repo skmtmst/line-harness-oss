@@ -173,6 +173,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'components/friend-fields/edit-tag-page-v4.tsx':
+    '保管済みタグの名前と説明の訂正。元の取消は確認なしで入力を破棄するため、共通作成型も dirty=false で同じ動きを保つ。番兵の要否は削除台帳の司令塔に確認へ記録する',
   'v8/restaurant/google/google.tsx':
     '編集を持たないGoogleの外枠。タブ・店舗の切替を共通の未保存確認へ委ね、現在の編集画面自身の番兵が止める。URLの試験で確認→続ける/破棄の動きを守る',
   'components/shared/entity-picker.tsx': '選ぶ窓の候補は仮選択で、選ぶを押したときだけ親へ渡す。閉じる操作は仮選択を破棄し、親の保存前の値を変えない。',
@@ -365,8 +367,6 @@ const UNTRIAGED: Record<string, string> = {
     's2: 自動応答の編集。共通ダイアログは背景クリックとEscで閉じる。V6R-S2-a（board#1066）で付ける',
   'components/broadcasts/broadcast-asset-manager.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'components/friend-fields/edit-tag-page-v4.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friend-fields/support-mark-rules-panel.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friends/advanced-search-dialog.tsx':
