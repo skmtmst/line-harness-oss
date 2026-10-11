@@ -19,7 +19,10 @@ it('R-MEET01: 結果保存の失敗は未完として残し、同じ受信で補
 });
 it('R-MEET01/B-248: 送信結果が不明なら失敗を見せ、自動で二度送らない',async()=>{
  push.mockRejectedValueOnce(new Error('fixture transport interrupted'));
- expect((await post()).status).toBe(202);expect((await post()).status).toBe(202);
+ const failed=await post();expect(failed.status).toBe(202);
+ expect(await failed.json()).toMatchObject({code:'MEET_DELIVERY_REVIEW_REQUIRED'});
+ expect((await post()).status).toBe(202);
+ expect(f.raw.prepare("SELECT status,error_code FROM workflow_steps WHERE step_key='__run'").get()).toEqual({status:'unknown',error_code:'delivery_unknown'});
  expect(push).toHaveBeenCalledTimes(1);
  expect(f.raw.prepare('SELECT status FROM outbound_send_requests').get()).toEqual({status:'unknown'});
 });

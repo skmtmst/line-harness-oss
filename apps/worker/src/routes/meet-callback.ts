@@ -1,5 +1,5 @@
 import { acquireWorkflow } from '../services/workflow-execution.js';
-import { sendRecordedNotification } from '../services/recorded-notification-send.js';
+import { sendRecordedNotification,NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
 import { prepareWorkflowStep, getWorkflowStep,ensureWorkflowStep,claimWorkflowStep,finishWorkflowStep,failWorkflowStep } from '@line-crm/db';
 import { patchFriendMetadata,friendMetadataPatchStatement } from '../services/friend-metadata.js';
 import { Hono } from 'hono';
@@ -94,7 +94,7 @@ app.post('/api/meet-callback', async (c) => {
   const execution=await acquireWorkflow(c.env.DB,ref);
   if(!execution){
     const finished=await getWorkflowStep(c.env.DB,{...ref,stepKey:'__run'});
-    return finished?.status==='succeeded'?c.json({success:true,duplicate:true}):c.json({success:false,code:'MEET_PROCESSING_INCOMPLETE'},202);
+    return finished?.status==='succeeded'?c.json({success:true,duplicate:true}):c.json({success:false,code:finished?.status==='unknown'?'MEET_DELIVERY_REVIEW_REQUIRED':'MEET_PROCESSING_INCOMPLETE'},202);
   }
   try {
     const metadataRef={...execution.ref,stepKey:'metadata'};
@@ -172,9 +172,11 @@ app.post('/api/meet-callback', async (c) => {
   });
   await execution.complete();
   return c.json({ success: true });
-  } catch {
-    await execution.fail().catch(()=>undefined);
-    return c.json({success:false,code:'MEET_PROCESSING_INCOMPLETE'},202);
+  } catch(error) {
+    const unknown=error instanceof NotificationDeliveryIncomplete&&error.deliveryStatus==='unknown';
+    if(unknown)await failWorkflowStep(c.env.DB,execution.ref,execution.owner,{unknown:true,code:'delivery_unknown'}).catch(()=>undefined);
+    else await execution.fail().catch(()=>undefined);
+    return c.json({success:false,code:unknown?'MEET_DELIVERY_REVIEW_REQUIRED':'MEET_PROCESSING_INCOMPLETE'},202);
   }
 });
 

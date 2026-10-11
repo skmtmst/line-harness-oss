@@ -1,4 +1,4 @@
-import {sendRecordedNotification} from './recorded-notification-send.js';
+import {sendRecordedNotification,NotificationDeliveryIncomplete} from './recorded-notification-send.js';
 import { LineClient } from '@line-crm/line-sdk';
 
 import type { Env } from '../index.js';
@@ -75,7 +75,7 @@ export async function processOperationNotificationOutbox(
           .bind(JSON.stringify({...payload,notificationRecipients:targets}),row.id,row.attempt_count+1).run();
       }
       const client=row.channel==='line'?new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN):null;
-      let incomplete=false;
+      let incomplete:false|'failed'|'unknown'=false;
       for(const recipient of targets){
         try{
           await sendRecordedNotification(env.DB,{sourceId:`operation:${row.id}`,channel:row.channel,recipient,
@@ -83,16 +83,16 @@ export async function processOperationNotificationOutbox(
             send:key=>client?client.pushMessage(recipient,[{type:'text',text}],key):
               sendOperationEmail(env,{to:recipient,subject:'【musubo】運用状態の重要なお知らせ',body:text}),
           });
-        }catch{incomplete=true;}
+        }catch(error){incomplete=error instanceof NotificationDeliveryIncomplete&&error.deliveryStatus==='failed'&&incomplete!=='unknown'?'failed':'unknown';}
       }
-      if(incomplete)throw new Error('notification_delivery_incomplete');
+      if(incomplete)throw new NotificationDeliveryIncomplete(incomplete);
       await env.DB.prepare(
         `UPDATE operation_notification_outbox
             SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND status='sending' AND attempt_count=?`,
       ).bind(now, now, row.id,row.attempt_count+1).run();
       sent += 1;
     } catch (error) {
-      const message = 'notification_delivery_incomplete';
+      const message = error instanceof NotificationDeliveryIncomplete&&error.deliveryStatus==='failed'?'notification_delivery_failed':'notification_delivery_unknown';
       await env.DB.prepare(
         `UPDATE operation_notification_outbox
             SET status = 'failed', last_error = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND status='sending' AND attempt_count=?`,

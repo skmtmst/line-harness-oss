@@ -77,6 +77,6 @@ it.each(['line','email'] as const)('SEND-S05: %s の途中失敗後も成功済�
  expect(delivered.filter(to=>to==='U-a'||to==='a@fixture.test')).toHaveLength(1);
  expect(delivered).not.toContain('U-c');expect(delivered).not.toContain('c@fixture.test');expect(delivered).not.toContain('U-changed');
  expect(delivered.filter(to=>to==='U-b'||to==='b@fixture.test')).toHaveLength(channel==='line'?2:1);
- expect(f.raw.prepare('SELECT status FROM operation_notification_outbox').get()).toEqual({status:channel==='line'?'sent':'failed'});
+ expect(f.raw.prepare('SELECT status,last_error FROM operation_notification_outbox').get()).toEqual({status:channel==='line'?'sent':'failed',last_error:channel==='line'?null:'notification_delivery_unknown'});
  f.raw.close();
 });
