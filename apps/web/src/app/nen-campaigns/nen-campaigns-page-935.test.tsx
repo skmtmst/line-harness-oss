@@ -139,12 +139,6 @@ async function click(element: HTMLElement) {
   await settle()
 }
 
-function button(label: string): HTMLButtonElement {
-  const found = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === label)
-  if (!found) throw new Error(`ボタン「${label}」が見つかりません: ${container.textContent?.slice(0, 200)}`)
-  return found as HTMLButtonElement
-}
-
 /* ConfirmDialog は document.body へ portal される。確認文・その中のボタンは body 側で読む。 */
 const bodyText = () => document.body.textContent ?? ''
 const bodyButton = (label: string): HTMLButtonElement => {
@@ -153,8 +147,14 @@ const bodyButton = (label: string): HTMLButtonElement => {
   return found as HTMLButtonElement
 }
 
+function columnLink(title: string): HTMLAnchorElement {
+  const found = Array.from(container.querySelectorAll('a')).find((link) => link.textContent === title && link.title === title)
+  if (!found) throw new Error(`Column ${title} not found`)
+  return found
+}
+
 function introTextarea(): HTMLTextAreaElement {
-  const found = container.querySelector('aside textarea')
+  const found = container.querySelector('textarea[aria-label="LINE \u306b\u51fa\u308b\u7d39\u4ecb\u6587"]')
   if (!found) throw new Error('紹介文の入力欄が見つかりません')
   return found as HTMLTextAreaElement
 }
@@ -171,10 +171,10 @@ async function typeIntro(value: string) {
 async function openColumn() {
   // タブは件数を内側に持つ（「コラム2」）。見出しで始まるボタンを拾う。
   const tab = Array.from(container.querySelectorAll('button'))
-    .find((b) => /^コラム\d*$/.test(b.textContent ?? ''))
+    .find((b) => /^コラム\s*\d*$/.test(b.textContent ?? ''))
   if (!tab) throw new Error('コラムのタブが見つかりません')
   await click(tab)
-  await click(button('選ぶ'))
+  await click(columnLink('題名c1'))
 }
 
 beforeEach(() => {
@@ -214,11 +214,11 @@ describe('紹介文の書きかけを守る（#935 N-301）', () => {
     await openColumn()
     await typeIntro('書きかけの紹介文')
 
-    await click(button('選ぶ'))
+    await click(columnLink('題名c2'))
 
     expect(bodyText()).toContain('入力した紹介文が保存されていません')
     // まだ c1 が選ばれたまま（c2 へ移っていない）。
-    expect(container.textContent).toContain('「題名c1」')
+    expect(new URLSearchParams(window.location.search).get('column')).toBe('c1')
     expect(introTextarea().value).toBe('書きかけの紹介文')
 
     // 「書き続ける」で入力に残る。
@@ -231,7 +231,7 @@ describe('紹介文の書きかけを守る（#935 N-301）', () => {
     await openColumn()
     await typeIntro('書きかけの紹介文')
 
-    await click(button('選ぶ'))
+    await click(columnLink('題名c2'))
     await click(bodyButton('保存せずに移る'))
 
     expect(introTextarea().value).toBe('紹介文c2')

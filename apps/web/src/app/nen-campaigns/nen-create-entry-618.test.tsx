@@ -9,6 +9,10 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/staff-role', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner',
+}))
 import type { NenCampaignSetting, NenColumn } from '../../lib/api'
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))
@@ -212,7 +216,7 @@ describe('NEN新規作成入口（#618）', () => {
   it('コラムが5件あっても未選択でも、ヘッダーから「コラムを書く」へ届く', async () => {
     await mount(React.createElement(NenCampaignsPage))
     const tab = Array.from(container.querySelectorAll('button'))
-      .find((b) => /^コラム\d*$/.test(b.textContent ?? ''))
+      .find((b) => /^コラム\s*\d*$/.test(b.textContent ?? ''))
     if (!tab) throw new Error('コラムのタブが見つかりません')
     await click(tab)
 
@@ -293,7 +297,7 @@ describe('NEN新規作成入口（#618）', () => {
     })
     await mount(React.createElement(NenCampaignsPage))
     const tab = Array.from(container.querySelectorAll('button'))
-      .find((b) => /^コラム\d*$/.test(b.textContent ?? ''))
+      .find((b) => /^コラム\s*\d*$/.test(b.textContent ?? ''))
     if (!tab) throw new Error('コラムのタブが見つかりません')
     await click(tab)
     expect(container.textContent).toContain('専用データの題名618')
