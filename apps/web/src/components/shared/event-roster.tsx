@@ -6,7 +6,7 @@ import styles from './event-roster.module.css'
 export function EventRosterCard({ title, id, note, action, splitAction, children }: {
   title: string; id: string; note?: ReactNode; action?: ReactNode; splitAction?: boolean; children: ReactNode
 }) {
-  return <Card padding="none" overflow="hidden" aria-labelledby={id}>
+  return <Card padding="rows" overflow="hidden" aria-labelledby={id}>
     <div className={styles.header} data-roster-header data-split-action={splitAction || undefined}>
       <div className={styles.heading}><h3 id={id}>{title}</h3>{note ? <p>{note}</p> : null}</div>
       {action ? <div className={styles.headerAction}>{action}</div> : null}
