@@ -1,3 +1,4 @@
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -363,7 +364,7 @@ siteTracking.get('/api/site/pages', requireRole('owner', 'admin', 'staff'), asyn
     const from =
       c.req.query('from') ??
       new Date(jstNow.getTime() - 30 * 24 * 3600_000).toISOString().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    if (!isExistingCalendarDate(from) || !isExistingCalendarDate(to)) {
       return c.json({ success: false, error: '期間は 2026-08-01 の形で指定してください' }, 400);
     }
     const items = await getPageViewSummary(c.env.DB, {

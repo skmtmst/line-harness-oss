@@ -79,6 +79,8 @@ describe('一括メッセージの承認', () => {
     }
     const { run } = await start(ids);
     expect(await getBulkMessageApproval(testDb.db, run.id)).toMatchObject({ status: 'pending', recipientCount: 1000, threshold: 1000 });
+    expect(testDb.raw.prepare('SELECT friend_id FROM friend_bulk_run_items WHERE run_id = ? ORDER BY ordinal').all(run.id))
+      .toEqual(ids.map(friend_id => ({ friend_id })));
   });
 
   it('予約時刻を過ぎた承認は拒否し、その後も送らない', async () => {

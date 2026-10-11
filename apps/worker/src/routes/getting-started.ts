@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration, resolveLineCredential } from '@line-crm/db';
@@ -80,8 +81,8 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       `SELECT id, is_active, channel_access_token, channel_access_token_encrypted,
               channel_secret, channel_secret_encrypted
          FROM line_accounts
-        WHERE archived_at IS NULL AND id IN (${accountIds.map(() => '?').join(', ')})`,
-    ).bind(...accountIds).all<AccountRow>() : { results: [] as AccountRow[] };
+        WHERE archived_at IS NULL AND id IN (${sqlIdSet(accountIds).sql})`,
+    ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<AccountRow>() : { results: [] as AccountRow[] };
     const rows = accounts.results;
 
     /*
@@ -178,12 +179,12 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
 
     let scenarioFromFriendAdd = false;
     if (startedScenarioIds.length > 0) {
-      const placeholders = startedScenarioIds.map(() => '?').join(', ');
+      const placeholders = sqlIdSet(startedScenarioIds).sql;
       const hit = await c.env.DB.prepare(
         `SELECT 1 AS hit FROM scenarios
           WHERE line_account_id = ? AND is_active = 1 AND id IN (${placeholders}) LIMIT 1`,
       )
-        .bind(accountId, ...startedScenarioIds)
+        .bind(accountId, ...(startedScenarioIds.length ? sqlIdSet(startedScenarioIds).binds : []))
         .first<{ hit: number }>();
       scenarioFromFriendAdd = hit !== null;
     }

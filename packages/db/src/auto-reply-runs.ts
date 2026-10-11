@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import type { AutoReply, CreateAutoReplyInput } from './auto-replies.js';
 import { jstNow } from './utils.js';
 
@@ -282,8 +283,8 @@ export async function getAutoReplyInternalMemos(
        FROM auto_replies ar
        JOIN auto_reply_versions arv
          ON arv.id = COALESCE(ar.current_draft_version_id, ar.current_published_version_id)
-      WHERE ar.id IN (${autoReplyIds.map(() => '?').join(',')})`,
-  ).bind(...autoReplyIds).all<{ auto_reply_id: string; definition_snapshot: string }>();
+      WHERE ar.id IN (${sqlIdSet(autoReplyIds).sql})`,
+  ).bind(...(autoReplyIds.length ? sqlIdSet(autoReplyIds).binds : [])).all<{ auto_reply_id: string; definition_snapshot: string }>();
   for (const row of rows.results ?? []) {
     try {
       const parsed = JSON.parse(row.definition_snapshot) as { internalMemo?: unknown };
@@ -1471,8 +1472,8 @@ function visibleAccountClause(input: {
   const pieces: string[] = [];
   const bindings: string[] = [];
   if (input.lineAccountIds.length > 0) {
-    pieces.push(`are.line_account_id IN (${input.lineAccountIds.map(() => '?').join(', ')})`);
-    bindings.push(...input.lineAccountIds);
+    pieces.push(`are.line_account_id IN (${sqlIdSet(input.lineAccountIds).sql})`);
+    bindings.push(...(input.lineAccountIds.length ? sqlIdSet(input.lineAccountIds).binds : []));
   }
   if (input.includeUnassigned) pieces.push('are.line_account_id IS NULL');
   return { sql: pieces.length > 0 ? `(${pieces.join(' OR ')})` : '0 = 1', bindings };

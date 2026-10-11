@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 
 const mocks = vi.hoisted(() => ({
   getBroadcasts: vi.fn(),
+  getBroadcastListPage: vi.fn(),
   getBroadcastById: vi.fn(),
   createBroadcast: vi.fn(),
   updateBroadcast: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@line-crm/db', async (importOriginal) => ({
   // 境界の判定対象（取得・作成・更新・削除）だけ差し替える。
   ...(await importOriginal<typeof import('@line-crm/db')>()),
   getBroadcasts: mocks.getBroadcasts,
+  getBroadcastListPage: mocks.getBroadcastListPage,
   getBroadcastById: mocks.getBroadcastById,
   createBroadcast: mocks.createBroadcast,
   updateBroadcast: mocks.updateBroadcast,
@@ -206,8 +208,8 @@ describe('broadcast tenant scope', () => {
 });
 
 test('broadcasts passes date boundaries together with tenant scope', async () => {
-  mocks.getBroadcasts.mockResolvedValue([]);
+  mocks.getBroadcastListPage.mockResolvedValue({ items:[], total:0, drafts:0, statusCounts:{all:0} });
   const response = await app().request('/api/broadcasts?from=2026-09-30&to=2026-09-30');
   expect(response.status).toBe(200);
-  expect(mocks.getBroadcasts).toHaveBeenCalledWith(expect.anything(), undefined, expect.objectContaining({ allowedAccountIds: ['own-account'] }), { order: 'desc', from: '2026-09-30T00:00:00+09:00', until: '2026-10-01T00:00:00+09:00' });
+  expect(mocks.getBroadcastListPage).toHaveBeenCalledWith(expect.anything(), undefined, expect.objectContaining({ allowedAccountIds: ['own-account'] }), expect.objectContaining({ order: 'desc', from: '2026-09-30T00:00:00+09:00', until: '2026-10-01T00:00:00+09:00', limit:20, offset:0 }));
 });

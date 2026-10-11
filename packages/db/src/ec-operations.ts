@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { REVENUE_IMPACT_KEYS, type EcIdentityCandidateSummary, type EcIdentityDuplicateSignal } from '@line-crm/shared';
 
 export type EcOrderState = 'current' | 'refunded' | 'cancelled';
@@ -402,9 +403,9 @@ export async function listEcOrders(
   const ids = rows.results.map((row) => String(row.id));
   const lineRows = ids.length
     ? await db.prepare(
-      `SELECT * FROM ec_order_lines WHERE order_id IN (${ids.map(() => '?').join(',')})
+      `SELECT * FROM ec_order_lines WHERE order_id IN (${sqlIdSet(ids).sql})
         ORDER BY order_id, line_index`,
-    ).bind(...ids).all<Record<string, unknown>>()
+    ).bind(...(ids.length ? sqlIdSet(ids).binds : [])).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
   const linesByOrder = new Map<string, EcOrderReadModel['orderLines']>();
   for (const line of lineRows.results) {

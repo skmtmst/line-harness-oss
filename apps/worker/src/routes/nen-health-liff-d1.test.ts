@@ -105,3 +105,8 @@ describe('POST /api/liff/nen/health-logs（監査 R59/R61）', () => {
     expect(changes).toContain('stool_abnormal');
   });
 });
+
+it('API-02 health log rejects impossible dates instead of normalizing or using today',async()=>{
+ const res=await liff('U-a').request('/api/liff/nen/health-logs',{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json'},body:JSON.stringify({petId:'pet-momo',loggedOn:'2026-02-30',stoolStatus:'normal',appetite:'good'})});
+ expect(res.status).toBe(400);
+});

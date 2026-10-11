@@ -18,7 +18,10 @@ const block: FormInputBlock = { id: 'block', kind: 'input', type: 'file', name: 
 const layout = () => { const v = emptyLayout(); v.sections[0].blocks = [block]; return v; };
 function adapter(sql: Database.Database): D1Database {
   const prepare = (query: string) => {
-    const bindable = (args: unknown[]): any => ({ bind: (...values: unknown[]) => bindable(values), first: async () => sql.prepare(query).get(...args) ?? null,
+    const bindable = (args: unknown[]): any => ({ bind: (...values: unknown[]) => {
+      if (values.length > 100) throw new Error('D1 bind limit exceeded');
+      return bindable(values);
+    }, first: async () => sql.prepare(query).get(...args) ?? null,
       all: async () => ({ results: sql.prepare(query).all(...args), success: true }), run: async () => ({ meta: { changes: sql.prepare(query).run(...args).changes } }),
       execute: () => ({ meta: { changes: sql.prepare(query).run(...args).changes } }) });
     return bindable([]);
@@ -49,6 +52,19 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); sql.close(); });
 describe('private form documents', () => {
+  it('claims 201 artificial attachments atomically within the D1 binding limit', async () => {
+    sql.exec(`INSERT INTO media_file_scans(id,line_account_id,subject_kind,subject_id,filename,mime_type,size_bytes,status)
+      VALUES ('synthetic-scan','a','form_file','synthetic','synthetic.png','image/png',1,'clean')`);
+    const insert = sql.prepare(`INSERT INTO form_submission_files
+      (id,line_account_id,form_id,block_id,friend_id,file_kind,side,r2_key,filename,mime_type,size_bytes,scan_id,created_at)
+      VALUES (?,'a','f','block','u','image','single',?,'synthetic.png','image/png',1,'synthetic-scan','2026-10-11')`);
+    const ids = Array.from({ length: 201 }, (_, i) => `synthetic-${i}`);
+    for (const id of ids) insert.run(id, id);
+    const record = await insertFormSubmissionRecord(db, { formId: 'f', friendId: 'u', data: '{}', fileIds: ids });
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM form_submission_files WHERE submission_id = ?').get(record.id)).toEqual({ n: 201 });
+    await expect(insertFormSubmissionRecord(db, { formId: 'f', friendId: 'u', data: '{}', fileIds: ids })).rejects.toThrow('document_attachment_conflict');
+    expect(sql.prepare('SELECT COUNT(*) AS n FROM form_submissions').get()).toEqual({ n: 1 });
+  });
   it('stores front/back privately, binds both to one answer, redacts staff, and serves owner/admin only', async () => {
     const front = await upload(); const back = await upload('back');
     expect(front.response.status).toBe(201); expect(back.response.status).toBe(201);

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 
 // Google Calendar 連携クエリヘルパー
@@ -44,12 +45,12 @@ function calendarAccountScopeSql(
 ): { sql: string; binds: string[] } {
   const clauses: string[] = [];
   if (scope.allowedAccountIds.length > 0) {
-    clauses.push(`${column} IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
+    clauses.push(`${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})`);
   }
   if (scope.includeUnassigned) clauses.push(`${column} IS NULL`);
   return {
     sql: clauses.length > 0 ? `(${clauses.join(' OR ')})` : '0 = 1',
-    binds: [...scope.allowedAccountIds],
+    binds: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [],
   };
 }
 

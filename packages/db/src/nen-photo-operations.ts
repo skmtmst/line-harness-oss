@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import {
   findRewardedAdoptedDuplicate,
   getEffectivePhotoRewardPolicy,
@@ -335,10 +336,10 @@ export async function applyBulkPhotoDecisions(
   // 写真行だけ見ると、他アカウントへ移った友だちの写真を確定してしまう。
   {
     const friendIds = [...new Set(subjects.map((subject) => subject!.friendId))];
-    const placeholders = friendIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(friendIds).sql;
     const rows = await db.prepare(
       `SELECT id FROM friends WHERE id IN (${placeholders}) AND line_account_id = ?`,
-    ).bind(...friendIds, input.lineAccountId).all<{ id: string }>();
+    ).bind(...(friendIds.length ? sqlIdSet(friendIds).binds : []), input.lineAccountId).all<{ id: string }>();
     const visible = new Set(rows.results.map((row) => row.id));
     const mismatchIndex = subjects.findIndex((subject) => !visible.has(subject!.friendId));
     if (mismatchIndex >= 0) return { kind: 'not_found', photoId: input.decisions[mismatchIndex].photoId };

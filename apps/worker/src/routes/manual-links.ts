@@ -130,7 +130,7 @@ async function update(c: AppContext, pathKey?: string) {
       key,
       keyKind,
       name,
-      url: body.url ?? existing?.url ?? null,
+      url: body.url === undefined ? existing?.url ?? null : body.url || null,
       expectedVersion: body.expectedVersion!,
       updatedBy: c.get('staff')?.id ?? null,
     });

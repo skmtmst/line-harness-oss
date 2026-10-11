@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -79,8 +80,8 @@ async function tagNames(db: D1Database, ids: Array<string | null>): Promise<Map<
   const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
   if (unique.length === 0) return new Map();
   const rows = await db.prepare(
-    `SELECT id, name FROM tags WHERE id IN (${unique.map(() => '?').join(',')})`,
-  ).bind(...unique).all<{ id: string; name: string }>();
+    `SELECT id, name FROM tags WHERE id IN (${sqlIdSet(unique).sql})`,
+  ).bind(...(unique.length ? sqlIdSet(unique).binds : [])).all<{ id: string; name: string }>();
   return new Map(rows.results.map((row) => [row.id, row.name]));
 }
 

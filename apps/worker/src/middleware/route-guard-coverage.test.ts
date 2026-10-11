@@ -273,6 +273,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/templates/message-references',
     'GET /api/identity-candidates',
     'GET /api/identity-candidates/:id',
+    'GET /api/images/:key',
     'GET /api/integrations/codex-monitor/status',
     'GET /api/integrations/google-calendar',
     'GET /api/integrations/google-calendar/bookings',

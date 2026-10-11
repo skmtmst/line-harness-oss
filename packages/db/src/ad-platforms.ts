@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow, toJstString } from './utils.js';
 import { decryptCredential, encryptCredential } from './credential-crypto.js';
 
@@ -340,10 +341,10 @@ export function adPlatformAccountCondition(
   scope: AdPlatformWriteScope,
 ): { clause: string; bindings: unknown[] } {
   if (scope.accountIds.length) {
-    const list = scope.accountIds.map(() => '?').join(',');
+    const list = sqlIdSet(scope.accountIds).sql;
     return scope.includeUnassigned
-      ? { clause: `(${column} IN (${list}) OR ${column} IS NULL)`, bindings: [...scope.accountIds] }
-      : { clause: `${column} IN (${list})`, bindings: [...scope.accountIds] };
+      ? { clause: `(${column} IN (${list}) OR ${column} IS NULL)`, bindings: scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : [] }
+      : { clause: `${column} IN (${list})`, bindings: scope.accountIds.length ? sqlIdSet(scope.accountIds).binds : [] };
   }
   return scope.includeUnassigned
     ? { clause: `${column} IS NULL`, bindings: [] }

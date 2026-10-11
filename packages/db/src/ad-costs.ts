@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 
 /**
@@ -393,7 +394,7 @@ export async function getAdCostImportStatus(
 ): Promise<Map<string, AdCostImportStatus>> {
   const map = new Map<string, AdCostImportStatus>();
   if (adPlatformIds.length === 0) return map;
-  const placeholders = adPlatformIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(adPlatformIds).sql;
   const rows = await db
     .prepare(
       `SELECT ad_platform_id, status, error_message, created_at
@@ -401,7 +402,7 @@ export async function getAdCostImportStatus(
         WHERE ad_platform_id IN (${placeholders})
         ORDER BY created_at DESC`,
     )
-    .bind(...adPlatformIds)
+    .bind(...(adPlatformIds.length ? sqlIdSet(adPlatformIds).binds : []))
     .all<{
       ad_platform_id: string;
       status: 'success' | 'failed';

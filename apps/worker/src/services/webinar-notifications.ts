@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   activeTenantLineAccountSql,
   isOperationCapabilityStopped,
@@ -485,11 +486,11 @@ export async function sendWebinarNotificationTest(
     throw new Error('invalid_test_recipients');
   }
   if (friendIds.length === 0) throw new Error('no_test_recipients');
-  const placeholders = friendIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(friendIds).sql;
   const targets = await db.prepare(
     `SELECT id, line_user_id, is_following FROM friends
       WHERE line_account_id=? AND id IN (${placeholders})`,
-  ).bind(webinar.accountId, ...friendIds).all<WebinarNotificationTestTarget>();
+  ).bind(webinar.accountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<WebinarNotificationTestTarget>();
   const account = await db.prepare(
     `SELECT channel_access_token, channel_access_token_encrypted, liff_id, is_active
        FROM line_accounts WHERE id=?`,

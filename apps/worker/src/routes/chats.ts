@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -199,8 +200,8 @@ async function countInboxSavedViewMatches(
     const clauses: string[] = [];
     if (conditions.assignees.includes('unassigned')) clauses.push('c.operator_id IS NULL');
     if (named.length > 0) {
-      clauses.push(`c.operator_id IN (${named.map(() => '?').join(', ')})`);
-      bindings.push(...named);
+      clauses.push(`c.operator_id IN (${sqlIdSet(named).sql})`);
+      bindings.push(...(named.length ? sqlIdSet(named).binds : []));
     }
     where.push(`(${clauses.join(' OR ')})`);
   }
@@ -287,8 +288,8 @@ async function countInboxSavedViewMatches(
     const clauses: string[] = [];
     if (conditions.assignees.includes('unassigned')) clauses.push('t.assigned_staff_id IS NULL');
     if (named.length > 0) {
-      clauses.push(`t.assigned_staff_id IN (${named.map(() => '?').join(', ')})`);
-      emailBindings.push(...named);
+      clauses.push(`t.assigned_staff_id IN (${sqlIdSet(named).sql})`);
+      emailBindings.push(...(named.length ? sqlIdSet(named).binds : []));
     }
     emailWhere.push(`(${clauses.join(' OR ')})`);
   }
@@ -606,9 +607,9 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
         const accountClauses: string[] = [];
         if (scope.allowedAccountIds.length > 0) {
           accountClauses.push(
-            `line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`,
+            `line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})`,
           );
-          accountFilterBindings.push(...scope.allowedAccountIds);
+          accountFilterBindings.push(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []));
         }
         if (scope.canSeeUnassigned) accountClauses.push('line_account_id IS NULL');
         accountFilterSql = accountClauses.length > 0
@@ -913,9 +914,9 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       const accountClauses: string[] = [];
       if (visibleScope.allowedAccountIds.length > 0) {
         accountClauses.push(
-          `line_account_id IN (${visibleScope.allowedAccountIds.map(() => '?').join(', ')})`,
+          `line_account_id IN (${sqlIdSet(visibleScope.allowedAccountIds).sql})`,
         );
-        accountFilterBindings.push(...visibleScope.allowedAccountIds);
+        accountFilterBindings.push(...(visibleScope.allowedAccountIds.length ? sqlIdSet(visibleScope.allowedAccountIds).binds : []));
       }
       if (visibleScope.canSeeUnassigned) accountClauses.push('line_account_id IS NULL');
       accountFilterSql = accountClauses.length > 0
@@ -1360,8 +1361,8 @@ chats.post('/api/chats/read-all', requireRole('owner', 'admin', 'staff'), inputJ
     const clauses: string[] = [];
     const accountBindings: string[] = [];
     if (scope.allowedAccountIds.length > 0) {
-      clauses.push(`f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
-      accountBindings.push(...scope.allowedAccountIds);
+      clauses.push(`f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})`);
+      accountBindings.push(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []));
     }
     if (scope.canSeeUnassigned) clauses.push('f.line_account_id IS NULL');
     if (clauses.length === 0) return c.json({ success: true, data: { marked: true } });

@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 export type LineWebhookEventStatus = 'received' | 'processing' | 'succeeded' | 'failed';
 
 export type LineWebhookErrorClassification = 'line_api_error' | 'db_error' | 'unknown';
@@ -128,9 +129,9 @@ export async function listLineWebhookEvents(
     rows.push(...result.results);
   }
   for (const accountIds of accountChunks) {
-    const placeholders = accountIds.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(accountIds).sql;
     const statusClause = input.status ? 'AND status = ?' : '';
-    const bindings: Array<string | number> = [...accountIds];
+    const bindings: Array<string | number> = [...(accountIds.length ? sqlIdSet(accountIds).binds : [])];
     if (input.status) bindings.push(input.status);
     bindings.push(limit);
 

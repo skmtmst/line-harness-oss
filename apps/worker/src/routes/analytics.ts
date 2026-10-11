@@ -1,3 +1,4 @@
+import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -105,7 +106,7 @@ function readRange(
     c.req.query('from') ??
     new Date(jstNow.getTime() - 30 * 24 * 3600_000).toISOString().slice(0, 10);
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromRaw) || !/^\d{4}-\d{2}-\d{2}$/.test(toRaw)) {
+  if (!isExistingCalendarDate(fromRaw) || !isExistingCalendarDate(toRaw)) {
     return { ok: false, error: '期間は 2026-08-01 の形で指定してください' };
   }
   if (fromRaw > toRaw) {

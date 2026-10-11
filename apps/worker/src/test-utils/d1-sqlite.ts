@@ -11,6 +11,7 @@ import Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { useSqliteClock } from './sqlite-clock.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DB_PKG_ROOT = join(__dirname, '../../../../packages/db')
@@ -80,9 +81,10 @@ function wrap(raw: Database.Database, sql: string, args: unknown[]) {
  * `attach` を渡した場合は既にあるDBへ繋ぐだけで、schemaは流さない。
  */
 export function createTestD1(
-  options?: { foreignKeys?: boolean; file?: string; attach?: boolean },
+  options?: { foreignKeys?: boolean; file?: string; attach?: boolean; now?: () => Date },
 ): SqliteD1 {
   const raw = new Database(options?.file ?? ':memory:')
+  if (options?.now) useSqliteClock(raw, options.now)
   if (options?.file) {
     /*
      * 実DBと同じ見え方のまま、テストのディスク待ちだけ削る。
@@ -116,7 +118,10 @@ export function createTestD1(
   const db = {
     prepare: (sql: string) => ({
       // batch が SELECT へ .all() を振り分けられるよう、元の SQL を残しておく。
-      bind: (...args: unknown[]) => ({ ...wrap(raw, sql, args), sql }),
+      bind: (...args: unknown[]) => {
+        if (args.length > 100) throw new Error(`D1 bind limit exceeded: ${args.length} > 100`)
+        return { ...wrap(raw, sql, args), sql }
+      },
       sql,
       ...(isSelect(sql) ? wrap(raw, sql, []) : wrap(raw, sql, [])),
     }),

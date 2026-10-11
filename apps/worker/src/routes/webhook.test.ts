@@ -160,7 +160,7 @@ const baseExecutionCtx = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([]);
+  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{id:'account-main',channel_secret:'env-default-secret',channel_access_token:'account-token',is_active:1} as never]);
 });
 
 describe('POST /webhook — V6 friend-add ledger', () => {
@@ -544,8 +544,8 @@ describe('POST /webhook — postback events', () => {
         eventData: { text: 'tag:premium', matched: false },
         replyToken: 'reply-token-postback',
       },
-      'env-default-token',
-      null,
+      'account-token',
+      'account-main',
       expect.objectContaining({sourceEventId:expect.any(String)}),
     );
     expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
@@ -642,8 +642,8 @@ describe('POST /webhook — postback events', () => {
         eventData: { text: 'tag:premium', matched: true },
         replyToken: 'reply-token-postback',
       },
-      'env-default-token',
-      null,
+      'account-token',
+      'account-main',
       expect.objectContaining({sourceEventId:expect.any(String)}),
     );
   });
@@ -910,3 +910,11 @@ vi.mock('../services/line-webhook-events.js',async()=>{
  return {...actual,processLineWebhookEvents:(input:any)=>unitLineEvents(input,ledger as any)};
 });
 vi.mock('../services/workflow-line-client.js',()=>({workflowLineClient:(client:any)=>client}));
+
+test('SEC-04 env署名が正しくても受信店が不明なら友だちを変更しない',async()=>{
+ vi.mocked(verifySignature).mockResolvedValue(true);
+ vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([]);
+ const pending:Promise<unknown>[]=[];
+ const res=await setupApp().request('/webhook',{method:'POST',headers:{'X-Line-Signature':'s'.repeat(44),'Content-Type':'application/json'},body:JSON.stringify({destination:'unknown',events:[{type:'unfollow',timestamp:Date.now(),source:{type:'user',userId:'U-other'}}]})},baseEnv,{...baseExecutionCtx,waitUntil:(p:Promise<unknown>)=>pending.push(p)});
+ await Promise.all(pending);expect(res.status).toBe(200);expect(getFriendByLineUserIdForAccount).not.toHaveBeenCalled();expect(updateFriendFollowStatus).not.toHaveBeenCalled();
+});

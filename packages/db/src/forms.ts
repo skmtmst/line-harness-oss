@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT, toJstString } from './utils.js';
 
 /**
@@ -140,7 +141,7 @@ export async function getFormsWithStats(
            EXISTS (
              SELECT 1 FROM form_accounts visible
              WHERE visible.form_id = f.id
-               AND visible.line_account_id IN (${accountIds.map(() => '?').join(', ')})
+               AND visible.line_account_id IN (${sqlIdSet(accountIds).sql})
            )
            ${scope.includeUnassigned
              ? `OR NOT EXISTS (SELECT 1 FROM form_accounts pending WHERE pending.form_id = f.id)`
@@ -205,7 +206,7 @@ export async function getFormsWithStats(
          last_submitted_at DESC,
          f.created_at DESC`,
     )
-    .bind(monthPrefix, monthPrefix, staleBefore, ...accountIds, ...folderBinds)
+    .bind(monthPrefix, monthPrefix, staleBefore, ...(accountIds.length ? sqlIdSet(accountIds).binds : []), ...folderBinds)
     .all<Form & {
       last_submitted_at: string | null;
       account_scope_review_required: number;
@@ -1106,7 +1107,7 @@ export async function insertFormSubmissionRecord(
   const now = jstNow();
   const fileIds = [...new Set(input.fileIds ?? [])];
   if (fileIds.length) {
-    const placeholders = fileIds.map(() => '?').join(',');
+    const placeholders = sqlIdSet(fileIds).sql;
     // D1 batch is a transaction: two concurrent answers cannot claim one upload.
     const results = await db.batch([
       db.prepare(`INSERT INTO form_submissions (id, form_id, friend_id, form_version_id, is_test, data, destination_write_status, created_at)
@@ -1115,10 +1116,10 @@ export async function insertFormSubmissionRecord(
           WHERE f.id IN (${placeholders}) AND f.friend_id = ? AND f.form_id = ? AND f.submission_id IS NULL
             AND f.deleted_at IS NULL AND (f.expires_at IS NULL OR julianday(f.expires_at) > julianday(?)) AND s.status = 'clean') = ?`)
         .bind(id, input.formId, input.friendId ?? null, input.formVersionId ?? null, input.isTest ? 1 : 0, input.data, now,
-          ...fileIds, input.friendId ?? null, input.formId, now, fileIds.length),
+          ...sqlIdSet(fileIds).binds, input.friendId ?? null, input.formId, now, fileIds.length),
       db.prepare(`UPDATE form_submission_files SET submission_id = ? WHERE id IN (${placeholders}) AND submission_id IS NULL
         AND EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
-        .bind(id, ...fileIds, id),
+        .bind(id, ...(fileIds.length ? sqlIdSet(fileIds).binds : []), id),
     ]);
     if (results[0].meta.changes !== 1 || results[1].meta.changes !== fileIds.length) throw new Error('document_attachment_conflict');
     return (await db.prepare('SELECT * FROM form_submissions WHERE id = ?').bind(id).first<FormSubmission>())!;
@@ -1373,7 +1374,7 @@ export async function getFormSubmissionAnalytics(
 
   let dateAnsweredUniqueFriends = 0;
   if (normalizedDateFields.length > 0) {
-    const placeholders = normalizedDateFields.map(() => '?').join(', ');
+    const placeholders = sqlIdSet(normalizedDateFields.map(field => field.key)).sql;
     const row = await db.prepare(
       `SELECT COUNT(DISTINCT fs.friend_id) AS unique_friends
          FROM form_submissions fs
@@ -1385,7 +1386,7 @@ export async function getFormSubmissionAnalytics(
           AND answer.key IN (${placeholders})
           AND answer.value IS NOT NULL
           AND TRIM(CAST(answer.value AS TEXT)) <> ''`,
-    ).bind(formId, lineAccountId, ...normalizedDateFields.map((field) => field.key))
+    ).bind(formId, lineAccountId, ...sqlIdSet(normalizedDateFields.map(field => field.key)).binds)
       .first<{ unique_friends: number }>();
     dateAnsweredUniqueFriends = Number(row?.unique_friends ?? 0);
   }

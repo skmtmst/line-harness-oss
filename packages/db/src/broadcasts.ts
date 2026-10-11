@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { refreshBroadcastReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
 // 'segment' は 029 の CHECK では前から許されていたが、型だけ落ちていた。
@@ -96,13 +97,12 @@ export interface Broadcast {
   approval_confirmed_count?: number | null;
 }
 
-export async function getBroadcasts(
-  db: D1Database,
+function broadcastListQuery(
   accountId?: string,
   scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
   // 一覧の並び順。一覧画面の「並び順」選択と連動する。既定は新しい順。
   opts?: { order?: 'asc' | 'desc'; from?: string; until?: string },
-): Promise<Broadcast[]> {
+): { sql: string; params: unknown[] } {
   // 一覧に集計の最新行を同梱する。送信済みごとに insight 口を叩く N+1 を
   // 一覧1クエリで吸収するため。LINEへの再取得は手動ボタン(fetch-insight)に寄せる。
   let sql = `SELECT b.*,
@@ -134,7 +134,8 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
   } else if (scope) {
     const conditions: string[] = [];
     if (scope.allowedAccountIds.length > 0) {
-      const placeholders = scope.allowedAccountIds.map(() => '?').join(',');
+      const idSet = sqlIdSet(scope.allowedAccountIds);
+      const placeholders = idSet.sql;
       conditions.push(`(
         b.line_account_id IN (${placeholders})
         OR (
@@ -146,7 +147,7 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
           )
         )
       )`);
-      params.push(...scope.allowedAccountIds, ...scope.allowedAccountIds);
+      params.push(...idSet.binds, ...idSet.binds);
     }
     if (scope.canSeeUnassigned) {
       conditions.push('(b.line_account_id IS NULL AND b.account_ids IS NULL)');
@@ -160,10 +161,56 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
     if (opts.until) { sql += ' AND julianday(COALESCE(b.sent_at, b.scheduled_at, b.created_at)) < julianday(?)'; params.push(opts.until); }
   }
   sql += ` ORDER BY COALESCE(b.sent_at, b.scheduled_at, b.created_at) ${opts?.order === 'asc' ? 'ASC' : 'DESC'}`;
-  const result = params.length > 0
-    ? await db.prepare(sql).bind(...params).all<Broadcast>()
-    : await db.prepare(sql).all<Broadcast>();
-  return result.results;
+  return { sql, params };
+}
+
+export async function getBroadcasts(db: D1Database, accountId?: string,
+  scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
+  opts?: { order?: 'asc' | 'desc'; from?: string; until?: string; status?: string; dueAt?: string },
+): Promise<Broadcast[]> {
+  const query = broadcastListQuery(accountId, scope, opts);
+  // 定期送信は終わった配信の本文まで読み込まない。
+  if(opts?.status || opts?.dueAt) {
+    query.sql = `SELECT * FROM (${query.sql}) b WHERE 1=1`;
+    if(opts.status){query.sql+=' AND b.status=?';query.params.push(opts.status);}
+    if(opts.dueAt){query.sql+=' AND b.scheduled_at IS NOT NULL AND julianday(b.scheduled_at)<=julianday(?)';query.params.push(opts.dueAt);}
+  }
+  return (await db.prepare(query.sql).bind(...query.params).all<Broadcast>()).results;
+}
+
+/** 集計はSQLで返し、本文・台帳は表示ページの分だけ読み込む。 */
+export async function getBroadcastListPage(db:D1Database, accountId:string|undefined,
+  scope:{allowedAccountIds:string[];canSeeUnassigned:boolean},
+  opts:{order:'asc'|'desc';from?:string;until?:string;folderId?:string;status?:string;displayStatuses?:string[];limit:number;offset:number;now?:string},
+):Promise<{items:Broadcast[];total:number;drafts:number;statusCounts:Record<string,number>}> {
+  const base=broadcastListQuery(accountId,scope,opts);
+  base.sql=base.sql.replace(/ ORDER BY COALESCE\(b.sent_at, b.scheduled_at, b.created_at\) (ASC|DESC)$/, '');
+  const draftRow=await db.prepare(`SELECT COUNT(*) n FROM (${base.sql}) WHERE status='draft'`).bind(...base.params).first<{n:number}>();
+  const folder=opts.folderId ? (opts.folderId==='unfiled' ? " WHERE (folder_id IS NULL OR folder_id='')" : ' WHERE folder_id=?') : '';
+  const folderBinds=opts.folderId && opts.folderId!=='unfiled' ? [opts.folderId]:[];
+  // deriveBroadcastDisplayStatus と同じ優先順位。件数・絞り込みのための存在確認はDB内だけで行う。
+  const classified=`SELECT b.*, CASE
+    WHEN approval_status='pending' THEN CASE WHEN scheduled_at IS NOT NULL AND julianday(scheduled_at)<=julianday(?) THEN 'expired' ELSE 'pending_approval' END
+    WHEN approval_status='expired' THEN 'expired'
+    WHEN stopped_at IS NOT NULL AND stopped_at<>'' THEN 'stopped'
+    WHEN status='scheduled' THEN 'scheduled'
+    WHEN status='sending' THEN CASE WHEN EXISTS(SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=b.id AND c.state IN('sent','failed','unknown','claimed')) THEN 'sending' ELSE 'preparing' END
+    WHEN status='sent' THEN CASE
+      WHEN EXISTS(SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=b.id AND c.state='failed') THEN CASE WHEN EXISTS(SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=b.id AND c.state='sent') THEN 'partial_failed' ELSE 'failed' END
+      WHEN NOT EXISTS(SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=b.id AND c.state='sent') AND EXISTS(SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=b.id AND c.state='unknown') THEN 'failed'
+      ELSE 'sent' END
+    ELSE 'draft' END AS display_status FROM (${base.sql}) b${folder}`;
+  const binds=[opts.now??new Date().toISOString(),...base.params,...folderBinds];
+  const counts=await db.prepare(`SELECT display_status,COUNT(*) n FROM (${classified}) GROUP BY display_status`).bind(...binds).all<{display_status:string;n:number}>();
+  const statusCounts:Record<string,number>={all:0};
+  for(const row of counts.results){statusCounts[row.display_status]=row.n;statusCounts.all+=row.n;}
+  const conditions:string[]=[];const filterBinds:string[]=[];
+  if(opts.status){conditions.push('status=?');filterBinds.push(opts.status);}
+  if(opts.displayStatuses){conditions.push('display_status IN (SELECT value FROM json_each(?))');filterBinds.push(JSON.stringify(opts.displayStatuses));}
+  const filtered=`SELECT * FROM (${classified})${conditions.length?' WHERE '+conditions.join(' AND '):''}`;
+  const total=await db.prepare(`SELECT COUNT(*) n FROM (${filtered})`).bind(...binds,...filterBinds).first<{n:number}>();
+  const items=await db.prepare(`${filtered} ORDER BY julianday(COALESCE(sent_at,scheduled_at,created_at)) ${opts.order==='asc'?'ASC':'DESC'},id ${opts.order==='asc'?'ASC':'DESC'} LIMIT ? OFFSET ?`).bind(...binds,...filterBinds,opts.limit,opts.offset).all<Broadcast>();
+  return {items:items.results,total:total?.n??0,drafts:draftRow?.n??0,statusCounts};
 }
 
 export async function getBroadcastById(

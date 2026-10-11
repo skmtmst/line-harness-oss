@@ -1625,6 +1625,21 @@ const spec = {
         responses: { '200': { description: 'Cancelled' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/images/{key}': {
+      get: {
+        tags: ['Media'],
+        summary: 'Read an uploaded image within the authenticated staff account scope',
+        parameters: [
+          { name: 'key', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Owned image bytes', content: { 'image/*': { schema: { type: 'string', format: 'binary' } } } },
+          '401': { description: 'Authentication required' },
+          '404': { description: 'Image not found within the account scope' },
+        },
+      },
+    },
     '/api/hq/banners/images': {
       get: {
         tags: ['HQ Banners'], summary: '統括のバナー画像一覧を取得',

@@ -1,3 +1,4 @@
+import { isCalendarDate as isExistingCalendarDate, scheduledJstIso } from '@line-crm/shared';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
 import { restaurantRotation } from '../services/restaurant-rotation.js';
@@ -542,23 +543,25 @@ function parseReservationFilter(c: Context<Env>, orgId: string, scopedStoreId: s
   let where = 's.organization_id = ? AND (? IS NULL OR s.id = ?)';
   const from = c.req.query('reservationFrom') || (c.req.path.endsWith('/board')?c.req.query('from'):'') || '';
   if (from) {
-    const parsed = Date.parse(from);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(from) && !isExistingCalendarDate(from)) return { ok: false, error: '期間の指定が正しくありません' };
+    const parsed = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(from) ? scheduledJstIso(from, '00:00')! : from);
     if (!Number.isFinite(parsed)) return { ok: false, error: '期間の指定が正しくありません' };
-    where += c.req.path.endsWith('/board')?' AND julianday(r.starts_at) >= julianday(?)':' AND r.starts_at >= ?';
+    where += ' AND julianday(r.starts_at) >= julianday(?)';
     params.push(new Date(parsed).toISOString());
   }
   const to = c.req.query('reservationTo') || (c.req.path.endsWith('/board')?c.req.query('to'):'') || '';
   if (to) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      if (!isExistingCalendarDate(to)) return { ok: false, error: '期間の指定が正しくありません' };
       // 日付だけの指定はその日の終わりまで含める（翌日0時未満）。
-      const next = new Date(`${to}T00:00:00.000Z`);
+      const next = new Date(scheduledJstIso(to, '00:00')!);
       next.setUTCDate(next.getUTCDate() + 1);
-      where += ' AND r.starts_at < ?';
+      where += ' AND julianday(r.starts_at) < julianday(?)';
       params.push(next.toISOString());
     } else {
       const parsed = Date.parse(to);
       if (!Number.isFinite(parsed)) return { ok: false, error: '期間の指定が正しくありません' };
-      where += c.req.path.endsWith('/board')?' AND julianday(r.starts_at) < julianday(?)':' AND r.starts_at <= ?';
+      where += c.req.path.endsWith('/board') ? ' AND julianday(r.starts_at) < julianday(?)' : ' AND julianday(r.starts_at) <= julianday(?)';
       params.push(new Date(parsed).toISOString());
     }
   }

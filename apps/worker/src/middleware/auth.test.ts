@@ -1153,3 +1153,17 @@ describe('N-423 staff deny-by-default (#670)', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('SEC-02 管理フォームの下書き権限', () => {
+ test('フォーム権限のない担当者はaccount_idを付けても管理定義を読めない', async()=>{
+  const res=await app().request('/api/forms/form-1?account_id=a',{headers:{Authorization:'Bearer no-permissions-key'}},crossSiteEnv());
+  expect(res.status).toBe(403);
+ });
+ test('停止した統括の管理者は下書きを読めない',async()=>{
+  expect((await app().request('/api/forms/form-1?account_id=a',{headers:{Authorization:'Bearer suspended-key'}},crossSiteEnv())).status).toBe(403);
+ });
+ test('管理者の下書き取得と認証なしの公開取得を保つ',async()=>{
+  expect((await app().request('/api/forms/form-1?account_id=a',{headers:{Authorization:'Bearer env-key'}},crossSiteEnv())).status).toBe(200);
+  expect((await app().request('/api/forms/form-1',{},crossSiteEnv())).status).toBe(200);
+ });
+});
