@@ -2,7 +2,7 @@
 
 /*
  * 「プレビューを開く →」：お客さまの申込ページの見本を窓で見せる（絵 d4adD4 の右の列）。
- * 口は今の作り（components/events/event-application-preview.tsx）と同じ applicationPreview。
+ * 口は既存の applicationPreview。APIが見本として返した情報を表示する。
  * 見本を作るだけで、申し込みや公開はしない。
  */
 import { useRef, useState } from 'react'
@@ -63,7 +63,9 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
           <div className={styles.previewBody}>
             <p className={styles.phoneName}>{data.name}</p>
             <p>{formatDateTime(data.startsAt)}〜{formatDateTime(data.endsAt)}</p>
-            {data.venueName ? <p>{data.venueName}</p> : null}
+            {data.venueName || data.venueUrl ? <p>{data.venueUrl
+              ? <a href={data.venueUrl} target="_blank" rel="noopener noreferrer">{data.venueName || '会場の案内'}</a>
+              : data.venueName}</p> : null}
             {data.venueAddress ? <p>{data.venueAddress}</p> : null}
             {data.description ? <p className={styles.previewText}>{data.description}</p> : null}
             <p>残り {data.capacity} 席</p>
