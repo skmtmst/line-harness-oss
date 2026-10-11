@@ -371,7 +371,7 @@ export default function OpsSupportV8() {
         <section aria-label="チケットの一覧" className={styles.list}>
           <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="チケットを探す" aria-label="チケットを探す" />
           <ListToolbarRow>
-            <Select aria-label="状態で絞る" label="状態" options={STAGE_CHIPS.map(c => ({ value: c.key, label: c.label }))} value={stage} onChange={value => setStage(value as typeof stage)} size="page-size" />
+            <Select aria-label="状態で絞る" label="状態" options={STAGE_CHIPS.map(c => ({ value: c.key, label: c.label, description: summary ? `${summary.byStage[c.key]}件` : undefined }))} value={stage} onChange={value => setStage(value as typeof stage)} size="page-size" />
             <SaveErrorField names={["priority"]}><Select aria-label="優先度で絞る" options={PRIORITY_FILTER} value={priority} onChange={value => setPriority(value as '' | OpsSupportPriority)} size="page-size" /></SaveErrorField>
             <SaveErrorField names={["sort"]}><Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={value => setSort(value as typeof sort)} size="page-size" /></SaveErrorField>
           </ListToolbarRow>

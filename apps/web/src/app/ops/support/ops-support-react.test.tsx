@@ -203,7 +203,12 @@ describe('画面', () => {
     const text = host.textContent ?? ''
     const information = Array.from(host.querySelectorAll('[title]')).map(node => node.getAttribute('title')).join('\n')
     expect(text).toContain('すべて')
-    expect(text).toContain('86')
+    const stages = host.querySelector<HTMLButtonElement>('button[aria-label="状態で絞る"]')!
+    await act(async () => { stages.click() })
+    const options = [...document.body.querySelectorAll('[role="option"]')]
+    expect(options.find(option => option.textContent?.includes('すべて'))?.textContent).toContain('86件')
+    expect(options.find(option => option.textContent?.includes('新規'))?.textContent).toContain('3件')
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
     expect(information).toContain('未対応のチケット')
     expect(information).toContain('LINEから受付 3件')
     expect(information).toContain('1時間24分')

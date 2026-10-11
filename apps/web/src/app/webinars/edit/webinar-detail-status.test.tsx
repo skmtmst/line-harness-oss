@@ -123,7 +123,7 @@ describe('通知概要の状態表示(DETAIL-19)', () => {
       const html = renderToStaticMarkup(<NotificationStateBadge state={state} />)
       expect(html).toContain(`data-tone="${tone}"`)
       expect(html).toContain(label)
-      expect(html).toContain('data-status-pill')
+      expect(html).toContain('data-design-node="xRvDB"')
       if (state !== 'configured') expect(html).not.toContain('data-tone="success"')
     }
     /* 4状態すべてが別の言葉になる */

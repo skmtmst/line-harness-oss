@@ -136,7 +136,8 @@ function moreButtons(): HTMLButtonElement[] {
 }
 
 function stopButton(): HTMLButtonElement | undefined {
-  return [...document.body.querySelectorAll<HTMLButtonElement>('[aria-label="止めるときの小窓"] button')]
+  const reason = document.body.querySelector('#cv-stop-reason')
+  return [...(reason?.closest('[role="dialog"]')?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
     .find(button => button.textContent?.trim() === '止める')
 }
 
@@ -203,7 +204,8 @@ describe('R280 成果地点の操作メニューは1つだけ', () => {
       row!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     await act(async () => { await Promise.resolve() })
-    expect(document.body.querySelector('[aria-label="詳細の小窓"]')).not.toBeNull()
+    expect(document.body.querySelector('[data-design-part="detail-panel"]')).not.toBeNull()
+    expect(document.body.textContent).toContain('今月の成果：')
   })
 })
 

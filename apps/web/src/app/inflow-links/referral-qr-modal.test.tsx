@@ -12,9 +12,9 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 describe('現役の流入QRと停止経路の発行制限', () => {
   it('有効な経路はQR・コピー・ダウンロードを出す', () => {
     render(<QrDialog route={{ refCode: 'shop-a', name: '店頭POP', genre: null, isActive: true }} onClose={() => {}} />)
-    expect(screen.getByRole('img', { name: '店頭POPのQRコード' }).getAttribute('src')).toContain('/api/qr')
-    expect(screen.getByRole('button', { name: 'URLをコピー' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'PNG を保存' }).getAttribute('href')).toContain('download=1')
+    expect(screen.getByRole('img', { name: '店頭POP の QR コード' }).getAttribute('src')).toContain('/api/qr')
+    expect(screen.getByRole('button', { name: 'コピー' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: '画像をダウンロード' }).getAttribute('href')).toContain('download=1')
   })
   it('停止中の経路はダッシュボードからQRを新しく発行できず、コピー・保存を止める', () => {
     const { container } = render(<DashboardQrDialog open accountName="店頭" baseLink="https://line.me/R/ti/p/@shop"
@@ -31,7 +31,7 @@ describe('現役の流入QRと停止経路の発行制限', () => {
   })
   it('未登録 ref（有効・無効の概念なし）は従来どおり出す', () => {
     render(<QrDialog route={{ refCode: 'external-x', name: '(未登録)', genre: null, isActive: null }} onClose={() => {}} />)
-    expect(screen.getByRole('img', { name: '(未登録)のQRコード' }).getAttribute('src')).toContain('/api/qr')
-    expect(screen.getByRole('link', { name: 'PNG を保存' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: '(未登録) の QR コード' }).getAttribute('src')).toContain('/api/qr')
+    expect(screen.getByRole('link', { name: '画像をダウンロード' })).toBeTruthy()
   })
 })
