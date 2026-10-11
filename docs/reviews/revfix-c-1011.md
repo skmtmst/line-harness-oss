@@ -15,6 +15,9 @@
 | NORMAL3-03 | 現役履歴の変更・取消がなく失敗 | 共通履歴へ接続、版つき取消APIで確認 | 旧履歴とカードを共通へ統一 | 実入口の取消＋既存self-change試験 |
 | NORMAL3-04 | 現役入口が4つの店設定を無視して4件失敗 | 共通日時選択が週先・月先・週だけ・月だけを反映 | 旧日時選択と週カレンダーを共通へ統一 | 店の全4設定を実入口で確認 |
 
+| REM3-03 | 元Booking＋本物Stepperで支払い応答を渡すと4段、1 failed / 1 passed | 支払いが返ったとき5段・現在は5を選択。店払いは4段 | 固定4段のサロン2実装は共通化済み、現在1か所 | Booking.payment-steps 2件（決済部品は差し替え、実決済なし） |
+| REM3-02 | 仕様と絵の寸法が不一致で判定保留 | 修正しない | 共通枠1か所、絵2種を比較 | 寸法の正本の統一待ち |
+
 ## 再現の証拠
 
 - UI-02: `/tmp/revfixc-ui02-red.log`。初回の依存未ビルドは再現証拠にせず、ビルド後の9 failed / 3 passedを確認。修正後は既存5試験を含む17 passed。
@@ -26,3 +29,6 @@
 - NORMAL3: `/tmp/revfixc-normal3-red.log` 元Worker入口から7 failed、共通化後同じ7件がpass。元moduleをimportし、APIだけを人工データへ置換。
 - 削除対象を読む試験: deployed-liffの3件をapps/liffのsalon-regressionへ移動（質問・期限・入力保持と同じ冪等鍵）。tap-actions.integrationの7件は共通入口のURL関数へ変更。entryのサロン2件は実際の共通画面を操作する形へ変更。12件の検証内容を維持。
 - Workerの入口wrapperとLIFF単体は同じBooking・BookingHistory・共通部品を読む。SDKをmain.tsから渡し、店と本人の文脈はsetLiffContextで保持。
+
+- REM3-03: `/tmp/revfixc-rem303-red.log` 1 failed / 1 passed。修正後2 passed。支払いの有無は予約作成応答のpaymentで判明するため、その後の手順帯を5段にする。事前の公開メニューには支払い方式の欄がないため、事前から5段にするには公開APIの欄が必要（今回追加しない）。
+- REM3-02: `v8-liff.md` は外枠330×690。固定htmlの `xRPdo.html:1223` は330×690、padding10・outline2・offset-1。一方 `owaS3.html:2112` は330×714、outline8・offset-4（半分外側）。実装LiffPhoneFrameは330×714、outline8・offset未指定（8すべて外側、外周は346×730）。測る基準をそろえても外枠と中身の寸法が違い、予約の絵自体も714のため、690固定にはしない。司令塔による枠寸法と線の位置の統一が必要。未確認を再現済みとして数えない。
