@@ -124,8 +124,17 @@ export function ListToolbarOptional({ children, label = 'ほかの絞り込み',
       if (!item.hasAttribute('data-collapsed')) expandedWidthRef.current = content.getBoundingClientRect().width
       const tools = [...toolbar.querySelectorAll<HTMLElement>('[data-toolbar-tools]')].flatMap((group) => [...group.children] as HTMLElement[])
       const gap = parseFloat(getComputedStyle(toolbar).columnGap) || 0
-      const required = tools.reduce((width, tool) => width + (tool === item ? expandedWidthRef.current : tool.getBoundingClientRect().width), 0) + gap * Math.max(0, tools.length - 1)
-      setCollapsed(required > toolbar.clientWidth)
+      const required = tools.reduce((total, tool) => {
+        let width = tool === item ? expandedWidthRef.current : tool.getBoundingClientRect().width
+        // 札が畳まれた瞬間の幅で補助操作を戻すと、両方が交互に開閉する。
+        // 補助操作を先に畳み、札は残った幅で判断する。
+        const groups = tool.matches('[data-filter-width]') ? [tool] : [...tool.querySelectorAll<HTMLElement>('[data-filter-width]')]
+        for (const group of groups) width += Math.max(0, Number(group.dataset.filterWidth) - group.getBoundingClientRect().width)
+        return total + width
+      }, 0) + gap * Math.max(0, tools.length - 1)
+      const css = getComputedStyle(toolbar)
+      const available = toolbar.clientWidth - parseFloat(css.paddingLeft || '0') - parseFloat(css.paddingRight || '0')
+      setCollapsed(required > available)
     }
     const observer = new ResizeObserver(measure)
     observer.observe(toolbar)
