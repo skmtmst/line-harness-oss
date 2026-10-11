@@ -10,6 +10,7 @@
  *      2成功0失敗=成功で、文言と色が分かれる。
  *   4. テスト送信もLINE公式アカウントの送信枠を使うと説明する。
  */
+import { setTextControlValue } from '@/test-utils/text-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -97,18 +98,13 @@ function unmount() {
 }
 
 function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-    'value',
-  )?.set
-  setter?.call(element, value)
-  element.dispatchEvent(new Event('input', { bubbles: true }))
+  setTextControlValue(element, value)
 }
 
 async function fillMinimum() {
   const title = container.querySelector('input[placeholder="例：8月キャンペーンのお知らせ"]') as HTMLInputElement | null
   expect(title).not.toBeNull()
-  const body = container.querySelector('textarea[placeholder="テキストを入力"]') as HTMLTextAreaElement | null
+  const body = container.querySelector('[role="textbox"][placeholder="テキストを入力"]') as HTMLTextAreaElement | null
   expect(body).not.toBeNull()
   await act(async () => {
     setNativeValue(title!, '検証配信用の題')

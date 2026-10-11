@@ -46,7 +46,8 @@ const STEP_CALL = callArguments(FORM, 'const progressSteps = broadcastSteps(')
 describe('作成画面の5段の帯（設計 LMiL2）', () => {
   it('帯を描いている', () => {
     // 設計 C：いまいる所は currentKey（URL の ?step=）で渡す。
-    expect(FORM).toContain('<BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />')
+    expect(FORM).toContain('<Steps connectorSize=')
+    expect(FORM).toContain('steps={steps} currentKey={currentStep ?? undefined}')
   })
 
   /**

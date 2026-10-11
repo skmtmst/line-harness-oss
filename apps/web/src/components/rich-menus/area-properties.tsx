@@ -1,7 +1,6 @@
 'use client'
 
 import TagPickerField from '@/components/shared/tag-picker-field'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useId } from 'react'
 import { ArrowLeftRight, CalendarClock, Copy, Phone, Send, Zap } from 'lucide-react'
 import MultiSelect from '@/components/shared/multi-select'
@@ -235,7 +234,7 @@ export function AreaProperties({
   const inputId = useId()
   const data = (area.actionData ?? {}) as Record<string, unknown>
   const intent = intentOf(area)
-  const theme = useAdminTheme()
+
   const selectedTagIds = area.tagIds ?? []
   const intentOptions = allowedIntents
     ? INTENT_OPTIONS.filter((option) => allowedIntents.includes(option.value))

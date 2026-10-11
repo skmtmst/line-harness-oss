@@ -22,7 +22,6 @@ import DateField from '@/components/shared/date-field'
 import MenuPortal from '@/components/shared/menu-portal'
 import Button from '@/components/shared/button'
 import { InsertButton, type InsertTextTarget } from '@/components/shared/insert-text-field'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
@@ -65,7 +64,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   const [targetDate, setTargetDate] = useState('')
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   /* ★V8（絵 OVCot）：差し込むボタンは丸い枠（＋名前・＋配信日・…その他）。v7 は今のまま。 */
-  const v8 = useAdminTheme() === 'v8'
+
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -118,7 +117,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     })
   }
 
-  const menuButton = (key: string, label: string, token?: string) => v8 ? (
+  const menuButton = (key: string, label: string, token?: string) => (
     <InsertButton size={compact ? 'compact' : undefined}
       ref={(element) => { buttonRefs.current[key] = element }}
       icon={key === 'other' ? 'more' : 'plus'}
@@ -126,14 +125,6 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
       expanded={token ? undefined : open === key}
       onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
     />
-  ) : (
-    <Button variant="secondary" className={(`border-hairline rounded-control v7:h-8 border px-2.5 text-xs transition-colors ${
-        open === key ? 'bg-accent-soft text-accent-deep border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
-      }`) + ' whitespace-normal'} type="button" ref={(element) => {
-        buttonRefs.current[key] = element
-      }} onClick={() => token ? insert(token) : setOpen(open === key ? null : key)} aria-expanded={open === key}>
-      {label}
-    </Button>
   )
 
   const list = (menuKey: string, items: Option[], empty: string) => (
@@ -171,11 +162,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     <div className="relative flex flex-wrap items-center gap-1.5 v8:gap-x-3 v8:gap-y-2">
       <span className="text-ink-faint text-xs v8:text-micro">差し込み</span>
 
-      {v8 ? <InsertButton size={compact ? 'compact' : undefined} label="名前" onClick={() => insert('{{name}}')} /> : (
-        <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
-          名前
-        </Button>
-      )}
+      {<InsertButton size={compact ? 'compact' : undefined} label="名前" onClick={() => insert('{{name}}')} />}
 
       {fieldsEnabled && (
         <div className="relative">
@@ -226,7 +213,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
                 aria-label="目標日"
                 className="min-w-0 flex-1"
               /></SaveErrorField>
-              <Button variant="secondary" className="text-ink-secondary v7:h-8 shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
+              <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
                 入れる
               </Button>
             </div>
@@ -234,7 +221,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
             <p className="text-ink text-xs font-medium mt-3">配信日から何日後かの日付</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {[1, 3, 7, 14, 30].map((n) => (
-                <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
+                <Button variant="secondary" className="text-ink-secondary px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
                   {n}日後
                 </Button>
               ))}
