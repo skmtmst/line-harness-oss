@@ -9,7 +9,7 @@ const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 const LIST = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const CREATE = readUiSource(join(HERE, 'new', 'page.tsx'), 'utf8')
 const EDIT = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
-const BRANCH_EDITOR = read('branch-editor.tsx')
+const BRANCH_EDITOR = read('..', '..', 'v8', 'automations', 'branch-editor.tsx')
 const VERSIONS = readUiSource(join(HERE, 'versions', 'page.tsx'), 'utf8')
 const EDITOR = read('..', '..', 'components', 'automations', 'common-action-editor.tsx')
 // #580: 権限の実体は use-can-manage.ts へ1本化。旧2ファイルは互換の再送出。
