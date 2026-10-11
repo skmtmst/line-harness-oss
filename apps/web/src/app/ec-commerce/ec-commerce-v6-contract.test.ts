@@ -7,7 +7,7 @@ const tabs = readFileSync(join(import.meta.dirname, 'ec-tabs.ts'), 'utf8')
 const tabsView = readFileSync(join(import.meta.dirname, 'ec-tabs-view.tsx'), 'utf8')
 const identity = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/identity.tsx'), 'utf8')
 const subscriptions = readFileSync(join(import.meta.dirname, 'subscriptions-panel.tsx'), 'utf8')
-const connector = readFileSync(join(import.meta.dirname, 'connector-panel.tsx'), 'utf8')
+const connector = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/connector.tsx'), 'utf8')
 const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6 EC integration screens', () => {
@@ -60,7 +60,7 @@ describe('V6 EC integration screens', () => {
       expect(source).toContain("'loading'")
     }
     expect(subscriptions).toContain("monthlyAmount === null ? '今月の金額は未取得'")
-    expect(connector).toContain("'— 未取得'")
+    expect(connector).toContain("'未取得'")
   })
 
   it('reads subscription facts and writes versioned connector settings without exposing the secret', () => {
@@ -68,7 +68,7 @@ describe('V6 EC integration screens', () => {
     expect(api).toContain('/api/ec-commerce/connector?')
     expect(connector).toContain('expectedVersion')
     expect(connector).toContain('type="password"')
-    expect(connector).toContain('鍵そのものは表示しません')
+    expect(connector).toContain('画面には最後の4文字だけを出します')
     expect(connector).not.toContain('inbound_secret_encrypted')
   })
 
@@ -78,10 +78,10 @@ describe('V6 EC integration screens', () => {
     // #948 N-320: 影響件数はEC起点の設定だけを数え、行ごとに範囲を添える。
     // やり直しかたは値に依存せず常時表示する(実行単位の手動やり直しへの行き先)。
     const mockApi = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
-    expect(connector).toContain('Object.values(data?.impact ?? {})')
+    expect(connector).toContain('const impact = data?.impact')
     expect(connector).toContain('「ECの出来事がきっかけ」とあるものは、このつなぎ先を止めると止まります。コンバージョンと分析はアカウント全体の記録数です。')
-    expect(connector).toContain("'ECの出来事がきっかけ'")
-    expect(connector).toContain("'アカウント全体'")
+    expect(connector).toContain('ECの出来事がきっかけ')
+    expect(connector).toContain('アカウント全体')
     expect(connector).toContain('失敗した処理のやり直しは「取り込みの記録」タブで一件ずつ「もう一度やる」から行います。')
     expect(connector).not.toContain('data?.retryPolicy')
     expect(connector).not.toContain('やり直しの決めごと')
@@ -135,7 +135,7 @@ describe('V6 EC integration screens', () => {
 
   it('shares one date formatter across the three EC screens (#580)', () => {
     expect(page).toContain("polishFormatDate(value, { style: 'list' })")
-    expect(connector).toContain("from './ec-datetime'")
+    expect(connector).toContain("formatDateTime(date)")
     expect(subscriptions).toContain("from './ec-datetime'")
     expect(page).toContain('function dateTime(')
     expect(connector).not.toContain('function dateTime(')

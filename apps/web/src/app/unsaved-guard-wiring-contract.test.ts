@@ -39,7 +39,6 @@ const GUARDED = [
   'app/booking/staff/new/page.tsx',
   'v8/common-vars-edit/new.tsx',
   'v8/conversions/create.tsx',
-  'app/ec-commerce/connector-panel.tsx',
   'v8/settings/ec-commerce/connector.tsx',
   'v8/form-edit/edit.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',

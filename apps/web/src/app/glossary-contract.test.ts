@@ -102,7 +102,6 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     const migrating = new Set([
     'app/booking/menus/page.tsx',
     'app/common-actions/versions/page.tsx',
-    'app/ec-commerce/connector-panel.tsx',
     'app/emergency/page.tsx',
 
 

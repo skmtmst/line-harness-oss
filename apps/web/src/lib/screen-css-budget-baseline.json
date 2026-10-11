@@ -64,11 +64,6 @@
     "height": 5,
     "font": 0
   },
-  "app/ec-commerce/ec-connector-v8.module.css": {
-    "spacing": 2,
-    "height": 2,
-    "font": 2
-  },
   "app/emergency/control-v8.module.css": {
     "spacing": 22,
     "height": 5,
