@@ -1748,7 +1748,6 @@ async function runFrequentHeavyJobs(
       },
     },
     { name: 'visit stamps', run: () => processVisitStampQueue(env) },
-    { name: 'restaurant events', run: () => processRestaurantEvents(env) },
     { name: 'restaurant followup jobs', run: async () => { await processScenarioSourceJobs(env); } },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
@@ -2093,6 +2092,10 @@ async function scheduled(
   // 通知・配信と、再実行できる重い集計・走査を別のCron invocationへ分ける。
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
   const lane = scheduledLane(event.cron);
+  if (lane === 'restaurantMinute') {
+    await runIsolatedScheduledJobs([{ name: 'restaurant events', run: () => processRestaurantEvents(env) }]);
+    return;
+  }
   if (lane === 'frequentHeavy') {
     await runFrequentHeavyJobs(event, env);
     return;
