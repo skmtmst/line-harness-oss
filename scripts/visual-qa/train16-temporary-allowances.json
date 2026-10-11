@@ -60,13 +60,6 @@
       "expires": "2026-10-17"
     },
     {
-      "match": "固定値不一致: 選ぶカード/オン B-203 background-color src/components/shared/radio-card.module.css .card.checked background\n    設計 html/components-NbomF.html fNPdg = #f1f8f3\n    実際 #e8f8ee",
-      "count": 1,
-      "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",
-      "owner": "pendec",
-      "expires": "2026-10-17"
-    },
-    {
       "match": "固定値不一致: 一斉配信一覧の名前 B-218 src/v8/broadcasts/list.module.css .cellTitle font-weight\n    設計 html/l5V9a.html 名前（一覧共通の決まりB-218） = 700\n    実際 500",
       "count": 1,
       "reason": "10-11固定写しで再確認した既知25件。写しは戻さず、pendecが実装を合わせるまでの一時許可。MAPREGEN2-1011-REPORT.md に一覧。",

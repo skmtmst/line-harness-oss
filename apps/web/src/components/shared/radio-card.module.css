@@ -223,7 +223,7 @@
 }
 [data-theme='v8'] .radio:checked { background: var(--color-canvas); outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; box-shadow: none; }
 [data-theme='v8'] .radio:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
-[data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { background: var(--color-accent-soft); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
+[data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { background: var(--color-choice-selected); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
 [data-theme='v8'] .disabled { background: var(--color-canvas-sunken); outline-color: var(--color-ink-disabled); }
 [data-theme='v8'] .disabled .radio { outline-color: var(--color-ink-disabled); }
 [data-theme='v8'] .invalid, [data-theme='v8'] .invalid .radio { outline-color: var(--color-status-danger); }
