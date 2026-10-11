@@ -29,7 +29,7 @@ for (const step of ['mileage','scenario_enroll','event_tag_change']) {
 test('D-04 保存応答を失っても3工程のpendingが残り、同じタグで補完する', async () => {
   const interrupted = { ...f.db, batch: async (statements: D1PreparedStatement[]) => {
     await f.db.batch(statements); throw new Error('process interrupted after commit');
-  } } as D1Database;
+  } } as unknown as D1Database;
   await expect(attachTagAndFireSideEffects(interrupted,'f','t')).rejects.toThrow('process interrupted');
   expect(f.raw.prepare("SELECT COUNT(*) n FROM friend_tag_side_effect_runs WHERE status='pending'").get()).toEqual({n:3});
   expect(fireEvent).not.toHaveBeenCalled();
