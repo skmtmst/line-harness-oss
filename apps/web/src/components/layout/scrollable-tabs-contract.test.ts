@@ -57,8 +57,10 @@ describe('右に隠れたタブへ届く（#975 U091）', () => {
 
   it('対象画面はすべてスクロールできるタブを使う', () => {
     expect(MERGED).toContain('ScrollableTabs')
-    expect(NEN_MEMBERS).toContain('ScrollableTabs')
-    expect(NEN_HEALTH).toContain('ScrollableTabs')
+    expect(NEN_MEMBERS).toContain('<Tabs')
+    expect(NEN_HEALTH).toContain('<Tabs')
+    expect(readFileSync(join(SRC, 'components', 'shared', 'tabs.module.css'), 'utf8')).toContain('overflow-x: auto')
+    expect(readFileSync(join(SRC, 'components', 'shared', 'tabs.tsx'), 'utf8')).toContain('tabs[next]?.focus()')
   })
 
   it('V8のメンバー管理は縦の設定メニューから各画面へ進む', () => {

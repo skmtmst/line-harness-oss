@@ -54,7 +54,7 @@ it('共通点検5: 小さい行のボタンはブラウザ既定の余白を足�
   expect(read('components/shared/icon-button.module.css')).toMatch(/\.button\s*\{[^}]*padding: 0;/s)
 })
 it('WEB253: span内の旧SVGにもV8のアイコン寸法を渡す', () => {
-  expect(read('components/layout/sidebar.tsx')).toContain('<NavIcon className={isV8 ? styles.v8NavIcon : undefined}')
+  expect(read('components/layout/sidebar.tsx')).toContain('<NavIcon className={styles.v8NavIcon}')
 })
 
 it('共通点検4・5: 同じCSSを使う残りの3タブも消した札とボタンの上書きを見ない', () => {

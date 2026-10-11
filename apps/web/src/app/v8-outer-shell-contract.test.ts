@@ -46,8 +46,8 @@ describe('外側の殻（V8 移行③）', () => {
     expect(board![1]).toContain('margin: 0 12px 12px 0')
   })
 
-  it('黄色の版の帯は v8 では出さない（v7-only で包む）', () => {
-    expect(appShell).toMatch(/v7-only.*UpdateBanner|UpdateBanner.*v7-only/s)
+  it('黄色の版の帯の旧本体を外枠から外す', () => {
+    expect(appShell).not.toContain('UpdateBanner')
   })
 
   it('左メニューは地の上に直接置き（枠・白地を外す）、幅は 240px', () => {

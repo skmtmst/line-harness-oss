@@ -92,7 +92,8 @@ describe('統括コンソール', () => {
     ])
     // 「設定」は左下のアカウントメニュー（メンバー管理）へ移した。★V6 36-1。
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.href === '/hq/settings')).toBe(false)
-    expect(sidebar).toContain('<HqAccountMenu />')
+    expect(sidebar).toContain('href="/hq/settings"')
+    expect(sidebar).toContain('<SidebarAccountMenu hq={isHq}')
     expect(templatePage).toContain('HqTemplatesV8')
     expect(sharedTemplatePage).toContain('<TemplateConsole type={type}')
   })

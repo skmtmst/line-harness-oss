@@ -107,7 +107,8 @@ describe('★V8 統括の上の帯', () => {
   it('札から店を選ぶと、その店へ入る', async () => {
     const view = render(<AppTopBar />)
     await act(async () => { await Promise.resolve() })
-    fireEvent.change(view.getByRole('combobox', { name: 'LINEアカウント' }), { target: { value: 'account-1' } })
+    fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
+    fireEvent.click(await view.findByRole('menuitemradio', { name: '然-NEN- 本店' }))
     expect(fixture.setSelectedAccountId).toHaveBeenCalledWith('account-1')
     expect(fixture.push).toHaveBeenCalledWith('/')
   })
@@ -123,7 +124,8 @@ describe('★V8 統括の上の帯', () => {
     expect(view.queryAllByText('オーナー')).toHaveLength(0)
     expect(view.queryAllByRole('button', { name: 'ログアウト' })).toHaveLength(0)
     expect(view.getByRole('link', { name: 'ホーム' }).getAttribute('href')).toBe('/')
-    fireEvent.change(view.getByRole('combobox', { name: 'LINEアカウント' }), { target: { value: 'account-1' } })
+    fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
+    fireEvent.click(await view.findByRole('menuitemradio', { name: '然-NEN- 本店' }))
     expect(fixture.push).not.toHaveBeenCalled()
   })
 
@@ -155,27 +157,31 @@ describe('★V8 統括の上の帯', () => {
     expect(view.queryAllByRole('button', { name: /統括へ/ })).toHaveLength(0)
   })
 
-  it('v7 の統括は今までどおり（統括名を取らず、役割はオーナー）', async () => {
+  it('旧テーマ指定でも統括名を取り、ホームと切り替えを出す', async () => {
     fixture.theme = 'v7'
     document.documentElement.dataset.theme = 'v7'
     const view = render(<AppTopBar />)
     await act(async () => { await Promise.resolve() })
-    expect(fixture.tenantsMe).not.toHaveBeenCalled()
-    expect(view.getAllByText('オーナー').length).toBeGreaterThan(0)
-    expect(view.getAllByText('店舗を選択').length).toBeGreaterThan(0)
-    // v7 は上の帯に名前とログアウトを出したまま。
-    expect(view.getAllByText('Kenta Kawano').length).toBeGreaterThan(0)
-    expect(view.getAllByRole('button', { name: 'ログアウト' }).length).toBeGreaterThan(0)
+    await waitFor(() => expect(view.getAllByText('然 -NEN- 本部').length).toBeGreaterThan(0))
+    expect(fixture.tenantsMe).toHaveBeenCalledOnce()
+    expect(view.getByRole('link', { name: 'ホーム' }).getAttribute('href')).toBe('/hq')
+    expect(view.queryAllByText('Kenta Kawano')).toHaveLength(0)
+    expect(view.queryAllByRole('button', { name: 'ログアウト' })).toHaveLength(0)
   })
 
-  it('v7 の店の画面も今までどおり（名前・役割・ログアウトは上の帯）', async () => {
+  it('旧テーマ指定でも店の切り替えを出し、自分の操作は左下に任せる', async () => {
     fixture.theme = 'v7'
     document.documentElement.dataset.theme = 'v7'
     fixture.pathname = '/friends'
     const view = render(<AppTopBar />)
     await act(async () => { await Promise.resolve() })
-    expect(view.getAllByText('Kenta Kawano').length).toBeGreaterThan(0)
-    expect(view.getAllByText('オーナー').length).toBeGreaterThan(0)
-    expect(view.getAllByRole('button', { name: 'ログアウト' }).length).toBeGreaterThan(0)
+    expect(view.queryAllByText('Kenta Kawano')).toHaveLength(0)
+    expect(view.queryAllByText('オーナー')).toHaveLength(0)
+    expect(view.queryAllByRole('button', { name: 'ログアウト' })).toHaveLength(0)
+    expect(fixture.tenantsMe).not.toHaveBeenCalled()
+    fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
+    fireEvent.click(await view.findByRole('menuitemradio', { name: '然-NEN- 本店' }))
+    expect(fixture.setSelectedAccountId).toHaveBeenCalledWith('account-1')
+    expect(fixture.push).not.toHaveBeenCalled()
   })
 })
