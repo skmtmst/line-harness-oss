@@ -2,8 +2,10 @@
 // apps/worker/src/client/main.ts (?page=event&id=<eventId> or ?page=event-me).
 // Mirrors salon-booking design language (LINE 緑 + sb-card + fade animations).
 
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import LoadErrorView from '../../../../liff/src/components/LoadErrorView.js';
+import '../../../../liff/src/embedded.css';
 import './styles.css';
 import {
   bookingOutcome,
@@ -562,21 +564,24 @@ function HistoryScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const requestGeneration = useRef(0);
   async function refresh() {
+    const generation = ++requestGeneration.current;
     setLoading(true);
     setError(null);
     try {
       const res = await apiGet<{ items: MyBooking[] }>(`/api/liff/events/me?tab=${tab}`, ctx);
-      setItems(res.items);
+      if (generation === requestGeneration.current) setItems(res.items);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (generation === requestGeneration.current) setError('読み込めませんでした');
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
   }
 
   useEffect(() => {
     void refresh();
+    return () => { requestGeneration.current++; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
@@ -598,8 +603,9 @@ function HistoryScreen({
         </div>
       </div>
       <div className="px-4 py-4 space-y-4">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-sm">{error}</div>}
-        {loading ? (
+        {error ? (
+          <LoadErrorView note="申し込みはなくなっていません。" onRetry={() => void refresh()} />
+        ) : loading ? (
           <Spinner />
         ) : items.length === 0 ? (
           <div className="eb-card text-center text-sm text-gray-500 py-8">
