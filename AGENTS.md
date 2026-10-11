@@ -133,7 +133,7 @@
 ## 古い要件定義は読まない
 
 - 要件の正本は `docs/v6-requirements/v6-requirements-master-index.md` が指す 34 本と、その §5 の横断契約、`docs/v8-requirements/` だけです。それ以外を要件として読まないでください。
-- 終わった V2〜V7 の文書（V6 の決まり・指示書・引き継ぎ、`docs/archive/`、V6 の点検・台帳など）は 2026-10-07 にリポジトリから外しました（git の履歴と外付けSSDの控えにだけ残ります）。読まず、引用せず、実装の根拠にしないでください。
+- 終わった V2〜V7 の文書（V6 の決まり・指示書・引き継ぎ、`docs/archive/`、V6 の点検・台帳など）は 2026-10-11 に残っていた `docs/archive/` も含めてリポジトリからすべて外しました（git の履歴と外付けSSDの控えにだけ残ります）。読まず、引用せず、実装の根拠にしないでください。
 - `docs/design-reference/` と `docs/design-qa/` の `-v2`〜`-v6` が付くフォルダは旧設計の画像です。設計一致の比較には使わず、★V8 の絵と重ねて比べてください。
 - 見た目の進捗は ★V8 との照合の記録（司令塔の `~/lh-work/design/v8/PASSED.tsv` と `SWITCH-READINESS.md`）を見てください。
 - Lステップ・Liny との比較の根拠には `docs/lstep-liny-screen-behavior-research-2026-08.md` と `docs/lstep-unverified-assumptions.md` を使ってください。
