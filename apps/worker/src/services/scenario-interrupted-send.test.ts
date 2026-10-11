@@ -21,7 +21,10 @@ function provider() {
   return { client: { pushMessage } as never, keys, delivered: () => deliveries };
 }
 function loseLogWrites(): D1Database {
-  return { ...f.db, async batch() { throw new Error('process lost after provider acceptance'); } } as D1Database;
+  return new Proxy(f.db,{get(target,key,receiver){
+    if(key==='batch') return async()=>{throw new Error('process lost after provider acceptance');};
+    return Reflect.get(target,key,receiver);
+  }});
 }
 describe('SEND-S02: LINE受理と進捗保存の間で中断', () => {
   it('回復で同じUUIDキーを渡し、同じ通を二重受理させない', async () => {
