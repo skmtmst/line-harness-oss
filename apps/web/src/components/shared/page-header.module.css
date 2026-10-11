@@ -13,32 +13,24 @@
   display: flex;
   align-items: center; /* alignItems: center */
   justify-content: space-between; /* justifyContent: space_between */
-  gap: 16px;
 }
 
 .heading {
   display: flex;
-  flex-direction: column; /* layout: vertical */
-  gap: 5px; /* gap: 5 */
+  flex-direction: column; /* layout: vertical */ /* gap: 5 */
   min-width: 0;
 }
 
 .title {
-  color: var(--color-ink); /* fill: $ink */
-  font-size: var(--text-display); /* fontSize: $size-display */
-  font-weight: 600; /* fontWeight: 600 */
+  color: var(--color-ink); /* fill: $ink */ /* fontSize: $size-display */ /* fontWeight: 600 */
 }
 
-.description {
-  color: var(--color-ink-secondary); /* fill: $ink-secondary */
-  font-size: var(--text-body); /* fontSize: $size-body */
-  font-weight: 500; /* fontWeight: 500 */
+.description { /* fill: $ink-secondary */ /* fontSize: $size-body */ /* fontWeight: 500 */
 }
 
 .actions {
   display: flex;
-  align-items: center;
-  gap: 8px; /* gap: 8 */
+  align-items: center; /* gap: 8 */
   flex: none;
 }
 

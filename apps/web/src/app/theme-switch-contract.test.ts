@@ -87,7 +87,7 @@ describe('見た目は V8 に固定', () => {
   it('V8 で増える語彙がある（divider・table-head・chat-outgoing・board・印のタイル）', () => {
     for (const token of [
       '--color-divider: #1d1d1f12',
-      '--color-table-head: #fafafb',
+      '--color-table-head: #f7f8fa',
       '--color-chat-outgoing: #dff5e7',
       '--color-board-line',
       '--shadow-board',

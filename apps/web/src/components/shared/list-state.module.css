@@ -19,8 +19,6 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: var(--radius-card);
-  background: var(--color-surface-pearl);
   padding: 24px;
   text-align: center;
 }
@@ -34,8 +32,6 @@
 /* `PzPQY` ほか。$size-label 13 / 700。 */
 .title {
   color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
   line-height: 1.2;
 }
 

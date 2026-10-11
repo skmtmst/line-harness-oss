@@ -30,24 +30,15 @@
   align-items: center; /* alignItems: center */
   justify-content: center; /* justifyContent: center */
   flex: none; /* 押し潰されて楕円・縦長にならない */
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
   min-height: 0; /* globals の 32px を上書き。題の行を伸ばさない */
-  max-width: 18px;
-  max-height: 18px;
-  aspect-ratio: 1 / 1; /* 縦横は必ず同じ */
-  padding: 0;
-  border: 1px solid var(--color-ink-faint); /* border: $ink-faint */
-  border-radius: var(--radius-pill); /* ★V7 `LYs5d` 18px 正円 */
-  background: var(--color-canvas); /* fill: $canvas */
+  aspect-ratio: 1 / 1; /* 縦横は必ず同じ */ /* border: $ink-faint */
+  border-radius: var(--radius-pill); /* ★V7 `LYs5d` 18px 正円 */ /* fill: $canvas */
   color: var(--color-ink-secondary); /* color: $ink-secondary */
   cursor: pointer;
 }
 
 /* 当たりだけを広げる。absolute のため行の高さ・幅に影響しない。 */
 .button::before {
-  content: "";
   position: absolute;
   inset: -5px; /* 18 + 10 = 28px の当たり */
 }
@@ -61,14 +52,10 @@
 
 .button:focus-visible {
   outline: 2px solid var(--color-status-info); /* keyboard focus */
-  outline-offset: 1px;
 }
 
 /* 箱の中の「?」。★V7 `LYs5d`：11px 太字 `ink-secondary`。 */
-.mark {
-  font-size: var(--text-micro); /* fontSize: 11 */
-  font-weight: 500;
-  line-height: 1;
+.mark { /* fontSize: 11 */
 }
 
 .tip {
@@ -77,15 +64,7 @@
   left: 0;
   z-index: 10;
   width: max-content;
-  max-width: 300px; /* maxWidth: 300 */
-  padding: 8px 10px; /* padding: [8, 10] */
-  border: 1px solid var(--color-hairline); /* border: $hairline */
-  border-radius: var(--radius-control); /* cornerRadius: $radius-control */
-  background: var(--color-canvas); /* fill: $canvas */
-  box-shadow: var(--shadow-card);
-  color: var(--color-ink-secondary); /* color: $ink-secondary */
-  font-size: var(--text-caption); /* fontSize: $size-caption */
-  line-height: 1.6;
+  max-width: 300px; /* maxWidth: 300 */ /* padding: [8, 10] */ /* border: $hairline */ /* cornerRadius: $radius-control */ /* fill: $canvas */ /* color: $ink-secondary */ /* fontSize: $size-caption */
   white-space: normal;
 }
 
@@ -93,7 +72,6 @@
 .tip a {
   display: inline-block;
   margin-left: 8px;
-  color: var(--color-action);
   font-weight: 600;
   text-decoration: underline;
 }

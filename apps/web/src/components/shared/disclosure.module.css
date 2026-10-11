@@ -28,7 +28,6 @@
   font-weight: 600;
   list-style: none;
   cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .summary::-webkit-details-marker {
@@ -40,7 +39,6 @@
 }
 
 .summary:focus-visible {
-  outline: revert;
   outline-offset: -2px;
 }
 

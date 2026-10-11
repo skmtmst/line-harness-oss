@@ -3,21 +3,13 @@
   display: flex;
   flex-wrap: wrap; /* 幅320で「次へ」が右に切れていた（★V7 修正方針 §3） */
   align-items: center;
-  gap: 6px;
 }
 
 .item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 32px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-segment);
   background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 500;
-  line-height: 1;
   white-space: nowrap;
 }
 
@@ -27,10 +19,6 @@ button.item {
 
 button.item:hover:not(:disabled, .current) {
   background: var(--color-canvas-sunken);
-}
-
-button.item:focus-visible {
-  outline: revert;
 }
 
 /*
@@ -58,22 +46,12 @@ button.item:disabled {
   opacity: 0.4;
 }
 
-.control {
-  width: 64px;
-}
-
-.page {
-  width: 38px;
-}
-
 /*
  * いま開いているページ。**白文字が乗るので `$accent-deep`。**
  * `$accent`(#06c755) に白文字は 2.26:1 で、13px の数字が読めない。
  */
 .current {
   border-color: transparent;
-  background: var(--color-ink);
-  color: var(--color-canvas);
   font-weight: 500;
 }
 
@@ -91,9 +69,6 @@ button.item:disabled {
  * 帯の左端に出す件数の文（例「40件中 1〜20件を表示」）。v7 は帯の外に
  * 従来の件数表示があるので、ここは v8 のときだけ出す。
  */
-.summary {
-  display: none;
-}
 
 /*
  * ★V8「ページ送り」（jX2Uw）：帯の余白は上下10・左右20、間は 6。
@@ -132,10 +107,6 @@ button.item:disabled {
 :root .control {
   width: 32px;
   padding: 0;
-}
-
-.controlGlyph {
-  display: none;
 }
 
 :root .controlLabel {

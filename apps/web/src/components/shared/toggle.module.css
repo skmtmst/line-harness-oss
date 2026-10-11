@@ -10,16 +10,13 @@
   position: relative;
   display: inline-block;
   width: 36px; /* width: 36 */
-  height: 20px; /* height: 20 */
-  border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
+  height: 20px; /* height: 20 */ /* cornerRadius: $radius-full */
   /*
    * ★V7（2026-09-24、better-accessibility：部品の見分けは 3:1）。オフの地は $step-idle（#eef0f3）で
    * 白い地と 1.1:1 しかなく、切替があること自体が見えなかった。ink-faint を 72% にして約 3.2:1。
    */
-  background: color-mix(in srgb, var(--color-ink-faint) 72%, var(--color-canvas));
   border: none;
   cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease-out);
   flex: none;
 }
 
@@ -30,14 +27,12 @@
   left: 2px;
   width: 16px; /* つまみ 16 */
   height: 16px;
-  border-radius: var(--radius-pill);
   background: var(--color-canvas); /* fill: $canvas */
   transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .on {
-  /* ★V7：明るい緑は白い地と 2.26:1。濃い緑で 5.44:1。 */
-  background: var(--color-accent-deep); /* fill: $accent-deep */
+  /* ★V7：明るい緑は白い地と 2.26:1。濃い緑で 5.44:1。 */ /* fill: $accent-deep */
 }
 
 .on::after {
@@ -45,8 +40,7 @@
 }
 
 /* 消せない項目。オンのまま押せない。 */
-.locked {
-  background: var(--color-hairline); /* fill: $hairline */
+.locked { /* fill: $hairline */
   cursor: not-allowed;
 }
 

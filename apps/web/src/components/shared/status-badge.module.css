@@ -2,12 +2,6 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: 1;
   white-space: nowrap;
 }
 
@@ -17,37 +11,16 @@
   font-size: var(--text-caption);
 }
 
-.neutral {
-  background: var(--polish-status-neutral-bg);
-  color: var(--polish-status-neutral-ink);
-}
-
-.info {
-  background: var(--color-status-info-soft);
-  color: var(--color-status-info);
-}
-
-.warning {
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
-}
-
 /*
  * #669 成功の札の文字は success に1本化する。accent-deep（#087a3e）と
  * success（#047833）が同役で共存していた。地は同値（#e8f8ee）のまま。
  */
-.success {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
 
 .danger {
-  background: var(--color-status-danger-soft);
   /*
    * #702: 文字は --color-danger(#b3261e)。--color-status-danger(#e5484d)
    * だと薄い地で 3.53:1 しかなく AA(4.5:1)に届かない。#b3261e なら 5.89:1。
    */
-  color: var(--color-danger);
 }
 
 /*

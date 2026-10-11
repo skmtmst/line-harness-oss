@@ -8,10 +8,8 @@
 }
 
 /* 枠を内側に引く段の箱。既定のカードの影・寸法は変えない。 */
-.inset { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
 
 .segment { border-radius: var(--radius-segment); }
-.paddingCompact { padding: 14px; }
 
 .vertical {
   display: flex;
@@ -23,22 +21,11 @@
   overflow: hidden;
 }
 
-.paddingDefault {
-  padding: 16px;
-}
-
-.paddingRoomy {
-  padding: 24px;
-}
-
 /*
  * 画面の絵での段の箱（d9xoI「段 基本」・T9gblG「箱 CSVで書き出す」・
  * JB8V1「推薦カード」）：内側の余白 20px。既定（16・18）の合格は
  * 変えない。変わり形として足す。
  */
-.paddingSpacious {
-  padding: 20px;
-}
 
 .card[data-card-surface='inset'], .card[data-card-surface='muted'] {
   border: 0; box-shadow: none;
@@ -57,7 +44,6 @@
   min-height: 48px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   padding: 0 16px;
 }
 
@@ -92,7 +78,6 @@
   flex: 0 0 auto;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 500;
 }
 
 /*
@@ -104,8 +89,6 @@
   flex-shrink: 0;
   align-items: center;
   color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -148,13 +131,11 @@
 :root .card[data-gap="tight"] { gap: var(--tpl-e49-section-gap); }
 :root .card[data-gap="loose"] { gap: var(--tpl-e1-sns-card-gap); }
 /* 縦に積む小さな設定カード。指定したカードだけに適用。 */
-.gapTight { gap: 12px; }
 
 /* カード内の設定段。既定のカード頭には効かない。 */
-.inset { min-width: 0; border: 0; box-shadow: none; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 .headerStacked, .headerPanel { flex: 0 1 auto; min-width: 0; min-height: 0; align-items: flex-start; gap: var(--tpl-rs-panel-head-gap); padding: 0; }
 .headerStacked .titleGroup, .headerPanel .titleGroup { flex: 1 1 0; flex-direction: column; align-items: stretch; gap: var(--tpl-rs-panel-head-text-gap); }
-.headerStacked .title, .headerPanel .title { margin: 0; font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rs-lh-14); }
+.headerStacked .title, .headerPanel .title { margin: 0; line-height: var(--tpl-rs-lh-14); }
 .headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
 .headerPanel { padding: var(--tpl-rs-panel-head-pad); box-shadow: var(--tpl-rs-line-bottom); }
 

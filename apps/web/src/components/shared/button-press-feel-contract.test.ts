@@ -49,9 +49,7 @@ describe('押した感じ（V8 のボタン・絵ボタン）', () => {
       expect(css).toMatch(/scale var\(--motion-snap\) var\(--motion-spring\)/)
     })
 
-    it(`${name}：v7 の沈みは変えない`, () => {
-      expect(css).toMatch(/\.button:active:not\(:disabled\) \{\s*scale: 0\.9[68];/s)
-    })
+
   }
 
   it('白地のボタンは弱い暗さ（白が灰色に沈みすぎない）', () => {

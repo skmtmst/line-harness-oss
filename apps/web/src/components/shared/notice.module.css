@@ -15,12 +15,7 @@
 .notice {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius-control);
-  font-size: var(--text-body);
   font-weight: 400;
-  line-height: 1.6;
 }
 
 .notice[hidden] {
@@ -51,7 +46,6 @@
 
 /* 案内（青）。地は info-bg、文字は ink-secondary（★V7 画面の決まり）。 */
 .info {
-  background: var(--color-info-bg);
   color: var(--color-ink-secondary);
 }
 
@@ -120,7 +114,6 @@
 }
 :root .info { background: var(--color-status-info-soft); }
 :root .info .icon { color: var(--color-status-info); }
-.infoIconV8 { display: none; }
 :root .infoIconV8 { display: block; }
 :root .infoIconV7 { display: none; }
 

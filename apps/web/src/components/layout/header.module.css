@@ -24,9 +24,6 @@
 .title {
   min-width: 0;
   color: var(--color-ink);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
 }
 
 .description {

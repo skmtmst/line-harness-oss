@@ -148,7 +148,7 @@ describe('ColorWell（★BG-2 カラーピッカー）', () => {
   it('承認した寸法を CSS が保つ', () => {
     expect(css).toMatch(/width:\s*288px/) // ピッカー本体
     expect(css).toMatch(/height:\s*168px/) // 彩度・明度の面
-    expect(css).toMatch(/border-radius:\s*var\(--radius-panel\)/)
+    expect(css).toMatch(/:root \.pop\s*\{[^}]*border-radius:\s*var\(--polish-radius-dialog\)/)
     expect(css).toMatch(/\.tabs\s*\{[^}]*height:\s*36px/)
     expect(css).toMatch(/\.bar\s*\{[^}]*height:\s*12px/)
     expect(css).toMatch(/\.cell\s*\{[^}]*height:\s*28px/)

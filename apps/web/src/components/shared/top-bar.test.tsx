@@ -52,15 +52,13 @@ describe('V8 の帯は絵どおり（殻合わせ）', () => {
     expect(source).toContain('pillText')
     expect(source).toContain('pillRole')
     expect(css).toMatch(/:root \.pillText \{[^}]*flex-direction:\s*column/s)
-    const pillTextBase = css.match(/\.pillText \{[^}]*\}/s)?.[0] ?? ''
-    expect(pillTextBase).toMatch(/display:\s*contents/)
+    expect(css).toMatch(/:root \.pillText \{[^}]*display:\s*flex/s)
   })
 
-  it('自分は名前→役割の積み（v7 は素通しで並び不変）', () => {
+  it('自分の名前と役割は現在のV8の縦の並びに固定する', () => {
     expect(source).toContain('identityText')
     expect(css).toMatch(/:root \.identityText \{[^}]*flex-direction:\s*column/s)
-    const textBase = css.match(/\.identityText \{[^}]*\}/s)?.[0] ?? ''
-    expect(textBase).toMatch(/display:\s*contents/)
+    expect(css).toMatch(/:root \.identityText \{[^}]*display:\s*flex/s)
   })
 
   it('パンくずは「ホーム › 画面名」1回だけ（先頭のホームは重ねない）', () => {

@@ -16,19 +16,11 @@
 }
 
 .slot {
-  width: 48px; /* width: 48 */
-  height: 56px; /* height: 56 */
+  width: 48px; /* width: 48 */ /* height: 56 */
   flex: 0 0 auto;
-  padding: 0;
-  border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
-  background: var(--color-canvas); /* fill: $canvas */
-  color: var(--color-ink); /* fill: $ink */
-  font-family: inherit;
-  font-size: 22px; /* fontSize: 22 */
-  font-weight: 600; /* fontWeight: 600 */
+  padding: 0; /* stroke: $hairline */ /* cornerRadius: $radius-sm */ /* fill: $canvas */
+  color: var(--color-ink); /* fill: $ink */ /* fontSize: 22 */ /* fontWeight: 600 */
   text-align: center;
-  caret-color: var(--color-accent);
 }
 
 /*
@@ -43,10 +35,8 @@
 }
 
 /* 誤り（違うコード）`Q10xgy`。読み上げと同じ aria-invalid を根拠に見た目を変える。 */
-.slot[aria-invalid='true'] {
-  border-color: var(--color-status-danger); /* stroke: $status-danger */
-  box-shadow: 0 0 0 1px var(--color-status-danger); /* strokeWidth: 2 */
-  background: var(--color-status-danger-soft); /* fill: $status-danger-soft */
+.slot[aria-invalid='true'] { /* stroke: $status-danger */
+  box-shadow: 0 0 0 1px var(--color-status-danger); /* strokeWidth: 2 */ /* fill: $status-danger-soft */
 }
 
 /* 無効（確認中）`BYrQG`。 */

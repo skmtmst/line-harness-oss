@@ -34,7 +34,6 @@
   height: 36px;
   /* 左 4・右 8（Pencil `KVkPg` の実寸。見本の左は詰める） */
   padding: 0 8px 0 4px;
-  border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
   cursor: pointer;
@@ -48,8 +47,6 @@
 .swatch {
   width: 56px;
   height: 28px;
-  border-radius: var(--radius-tile-sm);
-  box-shadow: inset 0 0 0 1px var(--color-board-line);
 }
 
 /* 色なし（指定なし）のときは斜線で示す */
@@ -97,10 +94,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-panel);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
   animation: color-well-pop var(--motion-fast) var(--motion-ease-out);
 }
 
@@ -245,11 +239,6 @@
   gap: 2px;
 }
 
-.hexMark {
-  color: var(--color-ink-faint);
-  font-size: 12px;
-}
-
 .unit {
   color: var(--color-ink-faint);
   font-size: 10px;
@@ -351,7 +340,6 @@
   height: 28px;
   border: 0;
   border-radius: var(--radius-mini);
-  box-shadow: inset 0 0 0 1px var(--color-board-line);
   cursor: pointer;
   transition: transform var(--motion-fast) var(--motion-ease-out);
 }

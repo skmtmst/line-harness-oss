@@ -53,10 +53,6 @@
   color: var(--color-on-accent);
 }
 
-.chipIcon {
-  display: none;
-}
-
 :global(:root) .chipIcon {
   display: inline-flex;
   flex: none;

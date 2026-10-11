@@ -19,20 +19,14 @@
   align-items: center;
   column-gap: var(--grid-table-gap);
   min-width: 0;
-  min-height: var(--grid-table-row-height, 0);
   padding: var(--grid-table-row-padding);
   box-shadow: var(--shadow-row-line);
   color: var(--grid-table-color, var(--color-ink-secondary));
-  font-size: var(--grid-table-font-size);
   line-height: var(--grid-table-line-height, inherit);
 }
 .row[data-head] {
-  min-height: var(--grid-table-head-height, 0);
   padding: var(--grid-table-head-padding, var(--grid-table-row-padding));
-  background: var(--grid-table-head-background, transparent);
   color: var(--grid-table-head-color, var(--color-ink-secondary));
-  font-size: var(--grid-table-head-font-size, var(--grid-table-font-size));
-  font-weight: 600;
   line-height: var(--grid-table-head-line-height, var(--grid-table-line-height, inherit));
   white-space: nowrap;
 }

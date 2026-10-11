@@ -17,8 +17,8 @@ describe('V8 の入力・選択・押し口規定', () => {
      * 以前はボタン36px・選択/検索42pxでずれていた。タッチ端末は44px。
      * （`@media (pointer: coarse)` の 44px は design-unification の試験が見る）
      */
-    expect(button).toMatch(/\.standard\s*{[^}]*height:\s*36px/s)
-    expect(button).toMatch(/\.field\s*{[^}]*height:\s*36px/s)
+    expect(button).toMatch(/:root \.standard,\s*:root \.field\s*{[^}]*height:\s*var\(--tpl-button-h\)/s)
+    expect(read('../../app/globals.css')).toMatch(/--tpl-button-h:\s*36px/)
     expect(textField).toMatch(/\.field\s*{[^}]*background:\s*var\(--color-canvas\)/s)
     expect(textField).toMatch(/\.single\s*{[^}]*height:\s*36px/s)
     expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*36px/s)

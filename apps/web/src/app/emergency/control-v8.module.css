@@ -17,7 +17,6 @@
 }
 
 /* 閲覧のみの帯。数の帯の上。 */
-.roBand { }
 
 /* 数の帯：4つのマスを区切り線で並べる。 */
 .kpis {
@@ -471,3 +470,4 @@
 .accountSelect :global(*) {
   max-width: 100%;
 }
+.roBand { }

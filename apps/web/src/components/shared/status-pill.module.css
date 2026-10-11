@@ -2,18 +2,7 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-width: 0;
-  max-width: 100%;
-  padding: 2px 8px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-support-hold-bg);
-  color: var(--color-support-hold);
   font-family: inherit;
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: 18px;
   vertical-align: middle;
 }
 .dot {

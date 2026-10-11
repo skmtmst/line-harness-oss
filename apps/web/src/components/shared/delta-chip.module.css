@@ -12,26 +12,8 @@
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  border-radius: var(--radius-mini);
-  font-size: var(--text-caption);
   font-weight: 600;
-  line-height: var(--text-lh, 1.4);
   white-space: nowrap;
-}
-
-.up {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.down {
-  background: var(--color-status-danger-soft);
-  color: var(--color-danger);
-}
-
-.attention {
-  background: var(--color-status-warn-soft);
-  color: var(--color-status-warn-deep);
 }
 
 :root .root {

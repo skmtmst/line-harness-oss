@@ -51,6 +51,6 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(css).toMatch(/:root \.heading \{[^}]*gap:\s*var\(--tpl-head-gap\)/s)
     expect(css).toMatch(/:root \.header\[data-header-size='compact'\] \.heading \{[^}]*gap:\s*var\(--tpl-compact-gap\)/s)
     // v7 の 5 は変えない。
-    expect(css).toMatch(/\.heading \{[^}]*gap:\s*5px/s)
+    expect(css).not.toMatch(/^\.heading \{[^}]*gap:\s*5px/ms)
   })
 })

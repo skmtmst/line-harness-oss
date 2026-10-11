@@ -5,13 +5,8 @@
  */
 .root {
   display: flex;
-  height: 56px;
   min-width: 0;
   align-items: center;
-  gap: 12px;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-shell-gray);
 }
 
 /* `cBSCb/wgtL5`。画面名とマニュアルは左。あきで右操作を押し出す。 */
@@ -96,7 +91,6 @@
   min-width: 0;
   flex-shrink: 0;
   align-items: center;
-  gap: 12px;
 }
 
 /* `cBSCb/VQGk7`。「LINEアカウント」の見出しと切替の札。 */
@@ -115,37 +109,24 @@
   position: relative;
   display: flex;
   min-width: 0;
-  height: 36px;
   align-items: center;
-  gap: 8px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
   background: var(--color-canvas);
-  padding: 0 10px;
 }
 
 /* `cBSCb/KZ9W9`。22px・radius-mini・accent-soft。 */
 .accountMark {
   display: flex;
-  width: 22px;
-  height: 22px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-mini);
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
-  font-size: var(--text-nano);
-  font-weight: 600;
 }
 
 /* `cBSCb/q6d8jk`。$size-label 13 / 700。 */
 .accountName {
-  max-width: 148px;
   overflow: hidden;
   color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -494,9 +475,6 @@
  * ------------------------------------------------------------------- */
 
 /* v7 の中箱（名前＋役割）は素通しにする。V8 でだけ積む。 */
-.identityText {
-  display: contents;
-}
 
 /* ホームの格子印＋文字。手前の段の頭。 */
 .crumbHome {
@@ -515,9 +493,6 @@
 }
 
 /* 札の中の役割（統括など）。V8 で名前の上に小さい行で添える。 */
-.pillText {
-  display: contents;
-}
 
 :root .pillText {
   display: flex;

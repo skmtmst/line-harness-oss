@@ -11,7 +11,6 @@
 .root {
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
 .title {
@@ -19,17 +18,10 @@
   /* 題は1行で「…」。全文は要素の title で読める（RESPONSIVE.md）。 */
   flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
-  font-size: var(--tpl-section-title-size);
-  font-weight: var(--tpl-section-title-weight);
   color: var(--color-ink);
-  line-height: var(--text-lh, 1.4);
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .note {
-  font-size: var(--text-caption);
   color: var(--color-ink-faint);
 }
 

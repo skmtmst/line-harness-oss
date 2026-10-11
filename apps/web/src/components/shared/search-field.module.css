@@ -4,14 +4,9 @@
   display: flex;
   min-width: 0;
   /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
-  height: 36px;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  border: 1px solid var(--color-field-border);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-field);
 }
 
 .search[hidden] {
@@ -19,10 +14,7 @@
 }
 
 .searchIcon {
-  width: 17px;
-  height: 16px;
   flex: 0 0 17px;
-  color: var(--color-ink-faint);
 }
 
 .input {
@@ -33,9 +25,7 @@
   border: 0;
   background: transparent;
   color: var(--color-ink);
-  font-family: inherit;
   /* #976 U079: 検索欄の文字も入力欄と同じ14px（以前は12pxで最小だった） */
-  font-size: var(--text-body);
 }
 
 .input::placeholder {
@@ -51,7 +41,6 @@
  * 色・太さ・余白は #804 と同じ（2px・action 色・offset 2px）。
  */
 .input:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -91,7 +80,6 @@
 .loadingIcon {
   flex: 0 0 16px;
   color: var(--color-ink-faint);
-  animation: search-spin var(--motion-spin) linear infinite;
 }
 
 @keyframes search-spin {
@@ -144,9 +132,6 @@
  * 近道の印（例 ⌘K。TSV 実寸 19x17≒12px）。ふだんは隠し、v8 だけで
  * 箱の右端に出す（中の入力が flex:1 で右へ寄せる）。v7 は変えない。
  */
-.shortcut {
-  display: none;
-}
 
 :root .shortcut {
   display: inline-block;

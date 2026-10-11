@@ -1,8 +1,7 @@
 @layer components {
-.root { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; padding: 3px; margin: -3px; }
-.input { appearance: none; width: 18px; height: 18px; flex: none; margin: 0; background: var(--color-canvas); border: 1.5px solid var(--color-ink-faint); border-radius: var(--radius-pill); cursor: inherit; }
+.root { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.input { appearance: none; width: 18px; height: 18px; flex: none; margin: 0; background: var(--color-canvas); cursor: inherit; }
 .input:checked { border: 5px solid var(--color-accent-deep); }
-.input:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .root:has(.input:disabled) { opacity: 0.5; cursor: not-allowed; }
 .label { color: var(--color-ink); font-size: var(--text-label); line-height: 20px; font-weight: 400; }
 .root[data-fill] { display: flex; width: 100%; min-width: 0; }

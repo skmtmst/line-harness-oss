@@ -64,7 +64,6 @@
  */
 :root .row[data-has-actions]:not([data-active]):is(:hover, :focus-within, [data-menu-open]) .count { visibility: hidden; }
 /* 選んだ行の場所取り（操作なしの行用。絵では選んだ行に「…」がある）。v7 では出さない。 */
-.menuSlot { display: none; }
 :root .menuSlot { display: block; width: 14px; height: 14px; flex-shrink: 0; }
 :root .menuButton { position: absolute; left: -9px; top: -9px; width: 32px; height: 32px; opacity: 1; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 /* 絵（uE9gf・apLqS・I1E7Bt）：「…」の場所を取るのは選んでいる行だけ。ほかの行は件数が右端に来る。

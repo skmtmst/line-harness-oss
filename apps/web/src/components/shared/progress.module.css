@@ -64,11 +64,8 @@
   margin: 0;
 }
 
-.track {
-  height: 8px; /* height: 8 */
-  overflow: hidden;
-  border-radius: var(--radius-mini); /* cornerRadius: 4 */
-  background: var(--color-shell); /* fill: $shell */
+.track { /* height: 8 */
+  overflow: hidden; /* cornerRadius: 4 */ /* fill: $shell */
   position: relative;
 }
 
@@ -79,8 +76,7 @@
 
 .fill {
   position: absolute;
-  inset: 0;
-  border-radius: var(--radius-mini); /* cornerRadius: 4 */
+  inset: 0; /* cornerRadius: 4 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   transform: scaleX(0);
   transform-origin: left center;
@@ -103,8 +99,7 @@
   top: 0;
   bottom: 0;
   left: 0;
-  width: 29%; /* width: 110（380 の帯のとき） */
-  border-radius: var(--radius-mini); /* cornerRadius: 4 */
+  width: 29%; /* width: 110（380 の帯のとき） */ /* cornerRadius: 4 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   opacity: 0.6; /* opacity: 0.6 */
   animation: progress-slide var(--motion-slow) var(--motion-ease-in-out) infinite alternate;

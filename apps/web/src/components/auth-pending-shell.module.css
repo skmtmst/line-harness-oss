@@ -10,7 +10,6 @@
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--color-hairline);
 }
 
 .nav {
@@ -24,8 +23,6 @@
   display: none;
   height: 56px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
 }
 
 @media (min-width: 1280px) {

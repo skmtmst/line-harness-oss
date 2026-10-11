@@ -82,13 +82,13 @@ describe('型の見出し（379板の絵）', () => {
     expect(stats![0]).not.toMatch(/margin|padding-top/)
   })
 
-  it('v8 の行の高さは1.5（caption・label・body。v7は変えない）', () => {
+  it('行の高さは現在のV8の1.5に固定し、旧値を残さない', () => {
     for (const name of ['--text-caption--line-height', '--text-label--line-height', '--text-body--line-height']) {
       const block = globals.match(new RegExp(`:root \\{[^}]*${name}:\\s*1\\.5`, 's'))
       expect(block, `${name} が v8 にありません`).toBeTruthy()
     }
-    expect(globals).toMatch(/--text-caption--line-height:\s*1\.6/)
-    expect(globals).toMatch(/--text-body--line-height:\s*1\.7/)
+    expect(globals).not.toMatch(/--text-caption--line-height:\s*1\.6/)
+    expect(globals).not.toMatch(/--text-body--line-height:\s*1\.7/)
   })
 
   it('作る型の頭は20/24/16・間8・手順は題と説明の下の行（置き場所は1つ・q1xNMz）', () => {

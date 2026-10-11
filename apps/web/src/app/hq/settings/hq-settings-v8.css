@@ -45,7 +45,6 @@
 .hq-settings-v8 .hq-settings-nav {
   padding: 16px 12px;
   border-right: 1px solid var(--color-hairline);
-  align-self: stretch;
 }
 
 /* ===== ここから下は V8 だけの寸法合わせ =====================================
@@ -131,8 +130,6 @@
   .hq-settings-v8 .hq-settings-nav {
     border-right: none;
     border-bottom: 1px solid var(--color-hairline);
-    align-self: auto;
-    width: 100%;
   }
 
   /* 上の V8 限定の指定（幅200・頭寄せ）は詳しさが上なので、狭い画面でも

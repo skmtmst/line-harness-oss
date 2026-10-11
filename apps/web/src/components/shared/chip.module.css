@@ -9,22 +9,13 @@
  */
 
 .chip {
-  display: inline-flex;
-  align-items: center; /* alignItems: center */
-  height: 17px; /* height: 17 */
-  padding: 0 7px; /* padding: [0, 7] */
-  border: 1px solid;
-  border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
-  font-size: var(--text-nano); /* fontSize: $size-nano */
-  font-weight: 500; /* fontWeight: 500 */
+  display: inline-flex; /* alignItems: center */ /* height: 17 */ /* padding: [0, 7] */ /* cornerRadius: $radius-full */ /* fontSize: $size-nano */ /* fontWeight: 500 */
   white-space: nowrap;
 }
 
 /* 落ち着いた印。「同じスイッチ」など、注意ではない補足。 */
 .neutral {
   border-color: var(--color-hairline);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-faint);
 }
 
 /* 数や行き先を示す印。 */

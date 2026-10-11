@@ -29,7 +29,6 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
-  transition: border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 /* 開いている間は緑の枠。1.5px に見せるため date-field と同じく内側に足す。 */

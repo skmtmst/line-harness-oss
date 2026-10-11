@@ -8,10 +8,6 @@
   width: 176px;
 }
 
-.pageSize {
-  width: 128px;
-}
-
 .full {
   width: 100%;
 }
@@ -21,20 +17,12 @@
   display: flex;
   width: 100%;
   /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
-  height: 36px;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 0 12px;
-  border: 1px solid var(--color-field-border);
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-family: inherit;
   /* #976 U079: 選択欄の文字も入力欄と同じ14px */
-  font-size: var(--text-body);
-  font-weight: 500;
   cursor: pointer;
-  box-shadow: var(--shadow-field);
 }
 
 .trigger:focus-visible,
@@ -45,15 +33,6 @@
 
 .closedTrigger {
   border-radius: var(--radius-control);
-}
-
-.openTrigger {
-  border-color: var(--color-accent);
-  border-radius: var(--radius-control) var(--radius-control) 0 0;
-}
-
-.invalid .trigger {
-  border-color: var(--color-danger);
 }
 
 .disabled {
@@ -72,8 +51,6 @@
 }
 
 .chevron {
-  width: 16px;
-  height: 16px;
   flex: 0 0 16px;
   color: var(--color-ink-faint);
 }
@@ -107,7 +84,6 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: inherit;
-  font-size: var(--text-body);
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -156,9 +132,7 @@
   flex: 0 0 18px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-checkbox-line);
   border-radius: var(--radius-checkbox-mark);
-  background: var(--color-canvas);
 }
 
 /*
@@ -167,13 +141,6 @@
  */
 .checked {
   border-color: var(--color-success);
-  background: var(--color-success);
-  color: var(--color-canvas);
-}
-
-.checkIcon {
-  width: 13px;
-  height: 13px;
 }
 
 .error {
@@ -279,9 +246,6 @@
  * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞）。
  * 渡さないときは出ない。v7 は変えない。
  */
-.leadingIcon {
-  display: none;
-}
 
 :root .leadingIcon {
   display: inline-flex;

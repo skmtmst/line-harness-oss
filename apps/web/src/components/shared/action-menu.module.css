@@ -17,10 +17,8 @@
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
-  border: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
   padding: 8px;
 }
 
@@ -144,7 +142,6 @@
 
 .divider {
   height: 1px;
-  margin: 4px 0;
   border: 0;
   background: var(--color-hairline);
 }

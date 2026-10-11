@@ -12,13 +12,9 @@
    */
   .toolbar {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 12px;
   }
 
   .row1 {
-    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
@@ -29,22 +25,14 @@
    * search-field 側の `.search`（min-width: 0）より詳細度を上げて
    * 320 / 240 を必ず効かせる。
    */
-  .row1 > .search {
-    width: 320px;
-    max-width: 100%;
-    min-width: 240px;
-    flex: 0 1 320px;
-  }
 
   .row2 {
-    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
   }
 
   .filters {
-    display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
@@ -66,14 +54,6 @@
     width: 132px;
     flex: none;
     max-width: 100%;
-  }
-
-  .trailing {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
   }
 
   /*

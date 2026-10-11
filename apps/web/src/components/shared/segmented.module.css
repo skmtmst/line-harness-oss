@@ -18,8 +18,6 @@
   /* 枠は高さ（36）を変えないよう内側の影で引く（border だと 38 になる）。 */
   border: 0;
   border-radius: var(--radius-control);
-  background: var(--color-track);
-  box-shadow: var(--shadow-segment-ring);
 }
 
 /* 白いつまみ。選択項目の後ろへ位置・幅を JS で合わせる。 */
@@ -31,7 +29,6 @@
   border-radius: var(--radius-segment);
   background: var(--color-canvas);
   box-shadow: var(--shadow-segment-thumb);
-  transition: transform var(--motion-fast) ease-out, width var(--motion-fast) ease-out;
   pointer-events: none;
 }
 
@@ -42,12 +39,8 @@
   border: 0;
   border-radius: var(--radius-segment);
   background: transparent;
-  font-size: var(--text-body);
-  font-weight: 500;
-  line-height: 1.5;
   color: var(--color-ink-secondary);
   cursor: pointer;
-  transition: color var(--motion-fast) ease-out;
 }
 
 .item:hover {

@@ -3,13 +3,6 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 100px;
-  padding: 16px 24px;
-  border: 1px solid var(--color-hairline);
-  border-radius: 0;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
 }
 
 .card[hidden] {
@@ -45,12 +38,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   /*
    * 題の行の高さは 20px にそろえる。「？」の有無で数字の位置が
    * ずれないようにする（？自体は 18px の箱で、行を伸ばさない）。
    */
-  min-height: 20px;
 }
 
 .retry {
@@ -63,12 +54,6 @@
 
 .retry:focus-visible {
   outline: revert;
-}
-
-.label {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-body);
-  font-weight: 500;
 }
 
 .labelV6 {
@@ -117,7 +102,6 @@
 .link {
   flex-shrink: 0;
   color: var(--color-action);
-  font-size: var(--text-nano);
 }
 
 .link:hover {
@@ -137,7 +121,6 @@
    * 数の行の高さは1行ぶんにそろえる。題の行（.head 20px）と合わせて、
    * 「？」の有無や補足の長さで数字の位置がずれないようにする。
    */
-  min-height: 1lh;
 }
 
 .valueWarning {
@@ -149,10 +132,7 @@
 }
 
 .detail {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
   /* 補足の行の高さは1行ぶんにそろえる。空でも潰さない。 */
-  min-height: 1lh;
 }
 
 .detailV6 {
@@ -168,7 +148,6 @@
 
 .skeleton {
   width: 96px;
-  height: var(--text-metric);
   border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
   animation: kpi-card-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
@@ -181,8 +160,6 @@
 }
 
 /* Pp3nS: the strip owns the boundary; cells have no enclosing box. */
-.valueRow { display: contents; }
-.unit, .labelText, .number { display: contents; }
 :root .card {
   justify-content: flex-start; min-width: 0; min-height: 0;
   gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: var(--radius-card);

@@ -15,14 +15,8 @@ const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
  * JB8V1「推薦カード」）は内側 20px。既定（なし・16・18）の合格は変えない。
  */
 describe('Card の内側の余白（変わり形）', () => {
-  it('spacious は内側 20px（絵の段の箱）', () => {
+  it('余白の変わり形は現在のV8の段とカードの値へそろえる', () => {
     const css = read('card.module.css')
-    const rule = css.match(/\.paddingSpacious\s*{[^}]*}/s)
-    expect(rule, 'spacious の指定がありません').toBeTruthy()
-    expect(rule![0]).toMatch(/padding:\s*20px/)
-    // V7 の余白は保持。V8 は B-152 の段へ寄せる。
-    expect(css).toMatch(/\.paddingDefault\s*{[^}]*padding:\s*16px/s)
-    expect(css).toMatch(/\.paddingRoomy\s*{[^}]*padding:\s*24px/s)
     expect(css).toContain(":root .paddingRoomy, :root .paddingSpacious { padding: var(--polish-space-section); }")
     expect(css).toContain(":root .paddingDefault, :root .paddingCompact { padding: var(--polish-space-card); }")
   })

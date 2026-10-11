@@ -76,13 +76,6 @@
 
 @media (min-width: 1024px) {
   /* 本文の上余白は14px。★V6 260枚すべてで例外がなかった値（§4）。 */
-  .content {
-    padding: 14px 40px 32px;
-  }
-
-  .contentFull {
-    padding: 14px 40px 32px;
-  }
 }
 
 /*

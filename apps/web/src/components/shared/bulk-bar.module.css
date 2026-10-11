@@ -20,7 +20,6 @@
   border-top: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
 }
 
 /* 「N件を選択中」。濃い緑の太字、桁は表と同じ tabular-nums。 */

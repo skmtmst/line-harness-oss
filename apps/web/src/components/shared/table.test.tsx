@@ -62,8 +62,8 @@ describe('既存の使い方を壊さない', () => {
     expect(screen.getByText('友だち').closest('tr')).not.toBeNull()
   })
 
-  it('一覧行の高さ58pxの既定は変えない', () => {
-    expect(dataTableCss).toContain('height: 58px;')
+  it('一覧行は現在のV8の共通の行高を使う', () => {
+    expect(dataTableCss).toMatch(/:root \.frame \.row\s*\{[^}]*height: var\(--polish-table-row\)/s)
   })
 
   it('Tr に何も渡さなければ aria-selected を付けない', () => {
@@ -76,10 +76,10 @@ describe('既存の使い方を壊さない', () => {
   })
 })
 
-describe('★V7の足し分', () => {
-  it('ゆったりした行は64px・見出し行は40px（CSSの指定）', () => {
-    expect(dataTableCss).toMatch(/\.rowComfortable\s*\{[^}]*height:\s*64px/s)
-    expect(tableCss).toMatch(/\.headComfortable\s*\{[^}]*height:\s*40px/s)
+describe('一覧の行と選択', () => {
+  it('行と見出しは現在のV8の共通の高さへそろえる', () => {
+    expect(dataTableCss).toMatch(/:root \.frame \.row\s*\{[^}]*min-height:\s*var\(--polish-table-row\)/s)
+    expect(tableCss).toMatch(/:root \.headRow \.cell\s*\{[^}]*height:\s*var\(--tpl-thead-h\)/s)
   })
 
   it('選んだ行は aria-selected と薄い緑の地（色だけにしない）', () => {

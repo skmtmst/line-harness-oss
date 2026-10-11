@@ -1,9 +1,4 @@
 @layer components {
-.headRow {
-  height: 40px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-surface-pearl);
-}
 
 .headRow[hidden],
 .cell[hidden] {

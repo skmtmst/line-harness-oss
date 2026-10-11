@@ -4,46 +4,25 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 0 16px;
-  border: 1px solid;
   border-radius: var(--radius-control);
   /*
    * #976 U079/U083: ボタンの文字は入力欄と同じ `$size-body`(14px)。
    * 以前は `$size-label`(13px) で、同じ行に並ぶ入力欄より小さかった。
    */
-  font-size: var(--text-body);
-  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    background-color var(--motion-fast) var(--motion-ease-out),
-    border-color var(--motion-fast) var(--motion-ease-out),
-    filter var(--motion-fast) var(--motion-ease-out),
-    scale var(--motion-instant) var(--motion-ease-out);
 }
 
 /*
  * 押したら少し沈む（★V7 仕上げ §2「押した」: 0.98倍・motion-instant 80ms）。
  * 動きを減らす設定では大きさを変えない（色の変化だけ残る）。
  */
-@media (prefers-reduced-motion: no-preference) {
-  .button:active:not(:disabled) {
-    scale: 0.98;
-  }
-}
 
 /*
  * #976 U083: PC標準は40pxにそろえる（入力欄・検索欄と同じ高さ）。
  * Pencil V5の実測は36pxだったが、共通デザイン仕様（監査 #976）で
  * 「主要ボタン・入力・検索・選択はPC 40px」と決め直した。
  */
-.standard {
-  height: 36px;
-}
-
-.field {
-  height: 36px;
-}
 
 /*
  * 行内用は32px（★V7：行内の操作は32）。アイコン操作（32×32）と
@@ -66,13 +45,8 @@
   display: none;
 }
 
-.button:focus-visible {
-  outline: revert;
-}
-
 .button:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
 }
 
 /*
@@ -90,8 +64,6 @@
   border-color: var(--color-accent-edge);
   background: var(--color-accent-deep);
   color: var(--color-on-accent);
-  border-radius: var(--radius-button-primary);
-  box-shadow: var(--card-shadow);
 }
 
 /*
@@ -108,7 +80,6 @@
   border-color: var(--color-field-border);
   background: var(--color-canvas);
   color: var(--color-ink);
-  box-shadow: var(--shadow-field);
 }
 
 .secondary:hover:not(:disabled) {
@@ -222,7 +193,7 @@
 :root .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 :root .primary { border: 1px solid var(--color-primary-border); border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
 :root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
-.text { border-color: transparent; background: transparent; color: var(--color-ink-secondary); }
+.text { border-color: transparent; }
 :root .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
 
 :root .button[data-presentation]:not([data-presentation='restaurant']) {
@@ -234,7 +205,7 @@
 :root .button[data-presentation]:hover:not(:disabled) { text-decoration: underline; }
 :root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
-.danger-outline { border-color: var(--color-hairline); background: var(--color-canvas); color: var(--color-danger); }
+.danger-outline { border-color: var(--color-hairline); }
 :root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
 
 /* 本文中の小さな操作。通常のボタンの高さは変えない。 */

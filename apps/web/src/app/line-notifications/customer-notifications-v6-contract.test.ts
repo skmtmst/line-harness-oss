@@ -50,7 +50,7 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
       join(REPO, 'apps', 'web', 'src', 'components', 'shared', 'tabs.module.css'),
       'utf8',
     )
-    expect(tabs).toContain('height: 44px;')
+    expect(tabs).toMatch(/:root \.list \.tab\.tab\s*\{[^}]*height: var\(--tpl-tabs-h\)/s)
   })
 
   it('編集は専用レイアウトへ切り替え、下書き保存と公開を分ける', () => {

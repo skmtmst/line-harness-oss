@@ -11,11 +11,8 @@
  */
 
 .list {
-  display: flex;
-  align-items: flex-end; /* alignItems: end */
-  justify-content: space-between; /* justifyContent: space_between */
-  gap: 26px; /* gap: 26 */
-  height: 44px; /* 種別タブ height: 44 */
+  display: flex; /* alignItems: end */
+  justify-content: space-between; /* justifyContent: space_between */ /* gap: 26 */ /* 種別タブ height: 44 */
   border-bottom: 1px solid var(--color-hairline);
 }
 
@@ -23,8 +20,6 @@
 .items {
   display: flex;
   min-width: 0;
-  align-items: flex-end;
-  gap: 26px;
 }
 
 /* タブ行の右端。ヘッダー操作を独立した行にしない。 */
@@ -37,14 +32,9 @@
 }
 
 .tab {
-  display: inline-flex;
-  align-items: center; /* alignItems: center */
-  height: 44px; /* height: 44 */
-  padding: 0 4px; /* padding: [0, 4] */
+  display: inline-flex; /* alignItems: center */ /* height: 44 */ /* padding: [0, 4] */
   border-bottom: 2px solid transparent; /* strokeWidth: {bottom: 2} / stroke: #00000000 */
-  color: var(--color-ink-secondary); /* fill: $ink-secondary */
-  font-size: var(--text-body); /* fontSize: $size-body */
-  font-weight: 500; /* fontWeight: 500 */
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */ /* fontSize: $size-body */ /* fontWeight: 500 */
   white-space: nowrap;
   cursor: pointer;
   background: none;
@@ -67,10 +57,7 @@
 /* VPn1F 共通 ページ内タブ項目（選択中）
  * #976 U084: 文字色は `$accent`(#06c755、白地で2.26:1) から
  * `$accent-deep`(#087a3e、5.44:1) へ。下線も同じ色で揃える。 */
-.current {
-  border-bottom-color: var(--color-accent-deep);
-  color: var(--color-accent-deep);
-  font-weight: 500; /* fontWeight: 500 */
+.current { /* fontWeight: 500 */
   cursor: default;
 }
 
@@ -82,10 +69,6 @@
   font-weight: 600;
 }
 
-.current .count {
-  color: var(--color-accent-deep);
-}
-
 /*
  * #1014 U029: 390pxではタブ4個と右端の操作が44pxの1行に入らず、
  * 重なって読めなかった。狭い画面ではタブ行を折り返し、タブは横に
@@ -94,7 +77,6 @@
 @media (max-width: 767px) {
   .list {
     flex-wrap: wrap;
-    height: auto;
     padding-bottom: 8px;
   }
 

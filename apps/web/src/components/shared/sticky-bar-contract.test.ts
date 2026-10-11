@@ -204,8 +204,8 @@ describe('下部追従バーの並びを部品で固定する', () => {
 
   it('画面の下に追従する', () => {
     expect(CSS).toMatch(/position:\s*sticky/)
-    // v7 の土台は画面の下端に付けるまま。
-    expect(CSS).toMatch(/\.bar \{\s*position:\s*sticky;\s*bottom:\s*0;/s)
+    // 現在のV8は下から12px浮かせる。
+    expect(CSS).toMatch(/:root \.bar \{\s*bottom:\s*12px;/s)
   })
 
   it('★A の浮かせ（V8 は下から 12px・枠なし・ふんわり影・角丸そのまま）', () => {

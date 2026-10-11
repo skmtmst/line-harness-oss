@@ -29,7 +29,6 @@
   width: 24px;
   height: 24px;
   flex-shrink: 0;
-  border-radius: var(--radius-pill);
   background: var(--color-shell);
   color: var(--color-ink-secondary);
   display: inline-flex;
@@ -52,8 +51,6 @@
 }
 
 .title {
-  font-size: var(--text-label);
-  font-weight: 500;
   color: var(--color-ink);
 }
 

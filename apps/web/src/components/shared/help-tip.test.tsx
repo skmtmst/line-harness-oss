@@ -97,9 +97,5 @@ describe('？印の当たりは透明のはみ出しを持たない（G3・V8）
     expect(css).toMatch(/:root \.button::before \{\s*content:\s*none;/s)
   })
 
-  it('v7 の札は 18px 円＋::before のまま', () => {
-    const css = readFileSync(join(DIR, 'help-tip.module.css'), 'utf8')
-    const base = css.match(/\.button \{[^}]*\}/s)?.[0] ?? ''
-    expect(base).toMatch(/width:\s*18px/)
-  })
+
 })

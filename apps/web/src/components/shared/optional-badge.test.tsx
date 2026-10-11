@@ -29,11 +29,9 @@ describe('任意の札', () => {
     expect(screen.getByText('必須')).toBeTruthy()
   })
 
-  it('V7の札を保ち、V8は共通の札の地を持つ', () => {
-    expect(css).toMatch(/\.optional\s*\{[^}]*margin-left:\s*6px/s)
-    expect(css).toMatch(/\.optional\s*\{[^}]*font-size:\s*var\(--text-micro\)/s)
-    expect(css).toMatch(/\.optional\s*\{[^}]*line-height:\s*var\(--text-micro--line-height\)/s)
-    expect(css.split(":root .optional")[0]).not.toMatch(/\.optional\s*\{[^}]*background/s)
-    expect(css.split(":root .optional")[0]).not.toMatch(/\.optional\s*\{[^}]*border-radius/s)
+  it('今の共通の札の地と文字の段を持つ', () => {
+    expect(css).toMatch(/:root \.optional\s*\{[^}]*background:\s*var\(--color-canvas-sunken\)/s)
+    expect(css).toMatch(/:root \.optional\s*\{[^}]*font-size:\s*var\(--text-caption\)/s)
+    expect(css).toMatch(/:root \.optional\s*\{[^}]*border-radius:\s*var\(--radius-pill\)/s)
   })
 })

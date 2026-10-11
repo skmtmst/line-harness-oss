@@ -32,14 +32,15 @@ describe('#673 A. カード・パネルの立体感', () => {
 
   it('浮く面はV8の8px・24pxの影', () => {
     const float = GLOBALS_CODE.match(/--shadow-float:\s*([^;]+);/)?.[1] ?? ''
-    expect(float).toBe('0 8px 24px #1d1d1f1f')
+    expect(float).toBe('var(--shadow-controls-pop)')
+    expect(GLOBALS_CODE).toContain('--shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12)')
   })
 
   it('モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む', () => {
     // components/shared/ は変更できないため、globals.css の属性規定で上書きする。
     // ★V7: ダイアログは最前面（段3）の影 `--shadow-overlay`。
     expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-overlay\)/)
-    expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--card-shadow\)/)
+    expect(GLOBALS_CODE).toMatch(/:root aside\[aria-label="フォルダ"\]\s*\{[^}]*box-shadow:\s*none/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\] \.shadow-lg\s*\{[^}]*var\(--shadow-float\)/)
   })
 
@@ -59,7 +60,7 @@ describe('#673 A. カード・パネルの立体感', () => {
     const editor = readFileSync(join(SRC, 'v8/dashboard/dashboard-editor.tsx'), 'utf8')
     const drawer = readFileSync(join(SRC, 'components/shared/drawer.module.css'), 'utf8')
     expect(editor).toContain('width="editor"')
-    expect(drawer).toContain('box-shadow: var(--shadow-overlay)')
+    expect(drawer).toContain('box-shadow: var(--shadow-controls-pop)')
   })
 })
 

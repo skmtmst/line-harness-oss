@@ -22,7 +22,6 @@
   font-size: var(--text-body);
   font-weight: 400; /* fontWeight: normal */
   font-family: inherit;
-  box-shadow: var(--shadow-field);
 }
 
 .field::placeholder {
@@ -32,7 +31,6 @@
 .field:disabled {
   cursor: not-allowed;
   background: var(--color-canvas-sunken);
-  opacity: 0.6;
 }
 
 .field:focus-visible {
@@ -41,9 +39,7 @@
 }
 
 /* ytG7l 共通 入力欄 */
-.single {
-  height: 36px; /* height: 40 */
-  padding: 0 12px; /* padding: [0, 12] */
+.single { /* height: 40 */ /* padding: [0, 12] */
 }
 
 /* keKe3 共通 入力欄（複数行）／★V8 i5BW8b。最小の高さ120・縦にだけ広げられる（下の層の外の決まり）。 */
@@ -61,9 +57,6 @@
 }
 
 /* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
-.invalid {
-  border-color: var(--color-status-danger);
-}
 
 /*
  * #976 U079/U083: タッチ端末は入力文字16px・欄の高さ44px。

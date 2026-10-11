@@ -2,18 +2,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
   background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out), color var(--motion-fast) var(--motion-ease-out);
 }
 
 /*
@@ -36,10 +27,6 @@
  * `:focus` ではなく `:focus-visible` にするのは、マウスで押したときに
  * 輪郭を出さないため（出すと「選んだ」と読み違える）。
  */
-.v6-filter-chip:focus-visible {
-  outline: 2px solid var(--color-status-info);
-  outline-offset: 2px;
-}
 
 /*
  * #669: 選んだ札は「有効状態」なので濃い緑の地に白文字＋✓。
@@ -47,8 +34,6 @@
  */
 .v6-filter-chip[aria-pressed='true'] {
   border-color: var(--color-accent-deep);
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
 }
 
 .v6-filter-chip:disabled {
@@ -57,8 +42,6 @@
 }
 
 .v6-filter-chip__icon {
-  width: 14px;
-  height: 14px;
   flex: 0 0 auto;
 }
 
@@ -68,11 +51,6 @@
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--color-ink-faint);
-}
-
-.v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count {
-  color: var(--color-on-accent);
-  opacity: 0.85;
 }
 
 /*

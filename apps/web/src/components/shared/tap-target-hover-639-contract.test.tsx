@@ -45,13 +45,13 @@ describe('#639 主要操作の最小高さ 32px', () => {
     // 行内アイコン操作 32px（Pencil K65Uhe・Ls12y・H0V8EK の寸法）。
     expect(readShared('row-actions.module.css')).toMatch(/\.action\s*\{[^}]*height:\s*32px/s)
     // 一覧の絞り込み札 32px。
-    expect(readShared('filter-chip.css')).toMatch(/\.v6-filter-chip\s*\{[^}]*height:\s*32px/s)
+    expect(readShared('filter-chip.css')).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
     // ページネーションは推奨 36px 以上（38px）。
     expect(readShared('pagination.module.css')).toMatch(/\.item\s*\{[^}]*height:\s*32px/s)
     // タブは 44px。
-    expect(readShared('tabs.module.css')).toMatch(/\.tab\s*\{[^}]*height:\s*44px/s)
+    expect(readShared('tabs.module.css')).toMatch(/:root \.list \.tab\.tab\s*\{[^}]*height:\s*var\(--tpl-tabs-h\)/s)
     // 共通ボタンの標準は 40px。
-    expect(readShared('button.module.css')).toMatch(/\.standard\s*\{[^}]*height:\s*36px/s)
+    expect(readShared('button.module.css')).toMatch(/:root \.standard,\s*:root \.field\s*\{[^}]*height:\s*var\(--tpl-button-h\)/s)
   })
 
   it('画像タイルのお気に入り星は現役の板の24pxを使う', () => {

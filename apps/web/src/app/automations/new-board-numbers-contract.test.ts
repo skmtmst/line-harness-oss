@@ -15,7 +15,7 @@ describe('automation 作成の現役の寸法と入口', () => {
     expect(PAGE).toContain('className={styles.triggerCard}')
     expect(CSS).toMatch(/\.triggerCard\s*\{[^}]*min-height: var\(--tpl-cfl-target-h\)/s)
     expect(CHOICE).toContain('padding: var(--polish-space-card); gap: var(--polish-space-row);')
-    expect(CHOICE).toContain('border-radius: var(--radius-card)')
+    expect(CHOICE).toContain('border-radius: var(--polish-radius-card)')
     expect(TOKENS).toContain('--tpl-cfl-target-h: 98px')
   })
 
