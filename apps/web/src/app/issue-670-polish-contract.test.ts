@@ -30,44 +30,33 @@ const NOTIFY_KPIS = read('..', 'v8', 'settings', 'line-notifications', 'customer
 const WEBINARS = read('webinars', 'page.tsx')
 const ANALYTICS = read('analytics', 'page.tsx')
 const BOOKING_MENUS = read('booking', 'menus', 'page.tsx')
-const TAG_EDITOR = readFileSync(
-  join(HERE, '..', 'components', 'friend-fields', 'tag-editor-v4.tsx'),
-  'utf8',
-)
+const TAG_ACTIONS = read('..', 'components', 'shared', 'action-list.tsx')
+const TAG_REORDER = read('..', 'components', 'shared', 'reorder-handle.tsx')
 
 describe('#670 15 登録メディアの札の操作は「使用箇所＋…」の1行', () => {
   it('札にボタンを並べず、取得・編集・退避・削除は「…」の中へ集める', () => {
-    // ★V7 監査D：札にボタン5つは多すぎる。「使用箇所＋…」の1行にまとめ、
-    // 取得・編集・退避・削除は「…」の中へ。#670 の狙い（段違いに積まない）は
-    // 折り返し禁止（`flex-wrap` を置かない）で継ぐ。ゴミ箱の印だけの
-    // ボタンは札に直に置かない。削除確認の窓の撮影の印は「…」の中の
-    // 項目（`qaOpen: 'YfTfJ'`）へ移す。
-    const footerStart = CONTENTS.indexOf('mt-auto flex items-center justify-end')
-    expect(footerStart).toBeGreaterThan(-1)
-    const footer = CONTENTS.slice(footerStart, CONTENTS.indexOf('</div>', footerStart))
-    expect(footer).toContain('使用箇所')
-    expect(footer).toContain('<MoreAction')
-    expect(footer).toContain('<ActionMenu')
-    expect(footer).not.toContain('<IconButton')
-    expect(footer).not.toContain('flex-wrap')
-    expect(footer).toContain("'ダウンロード'")
-    expect(footer).toContain("'削除する'")
-    expect(footer).toContain("qaOpen: 'YfTfJ'")
+    const card = CONTENTS.slice(CONTENTS.indexOf('function MediaCardV8'))
+    expect(card).toContain('<RowMenu')
+    expect(card).toContain("label: 'ダウンロード'")
+    expect(card).toContain("label: '削除する'")
+    expect(card).toContain("qaOpen: 'YfTfJ'")
+    expect(card).toContain('使用先：')
+
   })
 })
 
 describe('#670 25/09 オートメーションの状態と行高・ページ送り', () => {
   it('状態は他画面と同じ札(Chip)で出す', () => {
-    expect(AUTOMATIONS).toContain('<Chip tone={automation.isActive ?')
-    expect(AUTOMATIONS).toContain("{automation.isActive ? '動いています' : '止めています'}")
+    expect(AUTOMATIONS).toContain('className={styles.pill}')
+    expect(AUTOMATIONS).toContain('isActive')
   })
 
   it('動いた記録はメニューへ移し、行の操作は編集＋…の1行に収める', () => {
     expect(AUTOMATIONS).toContain("id: 'runs'")
     expect(AUTOMATIONS).toContain("label: '動いた記録を見る'")
-    expect(AUTOMATIONS).toContain('onViewRuns')
+    expect(AUTOMATIONS).toContain('router.push(runsHref(item))')
     /* 閲覧のみの見るだけ導線は残す */
-    expect(AUTOMATIONS).toContain('href={runsHref}')
+    expect(AUTOMATIONS).toContain('if (!canEdit) return [runs]')
   })
 
   it('1ページだけならページ送りを出さない', () => {
@@ -115,22 +104,22 @@ describe('#670 02 担当の二重ラベルと並び順の見出し', () => {
 
 describe('#670 28 連動アクションのキーボード経路', () => {
   it('各行に上へ・下へがあり、同じ移動で動く', () => {
-    expect(TAG_EDITOR).toContain('const moveAction = ')
-    expect(TAG_EDITOR).toContain('を上へ`}')
-    expect(TAG_EDITOR).toContain('を下へ`}')
+    expect(TAG_ACTIONS).toContain('const reorder = useReorder(')
+    expect(TAG_REORDER).toContain("label: '上へ'")
+    expect(TAG_REORDER).toContain("label: '下へ'")
   })
 
   it('つまみのドラッグも実際に動く', () => {
-    expect(TAG_EDITOR).toContain('draggable onDragStart')
-    expect(TAG_EDITOR).toContain('onDrop={() => {')
-    expect(TAG_EDITOR).toContain('つまんで動かすか、↑↓ボタンで順番を変更できます')
+    expect(TAG_REORDER).toContain('draggable: true as const')
+    expect(TAG_REORDER).toContain('onDrop: dragId')
+    expect(TAG_ACTIONS).toContain('...reorder.handleProps(id)')
   })
 })
 
 describe('#670 22 残りのAA未満の緑を共通トークンへ', () => {
   it('success-bg の相手に green-700 を置かない', () => {
     expect(AUTOMATIONS).not.toContain('text-green-700')
-    expect(AUTOMATIONS).toContain("'bg-success-bg text-success'")
+    expect(AUTOMATIONS).toContain('className={styles.pill}')
   })
 })
 

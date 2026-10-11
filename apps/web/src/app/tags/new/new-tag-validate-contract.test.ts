@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/v8/tags/create.tsx'), 'utf8')
 const ROUTE = fs.readFileSync(path.join(process.cwd(), 'src/app/tags/new/page.tsx'), 'utf8')
 const LIST = fs.readFileSync(path.join(process.cwd(), 'src/v8/tags/tags-tab.tsx'), 'utf8')
-const EDITOR = fs.readFileSync(path.join(process.cwd(), 'src/components/friend-fields/tag-editor-v4.tsx'), 'utf8')
+const EDITOR = fs.readFileSync(path.join(process.cwd(), 'src/v8/tag-edit/edit-form.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(process.cwd(), 'src/lib/api.ts'), 'utf8')
 
 describe('タグ作成の名前検査の契約', () => {
@@ -27,7 +27,7 @@ describe('タグ作成の名前検査の契約', () => {
     expect(ROUTE).not.toContain('LegacyNewTagPage')
     expect(ROUTE).toContain('<CreatePage')
     expect(LIST).toContain('<Button href="/tags/new" variant="primary"')
-    expect(EDITOR).toContain('href={`/tags/new?copy=${tag?.id ?? \'\'}`}')
+    expect(EDITOR).toContain('href={`/tags/new?copy=${tag.id}`}')
   })
 
   it('現役V8作成画面が旧画面の保存項目を引き継ぐ', () => {

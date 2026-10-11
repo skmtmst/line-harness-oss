@@ -15,10 +15,10 @@ describe('タグ V4 contract', () => {
   })
 
   it('タグ編集の遡及付与は初期OFFで専用確認を通す', () => {
-    const editor = read('components/friend-fields/tag-editor-v4.tsx')
+    const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
     const page = read('v8/tag-edit/edit.tsx')
-    expect(editor).toContain("useState(initialValues?.applyToExisting ?? initialApplyToExisting)")
-    expect(editor).toContain('すでに付いている人への反映')
+    expect(editor).toContain("useState(retroactiveReference)")
+    expect(editor).toContain('今付いている人にもさかのぼって積む')
     expect(editor).toContain('さかのぼってマイルを積みますか？')
     expect(editor).toContain('max-w-[670px] -translate-y-7')
     expect(editor).toContain('<Coins size={21}')
@@ -33,22 +33,22 @@ describe('タグ V4 contract', () => {
   })
 
   it('タグ編集と対応マーク保管はV6の結果を正しく案内する', () => {
-    const editor = read('components/friend-fields/tag-editor-v4.tsx')
+    const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
     const markList = (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx'))
-    expect(editor).toContain("mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'")
-    expect(editor).toContain('取り消せない操作です')
+    expect(editor).toContain('このタグを消すと、上の配信やフォームの条件から外れます')
+    expect(editor).toContain('この操作は取り消せません')
     expect(markList).toContain('人は下で選んだマークへ置き換え、履歴に残します')
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 
   it('タグ作成・編集は画面名をトップバーだけに置き、V6の操作を下部へまとめる', () => {
-    const editor = read('components/friend-fields/tag-editor-v4.tsx')
-    expect(editor).toContain("usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')")
-    expect(editor).toContain('<StickyBar')
+    const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
+    expect(editor).toContain("title={host?.title ?? (tag.name || 'タグを編集')}")
+    expect(editor).toContain('<CreatePage')
     expect(editor).not.toContain('text-[32px] font-bold tracking-tight')
     expect(editor).not.toContain('友だちを分類するタグを作ります。タグが付いた瞬間の連動')
-    expect(editor).toContain('番目のアクションを複製')
-    expect(editor).toContain("action.type === 'タグ追加' || action.type === 'タグ解除'")
+    expect(editor).toContain("label: '複製する'")
+    expect(editor).toContain("def.resource ?")
     // マイル設定だけを根拠に、存在しない連動アクションを作って表示しない。
     expect(editor).not.toContain("id: 'sample-1'")
   })

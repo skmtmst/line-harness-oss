@@ -24,7 +24,7 @@ const readWeb = (relative: string) =>
 const MARK_LIST = readWeb('src/v8/tags/marks-tab.tsx') + read('mark-list.tsx')
 const SAVED_LIST = readWeb('src/v8/tags/searches-tab.tsx') + read('saved-search-list.tsx')
 const FIELD_LIST = readWeb('src/v8/tags/fields-tab.tsx') + read('field-list.tsx')
-const TAG_EDITOR = read('tag-editor-v4.tsx')
+const TAG_EDITOR = readWeb('src/v8/tag-edit/edit.tsx') + readWeb('src/v8/tag-edit/edit-form.tsx')
 const CSV_DIALOG = read('tag-csv-import-dialog.tsx')
 const EDIT_PAGE = readWeb('src/app/tags/searches/edit/page.tsx')
 
@@ -133,7 +133,8 @@ describe('機能4の一覧・編集画面は取得済みの設計値を表示す
   })
 
   it('タグ編集は保存済みの連動アクションを復元する', () => {
-    expect(TAG_EDITOR).toContain('tag?.linkedActions ?? []')
+    expect(TAG_EDITOR).toContain('linkedActionFromDefinition(action, tag.linkedActions?.find')
+    expect(TAG_EDITOR).toContain('useState<LinkedAction[]>(initialActions)')
   })
 
   it('保存検索の該当人数は一覧で取得済みの値を初期表示に使う', () => {

@@ -14,9 +14,9 @@ it('共通点検1: 未分類は開いたフォルダ', () => {
   expect(read('components/shared/folder-picker-shell.tsx')).toContain('<FolderPanel readOnly')
   expect(read('components/shared/folder-panel.tsx')).toMatch(/kind === 'unfiled' \? <FolderOpen/)
 })
-it('共通点検2: タグ編集の切替は共通Toggle', () => {
-  const source = read('components/friend-fields/tag-editor-v4.tsx')
-  expect(source).toContain("from '@/components/shared/toggle'")
+it('共通点検2: タグ編集の切替は共通の設定Checkbox', () => {
+  const source = read('v8/tag-edit/edit-form.tsx')
+  expect(source).toContain('<SettingCheckbox')
   expect(source).not.toContain('h-7 w-12')
 })
 it('共通点検3: 会話右欄のタグは共通TagPill', () => {
