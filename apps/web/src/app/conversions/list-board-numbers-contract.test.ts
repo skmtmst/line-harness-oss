@@ -11,11 +11,12 @@ const PAGE = readFileSync(resolve(__dirname, "conversion-points-v8.tsx"), "utf-8
 const CSS = readFileSync(resolve(__dirname, "conversion-points-v8.module.css"), "utf-8");
 
 describe("conversions 一覧の板の数字", () => {
-  it("V8一覧の行セルは左右20・上下9（従来の一覧の余白は変更しない）", () => {
+  it("B-217 の平らな表は共通部品に寸法を渡し、画面からセルを上書きしない", () => {
     const listCells = PAGE.split("<tbody").at(-1)!.split("</tbody>")[0];
     expect(listCells).toContain('<Td');
-    expect(PAGE).toContain('className={styles.table}');
-    expect(CSS).toMatch(/\.table td \{[^}]*padding: 9px 20px;/s);
+    expect(PAGE).toContain("padding: '0 var(--tpl-list-inset)'");
+    expect(PAGE).toContain('columnLayout={{');
+    expect(CSS).not.toMatch(/:global\([^)]*\).*\.table/);
     expect(listCells).not.toMatch(/\bpx-\d+\s+py-/);
   });
 

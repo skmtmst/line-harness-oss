@@ -4284,18 +4284,6 @@
     "reason": "導入前の既存表示だけを残して新しい崩れを止めるため許可。開始時点でこの2つの中身の間に余白24pxを除いて99px残る。B-187の共通部品・型の修正で詰める。"
   },
   {
-    "route": "/conversions",
-    "width": 1920,
-    "kind": "wrap",
-    "target": "main.app-shell_main:nth-of-type(1) > div.app-shell_content:nth-of-type(1) > div.page-templates_frame:nth-of-type(1) > div.page-templates_listBody:nth-of-type(1) > div.page-templates_split:nth-of-type(2) > div.page-templates_main:nth-of-type(1) > div.page-templates_content:nth-of-type(2) > div.list_tableWrap:nth-of-type(1) > div.data-table_frame:nth-of-type(1) > table.data-table_table:nth-of-type(1) > tbody:nth-of-type(1) > tr.data-table_row:nth-of-type(1) > td.data-table_bodyCell:nth-of-type(6) > span.list_usageMain:nth-of-type(1)",
-    "text": "ファネル 2・アフィリエイト 1",
-    "measure": {
-      "lines": 2
-    },
-    "count": 1,
-    "reason": "列車13（9da94f6fe7）の同じ幅・文字・実寸でも確認済みの既存表示。列車14の列位置・型の構造に対象を合わせる。文字・場所・件数・実寸の悪化は引き続き止める。基準実寸：{\"lines\": 2}。対象：ファネル 2・アフィリエイト 1"
-  },
-  {
     "route": "/affiliates/new",
     "width": 1920,
     "kind": "overlap",

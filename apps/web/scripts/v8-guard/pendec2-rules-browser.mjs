@@ -4,7 +4,11 @@ export default function scanPendec2Rules() {
   const css = el => getComputedStyle(el)
   const visible = el => {
     if (!el || el.closest('svg,script,style,[inert],[data-line-preview-part="talk"],[data-template-region="folders"]')) return false
-    for (let p = el; p; p = p.parentElement) { const c = css(p); if (c.display === 'none' || c.visibility === 'hidden' || +c.opacity === 0) return false }
+    for (let p = el; p; p = p.parentElement) {
+      // 一般の崩れ検査と同じ。閉じた詳細設定の本文は描かれていない。
+      if (p !== el && p.matches('details:not([open])') && !p.querySelector(':scope > summary')?.contains(el)) return false
+      const c = css(p); if (c.display === 'none' || c.visibility === 'hidden' || +c.opacity === 0) return false
+    }
     const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0
   }
   const sel = el => {

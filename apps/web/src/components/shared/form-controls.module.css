@@ -167,3 +167,7 @@
   font-size: var(--tpl-field-label-size);
   font-weight: var(--tpl-field-label-weight);
 }
+
+/* B-152：ふつうの欄は親の間とラベルの下の余白を二重に足さない。 */
+html[data-theme='v8'] .field:not([data-density]):not([data-spacing]) { gap: var(--polish-space-row); }
+html[data-theme='v8'] .field:not([data-density]):not([data-spacing]) > .labelRow { margin-bottom: 0; }
