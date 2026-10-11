@@ -84,6 +84,7 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/nen-posts/review.module.css", ".tableWrap", "投稿の公開記録を表示する表の枠。影を重ねない。"],
   ["v8/ops/auth.module.css", ".digit", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["v8/restaurant/closures/closures.module.css", ".grid", "表・一覧の行。外側のカードと影を重ねない。"],
+  ["v8/restaurant/delivery/delivery.module.css", ".sumCard", "数の帯のマス。B-153に従い線で区切る。"],
   ["v8/rich-menus/connections.module.css", ".menu", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["v8/scenarios/results.module.css", ".kpiBox", "数の帯。B-153に従い線で区切る。"],
   ["v8/scenarios/results.module.css", ".stepList", "表・一覧の行。外側のカードと影を重ねない。"],

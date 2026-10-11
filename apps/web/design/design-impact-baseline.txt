@@ -665,6 +665,12 @@ shared-button-importer v8/restaurant-reservations/detail-dialog.tsx
 shared-button-importer v8/restaurant/dashboard/stores.tsx
 shared-button-importer v8/restaurant/dashboard/side.tsx
 shared-button-importer v8/restaurant/dashboard/today-table.tsx
+# ★V8 デリバリー受注 v02（2026-10-09 承認：kDQHr・hjdqV・dgeTy・OzHLO・h7OeT・XCVGd）。
+shared-button-importer v8/restaurant/delivery/delivery.tsx
+shared-button-importer v8/restaurant/delivery/orders.tsx
+shared-button-importer v8/restaurant/delivery/order-detail.tsx
+shared-button-importer v8/restaurant/delivery/history.tsx
+shared-button-importer v8/restaurant/delivery/bulk.tsx
 shared-button-importer v8/restaurant/front-desk/phone-drawer.tsx
 shared-button-importer v8/restaurant/close-tasks/close-tasks.tsx
 shared-button-importer v8/restaurant/closures/closures.tsx

@@ -348,6 +348,8 @@
 
 :global([data-theme='v8']) [data-page-template='restaurant'] .heading { min-height: 60px; }
 :global([data-theme='v8']) [data-page-template='restaurant'] .subtitle { line-height: 24px; }
+/* 絵が説明を本文の大きさで描く板だけ 13/20 にする（頭の任意の引数 subtitleSize）。渡さない板は上の 12/19 のまま。 */
+:global([data-theme='v8']) .heading[data-subtitle-size='body'] .subtitle { font-size: var(--polish-text-body); line-height: 20px; }
 
 :global([data-theme='v8']) [data-page-template='restaurant'] .titleRow > :last-child:not(h1) {transform:translateY(6px);}
 

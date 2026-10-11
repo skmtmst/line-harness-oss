@@ -167,3 +167,18 @@
   font-size: var(--tpl-field-label-size);
   font-weight: var(--tpl-field-label-weight);
 }
+
+/*
+ * 題と中身の間（Field の contentGap）。
+ * 共通の間は「題の行の下 8（--polish-space-row）＋段の間 6」で 14。絵の間が
+ * それと違う欄だけ contentGap を渡し、渡した値1つにそろえる（下の 8 は 0 にする）。
+ * 渡さない欄は上の決まりのままなので、他の画面の見え方は変わらない。
+ * @layer の外に置く。中に入れると、同じく外にある `.labelRow` の 8 に負ける。
+ */
+[data-theme='v8'] .field[data-field-content-gap] {
+  gap: var(--field-content-gap);
+}
+
+[data-theme='v8'] .field[data-field-content-gap] .labelRow {
+  margin-bottom: 0;
+}

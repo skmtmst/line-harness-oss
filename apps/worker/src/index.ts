@@ -185,6 +185,7 @@ import { tiktokPnl } from './routes/tiktok-pnl.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { restaurantGooglePosts } from './routes/restaurant-google-posts.js';
 import { restaurantGooglePerformance } from './routes/restaurant-google-performance.js';
+import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
@@ -271,6 +272,21 @@ export type Env = {
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
     RESTAURANT_TEST_ENABLED?: string;
+    /**
+     * デリバリー受注（Uber Eats・出前館・ロケットナウ）の接続設定。
+     * 送信は 'true' のときだけ行う。未設定の環境では台帳へ記録して送らない。
+     * 受信の合言葉は32文字以上でないと受け取らない（短い鍵は使わない）。
+     */
+    RT_DELIVERY_SEND_ENABLED?: string;
+    RT_DELIVERY_UBEREATS_API_BASE_URL?: string;
+    RT_DELIVERY_UBEREATS_API_TOKEN?: string;
+    RT_DELIVERY_UBEREATS_WEBHOOK_SECRET?: string;
+    RT_DELIVERY_DEMAECAN_API_BASE_URL?: string;
+    RT_DELIVERY_DEMAECAN_API_TOKEN?: string;
+    RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET?: string;
+    RT_DELIVERY_ROCKETNOW_API_BASE_URL?: string;
+    RT_DELIVERY_ROCKETNOW_API_TOKEN?: string;
+    RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
     RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;
@@ -647,6 +663,7 @@ app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
 app.route('/', restaurantGooglePerformance);
+app.route('/', restaurantDelivery);
 app.route('/', googleSheets);
 app.route('/', tiktokPnl);
 app.route('/', tenants);

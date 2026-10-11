@@ -139,6 +139,14 @@
 /* 失敗を2行で示すときも、見出しと印はdangerの色を保つ（N43uVX）。 */
 [data-theme='v8'] .twoLine.danger .heading,
 [data-theme='v8'] .twoLine.danger .icon { color: var(--color-status-danger); }
+/*
+ * 小さく出す帯（density="compact"）に題を付けたときの題の太さ。
+ * 上の qf3ky の2行帯は 13px で 700 を使っているが、globals.css の
+ * 「太さは 600 / 500 / 400 の3段だけ、700 は text-hero（28px）だけ」に
+ * 合わない。既定の帯の見え方は変えず、小さく出す帯だけ 600 に直す。
+ * 絵 hjdqV の「急ぎ対応のおすすめ」は 13/600。
+ */
+[data-theme='v8'] .notice[data-density='compact'] .heading { font-weight: 600; }
 /* 小さなカードに入れる1行の注意。既存の帯は変えない。 */
 [data-theme='v8'] .notice[data-compact] {
   min-width: 0;

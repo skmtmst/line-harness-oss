@@ -22,8 +22,16 @@ type CommonProps = {
    * `compact` は一覧の行内・絞り込み行など、32px級の操作と高さを
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
+   *
+   * `delivery-head` は★V8 デリバリー受注の板の頭の操作（絵 kDQHr・OzHLO）と
+   * 注文詳細の窓の足（絵 hjdqV）だけ。どの絵も余白 14・印 15・間 6 で同じ値。
+   * 高さ・角丸・字は既定と同じで、左右の余白と印の大きさだけ絵へ合わせる。
+   * 渡さないボタンは変わらない。
+   *
+   * `delivery-bulk` は★V8 デリバリー受注の「まとめて」の帯の中の操作（絵 h7OeT）だけ。
+   * 高さ28・左右10・角丸8・字12は `delivery-row` と同じで、印13角・印と字の間5が違う。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'booking'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'booking' | 'delivery-row' | 'delivery-bulk' | 'delivery-head'
   align?: 'start'
   /** 行内の時刻など、リンク色にしない文字操作。 */
   textTone?: 'action' | 'ink'
@@ -56,6 +64,15 @@ type NativeButtonProps = CommonProps &
     done?: boolean | null
     /** `done` の間に出す文字。規定は「保存しました」。 */
     doneLabel?: string
+    /**
+     * 幅の控えのしかた。規定の `'states'` は「保存中…」「保存しました」の
+     * 両方を先に測って広いほうで幅を押さえる（文字が変わっても跳ねない）。
+     *
+     * `'idle'` は平常時の文字だけで幅を決める。`done` を渡さないボタン、
+     * かつ絵が幅を指定している並び（窓の足など）で使う。`busy` の間も
+     * 平常時の幅を下回らないので、こちらでも幅は跳ねない。
+     */
+    widthReserve?: 'states' | 'idle'
   }
 
 type LinkButtonProps = CommonProps &
@@ -127,6 +144,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     busyLabel = '保存中…',
     done,
     doneLabel = '保存しました',
+    widthReserve = 'states',
     disabled,
     ref,
     onClick,
@@ -174,6 +192,15 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
     if (!v8) return
+    if (widthReserve === 'idle') {
+      /*
+       * 絵が幅を決めている並び。結果の文字の分を控えず、平常時の文字で幅を決める。
+       * `busy` の間は上の min-width がこの幅を守るので、やはり跳ねない。
+       */
+      el.style.width = ''
+      idleWidthRef.current = el.offsetWidth
+      return
+    }
     // いちばん長い結果の文字も最初に測る。成功した瞬間に幅が跳ねない。
     const sample = el.cloneNode(false) as HTMLButtonElement
     sample.removeAttribute('id')

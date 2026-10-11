@@ -279,6 +279,106 @@
 /* O2Z8u・GcyTr の電話予約。標準の高さを保ち、印と文字の間を絵へ合わせる。 */
 [data-theme='v8'] .button.booking { height: var(--tpl-chip-h); padding-inline: var(--tpl-booking-button-pad); gap: var(--tpl-body-gap); }
 
+/*
+ * ★V8 デリバリー受注の行の中の操作（kDQHr の `HYOW5` 受け付ける・`AuCyJ` 拒否・
+ * `WvPd6` 準備完了）。`size="delivery-row"` を渡したボタンだけに効き、
+ * 他の画面と既定のボタンは変えない。
+ *
+ * 絵の実寸は 高さ28・左右の余白10・字12の太字・角丸8。行内用の既定（`compact`）は
+ * 字14・左右の余白16・高さ32で、行が 12+32+12＝56 になり絵の 53・50・47 と合わない
+ * （2026-10-10 実測）。
+ *
+ * 高さは `height` だけでは下がらない。globals.css の全ボタン共通の下限
+ * `@layer base { button:not([role="switch"]) { min-height: 32px } }` が
+ * `height` より強いので、こちらも `min-height` で下限を28へ下げる。
+ */
+[data-theme='v8'] .button.delivery-row {
+  height: var(--tpl-rt-dlv-act-h);
+  min-height: var(--tpl-rt-dlv-act-h);
+  padding: var(--tpl-rt-dlv-act-pad);
+  border-radius: var(--tpl-rt-dlv-act-radius);
+  font-size: var(--tpl-rt-dlv-act-size);
+  line-height: var(--tpl-rt-dlv-act-lh);
+}
+
+/*
+ * 指で押す端末の当たり判定44px（#976 U083）。上の規定で下限を28へ下げたので、
+ * `compact` などと同じ扱いをこの大きさにも明示して戻す。
+ */
+@media (pointer: coarse) {
+  [data-theme='v8'] .button.delivery-row {
+    min-height: 44px;
+  }
+}
+
+/*
+ * ★V8 デリバリー受注の板の頭の操作（絵 kDQHr の「品切れ設定ボタン」`lmSlb`＋`gcVZx`・
+ * 「一括停止ボタン」`bX6bH`＋`aqR6A`）と、注文詳細の窓の足（絵 hjdqV の
+ * 「キャンセル・拒否する・受け付ける」）。`size="delivery-head"` を渡したボタンだけに効く。
+ *
+ * 絵は 高さ36・角丸10・字13の太字。角丸と字は共通の既定と同じなので触らない。
+ * 違うのは左右の余白14（既定16）と印15角（既定16）・印と字の間6（既定8）の3つだけ。
+ * 幅がちょうど 140（14＋15＋6＋字91＋14）になり、右端 1404 に合わせたときの字の位置が
+ * 絵と合う。既定のままだと 144 になって字が 19 右へずれる（2026-10-11 実測）。
+ *
+ * 高さ36は `.standard`・`.field` だけが持っていて、別の大きさを渡すと外れる。
+ * 外れると globals.css の全ボタン共通の下限 32 だけが残り、絵より 4 低い（2026-10-11 実測）。
+ * `height` だけでは下限 32 に勝てないので `min-height` も同じ 36 にする。
+ *
+ * 印の大きさは `@layer components` の中の `.button > svg`（16角）が持っているので、
+ * この規定は層の外に置いて上書きする。
+ *
+ * hjdqV の足も同じ 3 つ（余白14・印15・間6）だけが違う。既定のままだと 1 つあたり
+ * 5〜6 太くなり、右端 976 に寄せた並びが左へ積もって「キャンセル」＋5・「拒否する」−11
+ * ずれていた（2026-10-11 実測）。同じ値なので新しい大きさは増やさずこれを渡す。
+ */
+[data-theme='v8'] .button.delivery-head {
+  height: var(--tpl-button-h);
+  min-height: var(--tpl-button-h);
+  padding-inline: var(--tpl-rt-dlv-head-pad);
+  gap: var(--tpl-rt-dlv-act-gap);
+}
+
+[data-theme='v8'] .button.delivery-head > svg {
+  width: var(--tpl-rt-dlv-head-icon);
+  height: var(--tpl-rt-dlv-head-icon);
+}
+
+/*
+ * ★V8 デリバリー受注の「まとめて」の帯の中の操作（絵 h7OeT の `auy4o` 品切れ・
+ * `Y0xFE` 再開）。`size="delivery-bulk"` を渡したボタンだけに効く。
+ *
+ * 絵の実寸は 高さ28・左右の余白10・角丸8・字12の太字で、ここまでは行の中
+ * （`delivery-row`）と同じ値。違うのは印13角と印と字の間5の2つだけなので、
+ * 同じ値を使い回して差分だけ書く（2026-10-11 実測）。
+ * 画面CSSから共通ボタンを削る書き方（★V8 §24で禁止）の代わりに、
+ * 渡したときだけ効くこの大きさを部品側に置く。
+ *
+ * 印の大きさは `@layer components` の中の `.button > svg`（16角）が持っているので、
+ * delivery-head と同じようにこの規定も層の外に置いて上書きする。
+ */
+[data-theme='v8'] .button.delivery-bulk {
+  height: var(--tpl-rt-dlv-act-h);
+  min-height: var(--tpl-rt-dlv-act-h);
+  padding: var(--tpl-rt-dlv-act-pad);
+  border-radius: var(--tpl-rt-dlv-act-radius);
+  font-size: var(--tpl-rt-dlv-act-size);
+  line-height: var(--tpl-rt-dlv-act-lh);
+  gap: var(--tpl-rt-dlv-bulk-act-gap);
+}
+
+[data-theme='v8'] .button.delivery-bulk > svg {
+  width: var(--tpl-rt-dlv-bulk-act-icon);
+  height: var(--tpl-rt-dlv-bulk-act-icon);
+}
+
+/* 指で押す端末の当たり判定44px（#976 U083）。`delivery-row` と同じ扱いに戻す。 */
+@media (pointer: coarse) {
+  [data-theme='v8'] .button.delivery-bulk {
+    min-height: 44px;
+  }
+}
+
 @layer components {
 [data-theme='v8'] .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
 }

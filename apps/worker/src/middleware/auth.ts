@@ -463,6 +463,13 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   // performance/sync は口コミ・投稿・プロフィールのsyncと同じくGoogleから読んで自DBに書くだけ（Googleへの書き込みは無い）ため、担当者にも許可する。
   ['GET', '/api/restaurant-test/google/performance'],
   ['POST', '/api/restaurant-test/google/performance/sync'],
+  // デリバリー受注（D-1〜D-6）：担当者も注文を読み、厨房の流れ（受注→準備完了→受け渡し）と
+  // 品切れの一括設定を進められる。拒否・キャンセル・受付の一括停止と再開は店舗管理者以上。
+  ['GET', '/api/restaurant-test/delivery/orders'],
+  ['GET', '/api/restaurant-test/delivery/history'],
+  ['GET', '/api/restaurant-test/delivery/history.csv'],
+  ['GET', '/api/restaurant-test/delivery/menu-items'],
+  ['POST', '/api/restaurant-test/delivery/menu-items/bulk-sold-out'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
@@ -491,6 +498,11 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['GET', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
   ['PUT', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/posts\/[^/]+\/cancel$/],
+  // デリバリー受注の1件表示と、厨房の流れの3操作。拒否・キャンセルは含めない。
+  ['GET', /^\/api\/restaurant-test\/delivery\/orders\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/delivery\/orders\/[^/]+\/accept$/],
+  ['POST', /^\/api\/restaurant-test\/delivery\/orders\/[^/]+\/ready$/],
+  ['POST', /^\/api\/restaurant-test\/delivery\/orders\/[^/]+\/handed-over$/],
   ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
 ];
 
@@ -568,6 +580,10 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     // N-270: 外部システムからの成果受信。route 内で地点ごとの
     // 受信鍵をHMAC-SHA256で照合する。管理画面の認証は通さない。
     (normalizedMethod === 'POST' && /^\/api\/conversions\/ingest\/[^/]+$/.test(path)) ||
+    // デリバリー受注の通知受け口。route 内でサービスごとの合言葉を
+    // HMAC-SHA256で照合し、受信台帳で重複を排除する。管理画面の認証は通さない。
+    (normalizedMethod === 'POST' &&
+      /^\/api\/restaurant-test\/delivery\/webhooks\/[^/]+$/.test(path)) ||
     // #939 N-380: 外部システム向け公開API。route 内で integration_api_tokens
     // の Bearer トークンを照合する。管理画面の認証は通さない。
     path.startsWith('/api/public/v1/') ||
