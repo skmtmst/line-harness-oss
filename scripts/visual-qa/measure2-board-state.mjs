@@ -1,4 +1,5 @@
 /** 固定した絵の板IDで、撮影時に開く画面を選ぶ。製品の保存・権限は変えない。 */
+import { TAG_EDIT_GROUPS } from './fixtures.mjs'
 export const REFERENCE_REVISION = '2026-10-11 16:11 JST'
 
 const createTemplate = (kind) => ({
@@ -8,6 +9,7 @@ const createTemplate = (kind) => ({
 
 export const BOARD_STATE_PROFILES = {
   K7HWG: { url: '/auto-replies/edit?id=ar-new', click: ['fill:ルール名='] },
+  Qat9s: { url: '/tags/edit?id=tag-ec-customer', api: { match: 'GET /api/tag-groups$', body: { success: true, data: TAG_EDIT_GROUPS } } },
   iN6np: { url: '/broadcasts/new?step=message&draft=visual-compose' },
   pIHp3: { url: '/hq/broadcasts/new?step=message&id=hq-visual-compose' },
   M2tJM: { url: '/hq/broadcasts/detail?id=hq-visual-sent' },
@@ -31,8 +33,10 @@ export function applyBoardStateProfiles(map) {
     if (entry.state?.manual || entry.state?.role === 'viewer' || entry.kind === '閲覧のみ' || entry.state?.click) {
       throw new Error(`${id}: 既存の状態指定と撮影の指定が重なっています`)
     }
+    if (profile.api && entry.state?.api) throw new Error(`${id}: 既存のAPI指定と撮影の指定が重なっています`)
     entry.url = profile.url
     if (profile.click) entry.state = { ...entry.state, click: [...profile.click] }
+    if (profile.api) entry.state = { ...entry.state, api: structuredClone(profile.api) }
   }
   return result
 }

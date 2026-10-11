@@ -45,4 +45,15 @@ describe('板ごとの撮影条件', () => {
     expect(applyBoardStateProfiles({ boards: {} })).toEqual({ boards: {} })
     expect(() => applyBoardStateProfiles({})).toThrow('boards')
   })
+  it('編集板だけ購入フォルダを読み、他の板や既存のAPI状態を変えない', () => {
+    const map = { boards: { Qat9s: { url: '/tags/edit', state: { role: 'owner' } }, I1E7Bt: { url: '/tags' } } }
+    const result = applyBoardStateProfiles(map)
+    expect(result.boards.I1E7Bt).toEqual(map.boards.I1E7Bt)
+    const api = result.boards.Qat9s.state.api
+    expect(api.match).toBe('GET /api/tag-groups$')
+    expect(api.body.data.find((group: { id: string }) => group.id === 'g-purchase').name).toBe('購入')
+    expect(api.body.data.every((group: { accountId: string }) => group.accountId === 'visual-qa-account')).toBe(true)
+    expect(map.boards.Qat9s.state).toEqual({ role: 'owner' })
+    expect(() => applyBoardStateProfiles({ boards: { Qat9s: { url: '/tags/edit', state: { api: { match: 'GET /api/tag-groups$', status: 500 } } } } })).toThrow('既存のAPI指定')
+  })
 })
