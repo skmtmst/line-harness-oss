@@ -75,7 +75,7 @@ export async function processOperationNotificationOutbox(
           .bind(JSON.stringify({...payload,notificationRecipients:targets}),row.id,row.attempt_count+1).run();
       }
       const client=row.channel==='line'?new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN):null;
-      let incomplete:false|'failed'|'unknown'=false;
+      const failures: Array<'failed' | 'unknown'> = [];
       for(const recipient of targets){
         try{
           await sendRecordedNotification(env.DB,{sourceId:`operation:${row.id}`,channel:row.channel,recipient,
@@ -83,9 +83,11 @@ export async function processOperationNotificationOutbox(
             send:key=>client?client.pushMessage(recipient,[{type:'text',text}],key):
               sendOperationEmail(env,{to:recipient,subject:'【musubo】運用状態の重要なお知らせ',body:text}),
           });
-        }catch(error){incomplete=error instanceof NotificationDeliveryIncomplete&&error.deliveryStatus==='failed'&&incomplete!=='unknown'?'failed':'unknown';}
+        }catch(error){
+          failures.push(error instanceof NotificationDeliveryIncomplete && error.deliveryStatus === 'failed' ? 'failed' : 'unknown');
+        }
       }
-      if(incomplete)throw new NotificationDeliveryIncomplete(incomplete);
+      if(failures.length)throw new NotificationDeliveryIncomplete(failures.includes('unknown') ? 'unknown' : 'failed');
       await env.DB.prepare(
         `UPDATE operation_notification_outbox
             SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ? AND status='sending' AND attempt_count=?`,
