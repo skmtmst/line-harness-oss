@@ -80,7 +80,6 @@ const GUARDED = [
   'v8/events/edit-form.tsx',
   'v8/events/create.tsx',
   'v8/tags/mark-editor.tsx',
-  'components/reminders/reminder-publish-flow.tsx',
   /* 2026-10-07：src/v8 に一から書いた画面。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */
   'v8/affiliates/create.tsx',
   'v8/booking-menus/assign.tsx',

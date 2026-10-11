@@ -356,9 +356,6 @@
   "components/merged-person/merged-person-detail-v8.tsx": {
     "direct-th": 8
   },
-  "components/reminders/reminder-v6-ui.tsx": {
-    "unresolved-classname": 3
-  },
   "components/rich-menus/area-properties.tsx": {
     "unresolved-classname": 12
   },

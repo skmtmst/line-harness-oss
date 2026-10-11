@@ -89,11 +89,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "components/reminders/reminder-v6-ui.module.css": {
-    "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
   "components/shared/activity-item.module.css": {
     "color": 0,
     "radius": 1,

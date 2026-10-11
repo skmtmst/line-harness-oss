@@ -104,7 +104,19 @@ const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
 
 type V8Stage = 'basics' | 'target' | 'messages' | 'schedule' | 'confirm' | 'done'
 
-/** URL の ?stage= → 手順（今の画面と同じ名前）。 */
+/** 保存済みの対象人数。未取得を0にしない。現役の対象の段が使う。 */
+export function reminderAudienceCounts(validation: ReminderValidationResult | null) {
+  const matched = validation?.audience.matched ?? null
+  const excluded = validation?.audience.excluded ?? null
+  return {
+    matched,
+    excluded,
+    total: matched == null || excluded == null ? null : matched + excluded,
+  }
+}
+
+
+/** URLの?stage=を現役の手順へ対応させる。 */
 export function stageFor(raw: string | null): V8Stage {
   switch (raw) {
     case 'basics':
@@ -842,7 +854,7 @@ function BasicsStageV8({
 
 /* ---------------- 手順2：対象者と止める条件（YChR6） ---------------- */
 
-function TargetStageV8({
+export function TargetStageV8({
   frame,
   notice,
   reminderId,
@@ -912,12 +924,10 @@ function TargetStageV8({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderId, JSON.stringify(condition), recountRetryToken])
 
-  const matched = recount ? recount.matched : validation?.audience.matched ?? null
-  const total = recount
-    ? recount.matched + recount.excluded
-    : validation?.audience.matched != null && validation.audience.excluded != null
-      ? validation.audience.matched + validation.audience.excluded
-      : null
+  const savedAudience = reminderAudienceCounts(validation)
+  const matched = recount ? recount.matched : savedAudience.matched
+  const total = recount ? recount.matched + recount.excluded : savedAudience.total
+  const excluded = recount ? recount.excluded : savedAudience.excluded
 
   function openFaces() {
     if (recount) {
@@ -1008,7 +1018,7 @@ function TargetStageV8({
         {mode === 'condition' ? (
           <ConditionBuilder value={condition} showCount={false} onChange={(next) => onChange({ ...settings, targetCondition: next })} />
         ) : null}
-        <div className={styles.countBand}>
+        <div className={styles.countBand} aria-label={`対象人数：当てはまる ${countLabel(total, '人')}・送る予定 ${countLabel(matched, '人')}・除く ${countLabel(excluded, '人')}`}>
           <div className={styles.countItem}>
             <span className={styles.countLabel}>当てはまる人</span>
             <strong className={styles.countValue}>{`${counting ? '…' : total == null ? emptyValue('unknown') : formatNumber(total)} 人`}</strong>
@@ -1457,7 +1467,7 @@ function TimingEditor({
 
 /* ---------------- 手順4：配信予定（T0nis） ---------------- */
 
-function ScheduleStageV8({
+export function ScheduleStageV8({
   frame,
   notice,
   reminderId,
@@ -1510,7 +1520,9 @@ function ScheduleStageV8({
           />
           <PhoneV8
             accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
-            chip={nextItem ? formatMd(nextItem.scheduledAt) : '送信予定はまだありません'}
+            chip={nextItem ? formatMd(nextItem.scheduledAt)
+              : previewFailed ? '配信予定を読み込めませんでした'
+                : preview ? '送信予定はまだありません' : '配信予定を確認しています'}
             empty={!nextItem}
             message={nextItem ? renderReminderBodySample(firstReminderStepMessage(settings, nextItem.stableStepId) || '本文はまだありません') : undefined}
           />
@@ -1598,7 +1610,7 @@ function editHref(reminderId: string, stage: 'basics' | 'target' | 'preview' | n
   return `/reminders/edit?id=${encodeURIComponent(reminderId)}${stage ? `&stage=${stage}` : ''}`
 }
 
-function ConfirmStageV8({
+export function ConfirmStageV8({
   frame,
   notice,
   reminderId,
@@ -1739,7 +1751,9 @@ function ConfirmStageV8({
           {confirmRows.map((row) => (
             <div key={row.key} className={styles.confirmRow}>
               <span className={styles.confirmKey}>{row.key}</span>
-              <span className={styles.confirmVal} title={row.value}>{row.value}</span>
+              <span className={styles.confirmVal} title={row.key === '通知' && validation?.audience.matched != null
+                ? `${row.value}（対象者×通知数：${countLabel(validation.audience.matched * settings.steps.length, '通')}）`
+                : row.value}>{row.value}</span>
               <Button variant="text" href={editHref(reminderId, row.stage)}>変える</Button>
             </div>
           ))}
@@ -1819,7 +1833,7 @@ function CheckRow({ ok, title, note, action }: { ok: boolean; title: string; not
 
 /* ---------------- 完了（hjNpJ） ---------------- */
 
-function DoneStageV8({
+export function DoneStageV8({
   frame,
   reminderId,
   settings,
