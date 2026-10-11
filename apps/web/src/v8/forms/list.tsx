@@ -31,6 +31,7 @@ import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
@@ -1059,6 +1060,7 @@ export default function FormsListV8() {
         search={{
           placeholder: 'フォーム名・質問文',
           label: 'フォーム名・質問文で探す',
+          width: 200,
           value: query,
           onChange: onSearch,
         }}
@@ -1203,6 +1205,7 @@ export default function FormsListV8() {
               const row = (
                 <Tr highlighted={duplicateFeedback.highlightedId === form.id} key={form.id} data-row-id={form.id} detailKey={reviewMode ? undefined : "form"} onOpen={reviewMode ? undefined : () => openDetail(form.id)}>
                   <NameCell name={nameNode} folder={folderDotOf(form.folderId)}
+                    annotation={pendingCount > 0 ? <StatusBadge tone="danger" size="compact">{`後処理の未完 ${pendingCount}`}</StatusBadge> : null}
                   />
                   {!narrow && (
                     <Td className={styles.destCell} title={destination}>{destination}</Td>
@@ -1213,7 +1216,6 @@ export default function FormsListV8() {
                       {form.isActive ? '公開中' : '下書き'}
                     </span>
                     {reviewMode && form.accountScopeReviewRequired ? <span className={styles.reviewBadge}>管理者確認</span> : null}
-                    {pendingCount > 0 ? <span className={styles.pendingBadge}>{`後処理の未完 ${pendingCount}`}</span> : null}
                   </Td>
                   <Td className={styles.answerCell}>
                     {reviewMode ? (
@@ -1236,7 +1238,7 @@ export default function FormsListV8() {
                     <span className={styles.answerSub} title={answerSub}>{answerSub}</span>
                   </Td>
                   <Td>
-                    <CopyTextButton value={answerUrl ?? ''} aria-label={`${name}のURLをコピー`} disabled={!answerUrl} />
+                    <CopyTextButton value={answerUrl ?? ''} label="URL" icon={<Link2 size={14} aria-hidden="true" />} aria-label={`${name}のURLをコピー`} disabled={!answerUrl} />
                   </Td>
                   {!reviewMode ? (
                     /* 管理者確認は読み取り専用。編集・削除・回答の口は担当アカウント経由しか受けない。 */
@@ -1290,9 +1292,9 @@ export default function FormsListV8() {
     </ContextMenu>
   )
 
-  /* ページ送り（絵：左に件数、右に頁）。1ページに収まるときは件数だけ。 */
+  /* ページ送り（絵：左に件数、右に頁）。1ページでも現在のページを出す。 */
   const showPager = !loading && !loadError && visibleForms.length > 0
-  const listPager = !showPager ? null : pageCount > 1 ? (
+  const listPager = !showPager ? null : (
     <Pagination
       page={visiblePage}
       pageCount={pageCount}
@@ -1308,8 +1310,6 @@ export default function FormsListV8() {
         />
       )}
     />
-  ) : (
-    <p className={styles.pagerSolo}>{`${formatNumber(listTotal)} 件`}</p>
   )
 
   /* 閲覧のみの帯（`JV2oR`）。見出しの下・数の帯の上。 */
@@ -1592,7 +1592,7 @@ export default function FormsListV8() {
       className={styles.root}
       data-list-state={accountLoading || loading ? 'loading' : loadError ? 'error' : visibleForms.length === 0 ? 'empty' : 'ready'}
     >
-      <ListPage
+      <ListPage heightMode="content"
       skeleton
         boardId={narrow ? 'GrnO4' : 'I3L41O'}
         headingSize="regular"
