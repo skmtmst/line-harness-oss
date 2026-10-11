@@ -27,3 +27,14 @@ test('本物の数の帯CSS: 単位は補足の18px。文字の大きさと数�
   assert.deepEqual(values,['12px','18px','400'])
  }finally{await browser.close()}
 })
+test('本物のメニューCSS: 組の見出しは共通ボタンの下限32に押されず30px',async()=>{
+ const css=readFileSync(new URL('../../src/components/layout/sidebar.module.css',import.meta.url),'utf8')
+ const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
+ const browser=await chromium.launch()
+ try{
+  const page=await browser.newPage();const html=style=>`<html data-theme="v8"><style>${globals}\n${style}</style><body><aside><button class="sectionHeading sectionToggle">配信</button></aside></body></html>`
+  const height=()=>page.locator('button').evaluate(el=>el.getBoundingClientRect().height)
+  await page.setContent(html(css));assert.equal(await height(),30)
+  await page.setContent(html(css.replace('.sectionToggle { min-height: 0;', '.sectionToggle {')));assert.equal(await height(),32)
+ }finally{await browser.close()}
+})
