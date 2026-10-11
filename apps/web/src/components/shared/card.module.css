@@ -129,7 +129,7 @@
   box-shadow: var(--card-shadow);
 }
 [data-theme='v8'] .form {
-  gap: var(--tpl-cn-card-gap);
+  gap: var(--polish-space-field);
   padding: var(--tpl-cn-card-pad);
 }
 [data-theme='v8'] .aside {
