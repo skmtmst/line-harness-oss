@@ -27,6 +27,11 @@ import { DelayedSkeleton, ListSkeleton } from './skeleton'
  * 専用の部品が描かれたら、ここを合わせ直す。
  */
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
+
+/** 詳細の節だけが空のときは、一覧全体の絵や操作を増やさず1行で知らせる。 */
+export function ListEmptyMessage({ children }: { children: ReactNode }) {
+  return <p className={styles.inlineEmpty}>{children}</p>
+}
 /**
  * 空の内訳。`createable` はまだ1件も無い（作る口を出す）、`readonly` は
  * 画面から作れない記録、`filtered` は絞り込みの結果が0件（R38）。

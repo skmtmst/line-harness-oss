@@ -17,6 +17,7 @@ import { RovingTbody } from '@/components/shared/row-roving';
 import { ListPageBody } from '@/components/templates';
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors';
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
+import { FolderManagementDialog } from '@/components/shared/managed-folder-panel'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import StatusBadge from '@/components/shared/status-badge'
@@ -39,7 +40,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import TagPill from '@/components/shared/tag-pill'
 import { DelayedSkeleton } from '@/components/shared/skeleton';
-import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
+import PageSizeSelect from '@/components/shared/page-size-select';
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useLiveReorder } from '@/lib/use-live-reorder';
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils';
@@ -77,7 +78,7 @@ const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = [...new Set([...STANDARD_PAGE_SIZES, 30, 40])].sort((a, b) => a - b)
+import { EXTENDED_PAGE_SIZES as PAGE_SIZES } from '@/components/shared/page-size-options'
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
 /**
@@ -891,15 +892,10 @@ export default function TagsTab({
 
       {csvOpen ? <TagCsvImportDialog open onClose={onCsvClose} onCompleted={() => void load()} /> : null}
 
-      <Dialog open={manageFoldersOpen} title="フォルダを管理" onCancel={() => setManageFoldersOpen(false)} footer={null}>
-        <FolderPanel
-          activeId={folder}
-          onSelect={(id) => { setFolder(id); setManageFoldersOpen(false) }}
-          onAddFolder={canEdit ? () => { setManageFoldersOpen(false); setFolderDialog('new') } : undefined}
-          addFolderLabel="フォルダを追加"
-          rows={folderRows}
-        >{folderNote}</FolderPanel>
-      </Dialog>
+      <FolderManagementDialog open={manageFoldersOpen} rows={folderRows} activeId={folder} onSelect={setFolder}
+        onAdd={canEdit ? () => setFolderDialog('new') : undefined} onClose={() => setManageFoldersOpen(false)}>
+        {folderNote}
+      </FolderManagementDialog>
 
       {folderDialog ? (
         <TagFolderDialog

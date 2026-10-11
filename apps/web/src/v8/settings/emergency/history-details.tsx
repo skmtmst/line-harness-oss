@@ -9,6 +9,7 @@ import { formatMinutesRough } from '@/lib/format-duration'
 import releaseLog from '@/generated/release-log-summary.json'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
+import { downloadCsv as saveCsvFile } from '@/components/shared/csv-download'
 import Select from '@/components/shared/select'
 import { Field } from '@/components/shared/form-controls'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -72,10 +73,7 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
   const ready = state === 'ready'
   const downloadCsv = () => {
     if (!ready) return
-    const blob = new Blob([operationHistoryCsv(entries)], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url; anchor.download = 'operation-history.csv'; anchor.click(); URL.revokeObjectURL(url)
+    saveCsvFile(operationHistoryCsv(entries), 'operation-history.csv')
   }
   return <Dialog open={panel !== null} title={panel === 'incidents' ? '止めた・戻した記録' : '管理画面の更新内容'}
     description={panel === 'incidents' ? '選んだ期間の一覧・回数・最長停止を確認します。' : `新しい${RECENT_UPDATES_LIMIT}件を表示します。まだ画面に入っていない変更は行に混ぜません。`}

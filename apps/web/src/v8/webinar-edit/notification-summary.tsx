@@ -1,5 +1,5 @@
 import type { WebinarNotificationSettings } from '@/lib/api'
-import StatusPill from '@/components/shared/status-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import { formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 
@@ -17,7 +17,7 @@ export const NOTIFICATION_ROW_STATE = {
 
 export function NotificationStateBadge({ state }: { state: NotificationRowState }) {
   const view = NOTIFICATION_ROW_STATE[state]
-  return <StatusPill tone={view.tone}>{view.label}</StatusPill>
+  return <StatusBadge tone={view.tone}>{view.label}</StatusBadge>
 }
 
 export function notificationRowState(

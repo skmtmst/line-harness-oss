@@ -21,7 +21,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import { Field, RequiredBadge } from '@/components/shared/form-controls'
+import { Field, FieldError, RequiredBadge } from '@/components/shared/form-controls'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import ConditionBuilder, { isEmptyCondition, isRuleComplete, pruneCondition, type SegmentCondition, type SegmentRule } from '@/components/shared/condition-builder'
@@ -2911,7 +2911,7 @@ function ResourcePick(props: {
         onChange={(picked) => onPick(picked)}
         options={options}
       /></SaveErrorField>
-      {props.error ? <p id={`${id}-error`} className={styles.inputError} role="alert">{props.error}</p> : null}
+      {props.error ? <FieldError id={`${id}-error`}>{props.error}</FieldError> : null}
       {loading ? <p className={styles.cardDesc}>読み込んでいます</p> : null}
       {failed ? <p className={styles.cardDesc}>{failedNote}</p> : null}
     </div>

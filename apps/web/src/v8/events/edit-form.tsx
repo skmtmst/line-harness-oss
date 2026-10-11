@@ -18,6 +18,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
+import SelectionButton from '@/components/shared/selection-button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
@@ -415,7 +416,6 @@ function OverviewTab({
           onBlur={() => setNameError(checkName(draft.name))}
           maxLength={EVENT_NAME_MAX_LENGTH}
           placeholder="例: 第1回 AAA 説明会"
-          aria-invalid={nameError !== null}
         /></SaveErrorField>
       </Field>
         <Field label="開催場所">
@@ -1011,8 +1011,8 @@ export function BulkSlotDialog({
     <Field label="終了日"><SaveErrorField names={["end","end_date"]}><DateField value={end} onChange={setEnd} aria-label="終了日" /></SaveErrorField></Field>
     <Field label="曜日">
       <div role="group" aria-label="枠を作る曜日">
-        {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => <Button key={index}
-          variant={weekdays.includes(index) ? 'primary' : 'secondary'} aria-pressed={weekdays.includes(index)} onClick={() => toggleWeekday(index)}>{day}</Button>)}
+        {['日', '月', '火', '水', '木', '金', '土'].map((day, index) => <SelectionButton key={index}
+          selected={weekdays.includes(index)} onClick={() => toggleWeekday(index)}>{day}</SelectionButton>)}
       </div>
     </Field>
     <Checkbox checked={divideBand} onCheckedChange={setDivideBand}>時間帯を同じ長さの枠に分ける</Checkbox>

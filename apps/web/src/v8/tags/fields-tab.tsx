@@ -61,7 +61,7 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類の印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
-const PAGE_SIZES = [10, 20, 30, 40, 50] as const
+import { EXTENDED_PAGE_SIZES as PAGE_SIZES } from '@/components/shared/page-size-options'
 
 /** 種類の言葉（絵：選ぶ種類は「1つ選ぶ」「いくつも選ぶ」）。ほかは今の言葉。 */
 export function fieldTypeWord(type: FriendFieldType): string {

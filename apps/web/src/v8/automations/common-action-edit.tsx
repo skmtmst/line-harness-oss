@@ -12,6 +12,9 @@ import {
 import CommonActionEditor from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { isSaveConflict } from '@/components/shared/api-error-message'
+import { Field } from '@/components/shared/form-controls'
 import { CreatePage } from '@/components/templates'
 import Card, { CardHeader } from '@/components/shared/card'
 import TargetMissing from '@/components/shared/target-missing'
@@ -139,7 +142,7 @@ function EditCommonActionInner() {
       saveErrors.capture(caught)
       setError(caught instanceof ApiError || caught instanceof Error ? caught.message : '下書きを保存できませんでした')
       // 監査 R473: 先行保存との競合は入力を保持したまま、読み直しへ導く。
-      if (caught instanceof ApiError && caught.status === 409) setSaveConflict(true)
+      if (isSaveConflict(caught)) setSaveConflict(true)
     } finally {
       setSaving(false)
     }
@@ -255,8 +258,8 @@ function EditCommonActionInner() {
           <Card spacing="normal">
             <CardHeader title="名前と説明" />
             <div className="mt-4 space-y-4">
-              <label className="text-ink-secondary block text-sm">共通アクション名<SaveErrorField names={["name"]}><TextField value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1" /></SaveErrorField></label>
-              <label className="text-ink-secondary block text-sm">説明<SaveErrorField names={["description"]}><TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1" /></SaveErrorField></label>
+              <Field label="共通アクション名"><SaveErrorField names={["name"]}><TextField value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1" /></SaveErrorField></Field>
+              <Field label="説明"><SaveErrorField names={["description"]}><TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1" /></SaveErrorField></Field>
             </div>
           </Card>
           <section>
@@ -273,7 +276,7 @@ function EditCommonActionInner() {
           </section>
         </div>
 
-      {error ? <p className="text-danger mt-4 text-sm" role="alert">{error}</p> : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
       {saveConflict ? (
         <div className="mt-4">
           <Button onClick={() => { setSaveConflict(false); setReloadKey((key) => key + 1) }}>最新の内容を読み込み直す</Button>

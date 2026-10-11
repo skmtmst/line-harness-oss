@@ -10,6 +10,7 @@ import type { EventApplicationPreview } from '@line-crm/shared'
 import { eventsApi, type EventDetail } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import Button from '@/components/shared/button'
+import TextLink from '@/components/shared/text-link'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { jstToUtcIso } from './shared'
@@ -64,7 +65,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
             <p className={styles.phoneName}>{data.name}</p>
             <p>{formatDateTime(data.startsAt)}〜{formatDateTime(data.endsAt)}</p>
             {data.venueName || data.venueUrl ? <p>{data.venueUrl
-              ? <a href={data.venueUrl} target="_blank" rel="noopener noreferrer">{data.venueName || '会場の案内'}</a>
+              ? <TextLink href={data.venueUrl} external>{data.venueName || '会場の案内'}</TextLink>
               : data.venueName}</p> : null}
             {data.venueAddress ? <p>{data.venueAddress}</p> : null}
             {data.description ? <p className={styles.previewText}>{data.description}</p> : null}

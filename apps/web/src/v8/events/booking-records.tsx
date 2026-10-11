@@ -16,7 +16,7 @@ import { useBookingRequests } from './booking-requests'
 import { describeBookingCapacity } from './attention'
 import styles from './bookings.module.css'
 
-const PAGE_SIZE = 20
+import { DEFAULT_PAGE_SIZE as PAGE_SIZE } from '@/components/shared/page-size-options'
 const STATUS_LABELS: Record<string, string> = {
   all: '全件', requested: '承認待ち', confirmed: '確定', rejected: '拒否',
   cancelled: 'キャンセル', expired: '期限切れ', attended: '参加済', no_show: '無断',

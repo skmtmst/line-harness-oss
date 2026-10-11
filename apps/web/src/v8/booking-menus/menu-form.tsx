@@ -38,6 +38,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import { isSaveConflict } from '@/components/shared/api-error-message'
 
 /**
  * ★V8「予約メニューを作る」（板 QqER7・競合時 v5L19Z）。
@@ -623,7 +624,7 @@ export default function MenuFormV8() {
     } catch (error) {
       if (generationRef.current !== generation) return
       const fieldFailure = saveErrors.capture(error)
-      if (!fieldFailure) setResourceMessage(error instanceof ApiError && error.status === 409
+      if (!fieldFailure) setResourceMessage(isSaveConflict(error)
         ? 'ほかの担当者が先に保存しました。最新の内容を読み直してください。'
         : '設備の割当を保存できませんでした。入力は残っています。もう一度お試しください。')
     } finally {
@@ -1196,7 +1197,7 @@ export default function MenuFormV8() {
                   ]}
                 /></SaveErrorField>
               )}
-              {unavailableTag && <p role="alert" className="text-ink-faint text-sm">設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。</p>}
+              {unavailableTag && <Notice tone="warn">設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。</Notice>}
               <div className={styles.toggleLineLead}>
                 <SaveErrorField names={["askQuestion","ask_question"]}><SettingCheckbox
                   label="予約するときに質問を出す"

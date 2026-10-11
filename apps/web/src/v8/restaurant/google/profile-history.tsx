@@ -1,5 +1,6 @@
 'use client'
 
+import { downloadCsv } from '@/components/shared/csv-download'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
@@ -83,12 +84,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
         if (p * chunk.perPage >= chunk.total) break
       }
       const csv = `﻿${rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n')}`
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `google-business-changes-${jstDate()}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadCsv(csv, `google-business-changes-${jstDate()}.csv`)
     } catch (err) {
       setError(errorMessage(err, 'CSVを書き出せませんでした。'))
     } finally {

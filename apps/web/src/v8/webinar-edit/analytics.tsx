@@ -17,7 +17,7 @@ import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
-import { TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics, type WebinarUserComment } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { DetailHead } from './chrome'
@@ -208,7 +208,7 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
         <div>
           <h4 className={styles.detailTitle}>開催回ごとの結果</h4>
           {analytics.sessions.length === 0 ? <p className={styles.cardText}>まだ開催回の視聴データがありません。</p> : (
-            <table className={styles.detailTable}>
+            <DataTable label="項目ごとの到達人数" className={styles.detailTable}>
               <thead><TableHeadRow><Th>開催日時</Th><Th align="right">参加</Th><Th align="right">平均視聴</Th><Th align="right">CTA</Th></TableHeadRow></thead>
               <tbody>{analytics.sessions.map((session) => (
                 <Tr key={session.sessionStartAt}>
@@ -218,18 +218,18 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
                   <Td align="right">{`${formatNumber(session.ctaClicks)} 人（${percent(session.ctaClicks, session.viewers)}）`}</Td>
                 </Tr>
               ))}</tbody>
-            </table>
+            </DataTable>
           )}
         </div>
         <div>
           <h4 className={styles.detailTitle}>日別の結果</h4>
           {analytics.daily.length === 0 ? <p className={styles.cardText}>まだ日別のデータがありません。</p> : (
-            <table className={styles.detailTable}>
+            <DataTable label="項目ごとの到達人数" className={styles.detailTable}>
               <thead><TableHeadRow><Th>日付</Th><Th align="right">申込</Th><Th align="right">参加</Th><Th align="right">CTA</Th><Th align="right">送信</Th></TableHeadRow></thead>
               <tbody>{analytics.daily.map((day) => (
                 <Tr key={day.date}><Td>{day.date}</Td><Td align="right">{formatNumber(day.reservations)}</Td><Td align="right">{formatNumber(day.viewers)}</Td><Td align="right">{formatNumber(day.ctaClicks)}</Td><Td align="right">{formatNumber(day.formSubmissions)}</Td></Tr>
               ))}</tbody>
-            </table>
+            </DataTable>
           )}
         </div>
         <div>
@@ -242,10 +242,10 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
                 ['入力を始めた', funnel.formStarts], ['送信を試みた', funnel.submitAttempts], ['送信できた', funnel.submitSuccesses], ['送信エラー', funnel.submitErrors],
               ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{formatNumber(Number(value))} 人</dd></div>)}
             </dl>
-            {(funnel.fieldCompletions ?? []).length > 0 ? <table className={styles.detailTable}>
+            {(funnel.fieldCompletions ?? []).length > 0 ? <DataTable label="項目ごとの到達人数" className={styles.detailTable}>
               <thead><TableHeadRow><Th>項目</Th><Th align="right">到達人数</Th></TableHeadRow></thead>
               <tbody>{funnel.fieldCompletions.map((field) => <Tr key={field.fieldName}><Td><span title={field.fieldName}>{field.fieldName}</span></Td><Td align="right">{formatNumber(field.users)} 人</Td></Tr>)}</tbody>
-            </table> : null}
+            </DataTable> : null}
             </>
           ) : <p className={styles.cardText}>フォームの集計を取得できていません。</p>}
         </div>

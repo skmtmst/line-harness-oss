@@ -12,6 +12,8 @@ import NumberInput from '@/components/shared/number-field'
 import SegmentedControl from '@/components/shared/segmented'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
+import FolderSelect from '@/components/shared/folder-select'
+import { MediaLimitNote } from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import { AreaProperties } from '@/components/rich-menus/area-properties'
@@ -160,7 +162,7 @@ export default function RichMenuCreateForm({
       <SaveErrorField names={["name","value.name"]}><TextInput id="rich-menu-name" value={value.name} onChange={event => patch({ name: event.target.value })} disabled={locked} placeholder="例：メインメニュー" /></SaveErrorField>
     </Field>
     <Field label="フォルダ" htmlFor="rich-menu-folder">
-      <SaveErrorField names={["folderId","value.folderId","folder_id","value.folder_id"]}><Select id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={next => patch({ folderId: next })} options={[{ value: '', label: '未分類' }, ...folders.map(folder => ({ value: folder.id, label: folder.name }))]} size="full" /></SaveErrorField>
+      <SaveErrorField names={["folderId","value.folderId","folder_id","value.folder_id"]}><FolderSelect id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={next => patch({ folderId: next })} folders={folders.map(folder => ({ value: folder.id, label: folder.name }))} size="full" /></SaveErrorField>
     </Field>
     <Field label="トーク画面の下の文言" htmlFor="rich-menu-chat-bar-text" required error={chatBarTextError ?? undefined} note="14文字以内。メニューを開く前にトーク画面下に表示されます。">
       <SaveErrorField names={["chatBarText","value.chatBarText","chat_bar_text","value.chat_bar_text"]}><TextInput id="rich-menu-chat-bar-text" value={value.chatBarText} onChange={event => patch({ chatBarText: event.target.value })} disabled={locked} maxLength={14} /></SaveErrorField>
@@ -221,7 +223,7 @@ export default function RichMenuCreateForm({
       <Notice tone={unsetLabels.length > 0 ? 'warn' : 'success'} message={currentAreas.length === 0 ? '面を追加し、公開前にそれぞれのアクションを設定してください。' : unsetLabels.length > 0 ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。` : 'すべての面にアクションが設定されています。'} />
     </Card>
     <LinePreview note="メニューを開くボタンの文字と面の分け方を確認できます"><p>{value.chatBarText || 'メニュー'}</p><RichMenuTemplatePreview template={template} /></LinePreview>
-    <Notice tone="warn" heading="公開前に見ておくところ"><p>アクションが未設定の面が {unsetLabels.length}つあります</p><p>画像は1MBまで。超えると登録できません</p><p>切替メニューの移動先は、公開してからでないと動きません</p></Notice>
+    <Notice tone="warn" heading="公開前に見ておくところ"><p>アクションが未設定の面が {unsetLabels.length}つあります</p><MediaLimitNote maxMb={1} /><p>切替メニューの移動先は、公開してからでないと動きません</p></Notice>
     {footer}
   </Card>
 }

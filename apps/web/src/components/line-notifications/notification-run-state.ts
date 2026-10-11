@@ -1,6 +1,6 @@
 import { ApiError, type api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
 
-const PAGE_SIZE = 20
+import { DEFAULT_PAGE_SIZE as PAGE_SIZE } from '@/components/shared/page-size-options'
 
 type DeliveryAttempt = {
   number: number
@@ -254,4 +254,3 @@ export async function resolveNotificationRun(
       : current))
   }
 }
-

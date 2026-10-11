@@ -1,4 +1,11 @@
 @layer properties, theme, base, components, utilities;
+
+.inlineEmpty {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+  text-align: center;
+}
 @layer components {
 /*
  * 一覧の「中身が出せないとき」の1枚。

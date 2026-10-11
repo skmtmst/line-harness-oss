@@ -1,10 +1,7 @@
 'use client'
 
-import { useId } from 'react'
-import { X } from 'lucide-react'
 import type { SupportMarkArchiveImpact, SupportMarkListItem } from '@/lib/api'
-import Button from '@/components/shared/button'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -65,11 +62,9 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
   onCancel: () => void
   onConfirm: () => void
 }) {
-  const dialogRef = useOverlayFocus(true, onCancel, saving)
   /* ★V8 の小窓 `fy5dz` の題・実行ボタン・案内を使う。 */
 
   /* R138横展開: 確認窓の名前として見出しを読ませる。 */
-  const titleId = useId()
   const selected = impact?.replacementOptions.find((option) => option.id === replacementMarkId)
   /*
     ATTR-17: 以前は画面上端から margin-top:310px に固定しており、
@@ -99,18 +94,11 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
         : ''
   const canConfirm = !loading && !saving && Boolean(impact?.canArchive) && (!needsReplacement || Boolean(replacementMarkId))
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/45 p-4">
-      <section data-design-node="fy5dz" data-design-part="archive-position" className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
-        <div className="flex items-start justify-between gap-3 p-4 pb-0">
-          <div>
-            <h2 id={titleId} className="text-lg font-bold text-ink">{`「${mark.name}」を保管しますか`}</h2>
-            <p className="mt-2 text-xs leading-5 text-ink-secondary">{(needsReplacement ? `いま ${friendCount} 人に付いています。保管すると、この ${friendCount} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。')}</p>
-          </div>
-          <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-1 pt-3">
+    <Dialog open confirmation designNode="fy5dz" title={`「${mark.name}」を保管しますか`}
+      description={needsReplacement ? `いま ${friendCount} 人に付いています。保管すると、この ${friendCount} 人は下で選んだマークへ置き換え、履歴に残します。` : '使っている友だちはいないので、そのまま保管できます。'}
+      designWidth={576} designHeaderPadding="16px 16px 0" designContentPadding="12px 16px 4px" designFooterPadding="16px"
+      onCancel={onCancel} onConfirm={onConfirm} busy={saving} confirmDisabled={!canConfirm}
+      confirmLabel={needsReplacement ? '置き換えて保管する' : '保管する'} busyLabel="保管中…">
           {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact && needsReplacement ? (
             <div>
               <label className="block text-sm font-semibold text-ink">置き換え先
@@ -129,9 +117,6 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
           {<p className="mt-4 text-xs leading-5 text-ink-faint">初期値のマーク・共有しているマーク・自動のきまりで使っているマークは保管できません。</p>}
           {blockReason ? <p className="mt-4 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">{blockReason}</p> : null}
           {error ? <Notice tone="danger" className="mt-4">{error}</Notice> : null}
-        </div>
-        <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>キャンセル</Button><Button variant="primary" className="h-9 px-4 font-bold border-0 whitespace-normal" type="button" onClick={onConfirm} disabled={!canConfirm}>{saving ? '保管中…' : needsReplacement ? '置き換えて保管する' : '保管する'}</Button></div>
-      </section>
-    </div>
+    </Dialog>
   )
 }

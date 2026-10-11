@@ -460,6 +460,7 @@
 /* B-152・仕上げ7：操作の反応 */
 /* B-152・仕上げ8：読み込み中 */
 :root {
+  --priority-rank-min-width: 20px;
   --shadow-toast: 0 1px 2px #1d1d1f0f,0 8px 24px #1d1d1f14;
 
   --color-danger-action: #b3261e;
