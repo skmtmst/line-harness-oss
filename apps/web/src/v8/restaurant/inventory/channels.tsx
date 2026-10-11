@@ -142,7 +142,8 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
     if (!draft.customerName.trim()) errors.customerName = 'お客さまのお名前を入れてください。'
     const guests = Number(draft.guestCount)
     if (!Number.isInteger(guests) || guests < 1 || guests > 100) errors.guestCount = '人数は1〜100の整数で入れてください。'
-    const startsAt = datetimeLocalJstToUtcIso(draft.startsAt)
+    let startsAt = ''
+    try { if (draft.startsAt) startsAt = datetimeLocalJstToUtcIso(draft.startsAt) } catch { /* 日時の入力欄へ理由を出す */ }
     if (!startsAt) errors.startsAt = '来店の日時を入れてください。'
     setFieldErrors(errors); setImportError('')
     if (Object.keys(errors).length) {

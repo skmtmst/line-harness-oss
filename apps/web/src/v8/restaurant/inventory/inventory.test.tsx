@@ -160,3 +160,11 @@ it('OP-R04 未保存の配分があるタブの移動は確認し、取り消す
  expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
  delete document.documentElement.dataset.theme
 })
+
+it('B-241 inventory channel read failure does not become no channels',async()=>{
+ fetchApi.mockRejectedValueOnce(new Error('人工取得失敗'))
+ render(<InventoryPage />)
+ const error=await screen.findByText('予約媒体を読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText('予約媒体を読み込めませんでした')).toBeNull())
+})
