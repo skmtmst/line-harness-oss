@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Stepper from '@/components/shared/stepper'
+import { Steps } from '@/components/templates/steps'
 import { formatNumber } from '@/lib/format'
 
 export type BulkOpChoice = 'approved' | 'rejected'
@@ -61,7 +61,7 @@ export default function BulkOpWizard({
         </div>
       )}
     >
-      <Stepper
+      <Steps
         label="まとめて操作の進み"
         currentKey="choose"
         steps={[

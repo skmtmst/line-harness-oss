@@ -93,7 +93,7 @@ describe('OfferTermsDialog', () => {
     fixture.capStatusImpl = () => new Promise(() => {})
     fixture.versionsImpl = () => new Promise(() => {})
     render(<OfferTermsDialog offer={OFFER} onClose={() => {}} />)
-    expect(screen.getByText('決まりを読み込んでいます')).toBeTruthy()
+    expect(screen.getByLabelText('決まりを読み込んでいます')).toBeTruthy()
   })
 
   test('失敗は1つの帯で出し、再試行できる', async () => {
