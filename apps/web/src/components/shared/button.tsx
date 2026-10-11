@@ -33,8 +33,15 @@ type CommonProps = {
    */
   size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'booking' | 'delivery-row' | 'delivery-bulk' | 'delivery-head'
   align?: 'start'
-  /** 行内の時刻など、リンク色にしない文字操作。 */
-  textTone?: 'action' | 'ink'
+  /**
+   * 字の色だけを絵に合わせる指定。渡したボタンだけに効き、既定のボタンと他の画面は変えない。
+   * `action` が既定（指定なしと同じ）。`ink` は行内の時刻など、リンク色にしない文字操作。
+   * `danger`（赤）・`accent`（濃い緑）・`quiet`（本文より淡い灰）は、
+   * 白地・細枠のまま字だけ色を変える絵のために置く
+   * （★V8 デリバリー受注 kDQHr の `AuCyJ`/`HKAi1` 拒否・`WvPd6`/`jEsnn` 準備完了、
+   * サービス札の「停止」「再開」）。画面CSSから共通ボタンを上書きしない書き方（設計ルール2節）。
+   */
+  textTone?: 'action' | 'ink' | 'danger' | 'accent' | 'quiet'
   /** 欄の横の小さな文字操作。指定した操作だけ詰め、既定のボタンは変えない。 */
   presentation?: 'account-inline' | 'registration-inline' | 'restaurant'
   className?: string
@@ -109,10 +116,19 @@ function iconButtonLabel(props: {children:ReactNode;title?:string;'aria-label'?:
   return props['aria-label'] ?? (!props['aria-labelledby'] && !hasButtonText(props.children) ? props.title : undefined)
 }
 
+/** 字の色の指定を束ねの名前へ。`action`（既定）は何も足さない。 */
+const TEXT_TONE = {
+  ink: 'textInk',
+  danger: 'textDanger',
+  accent: 'textAccent',
+  quiet: 'textQuiet',
+} as const
+
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
   const size = props.size ?? 'standard'
-  const classes = [styles.button, styles[variant], styles[size], props.textTone === 'ink' ? styles.textInk : null, props.className].filter(Boolean).join(' ')
+  const tone = props.textTone && props.textTone !== 'action' ? styles[TEXT_TONE[props.textTone]] : null
+  const classes = [styles.button, styles[variant], styles[size], tone, props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
     const { children, className: _className, href, external, size: _size, variant: _variant, align, textTone: _textTone, presentation, ...linkProps } = props

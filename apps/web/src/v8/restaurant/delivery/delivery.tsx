@@ -23,7 +23,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
@@ -588,9 +588,12 @@ function DeliveryInner() {
       ?? ''
   ), [stores, selectedAccountId, data])
 
+  // 作ってある店舗から選ぶ欄なので、共通の EntitySelect（EntityPickerField）を使う。
+  // 置き場（フォルダ）は無いので kind は渡さない。
   const storePicker = stores.length > 0 ? (
-    <Select
-      aria-label="店舗を選ぶ"
+    <EntitySelect
+      aria-label="店舗"
+      noun="店舗"
       width={STORE_PICKER_WIDTH}
       value={currentStoreId}
       onChange={(value) => {
@@ -601,7 +604,7 @@ function DeliveryInner() {
       }}
       options={stores.map((item) => ({
         value: item.id,
-        label: `店舗：${item.name}`,
+        label: item.name,
         disabled: !item.line_account_id,
       }))}
     />

@@ -90,10 +90,15 @@ const URGENCY_ICONS: Record<DeliveryUrgency, LucideIcon | null> = {
 }
 
 /**
- * 急ぎ度の札（絵 `HbgSR`/`O1JQq`/`C0hA1v`）。点は出さず、印＋字にする。
+ * 急ぎ度の印（絵 `HbgSR`/`O1JQq`/`C0hA1v`）。点は出さず、印＋字にする。
  * 注文の詳細の窓（絵 `hjdqV`）も同じ形なので、そこからも使う。
+ *
+ * 札そのものは共通の `StatusBadge` が描く。ここは急ぎ度ごとの色と印を
+ * 決めて渡すだけの差し込みで、札を自作しているわけではない。2つの画面で
+ * 同じ形にするため置き場所は1つに保ち、見張りの「状態の札を自作」と
+ * 読み違えない名前にしている（B-172）。
  */
-export function UrgencyBadge({ urgency }: { urgency: DeliveryUrgency }) {
+export function UrgencyMark({ urgency }: { urgency: DeliveryUrgency }) {
   const Icon = URGENCY_ICONS[urgency]
   return (
     <StatusBadge tone={URGENCY_TONES[urgency]} size="delivery" dot={false}>
@@ -135,8 +140,11 @@ function signedPercent(value: number | null | undefined): string | undefined {
   return `${value > 0 ? '+' : '-'}${Math.abs(value)}%`
 }
 
-/* 絵（yrLKt）の増減は色付きの札。点は無い。取れないときは札を出さない。 */
-function deltaBadge(text: string | undefined, tone: StatusBadgeTone) {
+/*
+ * 絵（yrLKt）の増減は色付きの札。点は無い。取れないときは札を出さない。
+ * 札は共通の `StatusBadge` が描き、ここは文と色を渡すだけの小さな関数。
+ */
+function deltaMark(text: string | undefined, tone: StatusBadgeTone) {
   if (!text) return undefined
   return (
     <StatusBadge tone={tone} size="compact" dot={false}>
@@ -203,8 +211,9 @@ function ServiceCard({
            * 画面でも使うので触らない）。
            */
           <Button
-            size="compact"
-            className={`${styles.svcAction} ${styles.svcResume}`}
+            size="delivery-row"
+            textTone="accent"
+            className={styles.svcAction}
             busy={busy}
             busyLabel=""
             doneLabel=""
@@ -215,8 +224,9 @@ function ServiceCard({
           </Button>
         ) : (
           <Button
-            size="compact"
-            className={`${styles.svcAction} ${styles.svcStop}`}
+            size="delivery-row"
+            textTone="danger"
+            className={styles.svcAction}
             aria-label={`${label}の受付を停止`}
             onClick={() => onStop(state.service)}
           >
@@ -272,7 +282,7 @@ function OrderRow({
         <Button
           variant="text"
           size="inline"
-          className={styles.orderNumber}
+          className={styles.orderNumberButton}
           aria-label={`注文${order.orderNumber}の詳細`}
           onClick={() => onOpen(order.id)}
         >
@@ -300,7 +310,7 @@ function OrderRow({
       <Td>
         {/* 絵（kDQHr）の一覧は印だけ。理由の文は幅を押し広げるので注文の詳細（hjdqV）で出す。 */}
         <span className={styles.urgencyCell} title={order.urgencyReason || undefined}>
-          <UrgencyBadge urgency={order.urgency} />
+          <UrgencyMark urgency={order.urgency} />
         </span>
       </Td>
       <Td>
@@ -336,10 +346,14 @@ function OrderRow({
               >
                 受け付ける
               </Button>
-              {/* 絵（kDQHr `AuCyJ`・`HKAi1`）の「拒否」は白地・灰の細枠で、字は #4a5565。 */}
+              {/*
+                * 絵（kDQHr `AuCyJ`・`HKAi1`）の「拒否」は白地・灰の細枠で、字は #4a5565。
+                * 白地・細枠は既定（variant="secondary"）がそのまま絵と同じで、
+                * 字の色だけ共通ボタンの `textTone="quiet"` で渡す（画面CSSから上書きしない）。
+                */}
               <Button
                 size="delivery-row"
-                className={styles.rowActionReject}
+                textTone="quiet"
                 aria-label={`注文${order.orderNumber}を拒否`}
                 onClick={() => onReject(order)}
               >
@@ -350,11 +364,11 @@ function OrderRow({
             /*
              * 絵（kDQHr `WvPd6`・`jEsnn`）の「準備完了」は白地・灰の細枠で、字だけが緑。
              * 緑のべた塗り（variant="primary"）ではないので、既定の白い形のまま
-             * 字の色だけ板の中で緑に戻す。
+             * 字の色だけ共通ボタンの `textTone="accent"` で緑へ渡す（画面CSSから上書きしない）。
              */
             <Button
               size="delivery-row"
-              className={styles.rowActionReady}
+              textTone="accent"
               busy={busy}
               busyLabel="変更中"
               doneLabel="準備済"
@@ -387,8 +401,12 @@ function OrderRow({
 /**
  * 数の帯の「…」（kDQHr）。この画面から行ける先だけを出す。
  * いまはどの数も「今日の数」なので、行き先は注文履歴・売上（OzHLO）の1つ。
+ *
+ * 数の札そのものは共通の `KpiCard` が描き、ここはその `menu` へ入れる
+ * 共通の `RowMenu` だけを持つ。札を自作しているわけではないので、
+ * 見張りの「自作の数の札」と読み違えない名前にしている（B-172）。
  */
-function KpiMenu({ title, onOpenHistory }: { title: string; onOpenHistory: () => void }) {
+function OrderHistoryMenu({ title, onOpenHistory }: { title: string; onOpenHistory: () => void }) {
   const [open, setOpen] = useState(false)
   return (
     <span className={styles.kpiMenu}>
@@ -508,9 +526,9 @@ export default function OrdersBoard({
           icon={<ShoppingBag size={13} />}
           value={kpis.todayCount}
           unit="件"
-          delta={deltaBadge(signedCount(kpis.todayCountDelta, '件'), 'success')}
+          delta={deltaMark(signedCount(kpis.todayCountDelta, '件'), 'success')}
           detail={`受け渡し済み ${countText(kpis.handedOverCount)}`}
-          menu={<KpiMenu title="本日の注文" onOpenHistory={onOpenHistory} />}
+          menu={<OrderHistoryMenu title="本日の注文" onOpenHistory={onOpenHistory} />}
         />
         <KpiCard
           presentation="cell"
@@ -519,9 +537,9 @@ export default function OrdersBoard({
           value={kpis.todaySales}
           unit=""
           valueText={formatYen(kpis.todaySales)}
-          delta={deltaBadge(signedPercent(kpis.todaySalesDeltaPercent), 'success')}
+          delta={deltaMark(signedPercent(kpis.todaySalesDeltaPercent), 'success')}
           detail={`平均単価 ${formatYen(kpis.averageAmount)}`}
-          menu={<KpiMenu title="本日の売上" onOpenHistory={onOpenHistory} />}
+          menu={<OrderHistoryMenu title="本日の売上" onOpenHistory={onOpenHistory} />}
         />
         <KpiCard
           presentation="cell"
@@ -529,9 +547,9 @@ export default function OrdersBoard({
           icon={<Zap size={13} />}
           value={kpis.urgentCount}
           unit="件"
-          delta={deltaBadge(kpis.urgentCount > 0 ? '要対応' : undefined, 'danger')}
+          delta={deltaMark(kpis.urgentCount > 0 ? '要対応' : undefined, 'danger')}
           detail="待ち時間と注文内容から自動判定"
-          menu={<KpiMenu title="急ぎ対応" onOpenHistory={onOpenHistory} />}
+          menu={<OrderHistoryMenu title="急ぎ対応" onOpenHistory={onOpenHistory} />}
         />
         <KpiCard
           presentation="cell"
@@ -539,9 +557,9 @@ export default function OrdersBoard({
           icon={<Timer size={13} />}
           value={kpis.averagePrepMinutes}
           unit="分"
-          delta={deltaBadge(signedCount(kpis.averagePrepMinutesDelta, '分'), 'success')}
+          delta={deltaMark(signedCount(kpis.averagePrepMinutesDelta, '分'), 'success')}
           detail="目標 15分以内"
-          menu={<KpiMenu title="平均準備時間" onOpenHistory={onOpenHistory} />}
+          menu={<OrderHistoryMenu title="平均準備時間" onOpenHistory={onOpenHistory} />}
         />
       </KpiBand>
 

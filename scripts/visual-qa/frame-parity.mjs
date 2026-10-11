@@ -45,9 +45,10 @@
  *   VISUAL_QA_BASE=http://localhost:3101 node scripts/visual-qa/frame-parity.mjs
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PNG } from 'pngjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const DESIGN_DIR = path.join(HERE, 'v8-design-refs')
@@ -307,6 +308,28 @@ function rates(pairs) {
     ),
     sidebarCorrected: pct(within(left, 4, ldx, ldy), left.length),
     contentCorrected: pct(within(right, 4, rdx, rdy), right.length),
+    /*
+     * 軸ごとの割合と、横の外れの内訳。
+     * `contentCorrected` は縦横の両方が ±4px に入った割合なので、
+     * 「どちらの軸で落ちているか」が分からない。残った外れを直す側は
+     * そこを先に知りたいので、片軸ずつの割合と、横のずれ（ex）の数え上げを残す。
+     * ここも合否は書かない（§3 の合格は司令塔が画像を見て決める）。
+     */
+    contentCorrectedX: pct(
+      right.filter((item) => Math.abs(item.dx - rdx) <= 4).length,
+      right.length,
+    ),
+    contentCorrectedY: pct(
+      right.filter((item) => Math.abs(item.dy - rdy) <= 4).length,
+      right.length,
+    ),
+    contentExHist: Object.fromEntries(
+      [...right
+        .map((item) => item.dx - rdx)
+        .filter((ex) => Math.abs(ex) > 4)
+        .reduce((acc, ex) => acc.set(ex, (acc.get(ex) ?? 0) + 1), new Map())]
+        .sort((a, b) => b[1] - a[1]),
+    ),
     worstAfterGroup: [...pairs]
       .map((item) => {
         const base = item.design.x < SIDEBAR_EDGE ? { dx: ldx, dy: ldy } : { dx: rdx, dy: rdy }
@@ -327,11 +350,36 @@ function verticalOnly(pairs) {
   if (!r) return null
   const dy = r.offsetContent.dy
   const right = pairs.filter((item) => item.design.x >= SIDEBAR_EDGE)
+  const pct = (hit, total) => (total === 0 ? null : Math.round((hit / total) * 1000) / 10)
+  /*
+   * 1152 ではずれが「ひとつの値」にならない。頭の右のボタンが2行目へ回ると、
+   * その下の本文だけがまとめて下がり、窓と頭は動かない。中央値をひとつ引くやり方では
+   * 「下がった本文」と「動かない窓・頭」を同時に合わせられず、どちらかが必ず外れる。
+   * そこで 8px ずつの束に分け（3組以上の束だけ）、束ごとに中央値を引き直して数える。
+   * ここも合否は書かない。
+   */
+  const bins = new Map()
+  for (const item of right) {
+    const key = Math.round(item.dy / 8) * 8
+    if (!bins.has(key)) bins.set(key, [])
+    bins.get(key).push(item)
+  }
+  const kept = [...bins.entries()].filter(([, items]) => items.length >= 3)
+  const keptCount = kept.reduce((sum, [, items]) => sum + items.length, 0)
+  const hitByBucket = kept.reduce((sum, [, items]) => {
+    const mid = median(items.map((item) => item.dy))
+    return sum + items.filter((item) => Math.abs(item.dy - mid) <= 4).length
+  }, 0)
   return {
     matched: right.length,
     offsetDy: dy,
-    withinDy4: right.length === 0 ? null
-      : Math.round((right.filter((item) => Math.abs(item.dy - dy) <= 4).length / right.length) * 1000) / 10,
+    withinDy4: pct(right.filter((item) => Math.abs(item.dy - dy) <= 4).length, right.length),
+    buckets: kept
+      .map(([key, items]) => ({ dy: median(items.map((item) => item.dy)), bin: key, count: items.length }))
+      .sort((a, b) => b.count - a.count),
+    droppedToSmallBuckets: right.length - keptCount,
+    withinDy4ByBucket: pct(hitByBucket, right.length),
+    outliersAfterBucket: right.length - hitByBucket,
   }
 }
 
@@ -354,6 +402,59 @@ function pitch(pairs, labels) {
     })
   }
   return steps
+}
+
+/* ── 重ねた絵を作る ────────────────────────────────────── */
+
+/*
+ * 絵と画面を1枚に重ねる。§3 の目視（切れ・重なり・折り返し・色）はこの1枚を見る。
+ *
+ * なぜ道具の中に入れたか
+ * ----------------------
+ * 前の回の重ね絵はその場かぎりの手打ちで作ったので、測り直したあと
+ * 絵と画面の写真だけが新しくなり、重ね絵が古いまま残った。
+ * 次に見る人が同じ1枚を作り直せないと、目視の記録が確かめられない。
+ * だから測るのと同じ道具の中で、同じ回の写真から作る。
+ *
+ * 色の決め方（引き算ではなく、色の口ごとに入れる）
+ *   赤・青 ← 絵の明るさ、緑 ← 画面の明るさ
+ * すると見え方はこうなる。
+ *   黒     … 絵と画面が同じ場所に字がある（合っている）
+ *   緑     … 絵にだけ字がある（画面側で消えた・下がった）
+ *   赤紫   … 画面にだけ字がある（絵より増えた・ずれた先）
+ *   白     … どちらにも字がない
+ * ずれていれば緑と赤紫が隣り合って出るので、どちら向きに何px かが目で読める。
+ * ここも合否は書かない（§3 の合格は司令塔が画像を見て決める）。
+ */
+const writeOverlay = (designPath, implPath, outPath) => {
+  const design = PNG.sync.read(readFileSync(designPath))
+  const impl = PNG.sync.read(readFileSync(implPath))
+  const width = Math.max(design.width, impl.width)
+  const height = Math.max(design.height, impl.height)
+  const out = new PNG({ width, height })
+
+  /* 写真の高さは絵と画面で違う。はみ出した所は「字が無い」= 白として読む。 */
+  const lum = (png, x, y) => {
+    if (x >= png.width || y >= png.height) return 255
+    const at = (png.width * y + x) << 2
+    return Math.round(
+      0.299 * png.data[at] + 0.587 * png.data[at + 1] + 0.114 * png.data[at + 2],
+    )
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const at = (width * y + x) << 2
+      const d = lum(design, x, y)
+      const i = lum(impl, x, y)
+      out.data[at] = d
+      out.data[at + 1] = i
+      out.data[at + 2] = d
+      out.data[at + 3] = 255
+    }
+  }
+  writeFileSync(outPath, PNG.sync.write(out))
+  return { width, height, designHeight: design.height, implHeight: impl.height }
 }
 
 /* ── ページを用意する ────────────────────────────────────── */
@@ -601,6 +702,11 @@ async function main() {
        * 中身が丸ごと 42 下へずれて、画面自身のずれが見えなくなるため。
        */
       await impl.page.screenshot({ path: path.join(OUT_DIR, `${frame.id}-${width}-impl-nb.png`), fullPage: true })
+      const overlay = writeOverlay(
+        path.join(OUT_DIR, `${frame.id}-${width}-design.png`),
+        path.join(OUT_DIR, `${frame.id}-${width}-impl-nb.png`),
+        path.join(OUT_DIR, `${frame.id}-${width}-overlay-nb.png`),
+      )
       const implNoBanner = await impl.page.evaluate(MEASURE_CALL)
       const noBanner = pair(designOut.nodes, implNoBanner.nodes)
 
@@ -615,6 +721,8 @@ async function main() {
         verticalOnly: width === 1152 ? verticalOnly(pairs) : null,
         /* 共通の帯を隠した回。帯の高さ（複数あれば全部）と、隠したあとの数字。 */
         banner: bannerBoxes,
+        /* 目視用に重ねた1枚の大きさ。写真の高さが絵と画面でどれだけ違うかもここに出る。 */
+        overlay,
         positionNoBanner: width === 1440 ? rates(noBanner.pairs) : null,
         verticalOnlyNoBanner: width === 1152 ? verticalOnly(noBanner.pairs) : null,
         pitch: ROW_LABELS[frame.id] ? pitch(pairs, ROW_LABELS[frame.id]) : null,

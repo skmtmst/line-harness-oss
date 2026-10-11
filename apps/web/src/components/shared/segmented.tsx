@@ -45,8 +45,12 @@ export default function SegmentedControl<T extends string>({
   size?: 'medium' | 'small' | 'compact' | 'panel' | 'timing' | 'sticker' | 'booking'
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
-  /** 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。 */
-  appearance?: 'track' | 'choices' | 'reservation'
+  /**
+   * 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。
+   * 'intake-stop' はデリバリー受注の受付一括停止（XCVGd `To5Y0`）：
+   * 高さ32・左右14・間8の離れた札4つで、選んだ札だけ薄い緑の面と緑の枠。
+   */
+  appearance?: 'track' | 'choices' | 'reservation' | 'intake-stop'
   /** 選択肢を器の幅へ均等に並べる（統括の生成枚数）。 */
   equalWidth?: boolean
 }) {

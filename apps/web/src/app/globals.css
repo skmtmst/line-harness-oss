@@ -1772,8 +1772,11 @@
   --tpl-rt-dlv-service-h: 74px; --tpl-rt-dlv-service-pad: 0 16px; --tpl-rt-dlv-mark: 36px; --tpl-rt-dlv-service-badges-gap: 6px; --tpl-rt-dlv-stat-gap: 4px;
   /* 絵（kDQHr `foYm6`）の数と単位（「12」「件」）は字の下をそろえて間2。表の上の選ぶ帯は上下の間12。 */
   --tpl-rt-dlv-count-unit-gap: 2px; --tpl-rt-dlv-selectbar-margin: 12px;
-  /* 絵（kDQHr `bfsIp`・`zFulL`）のサービス札の「停止」「再開」は、高さ28・左右の余白10・字12の小さな白い札で、枠は髪筋の色。字の色だけ停止が赤・再開が緑。共通のボタンの既定（高さ32・字13）だと52〜106になり、左の札の居場所を奪う。 */
-  --tpl-rt-dlv-svc-btn-h: 28px; --tpl-rt-dlv-svc-btn-pad: 0 10px; --tpl-rt-dlv-svc-btn-size: 12px; --tpl-rt-dlv-svc-btn-radius: 8px;
+  /*
+   * 絵（kDQHr `bfsIp`・`zFulL`）のサービス札の「停止」「再開」は、高さ28・左右の余白10・字12・角丸8。
+   * これは上の行の中の操作（`--tpl-rt-dlv-act-*`）と同じ値なので、専用の名前は置かず
+   * 共通のボタンへ `size="delivery-row"` を渡して受け取る。字の色は `textTone` で渡す。
+   */
   /* 絵（OzHLO `ZuE0v`）の集計札は枠付きで4枚・幅276・余白14/16・題と金額の間8。金額は 20/700。 */
   --tpl-rt-dlv-sum-pad: 14px 16px; --tpl-rt-dlv-sum-gap: 8px; --tpl-rt-dlv-sum-amount: 20px; --tpl-rt-dlv-sum-amount-lh: 28px;
   /* 絵（OzHLO `Y1wPu`）の絞り込みは1行（日付185・サービス195）。折り返すと板の頭が2段になる。 */

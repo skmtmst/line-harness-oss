@@ -17,7 +17,9 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import { ListToolbarRow } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
+import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
 import Toggle from '@/components/shared/toggle'
@@ -35,7 +37,7 @@ import styles from './delivery.module.css'
 /*
  * 受付停止の確認（XCVGd）。上からの位置は絵のとおり 230。
  * 幅は絵が 500 だが、窓の幅は正本で 480／560／720／960 の4段に決まっている
- * （docs/v8-design-rules.md §8・B-177 の `DIALOG_WIDTHS`）。500 は4段に無いので
+ * （docs/v8-design-rules.md §6.12 の項目8・B-177 の `DIALOG_WIDTHS`）。500 は4段に無いので
  * 共通部品の `dialogWidth()` が 480 へ寄せる。暗に寄せられるのに任せず、
  * 実際に出る 480 をここに書く。中身は真ん中に並ぶので絵より左右 10 外へ出る
  * （この差は「絵と正本の食い違いを正本で解いた分」として記録する）。
@@ -69,7 +71,13 @@ export interface SoldOutHeaderActionsProps {
   onSoldOutOnlyChange: (value: boolean) => void
 }
 
-/** 板の頭の右（探す欄と「品切れ中のみ」）。親が RestaurantPage の picker へ置く。 */
+/**
+ * 板の頭の右（探す欄と「品切れ中のみ」）。親が RestaurantPage の picker へ置く。
+ *
+ * 段の形は画面に持たせず共通の道具の段（`ListToolbarRow`）に任せる（B-172）。
+ * 絵 `h7OeT` の間 8 は共通の `--tpl-list-gap` と同じ。探す欄は絵のとおり
+ * 中身なりの幅にしたいので、幅 240 に決める `ListToolbarSearchSlot` は使わない。
+ */
 export function SoldOutHeaderActions({
   query,
   soldOutOnly,
@@ -79,7 +87,7 @@ export function SoldOutHeaderActions({
   onSoldOutOnlyChange,
 }: SoldOutHeaderActionsProps) {
   return (
-    <div className={styles.filterRow}>
+    <ListToolbarRow>
       <SearchField
         aria-label="商品名で探す"
         placeholder="商品名で探す"
@@ -96,7 +104,7 @@ export function SoldOutHeaderActions({
       >
         品切れ中のみ
       </FilterChip>
-    </div>
+    </ListToolbarRow>
   )
 }
 
@@ -250,7 +258,9 @@ export default function SoldOutBoard({
                     <span className={styles.amount}>{formatYen(item.price)}</span>
                   </Td>
                   <Td>
-                    <StatusBadge tone={item.soldOut ? 'warning' : 'success'} size="delivery">
+                    {/* 絵（h7OeT）の「品切れ」は赤（#b3261e）。共通の札の赤は tone="danger"。
+                        橙（warning）だと絵と色の系統が変わるため danger を渡す。 */}
+                    <StatusBadge tone={item.soldOut ? 'danger' : 'success'} size="delivery">
                       {item.soldOut ? '品切れ' : '販売中'}
                     </StatusBadge>
                   </Td>
@@ -400,26 +410,23 @@ export function IntakeStopDialog({
         </div>
       </DialogField>
 
-      {/* 絵（`To5Y0`）の時間はつながった帯ではなく離れた札4つ。押した札だけ薄い緑にする。 */}
+      {/*
+        * 絵（`To5Y0`）の時間はつながった帯ではなく離れた札4つ。押した札だけ薄い緑にする。
+        * 4つの排他的な選択なので共通の切り替え部品に任せ、この見た目は部品側の
+        * `appearance="intake-stop"` が持つ（B-172：見た目は持ち主の部品に置く）。
+        */}
       <DialogField label="停止する時間（過ぎると自動で再開します）" kind="select" contentGap={STOP_FIELD_GAP}>
-        <div className={styles.timeRow} role="group" aria-label="停止する時間">
-          {INTAKE_STOP_PRESET_OPTIONS.map((option) => {
-            const value = option.value as DeliveryIntakeStopPreset
-            const on = preset === value
-            return (
-              <button
-                key={value}
-                type="button"
-                className={`${styles.timeCard} ${on ? styles.timeCardOn : ''}`}
-                aria-pressed={on}
-                disabled={busy}
-                onClick={() => onPresetChange(value)}
-              >
-                {option.label}
-              </button>
-            )
-          })}
-        </div>
+        <SegmentedControl
+          aria-label="停止する時間"
+          appearance="intake-stop"
+          options={INTAKE_STOP_PRESET_OPTIONS.map((option) => ({
+            value: option.value as DeliveryIntakeStopPreset,
+            label: option.label,
+          }))}
+          value={preset}
+          onChange={onPresetChange}
+          disabled={busy}
+        />
       </DialogField>
 
       {error ? <DialogNote>{error}</DialogNote> : null}

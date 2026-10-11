@@ -266,6 +266,18 @@
 
 [data-theme='v8'] .button.inline.text.textInk { color: var(--color-ink); }
 
+/*
+ * 字の色だけを絵へ合わせる指定（`textTone`）。白地・細枠の形はそのままで、字の色だけ変える。
+ * 渡したボタンだけに束ねが付くので、既定のボタンと他の画面の見た目は変わらない。
+ * ★V8 デリバリー受注：kDQHr の `HKAi1`/`AuCyJ`「拒否」は字が #4a5565（quiet）、
+ * `WvPd6`/`jEsnn`「準備完了」とサービス札の「再開」は濃い緑（accent）、
+ * サービス札の「停止」は赤（danger）。
+ * 画面CSSから共通ボタンを上書きする書き方（設計ルール2節・★V8 §24）の代わりにここへ置く。
+ */
+[data-theme='v8'] .button.textDanger { color: var(--color-danger); }
+[data-theme='v8'] .button.textAccent { color: var(--color-accent-deep); }
+[data-theme='v8'] .button.textQuiet { color: var(--color-ink-secondary); }
+
 [data-theme='v8'] .button.composer { height: var(--tpl-button-h); min-height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
 [data-theme='v8'] .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }

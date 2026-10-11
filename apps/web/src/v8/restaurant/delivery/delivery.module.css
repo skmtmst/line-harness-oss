@@ -186,26 +186,13 @@
 }
 
 /*
- * サービス札の「停止」「再開」。絵の寸法は共通のボタンのどの大きさとも合わないので、
- * この画面だけ高さ・余白・字を絵に合わせる（共通のボタンは他の画面でも使うので触らない。
- * この束ねは層に入れていないため、層の中の共通の見た目より後に効く）。
+ * サービス札の「停止」「再開」。絵の実寸（高さ28・左右の余白10・字12・角丸8）は
+ * 共通のボタンの `size="delivery-row"` と同じ値なので、寸法はそれを渡して受け取る。
+ * 字の色（停止＝赤・再開＝濃い緑）も共通のボタンの `textTone` で渡す。
+ * ここに残すのは札を縮めないための並びの指定だけ（見た目は共通部品が持つ・設計ルール2節）。
  */
 .svcAction {
   flex-shrink: 0;
-  height: var(--tpl-rt-dlv-svc-btn-h);
-  min-height: var(--tpl-rt-dlv-svc-btn-h);
-  padding: var(--tpl-rt-dlv-svc-btn-pad);
-  border-radius: var(--tpl-rt-dlv-svc-btn-radius);
-  font-size: var(--tpl-rt-dlv-svc-btn-size);
-  font-weight: 600;
-}
-
-.svcStop {
-  color: var(--color-danger);
-}
-
-.svcResume {
-  color: var(--color-accent-deep);
 }
 
 /* 一覧の表。 */
@@ -346,6 +333,15 @@
   white-space: nowrap;
 }
 
+/*
+ * 表の中の注文番号は押せる（共通の `variant="text" size="inline"`）。
+ * 字の形・太さ・折り返しは共通のボタンがそのまま絵と同じなので、
+ * ここで渡すのは数字の幅をそろえる指定だけ（見た目は共通部品が持つ・設計ルール2節）。
+ */
+.orderNumberButton {
+  font-variant-numeric: tabular-nums;
+}
+
 .items {
   display: block;
   overflow: hidden;
@@ -408,18 +404,11 @@
  */
 
 /*
- * 絵（kDQHr `WvPd6`・`jEsnn`）の「準備完了」は白地・灰の細枠で、字だけが緑（#087a3e）。
- * 共通の `variant="primary"` は緑のべた塗りなので、この板の中だけ字の色を緑へ戻す。
- * 枠と白地は `variant="secondary"`（既定）がそのまま絵と同じ。
+ * 行の中の「準備完了」（絵 kDQHr `WvPd6`・`jEsnn`）と「拒否」（`AuCyJ`・`HKAi1`）は
+ * 白地・灰の細枠で字だけ色が違う。白地・細枠は `variant="secondary"`（既定）が絵と同じで、
+ * 字の色は共通のボタンの `textTone="accent"` / `textTone="quiet"` で渡すので、
+ * 画面側の上書きは要らなくなった（設計ルール2節）。
  */
-.rowActionReady {
-  color: var(--color-accent-deep);
-}
-
-/* 絵（kDQHr `HKAi1`）の「拒否」の字は #4a5565（本文より淡い方）。 */
-.rowActionReject {
-  color: var(--color-ink-secondary);
-}
 
 .srOnly {
   position: absolute;
@@ -812,40 +801,7 @@
 /*
  * 絵（XCVGd `To5Y0`）の「停止する時間」は、つながった帯ではなく
  * 離れた枠付きの札を4つ（30分・60分・90分・本日中、高さ32・間8）並べる。
+ * この見た目は共通の切り替え部品が持つ（segmented.module.css の
+ * `[data-appearance='intake-stop']`）。画面側では上書きしない。
+ * 高さ・左右の余白は --tpl-rt-dlv-time-h / --tpl-rt-dlv-time-pad をそのまま使う。
  */
-.timeRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--tpl-rt-dlv-gap);
-}
-
-.timeCard {
-  display: inline-flex;
-  height: var(--tpl-rt-dlv-time-h);
-  align-items: center;
-  justify-content: center;
-  padding: var(--tpl-rt-dlv-time-pad);
-  border: 0;
-  border-radius: var(--radius-segment);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-choice-border);
-  outline-offset: -1px;
-  color: var(--color-ink-secondary);
-  font: inherit;
-  font-size: var(--text-caption);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.timeCardOn {
-  background: var(--color-accent-soft);
-  outline-color: var(--color-accent);
-  color: var(--color-accent-deep);
-  font-weight: 600;
-}
-
-.timeCard:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}

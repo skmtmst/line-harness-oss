@@ -34,7 +34,7 @@ import {
   formatShortStamp,
   formatYen,
 } from './format'
-import { UrgencyBadge } from './orders'
+import { UrgencyMark } from './orders'
 import styles from './delivery.module.css'
 
 /* キャンセル・拒否は色で責めない（起きたことを文字で伝えるだけ）。 */
@@ -239,7 +239,7 @@ export function OrderDetailDialog({
             <StatusBadge tone={STATUS_TONES[order.status]} size="delivery">
               {order.statusLabel || DASH}
             </StatusBadge>
-            <UrgencyBadge urgency={order.urgency} />
+            <UrgencyMark urgency={order.urgency} />
           </div>
 
           {urgencyTone && order.urgencyReason ? (

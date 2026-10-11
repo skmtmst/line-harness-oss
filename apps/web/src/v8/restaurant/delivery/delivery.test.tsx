@@ -343,6 +343,16 @@ describe('kDQHr デリバリー受注', () => {
     expect(screen.getByText('受け取り希望まで10分を切っています')).toBeTruthy()
     expect(document.body.textContent).not.toMatch(/Clef/i)
   })
+
+  it('店舗を選ぶ欄は共通の選ぶ部品（押すと選ぶ窓が開く）にする', async () => {
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+
+    // 自作の `<select>` ではなく、共通部品の押しボタン＋選ぶ窓であること（B-172）。
+    const picker = screen.getByRole('button', { name: '店舗' })
+    fireEvent.click(picker)
+    expect(await screen.findByRole('dialog', { name: '店舗を選ぶ' })).toBeTruthy()
+  })
 })
 
 describe('?view= で板を入れ替える', () => {
@@ -432,6 +442,17 @@ describe('承認v02の見え方を守る', () => {
     expect(css).toMatch(/\.tabTableGroup \{[^}]*gap: 0;/)
     const orders = readFileSync(join(__dirname, 'orders.tsx'), 'utf8')
     expect(orders).toMatch(/<div className=\{styles\.tabTableGroup\}>/)
+  })
+
+  it('品切れ（h7OeT）の「品切れ」の札は赤（tone="danger"）', async () => {
+    // 重ねた絵の色を測ったら、絵の「品切れ」は赤 #b3261e、画面は橙 #c2410c(warning) だった。
+    // 赤の系統は共通の札の tone="danger"。画面CSSで色を塗らず、渡す種類を直す。
+    at('/restaurant-test/delivery?view=sold-out')
+    render(<DeliveryPage />)
+
+    const soldOut = await screen.findByText('品切れ')
+    expect(soldOut.closest('[data-tone]')?.getAttribute('data-tone')).toBe('danger')
+    expect(screen.getByText('販売中').closest('[data-tone]')?.getAttribute('data-tone')).toBe('success')
   })
 
   it('共通部品の見た目を画面CSSから上書きしない', () => {
@@ -560,13 +581,18 @@ describe('承認v02の見え方を守る', () => {
     }
     expect(css).toMatch(/\.stopCard \{[^}]*outline: 1px solid var\(--color-choice-border\)/)
 
-    // 時間はつながった帯ではなく、離れた札4つ（押した札だけ色が付く）。
+    // 時間は共通の切り替え部品に任せ、つながった帯ではなく離れた札4つにする。
     const times = within(dialog).getByRole('group', { name: '停止する時間' })
+    expect(times.getAttribute('data-appearance')).toBe('intake-stop')
+    // つまみ（滑る白い帯）は出さない。
+    expect(times.querySelector('[aria-hidden="true"]')).toBeNull()
     const cards = times.querySelectorAll('button')
     expect(cards.length).toBe(4)
-    for (const card of Array.from(cards)) {
-      expect(card.getAttribute('aria-pressed')).toBeTruthy()
-      expect(card.className).toMatch(/timeCard/)
-    }
+    expect(Array.from(cards).map((card) => card.getAttribute('aria-pressed'))).toEqual([
+      'false',
+      'true',
+      'false',
+      'false',
+    ])
   })
 })
