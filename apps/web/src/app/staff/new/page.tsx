@@ -103,7 +103,7 @@ export default function NewStaffPage() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   return <div data-design-node="I3ZSrU">
-      <div className="v8-only"><PageHeading title="ユーザーを追加する" /></div><CreatePage
+      <div><PageHeading title="ユーザーを追加する" /></div><CreatePage
     title="ユーザーを追加する"
     help="管理画面にログインできる人を追加し、できることの範囲を決めます。"
     parent={['ログインユーザー', '/staff?tab=members']}

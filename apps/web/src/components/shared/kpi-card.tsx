@@ -174,7 +174,7 @@ export default function KpiCard({
           title={title || undefined}
         >
           {icon === null ? null : (
-            <span className={`${styles.icon} v8-only`} aria-hidden="true">
+            <span className={styles.icon} aria-hidden="true">
               {icon ?? <ChartNoAxesColumn size={14} />}
             </span>
           )}
@@ -188,13 +188,9 @@ export default function KpiCard({
             </HelpTip>
           ) : null}
         </p>
-        {menu ? <span className={`${styles.menu} v8-only`}>{menu}</span> : null}
+        {menu ? <span className={styles.menu}>{menu}</span> : null}
         {badge ? (
           <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
-        ) : action ? (
-          <Link href={action.href} className={`${styles.link} v7-only`}>
-            {action.label}
-          </Link>
         ) : null}
       </div>
 
@@ -218,7 +214,7 @@ export default function KpiCard({
       )}
 
       {statusText && !loading ? <StatusBadge>{statusText}</StatusBadge> : null}
-      {delta ? <span className={`${styles.delta} v8-only`}>{delta}</span> : null}
+      {delta ? <span className={styles.delta}>{delta}</span> : null}
       </div>
 
       <p data-kpi-detail className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
@@ -229,7 +225,7 @@ export default function KpiCard({
           </button>
         ) : null}
         {action ? (
-          <Link href={action.href} className={`${styles.link} v8-only`}>
+          <Link href={action.href} className={styles.link}>
             <span>{action.label}</span><ArrowRight size={12} aria-hidden="true" />
           </Link>
         ) : null}

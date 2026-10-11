@@ -189,13 +189,13 @@ export default function FolderPanel({
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
     <aside aria-label="フォルダ" className={`${styles.panel} overflow-visible`}>
-      {!readOnly && createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder} v8-only`} aria-hidden="true" /> : null}
+      {!readOnly && createAction ? <div className={styles.create}>{createAction}</div> : reserveCreateSpace ? <div className={`${styles.create} ${styles.createPlaceholder}`} aria-hidden="true" /> : null}
       {showHeading ? <div className={`${styles.heading} flex items-center justify-between`}>
         {headingHelp ? <p className=" font-semibold">{heading}<HelpTip label={`${heading}の説明`}>{headingHelp}</HelpTip></p>
           : <p className=" font-semibold">{heading}</p>}
         {total === undefined ? null : <span className="text-ink-faint">{total}</span>}
       </div> : null}
-      <nav aria-label={heading} className={`${styles.rows}`}>
+      <nav aria-label={heading} className={styles.rows}>
         {rows.map((row) => {
           const hasActions = !readOnly && Boolean(row.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
           const isActive = activeId === row.id
@@ -228,7 +228,7 @@ export default function FolderPanel({
               >
                 {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
                     色が面で乗って名前より目立ってしまう。 */}
-                <span className={`${styles.folderIcon} v8-only`} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <FolderDot folder={{ name: row.label, color: row.color }} />}</span>
+                <span className={styles.folderIcon} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <FolderDot folder={{ name: row.label, color: row.color }} />}</span>
                 <span className={`${styles.label} min-w-0 flex-1 truncate`}>{row.label}</span>
                 {row.count === null ? null : <span className={`${styles.count} text-ink-faint shrink-0`}>{row.count}</span>}
               </button>
@@ -254,7 +254,7 @@ export default function FolderPanel({
                     // 出さないとスマホから名前変更・削除に届かない。
                     className={`${styles.menuButton} text-ink-faint hover:text-action min-h-8 min-w-8 text-lg leading-none transition-opacity`}
                   >
-                    <Ellipsis className="v8-only" size={14} aria-hidden="true" />
+                    <Ellipsis size={14} aria-hidden="true" />
                   </button>
                   {/*
                     ★V7（m13g）：フォルダの操作も共通 ActionMenu にそろえる。
@@ -273,16 +273,16 @@ export default function FolderPanel({
         })}
       </nav>
       {!readOnly && (onAddFolder || addFolderDisabled || addFolderNote || children) && (
-        <div className={`${styles.footer}`}>
+        <div className={styles.footer}>
           {(onAddFolder || addFolderDisabled) && (
             <Button
               type="button"
               onClick={onAddFolder}
               disabled={addFolderDisabled}
               title={addFolderTitle}
-              className={`${styles.add}`}
+              className={styles.add}
             >
-              <FolderPlus className="v8-only" size={14} aria-hidden="true" />
+              <FolderPlus size={14} aria-hidden="true" />
               {addFolderLabel}
             </Button>
           )}

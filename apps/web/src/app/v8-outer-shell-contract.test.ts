@@ -113,8 +113,8 @@ describe('外側の殻（V8 移行③）', () => {
     expect(appTopBar).toContain('hidden xl:block v8-topbar-wrap')
   })
 
-  it('畳み・検索・通知は v7 では描かない（v8-only / v8Chrome の門）', () => {
-    expect(topBar).toContain('v8-only')
+  it('畳み・検索・通知は外枠に左メニューがあるときに出す', () => {
+    expect(topBar).not.toMatch(/className=.*v7-only/)
     expect(topBar).toContain('v8Chrome')
     // 左メニューの無い殻に畳みボタンを出さない
     expect(appShell).toContain('SuspendedSupportWorkspace')
