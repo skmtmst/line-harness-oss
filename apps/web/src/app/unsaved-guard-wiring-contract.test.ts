@@ -237,8 +237,6 @@ const EXEMPTIONS: Record<string, string> = {
     '統括の3つの窓（HMpVx・D6ljr・HFsO9）。窓内の入力は閉じると戻る仕様で、画面に残る下書きを持たないため画面離脱ガードの対象外',
   'app/line-notifications/page.tsx':
     '入力を端末の下書きへ随時保存し、閉じる確認はエディタ内で済ませる設計。画面離脱への警告は要検討',
-  'app/nen-campaigns/nen-overview.tsx':
-    '紹介文の下書きは大きな一覧コンポーネント内のローカル状態。親の番兵へ載せるには報告口が要るため別途検討',
   'app/scenarios/mode/page.tsx':
     '★V7: 方式選択はラジオの即時確定で未保存を持たない。名前・フォルダ欄は新規時は確定時に同送、既存時は欄内の保存で確定する小さな操作のため番兵を付けない',
   'components/automations/automation-draft-editor.tsx':

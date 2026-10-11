@@ -54,7 +54,6 @@ const KNOWN_FILES: string[] = [
   'app/inflow-links/ad-integration.tsx',
   'app/inflow-links/detail/page.tsx',
   'app/inflow-links/page.tsx',
-  'app/nen-campaigns/nen-overview.tsx',
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-profile.tsx',
   // page.tsx から分けた取り込み画面へ、v7 の持ち越し文が移った分。

@@ -31,13 +31,13 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['回答フォーム 回答一覧', '../../app/form-submissions/responses/page.tsx'],
   ['コンテンツ管理', '../../app/contents/page.tsx'],
   ['運営へのお知らせ', '../../v8/settings/line-notifications/operator-tab.tsx'],
-  ['NENキャンペーン 送った履歴', '../../app/nen-campaigns/nen-overview.tsx'],
+  ['NENキャンペーン 送った履歴', '../../v8/nen-campaigns/list.tsx'],
   ['コンバージョン', '../../v8/conversions/list.tsx'],
   ['EC連携 取り込みの記録', '../../app/ec-commerce/page.tsx'],
   ['EC連携 会員のつき合わせ', '../../app/ec-commerce/identity-candidates/page.tsx'],
   ['EC連携 定期便', '../../app/ec-commerce/subscriptions-panel.tsx'],
   ['予約メニュー', '../../app/booking/menus/page.tsx'],
-  ['ウェビナー', '../../app/webinars/page.tsx'],
+  ['ウェビナー', '../../v8/webinars/list.tsx'],
   ['運営 監査ログ', '../../app/ops/audit/page.tsx'],
   ['運営 お問い合わせ', '../../app/ops/support/page.tsx'],
   ['自動化の実行記録', '../../app/automations/runs/page.tsx'],
@@ -65,6 +65,13 @@ describe('ListRange 統一（監査6 #667）', () => {
       } else if (path === '../../v8/conversions/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + current.length')
         expect(source).toContain('formatNumber(shown.length)')
+        expect(source).toContain('pageCount > 1')
+      } else if (path === '../../v8/webinars/list.tsx') {
+        expect(source).toContain('(currentPage - 1) * pageSize + visibleItems.length')
+        expect(source).toContain('formatNumber(visibleTotal)')
+        expect(source).toContain('hasListData && pageCount > 1')
+      } else if (path === '../../v8/nen-campaigns/list.tsx') {
+        expect(source).toContain('`\u0024{formatNumber(total)} 件中 \u0024{(page - 1) * size + 1}〜\u0024{Math.min(total, page * size)} 件`')
         expect(source).toContain('pageCount > 1')
       } else expect(source, `${path} に ListRange がない`).toContain('ListRange')
     },

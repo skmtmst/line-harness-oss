@@ -19,7 +19,7 @@ import { fireEvent } from '@testing-library/react'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..')
-const NEN_OVERVIEW = readFileSync(join(HERE, 'nen-campaigns', 'nen-overview.tsx'), 'utf8')
+const NEN_OVERVIEW = readFileSync(join(HERE, '..', 'v8', 'nen-campaigns', 'list.tsx'), 'utf8')
 // ★V8：入口（settings/page.tsx）は src/v8/settings/features の画面を出す。読み先をその画面へ向ける。
 const SETTINGS_PAGE_SRC = readFileSync(join(HERE, '..', 'v8', 'settings', 'features', 'screen.tsx'), 'utf8')
 const SETTINGS_CSS = readFileSync(join(HERE, '..', 'v8', 'settings', 'features', 'screen.module.css'), 'utf8')
@@ -127,9 +127,10 @@ describe('21: 表は外枠で切り落とさず横スクロールで届く', () 
     expect(actionHeader?.className ?? '').toContain('sticky')
   })
 
-  it('nen-overviewの3表すべてに操作列stickyがある', () => {
-    expect(NEN_OVERVIEW.match(/sticky right-0 bg-surface-pearl/g)?.length).toBeGreaterThanOrEqual(3)
-    expect(NEN_OVERVIEW.match(/sticky right-0 bg-canvas/g)?.length).toBeGreaterThanOrEqual(3)
+  it('NENの現役3表の操作を共通の行末へ残す', () => {
+    expect(NEN_OVERVIEW.match(/<Th className=\{styles.colMenu\}/g)).toHaveLength(3)
+    expect(NEN_OVERVIEW.match(/<Td className=\{styles.colMenu\}/g)).toHaveLength(3)
+    expect(NEN_OVERVIEW).toContain('<SharedRowMenu')
   })
 })
 

@@ -108,7 +108,6 @@ shared-button-importer app/mileage/score-rules/page.tsx
 shared-button-importer app/nen-campaigns/columns/new/column-new-v8.tsx
 shared-button-importer app/nen-campaigns/edit/campaign-editor-v8.tsx
 shared-button-importer app/nen-campaigns/edit/page.tsx
-shared-button-importer app/nen-campaigns/nen-overview.tsx
 shared-button-importer app/nen-campaigns/page.tsx
 shared-button-importer app/nen-members/photo-policy-history-v8.tsx
 shared-button-importer app/nen-members/photo-review-detail.tsx

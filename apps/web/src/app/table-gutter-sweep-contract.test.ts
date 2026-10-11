@@ -49,8 +49,9 @@ describe('表の外側の余白の洗い出し', () => {
   })
 
   it('/common-actions：操作列は中身の幅で固定＋右寄せ', () => {
-    const body = code(read('app', 'common-actions', 'page.tsx'))
-    expect(body).toContain('<Th align="right" className="w-44">操作</Th>')
+    const body = code(read('v8', 'automations', 'common-actions.tsx'))
+    expect(body).toContain('<Th className={styles.colOps}>操作</Th>')
+    expect(read('v8', 'automations', 'common-actions.module.css')).toContain('.colOps')
   })
 
   it('/ops/audit：IP は右へ寄せる', () => {
@@ -73,9 +74,10 @@ describe('表の外側の余白の洗い出し', () => {
   })
 
   it('/nen-campaigns：操作列はボタンがはみ出さない幅にする', () => {
-    const body = code(read('app', 'nen-campaigns', 'nen-overview.tsx'))
-    expect(body).toContain('<Th className="w-36 sticky right-0')
-    expect(body).toContain('<Th className="w-32 sticky right-0')
+    const body = code(read('v8', 'nen-campaigns', 'list.tsx'))
+    expect(body.match(/<Th className=\{styles.colMenu\}/g)).toHaveLength(3)
+    expect(body.match(/<Td className=\{styles.colMenu\}/g)).toHaveLength(3)
+    expect(read('v8', 'nen-campaigns', 'list.module.css')).toContain('width: var(--tpl-nc-menu-size)')
   })
 
   it('/rich-menus：外側は px-5、操作列はボタン幅で固定', () => {
@@ -102,23 +104,14 @@ describe('表の外側の余白の洗い出し', () => {
   })
 
   it('/duplicates：外側は見出しの余白にそろえ、操作は右へ寄せる', () => {
-    const body = code(read('app', 'duplicates', 'page.tsx'))
-    // 候補の表（20px）。文字だけのセルは span で包み、本当の余白で測らせる（m22b。見た目は同じ）。
-    expect(body).toContain('<Th className="pl-5">候補</Th>')
-    expect(body).toContain('<Th align="right" className="pr-5">操作</Th>')
-    expect(body).toContain('py-3 pr-3 pl-5')
-    expect(body).toContain('<span className="block truncate">{candidate.left.label}')
-    expect(body).toContain('whitespace-nowrap py-2 pr-5 pl-3 text-right')
-    // アカウント別の表（20px）。
-    expect(body).toContain('<Th className="pl-5">アカウント</Th>')
-    expect(body).toContain('pr-5">重複率')
-    expect(body).toContain('py-4 pr-4 pl-5')
-    expect(body).toContain('<span className="block truncate">{row.accountName}</span>')
-    expect(body).toContain('py-4 pr-5 pl-4 text-right tabular-nums')
-    // 行列の表（16px。列数が可変のため末尾列は要素指定）。
-    expect(body).toContain('<Th className="pl-4">行')
-    expect(body).toContain('truncate pr-4')
-    expect(body).toContain('[data-duplicates-matrix] tr > :last-child')
+    const body = code(read('app', 'duplicates', 'duplicates-v8.tsx'))
+    expect(body).toContain('<th>操作</th>')
+    expect(body).toContain('className={styles.linkAction}')
+    expect(read('app', 'friends', 'friends-v8.module.css')).toContain('.table td')
+    expect(read('app', 'friends', 'friends-v8.module.css')).toContain('.linkAction')
+    expect(body).toContain('candidate.left.label')
+    expect(body).toContain('candidate.right.label')
+
   })
 
   it('/tags・/tags/folders/new：先頭列と操作列の外側をそろえる', () => {

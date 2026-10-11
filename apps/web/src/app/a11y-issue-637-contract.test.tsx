@@ -51,7 +51,9 @@ describe('Issue #637 h1は1画面に1つ', () => {
   })
 
   it('本文見出しをh1に戻さない（重複が直った画面はh2版を使う）', () => {
-    for (const rel of ['app/nen-campaigns/nen-overview.tsx', 'app/ec-commerce/page.tsx']) {
+    expect(read('v8/nen-campaigns/list.tsx')).toContain('<ListPage')
+    expect(read('components/templates/page-frame.tsx')).toContain("titleAs: HeadingTag = 'h2'")
+    for (const rel of ['app/ec-commerce/page.tsx']) {
       const src = read(rel)
       expect(src, rel + ' が共有PageHeader（h1）へ戻っている').toContain(
         "@/components/layout/page-header-h2",

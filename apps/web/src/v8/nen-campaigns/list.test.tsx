@@ -141,6 +141,17 @@ it('今月の補足に先月・注文・届かなかった数を残し、未取�
   expect(document.body.textContent).not.toContain('届かなかった 0通')
 })
 
+it('下書きの配信したい日時を日本時間で残し、予約済みと混ぜない', async () => {
+  const props = baseProps({ tab: 'columns', columns: [{ ...COLUMNS[0], deliveryStatus: 'draft', deliveryAt: '2099-05-01T01:30:00.000Z' }] })
+  await render(props)
+  const row = host.querySelector('tbody')
+  expect(row?.textContent).toContain('未配信・')
+  expect(row?.textContent).toContain('10:30')
+  expect(row?.textContent).toContain('に出したい')
+  expect(row?.textContent).not.toContain('予約中')
+  expect(props.onDeliverColumn).not.toHaveBeenCalled()
+})
+
 describe('V8 NEN配信の一覧', () => {
   it('V8 のテーマで、自動配信の表に止めている配信も今月多く送った順で並び、コラムは並ばない', async () => {
     await render(baseProps())

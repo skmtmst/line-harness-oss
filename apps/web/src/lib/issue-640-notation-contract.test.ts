@@ -9,7 +9,7 @@ const SCENARIO_LIST = read('../v8/scenarios/list.tsx')
 const AUTO_REPLIES = read('../v8/auto-replies/list.tsx')
 const FRIEND_ADD = read('../v8/friend-add/list.tsx')
 const VARS = readUiSource(new URL('../app/contents/vars/page.tsx', import.meta.url), 'utf8')
-const NEN_OVERVIEW = read('../app/nen-campaigns/nen-overview.tsx')
+const NEN_OVERVIEW = read('../v8/nen-campaigns/list.tsx')
 const TAGS = read('../components/friend-fields/tags-page-v4.tsx')
 const ANALYTICS = readUiSource(new URL('../app/analytics/page.tsx', import.meta.url), 'utf8')
 const ANALYTICS_TIME = read('../app/analytics/analytics-time.ts')
@@ -47,9 +47,11 @@ describe('#640 省略表示の全文確認（title）', () => {
   })
 
   it('/nen-campaigns: 配信名の補足・送った先・並び順に title', () => {
-    expect(NEN_OVERVIEW).toMatch(/truncate text-micro text-ink-faint" title=\{setting\.title\}/)
-    expect(NEN_OVERVIEW).toMatch(/title=\{`\$\{delivery\.friendName \|\| '名前未取得'\}・/)
-    expect(NEN_OVERVIEW).toMatch(/title=\{sort === 'name'/)
+    expect(NEN_OVERVIEW).toContain('title={setting.title}')
+    expect(NEN_OVERVIEW).toContain('title={who}')
+    expect(NEN_OVERVIEW).toContain("const who = `${delivery.friendName || '名前未取得'}・${delivery.lineAccountName}`")
+    expect(NEN_OVERVIEW).toContain('title={delivery.label}')
+
   })
 
   it('/tags: フォルダ行・使用先セルに title', () => {

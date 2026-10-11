@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const page = readFileSync(join(directory, 'page.tsx'), 'utf8');
-const overview = readFileSync(join(directory, 'nen-overview.tsx'), 'utf8');
+const overview = readFileSync(join(directory, '../../v8/nen-campaigns/list.tsx'), 'utf8');
 const editor = readFileSync(join(directory, 'edit/campaign-editor-v8.tsx'), 'utf8');
 const api = readFileSync(join(directory, '../../lib/api.ts'), 'utf8');
 
@@ -52,7 +52,7 @@ describe('NEN配信のテスト送信先', () => {
   test('取得済みの失敗・待機件数を表示し、配信日時を日本時間へ変える', () => {
     expect(overview).toContain('summary.pending + summary.processing');
     expect(page).toContain('undelivered: thisMonthRes.data.summary.failed');
-    expect(overview).toContain('formatNenJobDateTime(delivery.sentAt || delivery.scheduledAt)');
+    expect(overview).toContain('jstDateTime(delivery.sentAt || delivery.scheduledAt)');
     expect(overview).not.toContain('予定：{delivery.scheduledAt}');
   });
 

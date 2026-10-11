@@ -3,9 +3,9 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const OVERVIEW = fs.readFileSync(path.join(__dirname, 'nen-overview.tsx'), 'utf8')
+const OVERVIEW = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/list.tsx'), 'utf8')
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const PREVIEW = fs.readFileSync(path.join(__dirname, 'line-preview.tsx'), 'utf8')
+const PREVIEW = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/preview.tsx'), 'utf8')
 const NEW_COLUMN = fs.readFileSync(path.join(__dirname, 'columns/new/column-new-v8.tsx'), 'utf8')
 const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 
@@ -14,9 +14,9 @@ const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
  * 設計の骨組み（タブ・数値カード・案内帯・一覧操作・表・右パネル・下部追従バー）と、
  * 点検 #512／#727／#733 で決めた振る舞いが残っていることを見る。
  */
-describe('V6 37-6 NEN配信の画面契約', () => {
-  it('数値カードは今月・先月／開封／配信からの注文／届かなかった の4枚', () => {
-    for (const label of ['送った数', '先月', '開封', '配信からの注文', '届かなかった', '友だち解除']) {
+describe('V8 NEN配信の取得と操作の契約', () => {
+  it('現在の数の帯と補足に今月・先月・開封・注文・届かなかった数を残す', () => {
+    for (const label of ['今月送った', '先月', '開封', '配信からの注文', '届かなかった', '友だち解除']) {
       expect(OVERVIEW).toContain(label)
     }
     // 今月・先月は端末の時差ではなく日本時間の月の範囲で取る。
@@ -25,38 +25,38 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(PAGE).toContain('from: thisMonth.from, to: thisMonth.to')
     // 自動配信の開封は LINE から取れない。取れない理由を隠さない。
     // （自動配信の表の開封列を外したため、理由は数値カードの説明と表の注記に残す）
-    expect(OVERVIEW).toContain('LINEから個人開封を取得できません')
-    expect(OVERVIEW).toContain('自動配信は開封を取得できません')
+    expect(OVERVIEW).toContain('LINE から一人ずつの開封を取れません')
+    expect(OVERVIEW).toContain('自動配信は開封を取れません')
   })
 
   it('自動配信の表は 配信／きっかけ／対象／送信／注文／状態／操作（開封の列は置かない）', () => {
-    for (const label of ['<Th>配信</Th>', 'きっかけ</Th>', '対象</Th>', '送信</Th>', '注文</Th>', '状態</Th>']) {
+    for (const label of ['>配信</Th>', '>きっかけ</Th>', '>対象</Th>', '送信', '>注文</Th>', '>状態</Th>']) {
       expect(OVERVIEW).toContain(label)
     }
     // 開封の列は「—」しか並ばないので自動配信の表には置かない。
     // （送った履歴の表には「取得不可」の列が残るので、自動配信のパネル内だけ見る）
-    const autoPanel = OVERVIEW.slice(OVERVIEW.indexOf('function AutoPanel('), OVERVIEW.indexOf('function CouponDrawer('))
+    const autoPanel = OVERVIEW.slice(OVERVIEW.indexOf('function AutoTab('), OVERVIEW.indexOf('function CampaignPreviewDrawer('))
     expect(autoPanel).toContain('注文</Th>')
     expect(autoPanel).not.toContain('開封</Th>')
-    expect(OVERVIEW).toContain('自動配信は開封を取得できません')
+    expect(OVERVIEW).toContain('自動配信は開封を取れません')
     expect(OVERVIEW).toContain('formatCampaignTiming(setting)')
     expect(OVERVIEW).toContain('formatCampaignAudience(setting)')
-    expect(OVERVIEW).toContain('配信中</StatusBadge>')
-    expect(OVERVIEW).toContain('停止中</StatusBadge>')
+    expect(OVERVIEW).toContain('有効</Pill>')
+    expect(OVERVIEW).toContain('停止中</Pill>')
     // 編集は専用画面へ。その他は 中身を見る／テスト送信／止める・動かす。
     expect(OVERVIEW).toContain('/nen-campaigns/edit?key=')
     expect(OVERVIEW).toContain("label: '中身を見る'")
-    expect(OVERVIEW).toContain("setting.isEnabled ? '止める' : '動かす'")
+    expect(OVERVIEW).toContain("label: '止める'")
     // 停止・再開は専用の口（#659）。
     expect(PAGE).toContain('api.nenCampaigns.setEnabled(')
   })
 
-  it('コラムは一覧と右パネル（LINEに届くカード／誰に・いつ送るか）と下部追従バー', () => {
-    for (const label of ['LINEに届くカード', '誰に・いつ送るか', '送る相手', '送る時', '今すぐ', '日時を予約', '自分にテストを送る', 'この内容で予約する', 'この内容で送る']) {
+  it('コラムは一覧と選択中の操作と見本を実際の取得・予約へつなぐ', () => {
+    for (const label of ['LINE に届くカード', '送る相手・時刻', '送る相手', '送る日時', '今すぐ', '日時を予約', '自分にテストを送る', '配信を予約する']) {
       expect(OVERVIEW).toContain(label)
     }
-    expect(OVERVIEW).toContain('<StickyBar')
-    expect(OVERVIEW).toContain('ColumnLinePreview')
+    expect(OVERVIEW).toContain('<SelectedColumn')
+    expect(OVERVIEW).toContain('ColumnPreview')
     // 差し込みは実送信と同じ「大切なご家族」で見せる（コラムはペット情報を持たない）。
     expect(PREVIEW).toContain("COLUMN_PET_NAME_FALLBACK = '大切なご家族'")
     // 送る相手の人数は実口 columns-preview から。
@@ -65,9 +65,9 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(PAGE).toContain('ECのコラムを取り込む')
     expect(PAGE).toContain('api.nenCampaigns.importColumns(')
     // LINE配信の状態は日本語で（内部値をそのまま出さない）。
-    expect(OVERVIEW).toContain("draft: '未配信'")
-    expect(OVERVIEW).toContain("sent: '配信済み'")
-    expect(OVERVIEW).toContain('columnStatusLabel[column.deliveryStatus]')
+    expect(OVERVIEW).toContain('送っていない')
+    expect(OVERVIEW).toContain('送信済み')
+    expect(OVERVIEW).toContain('columnBadge(column, metric?.sent ?? null)')
     expect(OVERVIEW).toContain('metric?.articleOpened.value')
   })
 
@@ -77,7 +77,7 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(OVERVIEW).toContain('kind="error"')
     expect(OVERVIEW).toContain('onRetryTab')
     expect(OVERVIEW).toContain('kind="empty"')
-    expect(OVERVIEW).toContain('売らない配信です。ここで信用がたまると、売る配信が届きやすくなります。')
+    expect(OVERVIEW).toContain('コラムは外部サイトの記事へつなぐカードです。')
   })
 
   it('タブごとに取り、失敗はそのタブの一覧の場所の1枚で示す(点検 #512 の中3)', () => {
@@ -141,7 +141,7 @@ describe('V6 37-6 NEN配信の画面契約', () => {
 
   it('配信予約は確認ダイアログを挟む(点検 #512 の中9)', () => {
     expect(OVERVIEW).toContain('ConfirmDialog')
-    expect(OVERVIEW).toContain('confirmDeliver')
+    expect(OVERVIEW).toContain('setConfirm')
     expect(OVERVIEW).toContain('を配信予約しますか？')
     // ボタン直結のワンクリック実行は残さない。
     expect(OVERVIEW).not.toContain('onClick={() => onDeliver(column)}')
@@ -151,7 +151,7 @@ describe('V6 37-6 NEN配信の画面契約', () => {
     expect(OVERVIEW).toContain('delivery.lineAccountName')
     expect(OVERVIEW).toContain('deliveryTriggerLabel(delivery.campaignKey)')
     expect(OVERVIEW).toContain('delivery.reaction.reason')
-    expect(OVERVIEW).toContain('onShowDetail(delivery.id)')
+    expect(OVERVIEW).toContain('props.onShowDelivery(delivery.id)')
     expect(OVERVIEW).toContain('取得不可')
     expect(OVERVIEW).not.toContain('12pt')
   })
