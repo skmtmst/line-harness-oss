@@ -9,7 +9,7 @@
     "scripts/visual-qa/frozen-v8-1011-routes.json"
   ],
   "designDir": "/Users/kentakenta/lh-work/design/v8",
-  "boardCount": 613,
+  "boardCount": 612,
   "retired": [],
   "boards": {
     "jQRsr": {
@@ -98,24 +98,6 @@
       "exportTexts": "pencil-texts/etLd8.tsv",
       "exportSha256": "869204aeefccada81659580103dcc7e722cb4cc23fe255bd63ad2b6760e6dd73",
       "textsSha256": "6eee91b65993c7ae2b659f8e0b4ea0e721fd296fb2c439ddfbbf4b10a996d39b"
-    },
-    "sAnyy": {
-      "doc": "V8",
-      "name": "LIFF 席の予約 ③ 受け付けました｜状態は型の見本 CS のとおり",
-      "kind": "画面",
-      "route": null,
-      "routes": [],
-      "width": null,
-      "shot": null,
-      "url": "/restaurant/reserve/qa-token",
-      "app": "liff",
-      "state": {
-        "manual": "② で予約したあと。AC 10-09 に地図へ足した"
-      },
-      "exportHtml": "html/sAnyy.html",
-      "exportTexts": "pencil-texts/sAnyy.tsv",
-      "exportSha256": "b72f51a408df81a6aa5b4de9ac19e1195f4e37c74114604046ba396cfe3aa140",
-      "textsSha256": "b59564a5f0af56e40db8926e9db32f5a3511d71982924c4f560c63d1f4e2c3e9"
     },
     "aLU3r": {
       "doc": "V8",
@@ -9681,7 +9663,9 @@
       "shot": null,
       "exportHtml": "html/QX56l.html",
       "exportNodeName": "G-8k 店頭の QR の小窓",
-      "exportSha256": "a431d8b1d538545d436afc82c771e1aab81639f0896400706479bd6690101f0f"
+      "exportSha256": "a431d8b1d538545d436afc82c771e1aab81639f0896400706479bd6690101f0f",
+      "exportTexts": "pencil-texts/QX56l.tsv",
+      "textsSha256": "9d85398d339c255e1dc742250a01bd416cf45a4281b4ac5036a819177283f5aa"
     },
     "B3oGt3": {
       "doc": "V8",

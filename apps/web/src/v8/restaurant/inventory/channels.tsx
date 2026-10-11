@@ -11,6 +11,7 @@ import { TextField } from '@/components/shared/text-field'
 import Card, { CardHeader } from '@/components/shared/card'
 import KpiCard from '@/components/shared/kpi-card'
 import DateTimeField from '@/components/shared/date-time-field'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantIntakeAddress } from '@/lib/restaurant-test-api'
 import { Status } from '../booking-kit/shell'
@@ -141,8 +142,9 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
     if (!draft.customerName.trim()) errors.customerName = 'お客さまのお名前を入れてください。'
     const guests = Number(draft.guestCount)
     if (!Number.isInteger(guests) || guests < 1 || guests > 100) errors.guestCount = '人数は1〜100の整数で入れてください。'
-    const start = new Date(draft.startsAt)
-    if (!draft.startsAt || Number.isNaN(start.getTime())) errors.startsAt = '来店の日時を入れてください。'
+    let startsAt = ''
+    try { if (draft.startsAt) startsAt = datetimeLocalJstToUtcIso(draft.startsAt) } catch { /* 日時の入力欄へ理由を出す */ }
+    if (!startsAt) errors.startsAt = '来店の日時を入れてください。'
     setFieldErrors(errors); setImportError('')
     if (Object.keys(errors).length) {
       requestAnimationFrame(() => { const field = importRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
@@ -151,7 +153,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
     setBusy(true)
     void fetchApi(`/api/restaurant-test/inbound-emails/${encodeURIComponent(importing.id)}/manual-import?account_id=${encodeURIComponent(accountId)}`, {
       method: 'POST',
-      body: JSON.stringify({ customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt: start.toISOString() }),
+      body: JSON.stringify({ customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt }),
     })
       .then(() => { setImporting(null); setMessage({ tone: 'success', text: '予約台帳へ取り込みました。卓は空いている卓から自動で選びました。' }); setReload((n) => n + 1) })
       .catch((error: unknown) => setImportError(error instanceof Error ? error.message : '取り込めませんでした。'))

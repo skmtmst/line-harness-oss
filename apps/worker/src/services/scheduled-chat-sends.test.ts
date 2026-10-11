@@ -306,3 +306,11 @@ describe('送信予約のdispatcher(N-025)', () => {
     expect(row('s-unres-max').last_error_code).toBe('unresolved_template_variables');
   });
 });
+
+test('受理後に処理が消え、鍵の有効時間を越えた予約は自動で送り直さない', async () => {
+  await schedule({id:'expired',key:'aaaaaaaa-2222-4333-8444-555555555555',at:'2026-01-09T00:00:00Z'});
+  sqlite.raw.exec("UPDATE scheduled_chat_sends SET status='sending',attempt_count=1,lease_token='lost',lease_expires_at='2026-01-09T00:01:00Z',updated_at='2026-01-09T00:00:00Z'");
+  await processDueScheduledChatSends(env(),{now:NOW});
+  expect(pushMessage).not.toHaveBeenCalled();
+  expect(row('expired')).toMatchObject({status:'failed',last_error_code:'LINE_RETRY_KEY_EXPIRED'});
+});

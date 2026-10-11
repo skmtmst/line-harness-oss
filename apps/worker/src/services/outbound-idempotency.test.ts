@@ -52,6 +52,13 @@ describe('outbound send idempotency boundary', () => {
     }
   });
 
+  test('24時間を越えたLINEの処理途中再試行は送達不明で止める', async () => {
+    const args={key:KEY,channel:'line' as const,resourceId:'automation-step',payloadHash:await hashOutboundPayload('same'),retryInProgress:true,now:NOW};
+    await reserveOutboundSend(sqlite.db,args);
+    expect(await reserveOutboundSend(sqlite.db,{...args,now:'2026-08-22T00:00:00.000Z'})).toEqual({kind:'unknown',code:'LINE_RETRY_KEY_EXPIRED'});
+    expect(sqlite.raw.prepare('SELECT status,retryable FROM outbound_send_requests').get()).toEqual({status:'unknown',retryable:0});
+  });
+
   test('完了した送信は外部送信せず同じ結果を返す', async () => {
     const args = {
       key: KEY,

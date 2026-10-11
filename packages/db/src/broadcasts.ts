@@ -757,12 +757,9 @@ export async function updateBroadcastStatus(
   if (status === 'sent') {
     fields.push('sent_at = ?');
     values.push(jstNow());
-    // 完了マーカー: dedup_progress を NULL に戻して resume ロジックを無効化する。
-    // processMultiAccountDedupBroadcast 内で別 UPDATE として clear すると status='sent'
-    // との間で race window が生まれ、その間に Worker crash すると recover 経路が
-    // dedup_progress=NULL のまま再投入して全件再送 → 重複配信事故の元になる。
-    // status='sent' と同一 UPDATE で原子的に clear する。
-    fields.push('dedup_progress = NULL');
+    // 再送も開始時の宛先と既送IDを使う。完了後も snapshot を捨てない。
+    // recoverStalledBroadcasts は status='sending' だけを見るため、完了を
+    // progress の有無で表す必要はない。
     // batch_lock_at もクリア (sent 後は recover の対象外なので影響はないが綺麗に).
     fields.push('batch_lock_at = NULL');
   }

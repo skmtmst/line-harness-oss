@@ -50,6 +50,7 @@ interface AutoReplyRun {
   inputPreview: string | null;
   matchedKeyword: string | null;
   versionNumber: number | null;
+  errorCode: string | null;
   domainStatus: AutoReplyEvaluationStatus;
   replyStatus: 'not_attempted' | 'accepted' | 'failed';
   actionSummary: Record<string, number>;
@@ -118,6 +119,7 @@ const SKIP_LABELS: Record<string, string> = {
   outside_active_window: '応答する時間帯の外でした',
   weekday_not_allowed: '応答しない曜日でした',
   operator_handling: '担当者が対応中のため何もしませんでした',
+  partial_failure_requires_retry: '前の返信は受理済みです。前の実行結果から失敗した処理だけを再実行してください',
   already_replied_once: '1人1回の設定により何もしませんでした',
   cooldown_active: '連続返信を防ぐため何もしませんでした',
   friend_conditions_not_met: '友だちの条件に合いませんでした',
@@ -138,8 +140,11 @@ function detail(row: AutoReplyRunListRow, status: AutoReplyEvaluationStatus): st
     } catch {
       candidateReason = null;
     }
-    return SKIP_LABELS[candidateReason ?? row.skip_reason ?? ''] ?? '条件に合わず何もしませんでした';
+    const reason = row.candidate_result === 'skipped'
+      ? candidateReason ?? row.skip_reason : row.skip_reason ?? candidateReason;
+    return SKIP_LABELS[reason ?? ''] ?? '条件に合わず何もしませんでした';
   }
+  if (row.error_code === 'delayed_delivery_unknown') return '届いたか分からないため要確認です。自動では送り直しません';
   if (row.status === 'reply_failed') return 'LINEへの返信を受け付けてもらえませんでした';
   if (row.status === 'partial_failed') return '返信または一部の処理だけ完了しました';
   if (row.status === 'failed') return '自動応答を完了できませんでした';
@@ -183,7 +188,7 @@ function serializeRun(
     // 返信の失敗だけ・成功・処理中・見送り（選択ルールの見送り表示を含む）には出さない。
     // ただし途中で止まった再実行（actions_running のまま失敗行が残り、
     // 確保済みの行が無い）は再実行の入口が通るのでボタンを出す。
-    canRetry: row.has_failed_action_run === 1 && (
+    canRetry: row.error_code !== 'delayed_delivery_unknown' && row.has_failed_action_run === 1 && (
       RETRYABLE_DOMAIN_STATUSES.has(domainStatus)
       || (row.status === 'actions_running' && row.has_inflight_action_run === 0)
     ),
@@ -195,6 +200,7 @@ function serializeRun(
     inputPreview: canViewInput ? row.input_preview_masked : null,
     matchedKeyword: row.matched_keyword,
     versionNumber: row.version_number,
+    errorCode: row.error_code,
     domainStatus,
     replyStatus: row.reply_status,
     actionSummary: parseActionSummary(row.action_summary),

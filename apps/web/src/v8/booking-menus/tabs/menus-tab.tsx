@@ -216,7 +216,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   if (status === 'loading') {
     return (
       <SaveErrorScope errors={saveErrors}><div aria-busy="true">
-        <DelayedSkeleton loading skeleton={<SkeletonRows rows={5} />} />
+        <SkeletonRows rows={5} />
       </div></SaveErrorScope>
     )
   }

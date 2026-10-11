@@ -3,7 +3,7 @@
 import { useUrlTab } from '@/lib/use-url-tab'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import { ListPage } from '@/components/templates/list-page'
@@ -55,7 +55,6 @@ export default function CloseTasksPage() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   const canWrite = canWriteRole(role)
-  const [storeId, setStoreId] = useState('')
   const [tasks, setTasks] = useState<RestaurantChannelCloseTask[] | null>(null)
   const [media, setMedia] = useState<StoreMedium[]>([])
   const [error, setError] = useState<unknown>(null)
@@ -64,39 +63,31 @@ export default function CloseTasksPage() {
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
 
-  /* 店舗：選んでいる店舗（store-context）→ 無ければ先頭（ダッシュボードと同じ）。 */
-  useEffect(() => {
-    let current = true
-    if (!selectedAccountId) return
-    void Promise.all([
-      restaurantTestApi.listStores(selectedAccountId),
-      restaurantTestApi.storeContext(selectedAccountId).catch(() => null),
-    ]).then(([stores, context]) => {
-      if (!current) return
-      const selected = context?.data.selectedStore?.id
-      setStoreId(stores.data.stores.some((s) => s.id === selected) ? selected! : stores.data.stores[0]?.id ?? '')
-      if (stores.data.stores.length === 0) setTasks([])
-    }).catch((caught) => { if (current) setError(caught) })
-    return () => { current = false }
-  }, [selectedAccountId])
-
+  const latest = useRef(0)
   const load = useCallback(async () => {
-    if (!selectedAccountId || !storeId) return
+    const ticket = ++latest.current
+    if (!selectedAccountId) return
+    setError(null)
     try {
+      const [stores, context] = await Promise.all([
+        restaurantTestApi.listStores(selectedAccountId),
+        restaurantTestApi.storeContext(selectedAccountId),
+      ])
+      const selected = context?.data.selectedStore?.id
+      const storeId = stores.data.stores.some(s => s.id === selected) ? selected! : stores.data.stores[0]?.id
+      if (!storeId) { if (ticket === latest.current) { setTasks([]); setMedia([]) }; return }
       const [list, channels] = await Promise.all([
         restaurantTestApi.channelCloseTasks(selectedAccountId, storeId),
-        loadStoreMedia(selectedAccountId, storeId).catch(() => [] as StoreMedium[]),
+        loadStoreMedia(selectedAccountId, storeId),
       ])
-      setTasks(list.data); setMedia(channels); setError(null)
+      if (ticket !== latest.current) return
+      if (!Array.isArray(list.data)) throw new Error('読み込めませんでした')
+      setTasks(list.data); setMedia(channels)
     } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught);
-
-
-      if (!fieldFailure) {
-      setError(caught) }
+      if (ticket === latest.current) setError(caught)
     }
-  }, [selectedAccountId, storeId, saveErrors])
-  useEffect(() => { void load() }, [load]);
+  }, [selectedAccountId])
+  useEffect(() => { setTasks(null); setMedia([]); void load(); return () => { latest.current++ } }, [load])
 
 
   const groups = useMemo(() => groupCloseTasks(tasks ?? [], media), [tasks, media])
@@ -128,7 +119,7 @@ export default function CloseTasksPage() {
   }
 
   let content
-  if (error && tasks === null) content = <ListState kind="error" error={error} onRetry={() => void load()} />
+  if (error) content = <ListState kind="error" error={error} onRetry={() => void load()} />
   else if (tasks === null) content = <ListState kind="loading" />
   else if (shown.length === 0) {
     content = <ListState kind="empty" title={tab === 'open' ? '未対応の知らせはありません' : '閉じた知らせはありません'} description={tab === 'open' ? '他の予約サイトの枠を閉じる必要があると、ここに出ます。' : undefined} />

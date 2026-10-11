@@ -521,11 +521,12 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
       ])
       if (requestId !== requestRef.current) return
       if (!imageRes.success) throw new Error(imageRes.error)
+      if(!activeRes.success || !archivedRes.success)throw new Error('projects unavailable')
       setImages(imageRes.data)
       setCounts(imageRes.counts ?? null)
       setNextBefore(imageRes.nextBefore ?? null)
       const map: Record<string, BannerProject> = {}
-      for (const p of [...(activeRes.success ? activeRes.data : []), ...(archivedRes.success ? archivedRes.data : [])]) map[p.id] = p
+      for (const p of [...activeRes.data, ...archivedRes.data]) map[p.id] = p
       setProjects(map)
       setStatus('ready')
     } catch (caught) {
