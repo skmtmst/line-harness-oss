@@ -49,7 +49,12 @@ export async function processRestaurantEvents(env:Env['Bindings'],storeId?:strin
  if(!restaurantTestEnabled(env))return;
  const db=dbFor(env);
  const rows=await db.prepare(`SELECT e.*,r.consumer_key FROM rt_reservation_events e JOIN rt_reservation_event_receipts r ON r.event_id=e.id
- WHERE r.status<>'succeeded' AND (? IS NULL OR e.store_id=?) AND (r.next_attempt_at IS NULL OR julianday(r.next_attempt_at)<=julianday('now')) ORDER BY e.occurred_at,e.reservation_version LIMIT 100`).bind(storeId??null,storeId??null).all<RestaurantEvent&{consumer_key:string}>();
+ WHERE r.status<>'succeeded' AND r.attempt_count<50
+ AND (r.lease_until IS NULL OR julianday(r.lease_until)<=julianday('now'))
+ AND NOT EXISTS (SELECT 1 FROM workflow_steps w WHERE w.scope_id=e.store_id
+   AND w.process_kind='restaurant_event' AND w.subject_id=e.id||':'||r.consumer_key
+   AND w.step_key='__run' AND w.status='exhausted')
+ AND (? IS NULL OR e.store_id=?) AND (r.next_attempt_at IS NULL OR julianday(r.next_attempt_at)<=julianday('now')) ORDER BY julianday(COALESCE(r.next_attempt_at,e.occurred_at)),e.reservation_version,e.id,r.consumer_key LIMIT 100`).bind(storeId??null,storeId??null).all<RestaurantEvent&{consumer_key:string}>();
  for(const event of rows.results)await deliverRestaurantEvent(db,event,event.consumer_key,async(owned,e,execution)=>{
   if(event.consumer_key==='followup') { await scheduleRestaurantFollowup(owned,e); return; }
   if(event.consumer_key==='visit_stamp_queue') {
