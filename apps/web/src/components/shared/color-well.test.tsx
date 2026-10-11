@@ -75,7 +75,7 @@ describe('ColorWell（★BG-2 カラーピッカー）', () => {
     fireEvent.change(input, { target: { value: 'ズレ' } })
     fireEvent.blur(input)
     expect(onChange).not.toHaveBeenCalled()
-    expect(input.value).toBe('d7263d')
+    expect(input.value).toBe('D7263D')
   })
 
   it('すけ具合を下げると 8 桁で返す', () => {

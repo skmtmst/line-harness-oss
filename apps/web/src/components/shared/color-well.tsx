@@ -3,16 +3,9 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { ChevronDown, Pipette } from 'lucide-react'
 import styles from './color-well.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { isImeComposing } from './ime'
 import Notice from './notice'
 
-/** よく使う色の見本（8×3）。Pencil ★BG-2 `d6PU4a` の色グリッドと同じ並び。 */
-const DEFAULT_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#16a34a', '#06c755',
-  '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-  '#ec4899', '#f43f5e', '#64748b', '#1d1d1f', '#ffffff', '#9ca3af', '#d1d5db', '#f5f5f7',
-]
 
 /*
  * ピッカー本体の幅（`color-well.module.css` の `.pop` と同じ）と、画面の端に
@@ -155,8 +148,8 @@ export default function ColorWell({
   /** 指定なしのときにピッカーを開く色（★BG-B の役割ごとの見本の色）。 */
   fallback?: string
 }) {
-  const theme = useAdminTheme()
-  const palette = colors ?? (theme === 'v8' ? V8_COLORS : DEFAULT_COLORS)
+
+  const palette = colors ?? (V8_COLORS)
   const [open, setOpen] = useState(false)
   const initial = parseValue(value ?? fallback)
   const [hsv, setHsv] = useState<Hsv>(initial.hsv)
@@ -457,7 +450,7 @@ export default function ColorWell({
               {/* v8 は正本どおり大文字で見せる。入力中の文字は hexText のまま持つ。 */}
               <input
                 className={styles.hexInput}
-                value={theme === 'v8' ? hexText.toUpperCase() : hexText}
+                value={hexText.toUpperCase()}
                 aria-label="色を十六進で入力"
                 aria-invalid={hexError || undefined}
                 onChange={(event) => { setHexText(event.target.value.replace(/^#/, '')); setHexError(false) }}
@@ -487,7 +480,7 @@ export default function ColorWell({
               </label>
             ) : null}
             {/* v8 は正本どおりスポイトを必ず置き、対応していないブラウザでは押せない形で出す。 */}
-            {hasDropper || theme === 'v8' ? (
+            {(
               <button
                 type="button"
                 className={styles.dropper}
@@ -498,7 +491,7 @@ export default function ColorWell({
               >
                 <Pipette size={15} aria-hidden="true" />
               </button>
-            ) : null}
+            )}
           </div>
 
           <span className={styles.rule} aria-hidden="true" />

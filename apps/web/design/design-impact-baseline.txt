@@ -190,7 +190,6 @@ shared-button-importer components/templates/detail-columns.tsx
 shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/empty-list.tsx
 shared-button-importer components/shared/file-drop.tsx
-shared-button-importer components/shared/folder-add-dialog.tsx
 shared-button-importer components/shared/folder-panel.tsx
 shared-button-importer components/shared/media-picker-dialog.tsx
 shared-button-importer components/shared/not-connected.tsx
