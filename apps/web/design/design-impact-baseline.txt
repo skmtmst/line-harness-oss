@@ -99,17 +99,6 @@ shared-button-importer app/settings/file-scan/file-scan-v8.tsx
 shared-button-importer app/settings/manual-links/manual-links-v8.tsx
 shared-button-importer app/staff/email-change/page.tsx
 shared-button-importer app/staff/invite/page.tsx
-shared-button-importer app/tags/edit-field-page-v8.tsx
-shared-button-importer app/tags/field-editor-v8.tsx
-shared-button-importer app/tags/field-migrate-v8.tsx
-shared-button-importer app/tags/fields-tab-v8.tsx
-shared-button-importer app/tags/list-v8.tsx
-shared-button-importer app/tags/mark-editor-v8.tsx
-shared-button-importer app/tags/marks-v8.tsx
-shared-button-importer app/tags/search-editor-v8.tsx
-shared-button-importer app/tags/searches-v8.tsx
-shared-button-importer app/tags/tag-editor-v8.tsx
-shared-button-importer app/tags/tags-tab-v8.tsx
 shared-button-importer app/users/users-v8.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webinars/published/page.tsx
@@ -123,7 +112,6 @@ shared-button-importer components/shared/action-rows.tsx
 shared-button-importer components/broadcasts/broadcast-approval.tsx
 shared-button-importer components/broadcasts/broadcast-asset-manager.tsx
 shared-button-importer components/broadcasts/broadcast-form.tsx
-shared-button-importer components/broadcasts/broadcast-step-rail.tsx
 shared-button-importer components/broadcasts/segment-preset-controls.tsx
 shared-button-importer components/chats/friend-info-sidebar.tsx
 shared-button-importer components/chats/inbox-filter-panel.tsx
@@ -137,7 +125,6 @@ shared-button-importer components/forms/hq-form-definition-editor.tsx
 shared-button-importer components/forms/options-dialog.tsx
 shared-button-importer components/friend-fields/edit-tag-page-v4.tsx
 shared-button-importer components/friend-fields/mark-list.tsx
-shared-button-importer components/friend-fields/saved-search-list.tsx
 shared-button-importer components/friend-fields/support-mark-editor.tsx
 shared-button-importer components/friend-fields/support-mark-rules-panel.tsx
 shared-button-importer components/friend-fields/tag-csv-import-dialog.tsx
@@ -151,11 +138,8 @@ shared-button-importer components/friends/saved-search-dialog.tsx
 shared-button-importer components/friends/single-friend-actions.tsx
 shared-button-importer components/hq/account-list.tsx
 shared-button-importer components/hq/banners/generation-panel.tsx
-shared-button-importer components/hq/banners/image-detail-modal.tsx
-shared-button-importer components/hq/banners/library-section.tsx
 shared-button-importer components/hq/banners/limit-state.tsx
 shared-button-importer components/hq/banners/project-form-dialog.tsx
-shared-button-importer components/hq/banners/projects-section.tsx
 shared-button-importer components/hq/banners/reference-picker-dialog.tsx
 shared-button-importer components/hq/banners/upload-button.tsx
 shared-button-importer components/hq/banners/upload-target-dialog.tsx

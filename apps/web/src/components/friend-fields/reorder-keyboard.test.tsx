@@ -112,7 +112,9 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a1', selectedAccount: { id: 'a1', name: '店舗A' } }),
 }))
 
-import TagsPageV4 from './tags-page-v4'
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+
+import TagsList from '@/v8/tags/list'
 import FriendFieldList from '@/v8/tags/fields-tab'
 import SupportMarkList from '@/v8/tags/marks-tab'
 import SavedSearchList from '@/v8/tags/searches-tab'
@@ -231,13 +233,13 @@ afterEach(async () => {
 
 describe('N-049 キーボードだけで並び替えられる', () => {
   it('タグ一覧: ↓で1つ下へ動き、新しい並びを reorder API へ送る', async () => {
-    await render(React.createElement(TagsPageV4, { fixture: { items: tags, groups: [] } }))
+    await render(React.createElement(TagsList, { fixture: { items: tags, groups: [] } }))
     await press(grip('タグA'), 'ArrowDown')
     expect(calls.tagsReorder).toHaveBeenCalledWith(['t2', 't1', 't3'])
   })
 
   it('タグ一覧: 先頭で↑を押しても何も送らない', async () => {
-    await render(React.createElement(TagsPageV4, { fixture: { items: tags, groups: [] } }))
+    await render(React.createElement(TagsList, { fixture: { items: tags, groups: [] } }))
     await press(grip('タグA'), 'ArrowUp')
     expect(calls.tagsReorder).not.toHaveBeenCalled()
   })
@@ -311,9 +313,13 @@ describe('N-049 キーボードだけで並び替えられる', () => {
   })
 
   it('つまみは説明付きのボタンとして出る（マウス専用の印ではない）', async () => {
-    await render(React.createElement(TagsPageV4, { fixture: { items: tags, groups: [] } }))
+    await render(React.createElement(TagsList, { fixture: { items: tags, groups: [] } }))
     const el = grip('タグA')
     expect(el.tagName).toBe('BUTTON')
-    expect(el.tabIndex).not.toBe(-1)
+    const name = host.querySelector<HTMLAnchorElement>('a[href="/tags/edit?id=t1"]')!
+    expect(name.tabIndex).toBe(0)
+    name.focus()
+    await act(async () => { name.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })) })
+    expect(document.activeElement).toBe(el)
   })
 })

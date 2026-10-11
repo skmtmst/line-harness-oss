@@ -118,7 +118,6 @@ describe('共通部品の影響範囲', () => {
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
       // ★V8-B ウェビナー一覧（UyUMw）。表の下にページ送りを置く。
-      'components/friend-fields/tags-page-v4.tsx',
 
       // N-193/N-205・B-128: 登録メディアから選ぶ窓。3つの写しを共通部品1つにまとめた。20件ずつのページ送り。
       'components/shared/media-picker-dialog.tsx',

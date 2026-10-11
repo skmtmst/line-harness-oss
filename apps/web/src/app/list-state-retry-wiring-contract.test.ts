@@ -23,7 +23,7 @@ const TARGETS = [
   '../components/broadcasts/segment-preset-controls.tsx',
   '../v8/tags/fields-tab.tsx',
   '../v8/tags/marks-tab.tsx',
-  '../components/friend-fields/tags-page-v4.tsx',
+  '../v8/tags/tags-tab.tsx',
   '../components/friends/bulk-run-dialog.tsx',
   '../components/merged-person/merged-person-detail-v8.tsx',
   '../v8/friends/merged/merged.tsx',
@@ -38,7 +38,7 @@ function failureDisplays(source: string) {
     ...source.matchAll(/<StateCard\b[\s\S]*?\/>/g),
   ].map(([tag]) => tag)
   // 権限不足は通信失敗と別。権限を頼む案内へ、再取得の操作を強制しない。
-  return tags.filter((tag) => (tag.includes('kind="error"') || tag.includes('tone="error"')) && !tag.includes('permissionDeniedMessage('))
+  return tags.filter((tag) => (tag.includes('kind="error"') || tag.includes('tone="error"')) && !tag.includes('permissionDeniedMessage(') && !tag.includes('を見る権限がありません'))
 }
 
 describe('一覧の取得失敗からその場で読み直せる契約', () => {

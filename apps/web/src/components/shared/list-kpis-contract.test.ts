@@ -6,14 +6,11 @@ const SRC = join(process.cwd(), 'src')
 const read = (path: string) => readFileSync(join(SRC, path), 'utf8')
 
 describe('一覧KPIの取得失敗時', () => {
-  it('利用中の全画面が4枚の見出しを渡す', () => {
-    const callers = [
-      'components/friend-fields/tags-page-v4.tsx',
-    ]
-
-    for (const path of callers) {
-      expect(read(path), `${path} に titles がありません`).toMatch(/<ListKpis[\s\S]*?titles=/u)
-    }
+  it('V8タグ一覧は4つの指標の見出しを帯へ渡す', () => {
+    const source = read('v8/tags/tags-tab.tsx')
+    for (const title of ['未使用', '付けている友だち', '今月付けた回数', '整理の候補']) expect(source).toContain(`title: '${title}'`)
+    expect(source).toContain('<KpiBand')
+    expect(source).toContain('title={kpi.title}')
   })
 
   it('V8 のリマインダ・シナリオは取れない数を「—」で出す', () => {

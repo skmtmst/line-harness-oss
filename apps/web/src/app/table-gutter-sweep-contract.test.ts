@@ -34,12 +34,12 @@ function code(src: string): string {
 }
 
 describe('表の外側の余白の洗い出し', () => {
-  it('/accounts：外側は px-5、操作列は固定＋右寄せ', () => {
-    const body = code(read('app', 'accounts', 'page.tsx'))
-    expect(body).toContain('<Th className="pl-5">アカウント</Th>')
-    expect(body).toContain('w-28 pr-5">操作')
-    expect(body).toContain('py-3 pr-4 pl-5')
-    expect(body).toContain('py-3 pr-5 pl-4 text-right')
+  it('/accounts：列はV8の板の幅で固定し、操作は1つのメニューにする', () => {
+    const body = code(read('v8', 'settings', 'accounts', 'accounts.tsx'))
+    const css = read('v8', 'settings', 'accounts', 'accounts.module.css')
+    expect(body).toContain('<Th className={styles.colName}>アカウント</Th>')
+    expect(body).toContain('<Th className={styles.colMenu}>')
+    expect(css).toContain('.colMenu { flex: 0 0 var(--tpl-sa-acc-menu-w); }')
   })
 
   it('/affiliates：外側は px-5、操作列は中身の幅で固定', () => {
@@ -90,14 +90,16 @@ describe('表の外側の余白の洗い出し', () => {
     expect(css).toContain('justify-content: flex-end')
   })
 
-  it('/ec-commerce：操作列は中身の幅で固定', () => {
-    const body = code(read('app', 'ec-commerce', 'page.tsx'))
-    expect(body).toContain('<Th align="right" className="w-44">操作</Th>')
+  it('/ec-commerce：操作は行メニューにまとめる', () => {
+    const body = code(read('v8', 'settings', 'ec-commerce', 'screen.tsx'))
+    expect(body).toContain('<Th><span className={styles.srOnly}>操作</span></Th>')
+    expect(body).toContain('<RowMenu')
   })
 
-  it('/ec-commerce/identity-candidates：操作列は2ボタン幅で固定', () => {
-    const body = code(read('app', 'ec-commerce', 'identity-candidates', 'page.tsx'))
-    expect(body).toContain('<Th align="right" className="w-56">操作</Th>')
+  it('/ec-commerce/identity-candidates：V8の比較表で操作の列を持つ', () => {
+    const body = code(read('v8', 'settings', 'ec-commerce', 'identity.tsx'))
+    expect(body).toContain('<Th>操作</Th>')
+    expect(body).toContain('<DataTable')
   })
 
   it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {
@@ -118,13 +120,13 @@ describe('表の外側の余白の洗い出し', () => {
   })
 
   it('/tags・/tags/folders/new：先頭列と操作列の外側をそろえる', () => {
-    const body = code(read('components', 'friend-fields', 'tags-page-v4.tsx'))
+    const body = code(read('v8', 'tags', 'tags-tab.tsx'))
     // 共通 Th（余白 12px＝px-3 を持つ）へ寄せた後は幅だけ指定する。
     // 先頭列 w-11（44px）、操作列は編集＋…の2点分の128px（64pxでは枠付きボタンが切れる。m21o・m22b）。
-    expect(body).toContain('<Th style={{ width: 44 }}>')
-    expect(body).toContain('<Th style={{ width: 128 }} className="sticky right-0')
-    expect(body).toContain('>操作</Th>')
-    expect(body).toContain('cursor-grab')
+    expect(body).toContain('<Th className={styles.colName}>タグ</Th>')
+    expect(body).toContain('<Th className={styles.colMenu}>')
+    expect(body).toContain('<span className="sr-only">操作</span>')
+    expect(body).toContain('<ReorderHandle')
   })
 
   it('/friends/identity-candidates：V8の表は左右のセル余白を設計値で保つ', () => {

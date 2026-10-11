@@ -50,7 +50,7 @@ describe('V5 B4 オーバーレイ共通部品', () => {
 
   it('代表画面は共通部品を使い、既存の保存・削除・追加処理を残す', () => {
     const editor = readSource('components/friend-fields/tag-editor-v4.tsx')
-    const list = readSource('components/friend-fields/tags-page-v4.tsx')
+    const list = readSource('v8/tags/tags-tab.tsx')
     expect(editor).toMatch(/import Drawer/)
     expect(editor).toMatch(/import Notice/)
     expect(editor).toContain('onAdd({ id: crypto.randomUUID()')

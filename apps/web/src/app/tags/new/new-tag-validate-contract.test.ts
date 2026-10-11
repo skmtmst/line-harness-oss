@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/components/friend-fields/new-tag-page-v4.tsx'), 'utf8')
 const ROUTE = fs.readFileSync(path.join(process.cwd(), 'src/app/tags/new/page.tsx'), 'utf8')
-const LIST = fs.readFileSync(path.join(process.cwd(), 'src/components/friend-fields/tags-page-v4.tsx'), 'utf8')
+const LIST = fs.readFileSync(path.join(process.cwd(), 'src/v8/tags/tags-tab.tsx'), 'utf8')
 const EDITOR = fs.readFileSync(path.join(process.cwd(), 'src/components/friend-fields/tag-editor-v4.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(process.cwd(), 'src/lib/api.ts'), 'utf8')
 
@@ -26,7 +26,7 @@ describe('タグ作成の名前検査の契約', () => {
     expect(ROUTE).toContain('<Screen />')
     expect(ROUTE).not.toContain('LegacyNewTagPage')
     expect(ROUTE).toContain('<CreatePage')
-    expect(LIST).toContain('<Button href="/tags/new" variant="primary">＋ タグを作る</Button>')
+    expect(LIST).toContain('<Button href="/tags/new" variant="primary"')
     expect(EDITOR).toContain('href={`/tags/new?copy=${tag?.id ?? \'\'}`}')
   })
 

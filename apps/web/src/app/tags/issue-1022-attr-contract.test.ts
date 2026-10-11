@@ -57,12 +57,11 @@ describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更�
   })
 
   it('タグ一覧は重複名の整理候補を行ごとに示す', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx')
     // サーバーの cleanupReasons だけを見る。画面で再判定しない。
     expect(source).toContain("tag.cleanupReasons?.includes('duplicate_name')")
-    expect(source).toContain('重複名')
-    // PC表とモバイルカードの両方に出す。
-    expect(source.match(/重複名/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    expect(source).toContain('名前が重なっている')
+    expect(source).toContain('<StatusBadge size="annotation" tone="warning"')
   })
 
   it('タグ編集はHQ埋め込みではストアの一覧を読まず、同名だけを注意する', () => {

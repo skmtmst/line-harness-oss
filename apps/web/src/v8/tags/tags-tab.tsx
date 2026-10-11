@@ -21,6 +21,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import FilterChip from '@/components/shared/filter-chip'
 import { RowMenu } from '@/components/shared/row-actions';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
@@ -61,7 +62,7 @@ import Notice from '@/components/shared/notice'
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
 
-/** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。v7 の呼び名（tags-page-v4）は触らない。 */
+/** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   ec: 'EC 連携',
   line_login: 'LINE ログイン',
@@ -74,7 +75,7 @@ const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
-const PAGE_SIZES = STANDARD_PAGE_SIZES
+const PAGE_SIZES = [...new Set([...STANDARD_PAGE_SIZES, 30, 40])].sort((a, b) => a - b)
 
 /** 連動の文（絵の「本人+10・1.2倍 他1」）。マイル以外の連動は「他N」。0件は「—」。 */
 /**
@@ -225,6 +226,8 @@ export default function TagsTab({
   const [restoreError, setRestoreError] = useState('')
   const { leavingId, leave } = useRowLeaving()
   // 使っている所が0のタグは窓なしで保管し、5秒は「元に戻す」で取り消せる（動きの点検 17 番・旧い一覧と同じ）。
+  const [manageFoldersOpen, setManageFoldersOpen] = useState(false)
+  useEffect(() => { setManageFoldersOpen(false) }, [accountId])
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
@@ -490,7 +493,7 @@ export default function TagsTab({
       { id: 'copy', label: '複製して作る', external: false, href: `/tags/new?copy=${tag.id}`, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
       { id: 'move', label: 'フォルダへ移す', onSelect: () => setMenuMoveFor(tag.id) },
     ]
-    if (tag.status === 'archived') return [{ id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(tag) } }]
+    if (tag.status === 'archived') return [list[0], { id: 'restore', label: '保管から戻す', disabled: restoring, onSelect: () => { setRestoreError(''); setRestoreTarget(tag) } }]
     list.push({
         id: 'archive',
         label: '保管する',
@@ -550,10 +553,10 @@ export default function TagsTab({
       label: group.name,
       count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
       color: group.color,
-      onEdit: canEdit ? () => setFolderDialog(group) : undefined,
+      onEdit: canEdit ? () => { setManageFoldersOpen(false); setFolderDialog(group) } : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveGroupOrder(group, -1) : undefined,
       onMoveDown: canEdit && index < groups.length - 1 ? () => void moveGroupOrder(group, 1) : undefined,
-      onDelete: canEdit ? () => setDeletingGroup(group) : undefined,
+      onDelete: canEdit ? () => { setManageFoldersOpen(false); setDeletingGroup(group) } : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={14} aria-hidden="true" /> },
@@ -831,7 +834,7 @@ export default function TagsTab({
         </>}
         collapsedFolders={<>
           {createButton(false)}
-          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" width={150} value={folder} onChange={setFolder} options={folderSelectOptions} /></SaveErrorField>
+          <SaveErrorField names={["folder"]}><Select aria-label="フォルダ" width={150} value={folder} onChange={(next) => next === '__manage_folders__' ? setManageFoldersOpen(true) : setFolder(next)} options={[...folderSelectOptions, { value: '__manage_folders__', label: 'フォルダを管理' }]} /></SaveErrorField>
         </>}
         toolbar={narrow ? <>
           {/* 1152（aPeD8）：1段目＝作る・フォルダ・探す・使用状態、2段目＝付け方・よく使う・右端に表示件数。 */}
@@ -899,6 +902,16 @@ export default function TagsTab({
       )}
 
       {csvOpen ? <TagCsvImportDialog open onClose={onCsvClose} onCompleted={() => void load()} /> : null}
+
+      <Dialog open={manageFoldersOpen} title="フォルダを管理" onCancel={() => setManageFoldersOpen(false)} footer={null}>
+        <FolderPanel
+          activeId={folder}
+          onSelect={(id) => { setFolder(id); setManageFoldersOpen(false) }}
+          onAddFolder={canEdit ? () => { setManageFoldersOpen(false); setFolderDialog('new') } : undefined}
+          addFolderLabel="フォルダを追加"
+          rows={folderRows}
+        >{folderNote}</FolderPanel>
+      </Dialog>
 
       {folderDialog ? (
         <TagFolderDialog

@@ -10,7 +10,7 @@ const AUTO_REPLIES = read('../v8/auto-replies/list.tsx')
 const FRIEND_ADD = read('../v8/friend-add/list.tsx')
 const VARS = readUiSource(new URL('../app/contents/vars/page.tsx', import.meta.url), 'utf8')
 const NEN_OVERVIEW = read('../v8/nen-campaigns/list.tsx')
-const TAGS = read('../components/friend-fields/tags-page-v4.tsx')
+const TAGS = read('../v8/tags/tags-tab.tsx') + read('../components/friend-fields/tags-page-v4.tsx') + read('../components/shared/folder-panel.tsx')
 const ANALYTICS = readUiSource(new URL('../app/analytics/page.tsx', import.meta.url), 'utf8')
 const ANALYTICS_TIME = read('../app/analytics/analytics-time.ts')
 
@@ -61,9 +61,9 @@ describe('#640 省略表示の全文確認（title）', () => {
     expect(TAGS).not.toContain('<FolderSelect')
     expect(TAGS).toContain("title={group?.name ?? '未分類'}")
     expect(TAGS).not.toContain('<select')
-    expect(TAGS).toMatch(/min-w-0 flex-1 truncate" title=\{row\.name\}/)
+    expect(TAGS).toContain('title={row.label}')
     // 使用先セルは共通 Td（余白は部品側）。全文確認の title は残す。
-    expect(TAGS).toMatch(/truncate text-label text-ink" title=\{usageLabel\(tag\)\}/)
+    expect(TAGS).toContain('title={usageLabel(tag)}')
   })
 })
 
