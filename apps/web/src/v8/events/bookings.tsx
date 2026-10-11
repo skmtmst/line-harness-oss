@@ -3,7 +3,7 @@ import { CalendarClock, Users, Armchair, CalendarX, Inbox, Check, Download, Send
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { api, eventsApi, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
+import { api, eventsApi, type EventBookingItem, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
@@ -105,6 +105,7 @@ function Bookings({ eventId }: { eventId: string }) {
   const [selectedOccurrenceId, setSelectedOccurrenceId] = useState('')
   const [applicants, setApplicants] = useState<EventOccurrenceApplicants | null>(null)
   const [applicantsStatus, setApplicantsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [recordsRevision, setRecordsRevision] = useState(0)
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
   const [marking, setMarking] = useState<ReadonlySet<string>>(new Set())
@@ -144,6 +145,7 @@ function Bookings({ eventId }: { eventId: string }) {
   if (renderedOperationScope !== operationScope) {
     setRenderedOperationScope(operationScope)
     setApplicants(null)
+    setRecordsRevision(0)
     setApplicantsStatus('loading')
     setActionError('')
     setBusy(false)
@@ -167,7 +169,7 @@ function Bookings({ eventId }: { eventId: string }) {
   }
 
   const refreshEvent = useCallback(async () => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !eventId) return
     const request = requests.start('event', true)
     if (!request) return
     setEventStatus('loading')
@@ -187,7 +189,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
   const refreshSlots = useCallback(async () => {
     setSlotsStatus('loading')
-    if (!selectedAccountId) {
+    if (!selectedAccountId || !eventId) {
       setSlots([])
       setSelectedOccurrenceId('')
       return
@@ -220,6 +222,7 @@ function Bookings({ eventId }: { eventId: string }) {
       if (!request.isCurrent()) return
       if (!Array.isArray(data?.applicants) || !data.occurrence) throw new Error('malformed_applicants')
       setApplicants(data)
+      setRecordsRevision((value) => value + 1)
       setBroadcastPreview(null)
       setBroadcastConfirmOpen(false)
       setApplicantsStatus('ready')
@@ -273,7 +276,7 @@ function Bookings({ eventId }: { eventId: string }) {
   const confirmedSeats = summary?.confirmedSeats ?? bookingRows.filter((row) => row.status === 'confirmed').reduce((total, row) => total + row.partySize, 0)
   const requestedSeats = summary?.requestedSeats ?? bookingRows.filter((row) => row.status === 'requested').reduce((total, row) => total + row.partySize, 0)
   const waitingSeats = summary?.waitingSeats ?? waitingRows.reduce((total, row) => total + row.partySize, 0)
-  const offeredSeats = summary?.offeredSeats ?? 0
+  const offeredSeats = summary?.offeredSeats ?? rows.filter((row) => row.source === 'waitlist' && (row.status === 'offered' || row.status === 'accepted')).reduce((total, row) => total + row.partySize, 0)
   const capacity = occurrence?.capacity ?? null
   const history = applicants?.waitlistHistory ?? []
   const cancelledCount = history.filter((entry) => entry.status === 'cancelled').length
@@ -568,7 +571,7 @@ function Bookings({ eventId }: { eventId: string }) {
         action={<EventAttendanceSummary
           attended={ready ?attendance?.attendedSeats ?? null : null}
           noShow={ready ? attendance?.noShowSeats ?? null : null}
-          before={ready && attendance ? Math.max(0, confirmedSeats - attendance.attendedSeats - attendance.noShowSeats) : null}/>}>
+          before={ready && attendance ? confirmedSeats : null}/>}>
         {applicantsStatus === 'loading' ? <ListState kind="loading" /> : applicantsStatus === 'error' ? (
           <ListState
             kind="error"
@@ -718,14 +721,49 @@ function Bookings({ eventId }: { eventId: string }) {
           {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}
         </EventRosterCard>
       ) : null}
-      {selectedOccurrenceId ? <BookingRecords accountId={selectedAccountId} eventId={eventId} occurrenceId={selectedOccurrenceId} questionsJson={event?.questions_json} revision={applicants?.snapshotId} /> : null}
+      {selectedOccurrenceId ? <BookingRecords accountId={selectedAccountId} eventId={eventId} occurrenceId={selectedOccurrenceId} questionsJson={event?.questions_json} revision={`${applicants?.snapshotId}:${recordsRevision}`} renderActions={(booking) => {
+        const row: EventOccurrenceApplicant = {
+          source: 'booking', id: booking.id, friendId: booking.friend_id,
+          displayName: booking.friend_display_name ?? booking.friend_name ?? null,
+          pictureUrl: null, status: booking.status, partySize: 1 + (booking.companion_count ?? 0),
+          appliedAt: booking.requested_at ?? booking.created_at ?? '', answers: null,
+          firstParticipation: { isFirst: booking.is_first_time == null ? null : booking.is_first_time === 1, attendedCount: null, checkedAt: null },
+          offeredAt: null, offerExpiresAt: null,
+        }
+        return booking.status === 'confirmed' ? <>
+          <Button data-booking-id={booking.id} data-booking-action="attended" onClick={() => void markStatus(row, 'attended')} disabled={marking.has(booking.id)}>参加済</Button>
+          <Button data-booking-id={booking.id} data-booking-action="no_show" onClick={() => void markStatus(row, 'no_show')} disabled={marking.has(booking.id)}>無断</Button>
+          <Button onClick={() => { setCancelError(''); setCancelApplicant({ applicant: row, accountId: selectedAccountId }) }} disabled={busy}>キャンセルにする</Button>
+        </> : booking.status === 'requested' ? <>
+          <Button onClick={() => void decide(row, 'confirm')} disabled={busy}>承認する</Button>
+          <Button onClick={() => { setRejectReason(''); setRejectError(''); setRejectApplicant(row) }} disabled={busy}>断る</Button>
+        </> : null
+      }}>
+        {ready ? <>
+          <p>{`申込 ${confirmedSeats + requestedSeats}人（確定 ${confirmedSeats}人・承認待ち ${requestedSeats}人）・キャンセル待ち ${waitingSeats}人・案内中 ${offeredSeats}人 / ${capacity === null ? '定員の上限なし' : occurrence && occurrence.activeSeats >= capacity ? `満席（定員 ${capacity}人）` : `残席 ${Math.max(0, capacity - (occurrence?.activeSeats ?? 0))}席（定員 ${capacity}人）`}`}</p>
+          {attendance ? attendance.entries.length ? <EventRosterTable kind="cancel" label="当日の受付記録" headings={['友だち', '結果', '記録日時']}>
+            {attendance.entries.map((entry) => <EventRosterRow key={entry.id}>
+              <span role="cell" className={styles.cellName}>{entry.displayName ?? '友だちは未取得'}</span>
+              <span role="cell">{chip(entry.status)}</span>
+              <span role="cell" className={styles.cellText}>{jstShort(entry.markedAt)}</span>
+            </EventRosterRow>)}
+          </EventRosterTable> : null : <p>受付の記録はまだ読み込めていません。</p>}
+          {applicants?.waitlistHistory === undefined ? <p>履歴はまだ読み込めていません。</p> : null}
+          {rows.filter((row) => row.source === 'waitlist').map((row) => <Field key={row.id} label={row.displayName ?? '友だちは未取得'}>
+            <Button href={`/chats?friend=${encodeURIComponent(row.friendId)}`}>個別トーク</Button>
+            {row.status === 'waiting' ? <Button onClick={() => {
+              setWaitlistReason(''); setWaitlistError(''); setWaitlistDialog({ kind: 'skip', waitlistId: row.id, name: row.displayName ?? '待機中の方' })
+            }} disabled={waitlistBusy}>見送る</Button> : null}
+          </Field>)}
+        </> : null}
+      </BookingRecords> : null}
       </div>
 
       <ConfirmDialog
         open={cancelApplicant !== null}
         destructive
         title={`「${cancelApplicant?.applicant.displayName ?? '友だちは未取得'}」の予約をキャンセルしますか？`}
-        description="友だちへLINEでお知らせが届き、枠が空きます。空いた枠はキャンセル待ちの方へ回ります。この操作は元に戻せません。"
+        description="友だちへLINEでお知らせが届き、枠が空きます。空いた枠はキャンセル待ちの方へ回ります。この予約の通知予定も停止し、送信済みの記録は残ります。送ったお知らせは取り消せません。この操作は元に戻せません。"
         confirmLabel="キャンセルする"
         busy={cancelling}
         error={cancelError}
@@ -741,7 +779,7 @@ function Bookings({ eventId }: { eventId: string }) {
         open={rejectApplicant !== null}
         destructive
         title={`「${rejectApplicant?.displayName ?? '友だちは未取得'}」の申込を断りますか？`}
-        description="理由は内部にだけ残り、友だちには送りません。断ると枠が空きます。"
+        description="理由は内部にだけ残り、友だちには送りません。友だちには決まったお知らせの文が届き、断ると枠が空きます。"
         confirmLabel="断る"
         busy={busy}
         error={rejectError}
@@ -780,6 +818,7 @@ function Bookings({ eventId }: { eventId: string }) {
         }
         confirmLabel={waitlistDialog?.kind === 'reorder' ? '入れ替える' : '実行する'}
         busy={waitlistBusy}
+        confirmDisabled={waitlistReason.trim() === ''}
         error={waitlistError}
         onConfirm={() => runWaitlistOperation()}
         onCancel={() => {

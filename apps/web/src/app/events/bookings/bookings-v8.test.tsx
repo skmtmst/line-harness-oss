@@ -19,6 +19,7 @@ const decideBooking = vi.hoisted(() => vi.fn())
 const adminCancelBooking = vi.hoisted(() => vi.fn())
 const updateBooking = vi.hoisted(() => vi.fn())
 const promoteOccurrenceWaitlist = vi.hoisted(() => vi.fn())
+const skipOccurrenceWaitlist = vi.hoisted(() => vi.fn())
 const previewOccurrenceBroadcast = vi.hoisted(() => vi.fn())
 const downloadOccurrenceApplicantsCsv = vi.hoisted(() => vi.fn())
 const broadcastsSend = vi.hoisted(() => vi.fn())
@@ -43,6 +44,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       adminCancelBooking,
       updateBooking,
       promoteOccurrenceWaitlist,
+      skipOccurrenceWaitlist,
       previewOccurrenceBroadcast,
       downloadOccurrenceApplicantsCsv,
     },
@@ -156,6 +158,7 @@ beforeEach(() => {
   updateBooking.mockReset()
   broadcastsSend.mockReset()
   previewOccurrenceBroadcast.mockReset()
+  skipOccurrenceWaitlist.mockReset().mockResolvedValue({ success: true })
   getEvent.mockResolvedValue({ id: 'e1', name: '秋のしつけ教室', venue_name: '渋谷ベース 3F', is_published: 1, version: 3 })
   listOccurrenceSelector.mockResolvedValue({
     items: [{ id: 'slot-1', starts_at: '2026-10-12T05:00:00.000Z', ends_at: '2026-10-12T07:00:00.000Z', capacity: 20, is_active: 1 }],
@@ -196,6 +199,61 @@ async function prepareMessage(value: string) {
 }
 
 describe('V8-B 申込者（Mu8qW）', () => {
+  it('受付前は確定の人数で数え、記録済みの人数を二度引かない', async () => {
+    await renderV8()
+    const summary = host.querySelector('[aria-label="当日の受付"]')!
+    expect(summary.textContent).toContain('参加済 9人')
+    expect(summary.textContent).toContain('無断欠席 1人')
+    expect(summary.textContent).toContain('受付前 16人')
+  })
+
+  it('詳細で席を消費する案内人数と当日受付を確認し、旧応答の未取得を0と混ぜない', async () => {
+    const payload = applicantsPayload()
+    getOccurrenceApplicants.mockResolvedValue({ ...payload, summary: { bookingCount: 2, waitingCount: 1, activeSeats: 18 }, applicants: [...payload.applicants, applicant({ source: 'waitlist', id: 'w2', status: 'accepted', partySize: 3 })], attendance: undefined, waitlistHistory: undefined })
+    await renderV8()
+    const details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    expect(details.textContent).toContain('案内中 4人')
+    expect(details.textContent).toContain('残席 2席（定員 20人）')
+    expect(details.textContent).toContain('受付の記録はまだ読み込めていません')
+    expect(details.textContent).toContain('履歴はまだ読み込めていません')
+    expect(host.querySelector('[aria-label="当日の受付"]')?.textContent).toContain('参加済 —人')
+  })
+
+  it('記録の参加印は既存APIへ送り、成功した後に記録と通知予定を読み直す', async () => {
+    listBookings.mockResolvedValue({ items: [{ id: 'r1', friend_id: 'f1', friend_display_name: '過去の記録', status: 'confirmed' }], total: 1 })
+    updateBooking.mockResolvedValue({ ok: true })
+    await renderV8()
+    const details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    const button = details.querySelector<HTMLButtonElement>('[data-booking-id="r1"][data-booking-action="attended"]')!
+    await act(async () => { button.click() })
+    await flush()
+    expect(updateBooking).toHaveBeenCalledWith('acc-1', 'e1', 'r1', { status: 'attended' })
+    expect(listBookings).toHaveBeenCalledTimes(2)
+    expect(getOccurrenceApplicants).toHaveBeenCalledTimes(2)
+  })
+
+  it('待ちの見送りは理由なしでは押せず、理由を記録して最後尾へ回す', async () => {
+    const payload = applicantsPayload()
+    getOccurrenceApplicants.mockResolvedValue({ ...payload, applicants: [applicant({ source: 'waitlist', id: 'w1', status: 'waiting' })] })
+    await renderV8()
+    const details = host.querySelector('details')!
+    await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
+    await flush()
+    await act(async () => { [...details.querySelectorAll('button')].find((button) => button.textContent === '見送る')!.click() })
+    await flush()
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(skipOccurrenceWaitlist).not.toHaveBeenCalled()
+    expect([...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '実行する')!.disabled).toBe(true)
+    await act(async () => { fireEvent.change(dialog.querySelector('textarea')!, { target: { value: '本人から後回しの希望' } }) })
+    await act(async () => { [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '実行する')!.click() })
+    await flush()
+    expect(skipOccurrenceWaitlist).toHaveBeenCalledWith('acc-1', 'slot-1', { waitlist_id: 'w1', expectedVersion: 2, reason: '本人から後回しの希望' })
+  })
+
   it('開いた申込記録で回答と通知の予定・結果を同じ予約に出す', async () => {
     getEvent.mockResolvedValue({ id: 'e1', name: '秋のしつけ教室', questions_json: JSON.stringify([{ id: 'food', label: '好きな食べ物', type: 'text', required: false }]) })
     listBookings.mockResolvedValue({ items: [{ id: 'record-1', friend_id: 'f1', friend_display_name: '記録の太郎', status: 'attended', requested_at: '2026-10-01T00:00:00Z', slot_starts_at: '2026-10-12T05:00:00Z', answer_snapshot_json: JSON.stringify({ food: 'りんご' }), customer_note: '椅子を希望', companion_note: '家族1人', reminders: ['pending', 'sent', 'cancelled', 'failed', 'failed_permanent'].map((status) => ({ kind: status === 'pending' ? 'day_before' : 'hours_before', scheduled_at: '2026-10-11T03:00:00Z', status })) }], total: 1 })
@@ -211,7 +269,7 @@ describe('V8-B 申込者（Mu8qW）', () => {
     const reminders = details.querySelector('[data-booking-reminders="record-1"]')!
     expect(reminders.querySelectorAll('li')).toHaveLength(5)
     for (const label of ['前日のお知らせ', '開始前のお知らせ', '送信予定', '送信済み', '停止済み', '失敗', '12:00']) expect(reminders.textContent).toContain(label)
-    expect(details.querySelector('a')?.getAttribute('href')).toBe('/chats?friend=f1')
+    expect(details.querySelector('[aria-label="申込記録"] a')?.getAttribute('href')).toBe('/chats?friend=f1')
   })
 
   it('申込記録の失敗を空と混ぜず、開き直すと読み直せる', async () => {
