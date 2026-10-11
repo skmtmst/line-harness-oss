@@ -6,14 +6,9 @@ import type { Tag } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagDefinitionAction, type TagRetroactivePreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import SegmentedControl from '@/components/shared/segmented'
-import HelpTip from '@/components/shared/help-tip'
-import Drawer from '@/components/shared/drawer'
-import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 export type LinkedAction = {
   id: string
@@ -90,142 +85,6 @@ export function linkedActionFromDefinition(action: TagDefinitionAction, saved?: 
 
 export function definitionsForSave(actions: LinkedAction[]): TagDefinitionAction[] {
   return actions.flatMap((action) => action.definition ? [{ ...action.definition, id: action.id }] : [])
-}
-
-const cardClass =
-  'rounded-card border border-hairline bg-canvas p-5 shadow-card-surface'
-const inputClass =
-  'w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink'
-
-export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, selectedAction, referenceState = false, hqV8 = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction, beforeId?: string) => void; selectedAction?: Pick<LinkedAction, 'id' | 'label'>; referenceState?: boolean; hqV8?: boolean }) {
-  const [selected, setSelected] = useState<(typeof ACTION_TYPES)[number]>(referenceState ? ACTION_TYPES[1] : ACTION_TYPES[0])
-  const [timing, setTiming] = useState<'immediate' | 'delay'>('immediate')
-  const [delay, setDelay] = useState(referenceState ? '24' : '1')
-  const [delayUnit, setDelayUnit] = useState<'minutes' | 'hours' | 'days'>(referenceState ? 'hours' : 'minutes')
-  // 前へ追加する位置は、呼び出し元が最後に選んだ行に結ぶ。
-  const [position, setPosition] = useState('last')
-  const [message, setMessage] = useState('ご登録ありがとうございます。')
-  const [amount, setAmount] = useState('100')
-  const [resources, setResources] = useState<CommonActionResources | null>(suppliedResources ?? null)
-  const [resourceId, setResourceId] = useState('')
-  const definition = ACTION_DEFINITIONS[selected[0]]
-  const choices = definition.resource
-    ? (resources?.[definition.resource] as Array<{ id: string; name: string }> | undefined) ?? []
-    : []
-  const unavailable = selected[0] === '友だち情報更新' || (allowedActionTypes ? !allowedActionTypes.includes(selected[0]) : false)
-  const needsResource = Boolean(definition.resource)
-
-  useEffect(() => {
-    if (suppliedResources !== undefined) { setResources(suppliedResources); return }
-    if (!accountId) return
-    let active = true
-    void api.commonActions.resources(accountId, undefined, 'tag.added').then((res) => {
-      if (active && res.success) setResources(res.data)
-    })
-    return () => { active = false }
-  }, [accountId, suppliedResources])
-
-  useEffect(() => { setResourceId('') }, [selected])
-
-  const add = () => {
-    const delayMinutes = timing === 'immediate' ? 0 : Math.max(1, Number(delay) || 1) * (delayUnit === 'minutes' ? 1 : delayUnit === 'hours' ? 60 : 1440)
-    const params: Record<string, unknown> = { delayMinutes, cancelIfTagRemoved: true }
-    if (selected[0] === 'テキスト送信') params.content = message.trim()
-    else if (selected[0] === 'マイル付与') params.amount = Math.max(1, Number(amount) || 1)
-    else if (definition.paramKey) params[definition.paramKey] = resourceId
-    if (selected[0] === '担当者通知') params.message = message.trim()
-    const resourceName = choices.find((item) => item.id === resourceId)?.name
-    const label = selected[0] === 'テキスト送信' ? message.trim()
-      : selected[0] === 'マイル付与' ? `${Math.max(1, Number(amount) || 1)} mile`
-        : resourceName ?? selected[0]
-    onAdd({ id: crypto.randomUUID(), type: selected[1], label, timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後`, definition: { id: crypto.randomUUID(), type: definition.actionType, params, onFailure: 'stop' } }, position === 'before' ? selectedAction?.id : undefined)
-  }
-
-  return (
-    <Drawer
-      designWidth={hqV8 ? 640 : undefined}
-      open
-      title="連動アクションを追加"
-      description="タグが付いた直後に実行する処理を選びます。"
-      onClose={onClose}
-      footer={(
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" className="px-5 py-2.5 font-medium text-ink-secondary h-auto whitespace-normal" type="button" onClick={onClose}>キャンセル</Button>
-          <Button variant="primary" className="px-5 py-2.5 font-bold border-0 h-auto whitespace-normal" type="button" disabled={unavailable || (needsResource && !resourceId) || ((selected[0] === 'テキスト送信' || selected[0] === '担当者通知') && !message.trim())} onClick={add}>
-            このアクションを追加する
-          </Button>
-        </div>
-      )}
-    >
-          <section>
-            <h3 className="mb-3 text-sm font-bold text-ink">1. アクションの種類</h3>
-            <div className={hqV8 ? 'grid grid-cols-2 gap-2.5 sm:grid-cols-3' : 'grid grid-cols-2 gap-2 sm:grid-cols-3'}>
-              {ACTION_TYPES.map((action) => (
-                <Button variant="secondary" className={(`rounded-control border px-3 ${hqV8 ? 'py-2.5 text-caption' : 'py-3 text-sm'} text-left font-medium ${allowedActionTypes && !allowedActionTypes.includes(action[0]) ? 'cursor-not-allowed border-hairline text-ink-faint opacity-55' : selected[0] === action[0] ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={action[0]} type="button" disabled={Boolean(allowedActionTypes && !allowedActionTypes.includes(action[0]))} onClick={() => setSelected(action)}>
-                  {action[0]}
-                </Button>
-              ))}
-            </div>
-            {hqV8 ? <p className="mt-2 break-normal text-micro text-ink-faint">統括のひな形で使えるのは「テキスト送信」と「マイル付与」です。ほかは配った先の店で足します。</p> : null}
-          </section>
-
-          <section className={hqV8 ? 'mt-3 border-t border-hairline pt-3' : 'mt-7 border-t border-hairline pt-6'}>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink">2. 実行するタイミング
-              <HelpTip label="実行するタイミングの説明">時間をあけて実行すると、その時間が経ってから実行されます。待機中にタグが外れた場合は実行されません。</HelpTip>
-            </h3>
-            <SaveErrorField names={["timing"]}><SegmentedControl
-              aria-label="実行するタイミング"
-              size="timing"
-              options={[{ value: 'immediate', label: 'すぐに実行' }, { value: 'delay', label: '時間をあけて実行' }]}
-              value={timing}
-              onChange={setTiming}
-            /></SaveErrorField>
-            {timing === 'delay' ? (
-              <div className="mt-3 flex items-center gap-2">
-                <SaveErrorField names={["delay"]}><input aria-label="実行までの待ち時間" type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} /></SaveErrorField>
-                <SaveErrorField names={["delayUnit","delay_unit"]}><Select
-                  aria-label="遅延の単位"
-                  value={delayUnit}
-                  onChange={(value) => setDelayUnit(value as typeof delayUnit)}
-                  options={[
-                    { value: 'minutes', label: '分後' },
-                    { value: 'hours', label: '時間後' },
-                    { value: 'days', label: '日後' },
-                  ]}
-                /></SaveErrorField>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="mt-7 border-t border-hairline pt-6">
-            <h3 className="mb-3 text-sm font-bold text-ink">3. {selected[0]}の内容</h3>
-            {selected[0] === 'テキスト送信' || selected[0] === '担当者通知' ? (
-              <SaveErrorField names={["message"]}><textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={6} className={inputClass} /></SaveErrorField>
-            ) : selected[0] === 'マイル付与' ? (
-              <SaveErrorField names={["amount"]}><input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} className={inputClass} aria-label="付与マイル" /></SaveErrorField>
-            ) : (
-              <><SaveErrorField names={["resourceId","resource_id"]}><EntitySelect clearable size="full" aria-label={`${selected[0]}に使う内容を選択`} placeholder={unavailable ? 'この種類は配布先で設定してください' : resources ? `${selected[1]}を選択` : '選択肢を読み込み中…'} value={resourceId} onChange={setResourceId} disabled={unavailable || !resources} loading={!unavailable && !resources} options={choices.map((choice) => ({ ...entityOptionMetadata(choice), value: choice.id, label: choice.name }))} className="w-full" /></SaveErrorField>{referenceState && selected[0] === 'テンプレート送信' && <div className="mt-3 rounded-control bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary"><span className="font-semibold">プレビュー</span><br />選んだテンプレートの公開版を送ります。</div>}</>
-            )}
-            <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-3 text-xs leading-5 text-ink-secondary">
-              <span className="font-semibold">実行内容の確認：</span> {selected[0]}を{timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後に`}実行します。
-            </div>
-          </section>
-
-          <section className="mt-7 border-t border-hairline pt-6">
-            <label className="mb-1 block text-sm font-semibold text-ink">4. 追加する位置</label>
-            <SaveErrorField names={["position"]}><Select
-              aria-label="追加する位置"
-              value={position}
-              onChange={setPosition}
-              options={[
-                { value: 'last', label: 'いちばん最後に追加' },
-                { value: 'before', label: '選択中のアクションの前', disabled: !selectedAction },
-              ]}
-              size="full"
-            /></SaveErrorField>
-          </section>
-    </Drawer>
-  )
 }
 
 /**

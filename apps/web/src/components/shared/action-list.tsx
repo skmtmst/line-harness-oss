@@ -26,11 +26,12 @@ export type ActionChoice<T> = {
 }
 
 /** B-169: 種類を選んでから対象を確定する。取消では空の行を追加しない。 */
-export function ActionAddButton<T>({ choices, onAdd, disabled = false, id }: {
+export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label = '行うことを足す' }: {
   choices: ActionChoice<T>[]
   onAdd: (item: T) => void
   disabled?: boolean
   id?: string
+  label?: string
 }) {
   const anchor = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -44,7 +45,7 @@ export function ActionAddButton<T>({ choices, onAdd, disabled = false, id }: {
   return <>
     <Button id={id} ref={anchor} type="button" variant="secondary" disabled={disabled || choices.length === 0}
       aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-      <Plus size={16} aria-hidden="true" />行うことを足す
+      <Plus size={16} aria-hidden="true" />{label}
     </Button>
     <ActionMenu open={open} anchorRef={anchor} ariaLabel="行うことの種類" onClose={() => setOpen(false)}
       items={choices.map(choice => ({ id: choice.id, label: choice.label, disabled: choice.disabled, disabledReason: choice.disabledReason,
