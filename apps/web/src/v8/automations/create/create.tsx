@@ -2676,7 +2676,8 @@ export function NewAutomationV8({
         </div>
         {conditionUnreadable ? (
           <Notice tone="danger" heading={<> 保存されていた条件は読めませんでした </>} action={<> <div>
-              <Button id="v8-repair-condition" onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>
+              <Button id="v8-repair-condition" aria-describedby={inputError?.target === 'v8-repair-condition' ? 'v8-repair-condition-error' : undefined} onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>
+              {inputError?.target === 'v8-repair-condition' ? <p id="v8-repair-condition-error" className={styles.inputError} role="alert">{inputError.message}</p> : null}
             </div> </>} >以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
               以前の条件を外してもよければ、下のボタンから付け直せます。</Notice>
         ) : (
