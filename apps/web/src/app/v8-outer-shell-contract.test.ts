@@ -25,19 +25,17 @@ const events = readFileSync(join(WEB, 'src/lib/events.ts'), 'utf8')
 const friends = readFileSync(join(WEB, 'src/app/friends/page.tsx'), 'utf8')
 
 describe('外側の殻（V8 移行③）', () => {
-  it('v8 のときだけ出す・消すための印がある（v8-only / v7-only）', () => {
-    expect(globals).toContain('[data-theme="v8"] .v7-only')
-    expect(globals).toContain('.v8-only')
+  it('旧テーマで出し入れする表示印を残さない', () => {
+    expect(globals).not.toMatch(/\.v[78]-only\s*\{/)
   })
 
-  it('テーマのときだけ効くユーティリティ v7: / v8: がある（@custom-variant）', () => {
-    expect(globals).toContain('@custom-variant v7')
-    expect(globals).toContain('@custom-variant v8')
-    expect(globals).toContain(':root:not([data-theme="v8"])')
+  it('旧テーマを選ぶTailwindの分岐と負の条件を残さない', () => {
+    expect(globals).not.toMatch(/@custom-variant v[78]\b/)
+    expect(globals).not.toMatch(/:not\(\[data-theme=/)
   })
 
   it('中身は白い板1枚（radius 16・枠・薄い影・右下左に 12px）で、v8 のときだけ', () => {
-    const board = appShellCss.match(/\[data-theme="v8"\] \.main \{([\s\S]*?)\}/)
+    const board = appShellCss.match(/:root \.main \{([\s\S]*?)\}/)
     expect(board, 'v8 の .main の板の規定が無い').not.toBeNull()
     expect(board![1]).toContain('border-radius: var(--radius-panel)')
     expect(board![1]).toContain('border: 1px solid var(--color-board-line)')
@@ -51,7 +49,7 @@ describe('外側の殻（V8 移行③）', () => {
   })
 
   it('左メニューは地の上に直接置き（枠・白地を外す）、幅は 240px', () => {
-    const blocks = [...sidebarCss.matchAll(/\[data-theme="v8"\] \.desktop \{([^}]*)\}/g)]
+    const blocks = [...sidebarCss.matchAll(/:root \.desktop \{([^}]*)\}/g)]
     const aside = blocks.find((b) => b[1].includes('width: 240px'))
     expect(aside, 'v8 の .desktop（幅 240）の規定が無い').not.toBeUndefined()
     expect(aside![1]).toContain('border-right: 0')
@@ -59,7 +57,7 @@ describe('外側の殻（V8 移行③）', () => {
   })
 
   it('いまの項目は白い地＋薄い影（緑のベタ塗りではない）', () => {
-    const active = sidebarCss.match(/\[data-theme="v8"\] \.active \{([\s\S]*?)\}/)
+    const active = sidebarCss.match(/:root \.active \{([\s\S]*?)\}/)
     expect(active, 'v8 の .active の規定が無い').not.toBeNull()
     expect(active![1]).toContain('background: var(--color-canvas)')
     expect(active![1]).toContain('box-shadow')
@@ -75,7 +73,7 @@ describe('外側の殻（V8 移行③）', () => {
   })
 
   it('帯は高さ 60・地の上・下線なし。左にパンくず（アカウント › 画面名）', () => {
-    const root = topBarCss.match(/\[data-theme="v8"\] \.root \{([\s\S]*?)\}/)
+    const root = topBarCss.match(/:root \.root \{([\s\S]*?)\}/)
     expect(root, 'v8 の .root の規定が無い').not.toBeNull()
     expect(root![1]).toContain('height: 60px')
     expect(root![1]).toContain('background: transparent')
@@ -95,10 +93,10 @@ describe('外側の殻（V8 移行③）', () => {
   })
 
   it('帯が混まないよう、v8 はアカウント名 128px・自分の名前 104px で「…」に収める', () => {
-    const account = topBarCss.match(/\[data-theme="v8"\] \.accountName \{([^}]*)\}/)
+    const account = topBarCss.match(/:root \.accountName \{([^}]*)\}/)
     expect(account, 'v8 の .accountName の規定が無い').not.toBeNull()
     expect(account![1]).toContain('max-width: 128px')
-    const user = topBarCss.match(/\[data-theme="v8"\] \.user \{([^}]*)\}/)
+    const user = topBarCss.match(/:root \.user \{([^}]*max-width: 104px[^}]*)\}/)
     expect(user, 'v8 の .user の規定が無い').not.toBeNull()
     expect(user![1]).toContain('max-width: 104px')
   })

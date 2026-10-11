@@ -154,7 +154,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(box.hasAttribute('aria-hidden')).toBe(false)
     const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'sidebar.module.css'), 'utf8')
     // 動きは「動きを減らす」設定では付けない
-    expect(css).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\[data-theme="v8"\] \.sectionItems \{\s*transition:\s*grid-template-rows var\(--motion-base\)/)
+    expect(css).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*:root \.sectionItems \{\s*transition:\s*grid-template-rows var\(--motion-base\)/)
     expect(css).toMatch(/\.sectionItemsClosed \{\s*grid-template-rows: 0fr;/)
   })
 

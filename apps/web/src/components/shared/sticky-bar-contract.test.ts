@@ -209,7 +209,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
   })
 
   it('★A の浮かせ（V8 は下から 12px・枠なし・ふんわり影・角丸そのまま）', () => {
-    const v8 = CSS.match(/\[data-theme='v8'\] \.bar \{([^}]*)\}/s)?.[1] ?? ''
+    const v8 = CSS.match(/:root \.bar \{([^}]*)\}/s)?.[1] ?? ''
     expect(v8, 'V8 の .bar の規定が無い').not.toBe('')
     expect(v8).toMatch(/bottom:\s*12px/)
     expect(v8).toMatch(/border:\s*0/)
@@ -235,7 +235,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
    * ★A の規定を消す・弱めると上の試験が落ちる。ひと組で見張る。
    */
   it('板が枠線の帯を描く画面は、その板どおりに戻せる（★BG-B X2oLn）', () => {
-    const outlined = CSS.match(/\[data-theme='v8'\] \.bar\.outlined \{([^}]*)\}/s)?.[1] ?? ''
+    const outlined = CSS.match(/:root \.bar\.outlined \{([^}]*)\}/s)?.[1] ?? ''
     expect(outlined, 'V8 の .bar.outlined の規定が無い').not.toBe('')
     expect(outlined).toMatch(/min-height:\s*72px/) // height: 72
     expect(outlined).toMatch(/border:\s*1px solid var\(--color-hairline\)/) // stroke: #DADDE2 / 1
@@ -246,7 +246,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(BAR).toMatch(/outlined\?:\s*boolean/)
     expect(BAR).toMatch(/outlined \? styles\.outlined : null/)
     // 渡した画面だけに効く。渡さない画面は ★A の浮かせのまま。
-    expect(CSS).toMatch(/\[data-theme='v8'\] \.bar \{/)
+    expect(CSS).toMatch(/:root \.bar \{/)
   })
 
   it('バナーのプロジェクト（V8）が札を渡している', () => {

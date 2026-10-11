@@ -11,7 +11,7 @@ const css = readFileSync(fileURLToPath(new URL('./line-preview.module.css', impo
 
 function effective(selector: string): Record<string, string> {
   const result: Record<string, string> = {}
-  const pattern = /\[data-theme='v8'\]\s+\.(\w+)\s*\{([^}]*)\}/g
+  const pattern = /:root\s+\.(\w+)\s*\{([^}]*)\}/g
   for (let match = pattern.exec(css); match; match = pattern.exec(css)) {
     if (match[1] !== selector) continue
     for (const declaration of match[2].split(';')) {

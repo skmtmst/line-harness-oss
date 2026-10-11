@@ -5,13 +5,13 @@
  * 先頭に置く：印つきの帯（下の強い指定）が勝ち、狭幅の
  * 畳み方（下の決まり）も効く。v7 には効かない。
  */
-[data-theme='v8'] [data-kpi-strip] {
+:root [data-kpi-strip] {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: var(--tpl-band-gap);
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] {
+:root [data-kpi-strip][data-kpi-presentation='band'] {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
@@ -24,73 +24,73 @@
   background: var(--color-canvas);
   box-shadow: none;
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] {
+:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] {
   min-width: 0;
   border: 0;
   border-radius: 0;
   outline-color: transparent;
   box-shadow: none;
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]:not(:last-child) {
+:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]:not(:last-child) {
   border-right: 1px solid var(--tpl-band-line);
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > * {
+:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > * {
   padding: 10px 16px;
   gap: 4px;
 }
 @media (max-width: 639px) {
-  [data-theme='v8'] [data-kpi-strip] {
+  :root [data-kpi-strip] {
     grid-auto-flow: row;
     grid-template-columns: minmax(0, 1fr);
   }
-  [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]:not(:last-child) {
+  :root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]:not(:last-child) {
     border-right: 0;
     border-bottom: 1px solid var(--tpl-band-line);
   }
 }
 
 /* 帯の数は絵どおり 22px（--tpl- の変数で1か所管理）。 */
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
   font-size: var(--tpl-band-number-size);
   line-height: var(--tpl-band-number-lh);
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] {
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] {
   min-height: 18px;
 }
 
 /* 段の中の帯も共通部品で寸法を決め、数のマスには影を付けない。 */
-[data-theme='v8'] [data-kpi-strip][data-kpi-density='compact'] > [data-design-version] {
+:root [data-kpi-strip][data-kpi-density='compact'] > [data-design-version] {
   padding: 10px 16px;
   gap: 4px;
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] {
+:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] {
   font-size: var(--tpl-band-compact-number-size);
   line-height: var(--tpl-band-compact-number-lh);
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] + span {
+:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] + span {
   font-size: var(--text-micro);
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-density='compact'] [data-kpi-detail]:has(> span:only-child:empty) {
+:root [data-kpi-strip][data-kpi-density='compact'] [data-kpi-detail]:has(> span:only-child:empty) {
   display: none;
 }
 
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-skeleton] {
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-skeleton] {
   height: var(--tpl-band-number-lh);
 }
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] [data-kpi-skeleton] {
+:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] [data-kpi-skeleton] {
   height: var(--tpl-band-compact-number-lh);
 }
 
 /* B-187：補足も操作も無いマスは空の段を取らない。 */
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail]:has(> span:only-child:empty) { display: none; }
-[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail]:has(> span:only-child:empty) { display: none; }
+:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* B-178：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
-[data-theme='v8'] [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {
+:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {
   min-height: var(--tpl-list-band-h); box-sizing: border-box;
   padding: var(--tpl-list-band-pad); gap: var(--tpl-list-gap);
 }
 /* 長い説明は1行で省略する。KpiCardのtitleから全文を確かめられる。 */
-[data-theme='v8'] [data-list-skeleton] [data-kpi-strip]:not([data-kpi-density='compact']) [data-kpi-detail] > span {
+:root [data-list-skeleton] [data-kpi-strip]:not([data-kpi-density='compact']) [data-kpi-detail] > span {
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }

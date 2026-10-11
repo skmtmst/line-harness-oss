@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * お客さまの予約画面の写し（LIFF ②担当・③日時）。器は幅330・高さ714・縁8（外側に描く）。

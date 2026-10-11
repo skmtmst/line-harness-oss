@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities;
 @layer components {
 .panel { display: flex; flex-direction: column; gap: var(--tpl-fdt-summary-gap); min-width: 0; padding: var(--tpl-inbox-info-card-pad); border: 1px solid var(--card-edge); border-radius: var(--radius-card); box-shadow: var(--card-shadow); }
 .section { display: flex; flex-direction: column; gap: var(--tpl-fdt-group-gap); min-width: 0; }

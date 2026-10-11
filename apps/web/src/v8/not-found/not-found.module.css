@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /* ★V8 見つからない画面（板 Nx5dz）。値は globals.css の --tpl-release-*。 */
 .board {

@@ -1242,7 +1242,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせを読み込めませんでした')).toBeTruthy())
     expect(fixture.settings).toHaveBeenCalledTimes(1)
 
     // 2回目からは成功する応答へ差し替えてから、実物のボタンを押す。
@@ -1252,7 +1252,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
     expect(fixture.settings).toHaveBeenCalledTimes(2)
-    expect(screen.queryByText('顧客へのお知らせを表示できませんでした')).toBeNull()
+    expect(screen.queryByText('顧客へのお知らせを読み込めませんでした')).toBeNull()
   })
 
   it('運用者だけ403になっても顧客のお知らせは表示を続け、タブは「権限なし」にする', async () => {

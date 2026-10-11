@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 /**
  * **同じ塊の中で、同じ変数を違う値で2回書かない。**
  *
- * CSS は後に書いた値が勝つ。`[data-theme="v8"]` の中で予約スタッフ用の
+ * CSS は後に書いた値が勝つ。`:root` の中で予約スタッフ用の
  * `--tpl-bks-title-size: 22px` を書いたあと、予約からの売上の行で同じ名前を
  * `20px` と書き直していたため、予約スタッフの4枚（CcA4k・d5fmnM・E3YDK・wvGke）の
  * 題が絵の 22px ではなく 20px になっていた（監査 W152）。
@@ -56,8 +56,8 @@ describe('globals.css の変数の書き直し', () => {
   })
 
   it('見張りそのものが書き直しを見つける（対照）', () => {
-    expect(findTokenCollisions('[data-theme="v8"] { --a: 22px; --b: 1px; --a: 20px; }')).toHaveLength(1)
-    expect(findTokenCollisions('[data-theme="v8"] { --a: 22px; } [data-theme="v7"] { --a: 20px; }')).toHaveLength(0)
+    expect(findTokenCollisions(':root { --a: 22px; --b: 1px; --a: 20px; }')).toHaveLength(1)
+    expect(findTokenCollisions(':root { --a: 22px; } [data-theme="v7"] { --a: 20px; }')).toHaveLength(0)
   })
 
   it('予約スタッフの題と予約からの売上の題は別の名前で、どちらもページの題の値（22px）を読む', () => {

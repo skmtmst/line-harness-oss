@@ -22,7 +22,7 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["app/affiliates/list-v8.css", ".af-list-stateWrap", "一覧表の空・待機状態。表の枠と同じ形を保つ。"],
   ["app/auto-replies/publish/publish.css", ".arp-stickyBar", "保存の追従帯。浮く帯の影を使い、カードの影を重ねない。"],
   ["app/friend-add-settings/friend-add-rule-editor.css", ".friend-add-editor-dialog", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
-  ["app/hq/readonly-v8.css", "[data-theme='v8'] .v8-ro-hq-page .v8-ro-hq-tiles[data-ro-kpis] [data-design-version]", "閲覧のみの数の帯。数値のまとまりで、内容のカードではない。"],
+  ["app/hq/readonly-v8.css", ":root .v8-ro-hq-page .v8-ro-hq-tiles[data-ro-kpis] [data-design-version]", "閲覧のみの数の帯。数値のまとまりで、内容のカードではない。"],
   ["app/mileage/earning-rules/new/v8-create-form.module.css", ".choice", "獲得方法を選ぶ入力。選択枠で区別する。"],
   ["app/reminders/wizard-v8.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["app/reminders/wizard-v8.module.css", ".addStep", "入力欄・補助操作・選択肢。中身のカードではない。"],
@@ -33,9 +33,9 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/account-switch-menu.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/action-menu.module.css", ".menu", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/check-card.module.css", ".card", "複数選択の入力欄。枠は選択状態を示す。"],
-  ["components/shared/check-card.module.css", "[data-theme='v8'] .card", "複数選択の入力欄。枠は選択状態を示す。"],
+  ["components/shared/check-card.module.css", ":root .card", "複数選択の入力欄。枠は選択状態を示す。"],
   ["components/shared/command-palette.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
-  ["components/shared/data-table.module.css", "[data-theme='v8'] .frame[data-table-presentation='account-list'], [data-theme='v8'] .frame[data-table-presentation='account-handover']", "アカウント一覧と乗り換えの表の枠。影を重ねない。"],
+  ["components/shared/data-table.module.css", ":root .frame[data-table-presentation='account-list'], :root .frame[data-table-presentation='account-handover']", "アカウント一覧と乗り換えの表の枠。影を重ねない。"],
   ["components/shared/file-drop.module.css", ".zone", "ファイルを落とす入力欄。内容のカードではない。"],
   ["components/shared/file-drop.module.css", ".row", "選んだファイルの入力行。外側の入力欄と影を重ねない。"],
   ["components/shared/layout-picker.module.css", ".tile", "面の分け方の選択肢。選択枠で区別する。"],
@@ -45,7 +45,7 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/multi-select.module.css", ".overflow", "選びきれない札を表示する副ボタン。カードではない。"],
   ["components/shared/notification-panel.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/radio-card.module.css", ".card", "一つを選ぶ入力欄。枠は選択状態を示す。"],
-  ["components/shared/radio-card.module.css", "[data-theme='v8'] .card", "一つを選ぶ入力欄。枠は選択状態を示す。"],
+  ["components/shared/radio-card.module.css", ":root .card", "一つを選ぶ入力欄。枠は選択状態を示す。"],
   ["components/shared/seat-tile.module.css", ".map", "席を選ぶ入力。枠は選択状態を示す。"],
   ["components/shared/select-menu.module.css", ".surface", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/source-picker-dialog.module.css", ".selectedRow", "選ぶ窓の中の仮選択行。入れ子に影を重ねない。"],
@@ -53,7 +53,7 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/tap-area-editor.module.css", ".frame", "押したら行うことの入れ子の編集欄。影を重ねない。"],
   ["components/shared/time-field-v8.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/toast.module.css", ".toast", "一時的な知らせ。知らせ専用の影を保つ。"],
-  ["components/shared/toast.module.css", "[data-theme='v8'] .toast", "一時的な知らせ。知らせ専用の影を保つ。"],
+  ["components/shared/toast.module.css", ":root .toast", "一時的な知らせ。知らせ専用の影を保つ。"],
   ["v8/account-new/register.module.css", ".checkList", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/analytics/analytics.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/analytics/analytics.module.css", ".reportTable", "表・一覧の行。外側のカードと影を重ねない。"],
@@ -162,7 +162,7 @@ describe('B-168 カードの角丸・枠・影', () => {
 
   it('globalsの変数の連鎖・V8の上書き・フォールバックを解く（循環では止まる）', () => {
     const vars = globalTokens(`@theme { --radius-card: 8px; --alias: var(--radius-card); }
-      [data-theme="v8"] { --radius-card: 12px; }
+      :root { --radius-card: 12px; }
       .component { --radius-card: 3px; }`)
     expect(resolveValue('var(--alias)', vars)).toBe('12px')
     expect(resolveValue('var(--missing, var(--alias))', vars)).toBe('12px')

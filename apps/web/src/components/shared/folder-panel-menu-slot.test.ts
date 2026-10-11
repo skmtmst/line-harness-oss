@@ -13,7 +13,7 @@ describe('フォルダ行の「…」の場所（I3L41O）', () => {
 
   it('場所取りは v8 だけで出す（v7 の見た目は変えない）', () => {
     expect(CSS).toContain('.menuSlot { display: none; }')
-    expect(CSS).toContain("[data-theme='v8'] .menuSlot")
+    expect(CSS).toContain(":root .menuSlot")
   })
 
   it('選んでいない行の「…」は場所を取らない（重ねて出す）', () => {

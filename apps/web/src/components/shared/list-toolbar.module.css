@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
   /*
    * ★V7 `Xn1Mz`「一覧の上の道具の並び」。どの一覧も同じ2行。
@@ -111,7 +110,7 @@
    * Pencil の順：検索 → 絞り込み → 道具 → 右端に並び順・件数。
    * 入りきらない低優先度の道具は「…」へ畳み、帯は折り返さない。
    */
-  [data-theme='v8'] .toolbar {
+  :root .toolbar {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
@@ -119,29 +118,29 @@
     padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
   }
 
-  [data-theme='v8'] .row1,
-  [data-theme='v8'] .row2,
-  [data-theme='v8'] .filters {
+  :root .row1,
+  :root .row2,
+  :root .filters {
     display: contents;
   }
 
-  [data-theme='v8'] .filters > * {
+  :root .filters > * {
     order: 2;
   }
 
-  [data-theme='v8'] .row1 > *:not(.search) {
+  :root .row1 > *:not(.search) {
     order: 3;
   }
 
-  [data-theme='v8'] .trailing {
+  :root .trailing {
     order: 4;
   }
 
-[data-theme='v8'] .toolbar { margin-bottom: 0; }
-[data-theme='v8'] .row1 > .search { width: 280px; max-width: 100%; flex: none; }
+:root .toolbar { margin-bottom: 0; }
+:root .row1 > .search { width: 280px; max-width: 100%; flex: none; }
 
-[data-theme='v8'] .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
-[data-theme='v8'] .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+:root .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
+:root .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
   /*
    * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
    * （flex-shrink: 0）。中の文だけが flex:1 で伸び縮みする。
@@ -151,18 +150,18 @@
 
 }
 /* ★V8 型の道具の枠（[data-template-region=toolbar]）の中では、枠が余白を持つので部品は二重に持たない。並び・件数（trailing）は右端（c4n9Kr：右寄せ）。司令塔 2026-10-05 */
-[data-theme='v8'] :global([data-template-region='toolbar']) .toolbar { padding: 0; flex: 1; min-width: 0; }
-[data-theme='v8'] .trailing { margin-left: auto; display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
-[data-theme='v8'] .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+:root :global([data-template-region='toolbar']) .toolbar { padding: 0; flex: 1; min-width: 0; }
+:root .trailing { margin-left: auto; display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+:root .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 /* 道具の幅は文字と印から決める。親より広い選ぶ欄を残さない。 */
-[data-theme='v8'] .trailing { flex: none; flex-wrap: nowrap; }
-[data-theme='v8'] .trailing > * { width: max-content; flex: none; }
-[data-theme='v8'] .toolbar :global([data-design-node='rpot9']),
-[data-theme='v8'] .toolbar :global([data-design-node='Gfsb4']),
-[data-theme='v8'] .toolbar :global([data-design-node='niGPF']) { width: max-content; min-width: 0; max-width: 100%; }
-[data-theme='v8'] .toolbar :global(button[aria-haspopup='listbox']) { width: max-content; max-width: 100%; }
-[data-theme='v8'] .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
-[data-theme='v8'] .toolbar:has(.optional) .row1 > .search { flex: none; }
+:root .trailing { flex: none; flex-wrap: nowrap; }
+:root .trailing > * { width: max-content; flex: none; }
+:root .toolbar :global([data-design-node='rpot9']),
+:root .toolbar :global([data-design-node='Gfsb4']),
+:root .toolbar :global([data-design-node='niGPF']) { width: max-content; min-width: 0; max-width: 100%; }
+:root .toolbar :global(button[aria-haspopup='listbox']) { width: max-content; max-width: 100%; }
+:root .row1 > .search { flex: 0 1 var(--list-search-width, 280px); }
+:root .toolbar:has(.optional) .row1 > .search { flex: none; }
 .optional { position: relative; flex: none; width: max-content; }
 .optional > summary { display: none; }
 .optional > div { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
@@ -179,34 +178,34 @@
   border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
 }
 .optional[data-collapsed]:not([open]) > div { display: none; }
-[data-theme='v8'] .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
+:root .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
 /*
  * ★V8「道具の2段」（acRIl 予約管理）：1段目＝探す・担当・経路・CSV、
  * 2段目＝札。段の間 10・段の中の間 6。v7 の2段組みは変えない。
  * layout="stacked" のときだけ段を残し、それ以外は1本の帯。
  */
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1,
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters { display: contents; }
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters > *,
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1 > *,
-[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .trailing { order: 0; }
+:root .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
+:root .toolbar[data-toolbar-layout='stacked'] .row1,
+:root .toolbar[data-toolbar-layout='stacked'] .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+:root .toolbar[data-toolbar-layout='stacked'] .filters { display: contents; }
+:root .toolbar[data-toolbar-layout='stacked'] .filters > *,
+:root .toolbar[data-toolbar-layout='stacked'] .row1 > *,
+:root .toolbar[data-toolbar-layout='stacked'] .trailing { order: 0; }
 /* 畳む道具がない一覧では、実際の空き幅に合わせて折り返す。
  * フォルダ列がある1440幅でも、検索・並び順・件数を切らない。 */
-[data-theme='v8'] .toolbar:not(:has(.optional)) { flex-wrap: wrap; }
+:root .toolbar:not(:has(.optional)) { flex-wrap: wrap; }
 
 
 /* B-178：通常は1段。狭い板は検索を縮め、その次に右の道具を折り返す。 */
-[data-theme='v8'] :global([data-list-skeleton]) .toolbar {
+:root :global([data-list-skeleton]) .toolbar {
   flex-wrap: wrap; min-width: 0;
 }
-[data-theme='v8'] :global([data-list-skeleton]) .row1 > .search {
+:root :global([data-list-skeleton]) .row1 > .search {
   width: var(--tpl-list-search-w);
   flex: 0 1 var(--tpl-list-search-w);
   min-width: min(var(--tpl-list-search-min), 100%);
 }
-[data-theme='v8'] :global([data-list-skeleton]) .search > * { width: 100%; min-width: 0; }
+:root :global([data-list-skeleton]) .search > * { width: 100%; min-width: 0; }
 .secondary {
   display: flex; flex: 1 0 100%; order: 5; min-width: 0;
   flex-wrap: wrap; align-items: center; gap: var(--tpl-list-gap);

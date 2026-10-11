@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /* 隠れた所の誤りの数（B-139）。タブの件数の札（warning）と同じ大きさで、色だけ危険。 */
 .badge {

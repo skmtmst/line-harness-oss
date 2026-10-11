@@ -75,19 +75,19 @@ describe('B-178 共通の道具の段の操作', () => {
      * v7 の 320・下限240 は変えない。
      */
     const css = read('list-toolbar.module.css')
-    const v8Rule = css.match(/\[data-theme='v8'\]\s*\.row1\s*>\s*\.search\s*{[^}]*}/s)
+    const v8Rule = css.match(/:root\s*\.row1\s*>\s*\.search\s*{[^}]*}/s)
     expect(v8Rule, 'V8 の探す欄の幅指定がありません').toBeTruthy()
     expect(v8Rule![0]).toContain('280px')
     // 縮ませない（flex:none＝flex-shrink:0。min-width:0・flex:1 方式に戻さない）。
     expect(v8Rule![0]).toMatch(/flex:\s*none/)
     expect(v8Rule![0]).not.toContain('min-width: 0')
     expect(v8Rule![0]).not.toMatch(/flex:\s*1(?![\d.])/)
-    expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar\s*{[^}]*flex-wrap:\s*nowrap/s)
+    expect(css).toMatch(/:root\s*\.toolbar\s*{[^}]*flex-wrap:\s*nowrap/s)
   })
 
   it('畳む道具がないV8一覧では実際の空き幅に合わせて折り返す', () => {
     const css = read('list-toolbar.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
+    expect(css).toMatch(/:root\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
     // 「…」へ畳む一覧と、段を明示する一覧の指定は残す。
     expect(css).toContain('.optional[data-collapsed] > summary')
     expect(css).toContain(".toolbar[data-toolbar-layout='stacked']")

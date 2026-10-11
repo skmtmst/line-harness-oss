@@ -42,7 +42,7 @@ describe('後から出して消す・差し込む物を作らない', () => {
 
   it('数の骨組みは届いた数字と同じ行の高さ', () => {
     const css = src('components/shared/kpi-card.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.skeleton \{ height: 32px; \}/)
+    expect(css).toMatch(/:root \.skeleton \{ height: 32px; \}/)
     expect(css).toMatch(/\[data-kpi-presentation='band'\] \.skeleton \{ height: var\(--tpl-band-number-lh\); \}/)
   })
 

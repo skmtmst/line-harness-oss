@@ -1,17 +1,6 @@
+@layer properties, theme, base, components, utilities;
 @import "tailwindcss";
 @import "../components/shared/kpi-band-v8.css";
-
-/*
- * `v7:` / `v8:` バリアント（★V8 移行）。
- *
- * Tailwind ユーティリティは部品の CSS Module より後の層に出るため、
- * 呼び出し側の `h-9.5` のような指定が v8 規定にも勝ってしまう。
- * 「v7 の見た目を1画素も変えない」ために、テーマのときだけ効く
- * ユーティリティを `v7:h-9.5` の形で書けるようにする。
- * data-theme は `<html>` に常に v7 か v8 が付く（layout.tsx）。
- */
-@custom-variant v7 (&:where(:root:not([data-theme="v8"]) *));
-@custom-variant v8 (&:where([data-theme="v8"] *));
 
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
@@ -709,7 +698,7 @@
  *   shadow-segment-ring / shadow-segment-thumb  切り替え（3つ）の
  *     器の内側1pxの縁と、白いつまみの薄い影（同上）
  */
-[data-theme="v8"] {
+:root {
   /* B-149 案D：区切りは黒7%、表の行も同じ1本の線。 */
   --color-hairline: #1d1d1f12;
   --color-divider: #1d1d1f12;
@@ -893,7 +882,7 @@
  * 寸法・文字・間はここに1か所にまとめ、型・表・帯・ページ送りは変数だけを使う。
  * CSS Modules の pure 検査に当たるので、型の module ではなくこの層（①）に置く。
  */
-[data-theme="v8"] {
+:root {
   /* 予約の頭・数の帯（O2Z8u・GcyTr）。広い板では右の内訳列を空ける。 */
   --tpl-booking-aside-width: 300px;
   --tpl-booking-kpi-label-lh: 18px;
@@ -1794,7 +1783,7 @@
  * 1.5 にそろえ、1行ごとの 2〜3px のずれが下へ溜まらないようにする。
  * :root の値（v7）は変えない。
  */
-[data-theme="v8"] {
+:root {
   --text-caption--line-height: 1.5;
   --text-label--line-height: 1.5;
   --text-body--line-height: 1.5;
@@ -1805,7 +1794,7 @@
  * 列の幅・頭の余白と段の間・札・選ぶ欄・状態の切り替えの実寸。
  * 画面側（chats/inbox-v8.module.css）は var() で読む。v7 には効かない。
  */
-[data-theme="v8"] {
+:root {
   --tpl-inbox-list-w: 372px;              /* 一覧の列の幅（絵の 1440 の幅） */
   --tpl-inbox-list-w-min: 340px;          /* 狭い幅（左メニューを開いた 1135 など）で中央の欄を残す下限 */
   --tpl-inbox-list-w-ratio: 32%;          /* 3つの列の幅に対する一覧の割合（1440 で 372 に届く） */
@@ -1848,7 +1837,7 @@
  * 「2. 送信の設定」「4. テンプレートを選ぶ」「5. 会話の頭のメニュー」「6. 予約して送る」）。
  * 画面側（src/v8/inbox-chat/*.module.css）は var() で読む。v7 には効かない。
  */
-[data-theme="v8"] {
+:root {
   --tpl-inbox-tool-icon: 14px;            /* 一覧の頭の印のボタンの中の印 */
   --tpl-inbox-tool-shadow: 0 1px 2px #1d1d1f0a; /* 書く欄の道具の薄い影 */
   --tpl-inbox-pop-w: 320px;               /* 対応ルールの小窓の幅 */
@@ -1948,7 +1937,7 @@
  * 実寸の写しで、直値はここだけに置く。部品側（line-preview.module.css）は
  * var() で読む（色・丸み・影の直書きを数える試験が通る形）。
  */
-[data-theme="v8"] {
+:root {
   --v8-line-shell: #111214;           /* 器の地 */
   --v8-line-shell-edge: #3a3b3f;      /* 器の縁 */
   --v8-line-shell-shadow: 0 12px 28px #1d1d1f29; /* 器が下へ落とす影 */
@@ -1977,7 +1966,7 @@
  * `--v8-liff-*` で分ける（LINEプレビューの `--v8-line-*` と同じ考え）。
  * 値は Pencil の実寸の写しで、直値はここだけに置く。
  */
-[data-theme="v8"] {
+:root {
   --v8-liff-line: #e6e9ed;            /* カード・帯の細い枠 */
   --v8-liff-slot-line: #dfe3e8;       /* 時刻の枠の細い枠 */
   --v8-liff-primary: #03873a;         /* 決めるボタン・選んだ印・値段 */
@@ -2005,16 +1994,9 @@
  * `.v8-only` / `.v7-only` は「そのテーマのときだけ出る要素」の印。
  * v8 の新しい操作（検索・通知・メニュー畳み）は v7 では描かない。
  */
-[data-theme="v8"] .v7-only {
-  display: none !important;
-}
-
-html:not([data-theme="v8"]) .v8-only {
-  display: none !important;
-}
 
 /* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
-[data-theme="v8"] body {
+:root body {
   background-color: var(--color-shell);
 }
 
@@ -2027,7 +2009,7 @@ html:not([data-theme="v8"]) .v8-only {
  * （Verou のスクロール影）。端まで送る・戻ると影は消える。
  */
 @media (max-width: 1365px) {
-  [data-theme="v8"] [data-scroll-x] {
+  :root [data-scroll-x] {
     overflow-x: auto;
     background:
       linear-gradient(to right, var(--color-canvas) 30%, rgb(255 255 255 / 0)) 0 0 / 40px 100% no-repeat local,
@@ -2036,7 +2018,7 @@ html:not([data-theme="v8"]) .v8-only {
       radial-gradient(farthest-side at 100% 50%, rgb(29 29 31 / 0.18), rgb(29 29 31 / 0)) 100% 0 / 12px 100% no-repeat scroll;
     background-color: var(--color-canvas);
   }
-  [data-theme="v8"] [data-scroll-x] > * {
+  :root [data-scroll-x] > * {
     min-width: var(--scroll-min, 0px);
   }
 }
@@ -2046,18 +2028,18 @@ html:not([data-theme="v8"]) .v8-only {
  * 約96px）が 8% 列（約85px）からはみ出す。1列目（流入元名）は伸び縮み・
  * 日付は中身に合わせた幅にする。v7 は変えない。
  */
-[data-theme="v8"] col.inflow-name-col {
+:root col.inflow-name-col {
   width: auto;
 }
 
-[data-theme="v8"] col.inflow-date-col {
+:root col.inflow-date-col {
   width: 7rem;
 }
 
 /* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
    メニューと組むので、狭い PC 幅でも帯を畳まない。 */
 @media (min-width: 1024px) {
-  [data-theme="v8"] .v8-topbar-wrap {
+  :root .v8-topbar-wrap {
     display: block;
   }
 }
@@ -2070,7 +2052,7 @@ html:not([data-theme="v8"]) .v8-only {
  * 「動きを減らす」設定では末尾の規定で一瞬になる。
  */
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme="v8"] [data-skeleton] {
+  :root [data-skeleton] {
     background-image: linear-gradient(
       100deg,
       transparent 40%,
@@ -2096,7 +2078,7 @@ html:not([data-theme="v8"]) .v8-only {
  * ★V8「手順」（NUOgw）：白い板の中に枠付きカードを重ねない。
  * 段の丸・文字・つなぎ線は変えず、囲い（枠・地・余白）だけを取る。
  */
-[data-theme="v8"] [data-part="stepper"] {
+:root [data-part="stepper"] {
   border: 0;
   background: transparent;
   padding: 0;
@@ -2108,14 +2090,14 @@ html:not([data-theme="v8"]) .v8-only {
  * 使う側（友だち一覧の行）は `data-part="attention-star"` を付けるだけ。
  * オンになった瞬間、星が小さくふくらんで戻る（200ms・MOTION.md）。
  */
-[data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
+:root [data-part="attention-star"][aria-pressed="true"] svg {
   color: var(--color-star-on-edge);
   fill: var(--color-star-on);
   stroke: var(--color-star-on-edge);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme="v8"] [data-part="attention-star"][aria-pressed="true"] svg {
+  :root [data-part="attention-star"][aria-pressed="true"] svg {
     animation: v8-star-pop var(--motion-base) var(--motion-ease-out);
   }
 }
@@ -2126,12 +2108,12 @@ html:not([data-theme="v8"]) .v8-only {
  * 件数の文（data-pagebar-out）は帯の中の summary へ移すので隠す。
  * v7 は今までどおり。
  */
-[data-theme="v8"] [data-pagebar] {
+:root [data-pagebar] {
   height: auto;
   padding: 0;
 }
 
-[data-theme="v8"] [data-pagebar-out] {
+:root [data-pagebar-out] {
   display: none;
 }
 
@@ -2191,7 +2173,7 @@ html:not([data-theme="v8"]) .v8-only {
  * 押した角から開く動きを持つ。ここは層の外で、当てると部品の指定に必ず勝ってしまう
  * （V8 で上から沈む旧い動きが走っていた。窓の dialog と同じ直し方）。
  */
-:root:not([data-theme="v8"]) [data-design-part="action-menu"],
+
 [data-design-part="notification-panel"],
 aside[aria-label="フォルダ"] .shadow-lg {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
@@ -2204,9 +2186,6 @@ aside[aria-label="フォルダ"] .shadow-lg {
  * 部品の CSS は層の中・ここは層の外なので、当てるとこちらが必ず勝ち、
  * 閉じる逆再生の代わりに開く動きがもう一度走ってちらついていた（動きの点検 1 番）。
  */
-:root:not([data-theme="v8"]) [data-design-part="dialog"] {
-  animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
-}
 
 /*
  * ★V8 仕上げ（M10）：読み込み中の表示→中身はふっと出る
@@ -2215,7 +2194,7 @@ aside[aria-label="フォルダ"] .shadow-lg {
  * 動きを減らす設定では末尾の規定で一瞬になる。
  */
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme="v8"] [data-content-in] {
+  :root [data-content-in] {
     animation: v8-content-in var(--motion-base) var(--motion-ease-out);
   }
 }
@@ -2246,19 +2225,19 @@ aside[aria-label="フォルダ"] .shadow-lg {
  * 層の外に書く（手組みの表の行にも同じ動きを付けるため）。
  */
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:not([data-leaving="true"]) {
+  :root tbody:not([data-rows-settled]) > tr:not([data-leaving="true"]) {
     animation: v8-content-in var(--motion-base) var(--motion-ease-out) both;
   }
 
-  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(2) {
+  :root tbody:not([data-rows-settled]) > tr:nth-child(2) {
     animation-delay: var(--motion-stagger);
   }
 
-  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(3) {
+  :root tbody:not([data-rows-settled]) > tr:nth-child(3) {
     animation-delay: calc(var(--motion-stagger) * 2);
   }
 
-  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(n + 4) {
+  :root tbody:not([data-rows-settled]) > tr:nth-child(n + 4) {
     animation-delay: calc(var(--motion-stagger) * 3);
   }
 }
@@ -2278,21 +2257,6 @@ aside[aria-label="フォルダ"] .shadow-lg {
  * 新しく骨組みを置くときは shared の `Skeleton` を使う。
  * 「動きを減らす」設定では末尾の reduced-motion 規定が一瞬にする。
  */
-@media (prefers-reduced-motion: no-preference) {
-  .animate-pulse {
-    animation: v7-skeleton-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
-  }
-}
-
-@keyframes v7-skeleton-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
-}
 
 /*
  * §1 最初に開いたときの入り方。不透明度 0→1＋下から8px上がる、
@@ -2303,27 +2267,6 @@ aside[aria-label="フォルダ"] .shadow-lg {
  * （入れ物に `.v7-stagger` を付ける）。`both` の終端が最終表示なので、
  * reduced-motion で一瞬に潰れても表示は正しい。
  */
-@media (prefers-reduced-motion: no-preference) {
-  .v7-stagger > * {
-    animation: v7-rise var(--motion-base) var(--motion-ease-out) both;
-  }
-  .v7-stagger > :nth-child(2) {
-    animation-delay: var(--motion-stagger);
-  }
-  .v7-stagger > :nth-child(3) {
-    animation-delay: calc(var(--motion-stagger) * 2);
-  }
-  .v7-stagger > :nth-child(n + 4) {
-    animation-delay: calc(var(--motion-stagger) * 3);
-  }
-}
-
-@keyframes v7-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
 
 /*
  * `sTJsh` §2 前の表示を残したまま読み直す。読み直し中は中身を 0.55 に
@@ -2331,49 +2274,6 @@ aside[aria-label="フォルダ"] .shadow-lg {
  * では出さない）は shared `RefreshCover` が持つ。reduced-motion では
  * 棒は左端に置いたままにする（止まっていても「読み直し中」の印になる）。
  */
-.v7-refresh {
-  position: relative;
-}
-
-.v7-refresh-dim {
-  opacity: 0.55;
-}
-
-.v7-refresh-line {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  z-index: 1;
-  height: 2px;
-  overflow: hidden;
-}
-
-.v7-refresh-line::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 40%;
-  border-radius: 1px;
-  background: var(--color-accent);
-  content: '';
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .v7-refresh-line::before {
-    animation: v7-refresh-sweep var(--motion-spin) var(--motion-ease-in-out) infinite;
-  }
-}
-
-@keyframes v7-refresh-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(250%);
-  }
-}
 
 /*
  * フォルダパネルは枠線だけの平らな面だったので、カードの影で面から
@@ -2528,7 +2428,7 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
    * 画面に直接書いた <textarea> の既定（ブラウザの既定は縦横どちらも広がる both）。
    * base 層なので、画面が自分で resize を決めた欄（中身に合わせて伸びる欄など）はそちらが勝つ。
    */
-  [data-theme='v8'] textarea {
+  :root textarea {
     resize: vertical;
   }
 
@@ -2653,24 +2553,11 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
  * はみ出して見える。矢印を自前で描き、右に余白を確保する。
  * 4-1（タグ）の画像比較で見つかった（2026-08-26）。
  */
-.v6-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234A5565' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-color: var(--color-canvas);
-  background-position: right 12px center;
-  padding-right: 36px;
-}
 
 /*
  * 過去の呼び出しとの互換名。狭くして矢印を端へ追いやらず、標準と同じ
  * 右12pxを守る。幅は最長の選択肢に合わせて呼び出し側で確保する。
  */
-.v6-select-tight {
-  background-position: right 12px center;
-  padding-left: 12px;
-  padding-right: 36px;
-}
 
 /*
  * 共通部品へ移行途中の素の選択欄にも同じ規定を適用する。
@@ -2790,7 +2677,7 @@ select:not([multiple]):not(.appearance-none) {
 }
 
 /* cards レーン：正本HTMLの浮く部品の影。v7には適用しない。 */
-[data-theme="v8"] {
+:root {
   --v8-parts-primary-shadow: 0 1px 2px #087a3e40, 0 1px 0px #ffffff26;
   --v8-parts-toast-shadow: 0 1px 2px #1d1d1f0f, 0 8px 24px #1d1d1f14;
   --v8-parts-dialog-shadow: 0 2px 4px #1d1d1f14, 0 24px 48px #1d1d1f29;
@@ -2801,29 +2688,29 @@ select:not([multiple]):not(.appearance-none) {
 
 /* zUg8S の白い板は左メニューに接する。余白は右と下だけ。 */
 @media (min-width: 1024px) {
-  [data-theme="v8"] #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; }
+  :root #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; }
 }
 
-[data-theme="v8"] { --color-status-warn-deep: #c2410c; }
-[data-theme="v8"] aside[aria-label="フォルダ"] { box-shadow: none; }
+:root { --color-status-warn-deep: #c2410c; }
+:root aside[aria-label="フォルダ"] { box-shadow: none; }
 
-[data-theme="v8"] { --shadow-frozen-column: 6px 0 12px #1d1d1f14; --color-scroll-thumb: #1d1d1f40; --gradient-scroll-edge: linear-gradient(-90deg, #1d1d1f00 0%, #1d1d1f14 100%); }
+:root { --shadow-frozen-column: 6px 0 12px #1d1d1f14; --color-scroll-thumb: #1d1d1f40; --gradient-scroll-edge: linear-gradient(-90deg, #1d1d1f00 0%, #1d1d1f14 100%); }
 
-[data-theme="v8"] {
+:root {
   --font-sans: var(--font-noto-sans-jp), "Noto Sans JP", var(--font-inter), Inter, sans-serif;
   --color-avatar-purple-bg: #f3ecfb;
   --color-avatar-purple-ink: #6b3fa0;
 }
 
 /* 触り心地 5 回目：左メニューの組の開閉（組の見出しと項目の間）・「?」の印の字の書体。 */
-[data-theme="v8"] {
+:root {
   --tpl-ux5-nav-group-gap: 1px;
   --tpl-ux5-help-mark-font: var(--font-inter), Inter, sans-serif;
   --tpl-ux5-combobox-h: 36px;
 }
 
 /* 機能追加の画面（テンプレートの種類を選ぶ窓・見本から作る）。 */
-[data-theme="v8"] {
+:root {
   --tpl-feat-picker-gap: 20px;
   --tpl-feat-picker-col-gap: 12px;
   --tpl-feat-kind-h: 184px;
@@ -2839,7 +2726,7 @@ select:not([multiple]):not(.appearance-none) {
 }
 
 /* 一括配信①の選択窓 EpTBB（bcpick）：既存の部品の寸法には影響しない。 */
-[data-theme="v8"] {
+:root {
   --tpl-bcpick-z: 80;
   --tpl-bcpick-scrim: #1d1d1f59;
   --tpl-bcpick-margin: 24px;
@@ -2864,7 +2751,7 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-bcpick-mobile-preview: 30dvh;
 }
 /* 作ってあるもの・配るアカウントを選ぶ窓 dJZ7Q（picker）：欄の1行と窓の寸法。 */
-[data-theme="v8"] {
+:root {
   --tpl-picker-width: 880px;
   --tpl-picker-narrow-width: 640px;
   --tpl-picker-height: 560px;
@@ -2883,19 +2770,19 @@ select:not([multiple]):not(.appearance-none) {
   --tpl-picker-field-pad: 0 6px 0 12px;
   --tpl-picker-embed-h: 420px;
 }
-[data-theme="v8"] { --tpl-hq-attribute-distribute-col: 76px; }
+:root { --tpl-hq-attribute-distribute-col: 76px; }
 
-[data-theme='v8'] {
+:root {
   /* B-190: タグの1行表示と「+N」の共通寸法。 */
   --tpl-tag-overflow-max: 112px;
   --tpl-tag-overflow-gap: 8px;
   --tpl-tag-overflow-pad: 4px 8px;
   --tpl-wh-narrow-column-pad: 9px var(--tpl-af2-wh-narrow-pad);
 }
-[data-theme='v8'] { --shadow-wh-kpi-top: inset 0 1px 0 var(--tpl-band-line); }
+:root { --shadow-wh-kpi-top: inset 0 1px 0 var(--tpl-band-line); }
 
 /* B-152：V8の本文。数字の大きさ・数の帯は別の値を保つ。 */
-[data-theme='v8'] {
+:root {
   --text-body: 13px;
   --text-label: 12px;
   --text-caption: 12px;
@@ -2905,39 +2792,39 @@ select:not([multiple]):not(.appearance-none) {
 }
 
 /* 印だけに色を付けず、操作の文字色を継ぐ。グラフ・数の帯の絵は対象外。 */
-[data-theme='v8'] :is(button, a, [role='button'], th, td, [role='cell'], [role='columnheader']) svg.lucide {
+:root :is(button, a, [role='button'], th, td, [role='cell'], [role='columnheader']) svg.lucide {
   width: var(--polish-icon-control); height: var(--polish-icon-control);
   stroke-width: var(--polish-icon-stroke); color: inherit; flex-shrink: 0;
 }
-[data-theme='v8'] :is(h1, h2, h3) > svg.lucide {
+:root :is(h1, h2, h3) > svg.lucide {
   width: var(--polish-icon-heading); height: var(--polish-icon-heading); stroke-width: var(--polish-icon-stroke); color: inherit;
 }
 
 /* キーボードの輪は、画面から渡されたクラスにも共通で効く。 */
-html[data-theme='v8'] :is(button, a, input, textarea, select, [tabindex], [role='button'], [role='tab'], [role='menuitem'], [role='option']):focus-visible {
+html:root :is(button, a, input, textarea, select, [tabindex], [role='button'], [role='tab'], [role='menuitem'], [role='option']):focus-visible {
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
 }
 /* 数値として登録し、地の濃さを120msで連続して変える（文字には重ねない）。 */
 @property --polish-overlay-strength { syntax: '<number>'; inherits: false; initial-value: 0; }
-html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']) {
+html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']) {
   --polish-overlay-strength: var(--polish-overlay-idle);
   background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
   transition-property: background-color, color, border-color, outline-color, box-shadow, transform, filter, opacity, --polish-overlay-strength;
   transition-duration: var(--polish-interaction-duration);
 }
-html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):hover:not(:disabled):not([aria-disabled='true']) {
+html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):hover:not(:disabled):not([aria-disabled='true']) {
   --polish-overlay-strength: var(--polish-hover-opacity);
 }
-html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):active:not(:disabled):not([aria-disabled='true']) {
+html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):active:not(:disabled):not([aria-disabled='true']) {
   --polish-overlay-strength: var(--polish-active-opacity);
 }
-html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-disabled-opacity); }
+html:root :is(button, a, input, textarea, select, [role='button'], [role='tab'], [role='menuitem'], [role='option']):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-disabled-opacity); }
 
-[data-theme='v8'] [data-skeleton] { background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); background-image: none; animation: none; }
+:root [data-skeleton] { background: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); background-image: none; animation: none; }
 
 /* B-152・仕上げ9。旧テーマの角丸は維持する。 */
-[data-theme='v8'] {
+:root {
   --radius-mini: var(--polish-radius-small);
   --radius-icon: 6px;
   --radius-control: 10px;
@@ -2950,10 +2837,10 @@ html[data-theme='v8'] :is(button, a, input, textarea, select, [role='button'], [
 }
 
 /* B-152③：型の中の小さい表も、共通の行56・見出し40を読む。 */
-html[data-theme='v8'] [role='table'] [role='row'] { min-height: var(--polish-table-row); font-size: var(--polish-text-body); }
-html[data-theme='v8'] [role='table'] [role='row']:has([role='columnheader']) { min-height: var(--polish-table-head); height: var(--polish-table-head); background: var(--polish-table-head-bg); }
-html[data-theme='v8'] [role='table'] [role='columnheader'] { color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
-html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader'])):hover { background: var(--polish-table-hover); }
+html:root [role='table'] [role='row'] { min-height: var(--polish-table-row); font-size: var(--polish-text-body); }
+html:root [role='table'] [role='row']:has([role='columnheader']) { min-height: var(--polish-table-head); height: var(--polish-table-head); background: var(--polish-table-head-bg); }
+html:root [role='table'] [role='columnheader'] { color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { background: var(--polish-table-hover); }
 
 /* 中身のカード。数の帯・入れ子・操作欄には付けない（B-137・B-148）。 */
 .content-card {
@@ -2964,7 +2851,7 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
 }
 
 /* B-159 / B-161 / B-180：採用済みの値。部品ごとの写しよりこの値を優先する。 */
-[data-theme='v8'] {
+:root {
   --text-body: 13px;
   --text-label: 12px;
   --radius-segment: 10px;
@@ -3004,7 +2891,7 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
 }
 
 /* B-178：一覧の骨組み（v19Ivv）。画面の寸法ではなく部品の値。 */
-[data-theme='v8'] {
+:root {
   --tpl-list-row-h: 60px;
   --tpl-list-head-h: 40px;
   --tpl-list-search-w: 240px;
@@ -3015,8 +2902,8 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   --tpl-list-cell-side: 16px;
 }
 
-[data-theme='v8'] { --tpl-image-frame-w: 160px; --tpl-image-frame-h: 106px; }
-[data-theme="v8"] { --tpl-floor-map-inset: 32px; --tpl-floor-aside-w: 400px; --tpl-floor-detail-row-h: 59px; --tpl-board-tabs-top: 18px; --tpl-board-body-top: 10px; --tpl-board-section-gap: 13px; --tpl-board-detail-w: 330px; --tpl-board-side-w: 304px; --tpl-board-resource-w: 86px; --tpl-board-row-h: 52px; --tpl-board-block-top: 4px; }
+:root { --tpl-image-frame-w: 160px; --tpl-image-frame-h: 106px; }
+:root { --tpl-floor-map-inset: 32px; --tpl-floor-aside-w: 400px; --tpl-floor-detail-row-h: 59px; --tpl-board-tabs-top: 18px; --tpl-board-body-top: 10px; --tpl-board-section-gap: 13px; --tpl-board-detail-w: 330px; --tpl-board-side-w: 304px; --tpl-board-resource-w: 86px; --tpl-board-row-h: 52px; --tpl-board-block-top: 4px; }
 /* 印刷の内容は body 直下へ置き、画面のスクロール枠・高さ制限から外す。 */
 @media print {
   body:has(> [data-reservation-print]) { background: var(--color-canvas); }
@@ -3024,10 +2911,10 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   body > [data-reservation-print] { position: static; width: 100%; height: auto; overflow: visible; }
 }
 
-[data-theme="v8"] { --tpl-floor-outline-w: 3px; --tpl-floor-stopped-opacity: .5; }
+:root { --tpl-floor-outline-w: 3px; --tpl-floor-stopped-opacity: .5; }
 
 /* 飲食の融合1：各板で使う寸法。 */
-[data-theme="v8"] {
+:root {
   --tpl-rest1-restaurant-tables-tables-padding-inline-1: 24px;
   --tpl-rest1-restaurant-tables-tables-font-size-1: 13px;
   --tpl-rest1-restaurant-tables-tables-line-height-1: 20px;
@@ -3056,8 +2943,8 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
   --tpl-rest1-restaurant-booking-kit-shell-padding-1: 0 24px 20px;
 }
 
-[data-theme="v8"] {--tpl-board-legend-radius:4px;--tpl-rest1-aside-outer-pad:0;}
+:root {--tpl-board-legend-radius:4px;--tpl-rest1-aside-outer-pad:0;}
 
-[data-theme="v8"] { --tpl-rs-rsv-period-w:152px; --tpl-rs-rsv-status-w:164px; }
+:root { --tpl-rs-rsv-period-w:152px; --tpl-rs-rsv-status-w:164px; }
 
-[data-theme="v8"] { --tpl-rs-detail-fact-gap:10px; --tpl-rs-detail-fact-min-h:32px; --tpl-rs-detail-fact-pad:6px 0; --tpl-rs-detail-actions-gap:8px; }
+:root { --tpl-rs-detail-fact-gap:10px; --tpl-rs-detail-fact-min-h:32px; --tpl-rs-detail-fact-pad:6px 0; --tpl-rs-detail-actions-gap:8px; }

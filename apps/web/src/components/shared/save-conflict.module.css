@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 保存がぶつかったとき（409）の帯と、比べる窓の中身（共通）。

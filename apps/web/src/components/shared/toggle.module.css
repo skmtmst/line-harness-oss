@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * スイッチ。Pencil V5 の機能設定（31-1）で43個並ぶ。
@@ -65,15 +64,15 @@
  * オフの地は操作する部品の枠色（choice-border）に合わせる。
  * 「消せない項目」はオフに見せてはいけないので髪線の灰のまま保つ。
  */
-[data-theme='v8'] .toggle {
+:root .toggle {
   background: var(--color-choice-border);
 }
 
-[data-theme='v8'] .on {
+:root .on {
   background: var(--color-accent-deep);
 }
 
-[data-theme='v8'] .locked {
+:root .locked {
   background: var(--color-toggle-locked);
 }
 
@@ -82,24 +81,24 @@
  * 乗せたときは地を少し濃く、押したときはほんの少し沈む（明るさで）。
  * どちらも 120ms。押せない項目（locked）は動かさない。
  */
-[data-theme='v8'] .toggle {
+:root .toggle {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     filter var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .toggle:hover:not(:disabled) {
+:root .toggle:hover:not(:disabled) {
   filter: brightness(0.94);
 }
 
-[data-theme='v8'] .toggle:active:not(:disabled) {
+:root .toggle:active:not(:disabled) {
   filter: brightness(0.88);
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .toggle { padding: 2px; background: var(--color-toggle-off); }
-[data-theme='v8'] .on { background: var(--color-accent-deep); }
-[data-theme='v8'] .locked { background: var(--color-toggle-locked); }
-[data-theme='v8'] .toggle::after { border-radius: 50%; box-shadow: var(--shadow-controls-toggle); }
-[data-theme='v8'] .toggle { gap: 0; border-radius: var(--polish-radius-pill); }
+:root .toggle { padding: 2px; background: var(--color-toggle-off); }
+:root .on { background: var(--color-accent-deep); }
+:root .locked { background: var(--color-toggle-locked); }
+:root .toggle::after { border-radius: 50%; box-shadow: var(--shadow-controls-toggle); }
+:root .toggle { gap: 0; border-radius: var(--polish-radius-pill); }
 }

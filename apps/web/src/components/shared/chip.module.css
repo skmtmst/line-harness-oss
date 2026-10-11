@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 印（チップ）。Pencil V5 の一覧・カードの中で、状態や区分を1語で示す小さな札。
@@ -64,19 +63,19 @@
  * ★V8「タグ」（h7Ch3y）：文字 12px・余白 2/8。中立のタグは
  * 白地・細い枠・ink-secondary（意味の色を持つ札は状態の札の役目）。
  */
-[data-theme='v8'] .chip {
+:root .chip {
   height: auto;
   padding: 2px 8px;
   font-size: var(--text-caption);
   font-weight: 400;
 }
 
-[data-theme='v8'] .neutral {
+:root .neutral {
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
 }
 
-[data-theme='v8'] .chip {
+:root .chip {
   flex-shrink: 0;
   align-items: flex-start;
   gap: 0;
@@ -89,7 +88,7 @@
 }
 
 }
-[data-theme='v8'] .chip[data-kind='channel'] {
+:root .chip[data-kind='channel'] {
   align-items: center;
   gap: var(--tpl-e1-gap-s);
   padding: var(--tpl-e1-gap-xxs) var(--tpl-e49-gap-s);
@@ -99,7 +98,7 @@
   font-weight: 600;
   line-height: var(--tpl-e1-lh-20);
 }
-[data-theme='v8'] .chip[data-kind='channel']::before {
+:root .chip[data-kind='channel']::before {
   content: '';
   flex-shrink: 0;
   width: var(--tpl-e49-gap-s);

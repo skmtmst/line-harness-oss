@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * チェックボックス。Pencil ★V8 `dQCCN`・`S9U7v`「チェック/オン・オフ」。
@@ -160,11 +159,11 @@
  * 違うのは文字（13px）と、オフの箱の枠色（choice-border）。
  * 選んだ・誤りの枠色は details 度が高い規則が勝つので変わらない。
  */
-[data-theme='v8'] .label {
+:root .label {
   font-size: var(--text-label);
 }
 
-[data-theme='v8'] .box {
+:root .box {
   border-color: var(--color-choice-border);
 }
 
@@ -173,29 +172,29 @@
  * 乗せたときは選んでいない箱だけ地を少し沈め、押したときは
  * ほんの少し縮む。印の一筆描き・消え方は今までどおり。
  */
-[data-theme='v8'] .box {
+:root .box {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     border-color var(--motion-fast) var(--motion-ease-out),
     scale var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .line:hover .input:not(:checked, :indeterminate) + .box {
+:root .line:hover .input:not(:checked, :indeterminate) + .box {
   background: var(--color-canvas-sunken);
 }
 
-[data-theme='v8'] .line:active .box {
+:root .line:active .box {
   scale: 0.92;
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .label { line-height: 20px; font-weight: 400; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
-[data-theme='v8'] .input:checked + .box, [data-theme='v8'] .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
-[data-theme='v8'] .input[aria-invalid='true']:not(:checked) + .box { outline-color: var(--color-status-danger); }
-[data-theme='v8'] .input:focus-visible + .box { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-[data-theme='v8'] .mark { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
+:root .label { line-height: 20px; font-weight: 400; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
+:root .input:checked + .box, :root .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
+:root .input[aria-invalid='true']:not(:checked) + .box { outline-color: var(--color-status-danger); }
+:root .input:focus-visible + .box { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+:root .mark { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); }
 
-[data-theme='v8'] .root { gap: 8px; }
-[data-theme='v8'] .box { gap: 0; }
+:root .root { gap: 8px; }
+:root .box { gap: 0; }
 }

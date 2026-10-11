@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities;
 @layer components {
 .tableBox { border-radius: var(--radius-card); box-shadow: var(--tpl-htn-ring), var(--card-shadow); overflow: hidden; }
 .table { width: 100%; border-collapse: collapse; table-layout: fixed; }

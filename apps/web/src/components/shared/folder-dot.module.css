@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /* ★V8 フォルダの色の丸（絵 I1E7Bt・axFrW ほか一覧の行）。大きさ 8・名前との間 8。 */
 .dot {
@@ -37,4 +36,4 @@
 .name { flex: 1; }
 .name :is(a, button) { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-action); }
 
-[data-theme='v8'] [data-list-name] .name :is(a, button) { color: var(--color-action); }
+:root [data-list-name] .name :is(a, button) { color: var(--color-action); }

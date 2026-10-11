@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'page-templates.module.css'), 'utf8')
-/* 変数の定義場所は app/globals.css の [data-theme="v8"]（module の pure 検査に当たらない層）。 */
+/* 変数の定義場所は app/globals.css の :root（module の pure 検査に当たらない層）。 */
 const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
 
 /*
@@ -17,7 +17,7 @@ const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8
  */
 describe('型の見出し（379板の絵）', () => {
   it('寸法は先頭の変数に1か所まとめ・値は絵どおり', () => {
-    const vars = globals.match(/\[data-theme="v8"\] \{[^}]*--tpl-head-pad-top[^}]*\}/s)
+    const vars = globals.match(/:root \{[^}]*--tpl-head-pad-top[^}]*\}/s)
     expect(vars, '変数の一覧がありません').toBeTruthy()
     for (const [name, value] of [
       ['--tpl-head-pad-top', 'var(--polish-space-section)'], ['--tpl-head-pad-side', 'var(--polish-space-section)'], ['--tpl-head-pad-bottom', 'var(--polish-space-field)'],
@@ -84,7 +84,7 @@ describe('型の見出し（379板の絵）', () => {
 
   it('v8 の行の高さは1.5（caption・label・body。v7は変えない）', () => {
     for (const name of ['--text-caption--line-height', '--text-label--line-height', '--text-body--line-height']) {
-      const block = globals.match(new RegExp(`\\[data-theme="v8"\\] \\{[^}]*${name}:\\s*1\\.5`, 's'))
+      const block = globals.match(new RegExp(`:root \\{[^}]*${name}:\\s*1\\.5`, 's'))
       expect(block, `${name} が v8 にありません`).toBeTruthy()
     }
     expect(globals).toMatch(/--text-caption--line-height:\s*1\.6/)

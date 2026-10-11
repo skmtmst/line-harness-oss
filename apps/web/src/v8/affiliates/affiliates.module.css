@@ -23,33 +23,33 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   gap: var(--tpl-af-col-gap);
   height: var(--tpl-af-head-h);
   padding: var(--tpl-af-head-pad);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-af-col-gap);
   height: var(--tpl-af-row-h);
   padding: var(--tpl-af-row-pad);
   border-bottom: 0;
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   height: auto;
   padding: 0;
   border: 0;
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > .num,
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > .num {
+:global(:root) .table .row[data-table-layout='columns'] > .num,
+:global(:root) .table .headRow[data-table-layout='columns'] > .num {
   padding-right: var(--tpl-af-num-pad-end);
   text-align: right;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colName,
+:global(:root) .table .row[data-table-layout='columns'] > td.colName {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -285,7 +285,7 @@
 }
 
 /* 案件（h7dmB）：報酬 110・動き 150・紹介している人 96・成果 100・操作 170。行 56。 */
-:global([data-theme='v8']) .tableOffers .row[data-table-layout='columns'] { height: var(--tpl-af-offer-row-h); }
+:global(:root) .tableOffers .row[data-table-layout='columns'] { height: var(--tpl-af-offer-row-h); }
 .colOfferReward { width: var(--tpl-af-col-offer-reward); min-width: 0; }
 .colOfferAction { width: var(--tpl-af-col-offer-action); min-width: 0; }
 .colOfferAction .cellNum { overflow: hidden; text-overflow: ellipsis; }
@@ -294,7 +294,7 @@
 .colOfferOps { width: var(--tpl-af-col-offer-ops); }
 
 /* 成果承認（OylSV）：紹介した人 96・アカウント 92・案件 150・報酬 72・確認 72・決める 124。行 56。 */
-:global([data-theme='v8']) .tableApprovals .row[data-table-layout='columns'] { height: auto; min-height: var(--tpl-af-offer-row-h); }
+:global(:root) .tableApprovals .row[data-table-layout='columns'] { height: auto; min-height: var(--tpl-af-offer-row-h); }
 .colApAffiliate { width: var(--tpl-af-col-ap-affiliate); min-width: 0; }
 .colApAccount { width: var(--tpl-af-col-ap-account); min-width: 0; }
 .colApOffer { width: var(--tpl-af-col-ap-offer); min-width: 0; }
@@ -479,7 +479,7 @@
 }
 
 /* 支払い（aINnz）：払う額 150・中身 70・振込先 170・状態 130・操作 170。行 59。 */
-:global([data-theme='v8']) .tablePayment .row[data-table-layout='columns'] { height: auto; min-height: var(--tpl-af-pay-row-h); }
+:global(:root) .tablePayment .row[data-table-layout='columns'] { height: auto; min-height: var(--tpl-af-pay-row-h); }
 .colPayAmount { width: var(--tpl-af-col-pay-amount); }
 .colPayCount { width: var(--tpl-af-col-pay-count); }
 .colPayBank { width: var(--tpl-af-col-pay-bank); min-width: 0; }
@@ -550,8 +550,8 @@
 }
 
 /* レポート（Eo56k）：見出し 12/24・行 61・成果と売上 130・報酬 160・操作 28。 */
-:global([data-theme='v8']) .tableReport .headRow[data-table-layout='columns'] { height: var(--tpl-af-rep-head-h); padding: var(--tpl-af-rep-pad); }
-:global([data-theme='v8']) .tableReport .row[data-table-layout='columns'] { height: var(--tpl-af-rep-row-h); padding: var(--tpl-af-rep-pad); }
+:global(:root) .tableReport .headRow[data-table-layout='columns'] { height: var(--tpl-af-rep-head-h); padding: var(--tpl-af-rep-pad); }
+:global(:root) .tableReport .row[data-table-layout='columns'] { height: var(--tpl-af-rep-row-h); padding: var(--tpl-af-rep-pad); }
 .colRepConv { width: var(--tpl-af-col-rep-conv); }
 .colRepReward { width: var(--tpl-af-col-rep-reward); }
 .colRepOps { width: var(--tpl-af-col-rep-ops); }

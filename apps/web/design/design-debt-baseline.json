@@ -212,10 +212,6 @@
   "app/settings/settings-nav-v8.tsx": {
     "unresolved-classname": 1
   },
-  "app/staff/new/page.tsx": {
-    "direct-secondary-button": 1,
-    "arbitrary-value": 1
-  },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
   },
@@ -243,9 +239,6 @@
   },
   "app/webhooks/apitokens-v8.tsx": {
     "direct-th": 6
-  },
-  "app/webhooks/edit/page.tsx": {
-    "unresolved-classname": 4
   },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5
@@ -559,5 +552,12 @@
   },
   "v8/booking-menus/tabs/shared.tsx": {
     "unresolved-classname": 1
+  },
+  "v8/settings/staff/create.tsx": {
+    "direct-secondary-button": 1,
+    "arbitrary-value": 1
+  },
+  "v8/webhooks/edit.tsx": {
+    "unresolved-classname": 4
   }
 }

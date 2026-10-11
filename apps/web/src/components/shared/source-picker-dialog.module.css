@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .overlay { position: fixed; inset: 0; z-index: var(--tpl-bcpick-z); display: flex; align-items: center; justify-content: center; padding: var(--tpl-bcpick-margin); background: var(--tpl-bcpick-scrim); }
 .panel { display: flex; flex-direction: column; width: min(100%, var(--tpl-bcpick-width)); height: min(var(--tpl-bcpick-height), calc(100dvh - var(--tpl-bcpick-margin) * 2)); min-width: 0; overflow: hidden; background: var(--color-canvas); border-radius: var(--radius-card); box-shadow: var(--v8-parts-dialog-shadow); color: var(--color-ink); }

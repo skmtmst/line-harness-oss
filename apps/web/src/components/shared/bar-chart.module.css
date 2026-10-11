@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .chart {
   display: flex;
@@ -172,7 +171,7 @@
  * 下に隠れる（.column が relative のため）。字を前に出す＋地を敷いて、
  * 曜日まで読めるようにする。位置・大きさは変えない。v7 は今までどおり。
  */
-[data-theme='v8'] .axisLabel {
+:root .axisLabel {
   position: relative;
   z-index: 1;
   background: var(--color-canvas);
@@ -233,7 +232,7 @@
  * 選んだ日の白いふきだしは少し下からふっと出る
  * （小さいふきだしなので 120ms）。横の位置合わせは変えない。
  */
-[data-theme='v8'] [aria-pressed='true'] .tooltip {
+:root [aria-pressed='true'] .tooltip {
   animation: bar-chart-v8-tooltip-in var(--motion-fast) var(--motion-ease-out);
 }
 

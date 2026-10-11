@@ -159,8 +159,8 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   )
 
   return (
-    <div className="relative flex flex-wrap items-center gap-1.5 v8:gap-x-3 v8:gap-y-2">
-      <span className="text-ink-faint text-xs v8:text-micro">差し込み</span>
+    <div className="relative flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className="text-ink-faint text-micro">差し込み</span>
 
       {<InsertButton size={compact ? 'compact' : undefined} label="名前" onClick={() => insert('{{name}}')} />}
 

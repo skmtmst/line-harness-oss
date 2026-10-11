@@ -136,7 +136,7 @@ describe('LINEでの見え方共通部品', () => {
     // ★V8 の枠だけモジュール CSS に切り出した（`cfVyj` の板の決まり）。
     // モジュール内も値はトークンだけ。生の #16進・rgb() を置かない。
     const css = read('line-preview.module.css')
-    expect(css).toContain("[data-theme='v8']")
+    expect(css).toContain(":root")
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(css).not.toMatch(/\brgba?\(/)
   })

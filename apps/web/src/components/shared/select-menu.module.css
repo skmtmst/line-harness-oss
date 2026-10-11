@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 /*
  * ★V8 プルダウンの開いた中身（StFE7「選ぶ欄/開いた」）。値は globals.css の
  * [data-theme="v8"] の --select-menu-*。画面側で上書きしない。
@@ -202,4 +201,4 @@
 }
 
 /* B-161：開いた選ぶ欄も浮く面の薄い縁を使う。 */
-[data-theme='v8'] .surface { border-color: var(--card-edge); }
+:root .surface { border-color: var(--card-edge); }

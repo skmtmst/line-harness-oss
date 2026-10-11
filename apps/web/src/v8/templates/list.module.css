@@ -112,18 +112,18 @@
 }
 
 /* 種類のタブ：絵の段は 30.5（部品の既定より低い）。この画面のタブだけ行の高さを絵に合わせる。 */
-:global([data-theme='v8']) .tabsBox :global(button),
-:global([data-theme='v8']) .tabsBox :global(button) * {
+:global(:root) .tabsBox :global(button),
+:global(:root) .tabsBox :global(button) * {
   line-height: var(--tpl-tl-tab-lh);
 }
 
-:global([data-theme='v8']) .tabsBox :global(button) {
+:global(:root) .tabsBox :global(button) {
   min-height: 0;
   padding-bottom: var(--tpl-tl-tab-pad-bottom);
 }
 
 /* 数の帯：上の線はタブの段の線と重ねる（二重にしない）。 */
-:global([data-theme='v8']) .kpiStrip.kpiStrip {
+:global(:root) .kpiStrip.kpiStrip {
   border-top: 0;
 }
 

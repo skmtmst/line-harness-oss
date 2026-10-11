@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * ページヘッダー。★V5 227枚すべての先頭にある帯。
@@ -49,7 +48,7 @@
  * data-header-size="compact" は部品 EnlYo どおりの小さい形。
  * v7 は変えない。
  */
-[data-theme='v8'] .header {
+:root .header {
   gap: 12px;
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom);
   background: var(--color-canvas);
@@ -57,14 +56,14 @@
   outline-color: transparent;
 }
 
-[data-theme='v8'] .heading {
+:root .heading {
   flex: 1;
   gap: var(--tpl-head-gap);
 }
 
-[data-theme='v8'] .heading > nav { display: none; }
+:root .heading > nav { display: none; }
 
-[data-theme='v8'] .title {
+:root .title {
   display: block;
   min-width: 0;
   max-width: 100%;
@@ -76,33 +75,33 @@
   line-height: var(--tpl-title-lh);
 }
 
-[data-theme='v8'] .description {
+:root .description {
   color: var(--color-ink-secondary);
   font-size: var(--tpl-desc-size);
   font-weight: 400;
   line-height: var(--tpl-desc-lh);
 }
 
-[data-theme='v8'] .actions { gap: 12px; }
+:root .actions { gap: 12px; }
 
-[data-theme='v8'] .header[data-header-size='compact'] .title {
+:root .header[data-header-size='compact'] .title {
   font-size: var(--tpl-compact-title-size);
   font-weight: var(--tpl-compact-title-weight);
   line-height: var(--tpl-compact-title-lh);
 }
 
-[data-theme='v8'] .header[data-header-size='compact'] .heading {
+:root .header[data-header-size='compact'] .heading {
   gap: var(--tpl-compact-gap);
 }
 
-[data-theme='v8'] .header[data-header-size='compact'] .description {
+:root .header[data-header-size='compact'] .description {
   line-height: var(--tpl-compact-desc-lh);
 }
 
 
-[data-theme='v8'] .title, [data-theme='v8'] .description { width: fit-content; }
-[data-theme='v8'] .actions button { border: 0; }
-[data-theme='v8'] .actions button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
-[data-theme='v8'] .actions button[class*="button_primary"]:not(:focus-visible) { outline-color: transparent; }
+:root .title, :root .description { width: fit-content; }
+:root .actions button { border: 0; }
+:root .actions button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+:root .actions button[class*="button_primary"]:not(:focus-visible) { outline-color: transparent; }
 
 }

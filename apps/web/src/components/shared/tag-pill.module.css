@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities;
 @layer components {
 .pill {
   --tag-pill-font: 14px;
@@ -87,8 +86,8 @@
 }
 
 /* B-180：表・要点の欄・編集の札はすべて同じ24px。 */
-[data-theme='v8'] .pill,
-[data-theme='v8'] .pill[data-size] {
+:root .pill,
+:root .pill[data-size] {
   box-sizing: border-box;
   height: var(--tpl-tag-pill-h);
   --tag-pill-font: var(--text-caption);

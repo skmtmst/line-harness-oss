@@ -82,10 +82,13 @@ describe('#673 B. 触った感触', () => {
     expect(GLOBALS_CODE).toMatch(/tbody tr:hover\s*\{[^}]*var\(--color-canvas-sunken\)/)
   })
 
-  it('メニュー・モーダルの出入りは150〜250msの ease-out', () => {
-    expect(GLOBALS_CODE).toMatch(/@keyframes lh-surface-in/)
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="action-menu"\][\s\S]*?animation:\s*lh-surface-in var\(--motion-base\)/)
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\s*\{[^}]*animation:\s*lh-surface-in/)
+  it('メニュー・窓は共通部品の開閉を使い、全体の旧い動きを重ねない', () => {
+    const menu = readFileSync(join(SRC, 'components/shared/action-menu.module.css'), 'utf8')
+    const dialog = readFileSync(join(SRC, 'components/shared/dialog.module.css'), 'utf8')
+    expect(menu).toMatch(/animation:\s*action-menu-v8-enter var\(--motion-fast\) var\(--motion-ease-out\)/)
+    expect(dialog).toMatch(/:root \.panel\[data-closing\]/)
+    expect(dialog).toContain('transition-duration: var(--motion-exit)')
+    expect(GLOBALS_CODE).not.toMatch(/\[data-design-part="(?:action-menu|dialog)"\]\s*\{[^}]*animation:\s*lh-surface-in/)
   })
 
   it('動きを減らす設定で位置移動系が止まる', () => {

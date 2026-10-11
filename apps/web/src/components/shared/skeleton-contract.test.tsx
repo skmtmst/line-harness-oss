@@ -129,25 +129,24 @@ describe('RefreshCover（★V7 `sTJsh` §2 前の表示を残す）', () => {
   })
 })
 
-describe('globals.css の動き規定（★V7 `z97zZN` §1・§3）', () => {
-  it('骨組みの明滅は不透明度 1↔0.55・1.2 秒', () => {
-    expect(GLOBALS_CODE).toMatch(/--motion-pulse:\s*1\.2s/)
-    expect(GLOBALS_CODE).toMatch(/@keyframes v7-skeleton-pulse[\s\S]*?50%\s*\{\s*opacity:\s*0\.55/)
-    expect(GLOBALS_CODE).toMatch(/\.animate-pulse\s*\{[^}]*v7-skeleton-pulse/)
+describe('globals.css の現役の動き規定', () => {
+  it('骨組みは今の静止表示を保ち、旧い明滅を残さない', () => {
+    expect(GLOBALS_CODE).not.toContain('@keyframes v7-skeleton-pulse')
+    expect(GLOBALS_CODE).toMatch(/:root \[data-skeleton\] \{[^}]*background-image:\s*none;\s*animation:\s*none/)
   })
 
-  it('初回表示は下から 8px・200ms ease-out・40ms ずつ', () => {
-    expect(GLOBALS_CODE).toMatch(/@keyframes v7-rise[\s\S]*?translateY\(8px\)/)
-    expect(GLOBALS_CODE).toMatch(/\.v7-stagger > \*\s*\{[^}]*var\(--motion-base\)[^}]*var\(--motion-ease-out\)/)
+  it('今の初回表示は下から4px・200ms ease-out・40msずつ、消える行を除く', () => {
+    expect(GLOBALS_CODE).toMatch(/@keyframes v8-content-in[\s\S]*?translateY\(4px\)/)
+    expect(GLOBALS_CODE).toMatch(/tbody:not\(\[data-rows-settled\]\) > tr:not\(\[data-leaving="true"\]\)\s*\{[^}]*var\(--motion-base\)[^}]*var\(--motion-ease-out\)/)
     // 40ms のずらし幅は変数（--motion-stagger）に置いた（動きの点検 18 番）。
     expect(GLOBALS_CODE).toMatch(/--motion-stagger:\s*40ms;/)
     expect(GLOBALS_CODE).toMatch(/nth-child\(2\)\s*\{[^}]*var\(--motion-stagger\)/)
     expect(GLOBALS_CODE).toMatch(/nth-child\(n \+ 4\)\s*\{[^}]*calc\(var\(--motion-stagger\) \* 3\)/)
   })
 
-  it('読み直しの線は上に 2px、薄めは 0.55', () => {
-    expect(GLOBALS_CODE).toMatch(/\.v7-refresh-line\s*\{[^}]*height:\s*2px/)
-    expect(GLOBALS_CODE).toMatch(/\.v7-refresh-dim\s*\{[^}]*opacity:\s*0\.55/)
+  it('読み直しを旧い線や薄めへ戻さない', () => {
+    expect(GLOBALS_CODE).not.toMatch(/\.v7-refresh-(?:line|dim)\s*\{/)
+    expect(GLOBALS_CODE).not.toContain('@keyframes v7-refresh-sweep')
   })
 })
 

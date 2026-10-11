@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 手順・タブの中身の移り変わり（V8「サクサク感」★A②）。
@@ -11,9 +10,9 @@
   min-width: 0;
 }
 
-[data-theme='v8'] .panel[data-slide-direction='forward'] { animation: slide-panel-forward var(--motion-panel) var(--motion-glide); }
+:root .panel[data-slide-direction='forward'] { animation: slide-panel-forward var(--motion-panel) var(--motion-glide); }
 
-[data-theme='v8'] .panel[data-slide-direction='back'] { animation: slide-panel-back var(--motion-panel) var(--motion-glide); }
+:root .panel[data-slide-direction='back'] { animation: slide-panel-back var(--motion-panel) var(--motion-glide); }
 
 @keyframes slide-panel-forward {
   from {

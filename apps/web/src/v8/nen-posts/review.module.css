@@ -5,7 +5,7 @@
  */
 
 /* タブ（絵：高さ28.5・文字の下10・文字 13/18）。共通のタブの V8 の値より詰める。 */
-:global([data-theme='v8']) .tabs [role='tab'] {
+:global(:root) .tabs [role='tab'] {
   box-sizing: border-box;
   height: var(--tpl-nm-tab-h);
   min-height: 0;
@@ -113,10 +113,10 @@
   flex-shrink: 0;
 }
 /* 見え方の切り替え（絵：器の余白3・項目 5/12・文字12）。小型の切り替えより左右を広げる。 */
-:global([data-theme='v8']) .viewSwitch:nth-child(n) {
+:global(:root) .viewSwitch:nth-child(n) {
   padding: var(--tpl-nm-seg-pad);
 }
-:global([data-theme='v8']) .viewSwitch:nth-child(n) button {
+:global(:root) .viewSwitch:nth-child(n) button {
   padding: var(--tpl-nm-seg-item-pad);
 }
 
@@ -378,25 +378,25 @@
  * 絵の窓は四方24の1枚の箱（題 18/26・説明 12/19・中の間14・下の線の上14）。
  * 共通の窓は題の段・中身・下の帯で余白が違うので、この2枚の窓だけ寄せる（共通部品は変えない）。
  */
-:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child {
+:global(:root) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child {
   padding: var(--tpl-nm-dlg-head-pad);
 }
-:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child > :first-child {
+:global(:root) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child > :first-child {
   gap: var(--tpl-nm-dlg-title-gap);
 }
-:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child h2 {
+:global(:root) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child h2 {
   line-height: var(--tpl-nm-dlg-title-lh);
 }
-:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child h2 + * {
+:global(:root) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :first-child h2 + * {
   font-size: var(--tpl-nm-row-size);
   line-height: var(--tpl-nm-textarea-lh);
   /* 絵は言葉の途中で折る（全体の auto-phrase だと早く折れて行がずれる）。 */
   word-break: normal;
 }
-:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :nth-child(2) {
+:global(:root) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :nth-child(2) {
   padding: var(--tpl-nm-dlg-body-pad);
 }
-:global([data-theme='v8']) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :last-child > * {
+:global(:root) :is(:global([data-design-node='ujcar']), :global([data-design-node='N1br7'])):has(.dialogStack) :is(:global([role='dialog']), :global([role='alertdialog'])) > :last-child > * {
   width: auto;
   margin: var(--tpl-nm-dlg-foot-margin);
   padding: var(--tpl-nm-dlg-foot-pad);
@@ -523,29 +523,29 @@
   table-layout: fixed;
 }
 /* 絵の行：上下9・欄の間12（左右6ずつ）・端14、文字 12/17。見出しは 11 の高さ34。 */
-:global([data-theme='v8']) .historyTable :is(th, td):nth-child(n) {
+:global(:root) .historyTable :is(th, td):nth-child(n) {
   height: auto;
   padding: var(--tpl-nm-hist-cell-pad);
   font-size: var(--tpl-nm-row-size);
   line-height: var(--tpl-nm-row-lh);
   vertical-align: middle;
 }
-:global([data-theme='v8']) .historyTable th:nth-child(n) {
+:global(:root) .historyTable th:nth-child(n) {
   height: var(--tpl-nm-hist-head-h);
   padding-block: 0;
   font-size: var(--tpl-nm-small-size);
   line-height: var(--tpl-nm-small-lh);
   font-weight: 400;
 }
-:global([data-theme='v8']) .historyTable :is(th, td):first-child:nth-child(n) {
+:global(:root) .historyTable :is(th, td):first-child:nth-child(n) {
   padding-left: var(--tpl-nm-hist-edge);
 }
-:global([data-theme='v8']) .historyTable :is(th, td):last-child:nth-child(n) {
+:global(:root) .historyTable :is(th, td):last-child:nth-child(n) {
   padding-right: var(--tpl-nm-hist-edge);
   text-align: right;
   white-space: nowrap;
 }
-:global([data-theme='v8']) .historyTable td:first-child:nth-child(n) {
+:global(:root) .historyTable td:first-child:nth-child(n) {
   font-weight: 600;
 }
 .historyTable th:nth-child(1) { width: var(--tpl-nm-hist-col-v); }

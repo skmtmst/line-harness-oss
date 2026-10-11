@@ -35,7 +35,7 @@
 }
 
 @media (min-width: 1024px) {
-  :global([data-theme='v8']) .topBar {
+  :global(:root) .topBar {
     display: block;
   }
 }
@@ -48,11 +48,11 @@
 }
 
 /* ★V8 の外枠は、左メニューと上の帯が灰色の地のまま（線も地も持たない）。白いのは本文の板だけ。 */
-:global([data-theme='v8']) .brand {
+:global(:root) .brand {
   border-bottom: 0;
 }
 
-:global([data-theme='v8']) .topBar {
+:global(:root) .topBar {
   border-bottom: 0;
   background: transparent;
 }

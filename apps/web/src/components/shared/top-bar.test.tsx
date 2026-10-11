@@ -24,9 +24,9 @@ describe('V6共通トップバー', () => {
   })
 
   it('V8 の 1152 の帯：札は潰さない・パンくずと自分の名前が縮む', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.accountPill \{[^}]*flex-shrink:\s*0/s)
-    expect(css).toMatch(/\[data-theme=(["'])v8\1\] \.accountName \{\s*max-width:\s*128px/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.crumbCurrent/s)
+    expect(css).toMatch(/:root \.accountPill \{[^}]*flex-shrink:\s*0/s)
+    expect(css).toMatch(/:root \.accountName \{\s*max-width:\s*128px/s)
+    expect(css).toMatch(/:root \.crumbCurrent/s)
     expect(css).toMatch(/min-width:\s*0/)
     // v7 の札（縮む側）は変えない。
     expect(css).not.toMatch(/^\.accountPill \{[^}]*flex-shrink/m)
@@ -51,14 +51,14 @@ describe('V8 の帯は絵どおり（殻合わせ）', () => {
   it('切替の札に役割を添える（v8-only・v7 の1行札は不変）', () => {
     expect(source).toContain('pillText')
     expect(source).toContain('pillRole')
-    expect(css).toMatch(/\[data-theme='v8'\] \.pillText \{[^}]*flex-direction:\s*column/s)
+    expect(css).toMatch(/:root \.pillText \{[^}]*flex-direction:\s*column/s)
     const pillTextBase = css.match(/\.pillText \{[^}]*\}/s)?.[0] ?? ''
     expect(pillTextBase).toMatch(/display:\s*contents/)
   })
 
   it('自分は名前→役割の積み（v7 は素通しで並び不変）', () => {
     expect(source).toContain('identityText')
-    expect(css).toMatch(/\[data-theme='v8'\] \.identityText \{[^}]*flex-direction:\s*column/s)
+    expect(css).toMatch(/:root \.identityText \{[^}]*flex-direction:\s*column/s)
     const textBase = css.match(/\.identityText \{[^}]*\}/s)?.[0] ?? ''
     expect(textBase).toMatch(/display:\s*contents/)
   })
@@ -70,8 +70,8 @@ describe('V8 の帯は絵どおり（殻合わせ）', () => {
 
   it('切替の札は箱の中に小さい字＋名前（外の見出しは畳む）', () => {
     expect(source).toContain('>LINEアカウント<')
-    expect(css).toMatch(/\[data-theme='v8'\] \.accountField > span:first-child \{[^}]*display:\s*none/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.accountPill \{[^}]*height:\s*36px/s)
+    expect(css).toMatch(/:root \.accountField > span:first-child \{[^}]*display:\s*none/s)
+    expect(css).toMatch(/:root \.accountPill \{[^}]*height:\s*36px/s)
   })
 
   it('『前の見た目に戻す』は帯に無い（オーナー指示で廃止）', () => {

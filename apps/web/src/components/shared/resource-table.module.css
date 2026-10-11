@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities;
 @layer components {
 .references { width: var(--tpl-htn-col-ref); }
 .updated { width: var(--tpl-htn-col-date); }

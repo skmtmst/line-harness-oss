@@ -72,8 +72,8 @@ describe('「？」の正円', () => {
 
 describe('V8の「？」は円と押せる範囲を分ける', () => {
   it('16pxの円を28pxの当たりの中に置き、枠と背景は円が持つ', () => {
-    const button = CSS.match(/\[data-theme='v8'\] \.button\s*\{[^}]*\}/)?.[0]
-    const mark = CSS.match(/\[data-theme='v8'\] \.mark\s*\{[^}]*\}/)?.[0]
+    const button = CSS.match(/:root \.button\s*\{[^}]*\}/)?.[0]
+    const mark = CSS.match(/:root \.mark\s*\{[^}]*\}/)?.[0]
     expect(button).toContain('width: 28px;')
     expect(button).toContain('height: 28px;')
     expect(button).toContain('background: transparent;')

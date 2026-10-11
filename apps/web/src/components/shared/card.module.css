@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .card {
 
@@ -120,7 +119,7 @@
 }
 
 /* V8 の段の箱（j8p3yj・r6dJFy）。指定された箱だけに効かせる。 */
-[data-theme='v8'] :is(.form, .aside, .panel) {
+:root :is(.form, .aside, .panel) {
   display: flex;
   flex-direction: column;
   border: 0;
@@ -128,26 +127,26 @@
   outline-offset: -1px;
   box-shadow: var(--card-shadow);
 }
-[data-theme='v8'] .form {
+:root .form {
   gap: var(--tpl-cn-card-gap);
   padding: var(--tpl-cn-card-pad);
 }
-[data-theme='v8'] .aside {
+:root .aside {
   gap: var(--tpl-cn-side-card-gap);
   padding: var(--tpl-side-card-pad);
 }
-[data-theme='v8'] .panel {
+:root .panel {
   gap: var(--tpl-cn-panel-inner-gap);
   padding: var(--tpl-cn-panel-pad);
 }
-[data-theme='v8'] .card[data-appearance="outlined"] {  border-radius: var(--tpl-rt-card-radius);    min-width: 0;
+:root .card[data-appearance="outlined"] {  border-radius: var(--tpl-rt-card-radius);    min-width: 0;
   border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
 }
-[data-theme='v8'] .card[data-gap="normal"] { gap: var(--tpl-rt-section-gap); }
-[data-theme='v8'] .card[data-gap="tight"] { gap: var(--tpl-e49-section-gap); }
-[data-theme='v8'] .card[data-gap="loose"] { gap: var(--tpl-e1-sns-card-gap); }
+:root .card[data-gap="normal"] { gap: var(--tpl-rt-section-gap); }
+:root .card[data-gap="tight"] { gap: var(--tpl-e49-section-gap); }
+:root .card[data-gap="loose"] { gap: var(--tpl-e1-sns-card-gap); }
 /* 縦に積む小さな設定カード。指定したカードだけに適用。 */
 .gapTight { gap: 12px; }
 
@@ -159,7 +158,7 @@
 .headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
 .headerPanel { padding: var(--tpl-rs-panel-head-pad); box-shadow: var(--tpl-rs-line-bottom); }
 
-[data-theme='v8'] .card[data-spacing='settings'] {
+:root .card[data-spacing='settings'] {
   display: flex; flex-direction: column; min-width: 0;
   gap: var(--tpl-rest3-ec-card-gap); padding: var(--tpl-rest3-ec-card-pad);
    border-radius: var(--tpl-rest3-ec-radius);
@@ -168,52 +167,52 @@
   background: var(--color-canvas);
 }
 /* 外部連携の設定・見本カードだけ（spacing='integration' | 'preview'）。既定のカードは変えない。 */
-[data-theme='v8'] .spacedInset {
+:root .spacedInset {
   display: flex; flex-direction: column;
   border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
 }
-[data-theme='v8'] .integration { gap: var(--tpl-rule-row-gap); padding: var(--tpl-cn-card-pad); }
-[data-theme='v8'] .preview { gap: var(--tpl-toolbar-gap); padding: var(--tpl-side-card-pad); }
+:root .integration { gap: var(--tpl-rule-row-gap); padding: var(--tpl-cn-card-pad); }
+:root .preview { gap: var(--tpl-toolbar-gap); padding: var(--tpl-side-card-pad); }
 
 /* NEN の設定フォーム。既定の面と余白は保つ。 */
-[data-theme='v8'] .inset { min-width: 0; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
-[data-theme='v8'] .bordered { min-width: 0;
+:root .inset { min-width: 0; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
+:root .bordered { min-width: 0;
   border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
 }
-[data-theme='v8'] .spacingNormal { gap: var(--tpl-nm-card-gap); }
-[data-theme='v8'] .spacingRoomy { gap: var(--tpl-nc-card-gap-wide); }
+:root .spacingNormal { gap: var(--tpl-nm-card-gap); }
+:root .spacingRoomy { gap: var(--tpl-nc-card-gap-wide); }
 
-[data-theme='v8'] .paddingCompact { padding: var(--tpl-nc-side-pad); }
-[data-theme='v8'] .spacingTight { gap: var(--tpl-nc-field-gap); }
-[data-theme='v8'] .spacingControls { gap: var(--tpl-toolbar-gap); }
+:root .paddingCompact { padding: var(--tpl-nc-side-pad); }
+:root .spacingTight { gap: var(--tpl-nc-field-gap); }
+:root .spacingControls { gap: var(--tpl-toolbar-gap); }
 
 /* B-152・仕上げ1 */
-[data-theme='v8'] .paddingDefault, [data-theme='v8'] .paddingCompact { padding: var(--polish-space-card); }
-[data-theme='v8'] .paddingRoomy, [data-theme='v8'] .paddingSpacious { padding: var(--polish-space-section); }
-[data-theme='v8'] .header { padding-inline: var(--polish-space-card); gap: var(--polish-space-field); }
-[data-theme='v8'] .gapTight { gap: var(--polish-space-row); }
+:root .paddingDefault, :root .paddingCompact { padding: var(--polish-space-card); }
+:root .paddingRoomy, :root .paddingSpacious { padding: var(--polish-space-section); }
+:root .header { padding-inline: var(--polish-space-card); gap: var(--polish-space-field); }
+:root .gapTight { gap: var(--polish-space-row); }
 
 /* B-152・仕上げ2 */
-[data-theme='v8'] :is(.title, .headerStacked .title, .headerPanel .title) { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
-[data-theme='v8'] .meta { font-weight: var(--polish-weight-body); }
-[data-theme='v8'] .action { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }
+:root :is(.title, .headerStacked .title, .headerPanel .title) { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
+:root .meta { font-weight: var(--polish-weight-body); }
+:root .action { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }
 
 /* B-159：入れ子の面には影を重ねない。外のカードの内側だけをそろえる。 */
-[data-theme='v8'] .paddingCompact,
-[data-theme='v8'] .paddingDefault { padding: var(--tpl-card-pad); }
+:root .paddingCompact,
+:root .paddingDefault { padding: var(--tpl-card-pad); }
 
 /* B-180：中身の段の題は型や配置によらず15/700。 */
-[data-theme='v8'] .header .title,
-[data-theme='v8'] .headerStacked .title,
-[data-theme='v8'] .headerPanel .title {
+:root .header .title,
+:root .headerStacked .title,
+:root .headerPanel .title {
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
-[data-theme='v8'] .headerRestaurant{min-height:58px;padding:20px 24px 15px;align-items:flex-start;}
-[data-theme='v8'] .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
-[data-theme='v8'] .headerRestaurant .title{font-size:15px;line-height:23px;}
-[data-theme='v8'] .headerRestaurant .meta{font-size:14px;line-height:21px;}
+:root .headerRestaurant{min-height:58px;padding:20px 24px 15px;align-items:flex-start;}
+:root .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
+:root .headerRestaurant .title{font-size:15px;line-height:23px;}
+:root .headerRestaurant .meta{font-size:14px;line-height:21px;}

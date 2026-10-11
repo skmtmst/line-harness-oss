@@ -61,26 +61,12 @@ describe('V8 の入力・選択・押し口規定', () => {
     expect(offenders).toEqual([])
   })
 
-  it('部品の CSS Module は先頭で層の順番を宣言する', () => {
-    /*
-     * Tailwind v4 の出力は層の順番を先頭で宣言しない。部品の CSS が
-     * globals.css より先に読まれると、最初に現れた `@layer components` が
-     * 1番目の層になり、後から来る base（preflight）が部品に勝つ。
-     * ボタンの地・枠・余白、入力欄の枠が全部消えた（検証環境 2026-10-02）。
-     * どの順で読まれても同じになるよう、各ファイルの1行目で順番を宣言する。
-     *
-     * ★V8 移行が済んで不要になったら、次の1行で全部消せる（この試験も消す）:
-     *   grep -rl 'layer-order: V8 移行後に消す' apps/web/src | xargs sed -i '' '/layer-order: V8 移行後に消す/d'
-     */
-    // 層の順番を守る。注釈の有無は描画に関係しない。
-    const order = /^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;\s*(?:\/\*[\s\S]*?\*\/\s*)?@layer components\s*\{/
-    const dir = new URL('.', import.meta.url)
-    const modules = readdirSync(dir).filter((name) => name.endsWith('.module.css'))
-    const offenders = modules.filter((name) => {
-      const css = read(`./${name}`)
-      return css.includes('@layer components') && !order.test(css)
-    })
-    expect(offenders).toEqual([])
+  it('layer order is centralized, with no per-module migration declaration', () => {
+    expect(read('../../app/globals.css')).toMatch(/^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
+    const modules = readdirSync(new URL('.', import.meta.url)).filter(name => name.endsWith('.module.css'))
+    for (const name of modules) {
+      expect(read(`./${name}`), name).not.toMatch(/layer-order|@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
+    }
   })
 
   it('代表的な画面側上書きも規定値に戻す', () => {

@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .button {
   display: inline-flex;
@@ -157,21 +156,21 @@
  * 高さ36・余白 0 16・文字13px。主は B-151 の墨色の影、副は白地に
  * 細い枠と薄い影。compact（行内の操作）はV8に別寸法が無いので32のまま。
  */
-[data-theme='v8'] .button {
+:root .button {
   padding: 0 var(--tpl-button-pad-side);
   font-size: var(--text-body);
 }
 
-[data-theme='v8'] .standard,
-[data-theme='v8'] .field {
+:root .standard,
+:root .field {
   height: var(--tpl-button-h);
 }
 
-[data-theme='v8'] .primary {
+:root .primary {
   box-shadow: var(--shadow-primary-action);
 }
 
-[data-theme='v8'] .secondary {
+:root .secondary {
   box-shadow: var(--control-shadow);
 }
 
@@ -180,7 +179,7 @@
  * v7 は 80ms のまま。キーボードの印は action の 2px の輪
  * （文字ボタン text-action と同じ色にそろえる）。
  */
-[data-theme='v8'] .button {
+:root .button {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     border-color var(--motion-fast) var(--motion-ease-out),
@@ -195,16 +194,16 @@
  * 以前は乗せる 0.92・押す 0.95 で、押すと明るく戻る逆の手応えだった。
  * 動きを減らす設定では大きさを変えない（暗くするだけ残る）。
  */
-[data-theme='v8'] .button:active:not(:disabled) {
+:root .button:active:not(:disabled) {
   filter: var(--press-dim);
 }
 
-[data-theme='v8'] .secondary:active:not(:disabled) {
+:root .secondary:active:not(:disabled) {
   filter: var(--press-dim-soft);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme='v8'] .button:active:not(:disabled) {
+  :root .button:active:not(:disabled) {
     scale: var(--press-scale);
     transition:
       background-color var(--motion-fast) var(--motion-ease-out),
@@ -214,71 +213,71 @@
   }
 }
 
-[data-theme='v8'] .button:focus-visible {
+:root .button:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .primary { border: 1px solid var(--color-primary-border); border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
-[data-theme='v8'] .secondary { outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
+:root .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .primary { border: 1px solid var(--color-primary-border); border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
+:root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
 .text { border-color: transparent; background: transparent; color: var(--color-ink-secondary); }
-[data-theme='v8'] .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
+:root .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
 
-[data-theme='v8'] .button[data-presentation]:not([data-presentation='restaurant']) {
+:root .button[data-presentation]:not([data-presentation='restaurant']) {
   flex-shrink: 0; min-height: 0; height: auto; border: 0; padding: 0;
   background: transparent; box-shadow: none; font-family: inherit; font-weight: 600; line-height: inherit;
 }
-[data-theme='v8'] .button[data-presentation='account-inline'] { color: var(--color-accent-deep); font-size: var(--tpl-acd-label-size); }
-[data-theme='v8'] .button[data-presentation='registration-inline'] { color: var(--color-action); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
-[data-theme='v8'] .button[data-presentation]:hover:not(:disabled) { text-decoration: underline; }
-[data-theme='v8'] .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
+:root .button[data-presentation='account-inline'] { color: var(--color-accent-deep); font-size: var(--tpl-acd-label-size); }
+:root .button[data-presentation='registration-inline'] { color: var(--color-action); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
+:root .button[data-presentation]:hover:not(:disabled) { text-decoration: underline; }
+:root .button > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex: none; }
 /* 一覧から取消の確認を開く副ボタン。確定の danger はそのまま。 */
 .danger-outline { border-color: var(--color-hairline); background: var(--color-canvas); color: var(--color-danger); }
-[data-theme='v8'] .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
+:root .danger-outline { background: var(--color-canvas); color: var(--color-danger); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
 
 /* 本文中の小さな操作。通常のボタンの高さは変えない。 */
-[data-theme='v8'] .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }
-[data-theme='v8'] .inline.text { color: var(--color-action); }
+:root .inline { height: auto; min-height: 0; padding: 0; font-size: var(--text-caption); line-height: 19px; }
+:root .inline.text { color: var(--color-action); }
 
-[data-theme='v8'] .slot { min-height: 0; height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: 17px; }
+:root .slot { min-height: 0; height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: 17px; }
 }
 
 /* 節の見出しと同じ行に置く文字の操作。ほかの高さは変えない。 */
-[data-theme='v8'] .button.inline { min-height: 0; height: auto; padding: 0; font-size: var(--text-caption); line-height: var(--tpl-fdt-small-lh); }
-[data-theme='v8'] .button[data-align='start'] { justify-content: flex-start; }
+:root .button.inline { min-height: 0; height: auto; padding: 0; font-size: var(--text-caption); line-height: var(--tpl-fdt-small-lh); }
+:root .button[data-align='start'] { justify-content: flex-start; }
 
 /* 画像選択用の正方形。通常のボタンの既定値は変えない。 */
-[data-theme='v8'] .button.thumbnail {
+:root .button.thumbnail {
   width: var(--tpl-rt-picker-size); height: var(--tpl-rt-picker-size); min-height: 0;
   padding: 0; overflow: hidden; border: 0; border-radius: var(--tpl-rt-inner-radius);
   outline: 1px solid var(--color-hairline); outline-offset: -1px;
   background: var(--color-table-head);
 }
-[data-theme='v8'] .button.thumbnail:is(:hover, :focus-visible) { outline: var(--tpl-rt-focus-ring-accent); }
-[data-theme='v8'] .button.thumbnail > img { width: 100%; height: 100%; object-fit: cover; }
+:root .button.thumbnail:is(:hover, :focus-visible) { outline: var(--tpl-rt-focus-ring-accent); }
+:root .button.thumbnail > img { width: 100%; height: 100%; object-fit: cover; }
 /* 文字だけの行内操作。通常のボタンの見た目は変えない。 */
-[data-theme='v8'] .button.inline.text {
+:root .button.inline.text {
   height: auto; min-height: 0; padding: 0; border: 0; background: none;
   color: var(--color-action); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-rs-lh-12);
 }
 
-[data-theme='v8'] .button.inline.text.textInk { color: var(--color-ink); }
+:root .button.inline.text.textInk { color: var(--color-ink); }
 
-[data-theme='v8'] .button.composer { height: var(--tpl-button-h); min-height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
+:root .button.composer { height: var(--tpl-button-h); min-height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
-[data-theme='v8'] .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
+:root .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
 /* B-152・仕上げ2 */
-[data-theme='v8'] .button, .button.inline.text { font-weight: var(--polish-weight-body); }
+:root .button, .button.inline.text { font-weight: var(--polish-weight-body); }
 
 /* B-152・仕上げ7 */
-[data-theme='v8'] .button:disabled { opacity: var(--polish-disabled-opacity); }
-[data-theme='v8'] .button:is(:hover, :active):not(:disabled) { filter: none; }
+:root .button:disabled { opacity: var(--polish-disabled-opacity); }
+:root .button:is(:hover, :active):not(:disabled) { filter: none; }
 /* O2Z8u・GcyTr の電話予約。標準の高さを保ち、印と文字の間を絵へ合わせる。 */
-[data-theme='v8'] .button.booking { height: var(--tpl-chip-h); padding-inline: var(--tpl-booking-button-pad); gap: var(--tpl-body-gap); }
+:root .button.booking { height: var(--tpl-chip-h); padding-inline: var(--tpl-booking-button-pad); gap: var(--tpl-body-gap); }
 
 @layer components {
-[data-theme='v8'] .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
+:root .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
 }

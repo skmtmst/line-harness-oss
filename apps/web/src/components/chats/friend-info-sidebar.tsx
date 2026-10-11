@@ -199,7 +199,7 @@ function ExpandableText({ value, className = '', empty = '未登録' }: {
    * ★V8：空の「未登録」はほかの値と同じ大きさ（13px）・普通の太さで、薄い色にする。
    * 大きさを付けないと親の 16px を継いで、値より大きく見えていた（オーナー指摘）。
    */
-  if (!value) return <span className="text-ink-faint v8:text-label v8:font-normal">{empty}</span>
+  if (!value) return <span className="text-ink-faint text-label font-normal">{empty}</span>
   return (
     <button
       type="button"
@@ -1256,7 +1256,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
             {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
             {accountId && friendId ? (
               /* ★V8：前払いでない人は中身が空。空の帯（上下12＋線）を残さない（オーナー指摘）。 */
-              <div className="border-hairline border-b px-5 py-3 v8:empty:hidden">
+              <div className="border-hairline border-b px-5 py-3 empty:hidden">
                 <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} />
               </div>
             ) : null}
@@ -1274,11 +1274,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
               <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">本名</span>
-                <ExpandableText value={friend.realName} className="text-xs text-ink-secondary v8:text-label" />
+                <ExpandableText value={friend.realName} className="text-label text-ink-secondary" />
               </div>
               {((friend.systemDisplayName && friend.systemDisplayName !== friend.displayName)) ? <div className="flex justify-between items-center gap-2">
                 <span className="text-micro text-ink-faint shrink-0">システム表示名</span>
-                <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary v8:text-label" />
+                <ExpandableText value={friend.systemDisplayName} className="text-label text-ink-secondary" />
               </div> : null}
               {null}
             </div>

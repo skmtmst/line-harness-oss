@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /*
  * バナー生成パネルの小さな部品の見た目。

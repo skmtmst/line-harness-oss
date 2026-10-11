@@ -12,10 +12,10 @@ const CSS = readFileSync(join(HERE, 'settings-v8.module.css'), 'utf8')
 const START = readFileSync(join(HERE, '..', 'getting-started', 'page.tsx'), 'utf8')
 
 /*
- * V8 設定の細かい板（bR6a1・bKipf・BOj1a・ziYCN）。
+ * V8 設定の細かい板（bR6a1・bKipf・xuJ7D・ziYCN）。
  * `bR6a1`（状態ごとの見え方）：3画面とも0件に板IDと「条件を外す」。
  * `bKipf`（機能設定1152）：板1100px未満で畳む（同一画面の幅違い）。
- * `BOj1a`（はじめの設定）：順路の段に板ID。
+ * `xuJ7D`（はじめの設定）：順路の段に板ID。
  * `ziYCN`（機能設定の競合）：帯で知らせ、比べる・読み直しを出す。
  * 会社とロゴ（`uAWb7`）は読み書きの口が無いので作らない。
  * v7 は変えない。
@@ -41,8 +41,8 @@ describe('設定の細かい板', () => {
     expect(CSS).toContain('@media (max-width: 1100px)')
   })
 
-  it('はじめの設定の順路に板IDを付ける（BOj1a）', () => {
-    expect(START).toMatch(/(?:data-design-node|boardId)="BOj1a"/)
+  it('はじめの設定の順路に板IDを付ける（xuJ7D）', () => {
+    expect(START).toMatch(/(?:data-design-node|boardId)="xuJ7D"/)
   })
 
   it('機能設定の競合は帯・比べる・読み直しを出す（ziYCN）', () => {

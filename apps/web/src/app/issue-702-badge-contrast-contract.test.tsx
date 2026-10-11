@@ -138,7 +138,7 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
   it('テンプレートの種類タブ：選んだ札を明るい緑で上書きしない（濃い緑のまま）', () => {
     const page = read('../v8/templates/list.tsx')
     expect(page).toContain('<Tabs')
-    expect(read('../components/shared/tabs.module.css')).toMatch(/\[data-theme='v8'\] \.current \{[^}]*color: var\(--color-ink\)/)
+    expect(read('../components/shared/tabs.module.css')).toMatch(/:root \.current \{[^}]*color: var\(--color-ink\)/)
     expect(page).not.toContain("backgroundColor: 'var(--color-accent)'")
   })
 

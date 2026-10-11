@@ -40,7 +40,7 @@
   flex-shrink: 0;
 }
 
-[data-theme='v8'] .title {
+:root .title {
   font-size: var(--tpl-title-size);
   font-weight: var(--tpl-title-weight);
   line-height: var(--tpl-title-lh);

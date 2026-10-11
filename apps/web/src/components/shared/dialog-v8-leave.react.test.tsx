@@ -120,7 +120,6 @@ describe('V8 窓・引き出しの閉じ方', () => {
     const rules = [...css.matchAll(/(?<=^|[{}])([^{}]*)\{([^}]*)/g)]
       .filter((m) => m[1].includes('[data-design-part="dialog"]') && /animation:\s*lh-surface-in/.test(m[2]))
       .map((m) => m[1].trim())
-    expect(rules.length).toBeGreaterThan(0)
-    for (const selector of rules) expect(selector).toMatch(/:root:not\(\[data-theme="v8"\]\)/)
+    expect(rules).toEqual([])
   })
 })

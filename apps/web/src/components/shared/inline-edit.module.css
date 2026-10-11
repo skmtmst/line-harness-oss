@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * その場の書き換え（V8「サクサク感」C②）。見る目は文字だけ、

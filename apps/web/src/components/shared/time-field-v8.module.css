@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 時刻の欄（★V8）。Pencil V8.pen 提案 YCOoR「時刻を選ぶ（打つ＋2列から選ぶ）」。

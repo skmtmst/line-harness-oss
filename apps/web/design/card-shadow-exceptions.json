@@ -36,7 +36,7 @@
   },
   {
     "file": "v8/analytics/analytics.module.css",
-    "selector": ":global([data-theme='v8']) .rowMenuButton",
+    "selector": ":global(:root) .rowMenuButton",
     "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
   },
   {
@@ -146,7 +146,7 @@
   },
   {
     "file": "v8/form-edit/edit.module.css",
-    "selector": ":global([data-theme='v8']) .more :global(button)",
+    "selector": ":global(:root) .more :global(button)",
     "reason": "入力欄・補助操作・選択肢。中身のカードではない。"
   },
   {
@@ -436,7 +436,7 @@
   },
   {
     "file": "app/chats/inbox-v8.module.css",
-    "selector": ":global([data-theme='v8']) .channelBadge",
+    "selector": ":global(:root) .channelBadge",
     "reason": "札・印・画像・端末の見本。カードの影を付けない。"
   },
   {

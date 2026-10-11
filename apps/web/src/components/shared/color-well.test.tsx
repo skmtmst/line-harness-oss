@@ -153,7 +153,7 @@ describe('ColorWell（★BG-2 カラーピッカー）', () => {
     expect(css).toMatch(/\.bar\s*\{[^}]*height:\s*12px/)
     expect(css).toMatch(/\.cell\s*\{[^}]*height:\s*28px/)
     // V8 ではコントロールの枠色トークンを使う（直書きの #c9ced6 は使わない）。
-    expect(css).toMatch(/\[data-theme='v8'\][^{]*\{\s*border-color:\s*var\(--color-control-border\)/)
+    expect(css).toMatch(/:root[^{]*\{\s*border-color:\s*var\(--color-control-border\)/)
     expect(css).not.toMatch(/#c9ced6/i)
   })
 })

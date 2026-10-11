@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 .badge {
   display: inline-flex;
@@ -65,7 +64,7 @@
  * 余白 2/8。点は文字と同じ色（currentColor）で、色だけに頼らない
  * 印（形）としても働く。
  */
-[data-theme='v8'] .badge {
+:root .badge {
   gap: var(--polish-status-gap);
   padding: 2px 8px;
   font-size: var(--text-caption);
@@ -73,7 +72,7 @@
   line-height: var(--text-lh, 1.5); /* 12×1.5＋上下2 → 高さ22（mpVfY） */
 }
 
-[data-theme='v8'] .badge::before {
+:root .badge::before {
   width: 6px;
   height: 6px;
   flex: 0 0 6px;
@@ -83,7 +82,7 @@
 }
 
 /* Exported V8 states: exact geometry and palette; v7 stays above. */
-[data-theme='v8'] .badge {
+:root .badge {
   flex-shrink: 0;
   justify-content: flex-start;
   border-radius: var(--radius-pill);
@@ -91,55 +90,55 @@
   font-size: 12px;
   line-height: 18px;
 }
-[data-theme='v8'] .badge::before { border-radius: 50%; }
+:root .badge::before { border-radius: 50%; }
 /* 点なしの札（dot={false}）。 */
-[data-theme='v8'] .noDot::before { content: none; }
-[data-theme='v8'] .neutral { background: var(--color-v8-pill-off); color: var(--color-ink-secondary); }
-[data-theme='v8'] .info { background: var(--color-status-info-soft); color: var(--color-status-info); }
-[data-theme='v8'] .warning { background: var(--color-status-warn-soft); color: var(--color-warning); }
-[data-theme='v8'] .success { background: var(--color-success-bg); color: var(--color-success); }
-[data-theme='v8'] .danger { background: var(--color-status-danger-soft); color: var(--color-danger); }
+:root .noDot::before { content: none; }
+:root .neutral { background: var(--color-v8-pill-off); color: var(--color-ink-secondary); }
+:root .info { background: var(--color-status-info-soft); color: var(--color-status-info); }
+:root .warning { background: var(--color-status-warn-soft); color: var(--color-warning); }
+:root .success { background: var(--color-success-bg); color: var(--color-success); }
+:root .danger { background: var(--color-status-danger-soft); color: var(--color-danger); }
 
-[data-theme='v8'] .badge.micro { font-size: var(--text-nano); font-weight: 400; line-height: 14px; }
-[data-theme='v8'] .badge[data-surface='white'] { background: var(--color-canvas); }
+:root .badge.micro { font-size: var(--text-nano); font-weight: 400; line-height: 14px; }
+:root .badge[data-surface='white'] { background: var(--color-canvas); }
 }
 
 /* タグ名の横の注記。板の小さい札の寸法を保つ。 */
-[data-theme='v8'] .annotation { padding: 0 var(--tpl-tag-name-gap); background: var(--color-canvas-sunken); color: var(--color-ink-faint); font-size: var(--tpl-tag-note-size); font-weight: 500; line-height: var(--tpl-row-sub-lh); }
-[data-theme='v8'] .annotation.warning { color: var(--color-warning); }
+:root .annotation { padding: 0 var(--tpl-tag-name-gap); background: var(--color-canvas-sunken); color: var(--color-ink-faint); font-size: var(--tpl-tag-note-size); font-weight: 500; line-height: var(--tpl-row-sub-lh); }
+:root .annotation.warning { color: var(--color-warning); }
 
 /* B-152・仕上げ4 */
-[data-theme='v8'] .badge:not(.annotation) {
+:root .badge:not(.annotation) {
   gap: var(--polish-status-gap); padding: var(--badge-padding, var(--polish-status-pad));
   border: 0; border-radius: var(--radius-pill);
   background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink);
   font-size: var(--polish-text-support); font-weight: var(--polish-status-weight); line-height: 1.5;
   max-width: 100%; min-width: 0;
 }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='success'] { background: var(--polish-status-success-bg); color: var(--polish-status-success-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='success']::before { background: var(--polish-status-success-dot); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='warning'] { background: var(--polish-status-warning-bg); color: var(--polish-status-warning-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='warning']::before { background: var(--polish-status-warning-dot); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='danger'] { background: var(--polish-status-danger-bg); color: var(--polish-status-danger-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='danger']::before { background: var(--polish-status-danger-dot); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='info'] { background: var(--polish-status-info-bg); color: var(--polish-status-info-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='info']::before { background: var(--polish-status-info-dot); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='neutral'] { background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink); }
-[data-theme='v8'] .badge:not(.annotation)[data-tone='neutral']::before { background: var(--polish-status-neutral-dot); }
-[data-theme='v8'] .badge:not(.annotation)::before { background: var(--polish-status-neutral-dot); width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); }
+:root .badge:not(.annotation)[data-tone='success'] { background: var(--polish-status-success-bg); color: var(--polish-status-success-ink); }
+:root .badge:not(.annotation)[data-tone='success']::before { background: var(--polish-status-success-dot); }
+:root .badge:not(.annotation)[data-tone='warning'] { background: var(--polish-status-warning-bg); color: var(--polish-status-warning-ink); }
+:root .badge:not(.annotation)[data-tone='warning']::before { background: var(--polish-status-warning-dot); }
+:root .badge:not(.annotation)[data-tone='danger'] { background: var(--polish-status-danger-bg); color: var(--polish-status-danger-ink); }
+:root .badge:not(.annotation)[data-tone='danger']::before { background: var(--polish-status-danger-dot); }
+:root .badge:not(.annotation)[data-tone='info'] { background: var(--polish-status-info-bg); color: var(--polish-status-info-ink); }
+:root .badge:not(.annotation)[data-tone='info']::before { background: var(--polish-status-info-dot); }
+:root .badge:not(.annotation)[data-tone='neutral'] { background: var(--polish-status-neutral-bg); color: var(--polish-status-neutral-ink); }
+:root .badge:not(.annotation)[data-tone='neutral']::before { background: var(--polish-status-neutral-dot); }
+:root .badge:not(.annotation)::before { background: var(--polish-status-neutral-dot); width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); }
 
 /* B-159 / B-180：小さい注記も状態なら同じ22px・12/600。 */
-[data-theme='v8'] .badge {
+:root .badge {
   box-sizing: border-box;
   height: var(--tpl-badge-h);
   font-size: var(--text-caption); font-weight: 600; line-height: 18px;
 }
-[data-theme='v8'] .badge.micro {
+:root .badge.micro {
   font-size: var(--text-caption); font-weight: 600; line-height: 18px;
 }
-[data-theme='v8'] .neutral { background: var(--color-badge-neutral-bg); color: var(--color-badge-neutral); }
-[data-theme='v8'] .success { background: var(--color-badge-success-bg); color: var(--color-badge-success); }
-[data-theme='v8'] .warning { background: var(--color-badge-warning-bg); color: var(--color-badge-warning); }
-[data-theme='v8'] .danger { background: var(--color-badge-danger-bg); color: var(--color-badge-danger); }
-[data-theme='v8'] .info { background: var(--color-badge-info-bg); color: var(--color-badge-info); }
-@layer components { [data-theme='v8'] .badge[data-size='dining']{--badge-padding:2px 14px;} }
+:root .neutral { background: var(--color-badge-neutral-bg); color: var(--color-badge-neutral); }
+:root .success { background: var(--color-badge-success-bg); color: var(--color-badge-success); }
+:root .warning { background: var(--color-badge-warning-bg); color: var(--color-badge-warning); }
+:root .danger { background: var(--color-badge-danger-bg); color: var(--color-badge-danger); }
+:root .info { background: var(--color-badge-info-bg); color: var(--color-badge-info); }
+@layer components { :root .badge[data-size='dining']{--badge-padding:2px 14px;} }

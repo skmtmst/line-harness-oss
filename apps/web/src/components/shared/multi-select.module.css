@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
  * 複数選択。Pencil ★V8（V8.pen）「複数選ぶ（札＋N）」。欄・候補の決まりは Combobox と同じ。
@@ -31,7 +30,7 @@
   transition: border-color var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .field:not(.open):not(.invalid) {
+:root .field:not(.open):not(.invalid) {
   border-color: var(--color-control-border);
   box-shadow: var(--control-shadow);
 }
@@ -365,7 +364,7 @@
  * ★V8 仕上げ3回目（M10）⑤：候補は少し下から 200ms
  * （…・選ぶ欄・選ぶ箱と同じ速さ・同じ出方）。v7 は 120ms のまま。
  */
-[data-theme='v8'] .popup {
+:root .popup {
   animation-name: multi-select-v8-in;
   animation-duration: var(--motion-base);
 }
