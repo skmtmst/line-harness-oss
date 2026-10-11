@@ -106,8 +106,6 @@ const BASELINE: Record<string, number> = {
   'components/friends/advanced-search-dialog.tsx': 1,
   'components/hq/banners/upload-button.tsx': 1,
   'components/hq/banners/upload-target-dialog.tsx': 1,
-  'components/inflow-links/site-script-v8.tsx': 3,
-  'components/inflow-links/site-script.tsx': 3,
   'components/ops/ops-ui.tsx': 1,
   'components/rich-menus/apply-to-tag-modal.tsx': 1,
   'components/scenarios/duplicate-scenario.ts': 2,

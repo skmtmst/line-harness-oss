@@ -9,6 +9,7 @@ import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { describeSaveFailure } from '@/lib/api'
 
 type Values = Pick<AdEventMapping, 'mode' | 'eventName' | 'googleActionId'>
 
@@ -34,7 +35,7 @@ export default function AdMappingDialog({ item, onClose, onSave }: {
     try {
       if (await onSave({ mode, eventName: mode === 'manual' ? name : null, googleActionId: actionId || null })) disarm()
     } catch (failure) {
-      if (!errors.capture(failure)) setError(failure instanceof Error ? failure.message : '保存できませんでした。読み直してください。')
+      if (!errors.capture(failure)) setError(describeSaveFailure(failure))
     } finally {
       busyRef.current = false
       setBusy(false)

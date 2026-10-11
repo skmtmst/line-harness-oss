@@ -11,7 +11,7 @@ const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf
 // 削除の窓は詳細の画面（detail/page.tsx）の中にある。古い _components/inflow-delete-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
 const DELETE_DIALOG = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
 const MODAL = readFileSync(join(ROOT, '../../v8/inflow-links/edit-route-dialog.tsx'), 'utf8')
-const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
+const SITE = readFileSync(join(ROOT, '../../v8/inflow-links/site-script.tsx'), 'utf8')
 const LIFF = readFileSync(join(ROOT, '..', '..', '..', '..', 'worker', 'src', 'routes', 'liff.ts'), 'utf8')
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
@@ -100,7 +100,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
   it('#514-14: 計測先ホストとパスを口から受け取って表示する', () => {
     expect(SITE).not.toContain('new URL(page.path)')
     expect(SITE).not.toContain('unknown-')
-    expect(SITE).toContain('{page.host ?? \'以前の記録\'}')
+    expect(SITE).toContain('title={page.host ? `${page.host}${page.path}` : page.path}')
     expect(SITE).toContain('{page.path}')
     expect(FIXTURES).toContain("{ host: 'shop.example.com', path: '/', views:")
     expect(FIXTURES).not.toContain("path: 'https")

@@ -7,7 +7,7 @@ const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
 const ADS = ['ads.tsx', 'ad-connections.tsx', 'ad-history.tsx', 'ad-shared.ts'].map(file => readFileSync(join(ROOT, '../../v8/inflow-links', file), 'utf8')).join('\n')
 const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
-const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
+const SITE = readFileSync(join(ROOT, '../../v8/inflow-links/site-script.tsx'), 'utf8')
 const API = readFileSync(join(ROOT, '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
@@ -32,7 +32,7 @@ describe('V6 機能18の画面契約', () => {
   })
 
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {
-    expect(SITE).toContain('data-design-node="XjOte"')
+    expect(SITE).toContain('boardId="XjOte"')
     expect(ADS).toContain('boardId="qSTVR"')
     expect(ADS).toContain('data-design-node="FDBsG"')
     expect(ADS).toContain('data-design-node="p0kA3"')
@@ -43,7 +43,7 @@ describe('V6 機能18の画面契約', () => {
     // 直書きの警告は出さない。届いたパスをそのまま出す。
     expect(SITE).not.toContain('知らないドメインが1つあります')
     expect(SITE).not.toContain("includes('unknown-')")
-    expect(SITE).toContain('いま届いているページ')
+    expect(SITE).toContain('aria-label="ページごとの表示"')
   })
 
   it('押せない準備中UIを機能18から除く', () => {
@@ -86,7 +86,7 @@ describe('V6 機能18の計測鍵の契約(#514-2)', () => {
 
   it('取得前・失敗時はコードを出さず案内を出す', () => {
     expect(SITE).toContain('あなたのアカウントのコードを取得しています')
-    expect(SITE).toContain('計測コードを取得できませんでした')
+    expect(SITE).toContain('計測コードを読み込めませんでした')
     expect(SITE).toContain('コードをもう一度取得する')
   })
 
