@@ -34,7 +34,7 @@ const OTHER = 'other';
  * `fetch` 自体が失敗したとき（応答が返らなかったとき）の呼び名。
  *
  * - `TimeoutError` … `AbortSignal.timeout` の時間切れ。Meta が遅い／通信が出られない。
- * - `TypeError` … つなげなかった（名前が引けない・接続できない・許していない転送を受けた）。
+ * - `TypeError` … つなげなかった（名前が引けない・接続できない・要求の指定が実行環境に無い）。
  * - `AbortError` … 途中で打ち切られた。
  *
  * この呼び名も `Error` の `name` という**応答側の値ではない**が、投げられる中身は
@@ -54,6 +54,20 @@ function fetchErrorName(e: unknown): string {
   return typeof name === 'string' && FETCH_ERROR_NAMES.has(name)
     ? name
     : OTHER;
+}
+/**
+ * 受け取った応答が転送（リダイレクト）かどうか。
+ *
+ * `redirect: 'manual'` では転送を追わず、3xx の応答がそのまま返る。実行環境によっては
+ * 中身を読めない応答（`type` が `opaqueredirect`、状態番号は 0）になることもあるため、
+ * 番号と種類の両方で見分ける。
+ */
+function isRedirectResponse(response: Response): boolean {
+  return (
+    // 型の上では Workers に `opaqueredirect` は無いが、実行環境ごとの違いに備えて見る。
+    (response.type as string) === 'opaqueredirect' ||
+    (response.status >= 300 && response.status < 400)
+  );
 }
 /**
  * Meta のエラー本文から、原因調べに使う安全な項目だけを短く取り出す。
@@ -111,6 +125,7 @@ async function metaErrorDetail(response: Response): Promise<string | undefined> 
  * - 要求の種別と宛先（`GET v21.0/me/accounts` など。こちらのコードが決める形のみ）
  * - `fetch` … 応答が返らなかったときの呼び名（`FETCH_ERROR_NAMES` の一覧のみ）
  * - `status` … 3桁の数字
+ * - `redirect` … 転送を受けて止めたときの状態番号（3桁まで）
  * - `type` … 上の一覧に載る名前（載っていなければ `other`）
  * - `code` / `subcode` … 数字
  */
@@ -131,6 +146,9 @@ export function instagramUrlDetail(
     );
   const status = /(?:^| )status=([0-9]{3})(?= |$)/.exec(detail);
   if (status) parts.push(`status=${status[1]}`);
+  // 転送を受けて止めたときの状態番号だけ。中身を読めない応答では 0 になる。
+  const redirect = /(?:^| )redirect=([0-9]{1,3})(?= |$)/.exec(detail);
+  if (redirect) parts.push(`redirect=${redirect[1]}`);
   const type = /(?:^| )type=([A-Za-z]{1,40})(?= |$)/.exec(detail);
   if (type)
     parts.push(`type=${META_ERROR_TYPES.has(type[1]) ? type[1] : OTHER}`);
@@ -243,7 +261,12 @@ export async function instagramGraph<T>(
     response = await fetch(url, {
       method,
       headers,
-      redirect: 'error',
+      // Workers の実行環境は転送の扱いに `follow` と `manual` しか受け付けず、
+      // `error` を渡すと**通信する前に** TypeError で弾かれる（転送が起きたかに関係ない）。
+      // そのため Meta への要求が1本も出ず、接続が必ず失敗していた。
+      // `manual` は転送を追わないので、合鍵や認可コードを別の宛先へ渡さない点は同じ。
+      // 受け取った転送応答は下で失敗として扱う。
+      redirect: 'manual',
       signal: AbortSignal.timeout(15000),
     });
   } catch (e) {
@@ -255,6 +278,15 @@ export async function instagramGraph<T>(
       `${method} ${config.version}/${path} fetch=${fetchErrorName(e)}`,
     );
   }
+  // 転送応答は追わない。追えば合鍵・アプリシークレット・認可コードを
+  // Meta 以外の宛先へ渡してしまうため、ここで失敗にする。
+  // 転送先（`Location`）は手がかりに出さない。渡した値がそのまま入っている場合があるため。
+  if (isRedirectResponse(response))
+    throw new InstagramError(
+      'meta_request_failed',
+      502,
+      `${method} ${config.version}/${path} redirect=${response.status}`,
+    );
   if (!response.ok)
     throw new InstagramError(
       response.status === 401 || response.status === 403
