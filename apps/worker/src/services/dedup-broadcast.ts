@@ -294,6 +294,7 @@ const MAX_RUN_MS = 10_000;
  */
 interface DedupProgress {
   sentIdentKeys: string[];
+  audience?: DedupPreviewResult;
 }
 
 function parseProgress(raw: string | null | undefined): DedupProgress {
@@ -303,6 +304,7 @@ function parseProgress(raw: string | null | undefined): DedupProgress {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { sentIdentKeys?: unknown }).sentIdentKeys)) {
       return {
+        ...(parsed.audience ? { audience: parsed.audience as DedupPreviewResult } : {}),
         sentIdentKeys: (parsed as { sentIdentKeys: unknown[] }).sentIdentKeys
           .filter((s): s is string => typeof s === 'string'),
       };
@@ -350,16 +352,17 @@ export async function processMultiAccountDedupBroadcast(
   const accountIds = (broadcast.account_ids ? JSON.parse(broadcast.account_ids) : []) as string[];
   const dedupPriority = (broadcast.dedup_priority ? JSON.parse(broadcast.dedup_priority) : []) as string[];
 
-  const preview = await computeDedupBroadcastPreview(
-    db,
-    accountIds,
-    dedupPriority,
-    broadcast.target_tag_id ?? null,
-  );
-
-  // resume 用の進捗を読み込む。crash した前回の途中状態が入っていれば、
-  // identKey ベースで既送ぶんを除外して残差だけ送る。
   const progress = parseProgress(broadcast.dedup_progress);
+  const preview = progress.audience ?? await computeDedupBroadcastPreview(
+    db, accountIds, dedupPriority, broadcast.target_tag_id ?? null,
+  );
+  if (!progress.audience) {
+    // 当選した友だちと正規IDを、最初の外部送信より先に固定する。
+    progress.audience = preview;
+    await db.prepare('UPDATE broadcasts SET dedup_progress=? WHERE id=?')
+      .bind(JSON.stringify(progress),broadcast.id).run();
+  }
+
   const sentSet = new Set(progress.sentIdentKeys);
 
   /*

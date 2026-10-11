@@ -1,0 +1,81 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
+import { processQueuedBroadcasts, processBroadcastSend } from './broadcast.js';
+import { reopenFailedClaims } from '@line-crm/db';
+import { prepareHqBroadcast, dispatchHqBroadcast } from './hq-broadcasts.js';
+
+const sends = vi.hoisted(() => [] as string[]);
+vi.mock('@line-crm/line-sdk', async original => ({
+  ...await original<Record<string, unknown>>(),
+  LineClient: class {
+    async pushMessageWithRequestId(id: string) { sends.push(id); return { requestId: 'fake' }; }
+    async multicast(ids: string[]) { sends.push(...ids); return { requestId: 'fake' }; }
+  },
+}));
+vi.mock('./stealth.js', async original => ({ ...await original<Record<string,unknown>>(), sleep: async () => {}, calculateStaggerDelay: () => 0 }));
+const opened: ReturnType<typeof createTestD1>[] = [];
+function fixture(kind = 'segment') {
+  const f = createTestD1(); opened.push(f);
+  for (let i = 0; i < 160; i++) insertFriend(f.raw, `f${String(i).padStart(3, '0')}`);
+  f.raw.exec("INSERT INTO tags(id,name) VALUES('t','対象'); INSERT INTO friend_tags(friend_id,tag_id) SELECT id,'t' FROM friends");
+  const conditions = JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: 't' }] });
+  f.raw.prepare(`INSERT INTO broadcasts(id,title,message_type,message_content,target_type,target_tag_id,segment_conditions,status,batch_offset,track_links)
+    VALUES('b','試験','text','{{name}} さん',?,'t',?,'sending',0,0)`).run(kind, kind === 'tag' ? null : conditions);
+  return f;
+}
+const client = { async pushMessageWithRequestId(id: string) { sends.push(id); return { requestId: 'fake' }; } } as never;
+afterEach(() => { for (const f of opened.splice(0)) f.raw.close(); sends.length = 0; vi.unstubAllGlobals(); });
+describe('SEND-S01: 開始時の宛先をIDで保つ', () => {
+  it.each(['tag','segment'])('%s: 処理済み・未送信者のタグを外し、新しい一致者を足しても元の160人だけに送る', async kind => {
+    const f = fixture(kind);
+    // tag の通常入口も、差し込み付きならキューへ入る。
+    if (kind === 'tag') await processBroadcastSend(f.db, client, 'b');
+    await processQueuedBroadcasts(f.db, client);
+    expect(sends).toHaveLength(150);
+    f.raw.exec("DELETE FROM friend_tags WHERE friend_id IN ('f000','f155')");
+    insertFriend(f.raw, 'added'); f.raw.exec("INSERT INTO friend_tags VALUES('added','t',datetime('now'))");
+    await processQueuedBroadcasts(f.db, client);
+    expect(sends.length).toBe(160);
+    expect(new Set(sends).size).toBe(160);
+    expect(sends).toContain('Uf155'); expect(sends).not.toContain('Uadded');
+  });
+  it('再送は現在のタグでなく、台帳の一時失敗IDだけを選ぶ', async () => {
+    const f = fixture();
+    await processQueuedBroadcasts(f.db, client); await processQueuedBroadcasts(f.db, client); sends.length = 0;
+    f.raw.exec("UPDATE broadcast_send_claims SET state='failed',error_code='line_http_429' WHERE friend_id='f155'; DELETE FROM friend_tags WHERE friend_id='f155'; DELETE FROM messages_log WHERE friend_id='f155'; UPDATE broadcasts SET status='sending',sent_at=NULL,batch_offset=0,send_attempt_no=2 WHERE id='b'");
+    await reopenFailedClaims(f.db, 'b', 2);
+    await processQueuedBroadcasts(f.db, client);
+    expect(sends).toEqual(['Uf155']);
+  });
+  it('統括で店を確定した後、各店の配信開始時の友だちを保持する', async () => {
+    const f = fixture(); f.raw.exec("DELETE FROM broadcasts; INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES('shop','店','c','fake','fake','00000000-0000-4000-8000-000000000001'); UPDATE friends SET line_account_id='shop'; UPDATE tags SET line_account_id='shop'; INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','試験','owner','fake','00000000-0000-4000-8000-000000000001')");
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ type: 'limited', value: 10000, totalUsage: 0 }), { status: 200 })));
+    const run = await prepareHqBroadcast(f.db,'00000000-0000-4000-8000-000000000001','owner',{requestId:'hq',title:'試験',messageType:'text',messageContent:'{{name}} さん',accountIds:['shop'],accountTagIds:[],excludedAccountIds:[],audience:{kind:'tag',tagName:'対象'},scheduledAt:null});
+    const dispatched = await dispatchHqBroadcast(f.db,run,'owner',1);
+    await processBroadcastSend(f.db,client,dispatched.targets[0].broadcastId!);
+    await processQueuedBroadcasts(f.db,client);
+    f.raw.exec("DELETE FROM friend_tags WHERE friend_id IN ('f000','f155')");
+    await processQueuedBroadcasts(f.db,client);
+    expect(sends.length).toBe(160); expect(sends).toContain('Uf155');
+  });
+});
+
+it('複数アカウントの重複除外配信も、再開時に元の当選者を保つ', async () => {
+  const f = fixture();
+  for(let i=160;i<600;i++){const id=`f${String(i).padStart(3,'0')}`;insertFriend(f.raw,id);f.raw.prepare("INSERT INTO friend_tags(friend_id,tag_id) VALUES(?,'t')").run(id);}
+  f.raw.exec("DELETE FROM broadcasts; INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('a','店','c','fake','fake'); UPDATE friends SET line_account_id='a'; INSERT INTO broadcasts(id,title,message_type,message_content,target_type,account_ids,dedup_priority,status,track_links) VALUES('b','試験','text','案内','multi-account-dedup','[\"a\"]','[\"a\"]','sending',0)");
+  const { processMultiAccountDedupBroadcast } = await import('./dedup-broadcast.js');
+  const args = { id:'b',account_ids:'["a"]',dedup_priority:'["a"]',target_tag_id:'t',message_type:'text',message_content:'案内',stealth_spread_minutes:60 };
+  const fake = { async multicast(ids: string[]) { sends.push(...ids); f.raw.exec("UPDATE broadcasts SET stopped_at='stop' WHERE id='b'"); return {requestId:'fake'}; } } as never;
+  await processMultiAccountDedupBroadcast(f.db,args,()=>fake);
+  // 時間分割の最初の束の後で条件を変更。
+  const initialSent = sends.length;
+  expect(initialSent).toBeGreaterThan(0); expect(initialSent).toBeLessThan(600);
+  f.raw.exec("DELETE FROM friend_tags WHERE friend_id='f555'; UPDATE broadcasts SET stopped_at=NULL WHERE id='b'");
+  insertFriend(f.raw,'added',{line_account_id:'a'}); f.raw.exec("INSERT INTO friend_tags VALUES('added','t',datetime('now'))");
+  for (let i=0;i<50 && sends.length<600;i++) {
+    const progress = (f.raw.prepare('SELECT dedup_progress FROM broadcasts').get() as {dedup_progress:string}).dedup_progress;
+    await processMultiAccountDedupBroadcast(f.db,{...args,dedup_progress:progress},()=>({async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never));
+  }
+  expect(new Set(sends).size).toBe(600); expect(sends).toContain('Uf555'); expect(sends).not.toContain('Uadded');
+});
