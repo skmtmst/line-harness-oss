@@ -213,6 +213,9 @@ async function reserveLineOperation(
   if (reservation.kind === 'conflict') {
     throw invalid('idempotency_key_conflict', '同じ処理IDに異なる送信内容が指定されました');
   }
+  if (reservation.kind === 'unknown' || reservation.kind === 'failed') {
+    throw new AutomationActionError('delivery_unconfirmed', '送信結果は要確認です。自動では送り直しません', false);
+  }
   if (reservation.kind === 'in_progress') {
     throw new AutomationActionError('outbound_state_unavailable', '送信状態を確認できません', true);
   }

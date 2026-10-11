@@ -1,3 +1,5 @@
+import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { reserveOutboundSend, hashOutboundPayload, completeOutboundSendStatement } from './outbound-idempotency.js';
 import { decorateTapExtras } from './tap-extras.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 // メッセージの組み立ては一斉配信と共有する。ここからも取れるようにしておく（呼び出し側が多い）。
@@ -214,8 +216,8 @@ export async function processStepDeliveries(
   // Crash recovery: a claim (active→delivering) that never got released means
   // the worker died mid-delivery — without this, the enrollment is stranded
   // forever because the due query only picks up 'active' rows. Reclaim after
-  // 5 minutes (at-least-once: a crash after the LINE push but before advance
-  // re-sends that step once).
+  // 5 minutes. The durable send reservation reuses the same LINE retry key;
+  // an uncertain attempt older than 24 hours is held for operator review.
   const recovered = await recoverStuckDeliveries(db);
   if (recovered > 0) {
     console.warn(`[step-delivery] recovered ${recovered} stuck 'delivering' enrollment(s)`);
@@ -658,27 +660,45 @@ async function processSingleDelivery(
     const { LineClient: LC } = await import('@line-crm/line-sdk');
     deliveryClient = new LC(account.channel_access_token);
   }
-  await deliveryClient.pushMessage(friend.line_user_id, messages);
-
-  // Log what we actually pushed: variables expanded, URLs auto-tracked, AND
-  // any cleanEmptyNodes() mutation or parse-failure text fallback applied by
-  // buildMessage().
-  //
-  // 二重送信防止の正体は scenario_version_step_id（版所有の通ID）。下書きの
-  // 通を消しても照合が外れない。scenario_step_id には live が残っている
-  // ときだけ入れ、消されたあとは NULL（外部キーを壊さない）。
-  //
-  // 質問は前文と本体で2通になることがある。押した記録と突き合わせられるよう、
-  // 送った通ぶんすべて残す。
-  for (const sent of messages) {
-    const logPayload = messageToLogPayload(sent);
-    await db
-      .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, scenario_version_step_id, source, template_id_at_send, line_account_id, created_at)
-         VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, ?, 'scenario', ?, ?, ?)`,
-      )
-      .bind(crypto.randomUUID(), friend.id, logPayload.messageType, logPayload.content, liveStepId, currentStep.id, resolved.templateIdAtSend, deliveryAccountId, jstNow())
-      .run();
+  // 実行・友だち・固定版の通・予定から同じUUIDを作る。文面はキーへ混ぜない。
+  const sendKey = await createBroadcastRetryKey('scenario-step', fs.id, friend.id, currentStep.id, fs.next_delivery_at ?? fs.started_at);
+  const previous = await db.prepare(`SELECT status,created_at FROM outbound_send_requests WHERE idempotency_key=?`)
+    .bind(sendKey).first<{status:string;created_at:string}>();
+  if (previous && previous.status !== 'succeeded'
+      && (!Number.isFinite(Date.parse(previous.created_at)) || Date.now()-Date.parse(previous.created_at) >= 24*60*60_000)) {
+    const at = new Date().toISOString();
+    await db.batch([
+      db.prepare(`UPDATE outbound_send_requests SET status='unknown',failure_code='LINE_RETRY_KEY_EXPIRED',
+        retryable=0,next_retry_at=NULL,last_failed_at=?,updated_at=?,lease_token=NULL,lease_expires_at=NULL
+        WHERE idempotency_key=? AND status!='succeeded'`).bind(at,at,sendKey),
+      db.prepare(`UPDATE friend_scenarios SET status='paused',pause_reason='delivery_unconfirmed',updated_at=? WHERE id=? AND status='delivering'`).bind(jstNow(),fs.id),
+    ]);
+    return false;
+  }
+  const reservation = await reserveOutboundSend(db, {
+    key:sendKey,channel:'line',resourceId:`scenario-step:${fs.id}:${currentStep.id}`,
+    lineAccountId:deliveryAccountId,payloadHash:await hashOutboundPayload(JSON.stringify(messages)),
+    retryInProgress:true,now:new Date().toISOString(),
+  });
+  if (reservation.kind === 'conflict' || reservation.kind === 'unknown' || reservation.kind === 'failed') {
+    await db.prepare(`UPDATE friend_scenarios SET status='paused',pause_reason='delivery_unconfirmed',updated_at=? WHERE id=? AND status='delivering'`).bind(jstNow(),fs.id).run();
+    return false;
+  }
+  if (reservation.kind === 'in_progress') return false;
+  if (reservation.kind !== 'replay') {
+    await deliveryClient.pushMessage(friend.line_user_id, messages, sendKey);
+    // 台帳のresponse_idは内部の受理記録ID。LINE要求IDを捏造しない。
+    // 履歴と受理記録を同じbatchで残し、回復時は外へ送り直さず進行だけ続ける。
+    await db.batch([
+      ...messages.map((sent,index) => {
+        const payload = messageToLogPayload(sent);
+        return db.prepare(`INSERT OR IGNORE INTO messages_log
+          (id,friend_id,direction,message_type,content,broadcast_id,scenario_step_id,scenario_version_step_id,source,template_id_at_send,line_account_id,created_at)
+          VALUES (?,?,'outgoing',?,?,NULL,?,?,'scenario',?,?,?)`)
+          .bind(`scenario:${sendKey}:${index}`,friend.id,payload.messageType,payload.content,liveStepId,currentStep.id,resolved.templateIdAtSend,deliveryAccountId,jstNow());
+      }),
+      completeOutboundSendStatement(db,{key:sendKey,responseId:`scenario:${sendKey}`,now:new Date().toISOString()}),
+    ]);
   }
 
   // Determine next step (find the step after currentStep in the sorted list)

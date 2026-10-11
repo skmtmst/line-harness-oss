@@ -749,3 +749,15 @@ describe('V6オートメーションの既存処理接続', () => {
     expect(link).toHaveBeenCalledWith('U-friend-1', 'line-menu-1');
   });
 });
+
+it('send_messageは同じ実行キーで回復し、期限切れの不明送信を再送しない',async()=>{
+ const f=createTestD1();addAccount(f.raw,'a');addFriend(f.raw,'f','a');
+ const {reserveOutboundSend,hashOutboundPayload}=await import('./outbound-idempotency.js');
+ const key='aaaaaaaa-2222-4333-8444-555555555555';
+ await reserveOutboundSend(f.db,{key,channel:'line',resourceId:'send_message:a:f',payloadHash:await hashOutboundPayload(JSON.stringify({to:'U-f',messages:[{type:'text',text:'案内'}]})),retryInProgress:true,now:'2020-01-01T00:00:00Z'});
+ const pushMessage=vi.fn();
+ const executors=createAutomationActionExecutors({resolveLineAccessToken:async()=> 'fake',createLineClient:()=>({pushMessage,linkRichMenuToUser:vi.fn(),unlinkRichMenuFromUser:vi.fn()})});
+ const context={db:f.db,runId:'run',lineAccountId:'a',automationId:'a',automationVersionId:'v',friendId:'f',sourceEventId:'event',inputEvent:{},action:{id:'send',type:'send_message' as const,params:{content:'案内'}},stepExecutionId:key,idempotencyKey:key,attemptNumber:2,commonActionVersionId:null,isTest:false};
+ await expect(executors.send_message(context)).rejects.toMatchObject({code:'delivery_unconfirmed'});
+ expect(pushMessage).not.toHaveBeenCalled();f.raw.close();
+});
