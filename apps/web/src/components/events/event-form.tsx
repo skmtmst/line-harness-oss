@@ -7,7 +7,6 @@ import { RowMenu } from '@/components/shared/row-actions'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useEffect, useState } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter } from 'next/navigation'
 import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -32,6 +31,8 @@ import DateField from '@/components/shared/date-field'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import FormSection from '@/components/shared/form-section'
+import { TextArea } from '@/components/shared/text-field'
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
   EVENT_DEFAULT_DRAFT,
@@ -555,7 +556,6 @@ function OverviewTab({
   accounts: Array<{ id: string; name: string; country: string | null; isActive: boolean }>
   currentAccountId: string
 }) {
-  const theme = useAdminTheme()
   const descLen = (draft.description ?? '').length
   /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
   const [nameError, setNameError] = useState<string | null>(null)
@@ -572,12 +572,10 @@ function OverviewTab({
       : []
   const activeAccounts = accounts.filter((a) => a.isActive)
   return (
-    <div className="space-y-5">
-      <div>
-        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
-          イベント名 <span className="text-status-danger">*</span>
-        </label>
-        <input
+    <>
+      <FormSection id="ev-form-overview" title="概要">
+      <Field label="イベント名" required error={nameError}>
+        <TextInput
           type="text"
           value={draft.name}
           onChange={(e) => {
@@ -587,37 +585,26 @@ function OverviewTab({
           onBlur={() => setNameError(checkName(draft.name))}
           maxLength={EVENT_NAME_MAX_LENGTH}
           placeholder="例: 第1回 AAA 説明会"
-          className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
           aria-invalid={nameError !== null}
         />
-        {nameError !== null && (
-          <p className="text-status-danger mt-1 text-xs" role="alert">{nameError}</p>
-        )}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-ink-secondary mb-1.5">開催場所</label>
-          <input
+      </Field>
+        <Field label="開催場所">
+          <TextInput
             type="text"
             value={draft.venue_name ?? ''}
             onChange={(e) => update('venue_name', e.target.value || null)}
             placeholder="例: 渋谷ベース 3F"
-            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-ink-secondary mb-1.5">会場 URL</label>
-          <input
+        </Field>
+        <Field label="会場 URL">
+          <TextInput
             type="url"
             value={draft.venue_url ?? ''}
             onChange={(e) => update('venue_url', e.target.value || null)}
             placeholder="https://..."
-            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
           />
-        </div>
-      </div>
-      {theme === 'v8' && <Field label="会場の住所"><TextInput value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>}
-      <div>
+        </Field>
+      <Field label="会場の住所"><TextInput value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>
         <ImageUploader
           mode="url"
           value={draft.image_url ? { mode: 'url', url: draft.image_url } : null}
@@ -625,44 +612,30 @@ function OverviewTab({
           label="イベント画像"
           title="イベント画像を追加"
         />
-      </div>
-      <div>
-        <label className="flex justify-between items-center text-sm font-medium text-ink-secondary mb-1.5">
-          <span>イベント詳細</span>
-          <span className={`text-xs ${descLen > 20000 ? 'text-danger' : 'text-ink-faint'}`}>
-            {formatNumber(descLen)} / 20,000
-          </span>
-        </label>
-        <textarea
+      <Field label="イベント詳細" count={{ value: descLen, max: EVENT_DESCRIPTION_MAX_LENGTH }}>
+        <TextArea
           value={draft.description ?? ''}
           onChange={(e) => update('description', e.target.value || null)}
           rows={8}
           placeholder="開催趣旨、注意事項、持ち物などを記載..."
-          className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
         />
+      </Field>
         <Checkbox
-          className="mt-2"
           checked={draft.description_centered === 1}
           onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
         >
           詳細を中央揃えで表示
         </Checkbox>
-      </div>
-      <div className="border-t border-hairline pt-5">
-        <div className="text-sm font-medium text-ink mb-1">申し込みのときに聞くこと</div>
-        <p className="text-xs text-ink-secondary mb-3">
-          予約フォームに質問を追加できます。回答は申込の一覧で確認できます。
-        </p>
+      </FormSection>
+      <FormSection id="ev-form-questions" title="申し込みのときに聞くこと" description="予約フォームに質問を追加できます。回答は申込の一覧で確認できます。">
         <EventQuestionsEditor
           questions={draft.questions ?? []}
           onChange={(next) => update('questions', next)}
         />
-      </div>
+      </FormSection>
 
-      <div>
-        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
-          1 人あたり予約回数
-        </label>
+      <FormSection id="ev-form-target" title="公開対象">
+      <Field label="1 人あたり予約回数">
         <Select
           aria-label="1 人あたり予約回数"
           value={draft.max_bookings_per_friend == null ? 'unlimited' : String(draft.max_bookings_per_friend)}
@@ -680,25 +653,12 @@ function OverviewTab({
             { value: '5', label: '5 回まで' },
           ]}
         />
-      </div>
+      </Field>
 
-      {/* 公開対象 */}
-      <div className="border-t border-hairline pt-5">
-        <div className="text-sm font-medium text-ink-secondary mb-2">公開対象</div>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <button
-            type="button"
-            onClick={() => update('target_type', 'single')}
-            className={`p-3 border-2 rounded-control text-left ${
-              targetType === 'single' ? 'border-action bg-status-info-soft' : 'border-hairline hover:border-hairline'
-            }`}
-          >
-            <div className="text-sm font-bold">単一アカウント</div>
-            <div className="text-xs text-ink-secondary">1 つの LINE アカウントで運用</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
+        <RadioCardGroup legend="公開するアカウント">
+          <RadioCard name="event-target-type" value="single" checked={targetType === 'single'} onChange={() => update('target_type', 'single')} title="単一アカウント" note="1 つの LINE アカウントで運用" />
+          <RadioCard name="event-target-type" value="multi-account-dedup" checked={targetType === 'multi-account-dedup'} title="複数アカウント横断" note="重複なし配信に対応"
+            onChange={() => {
               update('target_type', 'multi-account-dedup')
               // single → multi 切替時: 編集中の admin account を account_ids[0]
               // sentinel として自動セット。active 一覧の先頭ではなく実際に
@@ -711,27 +671,19 @@ function OverviewTab({
                 }
               }
             }}
-            className={`p-3 border-2 rounded-control text-left ${
-              targetType === 'multi-account-dedup' ? 'border-action bg-status-info-soft' : 'border-hairline hover:border-hairline'
-            }`}
-          >
-            <div className="text-sm font-bold">複数アカウント横断</div>
-            <div className="text-xs text-ink-secondary">重複なし配信に対応</div>
-          </button>
-        </div>
+          />
+        </RadioCardGroup>
 
         {targetType === 'multi-account-dedup' && (
-          <div className="space-y-1.5">
-            <div className="text-xs text-ink-secondary">対象アカウント（重複なし配信）</div>
+          <Field label="対象アカウント（重複なし配信）" note={`${accountIds.length} 件選択中`}>
             {activeAccounts.length === 0 && (
-              <div className="text-sm text-ink-faint italic p-2">アクティブなアカウントがありません</div>
+              <Notice tone="info" message="アクティブなアカウントがありません" />
             )}
             <EntitySelect aria-label="対象アカウント（重複なし配信）" noun="アカウント" values={[...new Set([...accountIds, ...(currentAccountId ? [currentAccountId] : [])])]} onChange={(ids) => update('account_ids', [...new Set([...ids, ...(currentAccountId ? [currentAccountId] : [])])] as unknown as EventDetail['account_ids'])} options={activeAccounts.map((a) => ({ value: a.id, label: `${a.country ? a.country + ' ' : ''}${a.name}`, locked: a.id === currentAccountId, description: a.id === currentAccountId ? '今のアカウント・必須' : undefined }))} />
-            <div className="text-ink-faint mt-1 text-xs">{accountIds.length} 件選択中</div>
-          </div>
+          </Field>
         )}
-      </div>
-    </div>
+      </FormSection>
+    </>
   )
 }
 

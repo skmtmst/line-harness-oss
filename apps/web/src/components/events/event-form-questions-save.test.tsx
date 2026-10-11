@@ -175,4 +175,18 @@ describe('R82 続けて保存しても質問が消えない', () => {
     expect(updateEvent).toHaveBeenCalledTimes(2)
     expect(updateEvent.mock.calls[1][2].questions).toEqual([QUESTION])
   })
+
+  it('横断公開を選ぶと編集中のアカウントを含めて保存し、単一へ戻すと対象の配列を送らない', async () => {
+    await renderForm()
+    const multi = document.querySelector<HTMLInputElement>('input[name="event-target-type"][value="multi-account-dedup"]')!
+    await click(multi)
+    expect(multi.checked).toBe(true)
+    await click(saveButton())
+    expect(updateEvent.mock.calls[0][2]).toMatchObject({ target_type: 'multi-account-dedup', account_ids: ['acc-1'], questions: [QUESTION] })
+    // 保存の返事で単一へ戻るため、もう一度横断にしてから単一を選ぶ。
+    await click(document.querySelector('input[name="event-target-type"][value="multi-account-dedup"]')!)
+    await click(document.querySelector('input[name="event-target-type"][value="single"]')!)
+    await click(saveButton())
+    expect(updateEvent.mock.calls[1][2]).toMatchObject({ target_type: 'single', account_ids: null, questions: [QUESTION] })
+  })
 })
