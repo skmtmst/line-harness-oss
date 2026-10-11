@@ -1,5 +1,8 @@
 'use client'
 
+import { jstMonthRange, jstDate } from '@/lib/jst-datetime'
+
+
 import { RowActions } from '@/components/shared/row-actions'
 
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
@@ -303,11 +306,7 @@ export function AffiliatorsTab({
   const [accountSettlement, setAccountSettlement] = useState<AffiliateAccountSettlementPreview | null>(null)
   const [paymentState, setPaymentState] = useState<ConfirmedState>('loading')
   const settlementPeriod = useMemo(() => {
-    const now = new Date()
-    return {
-      periodFrom: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString(),
-      periodTo: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(),
-    }
+    return jstMonthRange()
   }, [])
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<Array<'active' | 'inactive' | 'reward'>>([])
@@ -685,7 +684,7 @@ export function AffiliatorsTab({
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `affiliates-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `affiliates-${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -2234,7 +2233,7 @@ export function ApprovalQueue({
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `conversion-approvals-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `conversion-approvals-${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -2948,7 +2947,7 @@ export function OffersTab() {
     )
     const a = document.createElement('a')
     a.href = url
-    a.download = `affiliate-offers-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `affiliate-offers-${jstDate()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

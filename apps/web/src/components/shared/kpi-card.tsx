@@ -12,6 +12,13 @@ import styles from './kpi-card.module.css'
 import { formatNumber } from '@/lib/format'
 import { RetryLabel } from './retry-label'
 
+function hasDetail(node: ReactNode): boolean {
+  return React.Children.toArray(node).some(child => {
+    if (typeof child === 'string' || typeof child === 'number') return String(child).trim().length > 0
+    return React.isValidElement<{ children?: ReactNode }>(child) && hasDetail(child.props.children)
+  })
+}
+
 export type KpiCardProps = {
   title: string
   /** 図柄。省略時は棒グラフ。`null` で図柄なし（X4STXS の絵どおり）。 */
@@ -221,7 +228,7 @@ export default function KpiCard({
       {delta ? <span className={`${styles.delta} v8-only`}>{delta}</span> : null}
       </div>
 
-      <p data-kpi-detail className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
+      <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
         <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>

@@ -1,0 +1,32 @@
+import {afterEach,beforeEach,expect,test} from 'vitest';
+import {Hono} from 'hono';
+import {DEFAULT_TENANT_ID,DEFAULT_CUSTOMER_LOOK} from '@line-crm/shared';
+import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite';
+import {authMiddleware} from '../middleware/auth';
+import {accountSettings} from './account-settings';
+import {liffRoutes} from './liff';
+import type {Env} from '../index';
+let f:SqliteD1,app:Hono<Env>;
+beforeEach(()=>{
+ f=createTestD1({foreignKeys:true});for(const id of ['a','b'])f.raw.prepare('INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id,liff_id) VALUES(?,?,?,\'t\',\'s\',?,?)').run(id,id,id,DEFAULT_TENANT_ID,'liff-'+id);
+ f.raw.prepare("INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope) VALUES('owner','店長','owner','owner-key',?,'all'),('admin','担当店','admin','admin-key',?,'accounts'),('viewer','閲覧','staff','viewer-key',?,'all')").run(DEFAULT_TENANT_ID,DEFAULT_TENANT_ID,DEFAULT_TENANT_ID);
+ f.raw.exec("INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('admin','a','now');UPDATE staff_members SET view_permission_keys='[\"/settings\"]' WHERE id='viewer'");
+ app=new Hono<Env>();app.use('*',authMiddleware);app.route('/',accountSettings);app.route('/',liffRoutes);
+});
+afterEach(()=>f.raw.close());
+const request=(path:string,method='GET',body?:unknown,key='owner-key')=>app.request(path,{method,headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})},{DB:f.db} as Env['Bindings']);
+const publicLook=(id='a')=>app.request('/api/liff/customer-look?liffId=liff-'+id,{}, {DB:f.db} as Env['Bindings']);
+test('保存した店だけ公開側へ反映し、古い版・担当外・閲覧のみ・不正なCSSを拒否',async()=>{
+ expect(await(await publicLook()).json()).toMatchObject({data:{version:0,look:DEFAULT_CUSTOMER_LOOK}});
+ const look={...DEFAULT_CUSTOMER_LOOK,preset:'night'};
+ const body={accountId:'a',expectedVersion:0,look};
+ expect((await request('/api/account-settings/customer-look','PUT',body)).status).toBe(200);
+ expect(await(await publicLook()).json()).toMatchObject({data:{version:1,look,settings:{liff_theme:'night'}}});
+ expect(await(await publicLook('b')).json()).toMatchObject({data:{version:0,look:DEFAULT_CUSTOMER_LOOK}});
+ expect((await request('/api/account-settings/customer-look','PUT',body)).status).toBe(409);
+ expect((await request('/api/account-settings/customer-look','PUT',{...body,accountId:'b'},'admin-key')).status).toBe(403);
+ expect((await request('/api/account-settings/customer-look','PUT',{...body,expectedVersion:1},'viewer-key')).status).toBe(403);
+ expect((await request('/api/account-settings/customer-look','PUT',{...body,expectedVersion:1,look:{...look,preset:'custom',primaryColor:'url(evil)'}})).status).toBe(422);
+ expect(await(await publicLook()).json()).toMatchObject({data:{version:1,look}});
+ expect((await publicLook('unknown')).status).toBe(404);
+});

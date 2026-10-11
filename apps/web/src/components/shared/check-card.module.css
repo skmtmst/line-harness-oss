@@ -191,3 +191,11 @@
 html[data-theme='v8'] .disabled .box:disabled { opacity: var(--polish-enabled-opacity); }
 
 [data-theme='v8'] .card { padding: var(--tpl-card-pad); }
+
+/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+html[data-theme='v8'] .card { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
+html[data-theme='v8'] .checked, html[data-theme='v8'] .checked:hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
+html[data-theme='v8'] .boxWrap, html[data-theme='v8'] .box { width: var(--choice-size); height: var(--choice-size); }
+html[data-theme='v8'] .mark { inset: 0; margin: auto; }
+html[data-theme='v8'] .card:has(.box:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+html[data-theme='v8'] .invalid { outline-color: var(--color-danger); }

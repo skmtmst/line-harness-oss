@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 const fx = vi.hoisted(() => ({ receive: vi.fn(), use: vi.fn() }));
-vi.mock('../lib/api.js', () => ({ api: { entryRouteCoupon: fx,
+vi.mock('../lib/api.js', () => ({ api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}), entryRouteCoupon: fx,
   bookingSettings: vi.fn().mockResolvedValue({}), liffConfig: vi.fn().mockResolvedValue({ success: true, data: { accountName: 'お店' } }) } }));
 vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
 import EntryRouteCoupon from './EntryRouteCoupon.js';

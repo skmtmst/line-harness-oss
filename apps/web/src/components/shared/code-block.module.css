@@ -1,0 +1,5 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.box { margin: 0; min-width: 0; max-width: 100%; overflow: auto; padding: var(--space-16); border: 1px solid var(--color-code-border); border-radius: var(--radius-control); background: var(--color-code-bg); color: var(--color-ink); font-family: var(--font-mono, monospace); font-size: var(--text-caption); line-height: var(--text-caption--line-height); }
+.box:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+}

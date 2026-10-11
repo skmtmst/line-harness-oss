@@ -141,3 +141,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* B-218：画面の名前リンクも共通部品が色と1行を所有する。 */
+html[data-theme='v8'] a.rowNameLink {
+  display: block; min-width: 0; max-width: 100%; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; color: var(--color-ink); font-weight: 700;
+}
+
+html[data-theme='v8'] .headRow[data-table-layout='columns'] { padding-inline: var(--tpl-list-inset); }

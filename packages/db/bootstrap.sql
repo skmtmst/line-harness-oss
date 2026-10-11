@@ -511,11 +511,12 @@ CREATE TABLE affiliate_offers (
   created_at      TEXT NOT NULL
 , operation_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
-CREATE TABLE affiliate_payout_batch_lines (
+CREATE TABLE "affiliate_payout_batch_lines" (
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   batch_id TEXT NOT NULL REFERENCES affiliate_payout_batches(id),
   settlement_line_id TEXT NOT NULL REFERENCES affiliate_settlement_lines(id),
-  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
   amount_minor INTEGER NOT NULL,
   bank_code TEXT NOT NULL,
   bank_name TEXT NOT NULL,
@@ -547,10 +548,11 @@ CREATE TABLE affiliate_payout_batches (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT, request_fingerprint TEXT, export_object_key TEXT, export_expires_at TEXT, download_token_hash TEXT, export_idempotency_key TEXT, export_request_fingerprint TEXT);
 
-CREATE TABLE affiliate_payout_results (
+CREATE TABLE "affiliate_payout_results" (
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   batch_id TEXT NOT NULL REFERENCES affiliate_payout_batches(id),
-  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
   settlement_line_id TEXT NOT NULL REFERENCES affiliate_settlement_lines(id),
   paid_amount_minor INTEGER NOT NULL,
   result TEXT NOT NULL CHECK (result IN ('paid', 'failed', 'returned')),
@@ -598,23 +600,27 @@ CREATE TABLE affiliate_reward_entries (
   UNIQUE (conversion_event_id, entry_type)
 );
 
-CREATE TABLE affiliate_settlement_lines (
+CREATE TABLE "affiliate_settlement_lines" (
+  adjustment_id_history TEXT,
+  entry_id_history TEXT,
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   settlement_id TEXT NOT NULL REFERENCES affiliate_settlements(id),
-  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
-  entry_id TEXT REFERENCES affiliate_reward_entries(id),
-  adjustment_id TEXT REFERENCES affiliate_adjustments(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
+  entry_id TEXT REFERENCES affiliate_reward_entries(id) ON DELETE SET NULL,
+  adjustment_id TEXT REFERENCES affiliate_adjustments(id) ON DELETE SET NULL,
   amount_minor INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'included' CHECK (status IN ('included', 'withheld')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  CHECK ((entry_id IS NOT NULL AND adjustment_id IS NULL) OR (entry_id IS NULL AND adjustment_id IS NOT NULL))
+  CHECK ((COALESCE(entry_id, entry_id_history) IS NOT NULL AND COALESCE(adjustment_id, adjustment_id_history) IS NULL) OR (COALESCE(entry_id, entry_id_history) IS NULL AND COALESCE(adjustment_id, adjustment_id_history) IS NOT NULL))
 );
 
-CREATE TABLE affiliate_settlements (
+CREATE TABLE "affiliate_settlements" (
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES tenants(id),
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
-  affiliate_id TEXT REFERENCES affiliates(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
   period_from TEXT NOT NULL,
   period_to TEXT NOT NULL,
   timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
@@ -628,11 +634,12 @@ CREATE TABLE affiliate_settlements (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , request_fingerprint TEXT NOT NULL DEFAULT '');
 
-CREATE TABLE affiliate_statements (
+CREATE TABLE "affiliate_statements" (
+  affiliate_id_history TEXT,
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES tenants(id),
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
-  affiliate_id TEXT NOT NULL REFERENCES affiliates(id),
+  affiliate_id TEXT REFERENCES affiliates(id) ON DELETE SET NULL,
   settlement_id TEXT NOT NULL REFERENCES affiliate_settlements(id),
   total_amount_minor INTEGER NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('generated', 'expired', 'revoked')),
@@ -1437,9 +1444,10 @@ CREATE TABLE billing_invoices (
   created_at          TEXT NOT NULL
 );
 
-CREATE TABLE booking_audit_logs (
+CREATE TABLE "booking_audit_logs" (
+  booking_id_history TEXT,
   id              TEXT PRIMARY KEY,
-  booking_id      TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  booking_id      TEXT REFERENCES bookings(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   action          TEXT NOT NULL,
   before_json     TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
@@ -1589,10 +1597,11 @@ CREATE TABLE booking_payment_menu_settings (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE booking_payments (
+CREATE TABLE "booking_payments" (
+  booking_id_history TEXT,
   id TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
-  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  booking_id TEXT REFERENCES bookings(id) ON DELETE SET NULL,
   amount INTEGER NOT NULL CHECK (amount >= 0),
   currency TEXT NOT NULL DEFAULT 'JPY',
   status TEXT NOT NULL DEFAULT 'unpaid'
@@ -4432,9 +4441,10 @@ CREATE TABLE messages_log (
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT, search_content TEXT);
 
-CREATE TABLE mileage_adjustment_approval_events (
+CREATE TABLE "mileage_adjustment_approval_events" (
+  request_id_history TEXT,
   id              TEXT PRIMARY KEY,
-  request_id      TEXT NOT NULL REFERENCES mileage_adjustment_approval_requests (id) ON DELETE CASCADE,
+  request_id      TEXT REFERENCES mileage_adjustment_approval_requests(id) ON DELETE SET NULL,
   actor_staff_id  TEXT NOT NULL,
   action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled')),
   reason          TEXT,
@@ -4994,9 +5004,10 @@ CREATE TABLE nen_pet_profiles (
   updated_at TEXT NOT NULL
 , breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT);
 
-CREATE TABLE nen_photo_assessment_runs (
+CREATE TABLE "nen_photo_assessment_runs" (
+  photo_id_history TEXT,
   id TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   requested_version INTEGER NOT NULL CHECK (requested_version > 0),
   status TEXT NOT NULL DEFAULT 'queued'
@@ -5057,18 +5068,20 @@ CREATE TABLE nen_photo_derivatives (
   UNIQUE(photo_id, kind, source_version)
 );
 
-CREATE TABLE nen_photo_original_download_audit (
+CREATE TABLE "nen_photo_original_download_audit" (
+  photo_id_history TEXT,
   id TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   requested_by TEXT NOT NULL,
   event TEXT NOT NULL CHECK (event IN ('issued', 'downloaded')),
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE nen_photo_original_download_grants (
+CREATE TABLE "nen_photo_original_download_grants" (
+  photo_id_history TEXT,
   token_hash TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   requested_by TEXT NOT NULL,
   requested_version INTEGER NOT NULL CHECK (requested_version > 0),
@@ -5137,8 +5150,9 @@ CREATE TABLE nen_photo_publications (
 , sort_order INTEGER NOT NULL DEFAULT 0, reward_policy_key TEXT, reward_points INTEGER CHECK (reward_points BETWEEN 0 AND 100000));
 
 CREATE TABLE "nen_photo_review_events" (
+  photo_id_history TEXT,
   id TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   from_status TEXT NOT NULL CHECK (from_status = 'pending'),
   to_status TEXT NOT NULL CHECK (to_status IN ('adopted', 'rejected')),
@@ -5181,9 +5195,10 @@ CREATE TABLE nen_photo_reward_outbox (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE nen_photo_risk_assessments (
+CREATE TABLE "nen_photo_risk_assessments" (
+  photo_id_history TEXT,
   id TEXT PRIMARY KEY,
-  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  photo_id TEXT REFERENCES nen_photo_submissions(id) ON DELETE SET NULL,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   flag TEXT NOT NULL,
   confidence REAL CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1)),
@@ -6803,6 +6818,18 @@ CREATE TABLE rt_reservation_close_tasks (
  UNIQUE(reservation_id,channel,starts_at)
 );
 
+CREATE TABLE rt_reservation_confirmations (
+ request_id TEXT PRIMARY KEY,
+ reservation_id TEXT NOT NULL REFERENCES rt_reservations(id),
+ reservation_version INTEGER NOT NULL CHECK(reservation_version>=1),
+ friend_id TEXT NOT NULL REFERENCES friends(id),
+ response TEXT CHECK(response IN('going','change_requested','cancel')),
+ requested_at TEXT NOT NULL,
+ responded_at TEXT,
+ expires_at TEXT NOT NULL,
+ UNIQUE(reservation_id,reservation_version,request_id)
+);
+
 CREATE TABLE rt_reservation_departures (
  id TEXT PRIMARY KEY, reservation_id TEXT NOT NULL REFERENCES rt_reservations(id),
  store_id TEXT NOT NULL REFERENCES rt_stores(id), request_id TEXT NOT NULL,
@@ -6929,6 +6956,25 @@ CREATE TABLE "rt_seat_waitlist" (
 CREATE TABLE rt_seat_waitlist_table_links (
  waitlist_id TEXT NOT NULL REFERENCES rt_seat_waitlist(id) ON DELETE CASCADE,
  table_id TEXT NOT NULL REFERENCES rt_tables(id), PRIMARY KEY(waitlist_id,table_id)
+);
+
+CREATE TABLE rt_store_followup_step_bindings (
+ store_id TEXT NOT NULL REFERENCES rt_stores(id),
+ trigger TEXT NOT NULL,
+ step_id TEXT NOT NULL REFERENCES scenario_steps(id),
+ offset_minutes INTEGER NOT NULL DEFAULT 0,
+ enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN(0,1)),
+ version INTEGER NOT NULL DEFAULT 1,
+ PRIMARY KEY(store_id,trigger,step_id)
+);
+
+CREATE TABLE rt_store_followup_templates (
+ store_id TEXT PRIMARY KEY REFERENCES rt_stores(id),
+ scenario_id TEXT NOT NULL UNIQUE REFERENCES scenarios(id),
+ template_version INTEGER NOT NULL DEFAULT 1,
+ sending_status TEXT NOT NULL DEFAULT 'stopped' CHECK(sending_status IN('stopped','pending','active')),
+ approved_version_id TEXT REFERENCES scenario_versions(id),
+ approval_id TEXT REFERENCES rt_approval_requests(id)
 );
 
 CREATE TABLE rt_store_media_links (
@@ -7100,6 +7146,25 @@ CREATE TABLE scenario_publish_keys (
   version_id                TEXT NOT NULL,
   content_snapshot          TEXT NOT NULL,
   created_at                TEXT NOT NULL
+);
+
+CREATE TABLE scenario_source_jobs (
+ id TEXT PRIMARY KEY,
+ line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+ friend_id TEXT NOT NULL REFERENCES friends(id),
+ scenario_version_id TEXT NOT NULL REFERENCES scenario_versions(id),
+ step_id TEXT NOT NULL,
+ source_kind TEXT NOT NULL,
+ source_id TEXT NOT NULL,
+ source_event_id TEXT NOT NULL,
+ source_version INTEGER NOT NULL,
+ scheduled_at TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','running','sent','cancelled','failed')),
+ attempt_count INTEGER NOT NULL DEFAULT 0,
+ lease_until TEXT,
+ idempotency_key TEXT NOT NULL UNIQUE,
+ message_log_id TEXT,
+ UNIQUE(source_kind,source_id,source_event_id,scenario_version_id,step_id)
 );
 
 CREATE TABLE "scenario_steps" (
@@ -10404,6 +10469,8 @@ CREATE INDEX idx_webinars_account_status_folder
 
 CREATE INDEX rt_closures_store_dates ON rt_closures(store_id,start_date,end_date) WHERE archived_at IS NULL;
 
+CREATE INDEX rt_confirmation_reservation ON rt_reservation_confirmations(reservation_id,reservation_version);
+
 CREATE UNIQUE INDEX rt_departure_one_active ON rt_reservation_departures(reservation_id) WHERE undone_at IS NULL;
 
 CREATE INDEX rt_event_pending ON rt_reservation_event_receipts(status,next_attempt_at);
@@ -10417,6 +10484,10 @@ CREATE INDEX rt_reserved_table ON rt_reservation_table_links(table_id,reservatio
 CREATE UNIQUE INDEX rt_visit_request ON rt_seat_visit_marks(reservation_id,request_id) WHERE request_id IS NOT NULL;
 
 CREATE INDEX rt_waiting_table ON rt_seat_waitlist_table_links(table_id,waitlist_id);
+
+CREATE INDEX scenario_source_due ON scenario_source_jobs(status,scheduled_at);
+
+CREATE INDEX scenario_source_reservation ON scenario_source_jobs(source_kind,source_id);
 
 CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
   ON google_calendar_connections (staff_id)
@@ -10436,6 +10507,26 @@ CREATE INDEX workflow_steps_due ON workflow_steps(process_kind, status, next_att
 CREATE TRIGGER affiliate_offers_folder_insert BEFORE INSERT ON affiliate_offers WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate_offer' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
 CREATE TRIGGER affiliate_offers_folder_update BEFORE UPDATE OF folder_id,line_account_id ON affiliate_offers WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate_offer' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER affiliate_payout_batch_lines_history_detach AFTER UPDATE OF affiliate_id ON affiliate_payout_batch_lines BEGIN UPDATE affiliate_payout_batch_lines SET affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_payout_batch_lines_history_insert AFTER INSERT ON affiliate_payout_batch_lines BEGIN UPDATE affiliate_payout_batch_lines SET affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_payout_results_history_detach AFTER UPDATE OF affiliate_id ON affiliate_payout_results BEGIN UPDATE affiliate_payout_results SET affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_payout_results_history_insert AFTER INSERT ON affiliate_payout_results BEGIN UPDATE affiliate_payout_results SET affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_settlement_lines_history_detach AFTER UPDATE OF adjustment_id, entry_id, affiliate_id ON affiliate_settlement_lines BEGIN UPDATE affiliate_settlement_lines SET adjustment_id_history = COALESCE(NEW.adjustment_id, OLD.adjustment_id, OLD.adjustment_id_history), entry_id_history = COALESCE(NEW.entry_id, OLD.entry_id, OLD.entry_id_history), affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_settlement_lines_history_insert AFTER INSERT ON affiliate_settlement_lines BEGIN UPDATE affiliate_settlement_lines SET adjustment_id_history = COALESCE(NEW.adjustment_id, NEW.adjustment_id_history), entry_id_history = COALESCE(NEW.entry_id, NEW.entry_id_history), affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_settlements_history_detach AFTER UPDATE OF affiliate_id ON affiliate_settlements BEGIN UPDATE affiliate_settlements SET affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_settlements_history_insert AFTER INSERT ON affiliate_settlements BEGIN UPDATE affiliate_settlements SET affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_statements_history_detach AFTER UPDATE OF affiliate_id ON affiliate_statements BEGIN UPDATE affiliate_statements SET affiliate_id_history = COALESCE(NEW.affiliate_id, OLD.affiliate_id, OLD.affiliate_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER affiliate_statements_history_insert AFTER INSERT ON affiliate_statements BEGIN UPDATE affiliate_statements SET affiliate_id_history = COALESCE(NEW.affiliate_id, NEW.affiliate_id_history) WHERE id = NEW.id; END;
 
 CREATE TRIGGER affiliates_folder_insert BEFORE INSERT ON affiliates WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
@@ -10466,9 +10557,17 @@ CREATE TRIGGER banner_projects_folder_insert BEFORE INSERT ON banner_projects WH
 
 CREATE TRIGGER banner_projects_folder_update BEFORE UPDATE OF folder_id,tenant_id ON banner_projects WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_banner_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND kind='project' AND archived_at IS NULL) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
+CREATE TRIGGER booking_audit_logs_history_detach AFTER UPDATE OF booking_id ON booking_audit_logs BEGIN UPDATE booking_audit_logs SET booking_id_history = COALESCE(NEW.booking_id, OLD.booking_id, OLD.booking_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER booking_audit_logs_history_insert AFTER INSERT ON booking_audit_logs BEGIN UPDATE booking_audit_logs SET booking_id_history = COALESCE(NEW.booking_id, NEW.booking_id_history) WHERE id = NEW.id; END;
+
 CREATE TRIGGER booking_auto_assign_sync_rules_insert AFTER INSERT ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
 
 CREATE TRIGGER booking_auto_assign_sync_rules_update AFTER UPDATE ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
+
+CREATE TRIGGER booking_payments_history_detach AFTER UPDATE OF booking_id ON booking_payments BEGIN UPDATE booking_payments SET booking_id_history = COALESCE(NEW.booking_id, OLD.booking_id, OLD.booking_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER booking_payments_history_insert AFTER INSERT ON booking_payments BEGIN UPDATE booking_payments SET booking_id_history = COALESCE(NEW.booking_id, NEW.booking_id_history) WHERE id = NEW.id; END;
 
 CREATE TRIGGER booking_resource_consumptions_account_insert
 BEFORE INSERT ON booking_resource_consumptions
@@ -10807,6 +10906,10 @@ CREATE TRIGGER messages_search_invalidate AFTER UPDATE OF content,unsent_at,deli
 WHEN OLD.content IS NOT NEW.content OR OLD.unsent_at IS NOT NEW.unsent_at OR OLD.delivery_type IS NOT NEW.delivery_type
 BEGIN UPDATE messages_log SET search_content=NULL WHERE id=NEW.id; END;
 
+CREATE TRIGGER mileage_adjustment_approval_events_history_detach AFTER UPDATE OF request_id ON mileage_adjustment_approval_events BEGIN UPDATE mileage_adjustment_approval_events SET request_id_history = COALESCE(NEW.request_id, OLD.request_id, OLD.request_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER mileage_adjustment_approval_events_history_insert AFTER INSERT ON mileage_adjustment_approval_events BEGIN UPDATE mileage_adjustment_approval_events SET request_id_history = COALESCE(NEW.request_id, NEW.request_id_history) WHERE id = NEW.id; END;
+
 CREATE TRIGGER mileage_reward_folders_common_delete AFTER DELETE ON mileage_reward_folders BEGIN DELETE FROM folders WHERE id=OLD.id AND kind='mileage_reward' AND account_id=OLD.line_account_id; END;
 
 CREATE TRIGGER mileage_reward_folders_common_insert AFTER INSERT ON mileage_reward_folders WHEN NOT EXISTS(SELECT 1 FROM folders WHERE id=NEW.id) BEGIN INSERT INTO folders(id,kind,account_id,name,display_order,created_at,updated_at) VALUES(NEW.id,'mileage_reward',NEW.line_account_id,NEW.name,NEW.display_order,NEW.created_at,NEW.updated_at); END;
@@ -10816,6 +10919,26 @@ CREATE TRIGGER mileage_reward_folders_common_update AFTER UPDATE ON mileage_rewa
 CREATE TRIGGER mileage_rewards_folder_insert BEFORE INSERT ON mileage_rewards WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='mileage_reward' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 
 CREATE TRIGGER mileage_rewards_folder_update BEFORE UPDATE OF folder_id,line_account_id ON mileage_rewards WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='mileage_reward' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
+
+CREATE TRIGGER nen_photo_assessment_runs_history_detach AFTER UPDATE OF photo_id ON nen_photo_assessment_runs BEGIN UPDATE nen_photo_assessment_runs SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_assessment_runs_history_insert AFTER INSERT ON nen_photo_assessment_runs BEGIN UPDATE nen_photo_assessment_runs SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_original_download_audit_history_detach AFTER UPDATE OF photo_id ON nen_photo_original_download_audit BEGIN UPDATE nen_photo_original_download_audit SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_original_download_audit_history_insert AFTER INSERT ON nen_photo_original_download_audit BEGIN UPDATE nen_photo_original_download_audit SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_original_download_grants_history_detach AFTER UPDATE OF photo_id ON nen_photo_original_download_grants BEGIN UPDATE nen_photo_original_download_grants SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE token_hash = NEW.token_hash; END;
+
+CREATE TRIGGER nen_photo_original_download_grants_history_insert AFTER INSERT ON nen_photo_original_download_grants BEGIN UPDATE nen_photo_original_download_grants SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE token_hash = NEW.token_hash; END;
+
+CREATE TRIGGER nen_photo_review_events_history_detach AFTER UPDATE OF photo_id ON nen_photo_review_events BEGIN UPDATE nen_photo_review_events SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_review_events_history_insert AFTER INSERT ON nen_photo_review_events BEGIN UPDATE nen_photo_review_events SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_risk_assessments_history_detach AFTER UPDATE OF photo_id ON nen_photo_risk_assessments BEGIN UPDATE nen_photo_risk_assessments SET photo_id_history = COALESCE(NEW.photo_id, OLD.photo_id, OLD.photo_id_history) WHERE id = NEW.id; END;
+
+CREATE TRIGGER nen_photo_risk_assessments_history_insert AFTER INSERT ON nen_photo_risk_assessments BEGIN UPDATE nen_photo_risk_assessments SET photo_id_history = COALESCE(NEW.photo_id, NEW.photo_id_history) WHERE id = NEW.id; END;
 
 CREATE TRIGGER outgoing_webhook_config_version
 AFTER UPDATE OF name, url, event_types, secret, secret_encrypted, is_active, max_retries, deleted_at
@@ -10906,6 +11029,42 @@ BEGIN SELECT RAISE(ABORT, 'external_link_store_mismatch'); END;
 CREATE TRIGGER rt_floor_new_store AFTER INSERT ON rt_stores BEGIN INSERT INTO rt_floors(id,store_id,name) VALUES('floor-'||NEW.id,NEW.id,'1階'); END;
 
 CREATE TRIGGER rt_floor_new_table AFTER INSERT ON rt_tables WHEN NEW.floor_id IS NULL BEGIN UPDATE rt_tables SET floor_id='floor-'||NEW.store_id WHERE id=NEW.id; END;
+
+CREATE TRIGGER rt_followup_approval_apply AFTER UPDATE OF status ON rt_approval_requests WHEN json_extract(NEW.payload_json,'$.operation')='start_restaurant_followup' AND NEW.status IN('approved','returned') BEGIN UPDATE rt_store_followup_templates SET sending_status=CASE WHEN NEW.status='approved' THEN 'active' ELSE 'stopped' END WHERE approval_id=NEW.id; END;
+
+CREATE TRIGGER rt_followup_approval_check BEFORE UPDATE OF status ON rt_approval_requests WHEN NEW.status='approved' AND json_extract(NEW.payload_json,'$.operation')='start_restaurant_followup' AND NOT EXISTS(SELECT 1 FROM rt_store_followup_templates t JOIN scenarios s ON s.id=t.scenario_id JOIN rt_stores store ON store.id=t.store_id WHERE t.store_id=NEW.store_id AND t.approval_id=NEW.id AND t.sending_status='pending' AND t.template_version=json_extract(NEW.payload_json,'$.templateVersion') AND t.approved_version_id=json_extract(NEW.payload_json,'$.scenarioVersionId') AND s.current_published_version_id=t.approved_version_id AND s.line_account_id=store.line_account_id AND store.line_account_id=json_extract(NEW.payload_json,'$.lineAccountId') AND EXISTS(SELECT 1 FROM scenario_versions v WHERE v.id=t.approved_version_id AND v.status='published')) BEGIN SELECT RAISE(ABORT,'followup_approval_version_conflict'); END;
+
+CREATE TRIGGER rt_followup_binding_deleted AFTER DELETE ON rt_store_followup_step_bindings BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE store_id=OLD.store_id; END;
+
+CREATE TRIGGER rt_followup_binding_inserted AFTER INSERT ON rt_store_followup_step_bindings BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE store_id=NEW.store_id; END;
+
+CREATE TRIGGER rt_followup_binding_updated AFTER UPDATE ON rt_store_followup_step_bindings BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE store_id=NEW.store_id; END;
+
+CREATE TRIGGER rt_followup_customer_notice AFTER INSERT ON rt_customer_notice_outbox WHEN EXISTS(SELECT 1 FROM rt_reservation_events e JOIN rt_reservation_event_receipts receipt ON receipt.event_id=e.id JOIN rt_store_followup_templates t ON t.store_id=e.store_id WHERE e.reservation_id=NEW.reservation_id AND e.reservation_version=NEW.customer_version AND e.event_type='restaurant.reservation.created' AND receipt.consumer_key='followup') BEGIN UPDATE rt_customer_notice_outbox SET valid=0 WHERE id=NEW.id; END;
+
+CREATE TRIGGER rt_followup_event_receipt AFTER INSERT ON rt_reservation_events BEGIN INSERT INTO rt_reservation_event_receipts(event_id,consumer_key) VALUES(NEW.id,'followup'); END;
+
+CREATE TRIGGER rt_followup_legacy_edit BEFORE UPDATE ON rt_line_flows WHEN EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE store_id=OLD.store_id) BEGIN SELECT RAISE(ABORT,'edit_restaurant_followup_in_common_scenario'); END;
+
+CREATE TRIGGER rt_followup_no_enrollment BEFORE INSERT ON friend_scenarios WHEN EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE scenario_id=NEW.scenario_id) BEGIN SELECT RAISE(ABORT,'restaurant_followup_requires_source_job'); END;
+
+CREATE TRIGGER rt_followup_published AFTER UPDATE OF current_published_version_id ON scenarios WHEN NEW.current_published_version_id IS NOT OLD.current_published_version_id BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE scenario_id=NEW.id; END;
+
+CREATE TRIGGER rt_followup_step_deleted AFTER DELETE ON scenario_steps BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE scenario_id=OLD.scenario_id; END;
+
+CREATE TRIGGER rt_followup_step_inserted AFTER INSERT ON scenario_steps BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE scenario_id=NEW.scenario_id; END;
+
+CREATE TRIGGER rt_followup_step_unbound BEFORE DELETE ON scenario_steps BEGIN DELETE FROM rt_store_followup_step_bindings WHERE step_id=OLD.id; END;
+
+CREATE TRIGGER rt_followup_step_updated AFTER UPDATE ON scenario_steps BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE scenario_id=NEW.scenario_id; END;
+
+CREATE TRIGGER rt_followup_store_added AFTER INSERT ON rt_stores BEGIN INSERT OR IGNORE INTO scenarios(id,name,description,trigger_type,is_active,line_account_id) SELECT 'restaurant-followup:'||NEW.id,'LINE来店フォロー：'||NEW.name,'予約ごとの起点から送る共通シナリオ','manual',0,NEW.line_account_id WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':reservation_created','restaurant-followup:'||NEW.id,0,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='reservation_created' LIMIT 1),'予約が入りました。'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'reservation_created','restaurant-followup:'||NEW.id||':reservation_created',0,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':reservation_24h','restaurant-followup:'||NEW.id,1,'flex',json_set('{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[{"type":"text","text":"{{name}}さん、{{var.reservation_datetime}}のご予約の確認です。","wrap":true}]},"footer":{"type":"box","layout":"vertical","contents":[{"type":"button","action":{"type":"postback","label":"行きます","data":"{{var.restaurant_going}}"}},{"type":"button","action":{"type":"postback","label":"変更したい","data":"{{var.restaurant_change}}"}},{"type":"button","action":{"type":"postback","label":"取り消す","data":"{{var.restaurant_cancel}}"}}]}}','$.body.contents[0].text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='reservation_24h' LIMIT 1),'{{name}}さん、{{var.reservation_datetime}}のご予約の確認です。')),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'reservation_24h','restaurant-followup:'||NEW.id||':reservation_24h',-1440,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':reservation_2h','restaurant-followup:'||NEW.id,2,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='reservation_2h' LIMIT 1),'ご来店をお待ちしています。'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'reservation_2h','restaurant-followup:'||NEW.id||':reservation_2h',-120,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':post_visit','restaurant-followup:'||NEW.id,3,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='post_visit' LIMIT 1),'ご来店ありがとうございました。'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'post_visit','restaurant-followup:'||NEW.id||':post_visit',180,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':review_request','restaurant-followup:'||NEW.id,4,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='review_request' LIMIT 1),'よろしければ口コミをお寄せください。'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'review_request','restaurant-followup:'||NEW.id||':review_request',181,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':waitlist_invited','restaurant-followup:'||NEW.id,5,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='waitlist_invited' LIMIT 1),'空きが出ました。
+この時間で予約する：{{var.waitlist_book_url}}
+今回は見送る：{{var.waitlist_decline_url}}'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'waitlist_invited','restaurant-followup:'||NEW.id||':waitlist_invited',0,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_templates(store_id,scenario_id) SELECT NEW.id,'restaurant-followup:'||NEW.id WHERE NEW.line_account_id IS NOT NULL; END;
+
+CREATE TRIGGER rt_followup_store_connected AFTER UPDATE OF line_account_id ON rt_stores WHEN OLD.line_account_id IS NULL AND NEW.line_account_id IS NOT NULL BEGIN INSERT OR IGNORE INTO scenarios(id,name,description,trigger_type,is_active,line_account_id) SELECT 'restaurant-followup:'||NEW.id,'LINE来店フォロー：'||NEW.name,'予約ごとの起点から送る共通シナリオ','manual',0,NEW.line_account_id WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':reservation_created','restaurant-followup:'||NEW.id,0,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='reservation_created' LIMIT 1),'予約が入りました。'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'reservation_created','restaurant-followup:'||NEW.id||':reservation_created',0,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':reservation_24h','restaurant-followup:'||NEW.id,1,'flex',json_set('{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[{"type":"text","text":"{{name}}さん、{{var.reservation_datetime}}のご予約の確認です。","wrap":true}]},"footer":{"type":"box","layout":"vertical","contents":[{"type":"button","action":{"type":"postback","label":"行きます","data":"{{var.restaurant_going}}"}},{"type":"button","action":{"type":"postback","label":"変更したい","data":"{{var.restaurant_change}}"}},{"type":"button","action":{"type":"postback","label":"取り消す","data":"{{var.restaurant_cancel}}"}}]}}','$.body.contents[0].text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='reservation_24h' LIMIT 1),'{{name}}さん、{{var.reservation_datetime}}のご予約の確認です。')),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'reservation_24h','restaurant-followup:'||NEW.id||':reservation_24h',-1440,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':reservation_2h','restaurant-followup:'||NEW.id,2,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='reservation_2h' LIMIT 1),'ご来店をお待ちしています。'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'reservation_2h','restaurant-followup:'||NEW.id||':reservation_2h',-120,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':post_visit','restaurant-followup:'||NEW.id,3,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='post_visit' LIMIT 1),'ご来店ありがとうございました。'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'post_visit','restaurant-followup:'||NEW.id||':post_visit',180,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':review_request','restaurant-followup:'||NEW.id,4,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='review_request' LIMIT 1),'よろしければ口コミをお寄せください。'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'review_request','restaurant-followup:'||NEW.id||':review_request',181,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'restaurant-followup:'||NEW.id||':waitlist_invited','restaurant-followup:'||NEW.id,5,'text',COALESCE((SELECT body FROM rt_line_flows WHERE store_id=NEW.id AND flow_type='waitlist_invited' LIMIT 1),'空きが出ました。
+この時間で予約する：{{var.waitlist_book_url}}
+今回は見送る：{{var.waitlist_decline_url}}'),0 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled) SELECT NEW.id,'waitlist_invited','restaurant-followup:'||NEW.id||':waitlist_invited',0,1 WHERE NEW.line_account_id IS NOT NULL; INSERT OR IGNORE INTO rt_store_followup_templates(store_id,scenario_id) SELECT NEW.id,'restaurant-followup:'||NEW.id WHERE NEW.line_account_id IS NOT NULL; END;
 
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (OLD.store_id); END;
 

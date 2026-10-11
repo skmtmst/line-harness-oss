@@ -1,3 +1,4 @@
+import { jstDate } from '@/lib/jst-datetime'
 import type { GoogleHoursPeriod, GoogleWeekday } from '@/lib/restaurant-google-api'
 import { formatDay, formatTime } from '@/lib/format'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -11,8 +12,7 @@ export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  const now = new Date()
-  const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
+  const sameDay = jstDate(date) === jstDate()
   const time = formatTime(date)
   if (sameDay) return `今日 ${time}`
   return `${formatDay(date)} ${time}`

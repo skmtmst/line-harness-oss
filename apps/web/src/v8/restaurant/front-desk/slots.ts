@@ -1,3 +1,4 @@
+import { jstDate, jstCalendar } from '@/lib/jst-datetime'
 /*
  * 電話予約（E-2）とウォークイン（E-3）が共通で使う「空いている時刻・卓」の決まり。
  * 予約台帳の電話の予約（reservations/phone.tsx）と同じ決まり（2時間いる・期限切れの押さえは数えない・
@@ -17,7 +18,7 @@ export function pad2(value: number): string {
 }
 
 export function toYmd(day: Date): string {
-  return `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`
+  return jstDate(day)
 }
 
 export function toMinutes(time: string): number {
@@ -52,7 +53,7 @@ export function freeTables(tables: RestaurantTable[], guests: number, start: num
 }
 
 export function startOf(date: string, time: string): number {
-  return new Date(`${date}T${time.padStart(5, '0')}:00`).getTime()
+  return new Date(`${date}T${time.padStart(5, '0')}:00+09:00`).getTime()
 }
 
 /**
@@ -61,7 +62,7 @@ export function startOf(date: string, time: string): number {
  */
 export function openTimes(date: string, hours: RestaurantOpeningDay[] | null, now = new Date()): string[] {
   const [y, m, d] = date.split('-').map(Number)
-  const weekday = y && m && d ? new Date(y, m - 1, d).getDay() : -1
+  const weekday = y && m && d ? new Date(Date.UTC(y, m - 1, d)).getUTCDay() : -1
   const periods = hours?.find((day) => day.weekday === weekday)?.periods
   const list: number[] = []
   if (periods && periods.length > 0) {
@@ -72,7 +73,8 @@ export function openTimes(date: string, hours: RestaurantOpeningDay[] | null, no
     for (let t = FALLBACK_START; t <= FALLBACK_END; t += 30) list.push(t)
   }
   const today = toYmd(now) === date
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const calendar = jstCalendar(now)
+  const nowMinutes = calendar.getUTCHours() * 60 + calendar.getUTCMinutes()
   return list.filter((t) => !today || t > nowMinutes).map(slotLabel)
 }
 

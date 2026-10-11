@@ -1,5 +1,6 @@
 'use client'
 
+import HqMessageBody from '@/components/shared/hq-message-inserts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -101,7 +102,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     const value = String(nested ? (settings?.definition as Record<string, unknown>)?.[key] ?? '' : settings?.[key] ?? '')
     const change = (text: string) => nested ? updateSetting('definition', { ...(settings?.definition as object), [key]: text }) : updateSetting(key, text)
     return <label className={styles.field} key={key}><span>{label}</span><SaveErrorField names={[key, `definition.settings.${nested ? 'definition.' : ''}${key}`]}>{multiline
-      ? canEdit ? <TextArea value={value} onChange={(event) => change(event.target.value)} rows={4} /> : <span>{String(value)}</span>
+      ? <HqMessageBody value={value} label={label} onChange={change} readOnly={!canEdit} disabled={busy}/>
       : canEdit ? <TextField value={value} onChange={(event) => change(event.target.value)} /> : <span>{String(value)}</span>}</SaveErrorField></label>
   }
   const save = async () => {
@@ -182,7 +183,9 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
         </>}
         {type === 'reminder' && <>{field('description', '説明')}
           <label className={styles.field}><span>配信方式</span>{canEdit ? <Select aria-label="配信方式" value={String(settings?.deliveryMode ?? 'time')} options={[{ value: 'time', label: '日時で送る' }, { value: 'countdown', label: '予定日から数えて送る' }]} onChange={(value) => updateSetting('deliveryMode', value)} /> : <span>{settings?.deliveryMode === 'countdown' ? '予定日から数えて送る' : '日時で送る'}</span>}</label>
-          {field('sendAtTime', '送る時刻')}</>}
+          {field('sendAtTime', '送る時刻')}
+          {(Array.isArray(settings?.steps)?settings.steps:[]).map((raw,index)=>{const step=raw as Record<string,unknown>;return <HqMessageBody key={String(step.stableStepId??index)} label={`${index+1}通目の本文`} value={String(step.messageContent??'')} readOnly={!canEdit} disabled={busy} onChange={messageContent=>updateSetting('steps',(settings?.steps as unknown[]).map((entry,i)=>i===index?{...step,messageContent}:entry))}/>})}
+          {canEdit && <Button disabled={busy} onClick={()=>updateSetting('steps',[...(Array.isArray(settings?.steps)?settings.steps:[]),{stableStepId:crypto.randomUUID(),messageType:'text',messageContent:'',offsetMinutes:-60,offsetDays:null,sendAtTime:null}])}>通知を足す</Button>}</>}
       </div>
   </CreatePage></SaveErrorScope>
   const shownAccounts = accountsInFolder(accounts, accountFolder, accountFolders.membership).filter(account=>account.name.includes(query.trim()))

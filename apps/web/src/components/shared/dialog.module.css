@@ -428,3 +428,8 @@
 [data-theme='v8'] .panel[data-layout='account-inset'] > .content { padding: 0; }
 [data-theme='v8'] .panel[data-layout='account-inset'] .title { font-size: var(--tpl-acd-dlg-title-size); line-height: var(--tpl-acd-dlg-title-lh); }
 [data-theme='v8'] .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }
+
+html[data-theme='v8'] .stepCurrent { background: var(--color-selection-border); color: var(--color-canvas); }
+
+/* 入力を含む確認窓は、欄を本文幅にそろえる。 */
+html[data-theme='v8'] .content[data-content-layout='form'] { align-items: stretch; }

@@ -59,6 +59,7 @@ export function purgeTablesChildFirst(): string[] {
   const dependsOn = (name: string): string | undefined => {
     // Files also reference answers and friends; remove them before either parent.
     if (name === 'form_submission_files') return 'form_submissions';
+    if (name === 'scenario_source_jobs') return 'scenario_versions';
     const scope = RETENTION_TABLES[name]?.scope;
     if (!scope) return undefined;
     if (scope.by === 'parent') return scope.parent;

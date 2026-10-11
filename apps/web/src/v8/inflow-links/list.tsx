@@ -686,8 +686,8 @@ export default function InflowListV8({
                 <Th className={styles.colFriends}>友だち追加</Th>
                 <Th className={styles.colClicks}>クリック</Th>
                 <Th className={styles.colLatest}>最新追加</Th>
-                <Th className={styles.colUrl}>発行URL</Th>
-                <Th className={styles.colOps}>状態</Th>
+
+                <Th className={styles.colStatus}>状態</Th><Th className={styles.colOps}>操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -729,7 +729,7 @@ export default function InflowListV8({
                         <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
                       )}
                     </Td>
-                    <Td className={styles.colName}>
+                    <Td className={styles.colName} data-list-name-cell>
                       <FolderDotName folder={r.genre ? { name: r.genre } : null}>{nameNode}</FolderDotName>
                     </Td>
                     <Td className={styles.colPool}>
@@ -761,20 +761,7 @@ export default function InflowListV8({
                     <Td className={styles.colLatest}>
                       <span className={styles.cellMain}>{summaryAvailable ? formatLatest(r.stats?.latestAt) : emptyValue('unknown')}</span>
                     </Td>
-                    <Td className={styles.colUrl}>
-                      <div className={styles.opsBox}>
-                        <CopyTextButton value={referralUrl(r.refCode)} aria-label={`${r.name}のURLをコピー`}  />
-                        {menuItems.length > 0 ? (
-                          <RowMenu
-                            label={menuLabel}
-                            items={menuItems}
-                            open={openMenuRefCode === r.refCode}
-                            onOpenChange={(next) => setOpenMenuRefCode(next ? r.refCode : null)}
-                          />
-                        ) : null}
-                      </div>
-                    </Td>
-                    <Td className={styles.colOps}>
+                    <Td className={styles.colStatus}>
                       {status ? (
                         <span
                           className={styles.pill}
@@ -790,6 +777,8 @@ export default function InflowListV8({
                           {status === 'measured' ? '計測済' : status === 'unregistered' ? '未登録' : '停止中'}
                         </span>
                       ) : null}
+                    </Td>
+                    <Td className={styles.colOps} data-list-action-cell>
                       <div className={styles.opsBox}>
                         {/* 閲覧のみ：編集・登録するは置かない（列の幅は残す） */}
                         {readonly ? null : editTarget ? (
@@ -805,6 +794,9 @@ export default function InflowListV8({
                             登録する
                           </Button>
                         )}
+                        <RowMenu appearance="plain" label={menuLabel} items={menuItems}
+                          open={openMenuRefCode === r.refCode}
+                          onOpenChange={(next) => setOpenMenuRefCode(next ? r.refCode : null)} />
                       </div>
                     </Td>
                   </Tr>

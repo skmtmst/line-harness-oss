@@ -85,7 +85,7 @@ export default function Pagination({
   if (total <= 1) return null
 
   return (
-    <nav aria-label={ariaLabel} className={classes} data-spacing={spacing}>
+    <nav aria-label={ariaLabel} data-pagination className={classes} data-spacing={spacing}>
       {summary ? <span className={styles.summary}>{summary}</span> : null}
       <button
         type="button"

@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
+
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MoreHorizontal } from 'lucide-react'
@@ -90,9 +93,7 @@ const EVENT_LABELS: Record<string, string> = {
 
 
 function dateOnlyDaysAgo(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString().slice(0, 10)
+  return jstDateOffset(-days)
 }
 
 /*
@@ -565,7 +566,7 @@ function MileagePageInner() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `mileage-earning-rules-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `mileage-earning-rules-${jstDate()}.csv`
       a.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -607,7 +608,7 @@ function MileagePageInner() {
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `mileage-balances-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `mileage-balances-${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }

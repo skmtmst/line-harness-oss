@@ -40,6 +40,8 @@ import type { Env } from '../index.js';
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { requireVisibleFriend } from './friends.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { accountAllergyOptions } from '../services/allergy-options.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 const friendFields = new Hono<Env>();
 
@@ -802,7 +804,14 @@ friendFields.get(
         && (hasStaffPermission(c, 'attribute.personal_info.view')
           || hasStaffPermission(c, 'attribute.personal_info.edit'));
 
-      const rows = await getFriendFieldsWithValues(c.env.DB, friendId);
+      const friend = await getFriendById(c.env.DB, friendId);
+      const allowed = await getFriendFieldsForScope(c.env.DB, {tenantId:staff?.tenantId ?? DEFAULT_TENANT_ID,lineAccountId:friend?.line_account_id ?? ''});
+      const allowedIds = new Set(allowed.map(field => field.id));
+      const rows = (await getFriendFieldsWithValues(c.env.DB, friendId)).filter(field => (allowedIds.has(field.id) || field.field_key.startsWith('fixed_')) && field.status !== 'archived');
+      if (friend?.line_account_id && rows.some(field=>field.field_key==='fixed_allergy')) {
+        const { options } = await accountAllergyOptions(c.env.DB, friend.line_account_id);
+        for (const field of rows) if (field.field_key === 'fixed_allergy') field.options_json = JSON.stringify(options);
+      }
       const visible = rows.filter((r) => r.is_personal === 0 || canSeePersonal);
       const hiddenCount = rows.length - visible.length;
 
@@ -863,7 +872,11 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
     const body = await c.req.json<{ values?: Record<string, unknown> }>();
     const values = body.values ?? {};
 
-    const fields = await getFriendFields(c.env.DB);
+    const friend = await getFriendById(c.env.DB, friendId);
+    const allFields = await getFriendFields(c.env.DB);
+    const scopedFields = await getFriendFieldsForScope(c.env.DB, {tenantId:staff?.tenantId ?? DEFAULT_TENANT_ID,lineAccountId:friend?.line_account_id ?? ''});
+    const allowedIds = new Set(scopedFields.map(field => field.id));
+    const fields = allFields.filter(field => (allowedIds.has(field.id) || field.field_key.startsWith('fixed_')) && field.status !== 'archived');
     const byId = new Map(fields.map((f) => [f.id, f]));
     const warnings: string[] = [];
     const pending: Array<{ fieldId: string; value: string | null; field: FriendField }> = [];
@@ -874,6 +887,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
     for (const [fieldId, raw] of Object.entries(values)) {
       const field = byId.get(fieldId);
       if (!field) {
+        if (allFields.some(field => field.id === fieldId)) return c.json({success:false,error:'この店で使える情報欄ではありません'},403);
         warnings.push(`知らない項目が含まれていたため無視しました（${fieldId}）`);
         continue;
       }

@@ -1,4 +1,7 @@
 'use client'
+
+import { jstMonthStart } from '@/lib/jst-datetime'
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -237,8 +240,7 @@ function FriendDetailInner() {
 
   const displayedHistory: MileageDetailHistoryItem[] = useMemo(() => v6History ?? mileage?.history ?? [], [mileage, v6History])
   const monthStart = useMemo(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    return jstMonthStart()
   }, [])
   const periodFrom = period === 'month' ? monthStart : undefined
   const filtered = useMemo(() => {

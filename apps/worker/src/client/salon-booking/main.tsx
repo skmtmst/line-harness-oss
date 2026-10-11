@@ -35,10 +35,10 @@ function App({ ctx }: { ctx: SalonBookingContext }) {
 
   return (
     <SalonBookingProvider value={ctx}>
-      <div className="min-h-screen sb-fade-in" style={{ background: '#f5f5f5' }}>
+      <div className="min-h-screen sb-fade-in" style={{ background: 'var(--customer-background, #f5f5f5)' }}>
         <header
           className="px-4 py-3 text-white text-center font-bold"
-          style={{ background: '#06C755', fontSize: '15px' }}
+          style={{ background: 'var(--customer-primary, #06C755)', fontSize: '15px' }}
         >
           {headerLabel}
         </header>

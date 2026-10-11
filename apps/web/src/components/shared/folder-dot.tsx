@@ -2,6 +2,7 @@
 import { Children, isValidElement, type ReactNode } from 'react'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import TruncatedText from './truncated-text'
+import Checkbox from './checkbox'
 import styles from './folder-dot.module.css'
 
 /**
@@ -58,10 +59,14 @@ function nameText(node: ReactNode): string {
  * B-194: どの幅でも丸を出す。旧い dot 指定は受け取るだけ。
  */
 export function FolderDotName({ folder, children }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode }) {
+  const parts = Children.toArray(children)
+  const selection = parts.filter(child => isValidElement(child) && child.type === Checkbox)
+  const name = parts.filter(child => !isValidElement(child) || child.type !== Checkbox)
   return (
-    <span className={styles.line} data-list-name="" title={nameText(children)}>
+    <span className={styles.line} data-list-name="" title={nameText(name)}>
+      {selection}
       <FolderDot folder={folder} />
-      {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{children}</span>}
+      {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{name}</span>}
     </span>
   )
 }

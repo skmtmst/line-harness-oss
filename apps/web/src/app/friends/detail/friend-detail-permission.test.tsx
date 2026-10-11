@@ -376,12 +376,16 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
   })
 })
 
+function supportEditButtons(): HTMLButtonElement[] {
+  return Array.from(document.querySelectorAll<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="対応"] button')).filter(button => button.textContent?.trim() === '編集')
+}
+
 describe('N-035 友だち詳細から担当・対応状況を変える', () => {
   it('管理者は「対応」の編集を開いて担当・対応状況を保存できる', async () => {
     setRole('admin')
     await render('timeline')
 
-    const editButtons = buttonsByText('編集する')
+    const editButtons = supportEditButtons()
     expect(editButtons).toHaveLength(1)
     await act(async () => {
       editButtons[0].click()
@@ -419,7 +423,7 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
     setRole('admin')
     await render('timeline')
     await act(async () => {
-      buttonsByText('編集する')[0].click()
+      supportEditButtons()[0].click()
     })
     await eventually(() => expect(document.querySelector('[role="dialog"]')).toBeTruthy())
     await setSelectValue(document.querySelector<HTMLSelectElement>('select[aria-label="担当者を変える"]')!, '')
@@ -435,14 +439,14 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
   it('chats編集キーを持つstaffにも同じ口が出る', async () => {
     setRole('staff', ['/chats'])
     await render('timeline')
-    expect(buttonsByText('編集する')).toHaveLength(1)
+    expect(supportEditButtons()).toHaveLength(1)
   })
 
   it('chats編集キーの無いstaffには編集口を出さない（受信箱への案内だけ）', async () => {
     setRole('staff', ['/friends'])
     await render('timeline')
     // 「編集」はボタンではなく受信箱へのリンクのまま
-    expect(buttonsByText('編集する')).toHaveLength(0)
+    expect(supportEditButtons()).toHaveLength(0)
     expect(linksByText('受信箱で開く').length).toBeGreaterThan(0)
     expect(document.querySelector('[role="dialog"]')).toBeNull()
   })

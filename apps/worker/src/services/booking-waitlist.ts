@@ -55,6 +55,11 @@ export async function dispatchWaitlistInvites(env: Env['Bindings'], accountId?: 
   const seats = restaurantTestEnabled(env) ? await db.prepare(`SELECT w.id,s.line_account_id account_id,w.line_uid line_user_id,w.starts_at,w.hold_expires_at,w.notification_retry_key,s.name detail,s.timezone FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=w.line_uid AND f.is_following=1 WHERE w.status='invited' AND w.notified_at IS NULL AND julianday(w.hold_expires_at)>julianday(?) AND (w.notification_claim_until IS NULL OR julianday(w.notification_claim_until)<=julianday(?)) AND (? IS NULL OR s.line_account_id=?) LIMIT 100`).bind(now, now, accountId ?? null, accountId ?? null).all<InviteRow>() : { results: [] as InviteRow[] };
   for (const [table, rows, featureId] of [['booking_waitlist', people.results, 'booking'], ['rt_seat_waitlist', seats.results, 'restaurant_test']] as const) {
     for (const row of rows) {
+      if(table==='rt_seat_waitlist') {
+        const managed=await db.prepare(`SELECT t.store_id FROM rt_store_followup_templates t JOIN rt_seat_waitlist w ON w.store_id=t.store_id JOIN rt_reservation_events e ON json_extract(e.payload_json,'$.waitlistId')=w.id JOIN rt_reservation_event_receipts r ON r.event_id=e.id AND r.consumer_key='followup' WHERE w.id=?`).bind(row.id).first<{store_id:string}>();
+        if(managed){const {processRestaurantEvents}=await import('./restaurant-events.js');const {processScenarioSourceJobs}=await import('./scenario-source-jobs.js');await processRestaurantEvents(env,managed.store_id);await processScenarioSourceJobs(env);continue;}
+      }
+
       const claim = await db.prepare(`UPDATE ${table} SET notification_claim_until=? WHERE id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND notified_at IS NULL AND (notification_claim_until IS NULL OR julianday(notification_claim_until)<=julianday(?))`).bind(new Date(Date.now() + 60_000).toISOString(), row.id, now).run();
       if (!claim.meta.changes) continue;
       try {
