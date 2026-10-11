@@ -41,11 +41,10 @@ import {
   getMessageTemplateById,
   getTemplateById,
   jstNow,
-  removeTagFromFriend,
   setFriendFieldValue,
   validateFriendFieldValue,
 } from '@line-crm/db';
-import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
 import { buildMessage } from './line-message.js';
 
 /** 回答1件。キーは入力ブロックの name。 */
@@ -746,7 +745,7 @@ export async function runFormAction(
     case 'tag':
       for (const tagId of action.tagIds ?? []) {
         if (action.op === 'remove') {
-          await removeTagFromFriend(db, friendId, tagId);
+          await detachTagAndFireSideEffects(db, friendId, tagId, input.idempotencyPrefix ? `${input.idempotencyPrefix}:${pushSuffix ?? actionIndex}:remove:${tagId}` : undefined);
         } else {
           await attachTagAndFireSideEffects(
             db,
