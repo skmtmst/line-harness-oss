@@ -159,9 +159,13 @@ export async function hasAlreadyRepliedOnce(
 ): Promise<boolean> {
   if (rule.once_per_friend !== 1) return false;
   if (await hasAutoReplyHitForFriend(db, rule.id, friendId)) return true;
+  const completed=await db.prepare(`SELECT 1 FROM auto_reply_evaluations
+    WHERE winning_auto_reply_id=? AND friend_id=? AND status='completed' AND reply_status='accepted' LIMIT 1`)
+    .bind(rule.id,friendId).first();
+  if(completed) return true;
   if (!rule.reply_delay_seconds) return false;
   const row = await db.prepare(`SELECT 1 FROM auto_reply_deliveries d JOIN auto_reply_versions v ON v.id=d.version_id
-    WHERE d.friend_id=? AND v.auto_reply_id=? AND (d.status IN ('pending','claimed','accepted') OR d.error_code='delayed_delivery_unknown') LIMIT 1`).bind(friendId,rule.id).first();
+    WHERE d.friend_id=? AND v.auto_reply_id=? AND (d.status IN ('pending','claimed') OR (d.status='accepted' AND COALESCE(json_extract(d.action_summary,'$.failed'),0)=0) OR d.error_code='delayed_delivery_unknown') LIMIT 1`).bind(friendId,rule.id).first();
   return row != null;
 }
 

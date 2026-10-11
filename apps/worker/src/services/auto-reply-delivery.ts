@@ -162,7 +162,7 @@ export async function processAutoReplyDeliveries(
         messageLogId: logId,
       });
       const settings = parseAutoReplyVersionSettings(version);
-      await recordAutoReplyHit(db, {
+      if (JSON.parse(row.action_summary).failed === 0) await recordAutoReplyHit(db, {
         autoReplyId: version.auto_reply_id,
         friendId: friend.id,
         lineAccountId: row.line_account_id,

@@ -118,6 +118,7 @@ const SKIP_LABELS: Record<string, string> = {
   outside_active_window: '応答する時間帯の外でした',
   weekday_not_allowed: '応答しない曜日でした',
   operator_handling: '担当者が対応中のため何もしませんでした',
+  partial_failure_requires_retry: '前の返信は受理済みです。前の実行結果から失敗した処理だけを再実行してください',
   already_replied_once: '1人1回の設定により何もしませんでした',
   cooldown_active: '連続返信を防ぐため何もしませんでした',
   friend_conditions_not_met: '友だちの条件に合いませんでした',
