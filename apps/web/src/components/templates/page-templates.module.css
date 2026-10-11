@@ -55,7 +55,8 @@
 /*
  * 統括（/hq）の列（絵 JKjsE・LRc93 ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
  * border-box のままだと中身が 164 に縮み、右の中身が 36px 左へずれていた（2026-10-08）。
- * B-7：通常の列も中身200に左右12の余白と線を足す。外寸指定（folderWidth）は渡された幅を守る。
+ * 設定の列は中身200に左右12の余白と線を足す。通常の一覧は下の B-178 で余白込み200。
+ * 外寸指定（folderWidth）は渡された幅を守る。
  */
 :global([data-theme='v8']) .folders[data-folder-inset] { box-sizing: content-box; padding-left: var(--tpl-folder-inset-pad-start); }
 :global([data-theme='v8']) .collapsedFolders { display: none; }
@@ -360,6 +361,7 @@
 }
 
 /* B-178：フォルダの列は余白込み200、ページ送りは右寄せ。 */
+:global([data-theme='v8']) [data-page-template='list'] .listBody:not([data-dialog-layout]) .folders:not([data-folder-inset]) { box-sizing: border-box; }
 :global([data-theme='v8']) [data-list-skeleton] .folders { box-sizing: border-box; width: var(--tpl-folder-width); }
 :global([data-theme='v8']) [data-list-skeleton] .paginationRow { justify-content: flex-end; gap: var(--space-16); }
 

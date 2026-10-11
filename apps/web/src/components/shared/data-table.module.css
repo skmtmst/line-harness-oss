@@ -504,6 +504,9 @@
 
 
 /* B-178：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
+[data-theme='v8'] :global([data-page-template='list'] [data-template-region='content']) .frame:not([data-table-presentation]):not([data-column-layout]):not([data-grid-table]) .row:not(:has([colspan])) {
+  height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h);
+}
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr {
   height: var(--tpl-list-head-h);
 }
@@ -536,7 +539,7 @@
 /* 通常の見出しは空欄。全選択は指を乗せる・キーボードで入る・選択中に出す。
    inputを残すので、Spaceと読み上げによる全選択も従来どおり使える。 */
 @media (hover: hover) and (pointer: fine) {
-  html[data-theme='v8'] :global([data-list-skeleton]) .table > thead > tr:not(:hover):not(:focus-within) > th:first-child:has(input[type='checkbox']:not(:checked):not(:indeterminate)) label {
+  html[data-theme='v8'] :global(:is([data-list-skeleton], [data-page-template='list'])) .table > thead > tr:not(:hover):not(:focus-within) > th:first-child:has(input[type='checkbox']:not(:checked):not(:indeterminate)) label {
     opacity: 0;
   }
 }
