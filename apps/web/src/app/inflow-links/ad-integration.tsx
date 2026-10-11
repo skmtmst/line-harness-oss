@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
+
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
@@ -434,7 +437,7 @@ export default function AdIntegration({
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `広告への送信履歴_${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.download = `広告への送信履歴_${jstDate()}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }

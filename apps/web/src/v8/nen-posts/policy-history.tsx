@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type PhotoRewardPolicyVersion } from '@/lib/api'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
+import Drawer from '@/components/shared/drawer'
 import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -40,6 +41,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
   const [publicationPoints, setPublicationPoints] = useState('0')
   const [summary, setSummary] = useState('')
   const [effective, setEffective] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [revertOpen, setRevertOpen] = useState(false)
@@ -80,7 +82,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
         ...(versions.length ? { expectedVersion: Math.max(...versions.map((version) => version.versionNumber)) } : {}),
       })
       if (!response.success) throw new Error(response.error)
-      setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); fields.reset(); await load(); onChanged()
+      setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); fields.reset(); setCreateOpen(false); await load(); onChanged()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
  { if (!fieldFailure) setSaveError('新しい版を保存できませんでした。最新の版を読み直して、もう一度お試しください。') } }
@@ -118,8 +120,12 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
               <p className={styles.historyReservedBody}>{policyContent(version)}</p>
             </div>) : <p className={styles.railNote}>予約中の版はありません</p>}
           </section>
-          {canEdit ? <form className={styles.historyCard} onSubmit={(event) => { event.preventDefault(); void save() }}>
-            <h3 className={styles.railTitle}>引き出し：新しい版を作る</h3>
+          {canEdit ? <Button variant="primary" onClick={() => setCreateOpen(true)}>新しい版を作る</Button> : null}
+        </div>
+      </>}
+      </div>
+    </Dialog>
+      <Drawer open={open && createOpen && canEdit} title="新しい版を作る" onClose={() => setCreateOpen(false)} busy={saving} dirty={Boolean(points || summary || effective || publicationPoints !== '0')}><form className={styles.dialogStack} onSubmit={(event) => { event.preventDefault(); void save() }}>
             <p className={styles.historyLead}>保存しても、使い始めの日時までは今の版のままです。</p>
             <div className={styles.historyFields}><Field label="採用したら（マイル）"><SaveErrorField names={["points"]}><NumberInput numericText unit="マイル" {...fields.bind('photo-policy-points')} aria-label="採用したら（マイル）" inputMode="numeric" value={points} onChange={(event) => setPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></SaveErrorField>
 <FieldError id="photo-policy-points-error">{fields.error('photo-policy-points')}</FieldError></Field>
@@ -128,12 +134,8 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
             <Field label="ひとこと（なぜ変えるか）"><SaveErrorField names={["summary"]}><TextField value={summary} maxLength={200} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></SaveErrorField></Field>
             <div className={styles.inputLabel} title="日本時間。空ならすぐ使い始めます。"><span aria-hidden="true">使い始め</span><SaveErrorField names={["effective"]}><DateTimeField id="photo-policy-effective" aria-describedby={fields.error('photo-policy-effective') ? 'photo-policy-effective-error' : undefined} invalid={Boolean(fields.error('photo-policy-effective'))} aria-label="使い始め（日本時間・空ならすぐ）" placeholder="空ならすぐ" value={effective} disabled={saving} onChange={setEffective} /></SaveErrorField><FieldError id="photo-policy-effective-error">{fields.error('photo-policy-effective')}</FieldError></div>
             {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}
-            <div className={styles.historyActions}><Button variant="secondary" disabled={saving} onClick={() => { setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); setSaveError(''); fields.reset() }}>キャンセル</Button><Button type="submit" variant="primary" busy={saving} disabled={saving}>{effective ? '版を予約する' : '版を保存する'}</Button></div>
-          </form> : null}
-        </div>
-      </>}
-      </div>
-    </Dialog>
+            <div className={styles.historyActions}><Button variant="secondary" disabled={saving} onClick={() => { setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); setSaveError(''); fields.reset(); setCreateOpen(false) }}>キャンセル</Button><Button type="submit" variant="primary" busy={saving} disabled={saving}>{effective ? '版を予約する' : '版を保存する'}</Button></div>
+          </form></Drawer>
     <ConfirmDialog open={revertOpen} title={`v${selected?.versionNumber}に戻しますか？`} description="過去の版は変わりません。その中身で新しい版を作ります。付与済みのマイルは変わりません。" busy={saving} error={saveError} confirmLabel="この版に戻す" onConfirm={() => revert()} onCancel={() => { if (!saving) setRevertOpen(false) }} />
   </></SaveErrorScope>
 }

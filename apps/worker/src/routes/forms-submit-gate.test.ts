@@ -51,6 +51,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', () => ({
+  getVersionedAccountSetting: vi.fn(async()=>null),
   getFormAccountIds: vi.fn(async () => ['account-a']),
   listLineAccountsWithTenantStatus: vi.fn(async () => [
     { id: 'account-a', tenant_status: 'active' },

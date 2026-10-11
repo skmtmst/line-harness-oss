@@ -18,7 +18,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 /*
  * ★V8 Googleビジネス 設定（`CuHXG`：接続済み）。未接続・店舗の選択待ちも同じ場所で出す（今の画面と同じ口）。
- * 接続・再接続は Google の認可画面へ移る。解除・取り消し・切り替えは確認の小窓を経る。
+ * 接続・再接続は Google の認可画面へ移る。解除・取り消し・切り替えは確認画面を経る。
  * 接続を管理できない人には、接続・解除のボタンを置かない。
  */
 
@@ -178,7 +178,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           </div>
         ) : manageNote}
       </Card>
-      <p className={styles.grayNote}>接続を解除すると、口コミ・投稿・パフォーマンスの取り込みが止まります。解除の前に確認の小窓が出ます。</p>
+      <p className={styles.grayNote}>接続を解除すると、口コミ・投稿・パフォーマンスの取り込みが止まります。解除の前に確認画面が出ます。</p>
       <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? emptyValue('unknown')}・最終同期：${formatStampFull(connection.lastSyncedAt)}`}</p>
       <ConfirmDialog
         open={confirmDisconnect}

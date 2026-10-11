@@ -21,8 +21,8 @@ import { scenarioReferenceData } from './scenario-reference-data'
 import DateField from '@/components/shared/date-field'
 import MenuPortal from '@/components/shared/menu-portal'
 import Button from '@/components/shared/button'
-import { InsertButton, type InsertTextTarget } from '@/components/shared/insert-text-field'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import { type InsertTextTarget } from '@/components/shared/insert-text-field'
+import MessageInsertRow, { MessageInsertButton } from '@/components/shared/message-insert-row'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
@@ -45,6 +45,7 @@ interface Option {
 
 export interface InsertToolbarProps {
   compact?: boolean
+  count?: React.ReactNode
   /** 差し込み先。入力欄そのものを渡す。 */
   targetRef: React.RefObject<HTMLTextAreaElement | HTMLInputElement | InsertTextTarget | null>
   value: string
@@ -53,7 +54,7 @@ export interface InsertToolbarProps {
   includeAnswerForm?: boolean
 }
 
-export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false, compact = false }: InsertToolbarProps) {
+export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false, count }: InsertToolbarProps) {
   const { selectedAccountId } = useAccount()
   // 友だち情報・共通情報は任意機能。オフのaccountでは差し込み口ごと出さない。
   const featureVisibility = useFeatureVisibility(selectedAccountId)
@@ -64,8 +65,8 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   const [vars, setVars] = useState<Option[]>([])
   const [targetDate, setTargetDate] = useState('')
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
-  /* ★V8（絵 OVCot）：差し込むボタンは丸い枠（＋名前・＋配信日・…その他）。v7 は今のまま。 */
-  const v8 = useAdminTheme() === 'v8'
+  /* B-221：本文の枠の中の共通行。種類と挿入処理だけを持つ。 */
+
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -118,22 +119,11 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     })
   }
 
-  const menuButton = (key: string, label: string, token?: string) => v8 ? (
-    <InsertButton size={compact ? 'compact' : undefined}
-      ref={(element) => { buttonRefs.current[key] = element }}
-      icon={key === 'other' ? 'more' : 'plus'}
-      label={label}
+  const menuButton = (key: string, label: string, token?: string) => (
+    <MessageInsertButton kind={key === 'field' || key === 'var' || key === 'date' ? key : 'other'}
+      ref={(element) => { buttonRefs.current[key] = element }} label={label}
       expanded={token ? undefined : open === key}
-      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)}
-    />
-  ) : (
-    <Button variant="secondary" className={(`border-hairline rounded-control v7:h-8 border px-2.5 text-xs transition-colors ${
-        open === key ? 'bg-accent-soft text-accent-deep border-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
-      }`) + ' whitespace-normal'} type="button" ref={(element) => {
-        buttonRefs.current[key] = element
-      }} onClick={() => token ? insert(token) : setOpen(open === key ? null : key)} aria-expanded={open === key}>
-      {label}
-    </Button>
+      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)} />
   )
 
   const list = (menuKey: string, items: Option[], empty: string) => (
@@ -168,22 +158,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   )
 
   return (
-    <div className="relative flex flex-wrap items-center gap-1.5 v8:gap-x-3 v8:gap-y-2">
-      <span className="text-ink-faint text-xs v8:text-micro">差し込み</span>
-
-      {v8 ? <InsertButton size={compact ? 'compact' : undefined} label="名前" onClick={() => insert('{{name}}')} /> : (
-        <Button variant="secondary" className="text-ink-secondary v7:h-8 px-2.5 text-xs whitespace-normal" type="button" onClick={() => insert('{{name}}')}>
-          名前
-        </Button>
-      )}
-
-      {fieldsEnabled && (
-        <div className="relative">
-          {menuButton('field', '友だち情報')}
-          {list('field', fields, '友だち情報欄がまだありません')}
-        </div>
-      )}
-
+    <MessageInsertRow count={count} more={<>
       {varsEnabled && (
         <div className="relative">
           {menuButton('var', '共通情報')}
@@ -242,6 +217,16 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
           </div>
         </MenuPortal>
       </div>
-    </div>
+    </>}>
+      <MessageInsertButton kind="name" label="名前" onClick={() => insert('{{name}}')} />
+
+      {fieldsEnabled && (
+        <div className="relative">
+          {menuButton('field', '友だち情報')}
+          {list('field', fields, '友だち情報欄がまだありません')}
+        </div>
+      )}
+
+    </MessageInsertRow>
   )
 }

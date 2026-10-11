@@ -1,4 +1,7 @@
 'use client'
+
+import { jstDateOffset } from '@/lib/jst-datetime'
+
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -79,6 +82,7 @@ import {
 import { describeReminderDiff } from './conflict-diff'
 import { BackToReminders, ChoiceCardV8, PhoneV8, ReminderV8Stepper, SummaryCardV8, WizardFooterV8, type ReminderV8StepKey } from './ui'
 import styles from './edit.module.css'
+import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components/shared/message-insert-row'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
 import { formatDate as polishFormatDate } from '@/lib/format'
@@ -144,12 +148,9 @@ function formatJpDay(value: Date): string {
   return polishFormatDate(value, { style: 'detail' })
 }
 
-/** 届く日時の例に使う見本の基準日。3日後の14:00（端末の時計）。 */
+/** 届く日時の例に使う見本の基準日。日本時間で3日後の14:00。 */
 function sampleBaseDate(): Date {
-  const base = new Date()
-  base.setDate(base.getDate() + 3)
-  base.setHours(14, 0, 0, 0)
-  return base
+  return new Date(`${jstDateOffset(3)}T14:00:00+09:00`)
 }
 
 function exampleSendAt(step: ReminderDraftStep, mode: ReminderDraftSettings['deliveryMode'], base: Date): Date {
@@ -1290,7 +1291,7 @@ function MessagesStageV8({
                       base={sampleBase.current}
                       onChange={(patch) => updateStep(step.stableStepId, patch)}
                     />
-                    <div className={styles.bodyBox}>
+                    <MessageBody>
                       <SaveErrorField names={[`shown.${index}.messageContent`,`shown.${index}.message_content`,"messageContent","step.messageContent","message_content","step.message_content"]}><InsertTextField
                         ref={bodyRef}
                         className={styles.bodyArea}
@@ -1301,34 +1302,14 @@ function MessagesStageV8({
                         onValueChange={(next) => updateStep(step.stableStepId, { messageContent: next })}
                         extraTokens={REMINDER_TOKENS}
 /></SaveErrorField>
-                      <span className={styles.bodyGap} aria-hidden="true" />
-                      <div className={styles.insertRow}>
-                        <span className={styles.insertLabel}>差し込む</span>
-                        <Button type="button" variant="text" onClick={() => insertToken('{{name}}')}>
-                          <User size={15} aria-hidden="true" />名前
-                        </Button>
-                        <Button type="button" variant="text" onClick={() => insertToken('{{date}}')}>
-                          <CalendarDays size={15} aria-hidden="true" />予約日時
-                        </Button>
-                        <Button type="button" variant="text" onClick={() => insertToken('{{meet_url}}')}>
-                          <Video size={15} aria-hidden="true" />Google Meet の URL
-                        </Button>
-                        {narrow ? null : (
-                          <>
-                            <FieldInsert fields={fields} onInsert={insertToken} />
-                            <span className={styles.spacer} aria-hidden="true" />
-                            <span className={styles.charCount}>{formatNumber(step.messageContent.length)} / {formatNumber(BODY_LIMIT)}</span>
-                          </>
-                        )}
-                      </div>
-                      {narrow ? (
-                        <div className={styles.insertRow}>
-                          <FieldInsert fields={fields} onInsert={insertToken} />
-                          <span className={styles.spacer} aria-hidden="true" />
-                          <span className={styles.charCount}>{formatNumber(step.messageContent.length)} / {formatNumber(BODY_LIMIT)}</span>
-                        </div>
-                      ) : null}
-                    </div>
+                      <MessageInsertRow count={`${formatNumber(step.messageContent.length)} / ${formatNumber(BODY_LIMIT)}`} more={<>
+                        <MessageInsertButton kind="date" label="予約日時" onClick={() => insertToken('{{date}}')} />
+                        <MessageInsertButton kind="other" label="Google Meet の URL" onClick={() => insertToken('{{meet_url}}')} />
+                        </>}>
+                        <MessageInsertButton kind="name" label="名前" onClick={() => insertToken('{{name}}')} />
+                        <FieldInsert fields={fields} onInsert={insertToken} />
+                      </MessageInsertRow>
+                    </MessageBody>
                   </>
                 ) : (
                   <button type="button" className={styles.stepPreview} onClick={() => setSelectedStepId(step.stableStepId)}>
@@ -1359,9 +1340,7 @@ function FieldInsert({ fields, onInsert }: { fields: FriendField[]; onInsert: (t
     : [{ id: 'none', label: '友だち情報欄がありません', disabled: true, disabledReason: '友だち情報欄を作ると差し込めます', onSelect: () => {} }]
   return (
     <span ref={anchorRef} className={styles.fieldInsert}>
-      <Button type="button" variant="text" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <IdCard size={15} aria-hidden="true" />友だち情報
-      </Button>
+      <MessageInsertButton kind="field" label="友だち情報" expanded={open} onClick={() => setOpen(value => !value)} />
       <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel="差し込む友だち情報" items={items} anchorRef={anchorRef} />
     </span>
   )

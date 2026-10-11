@@ -580,9 +580,13 @@ jobs:
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "diff=false" >> "$GITHUB_OUTPUT"
+            echo "compare=false" >> "$GITHUB_OUTPUT"
             echo "手動実行のため、崩れだけを見ます（v7 の比べる相手がありません）。"
             exit 0
           fi
+
+          # 新しい検出器も両方の版へ当てる。v7の画素を飛ばす印とは別の判断。
+          echo "compare=true" >> "$GITHUB_OUTPUT"
 
           # この見張りが止めたいのは「気づかずに v7 の見た目が変わる」ことで、
           # 製品名の言い換えのように**わざと v7 の文字を変える**ことは別。
@@ -629,7 +633,7 @@ jobs:
           pnpm --filter web build
           mv apps/web/out /tmp/head-out
       - name: Build the base admin against the same mock API
-        if: steps.scope.outputs.diff == 'true'
+        if: steps.scope.outputs.run == 'true' && steps.scope.outputs.compare == 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -646,14 +650,14 @@ jobs:
         run: |
           node scripts/visual-qa/mock-api.mjs > /tmp/mock-api.log 2>&1 &
           node apps/web/scripts/v8-guard/serve-out.mjs /tmp/head-out 4310 > /tmp/serve-head.log 2>&1 &
-          if [ "${{ steps.scope.outputs.diff }}" = "true" ]; then
+          if [ "${{ steps.scope.outputs.compare }}" = "true" ]; then
             node apps/web/scripts/v8-guard/serve-out.mjs /tmp/base/apps/web/out 4311 > /tmp/serve-base.log 2>&1 &
           fi
           ready=false
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:4310/friends > /dev/null \
               && curl -sf 'http://127.0.0.1:8788/api/friends?account_id=visual-qa-account' > /dev/null \
-              && { [ "${{ steps.scope.outputs.diff }}" != "true" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
+              && { [ "${{ steps.scope.outputs.compare }}" != "true" ] || curl -sf http://127.0.0.1:4311/friends > /dev/null; }; then
               ready=true
               break
             fi
@@ -670,10 +674,10 @@ jobs:
       # B-191/192 と B-187 はここに一本化。blank-gap.mjs を別ステップで重ねない。
       - name: Broken fixtures must fail the V8 layout guard
         if: steps.scope.outputs.run == 'true'
-        run: node --test apps/web/scripts/v8-guard/layout-defects.test.mjs
-      - name: No new overlap, wrap, squash, clipping, touching or blank space on V8
+        run: node --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs
+      - name: No new V8 layout or owner-rule defects (B-191 through B-218)
         if: steps.scope.outputs.run == 'true'
-        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json
+        run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
       - name: List row rules (B-190/193/194/195/198, with negative controls)
         if: steps.scope.outputs.run == 'true'
         run: |

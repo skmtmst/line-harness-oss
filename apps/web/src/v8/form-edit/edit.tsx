@@ -6,7 +6,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
 import { FlaskConical, Smartphone, Upload } from 'lucide-react';
-import { emptyLayout, formThemeContrastError, newBlockId, normalizeFormTheme, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
+import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, normalizeFormTheme, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -37,6 +37,7 @@ import { AfterTab } from './after-tab';
 import { AppearanceTab } from './appearance-tab';
 import { FormEditAttemptContext } from './field-issues';
 import { focusFieldById } from '@/lib/use-form-errors';
+import { useCustomerLook } from '@/components/shared/use-customer-look';
 import { FormPhone } from './phone';
 import styles from './edit.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
@@ -82,6 +83,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const hostRef = useRef(host)
   hostRef.current = host
   const { selectedAccount, selectedAccountId } = useAccount()
+  const customerLook = useCustomerLook(host ? null : selectedAccountId)
   const narrow = useNarrowViewport()
   const role = useStaffRole()
   const featureAccess = useFeatureAccess('forms')
@@ -370,7 +372,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const tabErrors: Record<EditTab, number> = attempted ? {
     content: layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
     after: 0,
-    appearance: (name.trim() ? 0 : 1) + (ogImageUrlError(ogImageUrl) ? 1 : 0) + (formThemeContrastError(normalizeFormTheme(layout.options?.theme)) ? 1 : 0),
+    appearance: (name.trim() ? 0 : 1) + (ogImageUrlError(ogImageUrl) ? 1 : 0) + (formThemeContrastError(resolveCustomerFormTheme(layout.options,customerLook.look ?? undefined)) ? 1 : 0),
   } : { content: 0, after: 0, appearance: 0 }
   const setBlocks = (next: FormBlock[]) =>
     setLayout((prev) => ({ ...prev, sections: prev.sections.map((s, i) => (i === page ? { ...s, blocks: next } : s)) }))
@@ -546,7 +548,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     const ogImageError = ogImageUrlError(ogImageUrl)
     if (ogImageError) return { message: ogImageError, tab: 'appearance', target: 'fe-og-image', inline: true }
     // 文字と背景の差が 4.5:1 未満の組み合わせは保存できない（保存APIも同じ検査をする）。
-    const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+    const contrastError = formThemeContrastError(resolveCustomerFormTheme(layout.options,customerLook.look ?? undefined))
     if (contrastError) return { message: contrastError, tab: 'appearance', target: 'fe-colors', inline: true }
     // 公開に進むときだけ、公開前の検査（分岐の循環・消えた行き先など）を通す。
     if (publishAfter) {
@@ -794,7 +796,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const publishChanges = describePublishChanges(publishedSide ?? savedSide, { name, description, layout })
 
   const phone = (
-    <FormPhone layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
+    <FormPhone accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
   )
 
   const preview = (
@@ -950,6 +952,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           <AppearanceTab
             readOnly={!canEdit}
             options={layout.options}
+            accountLook={customerLook.look}
+            accountLookError={customerLook.error}
             accountId={host ? null : selectedAccountId}
             portable={Boolean(host)}
             name={name}

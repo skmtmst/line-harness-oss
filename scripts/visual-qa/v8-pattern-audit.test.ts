@@ -228,3 +228,16 @@ describe('型の対応表の点検', () => {
     expect(readFileSync(DEFAULT_CATALOG, 'utf8')).toContain('"owner"')
   })
 })
+
+it('顧客欄とLIFF外枠は共通部品の利用を認識し、同じ名前の自作は引き続き止める', () => {
+  const root = mkdtempSync(join(tmpdir(), 'pattern-canonical-'))
+  const file = 'apps/web/src/v8/demo/panel.tsx'
+  put(root, file, 'export function FriendInfoSidebar() { return <CustomerInfoPanel /> }\nexport function FormPhone() { return <LiffPhoneFrame /> }\nexport function OverviewTab() { return <CustomerInfoRail><aside /></CustomerInfoRail> }')
+  const good = run({code:root,only:['customer-info','phone-preview','detail-panel']})
+  expect(Object.values(good.code.a).flat()).toEqual([])
+  put(root, file, 'export function FriendInfoSidebar() { return <div>顧客情報をすべて表示</div> }\nexport function FormPhone() { return <div /> }\nexport function OverviewTab() { return <aside /> }')
+  const broken = run({code:root,only:['customer-info','phone-preview','detail-panel']})
+  expect(broken.code.a['customer-info'].length).toBeGreaterThan(0)
+  expect(broken.code.a['phone-preview'].length).toBeGreaterThan(0)
+  expect(broken.code.a['detail-panel'].length).toBeGreaterThan(0)
+})
