@@ -13,7 +13,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 const account = vi.hoisted(() => ({ id: 'account-1' }))
 const routerPush = vi.hoisted(() => vi.fn())
-vi.mock('next/navigation', () => ({
+const notice = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', () => ({ notifyToast: notice, notifySaved: notice }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: routerPush, replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -64,7 +67,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { api, ApiError } from '@/lib/api'
-import NewAutomationPage from './page'
+import { NewAutomationV8 as NewAutomationPage } from '@/v8/automations/create/create'
 
 const mockList = api.automations.list as unknown as ReturnType<typeof vi.fn>
 const mockResources = api.automations.draftResources as unknown as ReturnType<typeof vi.fn>
@@ -90,6 +93,8 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  notice.mockReset()
   account.id = 'account-1'
   routerPush.mockReset()
   window.sessionStorage.clear()
@@ -122,6 +127,8 @@ afterEach(async () => {
   root = null
   container = null
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
+  vi.unstubAllGlobals()
   vi.clearAllMocks()
 })
 
@@ -140,7 +147,7 @@ async function mountPage(): Promise<HTMLDivElement> {
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存する')
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存')
   if (!button) throw new Error('保存ボタンが見つかりません')
   return button as HTMLButtonElement
 }
@@ -173,7 +180,7 @@ describe('R532 再開の取得失敗中は保存させない', () => {
     await act(async () => { retry!.click() })
     await act(async () => { await drainMicrotasks() })
 
-    expect(el.textContent).toContain('保存した下書きを読み込みました')
+    expect(notice).toHaveBeenCalledWith('保存した下書きを読み込みました。続きを直せます。')
     expect(saveButton(el).disabled).toBe(false)
     // 再試行は同じ下書きの再取得で、新規作成は走らない。
     expect(mockCreate).not.toHaveBeenCalled()
