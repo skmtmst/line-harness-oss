@@ -226,7 +226,7 @@ webhook.post('/webhook', async (c) => {
     if (valid) {
       const accounts = await listLineAccountsWithTenantStatus(db);
       const main = accounts.find(
-        (a) => a.is_active && a.channel_secret === envSecret,
+        (a) => a.is_active && !a.archived_at && a.channel_secret === envSecret,
       );
       if (main) {
         channelAccessToken = main.channel_access_token;
@@ -239,7 +239,7 @@ webhook.post('/webhook', async (c) => {
   if (!valid) {
     const accounts = await listLineAccountsWithTenantStatus(db);
     for (const account of accounts) {
-      if (!account.is_active) continue;
+      if (!account.is_active || account.archived_at) continue;
       if (envSecret && account.channel_secret === envSecret) continue; // already tried via fast path
       const isValid = await verifySignature(account.channel_secret, rawBody, signature);
       if (isValid) {
@@ -256,6 +256,9 @@ webhook.post('/webhook', async (c) => {
     console.error('Invalid LINE signature');
     return c.json({ status: 'ok' }, 200);
   }
+
+  // 署名だけでは店の所属を証明できない。解決不能な受信は副作用を起こさない。
+  if (!matchedAccountId) return c.json({ status: 'ok' }, 200);
 
   // 届いた時刻を覚える。届かない警告（X-2）の判定に使う。
   if (matchedAccountId) {
