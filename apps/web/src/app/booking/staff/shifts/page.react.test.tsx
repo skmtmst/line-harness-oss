@@ -144,15 +144,11 @@ async function pickDateByLabel(label: string, date: Date) {
   fireEvent.click(day)
 }
 
-/** 時刻の選択（★V7）で HH:mm を選ぶ。値は今までどおり HH:mm。 */
+/** 現役V8の時刻欄でHH:mmを入力する。 */
 async function pickTimeByLabel(label: string, hhmm: string) {
-  fireEvent.click(screen.getByLabelText(label))
-  const picker = document.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')!
-  const [hour, minute] = hhmm.split(':')
-  fireEvent.change(picker.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
-  fireEvent.change(picker.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
-  fireEvent.click([...picker.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
+  await setTimeControl(screen.getByLabelText(label), hhmm)
 }
+import { setTimeControl } from '@/test-utils/time-control'
 import BookingSettingsV8 from '@/v8/booking-menus/settings'
 function StaffShiftsPage() { const { selectedAccountId } = useControllableAccount(); return <BookingSettingsV8 accountId={selectedAccountId} /> }
 import { slotReasonLabel } from '@/v8/booking-menus/lib/slot-reason'

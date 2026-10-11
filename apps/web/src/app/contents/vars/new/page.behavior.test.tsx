@@ -173,16 +173,10 @@ async function setDateTimeValue(id: string, iso: string) {
   await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
   await pickCalendarDay(date)
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
-    hourSelect.value = hour
-    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
-    minuteSelect.value = minute
-    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  await setTimeControl(reopened.querySelector('input[role="combobox"]'), `${hour}:${minute}`)
   await closeDatePicker()
 }
+import { setTimeControl } from '@/test-utils/time-control'
 
 beforeEach(() => {
   vi.clearAllMocks()

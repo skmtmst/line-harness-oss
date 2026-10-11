@@ -154,21 +154,14 @@ async function setDateTime(label: string, iso: string) {
     await settle()
   })
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
-    hourSelect.value = hour
-    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
-    minuteSelect.value = minute
-    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    await settle()
-  })
+  await setTimeControl(reopened.querySelector('input[role="combobox"]'), `${hour}:${minute}`)
   await act(async () => {
     const close = Array.from(reopened.querySelectorAll('button')).find((b) => b.textContent?.trim() === '閉じる')!
     close.click()
     await settle()
   })
 }
+import { setTimeControl } from '@/test-utils/time-control'
 
 function selectByLabel(label: string): HTMLSelectElement {
   const el = document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)

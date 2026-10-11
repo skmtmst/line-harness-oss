@@ -165,27 +165,17 @@ function dialogDateTrigger(): HTMLButtonElement {
   return found as HTMLButtonElement
 }
 
-function dialogTimeTriggers(): HTMLButtonElement[] {
-  const found = [...(dialog()?.querySelectorAll('button[aria-label="開始"],button[aria-label="終了"]') ?? [])]
+function dialogTimeTriggers(): HTMLInputElement[] {
+  const found = [...(dialog()?.querySelectorAll('input[aria-label="開始"],input[aria-label="終了"]') ?? [])]
   expect(found, '開始と終了の選択がある').toHaveLength(2)
-  return found as HTMLButtonElement[]
+  return found as HTMLInputElement[]
 }
 
 /** 時刻の選択で「HH:mm」を選ぶ。値は今までどおり HH:mm（日本時間）。 */
 async function pickTime(trigger: Element, value: string) {
-  const [hour, minute] = value.split(':')
-  await act(async () => {
-    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    for (let step = 0; step < 10; step += 1) await Promise.resolve()
-  })
-  // 時刻の選択箱は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
-  const picker = document.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')
-  expect(picker, '時刻の選択箱がある').toBeTruthy()
-  await act(async () => {
-    fireEvent.change(picker!.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
-    fireEvent.change(picker!.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
-  })
+  await setTimeControl(trigger, value)
 }
+import { setTimeControl } from '@/test-utils/time-control'
 
 /** 窓の中の「保存」。ページ側の「保存して次へ」と取り違えないよう窓の中だけ探す。 */
 function dialogSaveButton(): HTMLButtonElement {
@@ -206,8 +196,8 @@ describe('予約枠の編集（入口29）', () => {
   it('「編集」で保存済みの日時・定員が入った窓が開く', async () => {
     await openEdit()
     expect(dialogDateTrigger().textContent).toContain('2026年10月1日（木）')
-    expect(dialogTimeTriggers()[0].textContent).toContain('14:00')
-    expect(dialogTimeTriggers()[1].textContent).toContain('15:30')
+    expect(dialogTimeTriggers()[0].value.replaceAll(' ', '')).toBe('14:00')
+    expect(dialogTimeTriggers()[1].value.replaceAll(' ', '')).toBe('15:30')
     expect(dialogInput('number').value).toBe('8')
     // 予約が入っているので、動かすとリマインドも動くことを先に伝える。
     expect(document.body.textContent).toContain('3件の予約')
