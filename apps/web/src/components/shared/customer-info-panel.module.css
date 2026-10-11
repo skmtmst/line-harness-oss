@@ -26,7 +26,7 @@
 }
 
 /* B-212：欄の内側は16以上。基本の値と出どころの印を横に並べる。 */
-.panel { padding: var(--space-24); border: 0; border-radius: var(--radius-flat); box-shadow: none; }
+.panel { padding: var(--polish-space-section); border: 0; border-radius: var(--radius-flat); box-shadow: none; }
 .profile { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
 .profileName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; }
 .profileDate { flex: none; color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
