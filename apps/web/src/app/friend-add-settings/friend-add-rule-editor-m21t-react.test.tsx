@@ -300,7 +300,9 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
     state.search = 'step=preview'
     await renderExisting()
     await act(async () => { button('試す条件を指定').click() })
-    await act(async () => { fireEvent.change(getByRole(document.body, 'combobox', { name: '試す流入リンク' }), { target: { value: 'route-1' } }); fireEvent.change(getByRole(document.body, 'textbox', { name: '想定日時' }), { target: { value: '2026-09-28T10:00' } }) })
+    await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '試す流入リンク' })) })
+    const route = await findByRole(document.body, 'radio', { name: '紹介QR' })
+    await act(async () => { fireEvent.click(route); fireEvent.click(within(route.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' })); fireEvent.change(getByRole(document.body, 'textbox', { name: '想定日時' }), { target: { value: '2026-09-28T10:00' } }) })
     api.friends.list.mockResolvedValue({
       success: true,
       data: { items: [{ id: 'friend-1', displayName: '山田 太郎' }], total: 1 },

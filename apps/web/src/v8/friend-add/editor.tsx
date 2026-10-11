@@ -29,6 +29,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Select from '@/components/shared/select'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import FolderSelect, { folderByName, folderCreator, type FolderSelectCreate } from '@/components/shared/folder-select';
 import FriendPickerField from '@/components/shared/friend-picker-field';
@@ -835,7 +836,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       ) : null}
 
       <Dialog open={testConditionsOpen && canEdit} title="テストの条件" busy={saving} onCancel={() => setTestConditionsOpen(false)} footer={<Button type="button" variant="primary" busy={saving} busyLabel="判定中…" onClick={() => { setTestConditionsOpen(false); void runTest() }}>この条件でテストする</Button>}>
-        <Field label="試す流入リンク"><SaveErrorField names={["routeId"]}><Select aria-label="試す流入リンク" value={testInput.routeId ?? ''} onChange={(routeId) => changeTestInput({ routeId: routeId || null })} options={[{ value: '', label: 'どの経路でも' }, ...options.routes.map((route) => ({ value: route.id, label: route.name }))]} /></SaveErrorField></Field>
+        <Field label="試す流入リンク"><SaveErrorField names={["routeId"]}><EntitySelect noun="流入リンク" clearable aria-label="試す流入リンク" value={testInput.routeId ?? ''} onChange={(routeId) => changeTestInput({ routeId: routeId || null })} options={[{ value: '', label: 'どの経路でも' }, ...options.routes.map((route) => ({ ...entityOptionMetadata(route), value: route.id, label: route.name }))]} /></SaveErrorField></Field>
         <Field label="想定日時"><SaveErrorField names={["expectedAt"]}><DateTimeField aria-label="想定日時" value={testInput.expectedAt ?? ''} onChange={(expectedAt) => changeTestInput({ expectedAt: expectedAt || null })} /></SaveErrorField></Field>
         <SaveErrorField names={["friendId"]}><FriendPickerField accountId={selectedAccountId} label="試す友だち" value={testInput.friendId ?? ''} onChange={(friendId) => changeTestInput({ friendId: friendId || null })} /></SaveErrorField>
         <Notice tone="info" message="指定しない条件は、いま・どの経路でも・友だち不問で判定します。実際の友だちへは送信しません。" />

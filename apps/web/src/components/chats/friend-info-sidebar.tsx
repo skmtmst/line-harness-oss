@@ -1006,18 +1006,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                       options={[{ value: '', label: '未割り当て' }, ...operators.map((op) => ({ ...entityOptionMetadata(op), value: op.id, label: op.name }))]}
                     />
                   </div>
-                ) : canEditChat && operators ? (
-                  <select
-                    id="inbox-panel-assignee"
-                    value={effectiveOperatorId ?? ''}
-                    onChange={(event) => saveAssignee(event.target.value || null)}
-                    className="border-hairline rounded-control text-ink mt-1.5 w-full border bg-canvas px-2 py-2 text-xs outline-none"
-                  >
-                    <option value="">未割り当て</option>
-                    {operators.map((op) => (
-                      <option key={op.id} value={op.id}>{op.name}</option>
-                    ))}
-                  </select>
                 ) : (
                   <p className="text-xs text-ink-secondary mt-1.5">{operatorName || <span className="text-ink-faint">未割り当て</span>}</p>
                 )}
