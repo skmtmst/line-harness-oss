@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 
 @layer components {
 .files { display: flex; flex-wrap: wrap; gap: var(--space-2); }

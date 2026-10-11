@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* ★V8 フォルダの色の丸（絵 I1E7Bt・axFrW ほか一覧の行）。大きさ 8・名前との間 8。 */
 .dot {

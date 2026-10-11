@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 日時の選択・時刻の選択。Pencil ★V8（V8.pen）「日時の入力（15分きざみ）」。

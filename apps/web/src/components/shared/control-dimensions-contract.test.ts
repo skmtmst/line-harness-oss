@@ -61,11 +61,11 @@ describe('V8 の入力・選択・押し口規定', () => {
     expect(offenders).toEqual([])
   })
 
-  it('layer order is centralized, with no per-module migration declaration', () => {
+  it('components loaded before globals still establish the same cascade order', () => {
     expect(read('../../app/globals.css')).toMatch(/^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
     const modules = readdirSync(new URL('.', import.meta.url)).filter(name => name.endsWith('.module.css'))
     for (const name of modules) {
-      expect(read(`./${name}`), name).not.toMatch(/layer-order|@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
+      expect(read(`./${name}`), name).toMatch(/^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
     }
   })
 

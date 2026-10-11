@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 認証コード入力（6マス）。Pencil ★V8 `RfHCo`「OTP入力」・`cMbie`「OTP入力/できた」。

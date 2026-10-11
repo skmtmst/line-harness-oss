@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .root { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .input { appearance: none; width: 18px; height: 18px; flex: none; margin: 0; background: var(--color-canvas); cursor: inherit; }

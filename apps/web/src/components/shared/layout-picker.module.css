@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* 案A（JeINq・EFV8l）：寸法は部品が持ち、呼ぶ画面から上書きしない。 */
 .list { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* 採用案 Wmch0：画像は幅 320 を左、面の一覧は残りの幅いっぱい。寸法は部品が持ち、呼ぶ画面から上書きしない。 */
 .root { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-gap, 14px); min-width: 0; }

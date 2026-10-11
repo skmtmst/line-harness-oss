@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * ページヘッダー。★V5 227枚すべての先頭にある帯。

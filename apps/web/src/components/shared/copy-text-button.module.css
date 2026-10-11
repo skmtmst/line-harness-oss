@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 :root .button { transition: transform var(--motion-instant) var(--motion-ease-out); }
 :root .button:active { transform: scale(var(--press-scale)); }

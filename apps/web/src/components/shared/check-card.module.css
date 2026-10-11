@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * チェックのカード（Pencil ★V8 `w6uYMd`・`RRxK5`）。

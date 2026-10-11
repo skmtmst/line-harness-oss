@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 
 /*
  * バナー生成パネルの小さな部品の見た目。

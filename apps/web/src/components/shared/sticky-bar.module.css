@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .inlineBar { display: flex; align-items: center; gap: var(--tpl-acd-actions-gap); }
 .inlineBar[data-presentation='account-registration'] {

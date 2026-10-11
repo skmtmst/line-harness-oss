@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .root { min-width: 0; width: 100%; }
 .plot { height: 180px; margin: 18px 12px 32px 52px; position: relative; }

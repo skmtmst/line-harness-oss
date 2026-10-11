@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 日付の選択。Pencil ★V8（V8.pen）「日付の入力（カレンダー）」。

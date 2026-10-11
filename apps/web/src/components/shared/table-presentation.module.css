@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* 予約一覧と時間×卓。既定の表の見た目は変えない。 */
 :root .calendar {

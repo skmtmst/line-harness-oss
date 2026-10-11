@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 画像・動画・ファイルを入れる所。Pencil ★V8 採用案 Z7vd2（B-128）。

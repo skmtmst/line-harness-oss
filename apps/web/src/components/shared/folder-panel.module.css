@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* faSbC: V7 の箱は既存の utility、V8 は右に一本だけの線。 */
 :root .panel {

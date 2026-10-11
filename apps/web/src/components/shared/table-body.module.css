@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* Spacers preserve native column widths and the total scroll extent, without cells or lines. */
 .spacer > td {

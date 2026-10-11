@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * チェックボックス。Pencil ★V8 `dQCCN`・`S9U7v`「チェック/オン・オフ」。

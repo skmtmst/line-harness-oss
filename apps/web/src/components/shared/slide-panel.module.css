@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 手順・タブの中身の移り変わり（V8「サクサク感」★A②）。

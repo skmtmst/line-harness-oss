@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 友だちの顔。Pencil ★V8「顔/小・中・大」（`MFTlt`・`pDKi6`・`zjEbn`）。

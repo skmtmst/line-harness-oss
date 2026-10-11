@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 複数選択。Pencil ★V8（V8.pen）「複数選ぶ（札＋N）」。欄・候補の決まりは Combobox と同じ。

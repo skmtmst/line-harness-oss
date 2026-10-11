@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * Pencil ★V8 `hnuY9`「その他操作メニュー」。

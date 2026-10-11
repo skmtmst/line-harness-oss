@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 開閉する欄。Pencil ★V8（V8.pen）「開け閉めする段」。

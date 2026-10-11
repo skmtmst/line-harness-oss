@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* 時間×卓の予約・空き枠・卓の選択。既定の Button の見た目に影響しない。 */
 .block {

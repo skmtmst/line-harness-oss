@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 /*
  * ★V8 プルダウンの開いた中身（StFE7「選ぶ欄/開いた」）。値は globals.css の
  * [data-theme="v8"] の --select-menu-*。画面側で上書きしない。

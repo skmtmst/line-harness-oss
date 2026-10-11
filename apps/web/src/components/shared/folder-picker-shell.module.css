@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .body { display: flex; width: 100%; height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); box-shadow: var(--tpl-inbox-line-top); }
 .side { display: grid; grid-template-rows: 1fr auto; flex: none; width: var(--tpl-folder-width); overflow-y: auto; }

@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* dJZ7Q：画面の欄。選んだもの＋［選ぶ］／［変える］の1行。 */
 .field { display: flex; align-items: center; gap: var(--tpl-picker-gap); min-width: 0; width: 100%; height: var(--tpl-picker-field-h); padding: var(--tpl-picker-field-pad); border: 1px solid var(--color-control-border, var(--color-hairline)); border-radius: var(--radius-control); background: var(--color-canvas); }

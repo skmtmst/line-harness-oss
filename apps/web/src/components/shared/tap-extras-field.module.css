@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .root { container: tap-extras / inline-size; display: flex; flex-direction: column; gap: var(--tap-action-gap); min-width: 0; width: 100%; padding: var(--tap-action-note-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--tap-action-gap); font-size: var(--text-caption); font-weight: 600; }

@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 .list { display: flex; flex-direction: column; gap: var(--tpl-action-list-gap); min-width: 0; }
 .empty { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }

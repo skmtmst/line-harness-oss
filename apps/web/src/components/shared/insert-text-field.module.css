@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 差し込みを札で見せる本文の欄（絵 OVCot ①）。v8 のときだけ描く（v7 は今の textarea）。

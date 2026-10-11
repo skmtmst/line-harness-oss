@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * どこからでも探す窓（V8「サクサク感」F②）。

@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * ★V8 ベルの小窓（V8.pen `DIHFx/D2eAyQ`・小窓 `mV28V`）。

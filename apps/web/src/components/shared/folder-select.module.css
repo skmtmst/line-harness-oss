@@ -1,3 +1,4 @@
+@layer properties, theme, base, components, utilities;
 /*
  * ★V8 フォルダを選ぶ欄（dLffh・iBuZH）。値は globals.css の [data-theme="v8"] の --select-menu-*。
  * 板（白い地・角丸・影）は select-menu が持つ。点は FolderDot、ここは「新しいフォルダ」の中身だけ。
