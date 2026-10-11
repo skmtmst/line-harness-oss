@@ -148,6 +148,36 @@ describe('N-024 LINE送信取消', () => {
     vi.clearAllMocks();
   });
 
+  it.each(['text', 'sticker'])('R-IN01: %s の保存直後に落ちても再配達で未完工程だけ続ける', async (kind) => {
+    const originalBatch = db.db.batch.bind(db.db);
+    let interrupted = false;
+    db.db.batch = async (statements) => {
+      const result = await originalBatch(statements);
+      if (!interrupted && statements.some((item) => /INSERT OR IGNORE INTO messages_log/.test((item as unknown as { sql: string }).sql))) {
+        interrupted = true;
+        throw new Error('sqlite simulated interruption after commit');
+      }
+      return result;
+    };
+    const event = {
+      ...base('a', `recover-${kind}`, 1_800_000_000_000), type: 'message', replyToken: 'fake-reply',
+      message: kind === 'text' ? { type: kind, id: `message-${kind}`, text: '人工の本文' }
+        : { type: kind, id: `message-${kind}`, stickerId: '1', packageId: '1', stickerResourceType: 'STATIC' },
+    };
+    await postEvent(db, 'a', event);
+    expect(db.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 1 });
+    expect(mileage).not.toHaveBeenCalled();
+    await postEvent(db, 'a', event);
+    expect(mileage).toHaveBeenCalledTimes(1);
+    expect(autoReply).toHaveBeenCalledTimes(1);
+    expect(db.raw.prepare('SELECT status FROM line_webhook_events WHERE webhook_event_id=?').get(`recover-${kind}`)).toEqual({ status: 'succeeded' });
+    await postEvent(db, 'a', event);
+    await postEvent(db, 'a', { ...event, webhookEventId: `other-${kind}` });
+    expect(mileage).toHaveBeenCalledTimes(1);
+    expect(autoReply).toHaveBeenCalledTimes(1);
+    expect(db.raw.prepare('SELECT COUNT(*) AS n FROM messages_log').get()).toEqual({ n: 1 });
+  });
+
   it('既存messageを取消し、重複unsendと別account同一message IDを分離してAPIを伏せる', async () => {
     await postText(db, 'a', 'event-message-a', 'line-message-shared', 'Aだけの秘密本文', 1_800_000_000_000);
     await postText(db, 'b', 'event-message-b', 'line-message-shared', 'Bの通常本文', 1_800_000_000_100);

@@ -1483,8 +1483,8 @@ async function handleEvent(
       }
     }
 
-    const logId = crypto.randomUUID();
-    const recorded = await recordIncomingLineMessage(db, {
+    let logId = crypto.randomUUID();
+    const recorded = await replay('incoming_message', () => recordIncomingLineMessage(execution?.mutationDb('incoming_message') ?? db, {
       id: logId,
       friendId: friend.id,
       messageType: msg.type,
@@ -1495,7 +1495,8 @@ async function handleEvent(
       createdAt: jstNow(),
       lineEventAt: toJstString(new Date(event.timestamp)),
       quoteToken: msg.quoteToken ?? null,
-    });
+    }));
+    logId = recorded.id;
     // 別webhook IDで同じmessageが再送された場合と、先に取消済みの場合は
     // マイル・自動応答・未読化などの副作用を繰り返さない。
     if (!recorded.inserted || recorded.isUnsent) return;
@@ -1552,11 +1553,11 @@ async function handleEvent(
 
     const incomingText = textMessage.text;
     const now = jstNow();
-    const logId = crypto.randomUUID();
+    let logId = crypto.randomUUID();
 
     // 受信メッセージをLINE message ID単位で記録する。取消が先着していた
     // 場合は本文を入れず、以後の副作用も起こさない。
-    const recorded = await recordIncomingLineMessage(db, {
+    const recorded = await replay('incoming_message', () => recordIncomingLineMessage(execution?.mutationDb('incoming_message') ?? db, {
       id: logId,
       friendId: friend.id,
       messageType: 'text',
@@ -1567,7 +1568,8 @@ async function handleEvent(
       createdAt: now,
       lineEventAt: toJstString(new Date(event.timestamp)),
       quoteToken: textMessage.quoteToken ?? null,
-    });
+    }));
+    logId = recorded.id;
     if (!recorded.inserted || recorded.isUnsent) return;
 
     await replay('awardActivityMileage:0',()=>awardActivityMileage(execution?.mutationDb('awardActivityMileage:0') ?? db, {
