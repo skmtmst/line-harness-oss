@@ -856,7 +856,7 @@ function AddSlotDialog({
   }
 
   return <Dialog open title="予約枠を追加" onCancel={onClose} onConfirm={submit} confirmLabel="追加する" busy={busy} error={err ?? undefined}>
-    
+
     <Field label="日付（JST）"><DateField value={date} onChange={setDate} aria-label="日付（JST）" /></Field>
     <Field label="開始"><TimeField value={startTime} onChange={setStartTime} aria-label="開始" /></Field>
     <Field label="終了"><TimeField value={endTime} onChange={setEndTime} aria-label="終了" /></Field>
