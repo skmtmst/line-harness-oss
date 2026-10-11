@@ -29,9 +29,8 @@ const GUARDED = [
   'v8/broadcasts/quick-send.tsx',
   'v8/auto-replies/quick-create.tsx',
   'v8/inflow-links/ad-mapping-dialog.tsx',
-  'app/settings/feature-settings-v8.tsx',
-  'app/affiliate-offers/new-offer-v8.tsx',
-  'app/affiliates/new-affiliate-v8.tsx',
+  'v8/affiliate-offer-new/create.tsx',
+  'v8/affiliates/create.tsx',
   'app/analytics/reports/new/page.tsx',
   'app/auto-replies/edit/wizard-v8.tsx',
   'app/booking/menus/new/page.tsx',
@@ -81,7 +80,6 @@ const GUARDED = [
   'v8/events/create.tsx',
   'v8/tags/mark-editor.tsx',
   /* 2026-10-07：src/v8 に一から書いた画面。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */
-  'v8/affiliates/create.tsx',
   'v8/booking-menus/assign.tsx',
   'v8/booking-menus/menu-form.tsx',
   'v8/booking-menus/settings.tsx',
@@ -117,7 +115,6 @@ const GUARDED = [
   'v8/hq/support.tsx',
   'v8/hq/support-detail.tsx',
   /* 2026-10-07：src/v8 に一から書いた画面（まとめの取り込みで見張りの対象に入った）。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */
-  'v8/affiliate-offer-new/create.tsx',
   'v8/tag-edit/search-edit.tsx',
   'v8/tags/create.tsx',
   'v8/tags/field-editor.tsx',
@@ -149,9 +146,9 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'components/webinars/webinar-form.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
-  'app/affiliate-offers/new/page.tsx': 'app/affiliate-offers/new-offer-v8.tsx',
-  'app/settings/page.tsx': 'app/settings/feature-settings-v8.tsx',
-  'app/settings/file-scan/file-scan-v8.tsx': 'app/settings/file-scan/page.tsx',
+  'app/affiliate-offers/new/page.tsx': 'v8/affiliate-offer-new/create.tsx',
+  'app/settings/page.tsx': 'v8/settings/features/screen.tsx',
+
   // 予約設定V8のタブ分割。書きかけは V8TabEditContext で親へ報告し、
   // 番兵（useUnsavedGuard＋離脱確認）は殻の settings-v8.tsx が持つ。
   // ★V8 予約設定（src/v8/booking-menus）のタブ。書きかけは V8TabEditContext で殻の settings.tsx へ報告し、番兵は殻が持つ。

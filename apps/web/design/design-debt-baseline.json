@@ -101,10 +101,6 @@
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
   },
-  "app/friend-add-settings/runs/runs-v8.tsx": {
-    "direct-th": 7,
-    "unresolved-classname": 1
-  },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 3,
     "arbitrary-value": 1
