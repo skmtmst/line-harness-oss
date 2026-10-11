@@ -56,6 +56,7 @@ import type { Env } from '../index.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { createEccubeCoupon } from '../services/eccube-coupon.js';
 import { issueFriendAddCoupon } from '../services/friend-add-coupon.js';
+import { snapshotLineReplyPolicy } from '../services/line-webhook-reply-policy.js';
 import {
   classifyLineWebhookError,
   processLineWebhookEvents,
@@ -1223,9 +1224,14 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
-    const applied = await updateFriendFollowStatus(db, userId, false, lineAccountId, toJstString(new Date(event.timestamp)));
-    if (applied === false) return;
+    const relationship = await replay('unfollow_relationship', async () => {
+      const ownedDb = execution?.mutationDb('unfollow_relationship') ?? db;
+      const friend = await getFriendByLineUserIdForAccount(ownedDb, userId, lineAccountId);
+      const applied = await updateFriendFollowStatus(ownedDb, userId, false, lineAccountId, toJstString(new Date(event.timestamp)));
+      return { friendId: friend?.id ?? null, applied, occurredAt: toJstString(new Date(event.timestamp)) };
+    });
+    const friend = relationship.friendId ? { id: relationship.friendId } : null;
+    if (relationship.applied === false) return;
     await replay('recordWebhookAnalyticsEvent:2',()=>recordWebhookAnalyticsEvent(execution?.mutationDb('recordWebhookAnalyticsEvent:2') ?? db, lineAccountId, event, {
       friendId: friend?.id,
       eventType: 'friend_unfollow',
@@ -1376,6 +1382,7 @@ async function handleEvent(
     // 利用者が "コスト比較" などのアクションを起こした事実を chat 履歴で可視化する。
     // delivery_type='push' は厳密には push ではないが、incoming/non-test として
     // 既存 chat list / 詳細 SQL のフィルタを通すための妥当な値 (auto_reply text 同様)。
+    await replay('postback_context', async () => ({ plain: !tap, hasData: Boolean(postbackData) }));
     let postbackIncomingLogId: string | null = null;
     try {
       postbackIncomingLogId=await replay('incoming_postback_log',async()=>{
@@ -1397,7 +1404,8 @@ async function handleEvent(
     // キーワード照合に回さない。空文字はどのキーワードとも照らし合わせようがない。
     // 返信の権利（replyToken）を先にテンプレート送信で使い切っている場合も回さない。
     // 自動応答は reply でしか返せないので、使い切った後に呼ぶと送信が失敗する。
-    const { matched: postbackMatched, replyTokenConsumed: postbackReplyTokenConsumed } =
+    await replay('reply_policy', () => snapshotLineReplyPolicy(db, lineAccountId, 'postback'));
+    const { matched: postbackMatched, replyTokenConsumed: postbackReplyTokenConsumed } = await replay('auto_reply', async () =>
       postbackData && postbackReplyToken
         ? await matchAndReply(db, lineClient, friend, postbackData, postbackReplyToken, {
             lineAccountId,
@@ -1409,7 +1417,7 @@ async function handleEvent(
             incomingMessageLogId: postbackIncomingLogId,
             occurredAt: new Date(event.timestamp).toISOString(),
           })
-        : { matched: false, replyTokenConsumed: false };
+        : { matched: false, replyTokenConsumed: false });
 
     // イベントバス発火: 専用イベント postback_received。
     // postback.data を text に載せることで、IF-THEN 自動化の keyword /
@@ -1506,6 +1514,7 @@ async function handleEvent(
     // 別webhook IDで同じmessageが再送された場合と、先に取消済みの場合は
     // マイル・自動応答・未読化などの副作用を繰り返さない。
     if (!recorded.inserted || recorded.isUnsent) return;
+    await replay('reply_policy', () => snapshotLineReplyPolicy(db, lineAccountId, msg.type));
     await replay('awardActivityMileage:1',()=>awardActivityMileage(execution?.mutationDb('awardActivityMileage:1') ?? db, {
       eventType: 'message_received',
       source: 'line',
@@ -1515,7 +1524,7 @@ async function handleEvent(
     }));
     // 自動応答の評価へ渡す。重複抑止・停止中除外・別アカウント分離は
     // 既存の matchAndReply が担う。replyToken はメッセージイベントに付く。
-    const { matched: nonTextMatched } = await matchAndReply(
+    const { matched: nonTextMatched } = await replay('auto_reply', () => matchAndReply(
       db,
       lineClient,
       friend,
@@ -1531,7 +1540,7 @@ async function handleEvent(
         incomingMessageLogId: logId,
         occurredAt: new Date(event.timestamp).toISOString(),
       },
-    );
+    ));
 
     // 自動応答に当たらなかった自発メッセージだけ chat を unread に戻す
     // （テキスト経路と同じ扱い）。これが無いと resolved 除外
@@ -1577,6 +1586,7 @@ async function handleEvent(
     }));
     logId = recorded.id;
     if (!recorded.inserted || recorded.isUnsent) return;
+    await replay('reply_policy', () => snapshotLineReplyPolicy(db, lineAccountId, 'text'));
 
     await replay('awardActivityMileage:0',()=>awardActivityMileage(execution?.mutationDb('awardActivityMileage:0') ?? db, {
       eventType: 'message_received',
@@ -1645,7 +1655,7 @@ async function handleEvent(
 
     // 自動返信チェック（このアカウントのルール + グローバルルールのみ）。
     // silent タイプは返信しないが matched=true になり unread / push を抑止する。
-    const { matched, replyTokenConsumed } = await matchAndReply(
+    const { matched, replyTokenConsumed } = await replay('auto_reply', () => matchAndReply(
       db,
       lineClient,
       friend,
@@ -1662,7 +1672,7 @@ async function handleEvent(
         incomingMessageLogId: logId,
         occurredAt: new Date(event.timestamp).toISOString(),
       },
-    );
+    ));
 
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする
     if (!matched) {

@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   get: vi.fn(),
   scope: vi.fn(),
+  retry: vi.fn(),
+  view: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
@@ -17,6 +19,8 @@ vi.mock('@line-crm/db', () => ({
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: mocks.scope,
 }));
+
+vi.mock('../services/line-webhook-recovery.js', () => ({ retryLineWebhookEvent: mocks.retry, lineWebhookRecoveryView: mocks.view }));
 
 import { lineWebhookEvents } from './line-webhook-events.js';
 
@@ -40,6 +44,8 @@ function app(role: AuthenticatedStaff['role']) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.view.mockResolvedValue(null);
+  mocks.retry.mockResolvedValue({status:'needs_review',reasonCode:'input_unavailable',reason:'必要な入力が残っていません'});
   mocks.scope.mockResolvedValue({
     accounts: [], ids: ['account-1'], allowedAccountIds: ['account-1'], canSeeUnassigned: true,
   });
@@ -116,7 +122,7 @@ describe('LINE Webhook台帳API', () => {
     expect((await app('staff').request('/api/line-webhook-events/evt-1/retry', { method: 'POST' }, env)).status).toBe(403);
   });
 
-  test('再試行APIは本文を返さず、安全にcannot retryを返す', async () => {
+  test('入力不足の再試行は本文を返さず、理由つきの要確認を返す', async () => {
     const response = await app('owner').request(
       '/api/line-webhook-events/evt-1/retry',
       { method: 'POST' },
@@ -124,12 +130,12 @@ describe('LINE Webhook台帳API', () => {
     );
     expect(response.status).toBe(409);
     const text = await response.text();
-    expect(text).toContain('WEBHOOK_PAYLOAD_UNAVAILABLE');
+    expect(text).toContain('WEBHOOK_REQUIRES_REVIEW');
     expect(text).not.toContain('lineUserId');
     expect(text).not.toContain('messageContent');
   });
 
-  test('既定統括の未割り当てイベントは404ではなくcannot retryを返す', async () => {
+  test('既定統括の未割り当てイベントは404ではなく要確認を返す', async () => {
     mocks.get.mockResolvedValue({
       webhook_event_id: 'evt-unassigned', line_account_id: null, event_type: 'unknown',
       status: 'failed', attempts: 1, last_error: 'unknown',
@@ -143,7 +149,7 @@ describe('LINE Webhook台帳API', () => {
     );
 
     expect(response.status).toBe(409);
-    expect(await response.text()).toContain('WEBHOOK_PAYLOAD_UNAVAILABLE');
+    expect(await response.text()).toContain('WEBHOOK_REQUIRES_REVIEW');
   });
 
   test('既定統括でない統括には未割り当てイベントを404で隠す', async () => {
@@ -162,5 +168,19 @@ describe('LINE Webhook台帳API', () => {
       { DB: {} as D1Database } as Env['Bindings'],
     );
     expect(response.status).toBe(404);
+  });
+
+  test('残っている入力で回復した管理者retryは200を返す', async () => {
+    mocks.retry.mockResolvedValueOnce({status:'succeeded'});
+    const response=await app('admin').request('/api/line-webhook-events/evt-1/retry',{method:'POST'},{DB:{} as D1Database} as Env['Bindings']);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({success:true,status:'succeeded'});
+  });
+
+  test('別アカウントの受信は404にし、回収処理を呼ばない', async () => {
+    mocks.get.mockResolvedValueOnce({webhook_event_id:'other',line_account_id:'account-other',event_type:'message',status:'failed'});
+    const response=await app('admin').request('/api/line-webhook-events/other/retry',{method:'POST'},{DB:{} as D1Database} as Env['Bindings']);
+    expect(response.status).toBe(404);
+    expect(mocks.retry).not.toHaveBeenCalled();
   });
 });
