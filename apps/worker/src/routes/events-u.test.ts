@@ -67,9 +67,13 @@ function asD1(sqlite: Database.Database): D1Database {
   return {
     prepare,
     async batch(statements: D1PreparedStatement[]) {
-      const results = [];
-      for (const statement of statements) results.push(await statement.run());
-      return results;
+      sqlite.exec('BEGIN');
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        sqlite.exec('COMMIT');
+        return results;
+      } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
     },
   } as unknown as D1Database;
 }
@@ -420,6 +424,18 @@ describe('U-3 LIFF の開催回変更', () => {
       { 'Idempotency-Key': key, Authorization: DUMMY_AUTH },
     );
   }
+
+  test('STATIC-API-0560 旧予約の取消が失敗しても新旧が二重に残らない', async () => {
+    seedChangeBase();
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    sqlite.exec(`CREATE TRIGGER synthetic_cancel_failure BEFORE UPDATE OF status ON event_bookings
+      WHEN OLD.id = 'b1' AND NEW.status = 'cancelled'
+      BEGIN SELECT RAISE(ABORT, 'synthetic cancellation failure'); END;`);
+    const res = await changeRequest('s2', 'synthetic-change-failure');
+    expect(res.status).toBe(500);
+    expect(sqlite.prepare("SELECT id, status FROM event_bookings WHERE event_id='e1'").all())
+      .toEqual([{ id: 'b1', status: 'confirmed' }]);
+  });
 
   test('新しい席を確保できた時だけ元の申込を取り消す', async () => {
     seedChangeBase();
