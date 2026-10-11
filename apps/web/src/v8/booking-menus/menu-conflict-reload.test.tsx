@@ -26,7 +26,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: { mileage: { rules: async () => ({ success: true, data: [] }) }, tags: { list: async () => ({ success: true, data: [] }) } },
     bookingApi: {
-      
+
       listMenus: async () => ({ menus: net.menus }),
       listStaff: async () => ({ staff: [{ id: 's1', name: '高田', display_name: '高田', role: 'トリマー', is_active: 1, is_designation_optional: 0 }] }),
       getSettings: async () => ({ success: true, data: { exceptions: [], businessHours: [] } }),
