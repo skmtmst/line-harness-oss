@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const TERMS_DOC = readFileSync(
-  new URL('../../../../components/legal/terms-document.tsx', import.meta.url),
-  'utf8',
-)
+const CSS = readFileSync(new URL('../../../../v8/restaurant/store-new/store-new.module.css', import.meta.url), 'utf8')
+const TERMS_CSS = readFileSync(new URL('../../../../v8/restaurant/store-new/terms-body.module.css', import.meta.url), 'utf8')
+function block(name: string) { return CSS.match(new RegExp('\\.' + name + ' \\{([^}]+)\\}'))?.[1] ?? '' }
 
 /*
  * #974 U095: 390pxで手順説明と規約パネルの右側が画面外へ切れた。
@@ -15,24 +13,23 @@ const TERMS_DOC = readFileSync(
  */
 describe('U095 店舗追加の画面全体のはみ出し', () => {
   it('外側と内側のグリッドは1列のとき minmax(0,1fr) で幅を越えない', () => {
-    // grid-cols-1 は repeat(1, minmax(0, 1fr)) と同じ。auto の1列では中身が広いと越える。
-    // 列の間隔はカード間と同じ gap-4（16px）にそろえる（m13h。minmax の意図は変えない）。
-    expect(PAGE).toContain('grid-cols-1 items-start gap-4 xl:grid-cols-[220px_minmax(0,1fr)]')
-    expect(PAGE).toContain('grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]')
+    expect(block('split')).toContain('display: flex')
+    expect(block('split')).toContain('min-width: 0')
   })
 
   it('手順・本文・案内の各パネルは内容より細く縮める', () => {
-    expect(PAGE).toContain('min-w-0 rounded-card border border-hairline bg-canvas p-4')
-    expect(PAGE).toContain('min-w-0 rounded-card border border-hairline bg-canvas p-5 sm:p-7')
-    expect(PAGE).toContain('min-w-0 rounded-card border border-hairline bg-canvas p-5')
+    expect(block('body')).toContain('min-width: 0')
+    expect(block('card')).toContain('flex: 1 1 0')
+    expect(block('card')).toContain('min-width: 0')
+    expect(block('helpPanel')).toContain('flex: 0 0 var(--tpl-rt-side-w)')
   })
 
   it('長い店舗名を確認画面で折り返す', () => {
-    expect(PAGE).toContain('break-words font-semibold text-ink')
+    expect(block('summaryValue')).toContain('overflow-wrap: anywhere')
   })
 
   it('規約の表は枠の内側だけで横へ動かせる', () => {
-    expect(TERMS_DOC).toContain('overflow-x-auto')
-    expect(TERMS_DOC).toContain('min-w-[520px]')
+    expect(block('termsBox')).toContain('overflow-y: auto')
+    expect(TERMS_CSS).toMatch(/\.table\s*\{[^}]*width: 100%/)
   })
 })

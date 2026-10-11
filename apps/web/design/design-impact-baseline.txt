@@ -114,8 +114,6 @@ shared-button-importer app/reminders/wizard-v8-ui.tsx
 shared-button-importer app/restaurant-test/google/google-business.tsx
 shared-button-importer app/restaurant-test/google/google-posts.tsx
 shared-button-importer app/restaurant-test/google/google-profile.tsx
-shared-button-importer app/restaurant-test/stores/new/page.tsx
-shared-button-importer app/restaurant-test/stores/new/terms-consent.tsx
 shared-button-importer app/restaurant-test/v8/google.tsx
 shared-button-importer app/restaurant-test/v8/inventory-channels.tsx
 shared-button-importer app/restaurant-test/v8/inventory.tsx

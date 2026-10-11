@@ -1,6 +1,6 @@
 # 店舗を追加（V8）の動き
 
-入口：`app/restaurant-test/stores/new/page.tsx`（`data-theme="v8"` のとき V8、それ以外は今の画面）。
+入口：`app/restaurant-test/stores/new/page.tsx`（V8だけ）。
 絵：①利用規約への同意 `ao15G`・②店舗の基本情報 `faGn4`。③〜⑤は絵が無いので①②と同じ形。
 
 ## 受け付ける URL と指定
