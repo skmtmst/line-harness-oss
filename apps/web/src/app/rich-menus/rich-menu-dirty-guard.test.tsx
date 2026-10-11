@@ -3,6 +3,7 @@
 import React, { act } from 'react'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
+import { pickDateTime } from '@/test-utils/rich-menu-editor'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
@@ -136,38 +137,6 @@ async function type(input: Element, value: string) {
 async function gotoStep(_view: ReturnType<typeof render>, step: string | null) {
   const labels: Record<string, string> = { shape: '形と画像', targeting: '誰に出すか', publish: '公開' }
   fireEvent.click(within(screen.getByRole('navigation', { name: 'リッチメニューを作る手順' })).getByRole('button', { name: `${labels[step ?? 'shape']}に戻る` }))
-  await flush()
-}
-
-const WEEK = '日月火水木金土'
-
-/** 日付と時刻を共通の実際の選ぶ窓で確定する。 */
-async function pickDateTime(label: string, iso: string) {
-  const [date, time] = iso.split('T')
-  const [hour, minute] = time.split(':')
-  const [y, mo, d] = date.split('-').map(Number)
-  const week = WEEK[new Date(y, mo - 1, d).getDay()]
-  fireEvent.click(screen.getByLabelText(label))
-  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  fireEvent.click(picker.querySelector('button[aria-label="日付"]')!)
-  for (let i = 0; i < 24; i += 1) {
-    const grid = document.querySelector('[role="grid"]')
-    if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
-    const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
-    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
-    const nav = [...document.querySelectorAll('button')].find(
-      (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
-    )!
-    fireEvent.click(nav)
-  }
-  fireEvent.click([...document.querySelectorAll('button')].find((b) =>
-    (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
-  )!)
-  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  const timeInput = within(reopened as HTMLElement).getByRole('combobox', { name: '時刻' })
-  await type(timeInput, `${hour}:${minute}`)
-  fireEvent.blur(timeInput)
-  fireEvent.click([...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
   await flush()
 }
 
