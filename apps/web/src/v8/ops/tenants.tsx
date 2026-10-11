@@ -6,7 +6,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus, Star } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
-import { formatDate, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
+import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
@@ -207,15 +207,15 @@ export default function OpsTenantsV8() {
                     <Link href={tenantDetailHref(row.id)} className={parts.link} ><TruncatedText value={String(row.name ?? '')} /></Link>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="cell"><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span>
+                  <span className={`${parts.fixed} ${styles.col90}`} role="cell" title={`利用 ${row.status === 'suspended' ? '利用停止' : row.status === 'archived' ? '解約済み' : '利用中'}・請求 ${PLAN_STATUS_LABEL[row.plan_status] ?? row.plan_status}`}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span>
                   <span className={`${parts.num} ${styles.colStores}`} role="cell">{row.account_count}</span>
                   <span className={`${parts.num} ${styles.colStaff}`} role="cell">{row.staff_count}</span>
                   <span className={`${parts.fixed} ${styles.colBilling} ${styles.billing}`} role="cell">
                     <span className={styles.billingMain}>{row.plan_status === 'trialing' ? 'トライアル' : planLabel(row.plan_key)}</span>
-                    <span className={styles.billingSub}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
+                    <span className={styles.billingSub} title={`トライアル期限 ${formatDateTime(row.trial_ends_at)}・次回請求 ${formatDateTime(row.current_period_ends_at)}`}>{row.trial_ends_at ? `期限 ${monthDay(row.trial_ends_at)}` : row.current_period_ends_at ? `次回 ${monthDay(row.current_period_ends_at)}` : emptyValue('unknown')}</span>
                   </span>
                   <span className={`${parts.fixed} ${styles.col90}`} role="cell">{formatDate(row.created_at).replace(/-/g, '/')}</span>
-                  <span className={`${parts.fixed} ${styles.col90}`} role="cell">{monthDay(row.last_login_at)}</span>
+                  <span className={`${parts.fixed} ${styles.col90}`} role="cell" title={formatDateTime(row.last_login_at)}>{monthDay(row.last_login_at)}</span>
                   <span className={`${parts.fixed} ${styles.colFeature}`} role="cell">{row.featurePacks.includes('restaurant') ? '使う' : emptyValue('unknown')}</span>
                 </div>
               )

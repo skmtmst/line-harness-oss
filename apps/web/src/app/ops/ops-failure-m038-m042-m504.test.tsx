@@ -38,7 +38,7 @@ const src = (...parts: string[]) => readFileSync(join(process.cwd(), 'src', ...p
 const ANN = src('v8', 'ops', 'announcements.tsx')
 const INV = src('v8', 'ops', 'invite.tsx')
 const LOG = src('v8', 'ops', 'login.tsx')
-const TEN = src('app', 'ops', 'tenants', 'page.tsx')
+const TEN = src('v8', 'ops', 'tenants.tsx')
 const TFA = src('v8', 'ops', 'two-factor.tsx')
 const KNL = src('components', 'ops', 'knowledge-list.tsx')
 
