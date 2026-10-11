@@ -1,4 +1,4 @@
-import type { FormEventHandler, ReactNode } from 'react'
+import type { FormEventHandler, KeyboardEventHandler, Ref, ReactNode } from 'react'
 import styles from './radio-card.module.css'
 import { joinDescribedBy, useFieldContext } from './field-context'
 
@@ -59,6 +59,10 @@ export function RadioCardGroup({
 
 export interface RadioCardProps {
   id?: string
+  inputRef?: Ref<HTMLInputElement>
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>
+  tabIndex?: number
+  ariaLabel?: string
   /** 同じ群で同じ name。矢印キーで行き来できるのは同じ name のラジオ同士だけ。 */
   name: string
   value: string
@@ -92,7 +96,7 @@ export interface RadioCardProps {
    * `'compact'` は小さい箱（★BG-B の出力サイズ o2XyUk/aCyxg：
    * 角 8・余白 8/10・題 11/600・補足 10）。狭い脇のパネルに並べる選択肢に使う。
    * `'form'` は作る画面や操作窓の小さい箱。印を題の左に並べる（RaMf3・hadfk）。
-   * 画面の絵で行で並んでいる選択肢には `'row'` を使う。箱の合格は変えない。
+   * 画面の絵で行で並んでいる選択肢には `'row'` を使う。カードのラジオは右上に置く。
    */
   variant?: 'card' | 'row' | 'compact' | 'form'
   /** 統括の生成パネルの小さい箱（題12/700、補足11）。 */
@@ -109,6 +113,7 @@ export interface RadioCardProps {
 
 export default function RadioCard({
   id,
+  inputRef, onKeyDown, tabIndex, ariaLabel,
   name,
   value,
   checked,
@@ -142,6 +147,7 @@ export default function RadioCard({
         invalid ? styles.invalid : null,
         className,
       ].filter(Boolean).join(' ')}
+      data-choice-card={variant !== 'row' || undefined}
       data-variant={variant}
       data-compact-typography={variant === 'compact' ? compactTypography : undefined}
       onClick={disabled ? undefined : onClick}
@@ -149,6 +155,10 @@ export default function RadioCard({
       {icon && variant !== 'form' ? <span className={styles.topIcon} aria-hidden="true">{icon}</span> : null}
       <input
         type="radio"
+        ref={inputRef}
+        onKeyDown={onKeyDown}
+        tabIndex={tabIndex}
+        aria-label={ariaLabel}
         id={id}
         className={styles.radio}
         name={name}
@@ -160,7 +170,7 @@ export default function RadioCard({
         onChange={() => onChange(value)}
       />
       <span className={styles.body}>
-        <strong className={styles.title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
+        <strong className={styles.title} title={title}>{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
         {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
       </span>

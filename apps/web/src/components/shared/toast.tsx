@@ -1,14 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useSyncExternalStore } from 'react'
-import { CircleAlert, CircleCheck, X } from 'lucide-react'
+import { useEffect, useRef, useSyncExternalStore, useState, type CSSProperties } from 'react'
+import { CircleAlert, CircleCheck, Info, X } from 'lucide-react'
 import { humanizeErrorText } from './human-error-text'
 import { useV8LeaveList } from './overlay-utils'
 import styles from './toast.module.css'
 import { useStackMotion } from './use-stack-motion'
 
 /** 知らせの種類。白地に印の色で分ける（緑=うまくいった、赤=できなかった）。 */
-export type ToastTone = 'success' | 'error'
+export type ToastTone = 'success' | 'error' | 'info'
 
 export type ToastItem = {
   id: number
@@ -232,7 +232,7 @@ export function Toast({
   /** 消えかけ（閉じる動きの間）。読み上げ・押す対象から外す。 */
   leaving?: boolean
 }) {
-  const Icon = item.tone === 'success' ? CircleCheck : CircleAlert
+  const Icon = item.tone === 'success' ? CircleCheck : item.tone === 'info' ? Info : CircleAlert
   const dismiss = onDismiss ?? (item.id !== undefined ? () => dismissToast(item.id as number) : undefined)
   /*
    * 1件ずつには role・aria-live を持たせない（動きの点検 14 番）。
@@ -268,7 +268,7 @@ export function Toast({
       }
     >
       <Icon
-        className={[styles.icon, item.tone === 'success' ? styles.iconSuccess : styles.iconError].join(' ')}
+        className={[styles.icon, item.tone === 'success' ? styles.iconSuccess : item.tone === 'info' ? styles.iconInfo : styles.iconError].join(' ')}
         aria-hidden="true"
         size={15}
       />
@@ -322,6 +322,29 @@ export default function ToastHost() {
   /* 消えるときは窓と同じ「消えかけ」で薄く消す（動きの点検 13 番）。 */
   const shown = useV8LeaveList(live)
   const hostRef = useRef<HTMLDivElement>(null)
+  const [bottom, setBottom] = useState(16)
+  useEffect(() => {
+    const view = document.defaultView
+    if (!view?.requestAnimationFrame || !view.cancelAnimationFrame) return
+    let frame = 0
+    const measure = () => {
+      view.cancelAnimationFrame(frame)
+      frame = view.requestAnimationFrame(() => {
+        const tops = [...document.querySelectorAll<HTMLElement>('[data-shared-part="sticky-bar"]')]
+          .map(el => el.getBoundingClientRect())
+          .filter(r => r.width > 0 && r.height > 0 && r.top < window.innerHeight && r.bottom > 0)
+          .map(r => r.top)
+        setBottom(tops.length ? Math.max(16, window.innerHeight - Math.min(...tops) + 16) : 16)
+      })
+    }
+    const Observer = document.defaultView?.MutationObserver
+    const observer = Observer ? new Observer(measure) : null
+    observer?.observe(document.body, { childList: true, subtree: true })
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    measure()
+    return () => { view.cancelAnimationFrame(frame); observer?.disconnect(); window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure, true) }
+  }, [shown.length])
   useStackMotion(hostRef, shown.map(({ item }) => item.id).join(','))
   /*
    * 読み上げの入れ物は空でも最初から置いておく（動きの点検 14 番）。
@@ -330,7 +353,7 @@ export default function ToastHost() {
    * （aria-atomic=true が既定）ので、足された1件だけを読むよう false にする。
    */
   return (
-    <div ref={hostRef} className={styles.host} role="status" aria-live="polite" aria-atomic="false" aria-label="知らせ">
+    <div ref={hostRef} style={{ '--toast-bottom': `${bottom}px` } as CSSProperties} className={styles.host} role="status" aria-live="polite" aria-atomic="false" aria-label="知らせ">
       {shown.map(({ item, leaving }) => (
         <div key={item.id} data-stack-item={item.id}><Toast item={item} leaving={leaving} /></div>
       ))}

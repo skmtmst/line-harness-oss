@@ -1,3 +1,5 @@
+import { publishScenarioVersion } from '@line-crm/db';
+import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 /**
  * 席の空き待ちと席の来店の印（booking-plus 6 の席対応）。
  *
@@ -13,6 +15,9 @@ import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+
+const commonSender=vi.hoisted(()=>vi.fn(async(..._args:unknown[])=>({requestId:null})));
+vi.mock('../services/line-proxy-send.js',()=>({pushViaHarnessProxy:commonSender}));
 
 const authMocks = vi.hoisted(() => ({
   getStaffByApiKey: vi.fn(async () => null),
@@ -147,9 +152,16 @@ beforeEach(() => {
     WORKER_URL: 'https://worker.example.test',
     LINE_CREDENTIAL_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
   };
-  cardSender.mockClear();
+  cardSender.mockClear();commonSender.mockClear();
   seedStore();
 });
+
+async function approveFollowup(){
+ await publishScenarioVersion(testDb.db,'restaurant-followup:store-s',{staffId:'owner',idempotencyKey:crypto.randomUUID()});
+ const t=testDb.raw.prepare("SELECT template_version FROM rt_store_followup_templates WHERE store_id='store-s'").get() as {template_version:number};
+ const a=await requestRestaurantFollowupApproval(testDb.db,'store-s',t.template_version,'owner');expect(a).not.toBeNull();
+ testDb.raw.prepare("UPDATE rt_approval_requests SET status='approved' WHERE id=?").run(a!.id);
+}
 
 describe('席の空き待ち', () => {
   test('登録・二重登録は409・一覧・取り消し', async () => {
@@ -190,13 +202,13 @@ describe('席の空き待ち', () => {
     });
 
     testDb.raw.exec(`INSERT INTO friends(id,line_account_id,line_user_id,display_name,is_following) VALUES('friend-fit','account-9','U-fit','試験の組',1)`);
+    await approveFollowup();
     const cancelled = await patch('/api/restaurant-test/reservations/res-full', { status: 'cancelled' });
     expect(cancelled.status).toBe(200);
 
-    expect(cardSender).toHaveBeenCalledTimes(1);
-    const sent = cardSender.mock.calls[0]?.[1] as { to: string; text: string };
-    expect(sent.to).toBe('U-fit');
-    const card = sent.text;
+    expect(cardSender).not.toHaveBeenCalled();expect(commonSender).toHaveBeenCalledTimes(1);
+    expect(commonSender.mock.calls[0]?.[2]).toBe('U-fit');
+    const card = JSON.stringify(commonSender.mock.calls[0]?.[3]);
     expect(card).toContain('この時間で予約する');
     expect(card).toContain('今回は見送る');
     expect(card).toContain('seat_waitlist=');
@@ -248,9 +260,10 @@ describe('飲食2の共通受付と権限',()=>{
   testDb.raw.exec("INSERT INTO friends(id,line_account_id,line_user_id,display_name,is_following) VALUES('friend-w','account-9','U-w','試験客',1)");
   await post('/api/restaurant-test/seat-waitlist',{storeId:'store-s',startsAt:SLOT,guestCount:2,customerName:'待つ組',lineUid:'U-w'});
   expect((await post('/api/restaurant-test/reservations/res-depart/attendance',{action:'visited',expectedVersion:1,requestId:'arrive'})).status).toBe(200);
+  await approveFollowup();
   const depart=()=>post('/api/restaurant-test/reservations/res-depart/attendance',{action:'depart',expectedVersion:2,requestId:'depart'});
   expect((await depart()).status).toBe(200);expect((await depart()).status).toBe(200);
-  expect(cardSender).toHaveBeenCalledTimes(1);
+  expect(cardSender).not.toHaveBeenCalled();expect(commonSender).toHaveBeenCalledTimes(1);
   expect(testDb.raw.prepare('SELECT status,table_id FROM rt_seat_waitlist').get()).toMatchObject({status:'invited',table_id:'table-1'});
   expect((await get('/api/restaurant-test/rotation?storeId=store-s&date=2026-11-10')).status).toBe(200);
  });

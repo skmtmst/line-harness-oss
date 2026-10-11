@@ -85,10 +85,12 @@ export default function scanBlankGap(opts = {}) {
   const visCache = new Map()
   const visible = (el) => {
     if (visCache.has(el)) return visCache.get(el)
+    // 閉じたdetailsの本文の寸法を空白や描画済みの箱として使わない。
+    for (let p = el.parentElement; p; p = p.parentElement) if (p.matches('details:not([open])') && !p.querySelector(':scope > summary')?.contains(el)) return false
     let v = true
     const s = CS(el)
-    // ページ内のタブは見える中身。段が増えても、その場所を空白と数えない。
-    if ((el.matches('nav') && !el.querySelector('[role="tablist"]')) || el.matches('[data-template-region="folders"],[data-template-region="collapsed-folders"],[data-line-preview-part="talk"]') || /フォルダの列|左メニュー/.test(el.getAttribute('data-pencil-name') || '') || /(?:^|[ _-])(?:bubbleBody|bubbleText|bubbleIn|bubbleOut|messageBubble|bubble)(?:[_ -]|$)/i.test(typeof el.className === 'string' ? el.className : '')) v = false
+    // ページ内のタブとメッセージの編集欄は見える中身。LINEの見本とは分ける。
+    if ((el.matches('nav') && !el.querySelector('[role="tablist"]')) || el.matches('[data-template-region="folders"],[data-template-region="collapsed-folders"],[data-line-preview-part="talk"]') || /フォルダの列|左メニュー/.test(el.getAttribute('data-pencil-name') || '') || /(?:^|[ _-])(?:bubbleBody|bubbleText|bubbleIn|bubbleOut|messageBubble|bubble)(?:[_ -]|$)/i.test(typeof el.className === 'string' ? el.className : '') && !el.closest('[data-message-composer]')) v = false
     else if (s.display === 'none' || s.visibility === 'hidden' || s.visibility === 'collapse' || Number(s.opacity) < 0.03) v = false
     else if (el.parentElement && el.parentElement !== document.documentElement) v = visible(el.parentElement)
     visCache.set(el, v)

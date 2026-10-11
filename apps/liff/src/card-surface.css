@@ -1,0 +1,6 @@
+/* B-223・B-224：別アプリとWorkerが同じ値を読む。 */
+:root { --liff-card-shadow: 0 1px 1px rgba(29,29,31,.16), 0 2px 4px rgba(29,29,31,.08); --liff-radio-size: 18px; --liff-radio-dot: 9px; }
+:root body :is([data-liff-card]:not([data-selected]), .sb-card, .eb-card:not(.eb-card-success), .af-card, .wb-card, .nm-card, .nm-ai-card, .nm-subscription-card, .nm-order-card, .nm-photo-form-card, .nm-photo-entry, .form-body) { box-shadow: var(--liff-card-shadow); }
+input[type='radio']:not([data-admin-radio]) { appearance: none; width: var(--liff-radio-size); height: var(--liff-radio-size); min-width: var(--liff-radio-size); flex-shrink: 0; border: 1.5px solid var(--color-choice-border, #c9ced6); border-radius: 50%; background: var(--color-canvas, #fff); }
+input[type='radio']:not([data-admin-radio]):checked { border-color: var(--color-selection-border, #087a3e); background: radial-gradient(circle, var(--color-selection-border, #087a3e) calc(var(--liff-radio-dot) / 2), var(--color-canvas, #fff) calc(var(--liff-radio-dot) / 2)); }
+[data-liff-card][data-selected] { box-shadow: none; }

@@ -100,7 +100,7 @@ export default function Booking({
                       left: '-50%',
                       width: '100%',
                       height: 2,
-                      background: i <= stepIdx ? '#06C755' : '#e5e7eb',
+                      background: i <= stepIdx ? 'var(--customer-primary, #06C755)' : '#e5e7eb',
                       zIndex: 0,
                     }}
                   />
@@ -111,7 +111,7 @@ export default function Booking({
                     width: 24,
                     height: 24,
                     borderRadius: 9999,
-                    background: future ? '#e5e7eb' : '#06C755',
+                    background: future ? '#e5e7eb' : 'var(--customer-primary, #06C755)',
                     color: future ? '#9ca3af' : '#fff',
                     fontSize: 11,
                     fontWeight: 700,
@@ -194,7 +194,7 @@ export default function Booking({
             <button
               onClick={exitPeekToBooking}
               className="w-full text-white py-3 rounded-xl font-bold text-sm"
-              style={{ background: '#06C755', boxShadow: '0 1px 3px rgba(6, 199, 85, 0.3)' }}
+              style={{ background: 'var(--customer-primary, #06C755)', boxShadow: '0 1px 3px rgba(6, 199, 85, 0.3)' }}
             >
               この時間で予約に進む
             </button>

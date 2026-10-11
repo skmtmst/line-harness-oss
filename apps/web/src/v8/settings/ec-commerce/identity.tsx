@@ -9,6 +9,8 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
+import Drawer from '@/components/shared/drawer'
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import { IdentityEvidenceList, IdentityHistoryList, IdentityImpactList, IdentitySubjectCard } from '@/components/identity/identity-parts'
 import { IdentityStateBlock } from '@/components/identity/identity-state'
@@ -79,6 +81,8 @@ export default function EcIdentityCandidatesScreen() {
   const role = useStaffRole()
   const canEdit = canManageRole(role)
   const review = useIdentityReview('ec_member', { lineAccountId: selectedAccountId })
+  const [candidateId, setCandidateId] = useDetailPanelUrl('candidate')
+  useEffect(() => { if (candidateId && candidateId !== review.selectedId) review.select(candidateId) }, [candidateId, review.selectedId, review.select])
   const detail = review.detail
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
@@ -239,7 +243,7 @@ export default function EcIdentityCandidatesScreen() {
                 <Td><span className={styles.ops}>
                   {hasCandidate ? (
                     <>
-                      <Button type="button" variant={selected ? 'primary' : 'secondary'} aria-pressed={selected} onClick={() => review.select(item.id)}>候補を見る</Button>
+                      <Button type="button" variant={selected ? 'primary' : 'secondary'} aria-expanded={selected} onClick={() => { setCandidateId(item.id); review.select(item.id) }}>候補を見る</Button>
                       {canEdit ? <Button type="button" data-qa-open="ELayY" onClick={() => review.openDialog(item.id)}>決める</Button> : null}
                     </>
                   ) : (
@@ -264,7 +268,8 @@ export default function EcIdentityCandidatesScreen() {
         </p>
 
         {detail ? (
-          <section className={styles.detail} aria-label="「候補を見る」で開いた中身">
+          <>
+          <Drawer contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</>}>
             <div className={styles.detailPair}>
               <IdentitySubjectCard side="ECの会員" subject={detail.left} />
               <IdentitySubjectCard side="LINE の友だち" subject={detail.right} />
@@ -274,6 +279,7 @@ export default function EcIdentityCandidatesScreen() {
               <IdentityImpactList impact={detail.impact} />
             </div>
             <IdentityHistoryList history={detail.history} />
+          </Drawer>
             <IdentityDecisionDialog
               open={canEdit && review.dialogOpen}
               candidate={detail}
@@ -282,7 +288,7 @@ export default function EcIdentityCandidatesScreen() {
               onCancel={review.closeDialog}
               onSubmit={review.decide}
             />
-          </section>
+          </>
         ) : null}
       </>
     )

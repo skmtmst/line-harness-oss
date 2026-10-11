@@ -27,7 +27,7 @@ export const RULE_VALUES = {
   '--tpl-badge-h': '22px', '--tpl-tag-pill-h': '24px',
   '--tpl-section-title-size': '15px', '--tpl-section-title-weight': '700',
   '--tpl-field-label-size': '12px', '--tpl-field-label-weight': '500',
-  '--tpl-card-pad': '16px', '--tpl-notice-pad': '12px 16px', '--tpl-thead-pad-side': '16px',
+  '--tpl-card-pad': '16px', '--tpl-notice-pad': '12px 16px', '--tpl-thead-pad-side': '24px',
 }
 
 export function verifyRuleValues(css, expected = RULE_VALUES) {

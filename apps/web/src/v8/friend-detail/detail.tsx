@@ -27,7 +27,7 @@ import { inboxHrefForFriend } from './timeline'
 import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import OverviewTab from './overview-tab'
 import HistoryTab from './history-tab'
-import InfoTab, { BASIC_GROUP } from './info-tab'
+import InfoTab, { ALL_GROUP } from './info-tab'
 import FormsTab from './forms-tab'
 import ScenarioTab from './scenario-tab'
 import BookingsTab from './bookings-tab'
@@ -73,7 +73,7 @@ function FriendDetailV8Inner() {
   const friendId = params.get('id') ?? ''
   const rawTab = params.get('tab')
   const tab: TabKey = (FRIEND_DETAIL_TABS.find((t) => t.key === rawTab)?.key ?? 'timeline') as TabKey
-  const group = params.get('group') ?? BASIC_GROUP
+  const group = params.get('group') ?? ALL_GROUP
   const { selectedAccountId, selectedAccount } = useAccount()
   // 情報欄タブは friend_fields の画面。オフのアカウントではタブごと出さない。
   const fieldsEnabled = useFeatureVisibility(selectedAccountId).enabled('friend_fields')
@@ -186,7 +186,7 @@ function FriendDetailV8Inner() {
           label="友だち詳細の中身"
           items={visibleTabs.map((t) => ({
             label: t.label,
-            href: `/friends/detail?id=${encodeURIComponent(friendId)}&tab=${t.key}${group === BASIC_GROUP ? '' : `&group=${encodeURIComponent(group)}`}`,
+            href: `/friends/detail?id=${encodeURIComponent(friendId)}&tab=${t.key}${group === ALL_GROUP ? '' : `&group=${encodeURIComponent(group)}`}`,
             current: tab === t.key,
           }))}
         />

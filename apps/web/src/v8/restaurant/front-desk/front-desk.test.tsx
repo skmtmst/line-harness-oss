@@ -22,7 +22,7 @@ import { freeTables, openTimes, toYmd } from './slots'
 import { WALK_IN_NOTE, isWalkIn, seatWalkIn } from './walk-in'
 
 const T = tables as unknown as RestaurantTable[]
-const today = (hour: number, minute = 0) => { const d = new Date(); d.setHours(hour, minute, 0, 0); return d }
+const today = (hour: number, minute = 0) => new Date(`${toYmd(new Date())}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`)
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -137,4 +137,19 @@ describe('電話予約（E-2）', () => {
     fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
     await waitFor(() => expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({ lineUid: null, notifyLine: false })))
   })
+})
+
+// 日本の00:09をUTCの端末で再現する。昨日を選ばず、今日の過ぎた時刻だけ除く。
+it('UTCの端末でも日付と受け付ける時刻を日本時間で選ぶ', () => {
+  const previous = process.env.TZ
+  process.env.TZ = 'UTC'
+  try {
+    const now = new Date('2026-10-10T15:09:00Z')
+    expect(toYmd(now)).toBe('2026-10-11')
+    expect(openTimes('2026-10-11', [{ weekday: 0, periods: [{ opensAt: '00:00', closesAt: '03:00' }] }] as Parameters<typeof openTimes>[1], now)).toEqual(['00:30', '01:00'])
+    expect(openTimes('2026-10-12', [{ weekday: 1, periods: [{ opensAt: '00:00', closesAt: '03:00' }] }] as Parameters<typeof openTimes>[1], now)).toEqual(['00:00', '00:30', '01:00'])
+  } finally {
+    if(previous === undefined) delete process.env.TZ
+    else process.env.TZ = previous
+  }
 })

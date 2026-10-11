@@ -48,6 +48,7 @@ import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 describe('★V8 設定の中のメニュー', () => {
   beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false')
     forgetStaffIdentity()
     clearFeatureVisibilityCache()
     fixture.visibility.mockReset()
@@ -62,7 +63,7 @@ describe('★V8 設定の中のメニュー', () => {
     rememberStaffIdentity({ role: 'owner' } as StaffMember)
   })
 
-  afterEach(() => cleanup())
+  afterEach(() => { cleanup(); vi.unstubAllEnvs() })
 
   it('WEB252: 切替先が読込中なら前の機能を出さず、設定保存後に再取得する', async () => {
     const view = render(<SettingsInnerNav />)
@@ -106,6 +107,15 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByText('専用')).toBeNull()
     // 「会社とロゴ」は API ができるまで出さない
     expect(view.queryByText('会社とロゴ')).toBeNull()
+  })
+
+  it('飲食のテスト機能を有効にした時だけ予約サイト・グルメ媒体へ進める', async () => {
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    const link = view.getByRole('link', { name: '予約サイト・グルメ媒体' })
+    expect(link.getAttribute('href')).toBe('/settings/booking-media')
+    expect(view.getAllByRole('link').at(-1)).toBe(link)
   })
 
   it('SNS 連携の画面では SNS 連携が今の画面になり、機能設定の下の2つは出さない', async () => {

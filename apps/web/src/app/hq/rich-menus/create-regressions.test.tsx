@@ -67,7 +67,8 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     fireEvent.keyDown(one, { key: 'ArrowRight' })
     const two = screen.getByRole('radio', { name: '上下2面（面 A・B）' }) as HTMLInputElement
     expect(two.checked).toBe(true)
-    expect(two.parentElement?.textContent).toBe('AB✓上下2面')
+    expect(two.closest('[data-choice-card]')?.textContent).toBe('上下2面AB')
+    expect(two.closest('[data-choice-card]')?.querySelectorAll('input:checked')).toHaveLength(1)
     fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '2面メニュー' } })
     click('次へ：ボタンの動き')
     await screen.findByText('画像の上で面を選ぶ')

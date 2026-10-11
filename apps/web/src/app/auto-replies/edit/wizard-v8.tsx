@@ -106,6 +106,7 @@ import {
 } from '@/app/auto-replies/auto-reply-words'
 import { inEvaluationOrder, PRIORITY_MAX, PRIORITY_MIN, type OrderedRule } from '@/app/auto-replies/auto-reply-order'
 import { canPublish, publishGates } from '@/app/auto-replies/publish/publish-flow'
+import MessageInsertRow, { MessageBody } from '@/components/shared/message-insert-row'
 import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
 import InsertTextField from '@/components/shared/insert-text-field'
@@ -2072,7 +2073,7 @@ function AutoReplyWizardV8Inner() {
                 </div>
 
                 {form.mode === 'inline-text' && (
-                  <div className={styles.bodyBox} data-invalid={!!fieldError('wiz-content') || undefined}>
+                  <MessageBody>
                     <SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><InsertTextField
                       id="wiz-content"
                       aria-invalid={!!fieldError('wiz-content') || undefined}
@@ -2084,18 +2085,11 @@ function AutoReplyWizardV8Inner() {
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
                       maxLength={5000}
                     /></SaveErrorField>
-                    <div className={styles.insertChips}>
-                      <span className={styles.insertLabel}>差し込む</span>
-                      <AutoReplyInsertChips
-                        accountId={matchedAccountId}
-                        onInsert={(token) => patch({ responseContent: form.responseContent + token })}
-                      />
-                      <span className={styles.counter}>
-                        {formatNumber(form.responseContent.length)} / 5,000
-                      </span>
-                    </div>
+                    <MessageInsertRow count={`${formatNumber(form.responseContent.length)} / 5,000`}>
+                      <AutoReplyInsertChips accountId={matchedAccountId} onInsert={(token) => patch({ responseContent: form.responseContent + token })} />
+                    </MessageInsertRow>
                     {fieldError('wiz-content') ? <FieldError id="wiz-content-error">{fieldError('wiz-content')}</FieldError> : null}
-                  </div>
+                  </MessageBody>
                 )}
 
                 {form.mode === 'template' && (

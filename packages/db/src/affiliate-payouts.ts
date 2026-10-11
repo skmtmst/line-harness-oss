@@ -695,7 +695,7 @@ export async function createAffiliatePayoutBatch(
     return { kind: 'changed' };
   }
   const lines = await db.prepare(
-    `SELECT sl.id AS settlement_line_id, sl.affiliate_id, sl.amount_minor,
+    `SELECT sl.id AS settlement_line_id, COALESCE(sl.affiliate_id, sl.affiliate_id_history) AS affiliate_id, sl.amount_minor,
             bp.bank_code, bp.bank_name, bp.branch_code, bp.branch_name, bp.account_type,
             bp.account_number_encrypted, bp.account_last4, bp.account_holder_name
        FROM affiliate_settlement_lines sl
@@ -761,11 +761,11 @@ export async function getAffiliatePayoutBatchExport(
   ).bind(input.batchId, input.tenantId, input.lineAccountId).first<PayoutBatchRow>();
   if (!batch) return null;
   const result = await db.prepare(
-    `SELECT affiliate_id, SUM(amount_minor) AS amount_minor, bank_code, bank_name,
+    `SELECT COALESCE(affiliate_id, affiliate_id_history) AS affiliate_id, SUM(amount_minor) AS amount_minor, bank_code, bank_name,
             branch_code, branch_name, account_type, account_number_encrypted,
             account_last4, account_holder_name
        FROM affiliate_payout_batch_lines WHERE batch_id = ?
-      GROUP BY affiliate_id, bank_code, bank_name, branch_code, branch_name,
+      GROUP BY COALESCE(affiliate_id, affiliate_id_history), bank_code, bank_name, branch_code, branch_name,
                account_type, account_number_encrypted, account_last4, account_holder_name
       ORDER BY affiliate_id`,
   ).bind(input.batchId).all<{
@@ -871,16 +871,17 @@ export async function prepareAffiliateStatement(
 ): Promise<AffiliateStatementSnapshot | null> {
   const row = await db.prepare(
     `SELECT s.id AS settlement_id, s.version, s.period_from, s.period_to, s.currency,
-            a.id AS affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
+            COALESCE(sl.affiliate_id, sl.affiliate_id_history) AS affiliate_id,
+            COALESCE(a.name, '削除済みのお客さま') AS affiliate_name, COALESCE(a.code, '') AS affiliate_code,
             COALESCE(SUM(sl.amount_minor), 0) AS total_amount,
             COALESCE(SUM(CASE WHEN sl.amount_minor > 0 THEN sl.amount_minor ELSE 0 END), 0) AS gross_amount,
             COALESCE(SUM(CASE WHEN sl.amount_minor < 0 THEN -sl.amount_minor ELSE 0 END), 0) AS deduction_amount,
             COUNT(sl.id) AS line_count
        FROM affiliate_settlements s
-       JOIN affiliate_settlement_lines sl ON sl.settlement_id = s.id AND sl.affiliate_id = ?
-       JOIN affiliates a ON a.id = sl.affiliate_id AND a.tenant_id = s.organization_id
+       JOIN affiliate_settlement_lines sl ON sl.settlement_id = s.id AND COALESCE(sl.affiliate_id, sl.affiliate_id_history) = ?
+       LEFT JOIN affiliates a ON a.id = sl.affiliate_id AND a.tenant_id = s.organization_id
       WHERE s.id = ? AND s.organization_id = ? AND s.line_account_id = ? AND s.state = 'closed'
-      GROUP BY s.id, s.version, s.period_from, s.period_to, s.currency, a.id, a.name, a.code`,
+      GROUP BY s.id, s.version, s.period_from, s.period_to, s.currency, COALESCE(sl.affiliate_id, sl.affiliate_id_history), a.name, a.code`,
   ).bind(input.affiliateId, input.settlementId, input.tenantId, input.lineAccountId).first<{
     settlement_id: string; version: number; period_from: string; period_to: string; currency: string;
     affiliate_id: string; affiliate_name: string; affiliate_code: string;
@@ -896,7 +897,7 @@ export async function prepareAffiliateStatement(
 }
 
 type StatementRow = {
-  id: string; line_account_id: string; affiliate_id: string; settlement_id: string;
+  id: string; line_account_id: string; affiliate_id: string | null; affiliate_id_history?: string | null; settlement_id: string;
   total_amount_minor: number; status: string; version: number; pdf_object_key: string;
   idempotency_key: string | null; request_fingerprint: string | null;
   snapshot_json: string; file_checksum: string | null; expires_at: string | null; created_at: string;
@@ -909,7 +910,7 @@ export interface AffiliateStatement {
 
 function affiliateStatement(row: StatementRow): AffiliateStatement {
   return {
-    id: row.id, lineAccountId: row.line_account_id, affiliateId: row.affiliate_id,
+    id: row.id, lineAccountId: row.line_account_id, affiliateId: row.affiliate_id ?? row.affiliate_id_history ?? '',
     settlementId: row.settlement_id, totalAmount: Number(row.total_amount_minor),
     status: row.status, version: Number(row.version), expiresAt: row.expires_at, createdAt: row.created_at,
   };
@@ -940,12 +941,12 @@ export async function createAffiliateStatement(
   const now = input.now ?? new Date().toISOString();
   await db.prepare(
     `INSERT INTO affiliate_statements
-       (id, organization_id, line_account_id, affiliate_id, settlement_id,
+       (id, organization_id, line_account_id, affiliate_id, affiliate_id_history, settlement_id,
         total_amount_minor, status, version, pdf_object_key, generated_by,
         expires_at, created_at, idempotency_key, request_fingerprint, snapshot_json, file_checksum)
-     VALUES (?, ?, ?, ?, ?, ?, 'generated', 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, (SELECT id FROM affiliates WHERE id = ?), ?, ?, ?, 'generated', 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
-    id, input.tenantId, input.lineAccountId, input.snapshot.affiliateId,
+    id, input.tenantId, input.lineAccountId, input.snapshot.affiliateId, input.snapshot.affiliateId,
     input.snapshot.settlementId, input.snapshot.totalAmount, input.objectKey,
     input.actorId, input.expiresAt, now, input.idempotencyKey, input.requestFingerprint,
     JSON.stringify(input.snapshot), input.checksum,
@@ -1036,22 +1037,23 @@ export async function getClosedAccountSettlement(
   if (!settlement) return null;
 
   const lines = await db.prepare(
-    `SELECT sl.affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
+    `SELECT COALESCE(sl.affiliate_id, sl.affiliate_id_history) AS affiliate_id,
+            COALESCE(a.name, '削除済みのお客さま') AS affiliate_name, COALESCE(a.code, '') AS affiliate_code,
             SUM(sl.amount_minor) AS amount,
             COUNT(CASE WHEN sl.amount_minor > 0 THEN 1 END) AS line_count,
             MAX(EXISTS(
               SELECT 1 FROM affiliate_statements st
                WHERE st.settlement_id = sl.settlement_id
-                 AND st.affiliate_id = sl.affiliate_id
+                 AND COALESCE(st.affiliate_id, st.affiliate_id_history) = COALESCE(sl.affiliate_id, sl.affiliate_id_history)
                  AND st.status = 'generated')) AS statement_issued,
             MAX(bp.version IS NOT NULL) AS bank_profile_registered
        FROM affiliate_settlement_lines sl
-       JOIN affiliates a ON a.id = sl.affiliate_id
+       LEFT JOIN affiliates a ON a.id = sl.affiliate_id
        LEFT JOIN affiliate_bank_profiles bp
          ON bp.affiliate_id = sl.affiliate_id
         AND bp.organization_id = ? AND bp.line_account_id = ?
       WHERE sl.settlement_id = ? AND sl.status = 'included'
-      GROUP BY sl.affiliate_id
+      GROUP BY COALESCE(sl.affiliate_id, sl.affiliate_id_history)
       ORDER BY a.name, sl.affiliate_id`,
   ).bind(input.tenantId, input.lineAccountId, settlement.id).all<{
     affiliate_id: string; affiliate_name: string; affiliate_code: string;

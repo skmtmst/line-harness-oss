@@ -32,6 +32,7 @@ afterEach(() => { act(() => root.unmount()); host.remove(); document.documentEle
 it('採用したらのマイルが空なら口を呼ばず、その欄が赤くなり理由が出て、そこへ移る', async () => {
   await act(async () => { root.render(<PhotoPolicyHistoryV8 open canEdit onClose={() => {}} onChanged={() => {}} />) })
   for (let i = 0; i < 4; i += 1) await act(async () => { await Promise.resolve() })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しい版を作る' })) })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '版を保存する' })) })
   await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
   expect(create).not.toHaveBeenCalled()

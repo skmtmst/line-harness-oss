@@ -117,7 +117,7 @@ describe('飲食店の本人予約', () => {
     await request(`/api/liff/restaurant/reservations/${data.id}/confirm`, {
       expectedVersion: 1,
     });
-    expect(mocks.send).toHaveBeenCalledTimes(1);
+    expect(mocks.send).not.toHaveBeenCalled(); // 未承認の予約入りは送らない
     const change = await request(
       `/api/liff/restaurant/reservations/${data.id}/reschedule`,
       { expectedVersion: 2, startsAt: '2027-10-01T04:00:00Z', guestCount: 2 },
@@ -287,7 +287,6 @@ describe('飲食店の本人予約', () => {
     expect((await hold()).status).toBe(401);
   });
   it('通知失敗で予約を戻さず、同じ鍵で再試行する', async () => {
-    mocks.send.mockRejectedValueOnce(new Error('mock failure'));
     const { data } = await read(await hold());
     expect(
       (
@@ -299,6 +298,8 @@ describe('飲食店の本人予約', () => {
     expect(db.raw.prepare('SELECT status FROM rt_reservations').get()).toEqual({
       status: 'confirmed',
     });
+    mocks.send.mockRejectedValueOnce(new Error('mock failure'));
+    expect((await request(`/api/liff/restaurant/reservations/${data.id}/reschedule`,{expectedVersion:2,startsAt:'2027-10-01T04:00:00Z',guestCount:2})).status).toBe(200);
     db.raw.exec('UPDATE rt_customer_notice_outbox SET lease_until=NULL');
     expect(
       await processRestaurantCustomerNotices({ DB: db.db } as Env['Bindings']),
@@ -386,4 +387,19 @@ it('営業時間があって受付終了した日は、定休と表示しない'
     const body=await (await request('/api/liff/restaurant/availability?storeId=store&date=2027-10-01&guestCount=2')).json() as any;
     expect(body.data).toMatchObject({slots:[],unavailableReason:'full'});
   } finally {now.mockRestore();}
+});
+
+it('来店の返事はLIFF本人・予約版で受け、未認証・他人・型違いを拒否する',async()=>{
+ const id=crypto.randomUUID();
+ db.raw.prepare("INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status) VALUES('confirmed','store','phone','本人','Uone',2,?,?,'confirmed')").run(start,'2027-10-01T04:30:00.000Z');
+ db.raw.prepare("INSERT INTO rt_reservation_confirmations(request_id,reservation_id,reservation_version,friend_id,requested_at,expires_at) VALUES(?,'confirmed',1,'f1',?,?)").run(id,new Date().toISOString(),start);
+ const path='/api/liff/restaurant/confirmations/'+id+'/respond';
+ expect((await request(path,{expectedVersion:1,response:'going'},'two')).status).toBe(404);
+ expect((await request(path,{expectedVersion:'1',response:'going'})).status).toBe(400);
+ expect((await request(path,{expectedVersion:2,response:'going'})).status).toBe(409);
+ const accepted=await request(path,{expectedVersion:1,response:'going'});expect(accepted.status).toBe(200);
+ expect(await accepted.json()).toMatchObject({success:true,data:{response:'going',version:1}});
+ expect(db.raw.prepare("SELECT customer_version,status FROM rt_reservations WHERE id='confirmed'").get()).toEqual({customer_version:1,status:'confirmed'});
+ const unauthenticated=await app().request(path+'?liffId=liff1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:1,response:'going'})});
+ expect(unauthenticated.status).toBe(401);
 });

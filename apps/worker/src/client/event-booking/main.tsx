@@ -807,10 +807,10 @@ function App({ ctx, initial }: { ctx: EventBookingContext; initial: Screen }) {
   })();
 
   return (
-    <div className="min-h-screen" style={{ background: '#f5f5f5' }}>
+    <div className="min-h-screen" style={{ background: 'var(--customer-background, #f5f5f5)' }}>
       <header
         className="px-4 py-3 text-white text-center font-bold sticky top-0 z-20"
-        style={{ background: '#06C755', fontSize: '15px' }}
+        style={{ background: 'var(--customer-primary, #06C755)', fontSize: '15px' }}
       >
         {headerLabel}
       </header>

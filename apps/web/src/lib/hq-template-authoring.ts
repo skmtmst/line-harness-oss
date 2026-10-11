@@ -7,6 +7,7 @@ export function freshDefinition(type: TemplateType): TemplateDefinition {
   if (type === 'template') return { schemaVersion: 1, template: { id: 'hq-authored-message', name: '', category: 'general', messageType: 'text', messageContent: '', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' }, media: [] }
   if (type === 'rich_menu') return { schemaVersion: 1, richMenu: { id: 'rich-menu-main', name: '', chatBarText: 'メニュー', size: 'large', defaultPageId: 'page-1', pages: [{ id: 'page-1', name: 'メイン', imageR2Key: '', areas: [] }] } }
   const layout = emptyLayout()
+  layout.options.customerDesign = {mode:'account',preset:'line'}
   return { schemaVersion: 1, form: { name: '', description: null, fields: [], layout, on_submit_tag_id: null, on_submit_scenario_id: null, save_to_metadata: true } }
 }
 

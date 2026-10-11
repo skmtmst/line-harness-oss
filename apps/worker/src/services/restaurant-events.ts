@@ -1,3 +1,4 @@
+import { scheduleRestaurantFollowup } from './restaurant-followup.js';
 import type { Env } from '../index.js';
 import { getLineAccountById, applyMileageRulesForEvent, getWorkflowStep } from '@line-crm/db';
 import { fireEvent } from './event-bus.js';
@@ -9,7 +10,7 @@ import {featureJobCanRun} from './feature-enforcement.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 export interface RestaurantEvent {
  id:string; reservation_id:string|null;store_id:string;event_type:string;reservation_version:number;
- occurred_at:string;line_account_id:string|null;friend_id:string|null;payload_json:string;
+ occurred_at:string;request_id:string;line_account_id:string|null;friend_id:string|null;payload_json:string;
 }
 export type RestaurantEventConsumer = (db:D1Database,event:RestaurantEvent,execution:IncomingWebhookExecution)=>Promise<void>;
 /** 消費者と各工程の記録を別々に持つ。SQL効果も共通workflowの柵と記録で再実行を防ぐ。 */
@@ -50,6 +51,7 @@ export async function processRestaurantEvents(env:Env['Bindings'],storeId?:strin
  const rows=await db.prepare(`SELECT e.*,r.consumer_key FROM rt_reservation_events e JOIN rt_reservation_event_receipts r ON r.event_id=e.id
  WHERE r.status<>'succeeded' AND (? IS NULL OR e.store_id=?) AND (r.next_attempt_at IS NULL OR julianday(r.next_attempt_at)<=julianday('now')) ORDER BY e.occurred_at,e.reservation_version LIMIT 100`).bind(storeId??null,storeId??null).all<RestaurantEvent&{consumer_key:string}>();
  for(const event of rows.results)await deliverRestaurantEvent(db,event,event.consumer_key,async(owned,e,execution)=>{
+  if(event.consumer_key==='followup') { await scheduleRestaurantFollowup(owned,e); return; }
   if(event.consumer_key==='visit_stamp_queue') {
    await processVisitStampQueue(env);
    if(await db.prepare("SELECT 1 FROM visit_stamp_visit_queue WHERE kind='restaurant' AND visit_id=?").bind(e.reservation_id).first())throw new Error('stamp_queue_pending');

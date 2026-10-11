@@ -1,3 +1,4 @@
+@import "./card-surface.css";
 @import "tailwindcss";
 /* ─── LIFF ★V7 デザイントークン ─────────────────────────────
  * 値は Pencil「★V7 LIFF 主要画面」の決まり (0-rules.png) から。
@@ -256,3 +257,13 @@ body {
   --liff-radius: 23px;
   --liff-radius-lg: 23px;
 }
+
+:root { --upload-slot-height: 140px; --upload-slot-padding: 16px; --choice-size: 16px; --choice-ring: 1.5px; --choice-dot: 8px; --color-choice-border: #c9ced6; --color-status-info: #2563eb; --choice-card-ring: 2px; --color-selection-border: #087a3e; --color-choice-selected: #f1f8f3; }
+
+/* B-203：フォーム以外の申込欄も16の輪・点・チェック。 */
+:root input:is([type='radio'], [type='checkbox']) { appearance: none; flex-shrink: 0; width: var(--choice-size); height: var(--choice-size); margin: 0; border: var(--choice-ring) solid var(--color-choice-border); background-color: var(--color-canvas); vertical-align: middle; }
+:root input[type='radio'] { border-radius: 50%; }
+:root input[type='radio']:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+:root input[type='checkbox'] { border-radius: 3px; }
+:root input[type='checkbox']:checked { border-color: var(--color-selection-border); background: var(--color-selection-border) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='m3 8 3 3 7-7'/%3E%3C/svg%3E") center/contain no-repeat; }
+:root input:is([type='radio'], [type='checkbox']):focus-visible { outline: 2px solid var(--color-status-info); outline-offset: 2px; }

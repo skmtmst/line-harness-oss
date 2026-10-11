@@ -217,3 +217,11 @@
 [data-theme='v8'] .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
 [data-theme='v8'] .headerRestaurant .title{font-size:15px;line-height:23px;}
 [data-theme='v8'] .headerRestaurant .meta{font-size:14px;line-height:21px;}
+
+/* B-187・208：枠のある箱・縦のまとまりは最低16。部分ごとに余白を持つカードは継続。 */
+html[data-theme='v8'] .paddingCompact { padding: var(--space-16); }
+html[data-theme='v8'] .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
+html[data-theme='v8'] .vertical { gap: max(var(--space-16), var(--card-content-gap, 0px)); }
+
+/* B-208：余白の口を持たない既存の箱にも、枠から16を確保する。表の器は平らなまま。 */
+html[data-theme='v8'] .card[data-card-padding='none'][data-card-variant='default']:not([data-card-unframed]):not([data-spacing]):not([data-card-spacing]):not(:has([data-shared-part='list-table'], table)) { padding: var(--space-16); }

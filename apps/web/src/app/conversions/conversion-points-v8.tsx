@@ -553,8 +553,8 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
       {panelPoint || model.stopTarget ? (
         <div className={styles.panels}>
           {panelPoint ? (
-            <section className={styles.panel} aria-label="詳細の小窓">
-              <h2 className={styles.panelTitle}>詳細の小窓：{panelPoint.name}</h2>
+            <section className={styles.panel} aria-label="詳細の画面">
+              <h2 className={styles.panelTitle}>詳細の画面：{panelPoint.name}</h2>
               <p className={styles.panelLead}>
                 <span className={`${styles.statePill} ${PILL_CLASS[panelPoint.state]}`}>
                   <span className={styles.statePillDot} aria-hidden="true" />
@@ -666,7 +666,7 @@ export default function ConversionPointsV8({ model }: { model: ConversionPointsV
           ) : null}
 
           {model.stopTarget ? (
-            <section className={styles.panel} aria-label="止めるときの小窓">
+            <section className={styles.panel} aria-label="止めるときの画面">
               <h2 className={styles.panelTitle}>「{model.stopTarget.name}」を止める</h2>
               <p className={styles.panelLead}>
                 {model.stopImpactLoading

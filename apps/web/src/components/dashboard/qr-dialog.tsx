@@ -6,7 +6,9 @@ import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
+import { FieldError } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
+import SegmentedControl from '@/components/shared/segmented'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatDateTime } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -53,6 +55,18 @@ export function resolveOfficialProfileUrl(
   return `https://line.me/R/ti/p/${basicId}`
 }
 
+export type FixedQrResource = {
+  url: string
+  title: string
+  stopped?: boolean
+  description?: string
+  downloadPdf?: (paper: 'A4' | 'A5') => Promise<Blob>
+  downloadImage?: (format: string, size: string) => Promise<Blob>
+  paperSizes?: boolean
+  formats?: { value: string; label: string }[]
+  sizes?: { value: string; label: string }[]
+}
+
 function DownloadIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -74,9 +88,12 @@ export default function QrDialog({
   routes: routesProp,
   routesPending: routesPendingProp,
   direct,
+  resource,
 }: {
   direct?:{title:string;description:string;content?:React.ReactNode;footer?:React.ReactNode;qrContent?:React.ReactNode;downloads?:boolean}
   open: boolean
+  /** 流入・クーポン・来店スタンプも同じ窓で出す。取得と保存は元のAPI。 */
+  resource?: FixedQrResource
   onClose: () => void
   accountName: string
   /** LINE公式プロフィールで発行した lin.ee の短縮URL。 */
@@ -111,7 +128,11 @@ export default function QrDialog({
    * 外れるため、「見つからない」と「止めている」を分けるための1回。
    */
   const [lookedUpRoute, setLookedUpRoute] = useState<EntryRoute | null>(null)
-  const [size, setSize] = useState(SIZES[0].value)
+  const sizes = resource?.sizes ?? SIZES
+  const formats = resource?.formats ?? FORMATS
+  const [size, setSize] = useState(sizes[0].value)
+  const [paper, setPaper] = useState<'A4' | 'A5'>('A4')
+  const [imageState, setImageState] = useState<'idle' | 'working' | 'failed'>('idle')
   const [format, setFormat] = useState(FORMATS[0].value)
   /* 印刷用PDFの取り寄せ状態。失敗してもダイアログは閉じない。 */
   const [pdfState, setPdfState] = useState<'idle' | 'working' | 'failed'>('idle')
@@ -132,7 +153,7 @@ export default function QrDialog({
   }, [open, initialRouteId])
 
   useEffect(() => {
-    if (!open || routesProp) return
+    if (!open || routesProp || resource) return
     let cancelled = false
     void api.entryRoutes.list()
       .then((res) => {
@@ -145,7 +166,7 @@ export default function QrDialog({
     return () => {
       cancelled = true
     }
-  }, [open, routesProp])
+  }, [open, routesProp, resource])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
@@ -157,7 +178,7 @@ export default function QrDialog({
    * 止める（DASH-09 / DASH-28 の方向）。
    */
   useEffect(() => {
-    if (!open || routeId === '' || routesPending) return
+    if (!open || resource || routeId === '' || routesPending) return
     if (routes.some((r) => r.id === routeId)) {
       setLookedUpRoute(null)
       return
@@ -174,12 +195,12 @@ export default function QrDialog({
     return () => {
       cancelled = true
     }
-  }, [open, routeId, routes, routesPending])
+  }, [open, routeId, routes, routesPending, resource])
   /* 止めた経路は QR も印刷も出さない（M）。選択肢にも出さない。 */
   const routeStopped = route != null && !route.isActive
   const routeMissing = routeId !== '' && !route && !routesPending
-  const link = route && route.isActive ? `${base}/r/${route.refCode}` : baseLink
-  const blocked = routeMissing || routeStopped
+  const link = resource?.url ?? (route && route.isActive ? `${base}/r/${route.refCode}` : baseLink)
+  const blocked = resource ? Boolean(resource.stopped) : routeMissing || routeStopped
 
   useEffect(() => {
     let cancelled = false
@@ -206,7 +227,8 @@ export default function QrDialog({
 
   if (!open) return null
 
-  const qrSrc = `${base}/api/qr?size=${size}&format=${format}&data=${encodeURIComponent(link)}`
+  const pixelSize = ({small:'256x256',medium:'512x512',large:'1024x1024'} as Record<string,string>)[size] ?? size
+  const qrSrc = `${base}/api/qr?size=${pixelSize}&format=${format}&data=${encodeURIComponent(link)}`
   const saveHref = `${qrSrc}&download=1&filename=${encodeURIComponent(
     route ? `qr-${route.refCode}` : 'qr-friend-add',
   )}`
@@ -245,14 +267,14 @@ export default function QrDialog({
    * 基本の追加URLには経路IDが無いため、従来どおりブラウザの印刷を使う。
    */
   const downloadPdf = async () => {
-    if (!route || !route.isActive) return
+    if (blocked || (!resource?.downloadPdf && (!route || !route.isActive))) return
     setPdfState('working')
     try {
-      const blob = await api.entryRoutes.qrPdf(route.id)
+      const blob = await (resource?.downloadPdf ? resource.downloadPdf(paper) : api.entryRoutes.qrPdf(route!.id))
       const objectUrl = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = objectUrl
-      anchor.download = `qr-${route.refCode}.pdf`
+      anchor.download = `qr-${route?.refCode ?? 'print'}-${paper}.pdf`
       document.body.appendChild(anchor)
       anchor.click()
       anchor.remove()
@@ -274,6 +296,19 @@ export default function QrDialog({
     if (reason && when) return `${reason}（${when}に停止）`
     return reason ?? (when ? `${when}に停止` : null)
   })()
+
+  const downloadImage = async () => {
+    if (blocked || !resource?.downloadImage) return
+    setImageState('working')
+    try {
+      const blob = await resource.downloadImage(format, size)
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl; anchor.download = `qr-${size}.${format}`
+      document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(objectUrl)
+      setImageState('idle')
+    } catch { setImageState('failed') }
+  }
 
   const printQr = () => {
     const printWindow = window.open('', '_blank', 'width=720,height=820')
@@ -306,7 +341,7 @@ export default function QrDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={direct?.title??'友だち追加のQRコード'}
+      aria-label={direct?.title ?? resource?.title ??'友だち追加のQRコード'}
       onClick={onClose}
     >
       <div
@@ -317,9 +352,9 @@ export default function QrDialog({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-ink text-base font-bold">{direct?.title??'友だち追加のQRコード'}</h2>
+            <h2 className="text-ink text-base font-bold">{direct?.title ?? resource?.title ??'友だち追加のQRコード'}</h2>
             <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-              {direct?.description??'チラシ・店頭POP・名刺などに印刷して使えます。読み取ると友だち追加の画面が開きます。'}
+              {direct?.description ?? resource?.description ??'チラシ・店頭POP・名刺などに印刷して使えます。読み取ると友だち追加の画面が開きます。'}
             </p>
           </div>
           <button
@@ -339,7 +374,7 @@ export default function QrDialog({
               パネルの内側に収まらず横にはみ出していた。正方形は保つ。
             */}
             <div className="bg-canvas-sunken rounded-panel flex aspect-square w-full max-w-[280px] items-center justify-center">
-              {direct?.qrContent ? direct.qrContent : routeStopped ? (
+              {direct?.qrContent ? direct.qrContent : (routeStopped || resource?.stopped) ? (
                 <p className="text-ink-secondary px-4 text-center text-xs leading-relaxed" role="alert">
                   この経路は停止しています。QRコードは表示しません。
                   {stoppedDetail ? <><br />{stoppedDetail}</> : null}
@@ -354,7 +389,7 @@ export default function QrDialog({
                 /* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */
                 <img
                   src={qrDataUrl || qrSrc}
-                  alt={direct?.title??'友だち追加QRコード'}
+                  alt={direct?.title ?? resource?.title ??'友だち追加QRコード'}
                   width={220}
                   height={220}
                   className="aspect-square h-auto w-full max-w-[220px]"
@@ -376,7 +411,7 @@ export default function QrDialog({
 
           <div className="min-w-0 space-y-4">
             {direct?.content}
-            {!direct?<div>
+            {!direct && !resource ? <div>
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
@@ -422,7 +457,7 @@ export default function QrDialog({
                   value={size}
                   onChange={(value) => setSize(value)}
                   className="w-full"
-                  options={SIZES.map((s) => ({ value: s.value, label: s.label }))}
+                  options={sizes.map((s) => ({ value: s.value, label: s.label }))}
                 /></SaveErrorField>
               </div>
               <div>
@@ -433,22 +468,11 @@ export default function QrDialog({
                   3形式は等幅のセグメントにする（DASH-19）。内容幅の flex だと
                   SVG 側だけ余白が偏り、未選択の余白が選択肢の一部に見えた。
                 */}
-                <div className="border-hairline rounded-control grid grid-cols-3 overflow-hidden border" aria-label="画像形式">
-                  {FORMATS.map((entry) => (
-                    <button
-                      key={entry.value}
-                      type="button"
-                      onClick={() => setFormat(entry.value)}
-                      aria-pressed={format === entry.value}
-                      className={`border-hairline flex h-10 items-center justify-center border-r px-2 text-xs font-medium last:border-r-0 ${format === entry.value ? 'bg-action text-on-action' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-                    >
-                      {entry.label}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl options={formats} value={format} onChange={setFormat} aria-label="画像形式" equalWidth />
               </div>
             </div>
 
+            {resource?.paperSizes ? <Select aria-label="紙の大きさ" value={paper} onChange={v => setPaper(v as 'A4' | 'A5')} options={[{value:'A4',label:'A4'},{value:'A5',label:'A5'}]} /> : null}
             <div>
               <label
                 htmlFor="qr-link"
@@ -494,7 +518,7 @@ export default function QrDialog({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {blocked ? (
+              {resource?.downloadImage ? <Button variant="primary" disabled={blocked || pdfState === 'working'} busy={imageState === 'working'} onClick={() => void downloadImage()}><DownloadIcon />{format.toUpperCase()} を保存</Button> : blocked ? (
                 <Button variant="primary" disabled>
                   <DownloadIcon />画像をダウンロード
                 </Button>
@@ -511,12 +535,12 @@ export default function QrDialog({
                 サーバーのPDFを取り寄せ、基本の追加URLのときだけ従来の
                 ブラウザ印刷を使う。止めた経路では押せない。
               */}
-              {route && route.isActive ? (
+              {resource?.downloadPdf || route && route.isActive ? (
                 <Button
                   variant="secondary"
                   type="button"
                   onClick={() => void downloadPdf()}
-                  disabled={pdfState === 'working'}
+                  disabled={blocked || pdfState === 'working' || imageState === 'working'}
                 >
                   PDFで印刷
                 </Button>
@@ -531,6 +555,7 @@ export default function QrDialog({
                 </Button>
               )}
             </div>
+            {imageState === 'failed' ? <FieldError id="qr-save-error">QRを保存できませんでした。もう一度お試しください。</FieldError> : null}
             {pdfState === 'failed' ? (
               <p className="text-danger mt-1 text-xs" role="alert">
                 印刷用PDFを作れませんでした。もう一度押してください。

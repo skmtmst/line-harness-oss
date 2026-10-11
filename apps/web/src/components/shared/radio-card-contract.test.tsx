@@ -114,15 +114,16 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     }
   })
 
-  it('オンは淡緑の地面＋1.5px の濃い緑の枠・題12/500・説明12/400（fNPdg）', () => {
+  it('B-203の選択の枠と、題・説明の文字を保つ', () => {
     const c = css()
-    expect(c).toMatch(/\[data-theme='v8'\]\s*\.checked[^{]*\{[^}]*outline:\s*1\.5px solid var\(--color-accent-deep\)/s)
+    expect(c).toMatch(/html\[data-theme='v8'\]\s*\.checked[^{]*\{[^}]*outline:\s*var\(--choice-card-ring\) solid var\(--color-selection-border\)/s)
     const titles = [...c.matchAll(/\[data-theme='v8'\]\s*\.title\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(titles.length, 'v8 の題の指定がありません').toBeGreaterThan(0)
-    const title = titles[titles.length - 1]
-    expect(title).toMatch(/font-size:\s*var\(--polish-text-support\)/)
-    expect(title).toMatch(/line-height:\s*var\(--text-lh\)/)
-    expect(title).toMatch(/font-weight:\s*var\(--polish-weight-label\)/)
+    // 後の規則が折り返しだけを足しても、各文字の値の最後の宣言を確認する。
+    for (const [property, value] of [['font-size', 'var(--polish-text-support)'], ['line-height', 'var(--text-lh)'], ['font-weight', 'var(--polish-weight-label)']]) {
+      const declarations = [...titles.join('\n').matchAll(new RegExp(`${property}:\\s*([^;}]+)`, 'g'))]
+      expect(declarations.at(-1)?.[1].trim()).toBe(value)
+    }
     const notes = [...c.matchAll(/\[data-theme='v8'\]\s*\.note\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(notes.length, 'v8 の説明の指定がありません').toBeGreaterThan(0)
     const note = notes[notes.length - 1]

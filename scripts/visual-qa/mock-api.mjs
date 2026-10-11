@@ -1,4 +1,5 @@
 import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
+import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js'
 /**
  * 画面確認だけのための、Workerの代わりになる小さなAPI。
  *
@@ -4051,6 +4052,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
+  }
+  if (method === 'GET' && pathname === '/api/account-settings/customer-look') {
+    return { success: true, data: { version: 1, look: { ...DEFAULT_CUSTOMER_LOOK } } }
   }
   if (pathname === '/api/account-settings/test-recipient-login-users') {
     /*

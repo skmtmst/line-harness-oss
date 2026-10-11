@@ -116,3 +116,5 @@
   border-top: 1px solid var(--color-hairline);
 }
 }
+
+.body[data-content-spacing='sections'] { display: flex; flex-direction: column; gap: var(--polish-space-card); }

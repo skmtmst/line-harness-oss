@@ -1,5 +1,8 @@
 'use client'
 
+import { jstDate } from '@/lib/jst-datetime'
+
+
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Clock3, Download, History, Info, Mic, Pencil, Plus, Sparkles, X } from 'lucide-react'
@@ -983,7 +986,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       const a = document.createElement('a')
       a.href = url
-      a.download = `google-business-changes-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `google-business-changes-${jstDate()}.csv`
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {

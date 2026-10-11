@@ -1,5 +1,5 @@
 import { normalizeScopedTagName } from '@line-crm/db';
-import { layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
+import { collectInputs, layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateStatement, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan, } from './contract.js';
 import { bindScenarioGraphRevision, loadScenarioReferenceGraph, scenarioGraphSnapshotToken, ScenarioGraphError } from './scenario-graph.js';
 /** Unbound callers remain closed until the common executor provides dependencies. */
@@ -250,6 +250,12 @@ function guard(sql: string, bindings: HqTemplateStatement['bindings']): HqTempla
 function authorize(authority: HqTemplateAuthority, context: Pick<HqTemplateAdapterContext, 'tenantId' | 'targetAccountId'>, state: FormSnapshot) {
     if (requireHqTemplateAuthority(authority).kind !== 'AUTHORIZED' || authority.tenantId !== context.tenantId || state.account?.tenant !== authority.tenantId || state.account.active !== 1 || state.account.archived)
         throw new FormTemplateError('FORBIDDEN');
+}
+export async function formTemplateWarnings(db: D1Database, accountId: string, input: HqTemplateAdapterInput): Promise<string[]> {
+    const def = parseFormTemplateDefinition(input);
+    if (!def.form.layout || !collectInputs(def.form.layout).some(block=>block.fixedField==='anniversary'||block.fixedField==='seat_preference')) return [];
+    const store = await db.prepare("SELECT id FROM rt_stores WHERE line_account_id=? AND status='active' LIMIT 1").bind(accountId).first();
+    return store ? [] : ['飲食を使わない店です。記念日・席の好みが含まれています。配る前に内容を確かめてください'];
 }
 export async function inspectFormTemplate(db: D1Database, authority: HqTemplateAuthority, accountId: string, input: HqTemplateAdapterInput) {
     const def = parseFormTemplateDefinition(input), snapshot = await formTemplateSnapshot(db, accountId), state = JSON.parse(snapshot) as FormSnapshot;

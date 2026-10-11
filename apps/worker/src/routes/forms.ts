@@ -3,6 +3,9 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import { formAvailability } from '../services/form-availability.js';
+import { applyAccountAllergyOptions } from '../services/allergy-options.js';
+import { accountCustomerLook } from '../services/customer-look.js';
+import { resolveCustomerFormTheme } from '@line-crm/shared';
 import type { FormSubmissionPostActions } from '@line-crm/shared';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -421,13 +424,16 @@ function publicWebhookConfig(row: DbForm): {
   }
 }
 
-function serializePublicForm(row: DbForm) {
+function serializePublicForm(row: DbForm, layout = parseLayout(row.layout, row.fields)) {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    fields: JSON.parse(row.fields || '[]') as unknown[],
-    layout: parseLayout(row.layout, row.fields),
+    fields: (JSON.parse(row.fields || '[]') as Array<{name: string}>).map(field => {
+      const block = collectInputs(layout).find(block => block.name === field.name && block.fixedField === 'allergy' && block.type === 'checkbox');
+      return block ? { ...field, options: block.choices?.map(choice => choice.label), columns: 2 } : field;
+    }),
+    layout,
     isActive: Boolean(row.is_active),
     onSubmitMessageContent: row.on_submit_message_content,
     onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
@@ -927,7 +933,13 @@ forms.get('/api/forms/:id', async (c) => {
       if (!draft) {
         return c.json({ success: false, error: 'Form not found' }, 404);
       }
-      return c.json({ success: true, data: { ...serializePublicForm(draft), isTest: true, availability: await formAvailability({ db: c.env.DB, formId: id, layout: parseLayout(draft.layout, draft.fields), active: !!draft.is_active, submitCount: draft.submit_count ?? 0, friendId: null, isTest: true }) } });
+      const testAccounts = await getFormAccountIds(c.env.DB, id);
+      let testLayout = parseLayout(draft.layout, draft.fields);
+      const testAccountId = testAccounts.length === 1 ? testAccounts[0] : null;
+      if (testAccountId) testLayout = await applyAccountAllergyOptions(c.env.DB, testAccountId, testLayout);
+      const testLook = testAccountId ? (await accountCustomerLook(c.env.DB, testAccountId)).look : undefined;
+      testLayout = {...testLayout, options: {...testLayout.options, theme: resolveCustomerFormTheme(testLayout.options, testLook)}};
+      return c.json({ success: true, data: { ...serializePublicForm(draft, testLayout), isTest: true, availability: await formAvailability({ db: c.env.DB, formId: id, layout: testLayout, active: !!draft.is_active, submitCount: draft.submit_count ?? 0, friendId: null, isTest: true }) } });
     }
     // ログイン中の運用者が公開URLを開いても、account_id を明示した管理画面取得で
     // ない限り下書きを漏らさない。
@@ -940,18 +952,29 @@ forms.get('/api/forms/:id', async (c) => {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
     let friendId: string | null = null;
-    const layout = parseLayout(form.layout, form.fields);
-    if (!adminView && layout.options.oncePerFriend?.enabled && c.req.header('Authorization')) {
+    let layout = parseLayout(form.layout, form.fields);
+    let publicAccountId: string | null = null;
+    if (!adminView && !staff && c.req.header('Authorization')) {
       const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
       if (!identity) return c.json({ success: false, error: 'Unauthorized' }, 401);
       if (!identity.lineAccountId || !await formBelongsToLineAccount(c.env.DB, id, identity.lineAccountId)) {
         return c.json({ success: false, error: 'Form not found' }, 404);
       }
       friendId = (await getFriendByLineUserIdForAccount(c.env.DB, identity.lineUserId, identity.lineAccountId))?.id ?? null;
+      publicAccountId = identity.lineAccountId;
+    }
+    if (!adminView && !publicAccountId) {
+      const accounts = await getFormAccountIds(c.env.DB, id);
+      if (accounts.length === 1) publicAccountId = accounts[0];
+    }
+    if (publicAccountId) layout = await applyAccountAllergyOptions(c.env.DB, publicAccountId, layout);
+    if (!adminView) {
+      const look = publicAccountId ? (await accountCustomerLook(c.env.DB, publicAccountId)).look : undefined;
+      layout = {...layout, options: {...layout.options, theme: resolveCustomerFormTheme(layout.options, look)}};
     }
     const data = adminView
       ? serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' })
-      : { ...serializePublicForm(form), availability: await formAvailability({
+      : { ...serializePublicForm(form, layout), availability: await formAvailability({
         db: c.env.DB, formId: id, layout, active: !!form.is_active,
         submitCount: form.submit_count ?? 0, friendId,
       }) };
@@ -1112,9 +1135,9 @@ forms.post('/api/forms', inputJsonBoundary({"name":["string"],"description":["nu
     }
     // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは作れない。
     if (normalized && !('error' in normalized) && normalized.layout) {
-      const createdLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
+      const createdLayout = JSON.parse(normalized.layout) as FormLayout;
       const createContrastError = formThemeContrastError(
-        normalizeFormTheme(createdLayout.options?.theme),
+        resolveCustomerFormTheme(createdLayout.options),
       );
       if (createContrastError) {
         return inputError(c, { success: false, error: createContrastError }, 422, ["layout"]);
@@ -1343,9 +1366,9 @@ forms.put('/api/forms/:id', inputJsonBoundary({"name":["string"],"description":[
         return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
       }
       // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
-      const savedLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
+      const savedLayout = JSON.parse(normalized.layout) as FormLayout;
       const contrastError = formThemeContrastError(
-        normalizeFormTheme(savedLayout.options?.theme),
+        resolveCustomerFormTheme(savedLayout.options),
       );
       if (contrastError) {
         return inputError(c, { success: false, error: contrastError }, 422, ["layout"]);
@@ -2606,7 +2629,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     //
     // layout が無い（昔のまま編集していない）フォームは、これまでどおり
     // fields の必須だけを見る。
-    const layout: FormLayout | null = form.layout ? parseLayout(form.layout) : null;
+    const layout: FormLayout | null = form.layout ? await applyAccountAllergyOptions(c.env.DB, identity.lineAccountId!, parseLayout(form.layout)) : null;
 
     const documentsError = await validateDocumentAnswers(c.env.DB, layout, submissionData, { accountId: identity.lineAccountId, formId, friendId, versionId: form.current_published_version_id ?? null, submissionId: resumeSubmissionId });
     if (documentsError) return c.json({ success: false, error: documentsError }, 400);

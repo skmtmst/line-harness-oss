@@ -14,7 +14,7 @@ import type { BookingHistoryItem } from '../lib/api.js';
  */
 
 vi.mock('../lib/api.js', () => ({
-  api: {
+  api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     me: vi.fn(),
     cancelMyBooking: vi.fn(),
     rescheduleMyBooking: vi.fn(),

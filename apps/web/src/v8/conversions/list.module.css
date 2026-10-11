@@ -340,3 +340,6 @@
   display: block;
   padding-left: var(--tpl-folder-dot-indent);
 }
+
+/* B-199：状態は固定の列。操作列の幅は共通ActionCellに任せる。 */
+.colState { flex: none; width: var(--tpl-list-state-w); }
