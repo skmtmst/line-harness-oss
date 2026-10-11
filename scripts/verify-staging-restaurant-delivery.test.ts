@@ -12,10 +12,15 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   FONTS_READY_SOURCE,
   READ_FAILURE_STATES_SOURCE,
+  READ_GATE_SOURCE,
   READ_TITLE_SOURCE,
+  SCREEN_PATH,
+  TITLE_PAGE,
+  TITLE_SUB,
   inspectFlatBody,
   missingFields,
   nextStepFor,
+  nextStepForGate,
   readAdminTarget,
   readOnlyRequest,
   readRestaurantTestFlag,
@@ -58,16 +63,26 @@ const listState = readFileSync(
   new URL('../apps/web/src/components/shared/list-state.tsx', import.meta.url),
   'utf8',
 );
+/** 題の大きさを決めている共通部品。副題の 18px/27px の出どころ。 */
+const pageFrame = readFileSync(
+  new URL('../apps/web/src/components/templates/page-frame.tsx', import.meta.url),
+  'utf8',
+);
 
 /** 3画面とも題が出て、中身も読めている状態。ここから1つずつ壊して不合格を確かめる。 */
 function passingScreen(overrides: Partial<ScreenReport> = {}): ScreenReport {
   return {
     view: 'orders',
     title: 'デリバリー受注',
+    expectedTitle: 'デリバリー受注',
+    observedType: { ...TITLE_PAGE },
+    expectedType: { ...TITLE_PAGE },
     titlePasses: true,
     landedOnLogin: false,
+    landedPath: SCREEN_PATH,
     crashed: false,
     loadFailures: [],
+    gate: null,
     pageErrors: 0,
     blockedWriteRequests: 0,
     ...overrides,
@@ -309,6 +324,41 @@ describe('staging delivery verification safety', () => {
     );
   });
 
+  test('keeps the chosen store by marking the post-auth clear as done', () => {
+    // AuthGuard は認証確認のあと一度だけ前回の選択を捨てる。印が無いと
+    // スクリプトが置いた店舗選択も消され、3画面とも店舗未選択の門で止まる。
+    const navigation = readFileSync(
+      new URL('../apps/web/src/lib/hq-navigation.ts', import.meta.url),
+      'utf8',
+    );
+    expect(navigation).toContain("ACCOUNT_SELECTION_KEY = 'lh_selected_account'");
+    expect(navigation).toContain("AUTH_SELECTION_CLEARED_KEY = 'lh_auth_selection_cleared'");
+    // 印があれば消さない、という実装と期待を結び付ける。
+    expect(navigation).toContain('if (local.getItem(AUTH_SELECTION_CLEARED_KEY) === \'1\') return false');
+    expect(navigation).toContain('if (session.getItem(AUTH_SELECTION_CLEARED_KEY) === \'1\') return false');
+    expect(navigation).toContain('local.removeItem(ACCOUNT_SELECTION_KEY)');
+    // その処理が認証確認の成功側で実際に呼ばれている。
+    const authGuard = readFileSync(
+      new URL('../apps/web/src/components/auth-guard.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(authGuard).toContain('clearSelectionAfterAuthentication(localStorage, sessionStorage)');
+
+    // スクリプトは正本の localStorage と、残存扱いにされる sessionStorage の
+    // 両方へ印を置く。どちらかの行が消えたらここで落ちる。
+    expect(script).toContain("localStorage.setItem('lh_auth_selection_cleared', '1')");
+    expect(script).toContain("sessionStorage.setItem('lh_auth_selection_cleared', '1')");
+    // 印は店舗選択より先に置く（後だと置く前に消される余地が残る）。
+    const markerAt = script.indexOf("localStorage.setItem('lh_auth_selection_cleared', '1')");
+    const selectionAt = script.indexOf("localStorage.setItem('lh_selected_account', accountId)");
+    expect(markerAt).toBeGreaterThan(-1);
+    expect(selectionAt).toBeGreaterThan(markerAt);
+    // 印も店舗選択も、画面が描かれる前に走る `addInitScript` の中にある。
+    const initAt = script.search(/await page\.addInitScript\(/);
+    expect(initAt).toBeGreaterThan(-1);
+    expect(markerAt).toBeGreaterThan(initAt);
+  });
+
   test('checks the real flat shape the three screens actually read', async () => {
     // 既定の器は `data` で包むので、包まれていないことが本物と同じ形の証。
     expect(inspectFlatBody(
@@ -334,13 +384,116 @@ describe('staging delivery verification safety', () => {
       expect(script).toContain(`title: '${title}'`);
       expect(deliveryScreen).toContain(`title: '${title}'`);
     }
-    expect(script).toContain("const SCREEN_PATH = '/restaurant-test/delivery'");
+    expect(script).toContain("export const SCREEN_PATH = '/restaurant-test/delivery'");
     expect(script).toContain("search: '?view=history'");
     expect(script).toContain("search: '?view=sold-out'");
-    // 合格の線は題の測定と同じ 22px/700/32px、落ちた画面の題は不合格。
-    expect(script).toContain("title.size === '22px' && title.weight === '700' && title.lh === '32px'");
     expect(script).toContain("const CRASH_TITLE = '画面を表示できませんでした'");
     expect(script).toContain('landedOnLogin');
+  });
+
+  test('measures each title against the type its own drawing uses', () => {
+    // 検証環境の実行 38143831111 が3画面とも `title` で落ちた原因。
+    // 1つの値で測っていたため、副題で描かれている2枚が必ず不合格になっていた。
+    expect(TITLE_PAGE).toEqual({ size: '22px', weight: '700', lh: '32px' });
+    expect(TITLE_SUB).toEqual({ size: '18px', weight: '700', lh: '27px' });
+
+    // 画面側は副題を2枚に渡している（板 OzHLO・h7OeT）。ここが期待値の根拠。
+    expect(deliveryScreen).toContain("history: { titleSize: 'sub' }");
+    expect(deliveryScreen).toContain("'sold-out': { titleSize: 'sub' }");
+    // 共通部品が副題のとき 18px/27px を頭の中だけに流す。
+    expect(pageFrame).toContain("titleSize === 'sub'");
+    expect(pageFrame).toContain("'--tpl-title-size': '18px'");
+    expect(pageFrame).toContain("'--tpl-title-lh': '27px'");
+
+    // 期待値は画面ごとに持つ。注文一覧だけが頁の題。
+    expect(script).toContain("title: 'デリバリー受注', type: TITLE_PAGE");
+    expect(script).toContain("title: '注文履歴・売上', type: TITLE_SUB");
+    expect(script).toContain("title: '品切れ一括設定', type: TITLE_SUB");
+    expect(script).toContain('title.size === screen.type.size');
+    expect(script).toContain('title.weight === screen.type.weight');
+    expect(script).toContain('title.lh === screen.type.lh');
+    // 1つの値で3画面をまとめて測る形へ戻さない。
+    expect(script).not.toContain("title.size === '22px' && title.weight === '700' && title.lh === '32px'");
+
+    // 型が違えば実測値を添えて不合格。副題の画面に頁の題が出たら気付ける。
+    expect(screenFailures(passingScreen({
+      view: 'history',
+      title: '注文履歴・売上',
+      expectedTitle: '注文履歴・売上',
+      expectedType: { ...TITLE_SUB },
+      observedType: { ...TITLE_SUB },
+    }))).toEqual([]);
+    expect(screenFailures(passingScreen({
+      view: 'sold-out',
+      title: '品切れ一括設定',
+      expectedTitle: '品切れ一括設定',
+      expectedType: { ...TITLE_SUB },
+      observedType: { ...TITLE_PAGE },
+    }))).toEqual(['title-type(22px/700/32px, want=18px/700/27px)']);
+
+    // 水分けを待つ目印。数え切りの待ちだけへ戻さない（配った HTML に題は入っていない）。
+    expect(script).toContain('page.waitForSelector(SETTLED_SELECTOR');
+    expect(script).not.toContain('await page.waitForTimeout(4000)');
+    expect(deliveryScreen).toContain('Suspense');
+  });
+
+  test('puts the values it actually read into the failure reasons', () => {
+    // 理由が `title` の1語だけだったため、検証環境の1回の実行から原因が分からず
+    // Claude と Codex の往復が無駄になった。実測値と行き先を必ず添える。
+    expect(screenFailures(passingScreen({ title: null, observedType: null })))
+      .toEqual(['title(none, want=デリバリー受注)']);
+    expect(screenFailures(passingScreen({ title: '店舗が選ばれていません' })))
+      .toEqual(['title(店舗が選ばれていません, want=デリバリー受注)']);
+    // `/login` 以外へ移った場合も行き先を出す。
+    expect(screenFailures(passingScreen({ landedPath: '/hq' })))
+      .toEqual(['redirect(/hq)']);
+    // `/login` のときは `login` が出るので行き先を重ねない。
+    expect(screenFailures(passingScreen({ landedOnLogin: true, landedPath: '/login' })))
+      .toEqual(['login']);
+    // 長い文字は失敗の1枚と同じ40字で切る。
+    expect(screenFailures(passingScreen({ title: 'あ'.repeat(60) })))
+      .toEqual([`title(${'あ'.repeat(40)}, want=デリバリー受注)`]);
+    // 重なったときは理由を全部並べる。
+    expect(screenFailures(passingScreen({
+      title: '別の題',
+      observedType: { ...TITLE_SUB },
+      loadFailures: ['error:注文を表示できませんでした'],
+      pageErrors: 2,
+    }))).toEqual([
+      'title(別の題, want=デリバリー受注)',
+      'title-type(18px/700/27px, want=22px/700/32px)',
+      'load-failure(error:注文を表示できませんでした)',
+      'page-error(2)',
+    ]);
+  });
+
+  test('reports a gate as a setting to fix, not as a broken screen', () => {
+    // 門（`FeatureDisabledGate` / `StoreSelectionGate`）は中身をそのまま差し替える。
+    // 題も失敗の1枚も出ないので、測るだけでは画面の作りと区別できない。
+    expect(screenFailures(passingScreen({ title: null, observedType: null, gate: 'store-unselected' })))
+      .toEqual(['gate(store-unselected)']);
+    expect(screenFailures(passingScreen({ title: null, observedType: null, gate: 'store-checking' })))
+      .toEqual(['gate(store-checking)']);
+    // 門が出ているときは題と失敗の1枚を重ねない。例外と行き先は別に残す。
+    expect(screenFailures(passingScreen({
+      title: null, observedType: null, gate: 'feature-off',
+      loadFailures: ['forbidden:表示する権限がありません'], pageErrors: 1,
+    }))).toEqual(['gate(feature-off)', 'page-error(1)']);
+
+    // 門ごとに、検証環境で次に整える設定が1つ出る。
+    expect(nextStepForGate('feature-off')).toContain('飲食店の機能パック');
+    expect(nextStepForGate('store-unselected')).toContain('/api/line-accounts');
+    expect(nextStepForGate('store-checking')).toContain('店舗の確認中');
+    expect(nextStepForGate('account-list')).toContain('CORS');
+    expect(nextStepForGate('')).toContain('入口の門');
+
+    // 門だけなら失敗として投げず、次の手が分かる形で止める。
+    expect(script).toContain("reason.startsWith('gate(')");
+    expect(script).toContain('blockedByGates = brokenScreens.map');
+    expect(script).toContain('nextStep: nextStepForGate(');
+    expect(script).toContain('temporarySessionDeleted: true');
+    // 門と混ざっていなければ、これまでどおり失敗として投げる。
+    expect(script).toContain('Staging delivery screens failed');
   });
 
   test('fails a screen that shows a load failure or throws, even when the title is right', () => {
@@ -355,11 +508,17 @@ describe('staging delivery verification safety', () => {
     expect(screenFailures(passingScreen({
       view: 'history',
       title: '注文履歴・売上',
+      expectedTitle: '注文履歴・売上',
+      observedType: { ...TITLE_SUB },
+      expectedType: { ...TITLE_SUB },
       loadFailures: ['error:注文履歴を表示できませんでした'],
-    }))).toHaveLength(1);
+    }))).toEqual(['load-failure(error:注文履歴を表示できませんでした)']);
     expect(screenFailures(passingScreen({
       view: 'sold-out',
       title: '品切れ一括設定',
+      expectedTitle: '品切れ一括設定',
+      observedType: { ...TITLE_SUB },
+      expectedType: { ...TITLE_SUB },
       loadFailures: ['forbidden:表示する権限がありません'],
     }))).toEqual(['load-failure(forbidden:表示する権限がありません)']);
 
@@ -369,13 +528,7 @@ describe('staging delivery verification safety', () => {
     // もとから見ていた3つは引き続き不合格。
     expect(screenFailures(passingScreen({ landedOnLogin: true }))).toContain('login');
     expect(screenFailures(passingScreen({ crashed: true }))).toContain('crash');
-    expect(screenFailures(passingScreen({ titlePasses: false }))).toContain('title');
-    // 重なったときは理由を全部並べる。
-    expect(screenFailures(passingScreen({
-      titlePasses: false, loadFailures: ['error:注文を表示できませんでした'], pageErrors: 2,
-    }))).toEqual([
-      'title', 'load-failure(error:注文を表示できませんでした)', 'page-error(2)',
-    ]);
+    expect(screenFailures(passingScreen({ title: '別の題' }))[0]).toMatch(/^title\(/);
 
     // 合否は `screenFailures` だけで決める（題の判定へ戻らない）。
     expect(script).toContain('reasons: screenFailures(screen)');
@@ -403,7 +556,9 @@ describe('staging delivery verification safety', () => {
     // 入っているため、関数の中の「名前付きの」矢印や関数を `__name(...)` で包む。
     // Playwright は関数を本文の文字列にして送るので、ブラウザに無い `__name` を
     // 呼んで落ちる。文字列で渡せば変換の対象外になり、この失敗の形が消える。
-    const payloads = { READ_TITLE_SOURCE, READ_FAILURE_STATES_SOURCE, FONTS_READY_SOURCE };
+    const payloads = {
+      READ_TITLE_SOURCE, READ_FAILURE_STATES_SOURCE, READ_GATE_SOURCE, FONTS_READY_SOURCE,
+    };
     for (const [name, source] of Object.entries(payloads)) {
       expect(source, name).not.toContain('__name');
       // keepNames が包むのは名前の付いた宣言。ブラウザへ渡す本文には作らない。
@@ -417,6 +572,7 @@ describe('staging delivery verification safety', () => {
     expect(script).toContain('await page.evaluate<boolean>(FONTS_READY_SOURCE)');
     expect(script).toContain('await page.evaluate<TitleInfo | null>(READ_TITLE_SOURCE)');
     expect(script).toContain('await page.evaluate<string[]>(READ_FAILURE_STATES_SOURCE)');
+    expect(script).toContain('await page.evaluate<string | null>(READ_GATE_SOURCE)');
     expect(script).not.toMatch(/page\.evaluate\(\s*(?:\(|async\b|function\b|read[A-Za-z]*InPage)/);
     // 合言葉を渡す `addInitScript` だけは関数のまま（引数を渡す必要があり、
     // 呼び出しの引数に直接書いた無名の矢印は keepNames に包まれない）。
@@ -448,6 +604,50 @@ describe('staging delivery verification safety', () => {
           + '</div><h2 style="font-size:22px;font-weight:700;line-height:32px">品切れ一括設定</h2></main>');
         expect((await page.evaluate<TitleInfo | null>(READ_TITLE_SOURCE))?.text)
           .toBe('品切れ一括設定');
+
+        // 門が出ていない画面では null。ここまでの雛形で誤検出しないことを先に見る。
+        expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe(null);
+        await page.setContent(FIXTURE_HTML);
+        expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe(null);
+
+        // 副題で描く2枚（板 OzHLO・h7OeT）は 18px/700/27px で読める。
+        // 共通部品が頭の中へ流す `--tpl-title-size` をそのまま再現する。
+        await page.setContent(`<main><div data-template-region="heading"
+          style="--tpl-title-size:18px;--tpl-title-lh:27px">
+          <h1 style="font-size:var(--tpl-title-size);font-weight:700;line-height:var(--tpl-title-lh)">
+          注文履歴・売上</h1></div></main>`);
+        expect(await page.evaluate<TitleInfo | null>(READ_TITLE_SOURCE)).toEqual({
+          text: '注文履歴・売上', size: '18px', weight: '700', lh: '27px',
+        });
+
+        // 入口の門4つ。題が出ないのに失敗の1枚も出ない状態を、門として見分ける。
+        await page.setContent('<main><div data-feature-disabled="restaurant">'
+          + '<h2>この機能はご契約に含まれていません</h2></div></main>');
+        expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe('feature-off');
+
+        await page.setContent('<main><div role="status" aria-label="店舗を確認中"'
+          + ' style="height:64px"><div style="height:32px"></div></div></main>');
+        expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe('store-checking');
+
+        // 本物の `StoreSelectionGate` と同じ形（`data-design="Empty"` の中の題）。
+        await page.setContent('<main><section data-design="Empty">'
+          + '<h1>店舗が選ばれていません</h1><p>この画面は店舗ごとのデータを扱います。</p>'
+          + '</section></main>');
+        expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe('store-unselected');
+
+        await page.setContent('<main><div data-list-state="error" role="alert">'
+          + '<h3>アカウント一覧を読み込めませんでした</h3></div></main>');
+        expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe('account-list');
+        // 画面側の失敗（注文が読めない）は門にしない。こちらは load-failure のまま。
+        await page.setContent('<main><div data-list-state="error" role="alert">'
+          + '<h3>注文を表示できませんでした</h3></div></main>');
+        expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe(null);
+        expect(await page.evaluate<string[]>(READ_FAILURE_STATES_SOURCE))
+          .toEqual(['error:注文を表示できませんでした']);
+        // 見えない門は数えない（開いていない引き出しの中など）。
+        await page.setContent('<main><section data-design="Empty" style="visibility:hidden">'
+          + '<h1>店舗が選ばれていません</h1></section></main>');
+        expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe(null);
 
         // 再発の検出：変換ヘルパーが混ざった本文は、実ブラウザでこう落ちる。
         // 上の3つが通りこれが落ちることで、「文字列で渡す」が効いている証になる。
