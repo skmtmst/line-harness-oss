@@ -1,5 +1,5 @@
 /** 固定した絵の板IDで、撮影時に開く画面を選ぶ。製品の保存・権限は変えない。 */
-import { RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_FOLDERS, TAGS, TAG_GROUPS, TEMPLATES, TEMPLATE_FOLDERS, FORMS, FORM_FOLDERS, AUTO_REPLIES, NEN_PHOTO_PUBLICATIONS, BROADCASTS, BROADCAST_FOLDERS, BOOKING_REQUESTS, BOOKING_STAFF, EC_NOTIFICATION_SETTINGS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_SEND_COUNTS } from './fixtures.mjs'
+import { RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_FOLDERS, TAGS, TAG_GROUPS, TEMPLATES, TEMPLATE_FOLDERS, FORMS, FORM_FOLDERS, AUTO_REPLIES, NEN_PHOTO_PUBLICATIONS, BROADCASTS, BROADCAST_FOLDERS, BOOKING_REQUESTS, BOOKING_STAFF, EC_NOTIFICATION_SETTINGS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_SEND_COUNTS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS, OUTGOING_WEBHOOKS, LINE_ACCOUNTS, BROADCAST_NOTIFICATION_SETTINGS, NEN_DELIVERIES } from './fixtures.mjs'
 
 export const REFERENCE_REVISION = '2026-10-11 16:11 JST'
 
@@ -80,7 +80,70 @@ const hqBroadcasts = BROADCASTS.map(row => {
 })
 const cancellationEvent = event => event === 'ec.subscription.payment_failed' ? 'ec.subscription.cancelled' : event
 
+const captureJst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+const monthDeliveryApi = [0, -1].map(offset => {
+  const from = new Date(Date.UTC(captureJst.getUTCFullYear(), captureJst.getUTCMonth() + offset, 1) - 9 * 60 * 60 * 1000).toISOString()
+  const to = new Date(Date.UTC(captureJst.getUTCFullYear(), captureJst.getUTCMonth() + offset + 1, 1) - 9 * 60 * 60 * 1000).toISOString()
+  const sent = NEN_DELIVERIES.summary.sent - (offset === -1 ? 240 : 0)
+  const summary = { ...NEN_DELIVERIES.summary, sent }
+  const total = ['pending', 'processing', 'sent', 'skipped', 'failed', 'cancelled'].reduce((count, key) => count + summary[key], 0)
+  return { match: `GET /api/nen-campaigns/deliveries?lineAccountId=visual-qa-account&limit=1&from=${encodeURIComponent(from)}`,
+    body: { success: true, data: { ...NEN_DELIVERIES, range: { ...NEN_DELIVERIES.range, from, to }, summary,
+      deliveries: NEN_DELIVERIES.deliveries.slice(0, 1).map(row => ({ ...row, scheduledAt: from, sentAt: row.sentAt ? from : null, updatedAt: from })), pagination: { ...NEN_DELIVERIES.pagination, total, limit: 1, cursor: '0', nextCursor: '1' },
+    } },
+  }
+})
+
 export const BOARD_STATE_PROFILES = {
+  qwIZr: { url: '/restaurant-test/dashboard', transformApi: (rules) => rules.map(rule => {
+    if (rule.match !== 'GET /api/restaurant-test/reservations/day') return rule
+    const samples = [
+      { customer_name: '田中 明子', source: 'restaurant_board', status: 'visited', table_label: 'T3' },
+      { customer_name: '佐藤 健', source: 'line', status: 'confirmed', table_label: 'C1' },
+      { customer_name: '山田 太郎', source: 'tabelog', status: 'pending', table_label: 'T1' },
+      { customer_name: '鈴木 真理', source: 'hotpepper', status: 'confirmed', table_label: 'T4' },
+      { customer_name: '押さえ', source: 'phone', status: 'pending', table_label: 'TR1', hold_expires_at: '@TODAY@T22:00:00+09:00' },
+    ]
+    return { ...rule, body: { ...rule.body, data: { ...rule.body.data,
+      reservations: rule.body.data.reservations.slice(0, samples.length).map((row, index) => ({ ...row, hold_expires_at: null, ...samples[index] })),
+    } } }
+  }) },
+  MuhWR: { url: '/nen-campaigns', api: monthDeliveryApi },
+  JKjsE: { url: '/hq', api: [
+    // 接続を確かめるTESTのアカウントも、普通の一覧では小さい利用数で撮る。
+    { match: 'GET /api/line-accounts$', body: { success: true, data: LINE_ACCOUNTS.map(account => account.id === 'visual-qa-account'
+      ? { ...account, stats: { ...account.stats, friendCount: 14, messagesThisMonth: 12 } } : account) } },
+  ] },
+  cdZBf: { url: '/broadcasts/reserved?id=broadcast-0', api: [
+    { match: 'GET /api/broadcasts/notification-settings$', body: { success: true, data: {
+      ...BROADCAST_NOTIFICATION_SETTINGS, displayText: '配信の開始・完了・エラーは、Slack の同じスレッドへ知らせます。',
+    } } },
+  ] },
+  v0SbYR: { url: '/form-submissions/responses?id=form-visit', api: [
+    // fields・入力の札・評価のまとめは、同じ質問の見出しを使う。
+    { match: 'GET /api/forms/form-visit$', body: { success: true, data: {
+      ...FORM_VISIT_DETAIL,
+      fields: FORM_VISIT_DETAIL.fields.map(field => field.name === 'staff' ? { ...field, label: '担当の対応はいかがでしたか？' } : field),
+      layout: { ...FORM_VISIT_DETAIL.layout, sections: FORM_VISIT_DETAIL.layout.sections.map(section => ({ ...section,
+        blocks: section.blocks.map(block => block.name === 'staff' ? { ...block, label: '担当の対応はいかがでしたか？' } : block),
+      })) },
+    } } },
+    { match: 'GET /api/forms/form-visit/submissions$', body: { success: true, data: {
+      ...FORM_VISIT_SUBMISSIONS, summary: { ...FORM_VISIT_SUBMISSIONS.summary,
+        ratingFields: FORM_VISIT_SUBMISSIONS.summary.ratingFields.map(field => field.key === 'staff' ? { ...field, label: '担当の対応はいかがでしたか？' } : field),
+      },
+    } } },
+  ] },
+  ZSbFY: { url: '/webhooks', api: [
+    // 名前と実装済みの受信/予約の出来事だけを撮影へ合わせる。先月比較や金額だけの送信を作らない。
+    { match: 'GET /api/webhooks/outgoing$', body: { success: true, data: OUTGOING_WEBHOOKS.map((row, index) => ({
+      ...row,
+      ...(index === 0 ? { name: '顧客台帳（CRM）', eventTypes: ['message_received'] } : {}),
+      ...(index === 1 ? { name: 'Slack への通知', eventTypes: ['friend_add'] } : {}),
+      ...(index === 2 ? { name: '予約台帳', eventTypes: ['booking_created'] } : {}),
+      ...(index === 4 ? { name: '旧ポイント連携' } : {}),
+    })) } },
+  ] },
   wxIQ7: { url: '/rich-menus/connections?id=rmg-1', api: [
     // 編集中の下書きとは別に、公開した3ページのつながりを撮る。
     { match: 'GET /api/rich-menu-groups/rmg-1$', body: { success: true, data: {
@@ -97,9 +160,11 @@ export const BOARD_STATE_PROFILES = {
     } } },
   ] },
   GcyTr: { url: '/booking/bookings?view=day&date=2026-09-03&status=all', api: [
+    { match: 'GET /api/booking/admin/staff$', body: { staff: BOOKING_STAFF.map((staff, index) => index === 0 ? { ...staff, display_name: 'Masato' } : staff) } },
     { match: 'GET /api/booking/admin/requests$', body: {
       requests: BOOKING_REQUESTS.filter(row => row.starts_at.startsWith('2026-09-03')).map(row => ({
         ...row, staff_id: BOOKING_STAFF.find(staff => staff.display_name === row.staff_name)?.id ?? null,
+        ...(row.staff_name === BOOKING_STAFF[0].display_name ? { staff_name: 'Masato' } : {}),
       })), total: 5, limit: 100, offset: 0,
     } },
   ] },
@@ -150,6 +215,9 @@ export function applyBoardStateProfiles(map) {
       throw new Error(`${id}: 既存の状態指定と撮影の指定が重なっています`)
     }
     entry.url = profile.url
+    if (profile.transformApi) {
+      entry.state = { ...entry.state, api: profile.transformApi(Array.isArray(entry.state?.api) ? entry.state.api : entry.state?.api ? [entry.state.api] : []) }
+    }
     if (profile.click) entry.state = { ...entry.state, click: [...profile.click] }
     if (profile.api) entry.state = { ...entry.state, api: [...profile.api, ...(Array.isArray(entry.state?.api) ? entry.state.api : entry.state?.api ? [entry.state.api] : [])] }
   }
