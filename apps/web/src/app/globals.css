@@ -1764,8 +1764,14 @@
    * 更新の印（`CjYcP`）だけ 14 角。注の文は 12/18/500。
    */
   --tpl-rt-dlv-head-pad: 14px; --tpl-rt-dlv-head-icon: 15px; --tpl-rt-dlv-refresh-icon: 14px; --tpl-rt-dlv-note-weight: 500;
-  /* 絵（kDQHr `foYm6`）のサービス札は横1行・高さ74・左右の余白16。印は36角、札の間6、数と説明の間4。 */
-  --tpl-rt-dlv-service-h: 74px; --tpl-rt-dlv-service-pad: 0 16px; --tpl-rt-dlv-mark: 36px; --tpl-rt-dlv-badge-gap: 6px; --tpl-rt-dlv-stat-gap: 4px;
+  /*
+   * 絵（kDQHr `foYm6`）のサービス札は横1行・高さ74・左右の余白16。印は36角、札の間6、数と説明の間4。
+   * 「札の間6」は札を並べる間で、札の中の点と字の間（上の `--tpl-rt-dlv-badge-gap`＝5）とは別物。
+   * 同じ名前で上書きすると、後から書いたほうが共通の札（`size="delivery"`）にも効いてしまう。
+   */
+  --tpl-rt-dlv-service-h: 74px; --tpl-rt-dlv-service-pad: 0 16px; --tpl-rt-dlv-mark: 36px; --tpl-rt-dlv-service-badges-gap: 6px; --tpl-rt-dlv-stat-gap: 4px;
+  /* 絵（kDQHr `foYm6`）の数と単位（「12」「件」）は字の下をそろえて間2。表の上の選ぶ帯は上下の間12。 */
+  --tpl-rt-dlv-count-unit-gap: 2px; --tpl-rt-dlv-selectbar-margin: 12px;
   /* 絵（kDQHr `bfsIp`・`zFulL`）のサービス札の「停止」「再開」は、高さ28・左右の余白10・字12の小さな白い札で、枠は髪筋の色。字の色だけ停止が赤・再開が緑。共通のボタンの既定（高さ32・字13）だと52〜106になり、左の札の居場所を奪う。 */
   --tpl-rt-dlv-svc-btn-h: 28px; --tpl-rt-dlv-svc-btn-pad: 0 10px; --tpl-rt-dlv-svc-btn-size: 12px; --tpl-rt-dlv-svc-btn-radius: 8px;
   /* 絵（OzHLO `ZuE0v`）の集計札は枠付きで4枚・幅276・余白14/16・題と金額の間8。金額は 20/700。 */
@@ -1797,6 +1803,8 @@
   --tpl-rs-icon-btn: 36px; --tpl-rs-row-actions-gap: 6px; --tpl-rs-legend-pad: 10px 14px;
   --tpl-rs-th-pad-block: 9px; --tpl-rs-cell-side: 20px; --tpl-rs-cell-gap: 16px; --tpl-rs-row-h: var(--polish-table-row); --tpl-rs-col-pad-num: 32px; --tpl-rs-col-pad-ops: 36px;
   --tpl-rs-dlg-gap: 14px; --tpl-rs-dlg-pull: -14px; --tpl-rs-dlg-actions-gap: 8px; --tpl-rs-field-gap: var(--polish-space-field); --tpl-rs-dlg-note-pad: 10px 12px; --tpl-rs-pair-gap: var(--polish-space-field);
+  /* 下の線が無い窓のボタンの段は、線のぶんが無いので上の間を 8 に詰める（線ありは上の 14）。 */
+  --tpl-rs-dlg-actions-pad-plain: 8px;
   --tpl-rs-menu-col-kind: 80px; --tpl-rs-menu-col-price: 104px; --tpl-rs-menu-col-period: 136px; --tpl-rs-menu-col-duration: 88px; --tpl-rs-menu-col-allergy: 116px; --tpl-rs-menu-col-status: 96px; --tpl-rs-menu-col-ops: 150px;
   --tpl-rs-lh-10: 14px; --tpl-rs-chip-pad: 2px 8px; --tpl-rs-line-green: #06c755;
   --tpl-rs-table-detail-w: 360px; --tpl-rs-table-card-h: 104px; --tpl-rs-table-card-pad: 0 8px; --tpl-rs-table-card-line: 2px; --tpl-rs-table-row-gap: 8px; --tpl-rs-table-row-side: 16px; --tpl-rs-table-chip-w: 64px;

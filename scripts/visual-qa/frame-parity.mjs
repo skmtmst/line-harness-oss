@@ -596,6 +596,11 @@ async function main() {
        * 残った分がこの画面自身のずれ。
        */
       const bannerBoxes = await impl.page.evaluate(HIDE_BANNER_CALL)
+      /*
+       * 重ねて目で見る分は帯を隠した画面で撮る。帯が出たままの写真と絵を重ねると
+       * 中身が丸ごと 42 下へずれて、画面自身のずれが見えなくなるため。
+       */
+      await impl.page.screenshot({ path: path.join(OUT_DIR, `${frame.id}-${width}-impl-nb.png`), fullPage: true })
       const implNoBanner = await impl.page.evaluate(MEASURE_CALL)
       const noBanner = pair(designOut.nodes, implNoBanner.nodes)
 

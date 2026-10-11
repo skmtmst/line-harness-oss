@@ -43,11 +43,13 @@ import styles from './delivery.module.css'
 const STOP_WIDTH = 480
 const STOP_TOP = 230
 /*
- * 絵（XCVGd）の段の間。絵は段ごとに下の余白を持つので、
- * 段の間を 12（一文の下 10 と欄の下 12 の分）、欄の題と中身の間を 8、
- * ボタンの段の上の間を 14（絵の y598→612）にする。
+ * 絵（XCVGd）の段の間。絵は段ごとに下の余白を持ち、一文の下が 10・欄の下が 12。
+ * 段の間は1つの値しか持てないので小さい方の 10 に合わせる（下の欄が 2 上がるが
+ * ±4 の内）。欄の題と中身の間は 8（絵 `nYJz5`・時間選択の `gap: 8px`）で、
+ * これは共通の欄の `contentGap` で渡す。窓の引数では共通の欄まで届かない。
+ * ボタンの段の上の間は 14（絵の y598→612）。
  */
-const STOP_BODY_GAP = 12
+const STOP_BODY_GAP = 10
 const STOP_FIELD_GAP = 8
 const STOP_FOOT_GAP = 14
 
@@ -170,7 +172,7 @@ export default function SoldOutBoard({
         <>
           {/* 閲覧のみの人は選べないので、選んだ数の帯もまとめての札も出さない（★V8 2026-10-06）。 */}
           {canManage ? (
-          <div className={`${styles.selectBar} ${styles.selectBarFlush}`}>
+          <div className={styles.selectBar}>
             <span className={styles.selectCount}>選択中 {checkedCount}品</span>
             <span className={styles.spacer} />
             <Button
@@ -339,7 +341,6 @@ export function IntakeStopDialog({
       plainTitle
       contentPadding="18px 24px 20px"
       bodyGap={STOP_BODY_GAP}
-      fieldGap={STOP_FIELD_GAP}
       footerPlain
       footerGap={STOP_FOOT_GAP}
       onCancel={onClose}
@@ -362,7 +363,7 @@ export function IntakeStopDialog({
         選んだサービスで新しい注文の受け付けを止めます。すでに受け付けた注文の調理・受け渡しはそのまま続きます。
       </p>
 
-      <DialogField label="停止するサービス" kind="select">
+      <DialogField label="停止するサービス" kind="select" contentGap={STOP_FIELD_GAP}>
         <div className={styles.stopList}>
           {services.length === 0 ? (
             <p className={styles.muted}>{DASH}</p>
@@ -374,11 +375,7 @@ export function IntakeStopDialog({
               return (
                 <div
                   key={state.service}
-                  className={[
-                    styles.stopCard,
-                    picked ? styles.stopCardOn : null,
-                    stopped ? styles.stopCardOff : null,
-                  ].filter(Boolean).join(' ')}
+                  className={`${styles.stopCard} ${picked ? styles.stopCardOn : ''} ${stopped ? styles.stopCardOff : ''}`}
                 >
                   {/* サービス名は色の付いた札で見せるので、印には読み上げ名を渡す。 */}
                   <Checkbox
@@ -389,11 +386,11 @@ export function IntakeStopDialog({
                   />
                   {/* 絵（XCVGd `Iv4Dr`/`Cxo9i`/`XK0ja`）のサービス札は点なしの丸い札。 */}
                   <StatusBadge tone={SERVICE_TONES[state.service]} size="compact" dot={false}>{label}</StatusBadge>
-                  <span className={[styles.stopState, stopped ? styles.stopStateOff : null].filter(Boolean).join(' ')}>
+                  <span className={`${styles.stopState} ${stopped ? styles.stopStateOff : ''}`}>
                     {stopped ? 'すでに停止中' : `現在 受付中・${state.todayCount}件対応中`}
                   </span>
                   {/* 絵（XCVGd）の札には細い横線が無いので、線は置かず右へ寄せるだけにする。 */}
-                  <span className={[styles.stopMark, stopped ? styles.stopMarkOff : null].filter(Boolean).join(' ')}>
+                  <span className={`${styles.stopMark} ${stopped ? styles.stopMarkOff : ''}`}>
                     {stopped ? '対象外' : '停止する'}
                   </span>
                 </div>
@@ -404,7 +401,7 @@ export function IntakeStopDialog({
       </DialogField>
 
       {/* 絵（`To5Y0`）の時間はつながった帯ではなく離れた札4つ。押した札だけ薄い緑にする。 */}
-      <DialogField label="停止する時間（過ぎると自動で再開します）" kind="select">
+      <DialogField label="停止する時間（過ぎると自動で再開します）" kind="select" contentGap={STOP_FIELD_GAP}>
         <div className={styles.timeRow} role="group" aria-label="停止する時間">
           {INTAKE_STOP_PRESET_OPTIONS.map((option) => {
             const value = option.value as DeliveryIntakeStopPreset
@@ -413,7 +410,7 @@ export function IntakeStopDialog({
               <button
                 key={value}
                 type="button"
-                className={[styles.timeCard, on ? styles.timeCardOn : null].filter(Boolean).join(' ')}
+                className={`${styles.timeCard} ${on ? styles.timeCardOn : ''}`}
                 aria-pressed={on}
                 disabled={busy}
                 onClick={() => onPresetChange(value)}

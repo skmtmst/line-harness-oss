@@ -89,6 +89,8 @@ const CANCEL_TOP = 330
  */
 const CANCEL_BODY_GAP = 12
 const CANCEL_FOOT_GAP = 10
+/** 絵（dgeTy `i3pvl`→選ぶ欄）の題と中身の間は 6。共通の欄の `contentGap` で渡す。 */
+const CANCEL_FIELD_GAP = 6
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -380,7 +382,7 @@ export function CancelOrderDialog({
       </p>
       {/* 絵（dgeTy）の題に「任意」の札はない。理由は必ず選ばれている（既定あり）ので共通の
         * 欄の任意の引数で消す。 */}
-      <DialogField label="キャンセルの理由" kind="select" optional={false}>
+      <DialogField label="キャンセルの理由" kind="select" optional={false} contentGap={CANCEL_FIELD_GAP}>
         <Select
           aria-label="キャンセルの理由"
           size="full"

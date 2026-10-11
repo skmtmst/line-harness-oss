@@ -82,10 +82,16 @@ const VIEW_HEAD: Record<DeliveryView, { titleSize?: 'sub'; descriptionSize?: 'bo
 const HEAD_PAD_TOP = 20
 const HEAD_TEXT_GAP = 4
 
+/*
+ * 中身の段どうしの間も絵の値で渡す（渡さない板は共通の16のまま）。
+ * h7OeT は 帯の下(y189)→表の見出し(y201) が12なので12を渡す。器を上書きして
+ * 帯を引き上げるのはやめた（2026-10-11 実測：帯 y130→y142＝絵の141、
+ * 表 y206→y202＝絵の201）。
+ */
 const VIEW_BODY: Record<DeliveryView, { padTop: number; gap?: number }> = {
   orders: { padTop: 14, gap: 12 },
   history: { padTop: 4 },
-  'sold-out': { padTop: 0 },
+  'sold-out': { padTop: 0, gap: 12 },
 }
 
 const TABS: DeliveryOrderTab[] = ['all', 'new', 'cooking', 'handed_over']

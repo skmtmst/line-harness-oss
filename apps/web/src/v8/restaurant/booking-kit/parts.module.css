@@ -52,12 +52,13 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--tpl-rs-dlg-actions-gap);
-  padding-top: var(--rs-dlg-actions-pad-top, 8px);
+  padding-top: var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-actions-pad-plain));
 }
 
 /*
  * 欄（題＋中身）。間は既定の 6。
- * 絵の間がそれと違う窓だけ RsDialog の fieldGap で `--rs-field-gap` を渡す。
+ * 窓の中の欄（`DialogField`）は共通の欄を出すので、ここの間は効かない。
+ * 絵の間が既定と違う欄は、その欄へ `contentGap` を渡して合わせる。
  */
 .field {
   display: flex;

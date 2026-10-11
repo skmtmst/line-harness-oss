@@ -398,15 +398,17 @@ describe('承認v02の見え方を守る', () => {
     expect(css).toMatch(/\.serviceRow \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
   })
 
-  it('3枚の中身の余白は器の任意の引数で渡す（絵 kDQHr 14/12・OzHLO 4・h7OeT 0）', () => {
+  it('3枚の中身の余白は器の任意の引数で渡す（絵 kDQHr 14/12・OzHLO 4・h7OeT 0/12）', () => {
     // 共通の器 CHz31 は上16・段の間16。絵は板ごとに違うので、画面CSSから器を
     // 上書きせず、RestaurantPage の bodyPadTop/bodyGap で板ごとに渡す。
     const page = readFileSync(join(__dirname, 'delivery.tsx'), 'utf8')
     expect(page).toMatch(/orders: \{ padTop: 14, gap: 12 \}/)
     expect(page).toMatch(/history: \{ padTop: 4 \}/)
-    expect(page).toMatch(/'sold-out': \{ padTop: 0 \}/)
+    expect(page).toMatch(/'sold-out': \{ padTop: 0, gap: 12 \}/)
     expect(page).toMatch(/bodyPadTop=\{VIEW_BODY\[view\]\.padTop\}/)
     expect(page).toMatch(/bodyGap=\{VIEW_BODY\[view\]\.gap\}/)
+    // 品切れ（h7OeT）の帯を負の margin で器の外へ引き上げない。
+    expect(css).not.toMatch(/selectBarFlush/)
   })
 
   it('3枚の板の頭も器の任意の引数で渡す（絵 上20・間4・説明は題の下）', () => {

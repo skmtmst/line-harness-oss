@@ -27,7 +27,7 @@ export function RowMore({ subject, items }: { subject: string; items: ActionMenu
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, titleNote, width, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, fieldGap, footerPlain = false, footerGap, onCancel, onSubmit, noValidate = false, actions, children }: {
+export function RsDialog({ open, title, titleNote, width, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, footerPlain = false, footerGap, onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   /** 題の下の小さな補足（絵の窓の頭が題＋1行のとき）。渡さないときは出ない。 */
@@ -52,8 +52,6 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
   contentPadding?: string
   /** 中身の段どうしの間を絵の値にする。既定は 14。 */
   bodyGap?: number
-  /** 欄の題と中身の間を絵の値にする。既定は 6。窓の中のすべての欄に効く。 */
-  fieldGap?: number
   /** 下のボタンの段に上の線を引かない（絵に線が無いとき）。 */
   footerPlain?: boolean
   /** 下のボタンの段の上の間を絵の値にする。既定は線ありで 14・線なしで 8。 */
@@ -64,13 +62,15 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
   actions: ReactNode
   children: ReactNode
 }) {
-  /* 絵の値を渡された分だけ変数で下へ流す。渡さない窓はいままでの間のまま。 */
-  const bodyStyle = bodyGap === undefined && fieldGap === undefined
+  /*
+   * 絵の値を渡された分だけ変数で下へ流す。渡さない窓はいままでの間のまま。
+   * 欄の題と中身の間は窓からまとめて渡さない。`DialogField` は共通の欄
+   * （`components/shared/form-controls`）を出すので、間はその欄の `contentGap`
+   * （`--field-content-gap`）だけが効く。窓側の変数は届かない。
+   */
+  const bodyStyle = bodyGap === undefined
     ? undefined
-    : ({
-        ...(bodyGap === undefined ? null : { '--rs-dlg-body-gap': `${bodyGap}px` }),
-        ...(fieldGap === undefined ? null : { '--rs-field-gap': `${fieldGap}px` }),
-      } as CSSProperties)
+    : ({ '--rs-dlg-body-gap': `${bodyGap}px` } as CSSProperties)
   const body = (
     <>
       {children}

@@ -150,7 +150,7 @@
 .serviceBadges {
   display: flex;
   align-items: center;
-  gap: var(--tpl-rt-dlv-badge-gap);
+  gap: var(--tpl-rt-dlv-service-badges-gap);
   min-width: 0;
 }
 
@@ -165,7 +165,7 @@
 .serviceCount {
   display: flex;
   align-items: baseline;
-  gap: 2px;
+  gap: var(--tpl-rt-dlv-count-unit-gap);
   font-size: var(--text-lead);
   font-weight: 600;
   color: var(--color-ink);
@@ -226,19 +226,7 @@
 }
 
 .tabTableGroup > .selectBar {
-  margin-block: 12px;
-}
-
-/*
- * 品切れ一括設定（h7OeT）の帯だけ、板の頭にぴたりと付ける。
- * 絵では 板の頭(y81で終わり)→帯(y81から) の間が0で、帯の高さ48のあと12あけて
- * 表の見出し(y141)が来る。板の段の間は12なので、帯の上の12を打ち消すと
- * 絵と同じ 0＋48＋12＝60 になる（下の12は板の段の間がそのまま使える）。
- * 以前は帯が高さ32のままで4px足りず、表を4px下げて埋めていた。
- * 帯を絵どおり48にしたので、その埋め合わせは要らなくなった（2026-10-11 実測）。
- */
-.selectBarFlush {
-  margin-top: calc(var(--tpl-rt-dlv-card-gap) * -1);
+  margin-block: var(--tpl-rt-dlv-selectbar-margin);
 }
 
 .th {
