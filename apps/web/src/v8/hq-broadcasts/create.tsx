@@ -399,9 +399,15 @@ export default function HqBroadcastCreate() {
   }, [needsCarousels, carousels])
 
   const chosen = useMemo(() => (stores ?? []).filter((s) => accountIds.includes(s.id)), [stores, accountIds])
+  const candidatesRequest = useRef(0)
+  const candidatesScope = useRef('')
+  candidatesScope.current = chosen.map((s) => s.id).join(',')
 
   /* 配信対象の候補：選んだアカウントごとにタグ・シナリオ・保存した条件を読み、同じ名前でまとめる。 */
   const loadTags = useCallback(async () => {
+    const request = ++candidatesRequest.current
+    const scope = chosen.map((s) => s.id).join(',')
+    const current = () => request === candidatesRequest.current && scope === candidatesScope.current
     if (chosen.length === 0) { setTagOptions([]); setScenarioOptions([]); setSavedOptions([]); setTagStatus('ready'); return }
     setTagStatus('loading')
     const group = (lists: string[][]) => {
@@ -412,15 +418,17 @@ export default function HqBroadcastCreate() {
     try {
       const [tagLists, scenarioLists, savedLists] = await Promise.all([
         Promise.all(chosen.map((s) => api.tags.list({ accountId: s.id }))),
-        Promise.all(chosen.map((s) => api.scenarios.list({ accountId: s.id }).catch(() => null))),
-        Promise.all(chosen.map((s) => api.segmentPresets.list(s.id).catch(() => null))),
+        Promise.all(chosen.map((s) => api.scenarios.list({ accountId: s.id }))),
+        Promise.all(chosen.map((s) => api.segmentPresets.list(s.id))),
       ])
-      if (tagLists.some((res) => !res.success)) throw new Error('tags')
+      if (!current()) return
+      if ([...tagLists, ...scenarioLists, ...savedLists].some((res) => !res.success)) throw new Error('candidates')
       setTagOptions(group(tagLists.map((res) => (res.success ? res.data.map((t) => t.name) : []))))
       setScenarioOptions(group(scenarioLists.map((res) => (res && res.success ? res.data.map((t) => t.name) : []))))
       setSavedOptions(group(savedLists.map((res) => (res && res.success ? res.data.map((t) => t.name) : []))))
       setTagStatus('ready')
     } catch (saveFailure) {
+      if (!current()) return
       saveErrors.capture(saveFailure)
       setTagStatus('error')
     }
@@ -490,6 +498,7 @@ export default function HqBroadcastCreate() {
   const fields = useFormErrors()
   fields.define('title', '配信名', () => !title.trim() ? '配信名を入れてください' : title.trim().length > TITLE_MAX ? `配信名は${TITLE_MAX}文字までです` : null, { reveal: () => changeStep('basic') })
   fields.define('accountIds', '送るアカウント', () => chosen.length ? null : '送るアカウントを選んでください', { reveal: () => changeStep('audience') })
+  fields.define('candidates', '配信対象の候補', () => chosen.length && tagStatus !== 'ready' ? '配信対象の候補を読み直してください' : null, { reveal: () => changeStep('audience') })
   fields.define('tagName', '送る相手のタグ', () => audience === 'tag' && !tagName ? '送る相手のタグを選んでください' : null, { reveal: () => changeStep('audience') })
   fields.define('target', '配信対象', () => audience === 'advanced' && !pruneCondition(condition) && !savedName ? '詳細条件を入力するか、保存した条件を選んでください' : null, { reveal: () => changeStep('audience') })
   fields.define('scheduledAt', '送る日時', () => when === 'later' && !scheduledAt ? '送る日時を選んでください' : scheduledAt && Date.parse(scheduledAt) <= Date.now() ? '予約日時は今より後にしてください' : null, { reveal: () => changeStep('schedule') })
@@ -1178,7 +1187,7 @@ export default function HqBroadcastCreate() {
             {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
             <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
             {step !== 'confirm' ? (
-              <Button variant="primary" disabled={composerBusy} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
+              <Button variant="primary" disabled={composerBusy || (step === 'audience' && chosen.length > 0 && tagStatus !== 'ready')} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
                 {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={15} aria-hidden /></> : nextLabel}
               </Button>
             ) : (
