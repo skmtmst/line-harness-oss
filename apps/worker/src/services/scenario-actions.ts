@@ -663,8 +663,11 @@ export async function runScenarioOp(
         .bind(c.scenarioId).first()
       if (!available) throw new Error('移動先のシナリオを開始できませんでした。元のシナリオは継続しています')
       await db.batch([
-        db.prepare(`UPDATE friend_scenarios SET status='active', previous_scenario_id=COALESCE(?,previous_scenario_id), updated_at=? WHERE id=? AND status='paused'`)
-          .bind(previousScenarioId, now, paused.id),
+        db.prepare(`UPDATE friend_scenarios SET status='active', previous_scenario_id=COALESCE(?,previous_scenario_id), updated_at=?
+          WHERE id=? AND status='paused' AND EXISTS(SELECT 1 FROM scenarios WHERE id=? AND is_active=1 AND current_published_version_id IS NOT NULL)`)
+          .bind(previousScenarioId, now, paused.id, c.scenarioId),
+        // 読み取り後に先が変わっていたらbatch全体を戻し、元の停止へ進まない。
+        db.prepare(`SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'SCENARIO_NOT_RESUMED' END)`),
         ...pausePrevious,
       ])
       return
@@ -681,8 +684,10 @@ export async function runScenarioOp(
     throw new Error('移動先のシナリオを開始できませんでした。元のシナリオは継続しています')
   }
   if (previousScenarioId) await db.batch([
-    db.prepare(`UPDATE friend_scenarios SET previous_scenario_id=COALESCE(?,previous_scenario_id) WHERE id=?`)
-      .bind(previousScenarioId, enrolled.id),
+    db.prepare(`UPDATE friend_scenarios SET previous_scenario_id=COALESCE(?,previous_scenario_id)
+      WHERE id=? AND status IN ('active','delivering') AND EXISTS(SELECT 1 FROM scenarios WHERE id=? AND is_active=1 AND current_published_version_id IS NOT NULL)`)
+      .bind(previousScenarioId, enrolled.id, c.scenarioId),
+    db.prepare(`SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'SCENARIO_NOT_STARTED' END)`),
     ...pausePrevious,
   ])
 }
