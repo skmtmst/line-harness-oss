@@ -535,6 +535,8 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
  * 画面を離れてしまう。保存済みの条件と同じかどうかで表示を分ける。
  */
 describe('条件の保存状態の表示 (DEEP-27)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const GROUP_WITH_CONDITION = {
     ...GROUP,
     targetingEnabled: true,
@@ -547,13 +549,11 @@ describe('条件の保存状態の表示 (DEEP-27)', () => {
   test('保存済み条件は「保存済み」、直した条件は「未保存」と区別する', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     await screen.findByText('保存済み条件 1件')
 
-    fireEvent.click(screen.getByText('条件を編集'))
-    await flush()
     // スタブの条件組み立て: 押すと別の条件が1件入る
     fireEvent.click(screen.getByText('条件を足す(スタブ)'))
     await flush()
@@ -570,20 +570,22 @@ describe('条件の保存状態の表示 (DEEP-27)', () => {
  * 対象の説明を両工程で揃える（数え方そのものは変えない）。
  */
 describe('条件が空のときの対象説明 (RICHMENU-03)', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const GROUP_EMPTY_CONDITION = {
     ...GROUP,
     targetingEnabled: true,
     targetingCondition: null,
   }
-  const EMPTY_WARNING = '条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。'
+  const EMPTY_WARNING = '条件が空のままだと、公開しても誰にも出ません。'
 
   test('条件ON・空条件ではSTEP2も「誰にも出しません」で0人と案内する', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
 
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
     expect(screen.getByText(EMPTY_WARNING)).toBeTruthy()
     // 「いま当てはまる人」「実際にこのメニューが出る人」は 0人 と出す
     expect(screen.getAllByText('0人')).toHaveLength(2)
@@ -591,12 +593,13 @@ describe('条件が空のときの対象説明 (RICHMENU-03)', () => {
 
   test('同じ状態でSTEP1も同じ案内を出す', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
-    searchParams.value = new URLSearchParams('id=grp-1')
-    render(<RichMenuEditPage />)
+    searchParams.value = new URLSearchParams('id=grp-1&step=shape')
+    render(<CurrentRichMenuEdit />)
     await flush()
 
     await screen.findByDisplayValue('メインメニュー')
-    expect(screen.getByText(EMPTY_WARNING)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '画面の説明' }))
+    expect(screen.getByText(/条件が空のままだと、公開しても誰にも出ません/)).toBeTruthy()
   })
 })
 
@@ -606,6 +609,8 @@ describe('条件が空のときの対象説明 (RICHMENU-03)', () => {
  * STEP2 と同じく 0人＋誰にも出しません にそろえる。
  */
 describe('公開前チェックの人数（未保存条件）', () => {
+  beforeEach(() => { document.documentElement.dataset.theme = 'v8' })
+  afterEach(() => { delete document.documentElement.dataset.theme })
   const GROUP_WITH_CONDITION = {
     ...GROUP,
     targetingEnabled: true,
@@ -620,8 +625,6 @@ describe('公開前チェックの人数（未保存条件）', () => {
   }
 
   async function editConditionUnsaved() {
-    fireEvent.click(screen.getByText('条件を編集'))
-    await flush()
     // スタブの条件組み立て: 押すと別の条件が1件入る
     fireEvent.click(screen.getByText('条件を足す(スタブ)'))
     await flush()
@@ -640,9 +643,9 @@ describe('公開前チェックの人数（未保存条件）', () => {
   test('条件を未保存で直すと、人数APIへその未保存条件が渡る', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
 
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await editConditionUnsaved()
@@ -657,13 +660,13 @@ describe('公開前チェックの人数（未保存条件）', () => {
   test('未保存の条件では、STEP3の公開前チェックと右の欄にも注記が出る', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=targeting')
-    const view = render(<RichMenuEditPage />)
+    const view = render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('このメニューを出す相手')
+    await screen.findByRole('radio', { name: /条件に当てはまる友だちだけ/ })
     await editConditionUnsaved()
 
     await gotoStep(view, 'publish')
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     // 公開前チェックの人数に「未保存の条件で計算」、右の欄に「（未保存の条件）」
     expect(screen.getByText(/未保存の条件で計算/)).toBeTruthy()
@@ -673,9 +676,9 @@ describe('公開前チェックの人数（未保存条件）', () => {
   test('保存済みの条件のままなら、注記は出ない', async () => {
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_WITH_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     expect(screen.queryByText(/未保存の条件/)).toBeNull()
   })
@@ -684,12 +687,12 @@ describe('公開前チェックの人数（未保存条件）', () => {
     const GROUP_EMPTY_CONDITION = { ...GROUP, targetingEnabled: true, targetingCondition: null }
     richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: GROUP_EMPTY_CONDITION }))
     searchParams.value = new URLSearchParams('id=grp-1&step=publish')
-    render(<RichMenuEditPage />)
+    render(<CurrentRichMenuEdit />)
     await flush()
-    await screen.findByText('いつ出すか')
+    await screen.findByRole('heading', { name: 'いつ公開するか' })
 
     // 空条件は誰にも出ない。人数APIの全員カウントで誤魔化さない。
-    expect(screen.getByText(/誰にも出しません（0人）/)).toBeTruthy()
+    expect(screen.getByText(/誰の画面にも出ません（0人）/)).toBeTruthy()
     expect(screen.queryByText(/誰に出すかが決まっています/)).toBeNull()
     // 右の欄と「公開すると何が変わるか」も 0人 でそろえる
     expect(screen.getByText('0人')).toBeTruthy()

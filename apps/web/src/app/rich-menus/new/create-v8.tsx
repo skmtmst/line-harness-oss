@@ -1727,6 +1727,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   })()
 
   const conditionEmpty = isEmptyCondition(targetingCondition)
+  const conditionUnsaved = Boolean(group) && JSON.stringify(audience === 'targeted' ? targetingCondition : null)
+    !== JSON.stringify(group?.targetingEnabled ? parseStoredCondition(group.targetingCondition) : null)
+  const conditionCount = targetingCondition?.rules.length ?? 0
   /*
    * 面の数：作成前は選んだ面の分けかたの数、作成後は全ページの面の合計。
    * 作成前の面はまだ動きが未設定（0設定済み）なので、分けかたの枚数だけ数える。
@@ -1770,6 +1773,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     step === 'shape'
       ? host ? 'いまは下書きとして作ります。最後の「配る」で選んだアカウントへ届けます。' : 'いまは下書きとして作ります。最後の「公開」で LINE に出します。'
       : `名前：${name || emptyValue('unconfigured')}・いまは下書きです`
+  const conditionHelp = audience === 'targeted' && conditionEmpty
+    ? '条件が空のままだと、公開しても誰にも出ません。条件を1つ以上足してください。'
+    : ''
 
   /* ---------- 描画 ---------- */
 
@@ -1823,7 +1829,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     <CreatePage dirty={false} boardId={
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
-      } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conflict ? (
+      } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conditionHelp ? <p>{conditionHelp}</p> : null}{conflict ? (
           /* 板 `r8dGXT`：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
           <div className={styles.conflictSlot}>
             <SaveConflictBand
@@ -2426,6 +2432,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 label="このメニューを出す相手"
                 showCount={false}
               />
+              {editGroupId && !conditionEmpty ? (
+                <p className={styles.fieldHint}>{conditionUnsaved ? `条件 ${conditionCount}件（未保存）` : `保存済み条件 ${conditionCount}件`}</p>
+              ) : null}
               {conditionEmpty ? (
                 <p className={styles.fieldHint}>条件が空のままだと、公開しても誰にも出ません。</p>
               ) : null}
@@ -2626,6 +2635,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                   <p className={styles.checkName}>自前の検査</p>
                   <p className={styles.checkNote}>
                     {checks.self.message ?? '未設定の面・重なり・画像・参照先・文字数・面の数'}
+                    {conditionUnsaved && !conditionEmpty ? '・人数は未保存の条件で計算しています' : ''}
                   </p>
                 </div>
                 <span className={styles.checkAction}>
@@ -2675,7 +2685,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             <span>
               {audience === 'all'
                 ? `公開すると、すべての友だちの既定のメニューが入れ替わります。`
-                : '公開すると、条件に当てはまる人にこのメニューが出ます。'}
+                : conditionEmpty
+                  ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
+                  : '公開すると、条件に当てはまる人にこのメニューが出ます。'}
               {targetPreview?.higherMenus && targetPreview.higherMenus.length > 0 && targetPreview.overlap?.value
                 ? `${targetPreview.higherMenus[0]}の${formatNumber(targetPreview.overlap.value)}人には、いままでどおり上のメニューが出ます。`
                 : ''}
@@ -2802,6 +2814,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
             ]}
           >
             {targetPreviewError ? <p className={styles.fieldError}>{targetPreviewError}</p> : null}
+            {conditionUnsaved && !conditionEmpty ? <p className={styles.cardNote}>人数はまだ保存していない条件で数えています</p> : null}
           </CreateSummaryCard>
         ) : null}
 
@@ -2827,7 +2840,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 value: audience === 'targeted' && conditionEmpty ? '0人' : targetPreviewLoading ? '確認中…' : <MetricValue metric={targetPreview?.effective} />,
               },
             ]}
-          />
+          >
+            {conditionUnsaved && !conditionEmpty ? <p className={styles.cardNote}>（未保存の条件）</p> : null}
+          </CreateSummaryCard>
         ) : null}
 
         <div className={`flex w-full min-w-0 flex-col ${styles.stackSection} ${styles.railPhone}`}>
