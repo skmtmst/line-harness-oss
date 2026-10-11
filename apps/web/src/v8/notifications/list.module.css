@@ -116,7 +116,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--polish-text-body);
   font-weight: 500;
   line-height: var(--tpl-nt-title-lh);
 }

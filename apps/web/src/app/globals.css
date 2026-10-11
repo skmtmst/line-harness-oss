@@ -978,8 +978,8 @@
   --tpl-rm-side-w: 380px; --tpl-rm-icon-btn: 36px; --tpl-rm-col-num: 48px; --tpl-rm-col-fail: 60px; --tpl-rm-col-time: 110px; --tpl-rm-col-result: 96px; --tpl-rm-col-date: 170px; --tpl-rm-col-ops: 140px; --tpl-rm-pill-gap: 5px; --tpl-rm-pill-pad: 2px 8px; --tpl-rm-pill-lh: 17px; --tpl-rm-search-w: 220px; --tpl-rm-pager-pad: 18px 20px 10px; --tpl-rm-date-h: 32px; --tpl-rm-phone-pull: 4px; --tpl-rm-viewer-create-h: 50px;
   --tpl-rm-line-bottom: inset 0 -1px 0 var(--color-divider); --tpl-rm-line-bottom-strong: inset 0 -1px 0 var(--color-hairline); --tpl-rm-line-left: inset 1px 0 0 var(--color-hairline);
   /* 通知（y8QQV）。 */
-  --tpl-nt-body-pad: 16px 24px 24px; --tpl-nt-body-gap: 16px; --tpl-nt-tab-gap: 20px; --tpl-nt-tab-pad: 8px; --tpl-nt-tab-lh: 19px; --tpl-nt-button-icon: var(--polish-icon-control); --tpl-nt-box-radius: var(--polish-radius-card);
-  --tpl-nt-row-pad: 14px 20px; --tpl-nt-row-gap: 12px; --tpl-nt-icon: 32px; --tpl-nt-icon-glyph: var(--polish-icon-control); --tpl-nt-text-gap: 2px; --tpl-nt-dot-gap: 6px; --tpl-nt-dot: 8px;
+  --tpl-nt-body-pad: 16px 24px 24px; --tpl-nt-body-gap: 16px; --tpl-nt-tab-gap: 24px; --tpl-nt-tab-pad: 8px; --tpl-nt-tab-lh: 19px; --tpl-nt-button-icon: var(--polish-icon-control); --tpl-nt-box-radius: var(--polish-radius-card);
+  --tpl-nt-row-pad: 16px 24px; --tpl-nt-row-gap: 12px; --tpl-nt-icon: 32px; --tpl-nt-icon-glyph: var(--polish-icon-control); --tpl-nt-text-gap: 2px; --tpl-nt-dot-gap: 8px; --tpl-nt-dot: 8px;
   --tpl-nt-title-lh: 19px; --tpl-nt-small-lh: 16px; --tpl-nt-go-lh: 17px; --tpl-nt-unread-bg: #f7faff; --tpl-nt-error-bg: #fdecea; --tpl-nt-focus-ring: 2px; --tpl-nt-focus-offset: -2px; --tpl-nt-row-line: inset 0 1px 0 var(--color-hairline);
   /* 上の帯のベルの小窓（V8.pen DIHFx の D2eAyQ・小窓 mV28V）。 */
   --bell-w: 380px; --bell-shadow: 0 12px 32px #1d1d1f24; --bell-lh: 1.5; --bell-title-size: 15px;
