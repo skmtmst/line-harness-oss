@@ -2,6 +2,20 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {chromium} from '@playwright/test'
+test('本物のページ送りCSS: 現在地の緑は通常セルの色に負けない（B-211）',async()=>{
+ const css=readFileSync(new URL('../../src/components/shared/pagination.module.css',import.meta.url),'utf8')
+ // ボタン全体のaria-current用CSSに頼らず、cursorのspanも共通部品自身で緑になる。
+ const globals=':root {--color-ink-secondary:#4a5565;--color-selection-border:#087a3e;--color-selection-bg:#e8f5ec;}'
+ const browser=await chromium.launch()
+ try{
+  const page=await browser.newPage();const html=style=>`<html data-theme="v8"><style>${globals}\n${style}</style><body><nav class="pagination"><span class="item page current" aria-current="page">1</span><button class="item page">2</button></nav></body></html>`
+  const colors=()=>page.locator('.page').evaluateAll(els=>els.map(el=>getComputedStyle(el).color))
+  for(const width of [1440,1152]){
+   await page.setViewportSize({width,height:600});await page.setContent(html(css));assert.deepEqual(await colors(),['rgb(8, 122, 62)','rgb(74, 85, 101)'])
+   await page.setContent(html(css.replace(/html\[data-theme='v8'\] \.current\s*\{[^}]*\}/,' ')));assert.deepEqual(await colors(),['rgb(74, 85, 101)','rgb(74, 85, 101)'],'選択色の指定欠けを検出')
+  }
+ }finally{await browser.close()}
+})
 test('本物の共通CSS: 通常ボタンは600、文字だけの操作は400。幅を変えても値が変わらない',async()=>{
  const css=readFileSync(new URL('../../src/components/shared/button.module.css',import.meta.url),'utf8')
  const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
