@@ -749,6 +749,7 @@ describe('POST /webhook — first-contact existing friends', () => {
     expect(upsertFriend).toHaveBeenCalledWith(db, {
       lineUserId: 'U-existing',
       lineAccountId: 'account-main',
+      followOccurredAt: '2026-08-24T12:00:00.000+09:00',
       displayName: 'Existing Friend',
       pictureUrl: 'https://example.com/profile.jpg',
       statusMessage: 'hello',
