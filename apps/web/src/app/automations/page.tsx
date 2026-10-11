@@ -12,7 +12,6 @@ import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import AutomationListV8 from '@/v8/automations/list'
 import AutomationTemplatesV8 from '@/v8/automations/templates'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
@@ -287,17 +286,10 @@ const MERGED_TABS = [
 /** 一覧の1ページぶん。口は全件返すので、ここで切り出す。 */
 const AUTOMATION_PAGE_SIZE = 6
 
-/*
- * 入口。★V8 切替（`LWQXd`・`c7dxp`）は、v7 の画面の取得（一覧・見本・共通アクション）が
- * 始まる前にここで分ける。v7 の画面の中で分けると、v7 の取得の effect が先に登録され、
- * V8 の画面と同じ一覧を二重に取っていた（監査 WEB-117）。フックは毎回同じ順に呼ぶ。
- */
+/* 現役の一覧と見本へ直接渡し、別の画面の取得を重ねない（WEB-117）。 */
 export default function AutomationsPage() {
   const tab = useMergedTab(MERGED_TABS)
-  const theme = useAdminTheme()
-  if (theme === 'v8' && tab === 'templates') return <AutomationTemplatesV8 />
-  if (theme === 'v8') return <AutomationListV8 />
-  return <AutomationsV7Page />
+  return tab === 'templates' ? <AutomationTemplatesV8 /> : <AutomationListV8 />
 }
 
 /** v7 の画面（見た目・取得・保存・権限・失敗時の扱いは前のまま）。 */
