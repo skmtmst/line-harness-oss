@@ -202,8 +202,8 @@ describe('N-024 LINE送信取消', () => {
   it.each(['text', 'sticker'])('R-IN01: %s の保存直後に落ちても再配達で未完工程だけ続ける', async (kind) => {
     const originalBatch = db.db.batch.bind(db.db);
     let interrupted = false;
-    db.db.batch = async (statements) => {
-      const result = await originalBatch(statements);
+    db.db.batch = async <T=unknown>(statements:D1PreparedStatement[]) => {
+      const result = await originalBatch<T>(statements);
       if (!interrupted && statements.some((item) => /INSERT OR IGNORE INTO messages_log/.test((item as unknown as { sql: string }).sql))) {
         interrupted = true;
         throw new Error('sqlite simulated interruption after commit');

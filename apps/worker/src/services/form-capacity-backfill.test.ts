@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import { claimFormCapacitySlot, insertFormSubmissionRecord } from '../../../../packages/db/src/forms.js';
+import { claimFormCapacitySlot, insertFormSubmissionRecord } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 let fixture: SqliteD1;
 beforeEach(() => {
@@ -30,7 +30,7 @@ test('R-FORM01: 添付条件が不成立で回答を保存できなかった枠�
 });
 test('R-FORM01: 保存結果が分からない例外では枠を勝手に解放しない', async () => {
   await claimFormCapacitySlot(fixture.db,'form','__total__','unknown-answer',5);
-  const uncertain={...fixture.db,batch:async()=>{throw new Error('transport unavailable')}} as D1Database;
+  const uncertain={...fixture.db,batch:async()=>{throw new Error('transport unavailable')}} as unknown as D1Database;
   await expect(insertFormSubmissionRecord(uncertain,{id:'unknown-answer',formId:'form',data:'{}',fileIds:['x']})).rejects.toThrow('transport');
   expect(fixture.raw.prepare("SELECT COUNT(*) AS n FROM form_capacity_claims WHERE submission_id='unknown-answer'").get()).toEqual({n:1});
 });

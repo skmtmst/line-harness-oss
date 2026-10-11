@@ -451,7 +451,7 @@ async function handleNoticeLinkCode(
   const userId = event.source.type === 'user' ? event.source.userId : undefined;
   if (!userId) return false;
   const { tryLinkStaffByCode } = await import('../services/platform-announcements.js');
-  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId,event.type==='follow'?toJstString(new Date(event.timestamp)):undefined);
+  const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
   if (!friend) return false;
   return tryLinkStaffByCode(env, {
     lineAccountId,
