@@ -19,6 +19,7 @@ import {
   isResourceInScenarioAccount,
   jstNow,
   setFriendFieldValue,
+  friendFieldValueStatements,
   validateFriendFieldValue,
   type PinnedScenarioAction,
 } from '@line-crm/db'
@@ -436,6 +437,9 @@ async function executeAction(
 ): Promise<boolean> {
   const config = JSON.parse(action.config_json) as unknown
   const accountId = options.accountId ?? null
+  const numericEffectKey = options.sourceEventId
+    ? JSON.stringify([options.sourceEventId, action.id])
+    : action.repeat_on_refire === 0 ? `once:${action.fires_key ?? action.id}` : undefined
 
   switch (action.action_type) {
     case 'tag': {
@@ -449,7 +453,7 @@ async function executeAction(
     }
 
     case 'friend_field': {
-      await applyFriendField(db, friendId, config as FriendFieldActionConfig)
+      await applyFriendField(db, friendId, config as FriendFieldActionConfig, numericEffectKey)
       return false
     }
 
@@ -480,7 +484,7 @@ async function executeAction(
     }
 
     case 'common_var': {
-      await applyCommonVar(db, friendId, config as CommonVarActionConfig)
+      await applyCommonVar(db, friendId, config as CommonVarActionConfig, numericEffectKey)
       return false
     }
 
@@ -549,6 +553,7 @@ async function applyFriendField(
   db: D1Database,
   friendId: string,
   c: FriendFieldActionConfig,
+  effectKey?: string,
 ): Promise<void> {
   if (!c.fieldId) throw new Error('friend_field action requires fieldId')
   const target = await getFriendFieldById(db, c.fieldId)
@@ -577,13 +582,10 @@ async function applyFriendField(
 
   const checked = validateFriendFieldValue(target, raw)
   if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`)
-  await setFriendFieldValue(db, {
-    friendId,
-    fieldId: c.fieldId,
-    value: checked.value,
-    updatedBy: 'scenario',
-    field: target,
-  })
+  const input = { friendId, fieldId: c.fieldId, value: checked.value, updatedBy: 'scenario', field: target }
+  if (effectKey && (c.op === 'add' || c.op === 'sub')) {
+    await commitNumericEffect(db, friendId, effectKey, friendFieldValueStatements(db, input))
+  } else await setFriendFieldValue(db, input)
 }
 
 /**
@@ -731,13 +733,14 @@ async function applyCommonVar(
   db: D1Database,
   friendId: string,
   c: CommonVarActionConfig,
+  effectKey?: string,
 ): Promise<void> {
   if (!c.varKey) throw new Error('common_var action requires varKey')
   const delta = Number(c.value ?? 0)
   const safeDelta = Number.isFinite(delta) ? delta : 0
   const signed = c.op === 'add' ? safeDelta : -safeDelta
   const now = jstNow()
-  const results = await db.batch([
+  const statements = [
     db.prepare(
       `UPDATE common_vars
           SET value = CASE
@@ -770,7 +773,39 @@ async function applyCommonVar(
       c.varKey,
       friendId,
     ),
-  ])
-  // 競合で当たらないことはない。当たらなければ行が無い。
-  if ((results[0]?.meta?.changes ?? 0) === 0) throw new Error(`common_var not found: ${c.varKey}`)
+  ]
+  if (effectKey) {
+    await commitNumericEffect(db, friendId, effectKey, [
+      db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM common_vars WHERE var_key=?
+        AND line_account_id=(SELECT line_account_id FROM friends WHERE id=?) AND archived_at IS NULL)
+        THEN '{}' ELSE 'MISSING_COMMON_VAR' END)`).bind(c.varKey, friendId),
+      ...statements,
+    ])
+  } else {
+    const results = await db.batch(statements)
+    if ((results[0]?.meta?.changes ?? 0) === 0) throw new Error(`common_var not found: ${c.varKey}`)
+  }
+}
+
+/** DB内の数値更新と受領記録を同じbatchへ入れる。工程記録を失っても加算し直さない。 */
+async function commitNumericEffect(
+  db: D1Database, friendId: string, effectKey: string, statements: D1PreparedStatement[],
+): Promise<void> {
+  const sourceId = JSON.stringify([friendId, effectKey])
+  const recorded = () => db.prepare('SELECT 1 FROM audit_events WHERE source_kind=? AND source_id=?')
+    .bind('scenario_numeric_action', sourceId).first()
+  if (await recorded()) return
+  try {
+    await db.batch([
+      db.prepare(`INSERT INTO audit_events(id,source_kind,source_id,tenant_id,line_account_id,category,actor_role,action,target_kind,target_id,result)
+        SELECT ?,'scenario_numeric_action',?,COALESCE(a.tenant_id,'00000000-0000-4000-8000-000000000001'),f.line_account_id,
+          'business','system','scenario.numeric','friend',f.id,'success'
+        FROM friends f LEFT JOIN line_accounts a ON a.id=f.line_account_id WHERE f.id=?`)
+        .bind(crypto.randomUUID(), sourceId, friendId),
+      ...statements,
+    ])
+  } catch (error) {
+    // 同じ出来事の並行実行だけは成功済みとして収束する。その他のDB失敗は返す。
+    if (!await recorded()) throw error
+  }
 }
