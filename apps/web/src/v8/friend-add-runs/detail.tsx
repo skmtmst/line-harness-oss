@@ -305,21 +305,21 @@ function FriendAddRunDetailInner() {
         </div>
         <ol className={styles.steps}>
           {messageSent ? (
-            <li className={styles.step} data-state="ok">
+            <li data-state="ok"><Card layout="horizontal" padding="compact" gap="var(--tpl-rule-row-gap)" className={styles.step} data-state="ok">
               <CheckCircle2 size={18} className={styles.stepIcon} aria-hidden="true" />
               <span className={styles.stepIndex}>1</span>
               <span className={styles.stepText}>
                 <span className={styles.stepTitle}>{`案内（${messageLabel}）を送った`}</span>
                 <span className={styles.stepSub}>{`${jstClock(detail.processedAt ?? detail.receivedAt)}・LINE 受付済み`}</span>
               </span>
-            </li>
+            </Card></li>
           ) : null}
           {actionRuns.map((action, index) => {
             const state = action.status === 'completed' ? 'ok' : action.status === 'failed' ? 'ng' : 'wait'
             const message = state === 'ng' ? safeErrorMessage(action.errorCode) : null
             const time = jstClock(action.completedAt ?? action.startedAt)
             return (
-              <li key={action.id} className={styles.step} data-state={state}>
+              <li key={action.id} data-state={state}><Card layout="horizontal" padding="compact" gap="var(--tpl-rule-row-gap)" className={styles.step} data-state={state} surface={state === 'ng' ? 'danger' : 'standard'}>
                 {state === 'ok' ? <CheckCircle2 size={18} className={styles.stepIcon} aria-hidden="true" />
                   : state === 'ng' ? <XCircle size={18} className={`${styles.stepIcon} ${styles.failedIcon}`} aria-hidden="true" />
                     : <Clock size={18} className={`${styles.stepIcon} ${styles.waitIcon}`} aria-hidden="true" />}
@@ -330,7 +330,7 @@ function FriendAddRunDetailInner() {
                     {message ?? (state === 'wait' ? `${time}・実行を待っています` : action.attemptCount > 1 ? `${time}・${action.attemptCount} 回目` : time)}
                   </span>
                 </span>
-              </li>
+              </Card></li>
             )
           })}
         </ol>

@@ -12,18 +12,8 @@
   list-style: none;
 }
 
-/* 1つの処理：既存の角8・余白12/16・間12。失敗は薄い赤の地で枠なし。 */
-/* 既存の処理の行。絵の余白12とB-233のCard16が食い違うため、箱の部品化は判断待ち。 */
-.step {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rule-row-gap);
-  padding: var(--tpl-fm2-rd-step-pad);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  border-radius: var(--radius-control);
-}
-.step[data-state='ng'] { outline-color: transparent; background: var(--color-danger-bg); }
+/* 枠・角・影・上下16は共通Card。失敗は既存の赤い状態を保つ。 */
+.step { align-items: center; }
 .stepIcon { flex-shrink: 0; width: var(--tpl-fm2-rd-step-icon); height: var(--tpl-fm2-rd-step-icon); color: var(--color-accent-deep); }
 .failedIcon { color: var(--color-danger); }
 .waitIcon { color: var(--color-ink-faint); }
