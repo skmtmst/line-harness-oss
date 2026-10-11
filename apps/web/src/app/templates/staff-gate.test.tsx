@@ -291,9 +291,10 @@ describe('テンプレート編集画面のstaffゲート (N-144)', () => {
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
 
-    expect(screen.getByRole('alert')).toBeTruthy()
-    expect(screen.getByText('テンプレートの作成・変更はオーナーと管理者だけができます')).toBeTruthy()
-    expect(screen.getByText('一覧へ戻る')).toBeTruthy()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存して公開' })).toBeNull()
+    expect(screen.getByText('閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。')).toBeTruthy()
   })
 })
 

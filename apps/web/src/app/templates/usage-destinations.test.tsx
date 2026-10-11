@@ -276,10 +276,10 @@ describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
      * R237: 保存は下書きの保存で、利用先へは公開した内容だけが届く。
      * 「そのまま使われる」とは書かない。公開の場所も名指しする。
      */
-    expect(screen.getByText(/保存は下書きの保存です/)).toBeTruthy()
-    expect(screen.getByText(/一覧の詳細パネルから公開してください/)).toBeTruthy()
+    expect(screen.getByText(/下書きを保存しただけでは届きません/)).toBeTruthy()
+    expect(screen.getByText(/「保存して公開」で使っている場所へ届きます/)).toBeTruthy()
     expect(screen.queryByText(/新しい内容がそのまま使われます/)).toBeNull()
-    expect(screen.getByText('シナリオ「来店後」2通目').closest('a')?.getAttribute('href'))
+    expect(screen.getByText(/シナリオ「来店後」2\s*通目/).closest('a')?.getAttribute('href'))
       .toBe('/scenarios/detail?id=sc-1')
     expect(screen.getByText('自動応答「予約」の返信').closest('a')?.getAttribute('href'))
       .toBe('/auto-replies/edit?id=ar-1')
@@ -299,7 +299,8 @@ describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
     await renderEditAndWait(USED_BY, 0)
 
     expect(screen.getByText(/まだ公開していません/)).toBeTruthy()
-    expect(screen.getByText(/保存しただけでは利用先へ反映されません/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    expect(screen.getByText(/「保存して公開」で使っている場所へ新しい内容が使われます/)).toBeTruthy()
     expect(screen.queryByText(/新しい内容がそのまま使われます/)).toBeNull()
   })
 
@@ -310,9 +311,9 @@ describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    await screen.findByText('この変更が使われる場所（0か所）')
-
-    expect(screen.getByText('このテンプレートはまだどこからも呼ばれていません。')).toBeTruthy()
+    const empty = await screen.findByTitle('この変更が使われる場所（0か所）。このテンプレートはまだどこからも呼ばれていません。')
+    expect(empty.getAttribute('title')).toContain('0か所')
+    expect(empty.getAttribute('title')).toContain('このテンプレートはまだどこからも呼ばれていません。')
   })
 })
 

@@ -497,7 +497,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
             <div className={styles.previewToggle}>
               <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
             </div>
-            <SenderCard />
+            <SenderCard emptyUsage={id && editor.status === 'ready' && editor.usedBy && templateUsageEntries(editor.usedBy).length === 0 ? 'この変更が使われる場所（0か所）。このテンプレートはまだどこからも呼ばれていません。' : undefined} />
             {id && editor.status === 'ready' && editor.usedBy && templateUsageEntries(editor.usedBy).length > 0 ? <UsageCard usedBy={editor.usedBy} published={(editor.publishedVersion ?? 0) >= 1} /> : null}
             <h2 className={styles.previewHead}>届き方</h2>
             <div className={styles.phone}>{phone}</div>
@@ -691,11 +691,11 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   )
 }
 
-function SenderCard() {
+function SenderCard({ emptyUsage }: { emptyUsage?: string }) {
   return (
     <section className={styles.sideCard}>
       <h2 className={styles.sideTitle}>送るときの名前</h2>
-      <p className={styles.sideText}>公式のアイコンと表示名で送ります。担当者の名前では送れません。</p>
+      <p className={styles.sideText} title={emptyUsage}>公式のアイコンと表示名で送ります。担当者の名前では送れません。</p>
     </section>
   )
 }
