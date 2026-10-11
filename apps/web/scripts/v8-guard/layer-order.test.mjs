@@ -36,3 +36,25 @@ test('V8 controls keep their appearance when component CSS arrives before Tailwi
     await browser.close()
   }
 })
+
+test('folder addition keeps the common button line height in either module order', async () => {
+  const globalsPath = fileURLToPath(new URL('../../src/app/globals.css', import.meta.url))
+  const globals = (await postcss([tailwind()]).process(readFileSync(globalsPath, 'utf8'), { from: globalsPath })).css
+  const button = readFileSync(new URL('../../src/components/shared/button.module.css', import.meta.url), 'utf8')
+  const folder = readFileSync(new URL('../../src/components/shared/folder-panel.module.css', import.meta.url), 'utf8')
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const measure = async (first, second) => {
+      await page.setContent(`<style>${globals}</style><style>${first}</style><style>${second}</style>
+        <aside class="panel"><button class="button standard secondary add">Add folder</button></aside>`)
+      return page.locator('button').evaluate(el => getComputedStyle(el).lineHeight)
+    }
+    assert.equal(await measure(button, folder), '20px')
+    assert.equal(await measure(folder, button), '20px')
+    assert.notEqual(await measure(button, folder.replace('.add {', '.add { line-height: normal;')), '20px',
+      'the removed override must reproduce the production difference')
+  } finally {
+    await browser.close()
+  }
+})
