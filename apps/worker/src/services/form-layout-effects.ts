@@ -1,3 +1,4 @@
+import { writeFormDestinationsOnce } from './form-destination-workflow.js';
 import { applyTapExtras } from './tap-extras.js';
 import { researchGateProblem, runResearchAnswerAction, validateResearchActionScope } from './research-forms.js';
 import type { Env } from '../index.js';
@@ -317,14 +318,13 @@ export async function applyFormLayoutEffects(input: FormEffectInput): Promise<Fo
     const value = answers[block.name];
     if (value === undefined) continue;
 
-    await runEffectStep(input, failedEffects, destinationWrites, `destinations:${block.id}`, () => writeDestinations(
-      db,
-      block,
-      value,
-      friendId,
-      destinationWrites,
-      input.formId,
-    ));
+    await runEffectStep(input, failedEffects, destinationWrites, `destinations:${block.id}`, () => {
+      if ((!block.destinations && !fixedFieldForBlock(block)) || isFormAnswerEmpty(value)) return Promise.resolve();
+      return writeFormDestinationsOnce({
+      db, friendId, sourceKey: input.idempotencyPrefix, blockId: block.id, stats: destinationWrites,
+      write: (ownedDb, stats) => writeDestinations(ownedDb, block, value, friendId, stats, input.formId),
+      });
+    });
 
     if (hasChoices(block)) {
       await runEffectStep(input, failedEffects, destinationWrites, `choices:${block.id}`, () =>
