@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 
 export const UID_EVIDENCE_TYPES = [
@@ -184,10 +185,10 @@ export async function getUidMigrationRun(db: D1Database, id: string): Promise<Ui
 
 export async function listUidMigrationRuns(db: D1Database, accountIds: string[], limit = 20): Promise<UidMigrationRunRow[]> {
   if (accountIds.length === 0) return [];
-  const placeholders = accountIds.map(() => '?').join(',');
+  const placeholders = sqlIdSet(accountIds).sql;
   const result = await db.prepare(`SELECT * FROM uid_migration_runs
     WHERE from_account_id IN (${placeholders}) OR to_account_id IN (${placeholders})
-    ORDER BY created_at DESC LIMIT ?`).bind(...accountIds, ...accountIds, limit).all<UidMigrationRunRow>();
+    ORDER BY created_at DESC LIMIT ?`).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : []), ...(accountIds.length ? sqlIdSet(accountIds).binds : []), limit).all<UidMigrationRunRow>();
   return result.results;
 }
 

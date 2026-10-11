@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import type { ReminderRunReadOptions, ReminderScheduleMetrics } from '@line-crm/shared';
 import { jstNow, nextVersionToken } from './utils.js';
 import { getPlatformSetting, setPlatformSetting } from './platform-announcements.js';
@@ -114,8 +115,8 @@ function reminderRowScopePredicate(
   if (!scope) return null;
   const parts: string[] = [];
   if (scope.allowedAccountIds.length > 0) {
-    parts.push(`${column} IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
-    bindings.push(...scope.allowedAccountIds);
+    parts.push(`${column} IN (${sqlIdSet(scope.allowedAccountIds).sql})`);
+    bindings.push(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []));
   }
   if (scope.canSeeUnassigned) parts.push(`${column} IS NULL`);
   return parts.length > 0 ? `(${parts.join(' OR ')})` : '1 = 0';
@@ -270,12 +271,12 @@ export async function getRemindersByIds(
 ): Promise<Array<{ id: string; line_account_id: string | null }>> {
   if (ids.length === 0) return [];
   const unique = [...new Set(ids)];
-  const placeholders = unique.map(() => '?').join(',');
+  const placeholders = sqlIdSet(unique).sql;
   const result = await db
     .prepare(
       `SELECT id, line_account_id FROM reminders WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
     )
-    .bind(...unique)
+    .bind(...(unique.length ? sqlIdSet(unique).binds : []))
     .all<{ id: string; line_account_id: string | null }>();
   return result.results;
 }
@@ -917,8 +918,8 @@ export async function snapshotReminderTemplateVersions(
   const ids = [...new Set(templateIds.filter((id): id is string => !!id))];
   if (ids.length === 0) return null;
   const rows = await db.prepare(
-    `SELECT id, published_version FROM templates WHERE id IN (${ids.map(() => '?').join(', ')})`,
-  ).bind(...ids).all<{ id: string; published_version: number }>();
+    `SELECT id, published_version FROM templates WHERE id IN (${sqlIdSet(ids).sql})`,
+  ).bind(...sqlIdSet(ids).binds).all<{ id: string; published_version: number }>();
   const map: Record<string, number> = {};
   for (const row of rows.results ?? []) {
     const version = Number(row.published_version);
@@ -1439,9 +1440,9 @@ async function selectV6LegacyIds(
   const conditions = v6BaseConditions(matcher, bindings);
   conditions.push(`fr.friend_id = ?`);
   bindings.push(matcher.friendId);
-  const placeholders = matcher.targetDates.map(() => '?').join(',');
+  const placeholders = sqlIdSet(matcher.targetDates).sql;
   conditions.push(`fr.target_date IN (${placeholders})`);
-  bindings.push(...matcher.targetDates);
+  bindings.push(...(matcher.targetDates.length ? sqlIdSet(matcher.targetDates).binds : []));
   // 同時刻の別予約・手動登録を巻き込まない。source を持つ行 (別予約の現行行や
   // 手動で作り直した行) は source 連動側でだけ触り、ここでは見ない。
   // 移行前のきっかけ登録は source_kind が 'manual' のまま残っているため、

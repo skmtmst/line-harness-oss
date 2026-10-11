@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { readHqBannerFolderAssignment } from './hq-folders.js';
 import { jstNow } from './utils.js';
 import type { Media } from './media.js';
@@ -598,7 +599,7 @@ async function listBannerImagesById(
   tenantId: string,
 ): Promise<BannerImageWithDetail[]> {
   if (ids.length === 0) return [];
-  const placeholders = ids.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(ids).sql;
   const rows = await db
     .prepare(
       `SELECT i.*,
@@ -628,7 +629,7 @@ async function listBannerImagesById(
          JOIN banner_projects p ON p.id = i.project_id AND p.tenant_id = i.tenant_id
         WHERE i.tenant_id = ? AND i.id IN (${placeholders})`,
     )
-    .bind(tenantId, ...ids)
+    .bind(tenantId, ...(ids.length ? sqlIdSet(ids).binds : []))
     .all<Record<string, unknown>>();
   return rows.results.map(rowToImageWithDetail);
 }

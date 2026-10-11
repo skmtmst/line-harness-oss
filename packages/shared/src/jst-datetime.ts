@@ -54,3 +54,8 @@ export function jstMonthRange(now: Date = new Date()): { periodFrom: string; per
   const next = Date.UTC(calendar.getUTCFullYear(), calendar.getUTCMonth() + 1, 1) - 9 * 3_600_000
   return { periodFrom: new Date(start).toISOString(), periodTo: new Date(next - 1).toISOString() }
 }
+
+/** YYYY-MM-DD の実在する暦日だけを受け付ける。日付の繰り上がりを許さない。 */
+export function isCalendarDate(value: unknown): value is string {
+  return typeof value === 'string' && scheduledJstIso(value, '00:00') !== null
+}

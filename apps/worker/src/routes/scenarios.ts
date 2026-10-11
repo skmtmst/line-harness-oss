@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
@@ -495,8 +496,8 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
     } else {
       const accountClauses: string[] = [];
       if (scope.allowedAccountIds.length > 0) {
-        accountClauses.push(`s.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})`);
-        binds.push(...scope.allowedAccountIds);
+        accountClauses.push(`s.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})`);
+        binds.push(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : []));
       }
       if (scope.canSeeUnassigned) accountClauses.push('s.line_account_id IS NULL');
       clauses.push(accountClauses.length > 0 ? `(${accountClauses.join(' OR ')})` : '0 = 1');
@@ -554,8 +555,8 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
       const scenarioIds = items.map((item) => item.id);
       const accountIds = lineAccountId ? [lineAccountId] : scope.allowedAccountIds;
       if (scenarioIds.length > 0 && accountIds.length > 0) {
-        const scenarioPlaceholders = scenarioIds.map(() => '?').join(',');
-        const accountPlaceholders = accountIds.map(() => '?').join(',');
+        const scenarioPlaceholders = sqlIdSet(scenarioIds).sql;
+        const accountPlaceholders = sqlIdSet(accountIds).sql;
         const rows = await c.env.DB
           .prepare(
           `SELECT scenario_id,
@@ -567,7 +568,7 @@ scenarios.get('/api/scenarios', scenarioPermission('view'), async (c) => {
               AND f.line_account_id IN (${accountPlaceholders})
             GROUP BY scenario_id`,
           )
-          .bind(...scenarioIds, ...accountIds)
+          .bind(...sqlIdSet(scenarioIds).binds, ...(accountIds.length ? sqlIdSet(accountIds).binds : []))
           .all<{ scenario_id: string; active_count: number; completed_count: number }>();
         for (const r of rows.results) {
           counts.set(r.scenario_id, {

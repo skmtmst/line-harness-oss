@@ -1,3 +1,4 @@
+import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   computeUnansweredInbox,
   type UnansweredInboxOptions,
@@ -149,10 +150,10 @@ function accountScopeSql(
       ? { clause: `AND ${accountExpression} IS NULL`, bindings: [] }
       : { clause: 'AND 1 = 0', bindings: [] };
   }
-  const placeholders = allowedAccountIds.map(() => '?').join(', ');
+  const placeholders = sqlIdSet(allowedAccountIds).sql;
   return {
     clause: `AND (${accountExpression} IN (${placeholders})${canSeeUnassigned ? ` OR ${accountExpression} IS NULL` : ''})`,
-    bindings: [...allowedAccountIds],
+    bindings: allowedAccountIds.length ? sqlIdSet(allowedAccountIds).binds : [],
   };
 }
 

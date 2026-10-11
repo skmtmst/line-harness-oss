@@ -1,3 +1,4 @@
+import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
@@ -195,10 +196,10 @@ export async function getStaffNameMap(
   )];
   const names = new Map<string, string>();
   if (unique.length === 0) return names;
-  const placeholders = unique.map(() => '?').join(',');
+  const placeholders = sqlIdSet(unique).sql;
   const rows = await db
     .prepare(`SELECT id, name FROM staff_members WHERE id IN (${placeholders})`)
-    .bind(...unique)
+    .bind(...(unique.length ? sqlIdSet(unique).binds : []))
     .all<{ id: string; name: string }>();
   for (const row of rows.results ?? []) names.set(row.id, row.name);
   return names;
@@ -448,8 +449,8 @@ export async function getStaffAccountScopeMap(
   const ids = [...new Set(staffIds.filter((id) => typeof id === 'string' && id.length > 0))];
   if (ids.length === 0) return map;
   const result = await db
-    .prepare(`SELECT staff_id, line_account_id FROM staff_account_scopes WHERE staff_id IN (${ids.map(() => '?').join(',')}) ORDER BY staff_id, line_account_id`)
-    .bind(...ids)
+    .prepare(`SELECT staff_id, line_account_id FROM staff_account_scopes WHERE staff_id IN (${sqlIdSet(ids).sql}) ORDER BY staff_id, line_account_id`)
+    .bind(...sqlIdSet(ids).binds)
     .all<{ staff_id: string; line_account_id: string }>();
   for (const row of result.results) {
     const list = map.get(row.staff_id) ?? [];

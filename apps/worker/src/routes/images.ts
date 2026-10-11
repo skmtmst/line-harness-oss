@@ -1,5 +1,7 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
@@ -7,9 +9,33 @@ import { imageDimensions } from '../services/media-metadata.js';
 
 const images = new Hono<Env>();
 
+// 汎用画像の管理口は所有者をR2の記録から読む。未記録の古い画像は操作しない。
+async function ownedImage(c: Context<Env>, key: string) {
+  if (!key || key.includes('/') || key.includes('..')) return null;
+  const object = await c.env.IMAGES.head(key);
+  const accountId = object?.customMetadata?.lineAccountId;
+  const tenantId = object?.customMetadata?.tenantId;
+  if (tenantId !== (c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID)) return null;
+  if (!accountId) {
+    // アカウントを渡さない既存のアップロードは作成者本人だけが管理する。
+    return object?.customMetadata?.ownerStaffId === c.get('staff')?.id ? object : null;
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return null;
+  const requested = c.req.query('account_id');
+  return requested && requested !== accountId ? null : object;
+}
+
+
 // POST /api/images — upload image (base64 or binary)
 images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoundary({"data":["string"],"mimeType":["string"],"filename":["string"]}), async (c) => {
   try {
+    const staff = c.get('staff');
+    const scope = await getVisibleLineAccountScope(c.env.DB, staff);
+    const accountId = c.req.query('account_id') ?? c.req.header('X-Line-Account-Id')
+      ?? (scope.ids.length === 1 ? scope.ids[0] : null);
+    if (accountId && !await canAccessAllLineAccounts(c.env.DB, staff, [accountId])) {
+      return c.json({ success: false, error: '対象が見つかりません' }, 404);
+    }
     const contentType = c.req.header('Content-Type') || '';
 
     let data: ArrayBuffer;
@@ -77,7 +103,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoun
 
     await c.env.IMAGES.put(key, data, {
       httpMetadata: { contentType: mimeType },
-      customMetadata: { originalFilename: filename ?? key },
+      customMetadata: { originalFilename: filename ?? key, lineAccountId: accountId ?? '', ownerStaffId: staff.id, tenantId: staff.tenantId ?? DEFAULT_TENANT_ID },
     });
 
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
@@ -93,7 +119,19 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), inputJsonBoun
   }
 });
 
-// GET /images/:key — serve image (public, no auth)
+// 管理画面から原本を読む口も、削除と同じ所有権を確かめる。
+images.get('/api/images/:key', requireRole('owner', 'admin'), async (c) => {
+  const key = c.req.param('key');
+  if (!await ownedImage(c, key)) return c.json({ success: false, error: 'Image not found' }, 404);
+  const object = await c.env.IMAGES.get(key);
+  if (!object) return c.json({ success: false, error: 'Image not found' }, 404);
+  return new Response(object.body, { headers: {
+    'Content-Type': object.httpMetadata?.contentType ?? 'image/png',
+    'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+  } });
+});
+
+// GET /images/:key — LINEが表示する公開済み画像（公開URLの互換性を保つ）
 images.get('/images/*', async (c) => {
   // NENのペット写真は `nen-pets/{friendId}/{file}` の階層キーで保存する。
   // `:key` では最初の `/` までしか一致せず404になっていたため、全パスを受け取る。
@@ -146,6 +184,7 @@ images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async 
   try {
     const key = c.req.param('key');
     if (key.startsWith('hq-templates/')) return c.json({success:false,error:'統括のファイルは統括の削除操作から外してください'},403);
+    if (!await ownedImage(c, key)) return c.json({ success: false, error: 'Image not found' }, 404);
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {
