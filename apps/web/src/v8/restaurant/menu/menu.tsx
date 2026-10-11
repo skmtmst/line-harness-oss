@@ -1,5 +1,7 @@
 'use client'
 
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
@@ -89,7 +91,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       kind: draft.kind,
       name: draft.name,
       price: Number(draft.price),
-      effectiveAt: draft.effectiveAt ? new Date(draft.effectiveAt).toISOString() : null,
+      effectiveAt: draft.effectiveAt ? datetimeLocalJstToUtcIso(draft.effectiveAt) : null,
       allergens: draft.allergens.split(',').map((part) => part.trim()).filter(Boolean),
       servicePeriods: draft.period === 'both' ? ['lunch', 'dinner'] : [draft.period],
     }
