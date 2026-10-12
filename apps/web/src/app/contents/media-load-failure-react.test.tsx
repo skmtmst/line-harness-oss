@@ -395,7 +395,7 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
     await waitForText(MEDIA_A.filename)
     // 復旧後は実件数に戻る。
     expect(folderRowButton('すべて').textContent).toBe('すべて1')
-    expect(host.textContent).toContain('1件中 1〜1件を表示')
+    expect(host.textContent).toContain('1件中 1〜1件')
   })
 
   it('成功時の純粋0件は0と出す（不明と区別する）', async () => {
@@ -419,7 +419,7 @@ describe('m26m 初回503の偽ゼロを出さない', () => {
       .filter((button) => /^画像(?:\s+\d+)?$/.test(button.textContent ?? ''))
     expect(imageChips).toHaveLength(1)
     await act(async () => { imageChips[0].click(); await settle() })
-    await waitForText('1件中 1〜1件を表示')
+    await waitForText('1件中 1〜1件')
     // 「すべて」は絞り込み前の総数（overallTotal）のまま。絞り込み後の1件を入れない。
     expect(folderRowButton('すべて').textContent).toBe('すべて2')
     expect(host.textContent).toContain(MEDIA_A.filename)

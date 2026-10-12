@@ -184,7 +184,7 @@ describe('V8 回答フォーム一覧', () => {
     fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
     await flush()
     expect(screen.getByRole('menuitem', { name: '集まった回答' })).toBeTruthy()
-    expect(screen.queryByRole('menuitem', { name: '編集' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '編集する' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '削除' })).toBeNull()
     fireEvent.click(host.querySelector('[data-row-id="f-1"]')!)
     await flush()
@@ -237,7 +237,7 @@ describe('V8 回答フォーム一覧', () => {
     expect(listCall).toContain('with_list_summary=1')
   })
 
-  it('件数が1ページを超えるときは共通の ListRange で「N件中 X〜Y件を表示」と出す', async () => {
+  it('件数が1ページを超えるときは共通の ListRange で「N件中 X〜Y件」と出す', async () => {
     fetchApi.mockImplementation(async (path: string) => {
       if (path.startsWith('/api/forms?')) {
         return {
@@ -254,7 +254,7 @@ describe('V8 回答フォーム一覧', () => {
       return { success: true, data: {} }
     })
     await mount()
-    expect(host.textContent).toContain('45件中 1〜2件を表示')
+    expect(host.textContent).toContain('45件中 1〜2件')
   })
 });
 

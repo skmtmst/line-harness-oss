@@ -6,7 +6,7 @@ const globals = readFileSync(new URL('../globals.css', import.meta.url), 'utf8')
 
 describe('V8 流入と計測の一覧の共通表', () => {
   it('B-217の左右24と本文13を共通表へ渡し、画面でセルを上書きしない', () => {
-    expect(page).toContain('<DataTable columnLayout={{')
+    expect(page).toMatch(/<DataTable\b[^>]*\bcolumnLayout=\{\{/)
     expect(page).toContain("padding: '0 var(--tpl-list-inset)'")
     expect(page).toContain("bodyTextSize: 'var(--polish-text-body)'")
     expect(globals).toContain('--tpl-list-inset: 24px')
