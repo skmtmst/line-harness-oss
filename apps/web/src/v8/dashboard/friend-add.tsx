@@ -82,11 +82,11 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
         <span className={styles.linkKey}>発行中</span>
         <span className={styles.routeSelect}>
           <SaveErrorField names={["routeId","route_id"]}><EntitySelect
-            value={routeId}
-            onChange={(value) => setRouteId(value)}
+            value={routeId || '__base_url__'}
+            onChange={(value) => setRouteId(value === '__base_url__' ? '' : value)}
             aria-label="発行中の追加URL"
             options={[
-              { value: '', label: '基本の追加URL' },
+              { value: '__base_url__', label: '基本の追加URL' },
               ...(routes ?? []).map((entry) => ({ ...entityOptionMetadata(entry), value: entry.id, label: entry.name })),
             ]}
           /></SaveErrorField>
@@ -104,7 +104,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
           aria-label="友だち追加リンク"
           className={styles.urlField}
         /></SaveErrorField>
-        <CopyTextButton value={link} aria-label="友だち追加URLをコピー"  />
+        <CopyTextButton value={link} label="コピーする" icon={<Copy size={16} aria-hidden="true" />} variant="secondary" aria-label="友だち追加URLをコピー" />
         <Button type="button" onClick={() => writeQr(routeId || 'base')}>
           <QrCode size={15} aria-hidden="true" />QRを表示
         </Button>
