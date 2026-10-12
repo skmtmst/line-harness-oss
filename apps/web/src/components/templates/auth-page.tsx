@@ -10,3 +10,7 @@ export function AuthPage({ title, help, titleId, boardId, children }: { title: s
 export function AuthForm(props: FormHTMLAttributes<HTMLFormElement>) {
   return <form {...props} className={styles.form} />
 }
+
+export function AuthStack({ children }: { children: ReactNode }) {
+  return <div className={styles.stack}>{children}</div>
+}
