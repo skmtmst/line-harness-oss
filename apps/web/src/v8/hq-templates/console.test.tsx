@@ -434,8 +434,9 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await screen.findByRole('dialog')
     await waitFor(() => expect(screen.getByRole('checkbox', { name: '然 -NEN- 本店' }).hasAttribute('disabled')).toBe(false))
+    // Dialogは初期描画からportalへ移る。待つたびに現在の窓を取り直す。
+    await waitFor(() => expect(within(screen.getByRole('dialog')).getByText('版 2 を配布済み')).toBeTruthy())
     const dialog = screen.getByRole('dialog')
-    expect(await within(dialog).findByText('版 2 を配布済み')).toBeTruthy()
     expect(within(dialog).getByText('配ると上書き')).toBeTruthy()
     fireEvent.click(await within(dialog).findByRole('checkbox', { name: '直営店をまとめて選ぶ' }))
     fireEvent.change(within(dialog).getByRole('searchbox', { name: 'アカウントを探す' }), { target: { value: '本店' } })
@@ -479,8 +480,9 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await screen.findByRole('dialog')
     await waitFor(() => expect(screen.getByRole('checkbox', { name: '然 -NEN- 本店' }).hasAttribute('disabled')).toBe(false))
+    // 古い窓を保持せず、現在の窓の全アカウントの描画完了まで待つ。
+    await waitFor(() => expect(within(screen.getByRole('dialog')).getAllByText('配布状況を確認できません')).toHaveLength(2))
     const dialog = screen.getByRole('dialog')
-    expect(await within(dialog).findAllByText('配布状況を確認できません')).toHaveLength(2)
     expect(within(dialog).queryByText('未配布')).toBeNull()
   })
 })

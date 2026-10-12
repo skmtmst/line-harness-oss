@@ -15,6 +15,7 @@ beforeEach(() => {
   vi.resetAllMocks(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/hq/templates?type=rich_menu')
   calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
   calls.list.mockResolvedValue([]); calls.accounts.mockResolvedValue([])
+  calls.deleteImage.mockResolvedValue(undefined)
   calls.create.mockImplementation(async (input: { definition: TemplateDefinition }) => ({ template: { id: 't1', name: 'x', template_type: 'rich_menu', revision: 1, updated_at: '2026-09-29T00:00:00Z' }, definition: input.definition }))
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -26,16 +27,29 @@ async function startCreate(label: 'リッチメニュー画像を選ぶ' | 'メ�
   await screen.findByLabelText(label === 'メッセージ画像を選ぶ' ? '画像を追加（ファイル）' : label)
 }
 
+async function cancelUploadedCreate(confirmDiscard = false) {
+  // 受信・採用・busy解除まで待つ。API呼び出しだけを待つと無効なボタンを押してしまう。
+  const cancel = await waitFor(() => {
+    const button = screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    return button
+  })
+  fireEvent.click(cancel)
+  if (confirmDiscard) fireEvent.click(await screen.findByRole('button', { name: /^(破棄する|保存せずに移る)$/ }))
+}
+
 describe('R568 cancelled or replaced uploads are reclaimed', () => {
   it('cancelling a rich menu create deletes the uploaded-but-unsaved image', async () => {
     vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 2500, height: 1686, close: vi.fn() })))
-    calls.uploadImage.mockResolvedValue(png('a.png', KEY_A))
+    let finishUpload!: (media: ReturnType<typeof png>) => void
+    calls.uploadImage.mockReturnValue(new Promise(resolve => { finishUpload = resolve }))
     await startCreate('リッチメニュー画像を選ぶ')
     fireEvent.change(screen.getByLabelText('リッチメニュー画像を選ぶ'), { target: { files: [new File(['a'], 'a.png', { type: 'image/png' })] } })
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
-    const discard = screen.queryByRole('button', { name: /^(破棄する|保存せずに移る)$/ })
-    if (discard) fireEvent.click(discard)
+    // API開始だけでは操作できない。遅いアップロードを確実に再現する。
+    expect((screen.getByRole('button', { name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(true)
+    finishUpload(png('a.png', KEY_A))
+    await cancelUploadedCreate(true)
     await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_A))
   })
   it('cancelling a shared message template create deletes its uploaded image', async () => {
@@ -43,9 +57,7 @@ describe('R568 cancelled or replaced uploads are reclaimed', () => {
     await startCreate('メッセージ画像を選ぶ')
     fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [new File(['m'], 'm.png', { type: 'image/png' })] } })
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalled())
-    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
-    const discard = screen.queryByRole('button', { name: /^(破棄する|保存せずに移る)$/ })
-    if (discard) fireEvent.click(discard)
+    await cancelUploadedCreate()
     await waitFor(() => expect(calls.deleteImage).toHaveBeenCalledWith(KEY_M))
   })
   it('saving deletes only the replaced image and keeps the adopted one', async () => {
@@ -55,8 +67,10 @@ describe('R568 cancelled or replaced uploads are reclaimed', () => {
     const input = screen.getByLabelText('リッチメニュー画像を選ぶ')
     fireEvent.change(input, { target: { files: [new File(['a'], 'a.png', { type: 'image/png' })] } })
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect((input as HTMLInputElement).disabled).toBe(false))
     fireEvent.change(input, { target: { files: [new File(['b'], 'b.png', { type: 'image/png' })] } })
     await waitFor(() => expect(calls.uploadImage).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect((input as HTMLInputElement).disabled).toBe(false))
     fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '案内' } })
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalled())
