@@ -483,6 +483,7 @@ shared-button-importer components/shared/list-state.tsx
 
 shared-button-importer components/shared/form-file-attachments.tsx
 shared-button-importer components/shared/form-document-retention.tsx
+shared-button-importer components/shared/customer-info-mileage.tsx
 shared-button-importer components/shared/customer-info-panel.tsx
 shared-button-importer components/friend-fields/linked-action-list.tsx
 shared-button-importer components/shared/action-list.tsx

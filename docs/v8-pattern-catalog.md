@@ -649,7 +649,7 @@
 ## customer-info 顧客情報の欄
 
 - **役目**：受信箱の右の欄と友だちの詳細の概要の左を同じ部品で（段ごとの見出し＋編集・決まった8つの欄・タグ・マイル…）
-- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`）。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
+- **持ち主（コード）**：`apps/web/src/components/shared/customer-info-panel.tsx`・`customer-info-panel.module.css`（`CustomerInfoPanel`・`CustomerInfoRail`）。マイルの数・記録・再試行は`customer-info-mileage.tsx`・同CSS。固定値は `fixed-friend-field-values.ts`、アレルギーの編集は `allergy-field.tsx`、表示項目は `display-items-dialog.tsx`。
 - **持ち主（Pen）**：`GBTyR`「顧客情報の欄（B-167）」
   - 2026-10-11確認：両画面の入口は別でも欄の持ち主は CustomerInfoPanel。取得・保存・権限は呼び出す側が渡す。
   - 部品の板の html に書き出されていない ID：`GBTyR`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）

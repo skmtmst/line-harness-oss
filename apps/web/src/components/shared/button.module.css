@@ -257,7 +257,7 @@
 
 /* B-152②：ボタン文字は太字の例外。文字だけの操作は本文の太さを保つ。 */
 :root .button { font-weight: var(--tpl-button-weight); }
-:root .button.inline.text { font-weight: var(--polish-weight-body); }
+:root .button.inline.text { font-weight: var(--font-weight-bold); }
 
 /* B-152・仕上げ7 */
 :root .button:disabled { opacity: var(--polish-disabled-opacity); }
