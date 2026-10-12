@@ -218,7 +218,8 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     await renderNew()
     const dialog = await openTags()
     fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: '常連' } })
-    await waitFor(() => expect(within(dialog).queryByRole('radio', { name: '予約中' })).toBeNull())
+    // 本線の300ms検索後の状態待機を、V8の選択窓へ移して残す。
+    await waitFor(() => expect(within(dialog).queryAllByRole('radio').map(item => item.getAttribute('aria-label'))).toEqual(['常連さん']))
     fireEvent.click(within(dialog).getByRole('radio', { name: '常連さん' }))
     fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
     await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0))
@@ -232,8 +233,10 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     await renderNew(); await chooseTag('予約中')
     const dialog = await openTags()
     fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: 'ありえない語' } })
-    await waitFor(() => expect(within(dialog).queryAllByRole('radio')).toHaveLength(0))
-    expect(within(dialog).getByText(/見つかりません|ありません/)).toBeTruthy()
+    await waitFor(() => {
+      expect(within(dialog).queryAllByRole('radio')).toHaveLength(0)
+      expect(within(dialog).getByText(/見つかりません|ありません/)).toBeTruthy()
+    })
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
     expect(chosenTag()).toContain('予約中')
   })

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import DateTimePicker from './DateTimePicker.js';
 import { dayStateLabel } from './DateTimePicker.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
@@ -741,11 +741,13 @@ describe('監査 L1：月の読込を途中で替えても、戻れば読み直�
     });
     renderPicker();
     await screen.findByText('2026年10月');
-    expect(pending).toHaveLength(1);
+    // 空き枠の読込は useEffect から始める。月の見出しが出た瞬間にはまだ効果が動いておらず、
+    // pending が空のことがある。読込が始まるまで再試行して待つ（以下も同じ理由）。
+    await waitFor(() => { expect(pending).toHaveLength(1); });
     fireEvent.click(screen.getByRole('radio', { name: '週で見る' }));
     await screen.findByRole('button', { name: '10月16日 空きあり' });
     fireEvent.click(screen.getByRole('radio', { name: 'カレンダー' }));
-    expect(pending).toHaveLength(2);
+    await waitFor(() => { expect(pending).toHaveLength(2); });
     await act(async () => pending[0]({ by_staff: [{ staff_id: 's1', display_name: '担当A', slots: [
       { date: '2026-10-17', start: '22:00', end: '23:00' },
     ] }], closed_dates: [] }));
