@@ -39,6 +39,7 @@ interface BookingState {
   profile: { userId: string; displayName: string; pictureUrl?: string } | null;
   friendId: string | null;
   loading: boolean;
+  slotsFailed: boolean;
   submitting: boolean;
 }
 
@@ -51,8 +52,10 @@ const state: BookingState = {
   profile: null,
   friendId: null,
   loading: false,
+  slotsFailed: false,
   submitting: false,
 };
+let slotsGeneration = 0;
 
 function escapeHtml(str: string): string {
   const div = document.createElement('div');
@@ -170,6 +173,11 @@ function renderSlots(): string {
     `;
   }
 
+  if (state.slotsFailed) {
+    return `<div class="slots-section"><h3>${formatDateJa(selectedDate)}</h3>
+      <p role="alert">予約枠を読み込めませんでした。電波のよいところで、もう一度お試しください。</p>
+      <button type="button" class="btn-primary" data-action="retry-slots">もう一度</button></div>`;
+  }
   if (slots.length === 0) {
     return `
       <div class="slots-section">
@@ -357,11 +365,18 @@ function attachEvents(): void {
   // Confirm booking
   const confirmBtn = app.querySelector('[data-action="confirm-booking"]');
   confirmBtn?.addEventListener('click', () => submitBooking());
+  app.querySelector('[data-action="retry-slots"]')?.addEventListener('click', () => {
+    if (state.selectedDate) void fetchSlots(state.selectedDate);
+  });
 }
 
 // ========== API Calls ==========
 
 async function fetchSlots(date: string): Promise<void> {
+  const generation = ++slotsGeneration;
+  state.loading = true;
+  state.slotsFailed = false;
+  render();
   try {
     const params = new URLSearchParams({ date });
     if (CONNECTION_ID) params.set('connectionId', CONNECTION_ID);
@@ -369,13 +384,15 @@ async function fetchSlots(date: string): Promise<void> {
     if (!res.ok) throw new Error('スロット取得に失敗しました');
     const json = await res.json() as { success: boolean; data: Slot[] };
     if (!json.success) throw new Error('スロット取得に失敗しました');
-    state.slots = json.data;
+    if (generation === slotsGeneration && date === state.selectedDate) state.slots = json.data;
   } catch (err) {
-    state.slots = [];
+    if (generation === slotsGeneration && date === state.selectedDate) state.slotsFailed = true;
     console.error('fetchSlots error:', err);
   } finally {
-    state.loading = false;
-    render();
+    if (generation === slotsGeneration && date === state.selectedDate) {
+      state.loading = false;
+      render();
+    }
   }
 }
 

@@ -367,6 +367,10 @@ jobs:
           VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
         run: pnpm --filter worker build
+      - name: Install browser for deployed LIFF entry guard
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Guard customer waitlist entry, theme and short actions (B-247 E3)
+        run: node scripts/codex/revfix-c-liff-browser.mjs
 
   web-checks:
     name: Admin lint, typecheck and tests
@@ -711,7 +715,9 @@ jobs:
         run: node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json
       - name: Virtual table selection, keyboard and layout
         if: steps.scope.outputs.run == 'true'
-        run: node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
+        run: |
+          node --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
+          node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
       - name: Upload V8 screen guard results
         if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

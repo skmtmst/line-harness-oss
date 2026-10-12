@@ -1,3 +1,4 @@
+import { useRequestGeneration } from '../lib/use-request-generation.js';
 import { TextInput, TextArea, ChoiceInput, FieldLabel, FieldCount, FormChoiceRow } from '../components/forms/controls.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -89,6 +90,8 @@ export default function EventConfirm() {
     navigate({ pathname: `/events/${id}/done`, search: next.toString() });
   }
 
+  const request = useRequestGeneration(JSON.stringify([id, slotId]));
+
   async function submit() {
     if (!id || !slotId) return;
     if (note.length > 5000) {
@@ -105,6 +108,8 @@ export default function EventConfirm() {
       setSubmitError(`「${missing.label}」が未回答です`);
       return;
     }
+    if (submitting) return;
+    const generation = request.begin();
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -114,6 +119,7 @@ export default function EventConfirm() {
         { slot_id: slotId, customer_note: note || null, ...(hasAnswers ? { answers } : {}) },
         idemKey,
       );
+      if (!request.isCurrent(generation)) return;
       const startsAt = `startsAt=${encodeURIComponent(slot?.starts_at ?? '')}`;
       if ('waitlisted' in res) {
         // 完了画面で自分の待ち (順番・やめる) を探すため、待ちに入った枠を渡す。
@@ -122,6 +128,7 @@ export default function EventConfirm() {
       }
       goDone(`bookingId=${res.id}&status=${res.status}&${startsAt}`);
     } catch (err) {
+      if (!request.isCurrent(generation)) return;
       logFailure('create-event-booking', err);
       const e = err as { status?: number; body?: { error?: string } };
       const code = e.body?.error;
@@ -144,11 +151,13 @@ export default function EventConfirm() {
       })();
       setSubmitError(msg);
     } finally {
-      setSubmitting(false);
+      if (request.isCurrent(generation)) setSubmitting(false);
     }
   }
 
   function back() {
+    request.invalidate();
+    setSubmitting(false);
     navigate(-1);
   }
 

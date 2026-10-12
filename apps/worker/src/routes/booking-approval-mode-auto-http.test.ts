@@ -33,6 +33,7 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
   ...availabilityMocks,
 }));
 
+const { bookingPayments } = await import('./booking-payments.js');
 const { default: booking } = await import('./booking.js');
 
 function asD1(sqlite: Database.Database): D1Database {
@@ -139,6 +140,7 @@ describe('予約のルール approvalMode', () => {
       return next();
     });
     app.route('/', booking);
+    app.route('/', bookingPayments);
     env = { DB: db };
 
     availabilityMocks.getAvailability.mockResolvedValue({
@@ -184,6 +186,23 @@ describe('予約のルール approvalMode', () => {
   function getBooking(id: string): Record<string, unknown> {
     return sqlite.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as Record<string, unknown>;
   }
+
+  test('BK-P01: 自動承認でも有料オンライン予約は支払い開始まで仮押さえ', async () => {
+    setup('automatic');
+    sqlite.exec(`INSERT INTO booking_payment_configs
+      (line_account_id,mode,provider,hold_minutes,created_at,updated_at)
+      VALUES ('account-am','online','stripe',10,'2026-10-01','2026-10-01')`);
+    const response = await liffCreate('paid-auto');
+    expect(response.status).toBe(201);
+    const body = await response.json() as { booking_id: string; status: string };
+    const started = await app.request('/api/liff/booking/payments/start?liffId=liff-am-1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fake' },
+      body: JSON.stringify({ bookingId: body.booking_id }),
+    }, { ...env, STRIPE_TEST_WEBHOOK_SECRET: 'fake-secret' }, execCtx);
+    expect(started.status).toBe(201);
+    expect(body.status).toBe('requested');
+    expect(getBooking(body.booking_id).decided_at).toBeNull();
+  });
 
   test('manual の店は今までどおり requested で作られる', async () => {
     setup('manual');

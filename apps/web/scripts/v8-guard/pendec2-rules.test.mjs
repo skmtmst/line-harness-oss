@@ -110,7 +110,8 @@ test('実物CSS：全部空なら90、1マスに補足があれば116で全マ�
 test('LIFFの実物CSSは白いカードだけに影を付け、ラジオは18・点9', async () => {
   const surface=readFileSync(new URL('../../../liff/src/card-surface.css',import.meta.url),'utf8')
   for(const entry of ['index.css','embedded.css']) assert.match(readFileSync(new URL('../../../liff/src/'+entry,import.meta.url),'utf8'),/card-surface\.css/)
-  for(const entry of ['affiliate','event-booking','salon-booking','webinar','nen-member']) assert.match(readFileSync(new URL('../../../worker/src/client/'+entry+'/styles.css',import.meta.url),'utf8'),/card-surface\.css/)
+  for(const entry of ['affiliate','event-booking','webinar','nen-member']) assert.match(readFileSync(new URL('../../../worker/src/client/'+entry+'/styles.css',import.meta.url),'utf8'),/card-surface\.css/)
+  assert.match(readFileSync(new URL('../../../liff/src/salon-entry.tsx',import.meta.url),'utf8'),/embedded\.css/)
   const browser=await chromium.launch()
   try {
     const page=await browser.newPage()
@@ -151,3 +152,15 @@ test('実物CSS：差し込み行の項目は8px、印と字は4px。未定義�
     assert.notEqual(await page.locator('.button').evaluate(el=>getComputedStyle(el).columnGap),'4px')
   } finally { await browser.close() }
 })
+
+// 現役のworkerのHTMLは登録案内用の中央寄せを持つ。共通化後も予約を狭めない。
+test('共通LIFF CSSはWorker入口の中央寄せ・余白を外し、操作の素の枠を消す', async () => {
+  const embedded = readFileSync(new URL('../../../liff/src/embedded.css', import.meta.url), 'utf8').replace(/^@import[^;]+;/gm, '').replace(/^@source[^;]+;/gm, '');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+    await page.setContent(`<style>body{display:flex;align-items:center;min-height:100vh}#app{max-width:480px;width:100%;padding:24px 16px}*{box-sizing:border-box;margin:0;padding:0}${embedded}</style><body class="sb-active"><div id="app"><button>人工操作</button></div></body>`);
+    const values = await page.evaluate(() => ({ display: getComputedStyle(document.body).display, padding: getComputedStyle(document.getElementById('app')).padding, border: getComputedStyle(document.querySelector('button')).borderWidth }));
+    assert.deepEqual(values, { display: 'block', padding: '0px', border: '0px' });
+  } finally { await browser.close(); }
+});

@@ -1,4 +1,4 @@
-import { mergeLiffStateSearch } from '@line-crm/shared';
+import { mergeLiffStateLocation } from '@line-crm/shared';
 import liff from '@line/liff';
 import { setCustomerLiffRuntime, type CustomerLiffRuntime } from './liff-runtime.js';
 
@@ -8,8 +8,8 @@ let _idToken: string | null = null;
 
 export async function initLiff(): Promise<void> {
   setCustomerLiffRuntime(null);
-  const search = mergeLiffStateSearch(window.location.search);
-  if (search !== window.location.search) window.history.replaceState(window.history.state, '', `${window.location.pathname}${search}${window.location.hash}`);
+  const restored = mergeLiffStateLocation(window.location.pathname, window.location.search, window.location.hash);
+  if (restored !== `${window.location.pathname}${window.location.search}${window.location.hash}`) window.history.replaceState(window.history.state, '', restored);
   const url = new URL(window.location.href);
   const liffId = url.searchParams.get('liffId') ?? import.meta.env.VITE_DEFAULT_LIFF_ID;
   if (!liffId) {

@@ -168,7 +168,7 @@ async function fetchOffers(): Promise<OfferData[]> {
   const token = await getAccessToken();
   const url = `${BASE}/api/liff/affiliate/offers?lineAccessToken=${encodeURIComponent(token)}`;
   const res = await fetch(url);
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error('案件を読み込めませんでした。');
   const data = (await res.json()) as { offers: OfferData[] };
   return data.offers;
 }
@@ -884,7 +884,7 @@ export default function Affiliate() {
       const [result, mileageResult] = await Promise.all([fetchMe(), fetchMileage()]);
       setWallet(mileageResult);
       if (result.registered) {
-        const offers = await fetchOffers().catch(() => []);
+        const offers = await fetchOffers();
         setState({ phase: 'registered', affiliate: result.affiliate, links: result.links, offers });
       } else {
         setState({ phase: 'not_registered' });
@@ -905,7 +905,7 @@ export default function Affiliate() {
     setRegisterBusy(true);
     try {
       const data = await postRegister();
-      const offers = await fetchOffers().catch(() => []);
+      const offers = await fetchOffers();
       setState({ phase: 'registered', affiliate: data.affiliate, links: data.links, offers });
     } catch (e) {
       logFailure('affiliate-register', e);

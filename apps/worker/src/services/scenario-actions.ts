@@ -13,15 +13,16 @@
  */
 import {
   addTagToFriend,
-  removeTagFromFriend,
   enrollFriendInScenario,
   getFriendFieldById,
   isResourceInScenarioAccount,
   jstNow,
   setFriendFieldValue,
+  friendFieldValueStatements,
   validateFriendFieldValue,
   type PinnedScenarioAction,
 } from '@line-crm/db'
+import { detachTagAndFireSideEffects } from './friend-tag-attach.js'
 import { executeConfiguredAction } from './action-execution-context.js'
 import type { AutomationActionExecutorDependencies } from './automation-action-executors.js'
 import { runEventBookingAction, validEventBookingAction } from './event-booking-action.js'
@@ -436,20 +437,23 @@ async function executeAction(
 ): Promise<boolean> {
   const config = JSON.parse(action.config_json) as unknown
   const accountId = options.accountId ?? null
+  const numericEffectKey = action.repeat_on_refire === 0
+    ? `once:${action.fires_key ?? action.id}`
+    : options.sourceEventId ? JSON.stringify([options.sourceEventId, action.id]) : undefined
 
   switch (action.action_type) {
     case 'tag': {
       const c = config as TagActionConfig
       const tagIds = await resolveTagIds(db, c, accountId)
       for (const tagId of tagIds) {
-        if (c.op === 'remove') await removeTagFromFriend(db, friendId, tagId)
+        if (c.op === 'remove') await detachTagAndFireSideEffects(db, friendId, tagId, numericEffectKey ? `${numericEffectKey}:remove:${tagId}` : undefined)
         else await addTagToFriend(db, friendId, tagId)
       }
       return false
     }
 
     case 'friend_field': {
-      await applyFriendField(db, friendId, config as FriendFieldActionConfig)
+      await applyFriendField(db, friendId, config as FriendFieldActionConfig, numericEffectKey)
       return false
     }
 
@@ -475,12 +479,12 @@ async function executeAction(
         )
         return false
       }
-      await runScenarioOp(db, friendId, action.scenario_id, c)
+      await runScenarioOp(db, friendId, action.scenario_id, c, options.sourceEventId)
       return true
     }
 
     case 'common_var': {
-      await applyCommonVar(db, friendId, config as CommonVarActionConfig)
+      await applyCommonVar(db, friendId, config as CommonVarActionConfig, numericEffectKey)
       return false
     }
 
@@ -549,6 +553,7 @@ async function applyFriendField(
   db: D1Database,
   friendId: string,
   c: FriendFieldActionConfig,
+  effectKey?: string,
 ): Promise<void> {
   if (!c.fieldId) throw new Error('friend_field action requires fieldId')
   const target = await getFriendFieldById(db, c.fieldId)
@@ -577,13 +582,10 @@ async function applyFriendField(
 
   const checked = validateFriendFieldValue(target, raw)
   if (!checked.ok) throw new Error(`invalid friend field value: ${checked.error}`)
-  await setFriendFieldValue(db, {
-    friendId,
-    fieldId: c.fieldId,
-    value: checked.value,
-    updatedBy: 'scenario',
-    field: target,
-  })
+  const input = { friendId, fieldId: c.fieldId, value: checked.value, updatedBy: 'scenario', field: target }
+  if (effectKey && (c.op === 'add' || c.op === 'sub')) {
+    await commitNumericEffect(db, friendId, effectKey, friendFieldValueStatements(db, input))
+  } else await setFriendFieldValue(db, input)
 }
 
 /**
@@ -597,6 +599,7 @@ export async function runScenarioOp(
   friendId: string,
   currentScenarioId: string,
   c: ScenarioActionConfig,
+  sourceEventId?: string,
 ): Promise<void> {
   const now = jstNow()
 
@@ -631,16 +634,13 @@ export async function runScenarioOp(
       .bind(friendId, c.scenarioId)
       .first<{ scenario_id: string }>()
     previousScenarioId = running?.scenario_id ?? null
-    if (previousScenarioId) {
-      await db
-        .prepare(
-          `UPDATE friend_scenarios SET status = 'paused', updated_at = ?
-            WHERE friend_id = ? AND scenario_id = ? AND status IN ('active','delivering')`,
-        )
-        .bind(now, friendId, previousScenarioId)
-        .run()
-    }
   }
+
+  // 元の購読を止めるのは、移動先への登録が成功した後だけ。
+  const pausePrevious = previousScenarioId ? [db.prepare(
+    `UPDATE friend_scenarios SET status='paused', updated_at=?
+      WHERE friend_id=? AND scenario_id=? AND status IN ('active','delivering')`,
+  ).bind(now, friendId, previousScenarioId)] : []
 
   // 読み終えた行が残っていると部分UNIQUE索引には触れないが、
   // 「最初から」を選んだときに読了済の行が邪魔をする。先に消す。
@@ -659,25 +659,37 @@ export async function runScenarioOp(
       .bind(friendId, c.scenarioId)
       .first<{ id: string }>()
     if (paused) {
-      await db
-        .prepare(
-          `UPDATE friend_scenarios
-              SET status = 'active', previous_scenario_id = COALESCE(?, previous_scenario_id), updated_at = ?
-            WHERE id = ?`,
-        )
-        .bind(previousScenarioId, now, paused.id)
-        .run()
+      const available = await db.prepare(`SELECT 1 FROM scenarios WHERE id=? AND is_active=1 AND current_published_version_id IS NOT NULL`)
+        .bind(c.scenarioId).first()
+      if (!available) throw new Error('移動先のシナリオを開始できませんでした。元のシナリオは継続しています')
+      await db.batch([
+        db.prepare(`UPDATE friend_scenarios SET status='active', previous_scenario_id=COALESCE(?,previous_scenario_id), updated_at=?
+          WHERE id=? AND status='paused' AND EXISTS(SELECT 1 FROM scenarios WHERE id=? AND is_active=1 AND current_published_version_id IS NOT NULL)`)
+          .bind(previousScenarioId, now, paused.id, c.scenarioId),
+        // 読み取り後に先が変わっていたらbatch全体を戻し、元の停止へ進まない。
+        db.prepare(`SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'SCENARIO_NOT_RESUMED' END)`),
+        ...pausePrevious,
+      ])
       return
     }
   }
 
-  const enrolled = await enrollFriendInScenario(db, friendId, c.scenarioId)
-  if (enrolled && previousScenarioId) {
-    await db
-      .prepare(`UPDATE friend_scenarios SET previous_scenario_id = ? WHERE id = ?`)
-      .bind(previousScenarioId, enrolled.id)
-      .run()
+  const enrollmentId = sourceEventId ? `scenario-action:${JSON.stringify([friendId, sourceEventId, c.scenarioId])}` : undefined
+  const enrolled = await enrollFriendInScenario(db, friendId, c.scenarioId, enrollmentId, { replacingScenarioId: previousScenarioId })
+  if (!enrolled) {
+    // 元々稼働中の同じ購読は重複開始。新しい移動とは扱わない。
+    const active = await db.prepare(`SELECT 1 FROM friend_scenarios WHERE friend_id=? AND scenario_id=? AND status IN ('active','delivering')`)
+      .bind(friendId, c.scenarioId).first()
+    if (active && !previousScenarioId) return
+    throw new Error('移動先のシナリオを開始できませんでした。元のシナリオは継続しています')
   }
+  if (previousScenarioId) await db.batch([
+    db.prepare(`UPDATE friend_scenarios SET previous_scenario_id=COALESCE(?,previous_scenario_id)
+      WHERE id=? AND status IN ('active','delivering') AND EXISTS(SELECT 1 FROM scenarios WHERE id=? AND is_active=1 AND current_published_version_id IS NOT NULL)`)
+      .bind(previousScenarioId, enrolled.id, c.scenarioId),
+    db.prepare(`SELECT json(CASE WHEN changes()=1 THEN '{}' ELSE 'SCENARIO_NOT_STARTED' END)`),
+    ...pausePrevious,
+  ])
 }
 
 /**
@@ -731,13 +743,14 @@ async function applyCommonVar(
   db: D1Database,
   friendId: string,
   c: CommonVarActionConfig,
+  effectKey?: string,
 ): Promise<void> {
   if (!c.varKey) throw new Error('common_var action requires varKey')
   const delta = Number(c.value ?? 0)
   const safeDelta = Number.isFinite(delta) ? delta : 0
   const signed = c.op === 'add' ? safeDelta : -safeDelta
   const now = jstNow()
-  const results = await db.batch([
+  const statements = [
     db.prepare(
       `UPDATE common_vars
           SET value = CASE
@@ -770,7 +783,39 @@ async function applyCommonVar(
       c.varKey,
       friendId,
     ),
-  ])
-  // 競合で当たらないことはない。当たらなければ行が無い。
-  if ((results[0]?.meta?.changes ?? 0) === 0) throw new Error(`common_var not found: ${c.varKey}`)
+  ]
+  if (effectKey) {
+    await commitNumericEffect(db, friendId, effectKey, [
+      db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM common_vars WHERE var_key=?
+        AND line_account_id=(SELECT line_account_id FROM friends WHERE id=?) AND archived_at IS NULL)
+        THEN '{}' ELSE 'MISSING_COMMON_VAR' END)`).bind(c.varKey, friendId),
+      ...statements,
+    ])
+  } else {
+    const results = await db.batch(statements)
+    if ((results[0]?.meta?.changes ?? 0) === 0) throw new Error(`common_var not found: ${c.varKey}`)
+  }
+}
+
+/** DB内の数値更新と受領記録を同じbatchへ入れる。工程記録を失っても加算し直さない。 */
+async function commitNumericEffect(
+  db: D1Database, friendId: string, effectKey: string, statements: D1PreparedStatement[],
+): Promise<void> {
+  const sourceId = JSON.stringify([friendId, effectKey])
+  const recorded = () => db.prepare('SELECT 1 FROM audit_events WHERE source_kind=? AND source_id=?')
+    .bind('scenario_numeric_action', sourceId).first()
+  if (await recorded()) return
+  try {
+    await db.batch([
+      db.prepare(`INSERT INTO audit_events(id,source_kind,source_id,tenant_id,line_account_id,category,actor_role,action,target_kind,target_id,result)
+        SELECT ?,'scenario_numeric_action',?,COALESCE(a.tenant_id,'00000000-0000-4000-8000-000000000001'),f.line_account_id,
+          'business','system','scenario.numeric','friend',f.id,'success'
+        FROM friends f LEFT JOIN line_accounts a ON a.id=f.line_account_id WHERE f.id=?`)
+        .bind(crypto.randomUUID(), sourceId, friendId),
+      ...statements,
+    ])
+  } catch (error) {
+    // 同じ出来事の並行実行だけは成功済みとして収束する。その他のDB失敗は返す。
+    if (!await recorded()) throw error
+  }
 }
