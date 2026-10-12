@@ -3,7 +3,7 @@ import { notifySaved } from '@/components/shared/toast';
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Check } from 'lucide-react';
+import { Check, Tag as TagIcon, Workflow } from 'lucide-react';
 import type { Scenario, Tag } from '@line-crm/shared';
 import { api } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
@@ -14,10 +14,9 @@ import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import { EntityKindField, EntityKindDialog } from '@/components/shared/entity-picker-sources';
 import { TextField } from '@/components/shared/text-field';
-import Checkbox from '@/components/shared/checkbox';
+import FixedActionList from '@/components/shared/fixed-action-list';
 import { useFormErrors } from '@/lib/use-form-errors';
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError, Field } from '@/components/shared/form-controls';
@@ -295,17 +294,9 @@ export default function AffiliateOfferCreateV8() {
 
       <Card variant="form" aria-labelledby="af-new-point">
         <CardHeader size="stacked" titleId="af-new-point" title="何を成果として数えるか" meta="コンバージョンで作った成果地点から選びます" />
-        <Field label="成果地点" htmlFor="of-point" help="成果地点と案件をつなぐ操作は、まだ保存できません。今は案件ごとの報酬だけを決めます。">
-          <Select
-            id="of-point"
-            aria-label="成果地点"
-            size="full"
-            value=""
-            onChange={() => undefined}
-            options={[{ value: '', label: 'まだ選べません' }]}
-            disabled
-          />
-        </Field>
+        <Notice tone="info" action={<Button href="/conversions" variant="text">成果地点を見る</Button>}>
+          成果地点と案件をつなぐ設定は、まだ保存できません。今は案件ごとの報酬を決められます。
+        </Notice>
       </Card>
 
       <Card variant="form" aria-labelledby="af-new-reward">
@@ -319,53 +310,23 @@ export default function AffiliateOfferCreateV8() {
       </Card>
 
       <Card variant="form" aria-labelledby="af-new-after">
-        <CardHeader size="stacked" titleId="af-new-after" title="成果を認めたときにすること" meta="任意" />
-        <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-          <SaveErrorField names={["tagEnabled","tag_enabled"]}><Checkbox checked={tagEnabled} aria-label="タグを付ける" onCheckedChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} description={tagName ?? 'まだ決めていません'}>タグを付ける</Checkbox></SaveErrorField>
-            {tagEnabled ? (
-              <div {...fields.bind('tag')}>
-                <SaveErrorField names={["tagId"]}><EntityKindField
-                  invalid={fields.invalid('tag')}
-                  describedBy={fields.error('tag') ? 'of-tag-error' : undefined}
-                  id="of-tag"
-                  kind="tag"
-                  label="付けるタグ"
-                  value={tagId}
-                  onChange={(value) => setTagId(value)}
-                  clearable
-                  placeholder="（なし）"
-                  readOnly={!canEdit}
-                  options={tags.filter((t) => (t.status ?? 'active') === 'active')}
-                /></SaveErrorField>
-              </div>
-            ) : null}
-            {tagEnabled ? <FieldError id="of-tag-error">{fields.error('tag')}</FieldError> : null}
-            {tagsFetch === 'loading' && tagEnabled ? <p className={styles.switchNote}>タグの候補を読み込んでいます</p> : null}
-            {tagsFetch === 'failed' ? retry('タグ') : null}
-        </Card>
-        <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-          <SaveErrorField names={["scenarioEnabled","scenario_enabled"]}><Checkbox checked={scenarioEnabled} aria-label="シナリオ配信を始める" onCheckedChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} description={scenarioName ?? 'まだ決めていません'}>シナリオ配信を始める</Checkbox></SaveErrorField>
-            {scenarioEnabled ? (
-              <div {...fields.bind('scenario')}>
-                <SaveErrorField names={["scenarioId"]}><EntityKindField
-                  invalid={fields.invalid('scenario')}
-                  describedBy={fields.error('scenario') ? 'of-scenario-error' : undefined}
-                  kind="scenario"
-                  id="of-scenario"
-                  label="開始するシナリオ"
-                  value={scenarioId}
-                  onChange={(value) => setScenarioId(value)}
-                  clearable
-                  placeholder="（なし）"
-                  readOnly={!canEdit}
-                  options={scenarios.filter((s) => s.isActive !== false)}
-                /></SaveErrorField>
-              </div>
-            ) : null}
-            {scenarioEnabled ? <FieldError id="of-scenario-error">{fields.error('scenario')}</FieldError> : null}
-            {scenariosFetch === 'loading' && scenarioEnabled ? <p className={styles.switchNote}>シナリオの候補を読み込んでいます</p> : null}
-            {scenariosFetch === 'failed' ? retry('シナリオ') : null}
-        </Card>
+        <CardHeader size="stacked" titleId="af-new-after" title="成果を認めたときにすること" optional />
+        <FixedActionList readOnly={!canEdit} options={[
+          { id: 'tag', label: 'タグを付ける', icon: TagIcon, enabled: tagEnabled,
+            onEnabledChange: next => { setTagEnabled(next); if (!next) setTagId('') }, onSelect: setTagId,
+            summary: tagName ?? 'タグを選んでください', disabled: tagsFetch !== 'ready', disabledReason: 'タグの候補を読み込んでから選べます',
+            picker: { title: 'タグを選ぶ', items: tags.filter(t => (t.status ?? 'active') === 'active').map(t => ({ id: t.id, name: t.name })),
+              render: ({ onConfirm, onCancel }) => <EntityKindDialog kind="tag" options={tags.filter(t => (t.status ?? 'active') === 'active')} onConfirm={id => onConfirm([id])} onCancel={onCancel} /> },
+            editor: <div {...fields.bind('tag')}><SaveErrorField names={["tagId"]}><EntityKindField id="of-tag" kind="tag" label="付けるタグ" value={tagId} onChange={setTagId} clearable readOnly={!canEdit} invalid={fields.invalid('tag')} describedBy={fields.error('tag') ? 'of-tag-error' : undefined} options={tags.filter(t => (t.status ?? 'active') === 'active')} /></SaveErrorField><FieldError id="of-tag-error">{fields.error('tag')}</FieldError></div> },
+          { id: 'scenario', label: 'シナリオ配信を始める', icon: Workflow, enabled: scenarioEnabled,
+            onEnabledChange: next => { setScenarioEnabled(next); if (!next) setScenarioId('') }, onSelect: setScenarioId,
+            summary: scenarioName ?? 'シナリオを選んでください', disabled: scenariosFetch !== 'ready', disabledReason: 'シナリオの候補を読み込んでから選べます',
+            picker: { title: 'シナリオを選ぶ', items: scenarios.filter(item => item.isActive !== false).map(item => ({ id: item.id, name: item.name })),
+              render: ({ onConfirm, onCancel }) => <EntityKindDialog kind="scenario" options={scenarios.filter(item => item.isActive !== false)} onConfirm={id => onConfirm([id])} onCancel={onCancel} /> },
+            editor: <div {...fields.bind('scenario')}><SaveErrorField names={["scenarioId"]}><EntityKindField id="of-scenario" kind="scenario" label="開始するシナリオ" value={scenarioId} onChange={setScenarioId} clearable readOnly={!canEdit} invalid={fields.invalid('scenario')} describedBy={fields.error('scenario') ? 'of-scenario-error' : undefined} options={scenarios.filter(item => item.isActive !== false)} /></SaveErrorField><FieldError id="of-scenario-error">{fields.error('scenario')}</FieldError></div> },
+        ]} />
+        {tagsFetch === 'failed' ? retry('タグ') : null}
+        {scenariosFetch === 'failed' ? retry('シナリオ') : null}
       </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した案件" onConfirm={confirmLeave} onCancel={cancelLeave} />

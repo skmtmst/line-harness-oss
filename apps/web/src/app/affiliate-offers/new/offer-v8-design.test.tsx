@@ -55,16 +55,15 @@ afterEach(() => {
 })
 
 describe('Td4TN 作る画面の絵合わせ', () => {
-  test('成果地点の札は見た目だけで選べない', async () => {
+  test('成果地点の未対応を説明し、使える一覧への道を残す', async () => {
     render(<NewOfferV8 />)
     await waitFor(() => {
       expect(screen.getByText('案件を作る')).toBeTruthy()
     })
     expect(screen.getByText('コンバージョンで作った成果地点から選びます')).toBeTruthy()
-    const point = screen.getByLabelText('成果地点')
-    expect((point as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: '成果地点の説明' }))
-    expect(screen.getByText(/成果地点と案件をつなぐ操作は、まだ保存できません/)).toBeTruthy()
+    expect(screen.queryByLabelText('成果地点')).toBeNull()
+    expect(screen.getByText(/成果地点と案件をつなぐ設定は、まだ保存できません/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: '成果地点を見る' }).getAttribute('href')).toBe('/conversions')
   })
 
   test('頭・見え方・気をつけること・足元が絵どおり', async () => {

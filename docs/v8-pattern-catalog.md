@@ -951,3 +951,5 @@
 - 作成段の任意の題は `CardHeader` の `optional`。窓の題の横は既存の `Dialog.titleHelp` に共通 `OptionalBadge` を渡す。括弧付きの題を画面ごとに描かない。
 
 - 名前とフォルダの2列は `SettingsFormRow layout="name-folder"`。名前2・フォルダ1の比率で行の幅を埋め、間は共通12。フォルダは既存 `FolderSelect size="full"`。文字数・再試行・社内メモは各入力の共通部品へ渡す。
+
+- 固定の保存項目しか持たない行うことは `FixedActionList` から既存 `ActionList` へ渡す。種類は保存できる物だけ、順序は固定。対象の選択を確定するまで行を作らず、保存形式は画面の既存の口へ戻す。

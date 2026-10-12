@@ -23,7 +23,7 @@ import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import Checkbox from '@/components/shared/checkbox'
+import FixedActionList from '@/components/shared/fixed-action-list'
 import { distributionUrl } from './display'
 import styles from './create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -493,13 +493,11 @@ export default function CreateAffiliateV8() {
       </Card>
 
       <Card variant="form" aria-label="成果が出たときにすること">
-        <CardHeader size="stacked" title="成果が出たときにすること" meta="任意" />
-        <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-          <SaveErrorField names={["notifyOnConversion","notify_on_conversion"]}><Checkbox checked={notifyOnConversion} aria-label="本人に LINE で知らせる" onCheckedChange={setNotifyOnConversion} description="成果 1 件ごとに">本人に LINE で知らせる</Checkbox></SaveErrorField>
-        </Card>
-        <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-          <SaveErrorField names={["startTracking","isActive","start_tracking"]}><Checkbox checked={startTracking} aria-label="すぐに計測を始める" onCheckedChange={setStartTracking} description={startTracking ? '登録したらすぐに数え始めます' : 'オフでもリンクは発行されます'}>すぐに計測を始める</Checkbox></SaveErrorField>
-        </Card>
+        <CardHeader size="stacked" title="成果が出たときにすること" optional />
+        <FixedActionList options={[
+          { id: 'notify', label: '本人に LINE で知らせる', enabled: notifyOnConversion, onEnabledChange: setNotifyOnConversion, summary: '成果 1 件ごとに' },
+          { id: 'tracking', label: 'すぐに計測を始める', enabled: startTracking, onEnabledChange: setStartTracking, summary: '登録したらすぐに数え始めます' },
+        ]} />
       </Card>
 
       {saveError ? <Notice tone="danger" >{saveError}</Notice> : null}
