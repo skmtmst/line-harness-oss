@@ -1099,7 +1099,7 @@ function CommonVarsListInner() {
             {`「${firstEmpty.name}」が空のまま ${typeof firstEmpty.usageCount === 'number' ? `${formatNumber(firstEmpty.usageCount)}か所` : '何か所か'}で使われています。差し込んだところが空欄のまま送られます。`}
           </span>
           <span className={styles.alertSpacer} aria-hidden="true" />
-          <Button type="button" onClick={applyEmptyFilter}>直す</Button>
+          <Button type="button" actionWording onClick={applyEmptyFilter}>{canWrite ? "直す" : "空のままを見る"}</Button>
         </div>
       ) : null}
       {listLimited && !listFailed ? (
@@ -1812,15 +1812,8 @@ function CommonVarsListInner() {
               icon={<kpi.icon size={13} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
-              detail={kpi.fix ? (
-                /* 絵：説明の右端に「直す →」。押すと「空のまま」で絞り込む。 */
-                <span className={styles.kpiDetailRow}>
-                  <span className={styles.kpiDetailText}>{kpi.detail}</span>
-                  <button type="button" className={styles.kpiFix} onClick={applyEmptyFilter}>
-                    直す<ArrowRight size={12} aria-hidden="true" />
-                  </button>
-                </span>
-              ) : kpi.detail}
+              detail={kpi.detail}
+              action={kpi.fix ? { label: canWrite ? '直す' : '空のままを見る', onClick: applyEmptyFilter } : undefined}
             />
           ))}
         </KpiBand>

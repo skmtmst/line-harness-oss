@@ -886,7 +886,8 @@
             "apps/web/src/components/shared/dialog.tsx",
             "apps/web/src/components/shared/dialog.module.css",
             "apps/web/src/components/shared/confirm-dialog.tsx",
-            "apps/web/src/components/shared/overlay-utils.ts"
+            "apps/web/src/components/shared/overlay-utils.ts",
+            "apps/web/src/components/shared/action-words.ts"
           ],
           "components": [
             "Dialog",
@@ -2515,7 +2516,8 @@
             "apps/web/src/components/shared/button.tsx",
             "apps/web/src/components/shared/button.module.css",
             "apps/web/src/components/shared/icon-button.tsx",
-            "apps/web/src/components/shared/icon-button.module.css"
+            "apps/web/src/components/shared/icon-button.module.css",
+            "apps/web/src/components/shared/action-words.ts"
           ],
           "components": [
             "Button",

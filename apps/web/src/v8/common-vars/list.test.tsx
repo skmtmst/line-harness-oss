@@ -2,7 +2,7 @@
 /*
  * V8 共通情報の一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 Hhl9M・xxKtW）・
- * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「直す」で絞れる。
+ * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「編集する」で絞れる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -164,11 +164,11 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     expect(host.textContent).toContain('株式会社NEN')
   })
 
-  it('空のままの帯の「直す」で、空のものだけに絞る', async () => {
+  it('空のままの帯の「編集する」で、空のものだけに絞る', async () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
-    const fix = [...host.querySelectorAll('[role="status"] button')].find((b) => b.textContent === '直す') as HTMLButtonElement
-    expect(fix, '帯の「直す」がありません').toBeTruthy()
+    const fix = [...host.querySelectorAll('[role="status"] button')].find((b) => b.textContent === '編集する') as HTMLButtonElement
+    expect(fix, '帯の「編集する」がありません').toBeTruthy()
     act(() => { fix.click() })
     await flush()
     expect(host.textContent).not.toContain('株式会社NEN')
