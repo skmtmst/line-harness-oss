@@ -38,7 +38,7 @@ test('B-254: rendered content selects 52/60, general tables stay 56; incorrect m
       await setDensity()
       assert.deepEqual(await heights('tr'), [56, 56, 56, 56, 56, 60, 60])
       assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-178 行52'))
-      await page.setContent(html('<div class="row">一般表</div><section data-list-skeleton><div class="row" data-shared-part="list-row"><span>一覧</span></div><div class="row" data-shared-part="list-row"><span>名前<br>補足</span></div></section>', css('grid-table')))
+      await page.setContent(html('<div class="table"><div class="row">一般表</div></div><section data-list-skeleton><div class="table"><div class="row" data-shared-part="list-row"><span>一覧</span></div><div class="row" data-shared-part="list-row"><span>名前<br>補足</span></div></div></section>', css('grid-table')))
       await setDensity()
       assert.deepEqual(await heights('.row'), [56, 52, 60])
       assert.deepEqual((await page.evaluate(scanListSkeleton)).failures, [])
@@ -61,5 +61,19 @@ test('B-254: rendered content selects 52/60, general tables stay 56; incorrect m
     await setDensity()
     assert.equal(await page.locator('#wrapped tr').evaluate(listRowContentLines), 3)
     assert.deepEqual(await heights('tr'), [60, 52])
+
+    // Real GridTable uses ARIA table/row. The general 56px rule in globals
+    // must not win when production CSS chunks load in a different order.
+    const grids = '<div class="table" role="table"><div class="row" role="row"><span>一般表</span></div></div>'
+      + '<section data-list-skeleton><div class="table" role="table"><div class="row" role="row" data-shared-part="list-row"><span>会員</span></div><div class="row" role="row" data-shared-part="list-row"><span>名前<br>補足</span></div></div></section>'
+    for (const width of [1152, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 })
+      for (const orderedStyles of [`${globals}\n${css('grid-table')}`, `${css('grid-table')}\n${globals}`]) {
+        await page.setContent(`<html data-theme="v8"><style>${orderedStyles}\n*{box-sizing:border-box}</style><body>${grids}</body></html>`)
+        await setDensity()
+        assert.deepEqual(await heights('.row'), [56, 52, 60], 'list density must win in both CSS orders')
+        assert.deepEqual((await page.evaluate(scanListSkeleton)).failures, [])
+      }
+    }
   } finally { await browser.close() }
 })

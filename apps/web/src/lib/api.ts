@@ -6021,6 +6021,8 @@ export type FileScanConfig = {
   externalProvider: string | null
   externalEndpointUrl: string | null
   externalSecretRef: string | null
+  /** 現在の運営の許可設定で送信できるか。鍵の実在・疎通確認ではない。 */
+  externalEnabled: boolean
   externalTimeoutMs: number
   maxBytesOverride: number | null
   maxPixelsOverride: number | null

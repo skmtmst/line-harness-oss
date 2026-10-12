@@ -255,6 +255,8 @@ export type Env = {
     BUILD_GIT_COMMIT?: string;
     BUILD_VERSION?: string;
     BUILD_RELEASED_AT?: string;
+    /** 外部ファイル検査の許可組（host=FILE_SCAN_SECRET_X、カンマ区切り）。未設定なら内蔵検査のみ。 */
+    FILE_SCAN_ALLOWED_PAIRS?: string;
     IMAGES: R2Bucket;
     /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
     RAW_MAIL?: R2Bucket;
@@ -288,6 +290,16 @@ export type Env = {
     RT_DELIVERY_ROCKETNOW_API_BASE_URL?: string;
     RT_DELIVERY_ROCKETNOW_API_TOKEN?: string;
     RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET?: string;
+    /**
+     * Uber Eats のログイン連携（設定 › デリバリー連携からお店の人が自分でつなぐ経路）。
+     * Uber の開発者画面で発行された値を、環境ごとの秘密設定として入れる。
+     * 入れるのは2つだけで、戻り先URLは WORKER_PUBLIC_URL から組み立てる。
+     * 2つそろわない環境では連携の口を開けない。
+     */
+    RT_DELIVERY_UBEREATS_CLIENT_ID?: string;
+    RT_DELIVERY_UBEREATS_CLIENT_SECRET?: string;
+    /** 既定では使わない。Uber 側の登録が別の文字列のときだけ上書きとして入れる。 */
+    RT_DELIVERY_UBEREATS_REDIRECT_URI?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
     RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;

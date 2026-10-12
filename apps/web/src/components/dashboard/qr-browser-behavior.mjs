@@ -10,7 +10,7 @@
  *
  * 実行（Node 22.18 以上。Worker の .ts をそのまま読むため）:
  *   NEXT_PUBLIC_API_URL=http://127.0.0.1:3158 pnpm --filter web build
- *   node apps/web/src/components/dashboard/qr-browser-behavior.mjs
+ *   node --import tsx apps/web/src/components/dashboard/qr-browser-behavior.mjs
  */
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
@@ -23,7 +23,6 @@ import {
   normalizeQrSize,
   qrResponseHeaders,
 } from '../../../../worker/src/lib/qr-response.ts'
-import { selectOptionIn } from '../../test-utils/select-helpers.ts'
 
 const PORT = 3158
 const outDir = join(process.cwd(), 'apps/web/out')
@@ -117,14 +116,18 @@ async function openDashboard(browser) {
     contentType: 'application/json',
     body: JSON.stringify({ latest: '0.24.0', releases: [] }),
   }))
-  await page.route('**/api/**', (route) => {
+  await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url())
     // QRだけは本物の受け口へ通す。ここを差し替えると何も確かめられない。
-    if (url.pathname === '/api/qr') return route.continue()
+    if (url.pathname === '/api/qr') {
+      const response = await route.fetch({ url: `${baseUrl}${url.pathname}${url.search}` })
+      return route.fulfill({ response })
+    }
     const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
     if (url.pathname === '/api/auth/session') {
-      return json({ success: true, data: { name: '管理者', role: 'owner', permissionKeys: [] }, csrfToken: 'test-csrf' })
+      return json({ success: true, data: { id: 'viewer', name: '管理者', role: 'owner', permissionKeys: [] }, csrfToken: 'test-csrf' })
     }
+    if (url.pathname === '/api/staff/me') return json({ success: true, data: { id: 'viewer', name: '管理者', role: 'owner', permissionKeys: [] } })
     if (url.pathname === '/api/line-accounts') return json({ success: true, data: accounts })
     if (url.pathname === '/api/entry-routes') {
       return json({ success: true, data: [{ id: 'route-1', name: '店頭POP', refCode: 'pop2026', isActive: true }] })
@@ -207,10 +210,13 @@ try {
   }
 
   // 経路を選ぶと保存名と対象URLがその経路になる（既存の動きを壊していない）。
-  // 「発行中の追加URL」は共通 Select なので共有の手助けで選ぶ。
+  // 「発行中の追加URL」は共通の選択窓で選び、確定する。
   // 作り物の経路 route-1 の名前は「店頭POP」。
   await dialog.getByRole('button', { name: 'PNG', exact: true }).click()
-  await selectOptionIn(page, '発行中の追加URL', '店頭POP')
+  await dialog.getByRole('button', { name: '発行中の追加URL', exact: true }).click()
+  const picker = page.getByRole('dialog').filter({ has: page.getByRole('radio', { name: '店頭POP', exact: true }) })
+  await picker.getByRole('radio', { name: '店頭POP', exact: true }).check()
+  await picker.getByRole('button', { name: '選ぶ', exact: true }).click()
   const [routeDownload] = await Promise.all([
     page.waitForEvent('download'),
     dialog.getByRole('link', { name: '画像をダウンロード' }).click(),

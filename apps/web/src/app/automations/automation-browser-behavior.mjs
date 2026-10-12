@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
-import { chromium } from '@playwright/test'
+import { chromium, expect } from '@playwright/test'
 
 const outDir = join(process.cwd(), 'apps/web/out')
 
@@ -105,8 +105,9 @@ async function openHarness(browser, role) {
     })
 
     if (path === '/api/auth/session') {
-      return json({ success: true, data: { name: `${role}利用者`, role, permissionKeys: [] }, csrfToken: 'test-csrf' })
+      return json({ success: true, data: { id: 'viewer', name: `${role}利用者`, role, permissionKeys: [] }, csrfToken: 'test-csrf' })
     }
+    if (path === '/api/staff/me') return json({ success: true, data: { id: 'viewer', name: `${role}利用者`, role, permissionKeys: [] } })
     if (path === '/api/line-accounts') return json({ success: true, data: accounts })
     if (path === '/api/automations' && request.method() === 'GET') {
       const selected = url.searchParams.get('lineAccountId')
@@ -120,16 +121,16 @@ async function openHarness(browser, role) {
         summary: { active: data.filter((item) => item.isActive).length, stopped: data.filter((item) => !item.isActive).length, executionCount30d: 6, failureCount30d: 0 },
       })
     }
-    if (/^\/api\/automations\/[^/]+$/.test(path) && request.method() === 'PUT') {
+    if (/^\/api\/automations\/[^/]+\/status$/.test(path) && request.method() === 'POST') {
       state.updateCalls += 1
       await new Promise((resolve) => setTimeout(resolve, 500))
       if (state.failNextUpdate) {
         state.failNextUpdate = false
         return json({ success: false, error: 'timeout' })
       }
-      const id = decodeURIComponent(path.split('/').at(-1))
+      const id = decodeURIComponent(path.split('/').at(-2))
       const body = request.postDataJSON()
-      state.items = state.items.map((item) => item.id === id ? { ...item, isActive: body.isActive, status: body.isActive ? 'active' : 'stopped' } : item)
+      state.items = state.items.map((item) => item.id === id ? { ...item, isActive: body.status === 'active', status: body.status } : item)
       return json({ success: true, data: state.items.find((item) => item.id === id) })
     }
     if (path === '/api/automation-runs') {
@@ -164,14 +165,28 @@ async function waitForAutomationPage(page) {
   }
 }
 
+async function openRowMenu(page, name) {
+  await page.getByRole('button', { name: `ルール「${name}」の操作`, exact: true }).click()
+  return page.getByRole('menu', { name: `ルール「${name}」の操作`, exact: true })
+}
+async function switchAccount(page, whileConfirming = false) {
+  const button = page.getByRole('button', { name: 'アカウントを切り替える', exact: true })
+  // 確認中もアカウント変更イベントが届いた場合の境界を守る（旧 selectOption と同じ契約）。
+  if (whileConfirming) await button.evaluate(element => element.click())
+  else await button.click()
+  const account = page.getByRole('menuitemradio', { name: 'B店', exact: true })
+  if (whileConfirming) await account.evaluate(element => element.click())
+  else await account.click()
+}
 const browser = await chromium.launch({ headless: true })
 try {
   for (const role of ['owner', 'admin']) {
     const { context, page } = await openHarness(browser, role)
     await page.goto(`${baseUrl}/automations`)
     await waitForAutomationPage(page)
-    assert.equal(await page.getByRole('link', { name: 'ルールを作成' }).count(), 1)
-    assert.equal(await page.getByRole('button', { name: '止める・動かす' }).count(), 2)
+    assert.equal(await page.getByRole('link', { name: 'ルールを作る' }).count(), 1)
+    const menu = await openRowMenu(page, '購入後フォロー')
+    await expect(menu.getByRole('menuitem', { name: '止める', exact: true })).toBeVisible()
     await context.close()
   }
 
@@ -179,7 +194,7 @@ try {
     const { context, page, state } = await openHarness(browser, 'owner')
     await page.goto(`${baseUrl}/automations`)
     await waitForAutomationPage(page)
-    await page.getByRole('button', { name: '止める・動かす' }).first().click()
+    await (await openRowMenu(page, '購入後フォロー')).getByRole('menuitem', { name: '止める', exact: true }).click()
     const confirm = page.getByRole('button', { name: '止める', exact: true })
     await confirm.waitFor()
     await confirm.evaluate((button) => { button.click(); button.click() })
@@ -187,15 +202,18 @@ try {
     assert.equal(state.updateCalls, 1, '二重クリックで更新APIを2回呼ばない')
 
     state.failNextUpdate = true
-    await page.getByRole('button', { name: '止める・動かす' }).nth(1).click()
+    await (await openRowMenu(page, '誕生日通知')).getByRole('menuitem', { name: '止める', exact: true }).click()
     await page.getByRole('button', { name: '止める', exact: true }).click()
-    await page.getByText('稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。', { exact: true }).waitFor()
+    await page.getByRole('dialog').getByText('稼働を切り替えられませんでした。状態を読み直してから、もう一度お試しください。', { exact: true }).waitFor()
     assert.ok(state.listCalls.length >= 3, '失敗後も一覧APIを再取得する')
 
     await page.getByRole('button', { name: 'キャンセル', exact: true }).click()
-    await page.getByRole('button', { name: '止める・動かす' }).first().click()
-    await page.getByLabel('LINEアカウント').selectOption('account-b')
-    await page.getByText(/押したあとにLINEアカウントが切り替わりました/).waitFor()
+    await (await openRowMenu(page, '購入後フォロー')).getByRole('menuitem', { name: '動かす', exact: true }).click()
+    const callsBeforeSwitch = state.updateCalls
+    await switchAccount(page, true)
+    await page.getByText('B店フォロー', { exact: true }).waitFor()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    assert.equal(state.updateCalls, callsBeforeSwitch, 'アカウント切替時に前アカウントを更新しない')
     assert.equal(await page.getByRole('button', { name: '動かす', exact: true }).count(), 0)
     assert.equal(await page.getByRole('button', { name: '止める', exact: true }).count(), 0)
     await context.close()
@@ -205,15 +223,19 @@ try {
     const { context, page, state } = await openHarness(browser, 'staff')
     await page.goto(`${baseUrl}/automations`)
     await waitForAutomationPage(page)
-    assert.equal(await page.getByRole('link', { name: 'ルールを作成' }).count(), 0)
-    assert.equal(await page.getByRole('button', { name: '止める・動かす' }).count(), 0)
-    assert.equal(await page.getByText('操作する権限がありません', { exact: true }).count(), 2)
-    assert.equal(await page.getByRole('note').filter({ hasText: '閲覧のみのため、ルールの作成・変更はできません。' }).count(), 1)
-
-    const links = page.getByRole('link', { name: '動いた記録を見る' })
-    assert.equal(await links.count(), 2)
-    await links.nth(1).click()
-    const search = page.getByPlaceholder('友だちの名前・オートメーションの名前で検索')
+    assert.equal(await page.getByRole('link', { name: 'ルールを作る' }).count(), 0)
+    await expect(page.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。', { exact: true })).toBeVisible()
+    for (const name of ['購入後フォロー', '誕生日通知']) {
+      const menu = await openRowMenu(page, name)
+      for (const action of ['編集する', '複製する', '1人で試す', '止める', '動かす', '保管する', 'フォルダへ移す']) {
+        await expect(menu.getByRole('menuitem', { name: action, exact: true })).toHaveCount(0)
+      }
+      await expect(menu.getByRole('menuitem', { name: '動いた記録を見る', exact: true })).toBeVisible()
+      if (name === '誕生日通知') await menu.getByRole('menuitem', { name: '動いた記録を見る', exact: true }).click()
+      else await page.keyboard.press('Escape')
+    }
+    assert.equal(state.updateCalls, 0, 'staff は状態更新を送信しない')
+    const search = page.getByPlaceholder('友だち・ルールの名前で探す')
     await search.waitFor()
     assert.equal(await search.inputValue(), '誕生日通知')
     await page.waitForTimeout(500)
@@ -239,9 +261,7 @@ try {
     const lateListA = page.waitForResponse((response) =>
       response.url().includes('/api/automations?') && response.url().includes('lineAccountId=account-a'))
     await page.goto(`${baseUrl}/automations`)
-    const accountSelect = page.getByLabel('LINEアカウント')
-    await accountSelect.waitFor()
-    await accountSelect.selectOption('account-b')
+    await switchAccount(page)
     await page.getByText('B店フォロー', { exact: true }).waitFor()
     await lateListA
     await page.waitForTimeout(500)

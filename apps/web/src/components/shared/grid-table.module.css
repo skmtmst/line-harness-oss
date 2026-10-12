@@ -54,11 +54,11 @@ html:root .table [data-list-name-cell] { color: var(--color-ink); font-weight: 7
 html:root .row[data-broken]:hover { background: var(--color-status-danger-soft); }
 
 /* B-254: one rendered line is 52; two or three are 60. The table sets the count. */
-html:root .row[data-list-content-lines] {
+html:root .table .row[data-list-content-lines] {
   --list-content-row-h: var(--tpl-list-row-h);
   height: var(--list-content-row-h); min-height: var(--list-content-row-h);
 }
-html:root .row[data-list-content-lines]:is([data-list-content-lines='2'], [data-list-content-lines='3']) {
+html:root .table .row[data-list-content-lines]:is([data-list-content-lines='2'], [data-list-content-lines='3']) {
   --list-content-row-h: var(--tpl-list-row-multi-h);
 }
 

@@ -497,6 +497,9 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/restaurant-test/delivery/intake/stop',
     'POST /api/restaurant-test/delivery/orders/:id/cancel',
     'POST /api/restaurant-test/delivery/orders/:id/reject',
+    // Uber Eats のログイン連携の入口。店舗の代理で使えるトークンを得る操作なので
+    // Google 接続の connect/start と同じく店舗管理者以上に限る。
+    'POST /api/restaurant-test/delivery/ubereats/connect/start',
     'POST /api/restaurant-test/floors',
     'POST /api/restaurant-test/followups/:storeId/bindings/:stepId',
     'POST /api/restaurant-test/followups/:storeId/request-start',
