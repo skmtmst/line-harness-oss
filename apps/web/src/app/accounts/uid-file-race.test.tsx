@@ -3,9 +3,15 @@
  * 監査 WEB316：対応表CSVを A→B と選び直したとき、遅い A の読み取りで
  * B の対応表を置き換えない。テスト移行は B の名前・中身・対応表をそろえて送る。
  */
-import { act, renderHook } from '@testing-library/react'
+import { cleanup, act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred, stubFetchNotFound } from '@/test-utils/race'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+  vi.unstubAllGlobals()
+})
 
 const fixture = vi.hoisted(() => ({ dryRun: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -20,7 +26,6 @@ beforeEach(() => {
   fixture.dryRun.mockReset()
   fixture.dryRun.mockResolvedValue({ success: false, error: 'stop' })
 })
-afterEach(() => vi.unstubAllGlobals())
 
 function slowFile(name: string, text: Promise<string>): File {
   return { name, text: () => text } as unknown as File

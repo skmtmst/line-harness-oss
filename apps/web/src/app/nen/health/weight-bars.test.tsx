@@ -4,9 +4,14 @@
  * 付けると、丸いはずの点が縦長に見える（8×16・8×24）。棒の上は丸めず、
  * 高さの違い（値の推移）だけを残すことが約束。
  */
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, cleanup, render } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { WeightBars } from '@/v8/nen-health/parts'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 describe('体重の推移の棒は丸めない（m22a）', () => {
   it('値のある週の棒に丸みの class が付かない', () => {

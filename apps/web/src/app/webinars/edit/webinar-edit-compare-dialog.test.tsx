@@ -2,11 +2,16 @@
 /*
  * 同時編集の見比べ（板 `pvimJ`）。行の組み立てと帯の比べ口だけを確かめる。
  */
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { buildCompareRows, describeCard } from '@/v8/webinar-edit/cta-compare'
 import type { WebinarCtaCard } from '@/lib/api'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 const card = (over: Partial<WebinarCtaCard> = {}): WebinarCtaCard => ({
   atSeconds: 180,
