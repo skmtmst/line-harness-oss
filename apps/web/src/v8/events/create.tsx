@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -268,7 +269,7 @@ function EventsCreateV8Inner() {
     >
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
-      <section className={styles.card} aria-labelledby="ev-new-body">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-body">
         <h2 className={styles.cardTitle} id="ev-new-body">イベントの中身</h2>
         <div className={styles.field}><Field label="イベント名" htmlFor="ev-new-name" required><SaveErrorField names={["name","draft.name"]}><TextField
             id="ev-new-name"
@@ -315,9 +316,9 @@ function EventsCreateV8Inner() {
             {fieldErrors['ev-new-url'] ? <p id="ev-new-url-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-url']}</p> : null}
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-target">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-target">
         <h2 className={styles.cardTitle} id="ev-new-target">公開対象</h2>
         <SaveErrorField names={["ev-new-target","target_type","draft.target_type"]}><RadioCardGroup legend="公開対象" className={styles.cardRow}>
           <RadioCard
@@ -339,9 +340,9 @@ function EventsCreateV8Inner() {
             note="同じ人に重ねて出しません"
           />
         </RadioCardGroup></SaveErrorField>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-slot">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-slot">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ev-new-slot">最初の予約枠</h2>
           <p className={styles.cardNote}>あとから回を足せます（中身を見る → 回を足す）</p>
@@ -381,9 +382,9 @@ function EventsCreateV8Inner() {
             /></SaveErrorField>
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-rules">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-rules">
         <h2 className={styles.cardTitle} id="ev-new-rules">申し込みのきまり</h2>
         <div className={styles.pair}>
           <div className={styles.field}>
@@ -426,9 +427,9 @@ function EventsCreateV8Inner() {
           </div>
           <span className={styles.field} aria-hidden="true" />
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-questions">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-questions">
         <h2 className={styles.cardTitle} id="ev-new-questions">申し込みのときに聞くこと</h2>
         {questions.length > 0 ? (
           <ul className={styles.questionList}>
@@ -473,9 +474,9 @@ function EventsCreateV8Inner() {
             <button type="button" className={styles.linkButton} onClick={() => setAdding({ label: '', required: true })}>＋ 質問を足す</button>
           </div>
         )}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-after-apply">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-after-apply">
         <h2 className={styles.cardTitle} id="ev-new-after-apply">申し込んだ人にすること</h2>
         <div className={styles.checks}>
           <div className={styles.checkItem}>
@@ -491,7 +492,7 @@ function EventsCreateV8Inner() {
             前日に思い出してもらう
           </Checkbox></SaveErrorField>
         </div>
-      </section>
+      </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したイベント" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <ConfirmDialog open={publishOpen} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} onConfirm={() => save(true)} onCancel={() => setPublishOpen(false)} />
