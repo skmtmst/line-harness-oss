@@ -1088,7 +1088,8 @@ export default function BroadcastListV8() {
                 {canEdit ? <div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>
                     <RowMenu
-                      className={styles.menuButton}
+                      appearance="box"
+                      size="row"
                       label={menuLabel}
                       items={rowMenuItems(broadcast)}
                       open={openMenuId === broadcast.id}

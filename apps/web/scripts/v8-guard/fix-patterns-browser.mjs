@@ -79,6 +79,11 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
         || el.matches('input[type="checkbox"],input[type="radio"]') && owned(el.closest('label'))) continue
       add('F5', el, 'tool has no shared or template CSS owner')
     }
+    if (cssOwners.length) for (const el of all('[data-row-menu]')) {
+      if (!owned(el) || [...el.classList].some(cls => cls.includes('__') && !cssOwners.some(name => cls.startsWith(`${name}_`)))) {
+        add('F5', el, 'row menu shape has a page CSS owner instead of shared props')
+      }
+    }
     for (const el of all('[data-template-region="toolbar"] button:disabled,[data-template-region="toolbar"] input:disabled')) {
       const explained = el.title || (el.getAttribute('aria-describedby') || '').split(/\s+/).some(id => document.getElementById(id)?.textContent.trim())
       if (!explained && !el.closest('[aria-busy="true"]') && !/読み込|保存中|送信中|処理中/.test(el.textContent)) add('F8', el, 'disabled tool has no reason')
@@ -111,5 +116,5 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       }
     }
   }
-  return { counts, findings, inventory, coverage: { listPages: roots.length, DOM: ['F1','F2','F3','F4','F7','F8','F9','F10'], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6' } }
+  return { counts, findings, inventory, coverage: { listPages: roots.length, DOM: ['F1','F2','F3','F4', ...(cssOwners.length ? ['F5'] : []),'F7','F8','F9','F10'], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6' } }
 }

@@ -1230,6 +1230,7 @@ export default function TemplatesListV8() {
       ) : null}
       <div className={styles.tabsBox}>
       <Tabs
+        size="compact"
         label="テンプレートの種類"
         items={[
           { label: 'メッセージ', count: loading ? undefined : templates.filter((t) => !t.question && !isRichVideoTemplate(t)).length, current: activeSection === 'message', onClick: () => switchSection('message') },
@@ -1654,7 +1655,7 @@ export default function TemplatesListV8() {
       tabs={tabs}
       stats={
         /* 数の帯 4つ。並びと間は共有の帯に任せる。 */
-        <KpiBand data-design="KPIs" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
             <KpiCard
               key={kpi.key}

@@ -17,6 +17,10 @@ test('F5 checks rendered toolbar control ownership without board exceptions', as
     assert.equal(before.findings.find(f=>f.pattern==='F5').text, '保存する')
     await page.locator('.page_ghostButton__abc').evaluate(el=>el.className='button_text__abc')
     assert.equal((await page.evaluate(scanFixPatterns,{cssOwners:owners})).counts.F5,0)
+    await page.locator('[data-page-template]').evaluate(el=>el.insertAdjacentHTML('beforeend','<button data-row-menu class="row-actions_action__abc page_menu__abc">…</button>'))
+    assert.equal((await page.evaluate(scanFixPatterns,{cssOwners:owners})).counts.F5,1)
+    await page.locator('[data-row-menu]').evaluate(el=>el.classList.remove('page_menu__abc'))
+    assert.equal((await page.evaluate(scanFixPatterns,{cssOwners:owners})).counts.F5,0)
   } finally { await browser.close() }
 })
 
