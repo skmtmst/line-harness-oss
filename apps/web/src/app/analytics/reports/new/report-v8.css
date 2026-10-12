@@ -88,10 +88,9 @@
 }
 
 
-/* 本文：左は段の列（余白 24/28・段の間 16）、右は幅 380 の列（線で区切る）。 */
+/* 本文：左は段の列（余白 24・段の間 16）、右は幅 380 の列（線で区切る）。 */
 .report-v8-columns { display: flex; align-items: flex-start; min-width: 0; }
 .report-v8-fields { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-an-rp-col-gap); min-width: 0; border: 0; padding: var(--tpl-an-rp-body-pad); margin: 0; }
-.report-v8-card { display: flex; flex-direction: column; gap: var(--tpl-an-rp-card-gap); outline: 1px solid var(--card-edge); outline-offset: -1px; border-radius: var(--tpl-an-rp-card-radius); background: var(--color-canvas); padding: var(--tpl-an-rp-card-pad); min-width: 0; box-shadow: var(--card-shadow); }
 .report-v8-cardTitle { display: flex; align-items: center; gap: var(--tpl-an-rp-field-gap); margin: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-card-title); font-weight: var(--tpl-an-rp-bold); line-height: normal; }
 .report-v8-cardHead { position: relative; min-width: 0; }
 .report-v8-cardHeadStack { display: flex; flex-direction: column; gap: var(--tpl-an-rp-stack-gap); min-width: 0; }

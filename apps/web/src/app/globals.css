@@ -1854,7 +1854,7 @@
   --tpl-composer-pad-top: 12px; --tpl-composer-pad-side: 20px; --tpl-composer-pad-bottom: 16px;
   /* 分析のレポートを作る（H5UoIu・競合 G83vi）。 */
   --tpl-an-rp-head-pad: 20px 24px 16px; --tpl-an-rp-head-gap: 8px; --tpl-an-rp-back-size: 13px; --tpl-an-rp-title-size: var(--polish-text-section); --tpl-an-rp-lead-size: 12px; --tpl-an-rp-bold: 700;
-  --tpl-an-rp-body-pad: 24px 28px; --tpl-an-rp-col-gap: 16px; --tpl-an-rp-rail-w: 380px; --tpl-an-rp-rail-pad: 24px; --tpl-an-rp-rail-gap: 14px;
+  --tpl-an-rp-body-pad: var(--polish-space-section); --tpl-an-rp-col-gap: 16px; --tpl-an-rp-rail-w: 380px; --tpl-an-rp-rail-pad: 24px; --tpl-an-rp-rail-gap: 14px;
   --tpl-an-rp-card-pad: var(--polish-space-card); --tpl-an-rp-card-gap: var(--polish-space-row); --tpl-an-rp-card-radius: var(--polish-radius-card); --tpl-an-rp-card-title: var(--polish-text-section); --tpl-an-rp-stack-gap: 2px; --tpl-an-rp-sub-size: var(--polish-text-support);
   --tpl-an-rp-choice-pad: 10px 12px; --tpl-an-rp-choice-radius: var(--polish-radius-control); --tpl-an-rp-choice-title: var(--polish-text-section); --tpl-an-rp-choice-detail: 11px; --tpl-an-rp-list-gap: 14px;
   --tpl-an-rp-chip-pad: 6px 10px; --tpl-an-rp-chip-gap: 6px; --tpl-an-rp-chips-gap: 8px; --tpl-an-rp-chip-h: 29px; --tpl-an-rp-chip-size: 12px;
