@@ -1,25 +1,40 @@
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 
-/** 旧版の分割保存で支払い行だけ欠けたオンライン予約を期限内に解放する。 */
+// 現在のメニュー設定や料金だけでは、申込時の店払いとオンライン払いを区別できない。
+// 完了応答に保存した支払いID・期限だけを証拠にする。記録のない旧予約は消さない。
+const orphanedOnlineBookingSql = `price_at_booking > 0
+  AND NOT EXISTS (SELECT 1 FROM booking_payments p
+    WHERE p.booking_id = bookings.id AND p.line_account_id = bookings.line_account_id)
+  AND EXISTS (
+    SELECT 1 FROM (
+      SELECT line_account_id, friend_id, response_status,
+        CASE WHEN json_valid(response_body) THEN response_body ELSE '{}' END AS body
+      FROM booking_idempotency_keys
+    ) snapshot
+    WHERE snapshot.line_account_id = bookings.line_account_id
+      AND snapshot.friend_id = bookings.friend_id AND snapshot.response_status = 201
+      AND json_extract(snapshot.body, '$.booking_id') = bookings.id
+      AND json_extract(snapshot.body, '$.payment_required') IS NOT 0
+      AND json_type(snapshot.body, '$.payment.id') = 'text'
+      AND length(json_extract(snapshot.body, '$.payment.id')) > 0
+      AND json_type(snapshot.body, '$.payment.holdUntil') = 'text'
+      AND julianday(json_extract(snapshot.body, '$.payment.holdUntil')) <= julianday(?)
+  )`;
+
+/** 申込時の支払い期限が残っている孤児だけを解放する。判断できない予約は保つ。 */
 export async function recoverOrphanedOnlineBookings(db: D1Database, now: Date): Promise<void> {
   await db.batch([
     db.prepare(`UPDATE bookings SET status = 'expired', decided_at = ?, updated_at = ?
-      WHERE status = 'requested' AND julianday(requested_at) <= julianday(?) - (
-        COALESCE((SELECT hold_minutes FROM booking_payment_configs WHERE line_account_id = bookings.line_account_id),10) / 1440.0)
-      AND price_at_booking > 0 AND COALESCE(
-        (SELECT mode FROM booking_payment_menu_settings WHERE menu_id = bookings.menu_id AND line_account_id = bookings.line_account_id),
-        (SELECT mode FROM booking_payment_configs WHERE line_account_id = bookings.line_account_id),'none') = 'online'
-      AND NOT EXISTS (SELECT 1 FROM booking_payments p WHERE p.booking_id = bookings.id AND p.line_account_id = bookings.line_account_id)`)
+      WHERE status = 'requested' AND ${orphanedOnlineBookingSql}`)
       .bind(now.toISOString(), now.toISOString(), now.toISOString()),
     db.prepare(`INSERT INTO booking_audit_logs
       (id,booking_id,line_account_id,action,after_json,reason,actor_type,occurred_at)
       SELECT 'orphan-payment:' || id,id,line_account_id,'expired','{"status":"expired"}',
         'payment_record_missing','system',? FROM bookings WHERE status='expired' AND decided_at=?
-        AND price_at_booking > 0 AND NOT EXISTS (SELECT 1 FROM booking_payments p
-          WHERE p.booking_id=bookings.id AND p.line_account_id=bookings.line_account_id)
+        AND ${orphanedOnlineBookingSql}
         AND NOT EXISTS (SELECT 1 FROM booking_audit_logs a WHERE a.id='orphan-payment:' || bookings.id)`)
-      .bind(now.toISOString(), now.toISOString()),
+      .bind(now.toISOString(), now.toISOString(), now.toISOString()),
   ]);
 }
 

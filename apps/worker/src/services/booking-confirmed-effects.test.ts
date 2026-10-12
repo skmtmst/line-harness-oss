@@ -36,6 +36,13 @@ beforeEach(() => {
 afterEach(() => { sql.raw.close(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 function count(table: string) { return (sql.raw.prepare(`SELECT COUNT(*) n FROM ${table}`).get() as { n: number }).n; }
 
+function paymentSnapshot(body: unknown, account = 'a', friend = 'f', responseStatus = 201) {
+  sql.raw.prepare(`INSERT INTO booking_idempotency_keys
+    (key,line_account_id,friend_id,response_status,response_body,expires_at) VALUES('snapshot',?,?,?,?,?)`)
+    .run(account, friend, responseStatus, typeof body === 'string' ? body : JSON.stringify(body), '2026-10-13T00:00:00Z');
+}
+const onlineSnapshot = {booking_id:'b', payment:{id:'p', status:'unpaid', holdUntil:'2026-10-12T00:10:00Z'}};
+
 it('REV-H1/B-248: 別のDB接続のwebhookと回収でも確定メッセージを一度だけ送る', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'train27-confirm-'));
   const file = join(dir, 'test.sqlite');
@@ -136,13 +143,60 @@ it('REV-H1: manualの支払いは確定しない、取消済み・旧版の確�
   await runConfirmedBookingSideEffects(sql.db, 'b', { now }); expect(effects.send).not.toHaveBeenCalled();
 });
 
-it('REV-H2: 旧版の支払い記録なし予約を10分で回収し、枠を空ける', async () => {
+it('REV-I1: 旧版の申込応答に残る支払い期限で回収し、設定変更後も枠を空ける', async () => {
   sql.raw.exec(`DELETE FROM booking_payments;
     INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at)
       VALUES('a','online','fake',10,'2026-10-12','2026-10-12');`);
+  paymentSnapshot(onlineSnapshot);
+  sql.raw.exec("UPDATE booking_payment_configs SET mode='onsite',hold_minutes=5");
   await recoverOrphanedOnlineBookings(sql.db, new Date(now.getTime()+9*60000));
   expect(sql.raw.prepare("SELECT status FROM bookings WHERE id='b'").get()).toEqual({status:'requested'});
   await recoverOrphanedOnlineBookings(sql.db, new Date(now.getTime()+10*60000));
   expect(sql.raw.prepare("SELECT status FROM bookings WHERE id='b'").get()).toEqual({status:'expired'});
   expect(count('booking_slot_allocations')).toBe(0); expect(effects.send).not.toHaveBeenCalled();
+  expect(sql.raw.prepare("SELECT reason FROM booking_audit_logs WHERE booking_id='b'").get())
+    .toEqual({reason:'payment_record_missing'});
+  await recoverOrphanedOnlineBookings(sql.db, new Date(now.getTime()+10*60000));
+  expect(count('booking_audit_logs')).toBe(1);
 });
+
+it.each(['onsite', 'none'])('REV-I1: %sで申し込んだ承認待ちはonlineへ変更しても回収しない', async mode => {
+  sql.raw.exec(`DELETE FROM booking_payments;
+    UPDATE booking_settings SET approval_mode='manual';
+    INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at)
+      VALUES('a','${mode}','fake',10,'2026-10-12','2026-10-12');
+    UPDATE booking_payment_configs SET mode='online';`);
+  await recoverOrphanedOnlineBookings(sql.db, new Date(now.getTime()+10*60000));
+  expect(sql.raw.prepare("SELECT status FROM bookings WHERE id='b'").get()).toEqual({status:'requested'});
+  expect(count('booking_audit_logs')).toBe(0);
+  expect(count('booking_slot_allocations')).toBe(1);
+});
+
+it.each([
+  ['記録なし', null],
+  ['支払い方式のない応答', {booking_id:'b', status:'requested'}],
+  ['不正なJSON', '{broken'],
+  ['期限のない応答', {booking_id:'b', payment:{id:'p'}}],
+  ['不正な期限', {booking_id:'b', payment:{id:'p', holdUntil:'not-a-date'}}],
+  ['支払いIDのない応答', {booking_id:'b', payment:{holdUntil:onlineSnapshot.payment.holdUntil}}],
+  ['支払い不要の応答', {...onlineSnapshot, payment_required:false}],
+  ['別の予約の応答', {...onlineSnapshot, booking_id:'other'}],
+])('REV-I1: %sからオンライン払いを推測せず承認待ちと枠を残す', async (_label, body) => {
+  sql.raw.exec(`DELETE FROM booking_payments;
+    INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at)
+      VALUES('a','online','fake',10,'2026-10-12','2026-10-12');`);
+  if (body !== null) paymentSnapshot(body);
+  await recoverOrphanedOnlineBookings(sql.db, new Date(now.getTime()+10*60000));
+  expect(sql.raw.prepare("SELECT status FROM bookings WHERE id='b'").get()).toEqual({status:'requested'});
+  expect(count('booking_slot_allocations')).toBe(1);
+  expect(count('booking_audit_logs')).toBe(0);
+});
+
+it.each([['other','f',201], ['a','other',201], ['a','f',202]] as const)
+  ('REV-I1: 別の店舗・本人・未完了応答を証拠にしない（%s/%s/%s）', async (account, friend, status) => {
+    sql.raw.exec('DELETE FROM booking_payments');
+    paymentSnapshot(onlineSnapshot, account, friend, status);
+    await recoverOrphanedOnlineBookings(sql.db, new Date(now.getTime()+10*60000));
+    expect(count('booking_slot_allocations')).toBe(1);
+    expect(count('booking_audit_logs')).toBe(0);
+  });
