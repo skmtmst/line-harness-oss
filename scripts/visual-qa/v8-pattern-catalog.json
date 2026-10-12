@@ -2682,7 +2682,8 @@
             "SegmentedControl",
             "RadioCard",
             "RadioCardGroup",
-            "CheckCard"
+            "CheckCard",
+            "UnavailableSelection"
           ],
           "vars": [
             "--shadow-controls-toggle"

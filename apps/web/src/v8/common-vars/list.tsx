@@ -30,7 +30,7 @@ import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -1166,8 +1166,7 @@ function CommonVarsListInner() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canWrite ? (
-                    <SaveErrorField names={["allOnPageSelected","selected","all_on_page_selected"]}><Checkbox
+                  {canWrite ? (<SaveErrorField names={["allOnPageSelected","selected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && someOnPageSelected}
                       onCheckedChange={() =>
@@ -1181,8 +1180,7 @@ function CommonVarsListInner() {
                         })
                       }
                       aria-label="このページの共通情報をすべて選ぶ"
-                    /></SaveErrorField>
-                  ) : null}
+                    /></SaveErrorField>) : <UnavailableSelection label="このページの共通情報をすべて選ぶ" />}
                 </Th>
                 <Th className={styles.headCell}>共通情報（差し込み名）</Th>
                 <Th className={styles.headCell}>中身</Th>
@@ -1210,13 +1208,11 @@ function CommonVarsListInner() {
 
                   >
                     <Td className={styles.selectCell}>
-                      {canWrite ? (
-                        <SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
+                      {canWrite ? (<SaveErrorField names={[`current.${saveFieldIndex}.id`,"id","item.id","itemId"]}><Checkbox
                           checked={selected.has(item.id)}
                           onCheckedChange={() => toggle(item.id)}
                           aria-label={`${item.name}を選ぶ`}
-                        /></SaveErrorField>
-                      ) : null}
+                        /></SaveErrorField>) : <UnavailableSelection label={`${item.name}を選ぶ`} />}
                     </Td>
                     <NameCell name={
                         <div className={styles.dotLine}>

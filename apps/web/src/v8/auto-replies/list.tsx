@@ -43,7 +43,7 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -1116,12 +1116,12 @@ export default function AutoRepliesListV8() {
           <thead>
             <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                  {canEdit ? <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのルールをすべて選択"
-                  /></SaveErrorField>}
+                  /></SaveErrorField> : <UnavailableSelection label="このページのルールをすべて選択" />}
                 </Th>
               {tableHeadCells}
             </TableHeadRow>
@@ -1149,11 +1149,11 @@ export default function AutoRepliesListV8() {
                    data-row-id={r.id}
                 >
                     <Td className={styles.selectCell}>
-                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
+                      {canEdit ? <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
                         checked={selectedIds.has(r.id)}
                         onCheckedChange={() => toggleOne(r.id)}
                         aria-label={`${name}を選択`}
-                      /></SaveErrorField>}
+                      /></SaveErrorField> : <UnavailableSelection label={`${name}を選択`} />}
                     </Td>
                   <Td
                     className={styles.gripCell}

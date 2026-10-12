@@ -805,7 +805,7 @@
 - **10-12の差し戻し（axFrW）**：一覧の選択は共通Checkboxの16px・角4（`--choice-checkbox-radius`）。画面のCSSで丸みを上書きせず、クリック・Space・一部選択・権限の動きは維持。絵の16px・角4と司令塔の16:47 JST判定に従う。
 
 - **役目**：その場で効く＝Toggle、保存して効く＝Checkbox、3つ以上＝SegmentedControl か RadioCard
-- **持ち主（コード）**：`apps/web/src/components/shared/toggle.tsx`・`apps/web/src/components/shared/checkbox.tsx`・`apps/web/src/components/shared/segmented.tsx`・`apps/web/src/components/shared/radio-card.tsx`・`apps/web/src/components/shared/radio.tsx`・`apps/web/src/components/shared/check-card.tsx`（部品 `Toggle`・`Checkbox`・`SegmentedControl`・`RadioCard`・`RadioCardGroup`・`CheckCard`）
+- **持ち主（コード）**：`apps/web/src/components/shared/toggle.tsx`・`apps/web/src/components/shared/checkbox.tsx`・`apps/web/src/components/shared/segmented.tsx`・`apps/web/src/components/shared/radio-card.tsx`・`apps/web/src/components/shared/radio.tsx`・`apps/web/src/components/shared/check-card.tsx`（部品 `Toggle`・`Checkbox`・`UnavailableSelection`・`SegmentedControl`・`RadioCard`・`RadioCardGroup`・`CheckCard`）
   - 読む変数：`--shadow-controls-toggle`
 - **持ち主（Pen）**：`bkjTv`「トグル/オン」・`LxHpj`「トグル/オフ」・`dQCCN`「チェック/オン」・`S9U7v`「チェック/オフ」・`dtJVi`「切り替え（3つ）」・`fNPdg`「選ぶカード/オン」・`r3xz1W`「選ぶカード/オフ」
 - **見つけ方（コード）**：
@@ -945,3 +945,5 @@
 - **決まり**：B-260・B-262 差し戻し E。保存値・CSV は変えない。
 - **見つけ方・増殖の見張り**：`formatListTimestamp(...).split(...)` を画面で書かず、共通部品へ日時を渡す。
 - **見張り**：共通の書式と部品の試験（別年の時刻、SQL UTC、店舗時間帯、無効値）と一覧の実幅測定。Pen の変更は司令塔へ渡す。
+
+- **L4 差し戻しH**：一覧のまとめて操作がある場合、全行で選択枠をそろえる。対象外・閲覧のみは `UnavailableSelection` の枠と理由を使い、変更処理を持たせない。まとめて操作が無い一覧に列・機能を足さない。

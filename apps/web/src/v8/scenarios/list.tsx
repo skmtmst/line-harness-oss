@@ -43,7 +43,7 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
@@ -871,12 +871,12 @@ export default function ScenariosListV8() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit && <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                  {canEdit ? <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのシナリオをすべて選択"
-                  /></SaveErrorField>}
+                  /></SaveErrorField> : <UnavailableSelection label="このページのシナリオをすべて選択" />}
                 </Th>
                 {tableHeadCells}
               </TableHeadRow>
@@ -911,11 +911,11 @@ export default function ScenariosListV8() {
                      data-row-id={s.id}
                   >
                     <Td className={styles.selectCell}>
-                      {canEdit && <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
+                      {canEdit ? <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
                         checked={selectedIds.has(s.id)}
                         onCheckedChange={() => toggleOne(s.id)}
                         aria-label={`${s.name}を選択`}
-                      /></SaveErrorField>}
+                      /></SaveErrorField> : <UnavailableSelection label={`${s.name}を選択`} />}
                     </Td>
                     <Td
                       className={styles.gripCell}

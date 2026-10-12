@@ -123,12 +123,14 @@ describe('V8 テンプレートの一覧', () => {
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
-  it('サーバの役割が staff なら閲覧のみの帯が出て、作るボタンと選ぶチェックは出さない', async () => {
+  it('サーバの役割が staff なら閲覧のみの帯が出て、選ぶ枠だけを残し、作るボタンは出さない', async () => {
     role.value = 'staff'
     await renderList()
     expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryAllByRole('button', { name: /テンプレートを作る/ })).toHaveLength(0)
-    expect(screen.queryAllByRole('checkbox', { name: /を選択$/ })).toHaveLength(0)
+    const selections = screen.getAllByRole('checkbox', { name: /を選択$/ }) as HTMLInputElement[]
+    expect(selections.every(input => input.disabled)).toBe(true)
+    expect(selections.every(input => input.title.includes('閲覧のみ'))).toBe(true)
   })
 
   it('オーナーには閲覧のみの帯を出さない', async () => {

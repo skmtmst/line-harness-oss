@@ -28,7 +28,7 @@ import { notifyToast } from '@/components/shared/toast';
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { RowMenu } from '@/components/shared/row-actions';
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -1104,15 +1104,13 @@ export default function TemplatesListV8() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {/* 閲覧のみ：まとめて変える操作が無いので、選ぶチェックを置かない（列の幅は残す） */}
-                  {canMutateTemplates ? (
-                    <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                  {/* 閲覧のみ：対象外の枠と理由だけを残す（差し戻しH）。 */}
+                  {canMutateTemplates ? (<SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && selectedCount > 0}
                       onCheckedChange={() => toggleAllOnPage()}
                       aria-label="このページのテンプレートをすべて選択"
-                    /></SaveErrorField>
-                  ) : null}
+                    /></SaveErrorField>) : <UnavailableSelection label="このページのテンプレートをすべて選択" />}
                 </Th>
                 <Th className={styles.headCell}>テンプレート</Th>
                 <Th className={styles.headCell}>種類</Th>
@@ -1141,13 +1139,11 @@ export default function TemplatesListV8() {
 
                   >
                     <Td className={styles.selectCell}>
-                      {canMutateTemplates ? (
-                        <SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
+                      {canMutateTemplates ? (<SaveErrorField names={[`shownItems.${saveFieldIndex}.id`,"id","t.id"]}><Checkbox
                           checked={selectedIds.has(t.id)}
                           onCheckedChange={() => toggleOne(t.id)}
                           aria-label={`「${t.name}」を選択`}
-                        /></SaveErrorField>
-                      ) : null}
+                        /></SaveErrorField>) : <UnavailableSelection label={`「${t.name}」を選択`} />}
                     </Td>
                     <NameCell name={
                         <div className={styles.dotLine}>

@@ -28,7 +28,7 @@ import { ListPage, ListPagePagination } from '@/components/templates';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
@@ -655,7 +655,7 @@ export default function InflowListV8({
             <thead>
               <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colCheck}>
-                  {readonly ? null : <SaveErrorField names={["allShownSelected","selectedRouteIds","all_shown_selected","selected_route_ids"]}><Checkbox
+                  {readonly ? <UnavailableSelection label="このページの全経路をまとめて操作の対象にする" /> : <SaveErrorField names={["allShownSelected","selectedRouteIds","all_shown_selected","selected_route_ids"]}><Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
                     indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
@@ -710,7 +710,7 @@ export default function InflowListV8({
                           }}
                         /></SaveErrorField>
                       ) : (
-                        <span className="sr-only">まとめて操作は登録済みの流入経路だけに使えます</span>
+                        <UnavailableSelection label={`${r.name}をまとめて操作の対象にする`} reason={readonly ? "閲覧のみのため選べません" : "まとめて操作は登録済みの流入経路だけに使えます"} />
                       )}
                     </Td>
                     <Td grow data-list-name-cell>

@@ -103,12 +103,15 @@ describe('V8 アフィリエイター', () => {
     expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 
-  it('閲覧のみでは作る・選ぶを出さず、帯を出す。「…」には変える操作を出さない', async () => {
+  it('閲覧のみは枠と理由だけを残し、作る・一括操作・行の変更操作を出さない', async () => {
     role.manage = false
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(host.textContent).not.toContain('アフィリエイターを作る')
-    expect(host.querySelector('[aria-label="多い人を選ぶ"]')).toBeNull()
+    const selection = host.querySelector('[aria-label="多い人を選ぶ"]') as HTMLInputElement
+    expect(selection.disabled).toBe(true)
+    expect(selection.title).toContain('閲覧のみ')
+    await act(async () => selection.click())
     const menu = host.querySelector('[aria-label="多い人の操作"]') as HTMLButtonElement
     await act(async () => { fireEvent.click(menu) })
     expect(document.body.textContent).toContain('紹介リンクをコピー')

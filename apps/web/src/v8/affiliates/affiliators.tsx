@@ -15,7 +15,7 @@ import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import EmptyList from '@/components/shared/empty-list'
 import BulkBar from '@/components/shared/bulk-bar'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -525,7 +525,7 @@ export default function AffiliatorsTab() {
         <thead>
           <TableHeadRow data-table-layout="columns">
             <Th className={styles.colCheck}>
-              {readonly ? null : (
+              {readonly ? <UnavailableSelection label="このページの全員を選ぶ" /> : (
                 <SaveErrorField names={["allChecked","checked","all_checked"]}><Checkbox
                   aria-label="このページの全員を選ぶ"
                   checked={allChecked}
@@ -546,7 +546,7 @@ export default function AffiliatorsTab() {
           {pagedRows.map((row, saveFieldIndex) => (
             <Tr key={row.id} data-table-layout="columns" data-row-id={row.id} detailKey="affiliate" onOpen={() => { setDrawerId(current => current === row.id ? null : row.id); setDrawerEdit(false) }}>
               <Td className={styles.colCheck}>
-                {readonly ? null : (
+                {readonly ? <UnavailableSelection label={`${row.name}を選ぶ`} /> : (
                   <SaveErrorField names={[`pagedRows.${saveFieldIndex}.id`,"id","row.id","checked"]}><Checkbox
                     aria-label={`${row.name}を選ぶ`}
                     checked={selected.has(row.id)}

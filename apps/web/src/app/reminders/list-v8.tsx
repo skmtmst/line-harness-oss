@@ -38,7 +38,7 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
-import Checkbox from '@/components/shared/checkbox'
+import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
@@ -866,7 +866,7 @@ export default function RemindersListV8() {
                       aria-label="このページのリマインダをすべて選択"
                     /></SaveErrorField>
                   </Th>
-                ) : <Th className={styles.selectCell}><span className="sr-only">選択できません</span></Th>}
+                ) : <Th className={styles.selectCell}><UnavailableSelection label="このページのリマインダをすべて選択" /></Th>}
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
@@ -905,7 +905,7 @@ export default function RemindersListV8() {
                           aria-label={`${row.name}を選択`}
                         /></SaveErrorField>
                       </Td>
-                    ) : <Td className={styles.selectCell} />}
+                     ) : <Td className={styles.selectCell}><UnavailableSelection label={`${row.name}を選択`} /></Td>}
                     <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}

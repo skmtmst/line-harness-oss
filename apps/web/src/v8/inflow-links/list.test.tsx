@@ -176,7 +176,7 @@ describe('V8 流入と計測の一覧', () => {
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
-  it('閲覧のみ（staff）は帯を出し、作る・編集・チェックを出さない', async () => {
+  it('閲覧のみ（staff）は枠と理由を残し、作る・編集・一括操作を出さない', async () => {
     role.value = 'staff'
     rememberStaffIdentity({ role: 'staff', permissionKeys: [] } as StaffMember)
     await render()
@@ -184,7 +184,11 @@ describe('V8 流入と計測の一覧', () => {
     const create = [...host.querySelectorAll('button')].filter((button) => button.textContent?.includes('流入リンクを作る'))
     expect(create).toHaveLength(0)
     expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
-    expect(host.querySelector('[aria-label="夏のInstagram投稿をまとめて操作の対象にする"]')).toBeNull()
+    const selection = host.querySelector('[aria-label="夏のInstagram投稿をまとめて操作の対象にする"]') as HTMLInputElement
+    expect(selection.disabled).toBe(true)
+    expect(selection.title).toContain('閲覧のみ')
+    act(() => selection.click())
+    expect(host.querySelector('[data-bulk-bar]')).toBeNull()
   })
 
   it('WEB032: 一覧を読み直しても、遅れて届いた候補（タグ名）を捨てない', async () => {
