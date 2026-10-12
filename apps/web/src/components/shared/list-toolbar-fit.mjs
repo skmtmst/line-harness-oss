@@ -9,8 +9,9 @@ export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 
     ? [...element.children].flatMap(flatten) : [element]
   const tools = [...toolbar.children].flatMap(flatten).filter(tool => {
     const css = getComputedStyle(tool)
-    return css.display !== 'none' && css.flexGrow === '0'
-      && !tool.matches('[data-design-part="notice"], :has(> [data-design-part="notice"])')
+    const spacer = css.flexGrow !== '0' && !tool.textContent.trim() && !tool.querySelector('button,input')
+    return css.display !== 'none' && !spacer
+      && !tool.matches('[data-toolbar-secondary], [data-design-part="notice"], :has(> [data-design-part="notice"])')
   })
   const css = getComputedStyle(toolbar), gap = parseFloat(css.columnGap) || 0
   const available = toolbar.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)

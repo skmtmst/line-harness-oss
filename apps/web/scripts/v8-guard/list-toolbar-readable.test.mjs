@@ -18,11 +18,13 @@ test('B-191: list placeholders remain readable at both widths; fixed-width regre
     for (const width of [1440, 1152]) {
       await page.setViewportSize({ width, height: 900 })
       for (const placeholder of ['ルール名・言葉で探す', '成果地点の名前で探す', '名前・本文・差し込みで探す']) {
-        await page.setContent(`<html data-theme="v8"><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n${css('search-field').replaceAll('.searchIcon', '.controlIcon').replaceAll('.search', '.controlSearch').replaceAll('.input', '.controlInput')}\n*{box-sizing:border-box} .toolbar{width:800px}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><div class="row1"><div class="search" data-toolbar-search style="--list-search-width:160px"><div class="controlSearch"><svg style="width:16px;height:16px;flex:none"></svg><input type="search" class="controlInput" placeholder="${placeholder}"></div></div></div></div></section></html>`)
+        await page.setContent(`<html data-theme="v8"><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n${css('search-field').replaceAll('.searchIcon', '.controlIcon').replaceAll('.search', '.controlSearch').replaceAll('.input', '.controlInput')}\n*{box-sizing:border-box} .toolbar{width:800px}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><div class="row1" data-toolbar-tools><div class="search" data-toolbar-search style="--list-search-width:160px"><div class="controlSearch"><svg style="width:16px;height:16px;flex:none"></svg><input type="search" class="controlInput" placeholder="${placeholder}"></div></div></div></div></section></html>`)
         await page.evaluate(() => document.fonts.ready)
         assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-191 探す欄の見本文字切れ'))
         await page.locator('input').evaluate(fitListSearchPlaceholder)
         assert.deepEqual((await page.evaluate(scanListSkeleton)).failures, [])
+        await page.locator('.toolbar').evaluate(el => { const optional = document.createElement('details'); optional.className = 'optional'; el.append(optional) })
+        assert.equal(await page.locator('[data-toolbar-search]').evaluate(el => getComputedStyle(el).flexShrink), '1', 'optional tools must not restore the old flex:none search')
         await page.locator('[data-toolbar-search]').evaluate(el => { el.style.setProperty('min-width', '160px', 'important'); el.style.setProperty('flex-basis', '160px', 'important') })
         assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-191 探す欄の見本文字切れ'))
       }
@@ -67,6 +69,9 @@ test('content-sized list selects stay readable; real band width decides chip col
     await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('select')}\n*{box-sizing:border-box} .band{display:flex;gap:8px;width:800px} .row{display:contents} .search{flex:0 1 240px;min-width:180px;--list-search-content-min:180px} .chips{width:400px;flex:none} .count{width:100px;flex:none}</style><section data-list-skeleton><div class="band" data-list-toolbar><div class="row"><div class="search" data-toolbar-search>検索</div><span class="chips" data-filter-width="400">状態</span><div class="content root"><button class="trigger"><span class="value" data-select-value>並び：件数が多い順</span><svg class="chevron"></svg></button></div><div class="count">件数</div></div></div></section></html>`)
     assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具のはみ出し'))
     assert.equal((await page.locator('.band').evaluate(toolbarContentFit)).fits, false)
+    await page.locator('.count').evaluate(el => { el.style.flexGrow = '1' })
+    assert.equal((await page.locator('.band').evaluate(toolbarContentFit)).fits, false, 'a growing real control must still be counted')
+    await page.locator('.count').evaluate(el => { el.style.flexGrow = '0' })
     await page.locator('.band').evaluate(el => { el.style.width = '1000px' })
     assert.equal((await page.locator('.band').evaluate(toolbarContentFit)).fits, true)
     assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-191 選ぶ欄の文字切れ'))
