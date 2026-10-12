@@ -44,7 +44,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import { ListPager } from '@/components/templates/list-page'
+import { ListPagePagination } from '@/components/templates/list-page'
 import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton';
@@ -1095,10 +1095,10 @@ export default function RemindersListV8() {
           </BulkBar>
         ) : null}
 
-        <ListPager>
+        <ListPagePagination>
           <Pagination page={reminderList.page} pageCount={reminderList.pageCount} onPageChange={reminderList.setPage}
             summary={paginationSummary(reminderList.total, (reminderList.page - 1) * reminderList.limit + 1, Math.min(reminderList.page * reminderList.limit, reminderList.total))} />
-        </ListPager>
+        </ListPagePagination>
       </>
     )
 
