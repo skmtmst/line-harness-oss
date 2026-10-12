@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Play, Plus } from 'lucide-react'
@@ -307,7 +308,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       </>}
     >
 
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-cta-title" data-wc-pane="cta">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-cta-title" data-wc-pane="cta">
         <div className={form.cardHeadRow}><h2 id="webinar-cta-title" className={form.cardTitle}>{ctas === null ? 'CTA カード' : `CTA カード ${ctas.length} 枚`}</h2></div>
         <p className={styles.desc}>動画の途中で出す申し込みボタンです。出す時刻は 分:秒 で入れます。</p>
         {message ? <Notice tone="danger">{message}</Notice> : null}
@@ -382,9 +383,9 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
             </fieldset>
           ) : null}
         </>}
-      </section>
+      </Card>
 
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-regform-title">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-regform-title">
         <div className={form.cardHeadRow}><h2 id="webinar-regform-title" className={form.cardTitle}>申込に使う回答フォーム</h2></div>
         <p className={styles.desc}>申し込みのときに答えてもらうフォームです。公開中のフォームから1つ選びます。</p>
         <div className={form.field}>
@@ -401,7 +402,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         {forms.state === 'ready' && published.length === 0 ? <p className={form.cardNote}>公開中の回答フォームがありません。</p> : null}
         {forms.state === 'ready' && registrationFormId && !published.some((item) => item.id === registrationFormId) ? <p className={form.fieldError} role="alert">前に選んだフォームは使えなくなりました。公開中のフォームを選び直してください。</p> : null}
         {registrationError ? <p className={form.fieldError} role="alert">{registrationError}</p> : null}
-      </section>
+      </Card>
 
       <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description="保存されている最新の CTA カードと申込フォームに置き換えます。この画面で直したところは消えます。" confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
       {compareOpen && latest ? (

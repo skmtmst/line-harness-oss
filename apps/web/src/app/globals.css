@@ -962,7 +962,7 @@
   --tpl-wc-cm-cell-radius: var(--polish-radius-small); --tpl-wc-cm-cell-hover: inset 0 -1px 0 var(--color-control-border); --tpl-wc-cm-side-w: 340px; --tpl-wc-cm-side-pad: var(--polish-space-card); --tpl-wc-cm-side-title-lh: 20px;
   --tpl-wc-cm-screen-gap: 4px; --tpl-wc-cm-screen-h: 180px; --tpl-wc-cm-screen-pad: 10px;
   --tpl-wc-nt-count-size: 18px; --tpl-wc-nt-count-lh: 26px; --tpl-wc-nt-row-gap: 16px; --tpl-wc-nt-row-pad: 9px 0; --tpl-wc-nt-label-w: 170px; --tpl-wc-nt-underline: 4px;
-  --tpl-wc-nt-time-w: 84px; --tpl-wc-nt-time-pad: 0 10px; --tpl-wc-nt-small-w: 58px; --tpl-wc-nt-after-label-w: 120px; --tpl-wc-nt-policy-w: 176px;
+  --tpl-wc-nt-time-w: 84px; --tpl-wc-nt-time-pad: 0 10px; --tpl-wc-nt-small-w: var(--tpl-select-page-size); --tpl-wc-nt-after-label-w: 120px; --tpl-wc-nt-policy-w: 176px;
   --tpl-wc-vd-row-radius: var(--polish-radius-control); --tpl-wc-vd-thumb-w: 96px; --tpl-wc-vd-thumb-h: 54px; --tpl-wc-vd-thumb-radius: var(--polish-radius-small); --tpl-wc-vd-stage-gap: 6px; --tpl-wc-vd-stage-pad: 3px 8px;
   --tpl-wc-vd-head-pad: 8px 16px; --tpl-wc-vd-row-pad: 9px 16px; --tpl-wc-vd-player-h: 186px; --tpl-wc-rv-player-h: 188px; --tpl-wc-ct-player-h: 150px; --tpl-wc-vd-col-when: 150px; --tpl-wc-vd-col-cap: 100px; --tpl-wc-vd-col-count: 80px;
   --tpl-wc-ct-time-w: 56px; --tpl-wc-ct-toggle-gap: 10px; --tpl-wc-ct-band-pad: 12px 16px; --tpl-wc-ct-preview-gap: 8px; --tpl-wc-ct-card-gap: var(--polish-space-row); --tpl-wc-ct-button-pad: 7px 12px;

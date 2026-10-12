@@ -1,13 +1,12 @@
 'use client'
+import Card from '@/components/shared/card'
 import type { ReactNode } from 'react'
 import { CalendarDays, Play } from 'lucide-react'
 import Button from '@/components/shared/button'
-import HelpTip from '@/components/shared/help-tip'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select'
-import { RequiredBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import type { WebinarFolder } from '@/lib/api'
 import { ReadValue } from './parts'
@@ -69,7 +68,7 @@ export function BasicForm({
   ]
   return (
     <>
-      <section className={styles.card} aria-labelledby={`${idPrefix}-basic`}>
+      <Card variant="form" gap="normal" aria-labelledby={`${idPrefix}-basic`}>
         <div className={styles.cardHead}>
           <h2 id={`${idPrefix}-basic`} className={styles.cardTitle}>基本設定</h2>
         </div>
@@ -86,11 +85,7 @@ export function BasicForm({
 {fieldErrors.title ? <p className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}</Field></div>
         <div className={styles.pair}>
           <div className={styles.field}>
-            <span className={styles.label}>
-
-              <HelpTip label="公開ページの URL の説明">アドレスの最後の部分です。半角の英小文字・数字・ハイフンで入れます。作るときに空のままなら自動で付けます。</HelpTip>
-            </span>
-            <Field label="公開ページの URL" htmlFor={`${idPrefix}-slug`}><SaveErrorField names={["slug","values.slug"]}><TextField
+            <Field label="公開ページの URL" help="アドレスの最後の部分です。半角の英小文字・数字・ハイフンで入れます。作るときに空のままなら自動で付けます。" htmlFor={`${idPrefix}-slug`}><SaveErrorField names={["slug","values.slug"]}><TextField
               id={`${idPrefix}-slug`}
               value={values.slug}
               disabled={disabled}
@@ -118,9 +113,9 @@ export function BasicForm({
             placeholder="15分で NEN の使い方がわかる無料セミナーです"
             onChange={(event) => onChange({ description: event.target.value })}
           /></SaveErrorField></Field></div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby={`${idPrefix}-kind`}>
+      <Card variant="form" gap="normal" aria-labelledby={`${idPrefix}-kind`}>
         <div className={styles.cardHead}>
           <h2 id={`${idPrefix}-kind`} className={styles.cardTitle}>開催形式</h2>
           <p className={styles.cardNote}>あとから動画の段でも変えられます</p>
@@ -135,9 +130,9 @@ export function BasicForm({
           </RadioCardGroup></SaveErrorField>
         )}
         {values.deliveryKind === 'external' ? <p className={styles.help}>今は外部の動画を使っています。別の形式を選ぶまでそのままです。</p> : null}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby={`${idPrefix}-audience`}>
+      <Card variant="form" gap="normal" aria-labelledby={`${idPrefix}-audience`}>
         <div className={styles.cardHead}>
           <h2 id={`${idPrefix}-audience`} className={styles.cardTitle}>だれに案内するか</h2>
         </div>
@@ -145,7 +140,7 @@ export function BasicForm({
             ? <ReadValue label="案内する相手">{audienceLabel}</ReadValue>
             : <Select id={`${idPrefix}-audience-select`} aria-label="案内する相手" size="full" value="registered" disabled={disabled} onChange={() => {}} options={[{ value: 'registered', label: audienceLabel }]} />}
 </Field></div>
-      </section>
+      </Card>
     </>
   )
 }

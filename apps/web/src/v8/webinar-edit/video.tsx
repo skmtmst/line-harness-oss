@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import DateField from '@/components/shared/date-field'
@@ -295,7 +296,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         ) : ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}
     >
-      <section className={form.card} aria-labelledby="webinar-video-title" data-wc-pane="video">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-video-title" data-wc-pane="video">
         <div className={form.cardHead}><h2 id="webinar-video-title" className={form.cardTitle}>動画</h2></div>
         <div className={styles.videoRow}>
           <span className={styles.thumb} aria-hidden="true"><Play size={18} /></span>
@@ -325,10 +326,10 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           </p>
         </> : null}
         {assetError ? <Notice tone="danger" className={styles.stageNoteNoticePlacement} >{assetError}<Button size="compact" onClick={() => loadAsset()} busyLabel="処理中…">もう一度読み込む</Button></Notice> : null}
-      </section>
+      </Card>
 
       {scheduled ? null : (
-        <section className={form.card} aria-labelledby="webinar-period-title">
+        <Card variant="form" gap="normal" aria-labelledby="webinar-period-title">
           <div className={form.cardHead}><h2 id="webinar-period-title" className={form.cardTitle}>公開期間</h2></div>
           <div className={form.pair}>
             <div className={form.field}><Field label="公開の開始" htmlFor="webinar-period-start"><SaveErrorField names={["startsAt","starts_at"]}><DateTimeField id="webinar-period-start" value={startsAt} readOnly={readOnly} onChange={setStartsAt} /></SaveErrorField></Field></div>
@@ -338,11 +339,11 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
 {!readOnly && !noEnd ? <SaveErrorField names={["noEnd","publicationEndsAt","no_end"]}><Checkbox checked={noEnd} onCheckedChange={setNoEnd}>終わりを決めない（いつでも見られる）</Checkbox></SaveErrorField> : null}</Field></div>
           </div>
           {periodError ? <Notice tone="danger">{periodError}</Notice> : null}
-        </section>
+        </Card>
       )}
 
       {scheduled ? (
-        <section className={form.card} data-gap="tight" aria-labelledby="webinar-sessions-title">
+        <Card variant="form" gap="normal" aria-labelledby="webinar-sessions-title">
           <div className={form.cardHeadRow}><h2 id="webinar-sessions-title" className={form.cardTitle}>開催回</h2></div>
           <p className={styles.note}>回ごとに日時と定員を決めます。定員を空にすると無制限</p>
           <div className={styles.sessionHead} role="presentation">
@@ -363,9 +364,9 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           {otherRules.map(({ rule, index }) => <RuleRow key={index} rule={rule} menu={ruleMenu(index, `枠${index + 1}`)} />)}
           {readOnly ? null : <button type="button" className={form.textButton} disabled={busy} onClick={() => setAdding('one')}>＋ 枠を足す（毎日・毎週・単発）</button>}
           {error ? <Notice tone="danger">{error}</Notice> : null}
-        </section>
+        </Card>
       ) : (
-        <section className={form.card} data-gap="tight" aria-labelledby="webinar-rules-title">
+        <Card variant="form" gap="normal" aria-labelledby="webinar-rules-title">
           <div className={form.cardHeadRow}><h2 id="webinar-rules-title" className={form.cardTitle}>{`配信枠 ${webinar.schedule.length} 件`}</h2></div>
           <p className={styles.desc}>視聴できる時間の枠です。枠が0件だと公開できません。</p>
           {webinar.schedule.map((rule, index) => <RuleRow key={index} rule={rule} webinarId={webinar.id} menu={ruleMenu(index, `枠${index + 1}`)} />)}
@@ -377,10 +378,10 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
             </div>
           )}
           {error ? <Notice tone="danger">{error}</Notice> : null}
-        </section>
+        </Card>
       )}
 
-      <section className={form.card} aria-labelledby="webinar-count-title">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-count-title">
         <div className={form.cardHead}><h2 id="webinar-count-title" className={form.cardTitle}>視聴の数え方</h2></div>
         <div className={form.pair}>
           <div className={form.field}><Field label="視聴完了とみなす" htmlFor="webinar-completion"><TextField id="webinar-completion" readOnly value="90%以上見たら視聴完了（変えられません）" title="視聴完了の決め方はサーバーが決めています（動画の9割以上）" /></Field></div>
@@ -389,7 +390,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
               : <SaveErrorField names={["policy"]}><Select id="webinar-policy" aria-label="結果が取れないとき" size="full" value={policy} disabled={policyBusy} onChange={(value) => void savePolicy(value as 'escalate' | 'retry_next_day')} options={[{ value: 'retry_next_day', label: '翌日に取り直す' }, { value: 'escalate', label: '担当へ上げる' }]} /></SaveErrorField>}
 {policyError ? <p className={form.fieldError} role="alert">{policyError}</p> : null}</Field></div>
         </div>
-      </section>
+      </Card>
 
       {adding ? <AddRuleDialog mode={adding} busy={busy} error={error} onCancel={() => { if (!busy) { setAdding(null); setError('') } }} onAdd={async (rules) => { if (await saveSchedule([...webinar.schedule, ...rules])) setAdding(null) }} /> : null}
       {replaceOpen ? <ReplaceVideoDialog ctx={ctx} asset={asset} onAsset={setAsset} onClose={() => setReplaceOpen(false)} /> : null}
