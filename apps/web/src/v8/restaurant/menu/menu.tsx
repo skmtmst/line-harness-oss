@@ -2,7 +2,6 @@
 
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 
-import { FolderDotName } from '@/components/shared/folder-dot'
 import { useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import { Check, Plus } from 'lucide-react'
@@ -10,7 +9,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Select from '@/components/shared/select'
-import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell, RowNameButton } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell, NameCell, RowNameButton } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
 import { useAccount } from '@/contexts/account-context'
@@ -151,7 +150,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         flush
       >
         <Notice tone="info">「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</Notice>
-        <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)', collapseScope: 'page' }}>
+        <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
           <thead>
             <TableHeadRow data-table-layout="columns">
               <Th grow>メニュー</Th>
@@ -172,9 +171,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
               const allergens = safeArray(item.allergens_json)
               return (
                 <Tr data-row-id={item.id} key={item.id} data-table-layout="columns" onOpen={() => openEdit(item)}>
-                  <Td grow><FolderDotName>
-                    <RowNameButton title={item.name} onClick={() => openEdit(item)}>{item.name}</RowNameButton>
-                  </FolderDotName></Td>
+                  <NameCell grow name={<RowNameButton title={item.name} onClick={() => openEdit(item)}>{item.name}</RowNameButton>} />
                   <Td className={styles.colKind}>{item.kind === 'course' ? 'コース' : '単品'}</Td>
                   <Td className={styles.colPrice} align="right">{formatYen(item.price)}</Td>
                   <Td collapseAt="narrow" className={styles.colPeriod}>{periodLabel(safeArray(item.service_periods_json))}</Td>

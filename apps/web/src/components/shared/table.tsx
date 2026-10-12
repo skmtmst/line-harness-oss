@@ -275,15 +275,17 @@ export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>)
 }
 
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, annotation, className }: {
+export function NameCell({ name, folder, annotation, className, grow }: {
   name: ReactNode
   /** 名前の横の状態札。名前やリンクの中には入れない。 */
   annotation?: ReactNode
   folder?: FolderDotFolder | null
   className?: string
+  /** 列の余りを名前へ配る。見出しの Th と同じ役割を渡す。 */
+  grow?: boolean
 }) {
   return (
-    <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
+    <td data-list-name-cell="" data-cell-grow={grow || undefined} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
       <div className={shell.name}><FolderDotName folder={folder} annotation={annotation}>{name}</FolderDotName></div>
     </td>
   )
