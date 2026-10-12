@@ -942,7 +942,7 @@
 <a id="list-date-time"></a>
 ## list-date-time 一覧の日時
 
-- **役目**：時刻を持つ記録を今年 `MM/DD HH:mm`、別年 `YYYY/MM/DD HH:mm` で出す。時刻を省かず、狭い列は日付と時刻の境目で折り返す。期限・年月日型の業務値・繰返しの曜日はこの役目ではない。
+- **役目**：時刻を持つ記録を今年 `MM/DD HH:mm`、別年 `YYYY/MM/DD HH:mm` で1行に出す。日時の列は文字の実寸を確保し、日付と時刻の間は共通の4pxにそろえる（L5差し戻しU1）。期限・年月日型の業務値・繰返しの曜日はこの役目ではない。
 - **持ち主（コード）**：`apps/web/src/lib/format.ts` の `formatListTimestamp`、`apps/web/src/components/shared/list-date-time.tsx`・同 CSS。年・時間帯・無効な値の扱いは日付の正本、段分けは `ListDateTime` が持つ。
 - **決まり**：B-260・B-262 差し戻し E。保存値・CSV は変えない。
 - **見つけ方・増殖の見張り**：`formatListTimestamp(...).split(...)` を画面で書かず、共通部品へ日時を渡す。

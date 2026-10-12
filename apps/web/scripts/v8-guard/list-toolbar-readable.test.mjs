@@ -167,3 +167,24 @@ test('page size wrappers use the same readable width as their control', async ()
     assert.equal(broken, true)
   } finally { await browser.close() }
 })
+
+test('U1: timestamps stay on one line and their columns reserve the full current or previous year', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    for (const flex of [false, true]) {
+      await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('data-table')}\n${css('list-date-time')}\n*{box-sizing:border-box}.frame{width:700px}table{table-layout:fixed;width:100%}td,th{font:12px sans-serif;padding:0 8px} ${flex ? 'table,thead,tbody{display:block}tr{display:flex}td:first-child,th:first-child{flex:1 1 0}td:last-child,th:last-child{width:72px}' : ''}</style><div class="frame" data-column-sizing="content"><table class="table">${flex ? '' : '<colgroup><col><col style="width:72px"></colgroup>'}<thead><tr ${flex ? 'data-table-layout="columns"' : ''}><th>名前</th><th>更新</th></tr></thead><tbody><tr ${flex ? 'data-table-layout="columns"' : ''}><td data-cell-grow>夏のキャンペーン</td><td><span class="timestamp" data-list-date-time><span>09/30</span> <span>14:12</span></span></td></tr></tbody></table></div></html>`)
+      const check = () => page.locator('[data-list-date-time]').evaluate(el => {
+        const a = el.firstElementChild.getBoundingClientRect(), b = el.lastElementChild.getBoundingClientRect(), cell = el.closest('td'), c = getComputedStyle(cell)
+        return { oneLine: Math.abs(a.y - b.y) < 1, gap: b.x - a.right, fits: el.getBoundingClientRect().width <= cell.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight) + 1 }
+      })
+      await page.locator('.frame').evaluate(fitListColumns)
+      assert.deepEqual(await check(), { oneLine: true, gap: 4, fits: true })
+      await page.locator('.timestamp span').first().evaluate(el => el.textContent = '2025/10/01')
+      await page.locator('.frame').evaluate(fitListColumns)
+      assert.deepEqual(await check(), { oneLine: true, gap: 4, fits: true })
+      await page.locator('.timestamp').evaluate(el => { el.style.flexWrap = 'wrap'; el.style.width = '48px' })
+      assert.equal((await check()).oneLine, false, 'the former wrap must expose the regression')
+    }
+  } finally { await browser.close() }
+})

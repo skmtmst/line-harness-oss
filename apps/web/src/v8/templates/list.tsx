@@ -1090,7 +1090,7 @@ export default function TemplatesListV8() {
         shouldOpen={(event) => Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))}
       >
         <div className={styles.tableWrap}>
-          <DataTable presentation="template-list">
+          <DataTable presentation="template-list" columnSizing="content">
             <colgroup>
               <col className={styles.colSelect} />
               <col />

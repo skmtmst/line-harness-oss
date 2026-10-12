@@ -45,9 +45,16 @@ export function fitListColumns(frame) {
     const cells = rows.map(row => row.children[index]).filter(Boolean).filter(cell => cell.getBoundingClientRect().width)
     // A genuinely long secondary value keeps its existing truncation budget.
     const required = Math.max(0, ...cells.map(intrinsic))
-    const controls = cells.some(cell => cell.querySelector('button, input, [data-design-node="xRvDB"]'))
-    return Math.ceil(controls ? required : Math.min(frame.listColumnCeilings[index], required))
+    const unbroken = cells.some(cell => cell.querySelector('button, input, [data-design-node="xRvDB"], [data-list-date-time]'))
+    return Math.ceil(unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
   })
+  // A native fixed-layout table reads <col> before the first row's cell width.
+  // Keep its column model in sync with the same measured content budget.
+  if (getComputedStyle(body).display !== 'flex') {
+    for (const [index, col] of [...table.querySelectorAll(':scope > colgroup > col')].entries()) {
+      if (widths[index] != null) col.style.width = `${widths[index]}px`
+    }
+  }
   for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
     cell.toggleAttribute('data-content-name-column', index === nameIndex)
     cell.toggleAttribute('data-content-support-column', widths[index] !== null && widths[index] !== undefined)

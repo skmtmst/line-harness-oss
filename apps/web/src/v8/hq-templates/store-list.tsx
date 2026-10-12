@@ -454,7 +454,7 @@ export default function HqStoreList(props: HqStoreListProps) {
     />
   ) : (
     <div className={`${storeStyles.tableWrap} ${storeStyles.hqTable}`}>
-      <DataTable>
+      <DataTable columnSizing="content">
         <colgroup>
           {type === 'rich_menu' ? <col className={storeStyles.colSelect} /> : null}
           <col />
