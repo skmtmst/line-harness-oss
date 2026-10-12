@@ -26,9 +26,8 @@ import styles from './create.module.css'
 import { tagNameProblem } from './tag-name'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { Field } from '@/components/shared/form-controls'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8「タグを作る」（Pencil `d9xoI`）。
@@ -134,7 +133,7 @@ function TagCreate() {
   }, [copyId, selectedAccountId])
 
   const save = async (andAnother: boolean) => {
-    if (saving) return
+    if (saving || !canManageRole(staffRole)) return
     const problem = tagNameProblem(name)
     if (problem) {
       setNameError(problem)
@@ -199,7 +198,7 @@ function TagCreate() {
 
   if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="複製元を読み込んでいます…" /></SaveErrorScope>
 
-  if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
+  if (!canManageRole(staffRole)) return <CreatePage boardId="d9xoI" title="タグを作る" readOnly footerActions={<Button onClick={() => router.push('/tags')}>一覧へ戻る</Button>}>{null}</CreatePage>
 
   const back = <></>
   const groupFolders = groups.map((group) => ({ value: group.id, label: group.name, color: group.color }))
@@ -235,10 +234,8 @@ function TagCreate() {
         {error || copyError ? <Notice tone="danger" message={error || copyError} /> : null}
 
         <Card variant="form" gap="normal" aria-labelledby="tag-new-basic">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="tag-new-basic">基本</h2>
-          </div>
-          <Field label="タグ名"><SaveErrorField names={["name"]}><TextField
+          <CardHeader layout="stacked" title="基本" titleId="tag-new-basic" />
+          <Field label="タグ名" required><SaveErrorField names={["name"]}><TextField
               ref={nameRef}
               aria-label="タグ名"
               invalid={Boolean(nameError)}
@@ -272,26 +269,23 @@ function TagCreate() {
         </Card>
 
         <Card variant="form" gap="normal" aria-labelledby="tag-new-ways">
-          <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle} id="tag-new-ways">付け方（どこで付けるか）</h2>
-            <p className={styles.cardNote}>作ったあとに、回答フォーム・オートメーション・タグ連動からこのタグを付けられます</p>
-          </div>
+          <CardHeader layout="stacked" title="付け方（どこで付けるか）" titleId="tag-new-ways" meta="作ったあとに、回答フォーム・オートメーション・タグ連動からこのタグを付けられます" />
           <div className={styles.waysRow}>
-            <Link href="/form-submissions" className={styles.way}>
+            <Link href="/form-submissions"><Card surface="muted" padding="compact" layout="vertical" gap="tight">
               <ClipboardList className={styles.wayIcon} aria-hidden="true" />
               <span className={styles.wayTitle}>回答フォーム</span>
               <span className={styles.wayNote}>答えに合わせて付ける</span>
-            </Link>
-            <Link href="/automations" className={styles.way}>
+            </Card></Link>
+            <Link href="/automations"><Card surface="muted" padding="compact" layout="vertical" gap="tight">
               <Workflow className={styles.wayIcon} aria-hidden="true" />
               <span className={styles.wayTitle}>オートメーション</span>
               <span className={styles.wayNote}>決まりで自動に付ける</span>
-            </Link>
-            <div className={styles.way}>
+            </Card></Link>
+            <Card surface="muted" padding="compact" layout="vertical" gap="tight">
               <Link2 className={styles.wayIcon} aria-hidden="true" />
               <span className={styles.wayTitle}>タグ連動</span>
               <span className={styles.wayNote}>付いたら次の動きをする</span>
-            </div>
+            </Card>
           </div>
         </Card>
       </CreatePage>
