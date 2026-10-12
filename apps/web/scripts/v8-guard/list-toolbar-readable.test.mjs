@@ -121,3 +121,18 @@ test('a requested secondary toolbar stays on its own row even when the primary c
     assert.ok(positions[1] > positions[0], 'an explicit second section is not counted as a first-row tool')
   } finally { await browser.close() }
 })
+
+test('page size wrappers use the same readable width as their control', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n${css('select')}\n*{box-sizing:border-box}.oldCount{width:96px}.toolbar{width:300px}.trigger{height:36px}</style><section data-list-skeleton><div class="toolbar" data-list-toolbar><div class="trailing"><div class="oldCount" data-per-page-select><div class="root content"><button class="trigger" aria-haspopup="listbox"><span class="value" data-select-value>50 件表示</span><svg class="chevron"></svg></button></div></div></div></div></section></html>`)
+    await page.locator('.root').evaluate(fitSelectContent)
+    const sizes = await page.locator('[data-per-page-select]').evaluate(el => ({ wrapper: el.getBoundingClientRect().width, control: el.querySelector('button').getBoundingClientRect().width }))
+    assert.ok(sizes.wrapper >= sizes.control)
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-191 選ぶ欄の文字切れ'))
+    await page.locator('[data-per-page-select]').evaluate(el => { el.style.width = '96px'; el.style.minWidth = '0' })
+    const broken = await page.locator('[data-per-page-select]').evaluate(el => el.getBoundingClientRect().width < el.querySelector('button').getBoundingClientRect().width)
+    assert.equal(broken, true)
+  } finally { await browser.close() }
+})
