@@ -1,3 +1,5 @@
+import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
@@ -518,7 +520,7 @@ function expectedSubmitStepNames(input: {
     && (webhookData as Record<string, unknown>).join_url) {
     steps.push('meet_link');
   }
-  steps.push('reply', 'destination_status');
+  steps.push('automation', 'reply', 'destination_status');
   return steps;
 }
 
@@ -2203,9 +2205,9 @@ forms.post('/api/forms/:id/partial', inputJsonBoundary({"data":["object"]}), asy
     if (new TextEncoder().encode(mergedJson).byteLength > PARTIAL_MERGED_MAX_BYTES) {
       return c.json({ success: false, error: '送信内容が大きすぎます' }, 413);
     }
-    await c.env.DB.prepare(
-      'UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?',
-    ).bind(mergedJson, jstNow(), friend.id).run();
+    if (!await patchFriendMetadata(c.env.DB, friend.id, filtered, { maxBytes: PARTIAL_MERGED_MAX_BYTES })) {
+      return c.json({ success: false, error: '送信内容が大きすぎます' }, 413);
+    }
 
     return c.json({ success: true });
   } catch (err) {
@@ -2929,7 +2931,8 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     // Webhook より前に置くのは、どうせ断る回答のために外部へ問い合わせを
     // 投げないため。工程(capacity)は一度きり: 再開時に二重に消費しない。
     const ensureCapacity = async (): Promise<string | null> => {
-      if (!claimCtx || claimDone('capacity') || !layout) return null;
+      if (!claimCtx || !layout) return null;
+      if (claimDone('capacity') && await getFormSubmissionById(c.env.DB, claimCtx.submissionId)) return null;
       const slots = collectCapacitySlots(layout, submissionData);
       if (slots.length === 0) {
         const lost = await claimCheckpoint('capacity');
@@ -2938,7 +2941,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
       }
       let rejectedMessage: string | null = null;
       for (const slot of slots) {
-        const ok = await claimFormCapacitySlot(c.env.DB, formId, slot.key, claimCtx.submissionId, slot.limit);
+        const ok = await claimFormCapacitySlot(c.env.DB, formId, slot.key, claimCtx.submissionId, slot.limit, slot.choice);
         if (!ok) {
           rejectedMessage = slot.message;
           break;
@@ -2959,7 +2962,7 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     const updateDestinationWriteResult = async (result: FormDestinationWriteResult): Promise<void> => {
       if (claimCtx && claimDone('destination_status')) {
         const current = await getFormSubmissionById(c.env.DB, submission.id);
-        if (current && current.destination_write_status !== 'pending') return;
+        if (current && ['succeeded','not_requested'].includes(current.destination_write_status)) return;
       }
       try {
         const status = await updateFormSubmissionDestinationWriteResult(c.env.DB, submission.id, result);
@@ -3176,13 +3179,6 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
           subjectKey: formId,
           occurredAt: submission.created_at,
         }),
-        dispatchAutomationEventWithLogging(c.env.DB, {
-          lineAccountId: identity.lineAccountId,
-          eventType: 'form_submitted',
-          sourceEventId: submission.id,
-          friendId,
-          eventData: { formId, submissionId: submission.id },
-        }),
         // R150: 送信Webhookの購読対象としても発火する。回答の中身は
         // 個人情報を含むので送らず、識別子とフォーム名だけ渡す。
         fireOutgoingWebhooks(c.env.DB, 'form_submitted', {
@@ -3312,6 +3308,7 @@ async function runFormPostEffects(input: {
   const claim = input.claim;
   const now = jstNow();
   const done = (step: string) => claim?.done(step) ?? false;
+  let registrationsReady = true;
 
   if (!done('mileage')) {
     // 付与の呼び出しは失敗を握らない。DB が落ちていれば投げて、
@@ -3381,12 +3378,7 @@ async function runFormPostEffects(input: {
       run: async () => {
         const friend = await getFriendById(db, friendId);
         if (!friend) return;
-        const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
-        const merged = { ...existing, ...submissionData };
-        await db
-          .prepare(`UPDATE friends SET metadata = ?, updated_at = ? WHERE id = ?`)
-          .bind(JSON.stringify(merged), now, friendId)
-          .run();
+        if (!await patchFriendMetadata(db, friendId, submissionData)) throw new Error('friend_metadata_unavailable');
       },
     });
   }
@@ -3401,6 +3393,7 @@ async function runFormPostEffects(input: {
     // 実行した分だけを数えても重ならない。
     let layoutStats: Record<string, { attempted: number; succeeded: number; failed: number }> = {};
     if (claim) layoutStats = await claim.readLayoutStats();
+    const completedThisRun = { attempted: 0, succeeded: 0, failed: 0 };
     effectRuns.push({
       step: 'layout_effects',
       run: () => applyFormLayoutEffects({
@@ -3420,6 +3413,7 @@ async function runFormPostEffects(input: {
         skipEffect: (effectId) => done(`layout:${effectId}`),
         onEffectComplete: async (effectId, delta) => {
           if (!claim) return;
+          for (const key of ['attempted','succeeded','failed'] as const) completedThisRun[key] += delta[key];
           const prev = layoutStats[effectId] ?? { attempted: 0, succeeded: 0, failed: 0 };
           const merged = {
             attempted: prev.attempted + delta.attempted,
@@ -3476,6 +3470,9 @@ async function runFormPostEffects(input: {
           totals.succeeded += stats.succeeded;
           totals.failed += stats.failed;
         }
+        for (const key of ['attempted','succeeded','failed'] as const) {
+          totals[key] += result.destinationWrites[key] - completedThisRun[key];
+        }
         destinationWriteResult = totals;
         // 欠落した工程があれば完了にせず、再送・再実行で補完する。
         if (result.failedEffects.length > 0) {
@@ -3497,11 +3494,29 @@ async function runFormPostEffects(input: {
   if (!layout) {
     effectRuns.push({
       step: 'legacy_fields',
-      run: () => writeLegacyFriendFields(db, form as DbForm, submissionData, friendId).then((result) => {
-        destinationWriteResult = result;
-      }),
+      run: async () => {
+        if(!parseFormFields(form.fields).some(field=>field.friendFieldId&&submissionData[field.name??field.id??'']!==undefined))return;
+        await writeFormDestinationsOnce({ db, friendId, sourceKey: `form-submit:${submission.id}`, blockId: 'legacy',
+          stats: destinationWriteResult,
+          write: async (ownedDb, stats) => { Object.assign(stats, await writeLegacyFriendFields(ownedDb, form as DbForm, submissionData, friendId)); },
+        });
+      },
     });
   }
+
+  // B-249: evaluate conditions only after every customer registration succeeded.
+  // This checkpoint also gives both resubmission and staff retry the same recovery path.
+  effectRuns.push({
+    step: 'automation',
+    run: async () => {
+      if (!registrationsReady) throw new Error('form_registration_incomplete');
+      await dispatchAutomationEventWithLogging(db, {
+        lineAccountId: input.expectedLineAccountId, eventType: 'form_submitted',
+        sourceEventId: submission.id, friendId,
+        eventData: { formId: input.formId, submissionId: submission.id },
+      });
+    },
+  });
 
   // Add tag — guarded attach so a tag_added-triggered scenario fires on
   // first-time submit (and never re-fires on duplicate submits).
@@ -3685,6 +3700,7 @@ async function runFormPostEffects(input: {
       await effect.run();
     } catch (error) {
       if (error instanceof ClaimOwnershipLost) throw error;
+      if (['metadata','layout_effects','legacy_fields'].includes(effect.step)) registrationsReady = false;
       console.error('Form side-effect failed:', error);
       continue;
     }
@@ -3695,7 +3711,7 @@ async function runFormPostEffects(input: {
   const recordDestinationWrite = async (): Promise<void> => {
     if (claim?.done('destination_status')) {
       const current = await getFormSubmissionById(db, submission.id);
-      if (current && current.destination_write_status !== 'pending') return;
+      if (current && ['succeeded','not_requested'].includes(current.destination_write_status)) return;
     }
     try {
       const status = await updateFormSubmissionDestinationWriteResult(db, submission.id, destinationWriteResult);

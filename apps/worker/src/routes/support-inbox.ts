@@ -107,6 +107,7 @@ supportInbox.post('/webhooks/xserver/support-email', inputJsonBoundary(), async 
     subject: parsed.subject,
     bodyText: formData.inquiry || parsed.text,
     bodyHtml: formData.inquiry ? undefined : parsed.html,
+    sentAt: parsed.date || parsed.headers.find(h=>h.key==='received')?.value,
     messageId: parsed.messageId,
     inReplyTo: parsed.inReplyTo,
     references: parsed.references,
