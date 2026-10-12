@@ -781,7 +781,7 @@ describe('POST /api/booking/admin/bookings/:id/notifications/:runId/retry (N-393
     await expect(res.json()).resolves.toMatchObject({
       status: 'failed',
       operation_status: 'permanent_failed',
-      error_code: 'Error',
+      error_code: 'delivery_unknown',
     });
   });
 });
