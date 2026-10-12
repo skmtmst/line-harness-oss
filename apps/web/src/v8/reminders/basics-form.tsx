@@ -409,7 +409,7 @@ export function ReminderBasicsFormV8({
       </Card>
 
       <Card variant="form" gap="normal">
-        <CardHeader size="stacked" title={<>ひな形から作る（任意）</>} meta={<>基準日・送るタイミング・本文がまとめて入ります</>} />
+        <CardHeader size="stacked" title="ひな形から作る" optional meta={<>基準日・送るタイミング・本文がまとめて入ります</>} />
         <div className={styles.tplGrid}>
           {reminderTemplatesV8.map((template) => (
             <Card key={template.id} padding="default" layout="vertical" className={styles.templateCard}>

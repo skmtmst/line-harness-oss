@@ -947,3 +947,5 @@
 
 ### 下の帯の左端の操作（F組4回目・Q）
 - 持ち主：`components/shared/sticky-bar.tsx` の `StickyBarAction`。確認窓を開く副ボタン・印・禁止時の理由を同じ口で出す。実際の削除・保管の処理と確認窓は呼び出す画面が保つ。
+
+- 作成段の任意の題は `CardHeader` の `optional`。窓の題の横は既存の `Dialog.titleHelp` に共通 `OptionalBadge` を渡す。括弧付きの題を画面ごとに描かない。

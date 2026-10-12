@@ -1672,7 +1672,7 @@ function AutoReplyWizardV8Inner() {
               </Notice>
 
               <Card variant="form" gap="normal" className={`${styles.cardContent} ${styles.starterSection}`}>
-                <CardHeader size="stacked" title={<>ひな形から作る（任意）</>} meta={<>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</>} />
+                <CardHeader size="stacked" title="ひな形から作る" optional meta={<>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</>} />
                 <CreateStarterCards
                   items={STARTER_TEMPLATES.map((tpl) => ({
                     key: tpl.key,

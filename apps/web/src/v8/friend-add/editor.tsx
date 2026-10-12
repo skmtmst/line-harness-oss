@@ -54,7 +54,7 @@ import { resendSuppressionText } from './text';
 import styles from './editor.module.css'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls';
+import { Field, OptionalBadge } from '@/components/shared/form-controls';
 import { withPermissionFailure } from '@/components/shared/api-error-message';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -1113,19 +1113,19 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
               <Plus size={15} aria-hidden="true" />流入リンクを新しく発行する
             </Button>
           ) : null}
-          {narrow ? <Button type="button" variant="text" onClick={() => setConditionsDialogOpen(true)}>対象をしぼる（任意）</Button> : null}
+          {narrow ? <Button type="button" variant="text" onClick={() => setConditionsDialogOpen(true)}>対象をしぼる <OptionalBadge /></Button> : null}
           <span className={styles.spacer} aria-hidden="true" />
           <span className={styles.countNote}>{selectedCount > 0 ? `${selectedCount}つ選んでいます` : '選んでいません'}</span>
         </div>
         {routeError ? <p id="fa-routes-error" className={styles.fieldError} role="alert">{routeError}</p> : null}
         {!narrow ? (
-          <div className={styles.narrowBox} aria-label="対象をしぼる（任意）" role="group">
-            <h3 className={styles.subTitle}>対象をしぼる（任意）</h3>
+          <div className={styles.narrowBox} aria-label="対象をしぼる" role="group">
+            <CardHeader headingLevel={3} size="stacked" title="対象をしぼる" optional />
             {conditions}
           </div>
         ) : null}
       </Card>
-      <Dialog open={narrow && conditionsDialogOpen} title="対象をしぼる（任意）" onCancel={() => setConditionsDialogOpen(false)}>
+      <Dialog open={narrow && conditionsDialogOpen} title="対象をしぼる" titleHelp={<OptionalBadge />} onCancel={() => setConditionsDialogOpen(false)}>
         {conditions}
       </Dialog>
       <Notice

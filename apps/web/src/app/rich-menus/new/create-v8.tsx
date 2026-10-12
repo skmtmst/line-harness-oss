@@ -35,7 +35,7 @@ import {
 import Card from '@/components/shared/card'
 import LayoutPicker from '@/components/shared/layout-picker'
 import TargetMissing from '@/components/shared/target-missing'
-import { Field, TextInput } from '@/components/shared/form-controls'
+import { Field, TextInput, OptionalBadge } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
@@ -2647,7 +2647,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
           {/* 板 `F4gELj`：終わりを決めるは枠の箱。上の行に題とトグル、下の行に「日時 に終わり、［戻す先］に戻す」。オフのときは入力を無効化。 */}
           <div className={styles.endBox}>
             <div className={styles.endHead}>
-              <span className={styles.endTitle} title="指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください">終わりを決める（任意）</span>
+              <span className={styles.endTitle} title="指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください">終わりを決める <OptionalBadge /></span>
               <SaveErrorField names={["endEnabled","end_enabled"]}><SettingCheckbox
                 label="終わりを決める"
                 checked={endEnabled}

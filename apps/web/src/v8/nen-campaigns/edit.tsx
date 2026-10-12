@@ -30,7 +30,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { formatNumber } from '@/lib/format'
 import { formatCampaignTiming } from './display'
 import styles from './form.module.css'
-import { FieldError, Field } from '@/components/shared/form-controls'
+import { FieldError, Field, OptionalBadge } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { tapActionLiffUrl } from '@/lib/tap-actions'
@@ -552,12 +552,12 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         <CardHeader size="stacked" titleId="nen-edit-after" title="押されたあとにすること" meta={`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`} />
         <div className={styles.row}>
           <div className={styles.field}>
-            <span className={styles.labelSmall}>回答フォームを開かせる（任意）</span>
+            <span className={styles.labelSmall}>回答フォームを開かせる <OptionalBadge /></span>
             {!canEdit ? <StaticBox label="回答フォーム" value={formAction?.formName ?? '開かせない'} /> : <>
               <SaveErrorField names={["formId","formAction?.formId"]}><EntityKindField
                 id="nen-edit-form"
                 kind="form"
-                label="回答フォームを開かせる（任意）"
+                label="回答フォームを開かせる"
                 options={forms.map((form) => ({ ...form, disabled: !form.isActive }))}
                 meta={(row) => (row.isActive === false ? '公開されていないため選べません' : undefined)}
                 placeholder="（開かせない）"
