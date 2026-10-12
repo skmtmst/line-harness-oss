@@ -3571,6 +3571,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'DELETE' && pathname === '/api/hq/templates/media') {
     return { success: true, data: { deleted: true } }
   }
+  if (pathname === '/api/line-webhook-events') return { success: true, data: [] }
   if (pathname === '/api/operations/health') {
     /* 確認の時刻は「いま」に寄せる（固定の日時だと全部が「古い確認」になり、★V8 Y4LkX1 の判定が撮れない）。 */
     const now = Date.now()

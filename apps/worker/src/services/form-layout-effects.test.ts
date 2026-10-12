@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   getFriendFieldById: vi.fn(),
   getFixedFriendField: vi.fn(),
   getMessageTemplateById: vi.fn(),
-  removeTagFromFriend: vi.fn(),
+  detachTag: vi.fn(),
   setFriendFieldValue: vi.fn(),
   attachTag: vi.fn(),
 }));
@@ -26,7 +26,6 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     getFriendFieldById: mocks.getFriendFieldById,
     getFixedFriendField: mocks.getFixedFriendField,
     getMessageTemplateById: mocks.getMessageTemplateById,
-    removeTagFromFriend: mocks.removeTagFromFriend,
     setFriendFieldValue: mocks.setFriendFieldValue,
     validateFriendFieldValue: actual.validateFriendFieldValue,
     jstNow: () => '2026-08-19T12:00:00+09:00',
@@ -35,6 +34,7 @@ vi.mock('@line-crm/db', async (importOriginal) => {
 
 vi.mock('./friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: mocks.attachTag,
+  detachTagAndFireSideEffects: mocks.detachTag,
 }));
 
 import { applyFormLayoutEffects, checkFormGates, collectCapacitySlots, layoutEffectStepIds } from './form-layout-effects.js';
@@ -82,7 +82,8 @@ beforeEach(() => {
   mocks.countChoiceUsage.mockResolvedValue(new Map());
   mocks.countFormSubmissionsByFriend.mockResolvedValue(0);
   mocks.enrollFriendInReminder.mockResolvedValue(undefined);
-  mocks.enrollFriendInScenario.mockResolvedValue(undefined);
+  mocks.enrollFriendInScenario.mockResolvedValue({ id: 'enrolled-scenario' });
+  mocks.detachTag.mockResolvedValue({ removed: true });
   mocks.getFriendFieldById.mockResolvedValue({
     id: 'ff-1',
     ec_is_master: 0,
@@ -386,7 +387,7 @@ describe('回答を配る', () => {
     const { db } = fakeDb();
     const sent: string[] = [];
 
-    await applyFormLayoutEffects({
+    const result = await applyFormLayoutEffects({
       db,
       layout,
       friendId: 'f1',
@@ -397,7 +398,8 @@ describe('回答を配る', () => {
     });
 
     expect(sent).toEqual(['資料をお送りします']);
-    expect(mocks.enrollFriendInScenario).toHaveBeenCalledWith(db, 'f1', 'sc-1');
+    expect(mocks.enrollFriendInScenario).toHaveBeenCalledWith(db, 'f1', 'sc-1', undefined, { replacingScenarioId: null });
+    expect(result.failedEffects).toEqual([]);
     expect(mocks.attachTag).not.toHaveBeenCalled();
   });
 
@@ -469,8 +471,9 @@ describe('回答を配る', () => {
     layout.options.afterActions = [{ kind: 'tag', op: 'remove', tagIds: ['tag-old'] }];
     const { db } = fakeDb();
 
-    await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: {} });
-    expect(mocks.removeTagFromFriend).toHaveBeenCalledWith(db, 'f1', 'tag-old');
+    const result = await applyFormLayoutEffects({ db, layout, friendId: 'f1', answers: {} });
+    expect(mocks.detachTag).toHaveBeenCalledWith(db, 'f1', 'tag-old', undefined);
+    expect(result.failedEffects).toEqual([]);
   });
 
   test('1つ失敗しても、残りは実行する', async () => {

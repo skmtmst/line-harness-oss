@@ -1,12 +1,8 @@
-import { mergeLiffStateSearch } from '@line-crm/shared';
+import { mergeLiffStateLocation } from '@line-crm/shared';
 export { mergeLiffStateSearch } from '@line-crm/shared';
 
 export function restoreLiffStateInCurrentUrl(): void {
-  const mergedSearch = mergeLiffStateSearch(window.location.search);
-  if (mergedSearch === window.location.search) return;
-  window.history.replaceState(
-    window.history.state,
-    '',
-    `${window.location.pathname}${mergedSearch}${window.location.hash}`,
-  );
+  const restored = mergeLiffStateLocation(window.location.pathname, window.location.search, window.location.hash);
+  if (restored === `${window.location.pathname}${window.location.search}${window.location.hash}`) return;
+  window.history.replaceState(window.history.state, '', restored);
 }

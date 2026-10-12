@@ -95,6 +95,6 @@ describe('WaitlistSheet', () => {
     waitlistMine.mockRejectedValue(new Error('network down'));
     renderSheet();
 
-    expect(await screen.findByText('読み込めませんでした。電波の良い所でもう一度開いてください。')).toBeTruthy();
+    expect(await screen.findByText('読み込めませんでした。電波の良い所でもう一度お試しください。')).toBeTruthy();
   });
 });

@@ -65,7 +65,7 @@ export async function runResearchAnswerAction(db: D1Database, action: Extract<Fo
   } else if (!isScenarioActionComplete(action.actionType, action.config)) throw new Error('回答後に行うことの設定が不完全です');
   const result = action.actionType === 'notify_staff'
     ? await runAutoReplyAction(db, row, friendId, { lineAccountId: friend.line_account_id, sourceEventId: effectKey, env })
-    : await runActionRows(db, [row as ScenarioActionRow], friendId, { accountId: friend.line_account_id });
+    : await runActionRows(db, [row as ScenarioActionRow], friendId, { accountId: friend.line_account_id, sourceEventId: effectKey });
   if (result.failed || result.skippedIncomplete) throw new Error('回答後に行うことを完了できませんでした');
 }
 

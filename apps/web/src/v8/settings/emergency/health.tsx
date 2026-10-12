@@ -10,6 +10,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import {
   api,
   ApiError,
+  type LineWebhookRecoveryEvent,
   type OperationAlert,
   type OperationHealthCheckKey,
   type OperationHealthSnapshot,
@@ -20,6 +21,8 @@ import { formatMinutesRough } from '@/lib/format-duration'
 import { onlyWhenVisible } from '@/lib/visible-polling'
 import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
+import Notice from '@/components/shared/notice'
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
 import { formatTime as polishFormatTime, formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -291,6 +294,54 @@ export function HealthPanelV8({
   const currentAccountIdRef = useRef(accountId)
   currentAccountIdRef.current = accountId
 
+  const [lineReceipts, setLineReceipts] = useState<LineWebhookRecoveryEvent[]>([])
+  const [lineReceiptsFailed, setLineReceiptsFailed] = useState(false)
+  const [lineRetryId, setLineRetryId] = useState<string | null>(null)
+  const lineRetryLock = useRef(false)
+  const receiptGeneration = useRef(0)
+  const loadLineReceipts = useCallback(async () => {
+    const generation = ++receiptGeneration.current
+    const requestedAccountId = accountId
+    if (!canManage || !accountId) { setLineReceipts([]); setLineReceiptsFailed(false); return }
+    try {
+      const response = await api.operations.lineReceipts(accountId)
+      if (generation !== receiptGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
+      if (!response.success) throw new Error(response.error)
+      setLineReceipts(response.data.filter((item) => item.lineAccountId === accountId))
+      setLineReceiptsFailed(false)
+    } catch {
+      if (generation !== receiptGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
+      setLineReceiptsFailed(true)
+    }
+  }, [accountId, canManage])
+  useEffect(() => {
+    setLineReceipts([])
+    setLineReceiptsFailed(false)
+    void loadLineReceipts()
+    const timer = window.setInterval(onlyWhenVisible(() => { void loadLineReceipts() }), 5 * 60 * 1000)
+    return () => { ++receiptGeneration.current; window.clearInterval(timer) }
+  }, [loadLineReceipts, manualRunRequest])
+  const retryLineReceipt = async (item: LineWebhookRecoveryEvent) => {
+    if (!canManage || !item.canRetry || item.recoveryStatus === 'needs_review' || lineRetryLock.current) return
+    const requestedAccountId = accountId
+    const generation = receiptGeneration.current
+    lineRetryLock.current = true
+    setLineRetryId(item.webhookEventId)
+    try {
+      const response = await api.operations.retryLineReceipt(item.webhookEventId)
+      if (generation !== receiptGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
+      if (!response.success) throw new Error(response.reason ?? '受信の工程をやり直せませんでした。履歴を確認してください。')
+      setAlertNotice({ tone: 'success', text: '保存済みの受信から、残っていた工程をやり直しました。' })
+    } catch (error) {
+      if (generation !== receiptGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
+      setAlertNotice({ tone: 'warning', text: japaneseDetailOf(error) || describeApiFailure(error, '受信のやり直し') })
+    } finally {
+      lineRetryLock.current = false
+      setLineRetryId(null)
+      if (generation === receiptGeneration.current && requestedAccountId === currentAccountIdRef.current) await loadLineReceipts()
+    }
+  }
+
   const applySnapshot = useCallback((snapshot: OperationHealthSnapshot) => {
     const results = snapshot.latestRun?.results ?? []
     const snapshotStale = snapshot.overallStatus === 'stale'
@@ -495,6 +546,27 @@ export function HealthPanelV8({
           onAcknowledge={acknowledgeAlert}
           onRetry={retryAlertNotifications}
         />
+        {canManage && accountId && lineReceiptsFailed ? <Notice tone="danger" action={<Button variant="secondary" onClick={() => void loadLineReceipts()}>読み直す</Button>}>LINE受信の失敗を読み込めませんでした。失敗なしとは扱いません。</Notice> : null}
+        {canManage && !lineReceiptsFailed && lineReceipts.some((item) => item.lineAccountId === accountId) ? (
+          <section className={styles.alerts} aria-label="LINE受信の失敗">
+            <h2 className={styles.alertsTitle}>LINE受信の失敗</h2>
+            <div className={styles.alertRows}>
+              {lineReceipts.filter((item) => item.lineAccountId === accountId).map((item) => (
+                <div className={styles.alertRow} key={item.webhookEventId}>
+                  <div className={styles.alertLine}>
+                    <StatusBadge tone="warning">{item.recoveryStatus === 'needs_review' ? '要確認' : '未完了'}</StatusBadge>
+                    <p className={styles.alertText} title={item.webhookEventId}>受信：{formatOperationDate(item.receivedAt)}</p>
+                    {item.canRetry === true && item.recoveryStatus !== 'needs_review' ? <Button variant="secondary" disabled={lineRetryId !== null} busy={lineRetryId === item.webhookEventId} onClick={() => void retryLineReceipt(item)}>やり直す</Button> : null}
+                  </div>
+                  <Notice tone="warn">
+                    {item.recoveryReason ?? (item.canRetry ? '保存済みの受信から、やり直せる工程が残っています。' : 'やり直せる工程を確認できません。受信と処理の履歴を照らしてください。')}
+                    履歴を照らし、必要なら受信箱から担当者が返信するか、お客さまに送り直しを頼んでください。
+                  </Notice>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
         <GridTable label="確かめていること" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-sb-hc-col-judge) var(--tpl-sb-hc-col-time) var(--tpl-sb-hc-col-how)', gap: 'var(--tpl-sb-ec-gap)', rowPadding: 'var(--tpl-sb-hc-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)', fontSize: 'var(--tpl-sb-band-text)', headFontSize: 'var(--tpl-sb-row-sub)', headLineHeight: 'var(--tpl-sb-row-sub-lh)', headBackground: 'var(--color-surface-pearl)' }}>
           <div role="rowgroup">
             <GridHeadRow>

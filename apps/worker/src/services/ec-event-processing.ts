@@ -1,3 +1,4 @@
+import { upsertEcEventReadModels } from '@line-crm/db';
 import { acquireWorkflow, runWorkflowStep, type WorkflowExecution } from './workflow-execution.js';
 import {
   getWorkflowStep,failWorkflowStep,
@@ -155,6 +156,17 @@ export async function processEcEvent(
     return 'duplicate';
   }
   try {
+    // Receipt replay and cron recovery share this checkpoint. Display data must
+    // exist before the event can report success, even if the first receipt failed.
+    await execution.step('read_models', async () => {
+      const source = await execution.db.prepare('SELECT source FROM ec_events WHERE id=?').bind(row.id).first<{source:string}>();
+      await upsertEcEventReadModels(execution.db, {
+        eventId: row.id, sourceKey: source?.source ?? `eccube:${lineAccountId}`,
+        externalEventId: event.event_id, eventType: event.event_type, lineAccountId,
+        customerId: event.customer_id == null ? null : String(event.customer_id),
+        occurredAt: event.occurred_at, order: event.order, refund: event.refund,
+      }, now);
+    });
     const outcome=await processClaimedEcEvent(execution.db,input,execution);
     await execution.complete({outcome});
     return outcome;

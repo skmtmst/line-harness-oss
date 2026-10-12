@@ -234,7 +234,7 @@ describe('POST /webhook — V6分析イベント', () => {
     await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
 
     expect(updateFriendFollowStatus).toHaveBeenCalledWith(
-      baseEnv.DB, 'U-1', false, 'account-main',
+      baseEnv.DB, 'U-1', false, 'account-main', '2026-08-24T12:00:00.000+09:00',
     );
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(baseEnv.DB, {
       lineAccountId: 'account-main',
@@ -485,6 +485,7 @@ describe('POST /webhook — postback events', () => {
 
     const stmt = {
       bind: vi.fn(),
+      first: vi.fn().mockResolvedValue(null),
       run: vi.fn().mockResolvedValue({}),
       all: vi.fn().mockResolvedValue({ results: [] }), // no auto_reply match
     };
@@ -571,6 +572,7 @@ describe('POST /webhook — postback events', () => {
 
     const stmt = {
       bind: vi.fn(),
+      first: vi.fn().mockResolvedValue(null),
       run: vi.fn().mockResolvedValue({}),
       all: vi.fn().mockResolvedValue({
         results: [
@@ -749,6 +751,7 @@ describe('POST /webhook — first-contact existing friends', () => {
     expect(upsertFriend).toHaveBeenCalledWith(db, {
       lineUserId: 'U-existing',
       lineAccountId: 'account-main',
+      followOccurredAt: '2026-08-24T12:00:00.000+09:00',
       displayName: 'Existing Friend',
       pictureUrl: 'https://example.com/profile.jpg',
       statusMessage: 'hello',

@@ -137,6 +137,8 @@ export default function VisitStamps() {
   const [redemption, setRedemption] = useState<(VisitStampRedemption & { shownAt: Date }) | null>(null);
   const [used, setUsed] = useState<{ at: Date; balance: number; staffName: string } | null>(null);
   /* 自分の紙のカードの申請（確認待ち・承認・却下と理由）。 */
+  const [requestsFailed, setRequestsFailed] = useState(false);
+  const requestsGeneration = useRef(0);
   const [requests, setRequests] = useState<VisitStampPaperRequest[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -160,10 +162,12 @@ export default function VisitStamps() {
   useEffect(() => { void load(); }, [load]);
   const loadRequests = useCallback(async () => {
     if (!accountId || !entry) return;
-    try { setRequests((await visitStampsApi.paperRequests(accountId, entry.card.id)).data); }
-    catch (e) { logFailure('visit-stamps-paper-requests', e); setRequests([]); }
+    const generation = ++requestsGeneration.current;
+    setRequests(null); setRequestsFailed(false);
+    try { const response = await visitStampsApi.paperRequests(accountId, entry.card.id); if (generation === requestsGeneration.current) setRequests(response.data); }
+    catch (e) { logFailure('visit-stamps-paper-requests', e); if (generation === requestsGeneration.current) setRequestsFailed(true); }
   }, [accountId, entry]);
-  useEffect(() => { void loadRequests(); }, [loadRequests]);
+  useEffect(() => { void loadRequests(); return () => { requestsGeneration.current++; }; }, [loadRequests]);
 
   const info = useMemo(() => (entry ? cardState(entry.card, entry.wallet.balance) : null), [entry]);
   const chosen = info?.usable.find((r) => r.id === picked) ?? info?.best ?? null;
@@ -241,6 +245,7 @@ export default function VisitStamps() {
   }
 
   if (view === 'paper' || view === 'pending') {
+    if (requestsFailed || requests === null) return <LiffLookScope className="min-h-screen bg-canvas"><LiffHeader title="紙のカードを移す" />{requestsFailed ? <LoadErrorView note="申請はなくなっていません。" onRetry={() => void loadRequests()} /> : <LoadingView />}<BottomBar><Button variant="secondary" onClick={() => setView('card')}>カードに戻る</Button></BottomBar></LiffLookScope>;
     return (
       <PaperCard
         accountId={accountId}

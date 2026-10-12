@@ -94,7 +94,7 @@ function seedBase(raw: Database.Database): void {
   });
 }
 
-async function postFollow(webhookEventId: string, useDb: D1Database): Promise<void> {
+async function postFollow(webhookEventId: string, useDb: D1Database,timestamp=Date.now()): Promise<void> {
   const app = new Hono();
   app.route('/', webhook);
   const waitUntil = vi.fn();
@@ -103,7 +103,7 @@ async function postFollow(webhookEventId: string, useDb: D1Database): Promise<vo
     headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
     body: JSON.stringify({
       events: [{
-        type: 'follow', webhookEventId, timestamp: Date.now(),
+        type: 'follow', webhookEventId, timestamp,
         source: { type: 'user', userId: 'U-1' }, replyToken: `reply-${webhookEventId}`,
         follow: { isUnblocked: false },
       }],
@@ -195,9 +195,10 @@ describe('POST /webhook — 独立2接続の並行follow (#622)', () => {
     lineClientMocks.replyMessage.mockImplementation(
       async () => { await new Promise((resolve) => setTimeout(resolve, 50)); },
     );
+    const occurredAt=Date.now();
     await Promise.all([
-      postFollow('webhook-a', connA.db),
-      postFollow('webhook-b', connB.db),
+      postFollow('webhook-a', connA.db,occurredAt),
+      postFollow('webhook-b', connB.db,occurredAt),
     ]);
 
     expect(sendCount()).toBe(1);
