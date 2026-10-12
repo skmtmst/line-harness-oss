@@ -48,10 +48,12 @@ const GROUP = {
 let host: HTMLDivElement
 let root: Root
 let groupStatus = 200
+let readonlyMode: 'owner' | 'readonly' | 'unknown' = 'owner'
 
 function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
     const path = new URL(String(url), 'http://localhost').pathname
+    if (path === '/api/staff/me') return { ok: true, status: 200, json: async () => readonlyMode === 'unknown' ? ({ success: false, error: 'role unavailable' }) : ({ success: true, data: { id: 'owner-1', role: 'owner', readOnly: readonlyMode === 'readonly' } }) }
     if (path === '/api/rich-menu-groups/rmg-x') {
       return groupStatus === 200
         ? { ok: true, status: 200, json: async () => ({ success: true, data: GROUP }) }
@@ -71,6 +73,7 @@ async function settle() {
 describe('作りかけの下書きを ?id= で開き直す', () => {
   beforeEach(() => {
     groupStatus = 200
+    readonlyMode = 'owner'
     window.history.replaceState(null, '', '/rich-menus/new?id=rmg-x&step=buttons')
     stubFetch()
     host = document.createElement('div')
@@ -197,6 +200,16 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     await act(async () => release({ ok: false, status: 500, json: async () => ({ success: false, error: 'down' }) }))
     await settle(); expect(name.closest('fieldset[disabled]')).toBeNull()
     expect(name.value).toBe('直した名前')
+  })
+
+  for (const mode of ['readonly', 'unknown'] as const) it(`${mode}では編集と保存を置かず戻る道を残す`, async () => {
+    readonlyMode = mode
+    window.history.replaceState(null, '', '/rich-menus/new')
+    await act(async () => { root.render(<RichMenuCreateV8 />) })
+    await settle()
+    expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '下書きを保存', exact: true })).toBeNull()
+    expect(screen.queryByLabelText('メニュー名（友だちには見えません）')).toBeNull()
   })
 
 })
