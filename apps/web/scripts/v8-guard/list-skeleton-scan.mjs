@@ -45,6 +45,13 @@ export function scanListSkeleton() {
     for (const toolbar of root.querySelectorAll('[data-list-toolbar]')) {
       if (!visible(toolbar)) continue
       if (toolbar.scrollWidth > toolbar.clientWidth + 1) fail('B-178 道具のはみ出し', toolbar)
+      for (const input of toolbar.querySelectorAll('input[type="search"]')) {
+        if (!visible(input) || input.value || !input.placeholder) continue
+        const css = getComputedStyle(input), context = document.createElement('canvas').getContext('2d')
+        context.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`
+        const available = input.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
+        if (context.measureText(input.placeholder).width > available + 1) fail('B-191 探す欄の見本文字切れ', input)
+      }
       for (const tool of toolbar.querySelectorAll('input, button, [role="combobox"]')) {
         if (visible(tool) && !tool.closest('[role="menu"], [role="dialog"], details[open]') && (tool.getBoundingClientRect().right > toolbar.getBoundingClientRect().right + 1 || tool.getBoundingClientRect().left < toolbar.getBoundingClientRect().left - 1)) fail('B-178 道具のはみ出し', tool)
       }

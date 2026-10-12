@@ -218,3 +218,9 @@
 html:root :global([data-template-region='toolbar']):has(> div > :is([data-design-part='notice'], [role='status'], [role='alert'])):has(> .slots > .toolbar) {
   row-gap: var(--polish-space-card);
 }
+
+/* B-191: reserve the measured placeholder, then wrap the other list tools. */
+html:root :is(.toolbar, .slots) [data-toolbar-search] {
+  min-width: min(var(--list-search-content-min, var(--tpl-list-search-min)), 100%);
+  flex-basis: max(var(--list-search-width, var(--tpl-list-search-w)), var(--list-search-content-min, 0px));
+}
