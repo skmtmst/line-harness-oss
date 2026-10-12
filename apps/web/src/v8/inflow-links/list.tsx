@@ -1,5 +1,7 @@
 'use client'
 
+import ListDateTime from '@/components/shared/list-date-time'
+
 import ListToolbar, { ListToolbarFrame, ListToolbarOptional, ListToolbarSort } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -48,7 +50,7 @@ import GenreDialog from './genre-dialog'
 import BulkDialog, { type BulkRouteAction } from './bulk-dialog';
 import StatusBadge from '@/components/shared/status-badge'
 import QrDialog, { referralUrl, type QrRoute } from './qr-dialog';
-import { becameLines, buildRows, formatLatest, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from './rows';
+import { becameLines, buildRows, isRefSummaryData, isUnconfigured, matchesFilter, routeStatus, shouldShowRow, sortRows, type RefSummaryData, type RouteFilter, type RouteRow, type RouteSort, type TrackedLinkRow } from './rows';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
@@ -741,7 +743,7 @@ export default function InflowListV8({
                       <span className={styles.cellMain}>{summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : emptyValue('unknown')}</span>
                     </Td>
                     <Td collapseAt="narrow" className={styles.colLatest}>
-                      <span className={styles.cellMain}>{summaryAvailable ? formatLatest(r.stats?.latestAt) : emptyValue('unknown')}</span>
+                      <span className={styles.cellMain}>{summaryAvailable ? <ListDateTime value={r.stats?.latestAt} /> : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colStatus}>
                       {status ? (

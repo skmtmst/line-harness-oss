@@ -47,7 +47,7 @@ import { publicationStateLabel } from '@/components/webinars/publication-label';
 import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { runUndoable } from '@/lib/undoable';
-import { formatDateTime, formatNumber } from '@/lib/format';
+import { formatListTimestamp, formatNumber } from '@/lib/format';
 import { ApiError, webinarApi, type Webinar, type WebinarFolder, type WebinarListItem, type WebinarListParams, type WebinarOverview } from '@/lib/api';
 import { beforeStart, publicPath, showsCounts, statusLabel, statusTone, webinarListCsv, webinarLoadFailure, type WebinarLoadFailure } from './helpers';
 import styles from './list.module.css'
@@ -100,12 +100,15 @@ function scheduleSummary(w: Webinar): string {
   }
   otherRules.forEach((rule) => {
     if (rule.type === 'weekly') parts.push(`毎週${(rule.days ?? []).map((day) => DAYS[day]).join('・')} ${rule.time}`)
-    if (rule.type === 'once') parts.push(rule.at ? formatDateTime(rule.at) : '単発・日時未設定')
+    if (rule.type === 'once') parts.push(rule.at ? formatListTimestamp(rule.at) : '単発・日時未設定')
   })
   return parts.join(' / ')
 }
 
 function periodSummary(webinar: WebinarListItem): string {
+  if (webinar.publicationState === 'scheduled') return formatListTimestamp(webinar.publicationStartsAt)
+  if (webinar.publicationState === 'period' && webinar.publicationStartsAt && webinar.publicationEndsAt)
+    return `${formatListTimestamp(webinar.publicationStartsAt)}〜${formatListTimestamp(webinar.publicationEndsAt)}`
   return publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt)
     ?? scheduleSummary(webinar)
 }

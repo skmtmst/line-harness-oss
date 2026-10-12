@@ -1,4 +1,6 @@
 'use client'
+
+import ListDateTime from '@/components/shared/list-date-time'
 import StatusBadge from '@/components/shared/status-badge'
 
 import { useActionError } from '@/lib/use-action-error'
@@ -70,7 +72,6 @@ import {
   type BandCell,
 } from './shell'
 import styles from './list.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
@@ -132,11 +133,6 @@ export function actionSummary(item: Pick<Automation, 'actions'>): { title: strin
     title: automationActionLabel(first.type),
     detail: rest.map((action) => automationActionLabel(action.type)).join('・'),
   }
-}
-
-/** 月/日（日本時間）。 */
-function monthDay(iso: string): string {
-  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 function TableHead({ selection }: { selection?: ReactNode } = {}) {
@@ -569,7 +565,7 @@ export default function AutomationListV8() {
                     <Td className={styles.colRuns}>
                       <span className={styles.numMain}>{`${formatNumber(item.executionCount30d)} 回`}</span>
                       <span className={styles.numSub}>
-                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : `更新 ${monthDay(item.updatedAt)}`}
+                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : <>更新 <ListDateTime value={item.updatedAt} /></>}
                       </span>
                     </Td>
                     <Td className={styles.colState}>

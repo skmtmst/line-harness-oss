@@ -1,0 +1,8 @@
+.timestamp {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-8);
+  max-width: 100%;
+}
+.timestamp > span { white-space: nowrap; }

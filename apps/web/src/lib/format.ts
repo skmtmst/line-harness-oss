@@ -91,7 +91,7 @@ const weekday = (w: number) => `（${WEEKDAYS[w]}）`
 /** B-152：日付の表示はこの1つの関数で作る。保存値・CSVには使わない。 */
 export function formatDate(
   value: DateInput,
-  options: { style?: 'detail' | 'list' | 'list-day' | 'list-day-weekday' | 'day' | 'time'; fallback?: string; now?: DateInput; timeZone?: string } = {},
+  options: { style?: 'detail' | 'list' | 'list-time' | 'list-day' | 'list-day-weekday' | 'day' | 'time'; fallback?: string; now?: DateInput; timeZone?: string } = {},
 ): string {
   const { style = 'detail', fallback = '—', now, timeZone = 'Asia/Tokyo' } = options
   const p = toParts(value, timeZone)
@@ -100,6 +100,7 @@ export function formatDate(
   if (style === 'time') return clock
   const currentYear = (toParts(now ?? new Date(), timeZone) ?? nowJst()).y
   const sameYear = p.y === currentYear
+  if (style === 'list-time') return `${sameYear ? '' : `${p.y}/`}${pad2(p.m)}/${pad2(p.d)} ${clock}`
   if (style === 'list' || style === 'list-day' || style === 'list-day-weekday') {
     const day = `${pad2(p.m)}/${pad2(p.d)}`
     if (!sameYear) return `${p.y}/${day}${style === 'list-day-weekday' ? weekday(p.w) : style === 'list' && p.y > currentYear ? ` ${clock}` : ''}`
@@ -118,6 +119,11 @@ export function formatDateTime(value: DateInput, fallback = '—', now?: DateInp
 /** 一覧・表の日付。今年は MM/DD HH:mm、別の年は YYYY/MM/DD。 */
 export function formatListDateTime(value: DateInput, fallback = '—', now?: DateInput, timeZone = 'Asia/Tokyo'): string {
   return formatDate(value, { style: 'list', fallback, now, timeZone })
+}
+
+/** 一覧の時刻を持つ記録。別年でも時刻を省かない。 */
+export function formatListTimestamp(value: DateInput, options: { fallback?: string; now?: DateInput; timeZone?: string } = {}): string {
+  return formatDate(value, { ...options, style: 'list-time' })
 }
 
 /** 時刻を持たない一覧の日付。 */

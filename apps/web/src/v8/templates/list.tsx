@@ -1,5 +1,7 @@
 'use client'
 
+import ListDateTime from '@/components/shared/list-date-time'
+
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar';
@@ -19,7 +21,7 @@ import { clampSearchQuery } from '@/lib/search-query';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { formatNumber, formatDate as polishFormatDate, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
+import { formatNumber, formatListTimestamp } from '@/lib/format';
 import { contentExcerpt } from '@/lib/broadcast-summary';
 import { ListPage } from '@/components/templates';
 import { notifyToast } from '@/components/shared/toast';
@@ -150,11 +152,6 @@ const KIND_CARDS: Array<{
 /** 検索欄と検索対象を、大小文字・全半角・空白の違いで外れない形へそろえる。 */
 function normalizeTemplateSearchText(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase('ja-JP').trim().replace(/\s+/gu, ' ')
-}
-
-/** M月D日（絵 v19Ivv は曜日を書かない）。時刻は title で見せる。 */
-function formatMonthDay(iso: string): string {
-  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
 
 /** 一覧・検索は「いまの最新」を対象にする（下書きがあれば下書き）。 */
@@ -1192,8 +1189,8 @@ export default function TemplatesListV8() {
                       </Td>
                     )}
                     {!narrow && (
-                      <Td className={styles.cellPlain} title={polishFormatListDateTime(t.updatedAt)}>
-                        {formatMonthDay(t.updatedAt)}
+                      <Td className={styles.cellPlain} title={formatListTimestamp(t.updatedAt)}>
+                        <ListDateTime value={t.updatedAt} />
                       </Td>
                     )}
                     <Td className={styles.menuCell}>

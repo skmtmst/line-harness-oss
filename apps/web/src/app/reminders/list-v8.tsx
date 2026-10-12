@@ -1,4 +1,6 @@
 'use client'
+
+import ListDateTime from '@/components/shared/list-date-time'
 import { useDeferredDelete } from '@/lib/use-deferred-delete';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
@@ -11,7 +13,7 @@ import { RowNameLink } from '@/components/shared/table';
 
 
 import { permissionDeniedMessage } from '@/components/shared/api-error-message';
-import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
+import { formatListTimestamp, formatNumber } from '@/lib/format';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
@@ -150,11 +152,9 @@ function rowView(reminder: ReminderRow) {
   return { status: statusKeyOf(reminder), subtitle: `${base}・${timing}` }
 }
 
-const NEXT_SEND_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const
-
-/** 「次に送る」の表示（板 `apLqS`：`10/1（水）18:00`）。店舗時間帯（JST）で出す。 */
+/** 次に送る日時は、別年でも時刻を残す。 */
 function formatNextSend(iso: string | null | undefined): string {
-  return polishFormatDate(iso, { style: 'list' })
+  return formatListTimestamp(iso)
 }
 
 /** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
@@ -880,7 +880,7 @@ export default function RemindersListV8() {
                       ? emptyValue('unknown')
                       : `${formatNumber(row.plannedDeliveries)}通`
                 const nextSend =
-                  view.status === 'active' ? formatNextSend(row.nextScheduledAt) : emptyValue('unknown')
+                  view.status === 'active' ? <ListDateTime value={row.nextScheduledAt} /> : emptyValue('unknown')
                 return (
                   <Tr interactive
                     highlighted={duplicateFeedback.highlightedId === row.id}

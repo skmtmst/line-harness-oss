@@ -51,7 +51,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shar
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
 import { classifyApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars';
-import { formatDay, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
+import { formatListTimestamp, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
 import { blockedReason, canDelete as canDeleteVar, checkedAtText, consequenceText, filterAndSortCommonVars, placeholderText, splitItems, unavailableText, usageText, type CommonVarFilter, type CommonVarOrder } from './model';
 import VarsExportPanel from './export-panel'
 import styles from './list.module.css'
@@ -119,14 +119,9 @@ const PAGE_SIZE_OPTIONS = [
   { value: '50', label: '50件表示' },
 ]
 
-/*
- * 一覧の更新日は、次回変更と同じセルに収まる短い形で出す（v7 と同じ）。
- * 更新日は UTC の ISO で来るので JST 固定で出す。
- */
+/** 記録の更新日時は別年でも時刻を残す。業務値の日付は変えない。 */
 function formatListDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return formatDay(date)
+  return formatListTimestamp(value)
 }
 
 /** 「10/7まで」の札の日付。年月は要らず、月日だけ出す。 */

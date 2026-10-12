@@ -1,4 +1,6 @@
 'use client'
+
+import ListDateTime from '@/components/shared/list-date-time'
 import StatusBadge from '@/components/shared/status-badge'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import TagPill from '@/components/shared/tag-pill'
@@ -27,7 +29,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
-import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
+import { formatNumber } from '@/lib/format'
 import type { HqTemplate, TemplateType } from '@/lib/hq-templates-api'
 import { distributedAccountsLine, templateSubLine, hqMessageTypeLabel } from './list-row'
 import { AttributeTabs, OtherTabPanel, assignmentMethods, cleanupTagCount, matchesTagFilters, unusedTagCount, useAttributeTab, type TagUsageFilter } from './attribute-tabs'
@@ -79,9 +81,6 @@ const PAGE_SIZE_OPTIONS = [
 ]
 
 /** M月D日（店の一覧と同じ。時刻は title）。 */
-function monthDay(iso: string): string {
-  return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
-}
 
 /**
  * 公開の札（店と同じ3つ：公開中／未公開の変更／下書きだけ。絵 i0Ao0R）。統括では「配ったか」で決める：
@@ -419,7 +418,7 @@ export default function HqStoreList(props: HqStoreListProps) {
     { key: 'state', head: '公開', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'sent', head: '今月送った数', col: <col key="sent" className={storeStyles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
-    ...(!narrow ? [{ key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row: HqTemplate) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },] : []),
+    ...(!narrow ? [{ key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row: HqTemplate) => plainTd('updated', <ListDateTime value={row.updated_at} />, row.updated_at) },] : []),
   ] : type === 'tag' ? [
     { key: 'friends', head: '人数', col: <col key="friends" className={storeStyles.colKind} />, cell: (row) => plainTd('friends', row.friend_count == null ? emptyValue('unknown') : `${formatNumber(row.friend_count)}人`, '配った先のアカウントで、このタグが付いている友だちの合計') },
     { key: 'method', head: '付け方', col: <col key="method" className={storeStyles.colKind} />, cell: (row) => plainTd('method', row.assignment_method ?? emptyValue('unknown')) },
@@ -436,7 +435,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   ] : [
     { key: 'state', head: '状態', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
-    { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', monthDay(row.updated_at), row.updated_at) },
+    { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', <ListDateTime value={row.updated_at} />, row.updated_at) },
   ]
   const body = !ready ? (
     <div className={storeStyles.stateCard} role="status">

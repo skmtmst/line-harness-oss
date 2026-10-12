@@ -1,4 +1,6 @@
 'use client'
+
+import ListDateTime from '@/components/shared/list-date-time'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
@@ -47,7 +49,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
 import { runOptimistic } from '@/lib/undoable';
-import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value';
@@ -1064,8 +1066,8 @@ export default function BroadcastListV8() {
               <Td>
                 <span className={styles.cellMain}>
                   {broadcast.status === 'sent'
-                    ? (broadcast.sentAt ? polishFormatListDateTime(broadcast.sentAt) : emptyValue('unknown'))
-                    : (broadcast.scheduledAt ? polishFormatListDateTime(broadcast.scheduledAt) : emptyValue('unconfigured'))}
+                    ? (broadcast.sentAt ? <ListDateTime value={broadcast.sentAt} /> : emptyValue('unknown'))
+                    : (broadcast.scheduledAt ? <ListDateTime value={broadcast.scheduledAt} /> : emptyValue('unconfigured'))}
                 </span>
                 {broadcast.status === 'scheduled' && broadcast.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
               </Td>

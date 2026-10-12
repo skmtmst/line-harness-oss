@@ -1,5 +1,7 @@
 'use client'
 
+import ListDateTime from '@/components/shared/list-date-time'
+
 import { canManageRole } from '@/lib/staff-role';
 import { RowNameLink } from '@/components/shared/table';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
@@ -39,7 +41,7 @@ import { usePageTitle } from '@/components/shell/page-chrome';
 import { formatNumber } from '@/lib/format';
 import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api';
 import { useStaffRole } from '@/lib/staff-role';
-import { failedCount, jpDateTime, runBadge, sendTotals } from './model';
+import { failedCount, runBadge, sendTotals } from './model';
 import styles from '../broadcasts/list.module.css'
 import { folderDisplayColor } from '@/components/shared/folder-dot';
 import { emptyValue } from '@/components/shared/empty-value';
@@ -348,7 +350,7 @@ export default function HqBroadcastList() {
                   <span className={styles.cellSub}>{audienceText(run)}</span>
                 </Td>
                 <Td>
-                  <span className={styles.cellMain}>{run.scheduledAt ? jpDateTime(run.scheduledAt) : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
+                  <span className={styles.cellMain}>{run.scheduledAt ? <ListDateTime value={run.scheduledAt} /> : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
                   {statusKeyOf(run) === 'scheduled' && run.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
                 </Td>
                 {!narrow && <Td>

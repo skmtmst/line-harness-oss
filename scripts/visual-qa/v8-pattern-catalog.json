@@ -3020,6 +3020,59 @@
         ],
         "needed": ""
       }
+    },
+    {
+      "id": "list-date-time",
+      "name": "一覧の日時",
+      "role": "時刻を持つ記録を統一した日付と時刻で表示し、狭い列では境目で折り返す",
+      "rules": [
+        "B-260",
+        "B-262"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/lib/format.ts",
+            "apps/web/src/components/shared/list-date-time.tsx",
+            "apps/web/src/components/shared/list-date-time.module.css"
+          ],
+          "components": [
+            "ListDateTime"
+          ],
+          "vars": [
+            "--space-8"
+          ]
+        },
+        "pen": [],
+        "status": "L4 E：Penの書式は司令塔が同期する"
+      },
+      "code": {
+        "selectorHint": "listDateTime",
+        "overrideSelectors": [
+          "listDateTime"
+        ],
+        "signals": [
+          {
+            "id": "own-split",
+            "re": "formatListTimestamp\\([^\\n]*\\)\\.split\\(",
+            "why": "日時の段分けを画面で書く（ListDateTimeへ日時を渡す）"
+          }
+        ]
+      },
+      "pen": {
+        "names": [
+          "一覧の日時"
+        ],
+        "types": [],
+        "ancestorNot": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/list-date-time.test.tsx",
+          "apps/web/src/lib/format.test.ts"
+        ],
+        "needed": ""
+      }
     }
   ]
 }
