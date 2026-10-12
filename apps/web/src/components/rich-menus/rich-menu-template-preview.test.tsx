@@ -8,10 +8,15 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, cleanup, render } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { TEMPLATES } from '@/lib/rich-menu-templates'
 import { RichMenuTemplatePreview } from './rich-menu-create-form'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(join(DIR, 'rich-menu-create-form.tsx'), 'utf8')

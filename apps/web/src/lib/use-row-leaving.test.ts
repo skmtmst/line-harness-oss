@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, renderHook } from '@testing-library/react'
+import { cleanup, act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRowLeaving } from './use-row-leaving'
 
@@ -8,7 +8,9 @@ describe('useRowLeaving', () => {
     vi.useFakeTimers()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // タイマーを戻す前に根を外し、hook が持つタイマーも片づける。
+    await act(async () => cleanup())
     vi.useRealTimers()
   })
 

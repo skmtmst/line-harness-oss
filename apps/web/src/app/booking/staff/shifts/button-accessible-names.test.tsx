@@ -7,8 +7,8 @@
  * このテストは「営業時間タブに無名ボタンが戻らないこと」を固定する。
  */
 import React, { act } from 'react'
-import { render, waitFor } from '@testing-library/react'
-import { describe, expect, test, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 import { buttonsWithoutAccessibleName } from '@/test-utils/accessible-name'
 
@@ -79,6 +79,11 @@ import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity
 import type { StaffMember } from '@line-crm/shared'
 import BookingSettingsV8 from '@/v8/booking-menus/settings'
 
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
+
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 describe('Issue #637 /booking/staff/shifts 全ボタンにアクセシブルな名前', () => {
@@ -114,10 +119,10 @@ describe('Issue #637 /booking/staff/shifts 全ボタンにアクセシブルな�
     fixture.listStaff.mockResolvedValue({ staff: [] })
 
     const { container } = render(<BookingSettingsV8 accountId={fixture.selectedAccountId} />)
-    await waitFor(() => {
-      expect(container.querySelector('section')).toBeTruthy()
-    })
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)) })
+    // タブと右の写しは別々の動的 import。両方の応答と描画を待つ。
+    await screen.findByRole('heading', { name: '開ける時間' })
+    await screen.findByText('設備はまだありません。')
+    await screen.findByText('この期間に空きはありません。')
     const unnamed = buttonsWithoutAccessibleName(container)
     expect(
       unnamed.map((b) => b.outerHTML.slice(0, 160)),
