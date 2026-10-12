@@ -7,7 +7,7 @@ const css = read('v8/tag-edit/edit.module.css')
 describe('R137 タグ編集の狭幅表示', () => {
   it('所属フォルダとタグ名の欄は幅を縮められる', () => {
     expect(editor).toContain('aria-label="所属フォルダ"')
-    expect(editor).toContain('<Field label="タグ名"')
+    expect(editor).toMatch(/<Field\b[^>]*label="タグ名"/)
     expect(css).toMatch(/\.field \{[^}]*min-width: 0/)
     expect(css).toContain('.selectBox { min-width: 0; }')
   })
