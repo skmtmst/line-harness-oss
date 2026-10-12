@@ -91,10 +91,47 @@ Instagram同時投稿の接続について、**済んだこと・証拠・原因
 | 本番の管理画面で実際につなぐ | **利用者** | **見送り**（判断D）。新しい管理画面が `main` へ出る回で自動的に使えるようになる |
 | 本番で同時投稿を1件試す | **利用者**＋結果確認 | **見送り**（判断D）。接続・録画は `stg-admin.musubo.jp` で行う |
 
+### `GET /api/instagram/connection` が返すもの（認証が前提です）
+
+この接続APIは**管理画面にログインしている人向けのAPI**で、ログインしていない状態では
+Instagramの設定とは関係なく認証で止まります。以下は読み取り確認の目安です。
+
+| 呼び方 | 返るもの | 根拠 |
+| --- | --- | --- |
+| ログインしていない（匿名） | **HTTP 401** `Unauthorized` | 全体の認証 `authMiddleware`（`apps/worker/src/middleware/auth.ts` 660行目。`apps/worker/src/index.ts` 457行目で全経路に適用） |
+| ログイン済みだが `/webhooks` の権限が無い | HTTP 403 | `requirePermission('/webhooks')`（`apps/worker/src/middleware/role-guard.ts` 46〜56行目。`apps/worker/src/routes/instagram.ts` の `instagram.use('/api/instagram/*', …)` で適用。`/api/instagram/webhook` だけ除外） |
+| ログイン済みだが `lineAccountId` を付けていない | HTTP 400 `account_required` | `account(c)`（`apps/worker/src/routes/instagram.ts`）。設定の確認より**手前**で動きます |
+| ログイン済み＋`lineAccountId` あり＋`INSTAGRAM_APP_*` 未登録 | **HTTP 200** `{ success: true, data: { state: 'unconfigured', replyEnabled: false } }` | `apps/worker/src/routes/instagram.ts` 102〜112行目 |
+
 上の2件（リダイレクトURIと `INSTAGRAM_APP_*`）が未登録のあいだは、
-`GET /api/instagram/connection` が `state: 'unconfigured'` を HTTP 200 で返します
-（`apps/worker/src/routes/instagram.ts` 102〜112行目）。画面では「設定がありません」に当たります。
+**ログイン済みで `lineAccountId` を付けて呼んだときに** `state: 'unconfigured'` が HTTP 200 で返ります。
+画面では「設定がありません」に当たります。
 **これは配備の失敗ではなく、未登録のときの正常な状態です。**
+
+### 未登録のときに他のInstagram APIが返すもの（503・302・200の3種類に分かれます）
+
+`INSTAGRAM_APP_*` 未登録のとき、**すべてのInstagram APIが503になるわけではありません。**
+返り方は3つに分かれます。以下はいずれも `apps/worker/src/routes/instagram.ts`。
+**前提条件は経路ごとに違うので、下の表の「前提」の欄も合わせて読んでください。**
+
+| 未登録時の返り | 経路 | 前提 | 根拠（行番号） |
+| --- | --- | --- | --- |
+| **HTTP 503** `unconfigured` | `POST /api/instagram/oauth/start`・`POST /api/instagram/refresh`・`POST /api/instagram/sync` | ログイン・`/webhooks` 権限・`owner`/`admin` の役割・`lineAccountId` | 3経路とも `await account(c)` の**あとに** `ready(c)` を呼びます（143・395・468行目）。`ready` は 81〜85行目で `InstagramError('unconfigured', 503)` を投げ、それを 36〜41行目の `instagram.onError` がJSONの503にします |
+| **HTTP 302** リダイレクト（`/settings/sns?instagram=failed&instagram_code=unconfigured`） | `GET /api/instagram/oauth/callback` | ログイン・`/webhooks` 権限・`owner`/`admin` の役割。**`lineAccountId` は不要**（Instagramから戻ってきたブラウザが `state` と `code` を持って来る口で、対象のLINEアカウントは `instagram_oauth_states` の行から取ります。276〜280行目） | `ready(c)` の呼び出し（261行目）は 260行目から始まる `try` の中にあります。投げられた503は 365行目の `catch` が捕まえ、`onError` には届きません。最後は 386行目の `c.redirect(snsReturnUrl(c, 'failed', diagnostic))` で**失敗画面へ戻します**（戻り先の組み立ては 204〜222行目、`instagram_code` に載る種類名の絞り込みは `services/instagram.ts` 177〜181行目） |
+| **HTTP 200** `{ state: 'unconfigured' }` | `GET /api/instagram/connection`・`GET /api/instagram/profile`・`GET /api/instagram/posts`・`GET /api/instagram/messages` | ログイン・`/webhooks` 権限・`lineAccountId` | `ready(c)` を通らず `instagramConfig(c.env)` を直接見て、未登録ならそのまま200を返します（104行目／`profile`・`posts` を作る繰り返しの中の 513行目／`messages` の 533行目） |
+
+同じ「未設定」でも、**画面を開くだけの読み取りは200**、**つなぐ・更新するなどInstagram側を呼ぶ操作は503**、
+**Instagramから戻ってくる口だけは302で失敗画面**という区別です。
+戻り先が503のJSONにならないのは意図した作りで、ここはブラウザが見る画面だからです
+（失敗の中身は画面に出さず、`instagram_code` という安全な種類名だけをURLに載せます）。
+
+なお `DELETE /api/instagram/connection`（439行目）は設定の有無を見ません。
+`POST /api/instagram/messages/:id/reply`（577行目）は設定に関係なく常に403 `meta_review_required` を返します
+（返信は審査が通るまで出しません）。`POST /api/instagram/webhook`（597〜599行目）だけは
+`META_APP_SECRET` が無いときに503を返しますが、これは `INSTAGRAM_APP_*` とは別の設定です。
+
+匿名での 401 は「APIが落ちている」ことを意味しません。認証が必要なAPIとして正しく守られている状態で、
+Instagramの設定の有無を匿名アクセスで判定することはできません。
 
 ## 未確認のまま残っている2項目（合格扱いにしません）
 
@@ -109,7 +146,7 @@ Instagram同時投稿の接続について、**済んだこと・証拠・原因
 | なぜ未確認か | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` が Worker `nen-line` に未登録で、Meta側のリダイレクトURIにも本番URLが未追記のため、認可そのものが始められない |
 | 前提条件 | ①利用者がMeta側のOAuthリダイレクトURIへ `https://api.musubo.jp/api/instagram/oauth/callback` を追記 ②利用者が `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` を Worker `nen-line` へ登録 ③本番の管理画面にSNS連携の画面が出ること（V8が `main` へ出る回） |
 | 担当 | **利用者**（①②は本人のみ。値は会話・記録に出しません）／画面は別件のV8反映 |
-| 確認方法 | 前提が揃ったあと、`GET /api/instagram/connection` が `unconfigured` から `disconnected` へ変わることを読み取りで確認 → 本番の管理画面で接続 → `state: 'connected'` と `@ユーザー名` の表示を確認 → Googleビジネスの投稿を1件出し、`rt_google_posts` の `instagram_*` 列が進むことを**列の有無と状態名だけ**で確認 |
+| 確認方法 | 前提が揃ったあと、`GET /api/instagram/connection` が `unconfigured` から `disconnected` へ変わることを読み取りで確認（**管理画面にログインした状態で `lineAccountId` を付けて呼びます**。匿名では401、`lineAccountId` 無しでは400になり、設定の有無は判定できません。上の「返すもの」の表を参照） → 本番の管理画面で接続 → `state: 'connected'` と `@ユーザー名` の表示を確認 → Googleビジネスの投稿を1件出し、`rt_google_posts` の `instagram_*` 列が進むことを**列の有無と状態名だけ**で確認 |
 | いま確認できること | 判断Dにより、**接続操作と審査用の録画は検証環境 `stg-admin.musubo.jp` で続けます**。検証環境では2026-10-12に実機で接続成功を確認済みです（上の表） |
 
 ### 2. 掃除ジョブ `instagram transient data retention` の成功
