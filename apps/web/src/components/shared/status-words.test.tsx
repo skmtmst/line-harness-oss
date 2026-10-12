@@ -1,9 +1,14 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import StatusBadge from './status-badge'
 import StatusPill from './status-pill'
 import { normalizeStatusWord, STATUS_WORDS } from './status-words'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 describe('B-158 status words', () => {
   it('keeps the approved state vocabulary in one shared table', () => {
