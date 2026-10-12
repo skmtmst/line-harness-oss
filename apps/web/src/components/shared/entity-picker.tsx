@@ -423,7 +423,7 @@ type MultiField = FieldBase & {
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix }: {
   label: string; noun: string; icon?: LucideIcon
   name?: string; meta?: string; placeholder?: string
   disabled?: boolean; readOnly?: boolean; invalid?: boolean; id?: string
@@ -434,12 +434,13 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, place
   onClear?: () => void
   selection?: ReactNode
   ariaLabel?: string
+  valuePrefix?: string
 }) {
   const field = useFieldContext()
   const empty = !name
   const actionLabel = readOnly ? '見る' : empty ? '選ぶ' : '変える'
   const isInvalid = invalid || Boolean(field?.invalid)
-  return <div className={styles.field} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
+  return <div className={styles.field} data-value-prefix={valuePrefix ? '' : undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
     {readOnly && empty ? null : <button type="button" className={styles.fieldTrigger} ref={buttonRef} id={id ?? field?.controlId}
       disabled={disabled} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
       aria-invalid={isInvalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy)} onClick={onOpen} />}
@@ -479,7 +480,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const close = () => setOpen(false)
   return <>
     <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
-      ariaLabel={props.ariaLabel}
+      ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)
         const folder = item ? folderOf(item, folders) : null

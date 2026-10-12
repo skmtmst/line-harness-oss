@@ -98,3 +98,5 @@
 :root .v6-filter-chip { border-radius: 999px; }
 
 :root .v6-filter-chip[data-size='compact'] { height: var(--tpl-msg-composer-sticker-chip-h); padding: var(--tpl-msg-composer-sticker-chip-pad); }
+/* eovoGの3つのクイック絞り込み。通常の札の寸法は保つ。 */
+:root .v6-filter-chip[data-size='inbox'] { padding: 0 var(--tpl-inbox-composer-input-pad); }

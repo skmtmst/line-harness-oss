@@ -2838,7 +2838,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            */
           { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
         ].map((filter) => (
-          <FilterChip key={filter.key} selected={quickFilter === filter.key} onChange={() => { setQuickFilter(filter.key); dropSavedViewParam() }} title={filter.title} showCheck={false} icon={filter.icon ? <filter.icon aria-hidden size={14} /> : undefined}>
+          <FilterChip size="inbox" key={filter.key} selected={quickFilter === filter.key} onChange={() => { setQuickFilter(filter.key); dropSavedViewParam() }} title={filter.title} showCheck={false} icon={filter.icon ? <filter.icon aria-hidden size={14} /> : undefined}>
             {filter.label}
             {quickCountsNow ? <span className="sr-only tabular-nums">{quickCountsNow[filter.key]}</span> : null}
           </FilterChip>
@@ -2938,7 +2938,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   />
                 )}
 </>
-              <Select width={124} aria-label="受信経路で絞り込む" value={channel} onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))} options={CHANNELS.map((item) => ({value:item.key,label:`経路：${item.label}`}))} />
+              <EntitySelect width={124} aria-label="受信経路で絞り込む" label="経路" valuePrefix="経路：" value={channel} onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))} options={CHANNELS.map((item) => ({value:item.key,label:item.label}))} />
             </InboxFilterControls>
           </InboxListSearch>
 

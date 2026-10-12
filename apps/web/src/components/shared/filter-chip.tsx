@@ -27,7 +27,7 @@ export default function FilterChip({
   icon?: ReactNode
   /** 印のない絞り込み札（設定・ログインユーザーの板）。省略時は従来の ✓。 */
   selectedIcon?: boolean
-  size?: 'compact'
+  size?: 'compact' | 'inbox'
   /** 選んだときの ✓ を出すか（メッセージ作成の札）。selectedIcon と同じ意味で、どちらかが false なら出さない。 */
   showCheck?: boolean
   selected: boolean

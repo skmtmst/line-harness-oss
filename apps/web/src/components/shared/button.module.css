@@ -253,7 +253,7 @@
 
 :root .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 /* eovoG：返信する前の道具。共通Buttonが寸法を持ち、画面で上書きしない。 */
-:root .button.inbox-tool { min-height: var(--tpl-inbox-composer-btn-h); height: var(--tpl-inbox-composer-btn-h); padding: 0 var(--tpl-inbox-composer-input-pad); gap: var(--tpl-inbox-composer-gap); font-size: var(--text-label); line-height: var(--text-label--line-height); }
+:root .button.inbox-tool { min-height: var(--tpl-inbox-composer-btn-h); height: var(--tpl-inbox-composer-btn-h); padding: 0 var(--tpl-inbox-composer-input-pad); gap: var(--tpl-inbox-composer-gap); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
 
 /* B-152②：ボタン文字は太字の例外。文字だけの操作は本文の太さを保つ。 */
 :root .button { font-weight: var(--tpl-button-weight); }
