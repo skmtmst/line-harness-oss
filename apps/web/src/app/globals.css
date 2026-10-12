@@ -3062,7 +3062,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --color-code-bg: #f5f6f8;
   --color-code-border: #e5e7eb;
   --color-choice-border: #c9ced6;
-  --choice-size: 16px;
+  --choice-size: 16px; --choice-checkbox-radius: 4px;
   --choice-ring: 1.5px;
   --choice-dot: 8px;
   --choice-card-ring: 2px;
