@@ -49,11 +49,13 @@ describe('V5 B4 オーバーレイ共通部品', () => {
   })
 
   it('代表画面は共通部品を使い、既存の保存・削除・追加処理を残す', () => {
-    const editor = readSource('components/friend-fields/tag-editor-v4.tsx')
-    const list = readSource('components/friend-fields/tags-page-v4.tsx')
-    expect(editor).toMatch(/import Drawer/)
+    const editor = readSource('components/friend-fields/tag-editor-v4.tsx') + readSource('v8/tag-edit/edit-form.tsx')
+    const list = readSource('v8/tags/tags-tab.tsx')
+    const actions = readSource('components/friend-fields/linked-action-list.tsx')
+    expect(actions).toContain('ActionAddButton')
     expect(editor).toMatch(/import Notice/)
-    expect(editor).toContain('onAdd({ id: crypto.randomUUID()')
+    expect(actions).toContain('params: { delayMinutes: 0, cancelIfTagRemoved: true }')
+    expect(actions).toContain('newStepId()')
     expect(list).toMatch(/import ActionMenu/)
     expect(list).toMatch(/import ConfirmDialog/)
     expect(list).toContain('api.tagGroups.delete')
@@ -73,8 +75,9 @@ describe('V5 B4 オーバーレイ共通部品', () => {
   it('ダイアログのボタンは最小幅を保ち、長いラベルを折り返さない', () => {
     // #976: 高さ・文字・色は共通Buttonへ委譲した。ここに残るのは幅の指定だけ。
     const css = read('dialog.module.css')
+    expect(css).toMatch(/:root \.designButton \{[^}]*min-width: 0;/s)
     for (const className of ['designButton']) {
-      expect(css).toMatch(new RegExp(`\\.${className} \\{[^}]*min-width: 112px;[^}]*width: auto;[^}]*white-space: nowrap;`, 's'))
+      expect(css).toMatch(new RegExp(`\\.${className} \\{[^}]*width: auto;[^}]*white-space: nowrap;`, 's'))
     }
   })
 })

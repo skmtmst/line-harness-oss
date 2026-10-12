@@ -5,8 +5,9 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const read = (name: string) => readFileSync(join(here, name), 'utf8')
-const PROJECTS = read('projects-section.tsx')
-const LIBRARY = read('library-section.tsx')
+const PROJECTS = read('../../../v8/hq-banners/list.tsx')
+const WORDS = read('../../../v8/hq-banners/words.ts')
+const LIBRARY = PROJECTS
 
 /**
  * M022：作成・操作の失敗が原文表示のままで再試行の案内がない。
@@ -15,17 +16,17 @@ const LIBRARY = read('library-section.tsx')
  */
 describe('M022 バナー作成・操作の失敗の再試行案内', () => {
   it('プロジェクト作成の失敗は状態別案内へ渡す', () => {
-    expect(PROJECTS).toContain('describeApiFailure(')
+    expect(WORDS).toContain('describeApiFailure(')
     expect(PROJECTS).toContain('プロジェクトの作成')
-    expect(PROJECTS).toContain('この操作はオーナーか管理者だけができます')
+    expect(WORDS).toContain('この操作はオーナーか管理者だけができます')
     expect(PROJECTS).not.toContain("caught.message : 'プロジェクトを作れませんでした'")
   })
 
   it('受け渡し・一覧から外す失敗は状態別案内へ渡す', () => {
-    expect(LIBRARY).toContain('describeApiFailure(')
-    expect(LIBRARY).toContain('アカウントへの受け渡し')
+    expect(WORDS).toContain('describeApiFailure(')
+    expect(LIBRARY).toContain('アカウントへの配布')
     expect(LIBRARY).toContain('一覧からの削除')
-    expect(LIBRARY).toContain('この操作はオーナーか管理者だけができます')
+    expect(WORDS).toContain('この操作はオーナーか管理者だけができます')
     expect(LIBRARY).not.toContain("caught.message : 'アカウントへ渡せませんでした。もう一度お試しください。'")
     expect(LIBRARY).not.toContain("caught.message : '一覧から外せませんでした。もう一度お試しください。'")
   })

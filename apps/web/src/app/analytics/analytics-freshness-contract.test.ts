@@ -1,7 +1,8 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const TIME = readFileSync(new URL('./analytics-time.ts', import.meta.url), 'utf8')
 
 /**
@@ -10,20 +11,20 @@ const TIME = readFileSync(new URL('./analytics-time.ts', import.meta.url), 'utf8
  */
 describe('分析の期間と締切の明示', () => {
   it('「集計期間・データ締切」を出す共通の注記がある', () => {
-    expect(PAGE).toContain('function AnalyticsPeriodCaption')
-    expect(PAGE).toContain('データ締切 {formatAnalyticsDateTime(cutoffAt)}')
+    expect(PAGE).toContain('function periodCaption')
+    expect(PAGE).toContain('データ締切 ${formatAnalyticsDateTime(cutoffAt)}')
   })
 
   it('各タブが同じ注記で期間と締切を出す', () => {
     // 友だち・配信の反応・経路と成果・使われ方・URLクリック・クロス分析
-    const uses = PAGE.match(/<AnalyticsPeriodCaption[\s>]/g) ?? []
+    const uses = PAGE.match(/(?:periodCaption|dataRangeCaption)\(/g) ?? []
     expect(uses.length).toBeGreaterThanOrEqual(6)
   })
 
   it('ファネル結果と保存済み結果も期間と締切を出す', () => {
-    expect(PAGE).toContain('集計期間 {formatAnalyticsDate(run.cohortFrom)}')
-    expect(PAGE).toContain('データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}')
-    expect(PAGE).toContain('データ締切 {formatAnalyticsDateTime(snapshot.dataCutoffAt)}')
+    expect(PAGE).toContain('集計期間 ${formatAnalyticsDate(run.cohortFrom)}')
+    expect(PAGE).toContain('データ締切 ${formatAnalyticsDateTime(run.dataCutoffAt)}')
+    expect(PAGE).toContain('formatAnalyticsDateTime(snapshot.dataCutoffAt)')
   })
 
   it('集計待ちには次の更新のめどを伝える', () => {
@@ -42,8 +43,8 @@ describe('未取得・未計測を0にしない', () => {
 
   it('グラフが描けない間は選択日の内訳を出さない', () => {
     // 「増加0人・減少0人・施策なし」は未取得の0を確定値に見せる。
-    expect(PAGE).toContain('{daysShown && selectedDay &&')
+    expect(PAGE).toContain('{daysShown && (selectedDay || overview.campaigns.length > 0)')
     // ★V7 h99Gb：凡例は部品へ移り、施策名だけが残った。daysShown の門は残す。
-    expect(PAGE).toContain('{daysShown && overview.campaigns.length > 0 &&')
+    expect(PAGE).toContain('overview.campaigns.map((item) =>')
   })
 })

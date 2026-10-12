@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -7,9 +7,11 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const SCORE_RULES = readFileSync(join(HERE, 'score-rules', 'page.tsx'), 'utf8')
 // R296: きっかけの一覧は作成・編集で共用の rule-fields.ts にまとめた。
 const EARNING_RULES = readFileSync(join(HERE, 'earning-rules', 'rule-fields.ts'), 'utf8')
-const REWARDS_TAB = readFileSync(join(HERE, 'mileage-rewards-tab.tsx'), 'utf8')
-const SCORE_TAB = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
-const SCORE_DIALOG = readFileSync(join(HERE, 'action-score-adjustment-dialog.tsx'), 'utf8')
+const REWARDS_TAB = readFileSync(join(HERE, '../../v8/mileage/rewards.tsx'), 'utf8')
+const SCORE_TAB = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
+const SCORE_DIALOG = SCORE_TAB.slice(SCORE_TAB.indexOf('export function ScoreAdjustDialog('), SCORE_TAB.indexOf('function formatScoreHistoryTime('))
+const ROLE = readFileSync(join(HERE, '../../lib/staff-role.ts'), 'utf8')
+const SHELL = readFileSync(join(HERE, '../../v8/mileage/mileage.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /*
@@ -113,9 +115,11 @@ describe('N-236：止めた使い道は一覧からまた出せる', () => {
 describe('N-235：点数の手動調整と帯の試算', () => {
   it('一覧の各行から権限つきで調整ダイアログを開く', () => {
     expect(SCORE_TAB).toContain('点数を直す')
-    expect(SCORE_TAB).toContain('ActionScoreAdjustmentDialog')
-    expect(SCORE_TAB).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
-    expect(SCORE_TAB).toContain('canAdjust ? <Button')
+    expect(SCORE_TAB).toContain('<ScoreAdjustDialog')
+    expect(ROLE).toContain("role === 'owner' || role === 'admin'")
+    expect(SHELL).toContain("const readonly = !canManageRole(role)")
+    expect(SCORE_TAB).toContain('adjustTarget && !readonly')
+    expect(SCORE_TAB).toContain("...(readonly ? [] : [{ id: 'adjust'")
   })
 
   it('調整は確認段・理由必須・冪等キーを備える', () => {

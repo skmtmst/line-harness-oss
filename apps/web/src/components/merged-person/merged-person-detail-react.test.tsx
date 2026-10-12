@@ -9,7 +9,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -39,7 +39,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 const { ApiError } = await import('@/lib/api')
-import MergedPersonDetailView from './merged-person-detail'
+import MergedPersonDetailView from './merged-person-detail-v8'
+import MergedPersonV8 from '@/v8/friends/merged/person'
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends' }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -82,9 +86,9 @@ afterEach(async () => {
   document.body.innerHTML = ''
 })
 
-async function renderView(onClose: () => void) {
+async function renderView(onClose: () => void, View = MergedPersonDetailView) {
   await act(async () => {
-    root.render(<MergedPersonDetailView personId="user-a" onClose={onClose} />)
+    root.render(<View personId="user-a" onClose={onClose} />)
   })
 }
 
@@ -101,15 +105,15 @@ function buttonByText(text: string, scope: ParentNode = document.body): HTMLButt
 }
 
 describe('R389 解除の競合は窓を閉じて読み直す', () => {
-  it('409の後は古い結び付きの窓を残さず、成功した解除だけが残る', async () => {
+  it.each([MergedPersonDetailView, MergedPersonV8])('409の後は古い結び付きの窓を残さず、成功した解除だけが残る (%#)', async (View) => {
     calls.get
       .mockResolvedValueOnce(personFixture(1, true))
       .mockResolvedValue(personFixture(2, false))
     calls.unlink.mockRejectedValue(new ApiError(409, '別の人が先に変更しました'))
     const onClose = vi.fn()
-    await renderView(onClose)
+    await renderView(onClose, View)
     await flush()
-    fireEvent.click(buttonByText('統合を解除'))
+    fireEvent.click(buttonByText('解除する'))
     await flush()
     const dialog = document.body.querySelector('[role="dialog"], [role="alertdialog"]')
     if (!dialog) throw new Error('unlink dialog not open')
@@ -119,18 +123,21 @@ describe('R389 解除の競合は窓を閉じて読み直す', () => {
     fireEvent.click(buttonByText('結び付けを解除', dialog))
     await flush()
     // 解除の窓は閉じ、競合の文と読み直した中身が出る。
-    expect(document.body.textContent).not.toContain('確認した根拠を書いてください')
+    await waitFor(() => expect(document.body.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull())
     expect(document.body.textContent).toContain('別の人が先に変更しました')
     expect(calls.get).toHaveBeenCalledTimes(2)
+    expect(calls.unlink).toHaveBeenCalledWith('user-a', 'friend-a', {
+      expectedRevision: 1, reason: '確認した根拠を書きます',
+    })
     expect(document.body.textContent).not.toContain('friend-a')
   })
 })
 
 describe('R391 権限不足でも一覧へ戻れる', () => {
-  it('forbidden の面に「一覧へ戻る」がある', async () => {
+  it.each([MergedPersonDetailView, MergedPersonV8])('forbidden の面に「一覧へ戻る」がある (%#)', async (View) => {
     calls.get.mockRejectedValue(new ApiError(403, 'この統合ユーザーを表示する権限がありません'))
     const onClose = vi.fn()
-    await renderView(onClose)
+    await renderView(onClose, View)
     await flush()
     expect(document.body.textContent).toContain('権限')
     fireEvent.click(buttonByText('一覧へ戻る'))

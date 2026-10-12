@@ -152,10 +152,9 @@ describe('画面に「準備中」を置かない', () => {
     const events = FILES.find((f) => f.p === 'app/events/page.tsx')!
     // U で状態名を「下書き」に変えたので、「準備中」は0件のはず。
     expect(count(events.s, ANY)).toBe(0)
-    // 設計の書き出しにも同じ言葉がある（状態の列の値）。実装だけの言い訳ではない。
-    const structure = JSON.parse(fs.readFileSync(path.join(SRC, 'lib', 'design-structure.json'), 'utf8'))
-    const parts: string[] = structure.screens['/events'].parts
-    expect(parts).toContain('状態')
-    expect(parts).toContain('下書き')
+    // 現役の一覧が状態として使う言葉を確認する。古い設計の写しは読まない。
+    const source = fs.readFileSync(path.join(SRC, 'v8', 'events', 'list.tsx'), 'utf8')
+    expect(source).toContain('下書き')
+    expect(source).toContain('state')
   })
 })

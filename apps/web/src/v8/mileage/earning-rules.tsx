@@ -182,6 +182,9 @@ export default function EarningRulesTab() {
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [menuId, setMenuId] = useState<string | null>(null)
+  const [viewTarget, setViewTarget] = useState<MileageEarningRuleV6 | null>(null)
+  const [averageDenominator, setAverageDenominator] = useState<number | null>(null)
+  useEffect(() => { setViewTarget(null); setAverageDenominator(null) }, [selectedAccountId])
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [menuNotice, setMenuNotice] = useState('')
@@ -247,6 +250,7 @@ export default function EarningRulesTab() {
       setSpentMiles(spend?.amount ?? 0)
       setSpentCount(spend?.count ?? 0)
       setBalanceTotal(friendsRes.data.summary.available)
+      setAverageDenominator(friendsRes.data.summary.withBalanceCount)
       setFriendTotal(friendsRes.data.summary.totalMembers)
       setRuleOrder(items.map((rule) => rule.id))
       setOrderDirty(false)
@@ -569,7 +573,7 @@ export default function EarningRulesTab() {
         icon={<Wallet size={14} aria-hidden="true" />}
         value={ready ? balanceTotal ?? 0 : null}
         unit=""
-        detail={dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}
+        detail={<span title={ready && averageDenominator !== null && balanceTotal !== null ? averageDenominator > 0 ? `残高0の人は除き、マイルを持っている${formatMileageNumber(averageDenominator)}人で割った平均：${formatMileageNumber(balanceTotal / averageDenominator)}マイル` : '残高がある人がいないため計算していません' : undefined}>{dash(`友だち ${formatMileageNumber(friendTotal ?? 0)} 人`)}</span>}
       />
     </KpiBand>
   )
@@ -735,6 +739,11 @@ export default function EarningRulesTab() {
           open={menuId === rule.id}
           onOpenChange={(next) => setMenuId(next ? rule.id : null)}
           items={[
+            {
+              id: 'view',
+              label: rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る',
+              onSelect: () => setViewTarget(rule),
+            },
             /* 閲覧のみの人には、変える操作を出さない（押せない形で残さない）。 */
             ...(readonly ? [] : [
               {
@@ -914,6 +923,23 @@ export default function EarningRulesTab() {
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        <Dialog
+          open={viewTarget !== null}
+          title={viewTarget?.publishedVersion == null ? '下書きの内容' : '公開版の中身'}
+          onCancel={() => setViewTarget(null)}
+        >
+          {viewTarget ? <>
+            <p>{viewTarget.publishedVersion == null
+              ? `${viewTarget.draft.name}・${ruleEventLabel(viewTarget.draft.eventType, EVENT_LABELS)}・${formatMileageNumber(viewTarget.draft.amount)}マイル`
+              : `${viewTarget.published.name}・${ruleEventLabel(viewTarget.published.eventType, EVENT_LABELS)}・${formatMileageNumber(viewTarget.published.amount)}マイル`}</p>
+            <p>{viewTarget.publishedVersion == null
+              ? `下書き v${viewTarget.draftVersion}・${formatMileageDate(viewTarget.draftUpdatedAt)} に保存・まだ公開版はありません`
+              : `公開版 v${viewTarget.publishedVersion}・${formatMileageDate(viewTarget.published.updatedAt)} に反映`}</p>
+            <p>{viewTarget.draft.targetConditions
+              ? `利用対象：条件 ${viewTarget.draft.targetConditions.rules.length + (viewTarget.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き v${viewTarget.draftVersion}`
+              : `利用対象：すべての友だち・下書き v${viewTarget.draftVersion}`}</p>
+          </> : null}
+        </Dialog>
         <ConfirmDialog
           open={publishTarget !== null}
           title={publishTarget ? `「${publishTarget.draft.name}」の下書きを公開して反映しますか？` : '下書きを公開して反映しますか？'}

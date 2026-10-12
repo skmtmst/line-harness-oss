@@ -37,7 +37,7 @@
 /* 数の帯の境目は共通の型と帯に任せる。数字の字幅だけを絵に合わせる。 */
 
 
-:global([data-theme='v8']) .kpiStrip :global([data-kpi-number]) {
+:global(:root) .kpiStrip :global([data-kpi-number]) {
   font-variant-numeric: normal;
 }
 
@@ -208,7 +208,7 @@
 }
 
 /* 見出しの段は絵の高さ（39）。中の選ぶ箱（16）でも伸びないよう上下の余白を高さへ寄せる。 */
-:global([data-theme='v8']) .tableWrap thead th {
+:global(:root) .tableWrap thead th {
   height: var(--tpl-cv-head-h);
   padding-block: 0;
   vertical-align: middle;
@@ -381,7 +381,7 @@
   justify-content: flex-end;
 }
 
-:global([data-theme='v8']) .menuBox .rowMenuButton {
+:global(:root) .menuBox .rowMenuButton {
   width: var(--tpl-cv-row-menu);
   min-width: 0;
   height: var(--tpl-cv-row-menu);

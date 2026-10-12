@@ -8,24 +8,25 @@ import { describe, expect, it } from 'vitest'
  * 見本の数字が変わったらここも直す。共通部品の中身は M10 の持ち物なので見ない。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
-const css = readFileSync(join(HERE, 'list-v8.module.css'), 'utf8')
+const kpi = readFileSync(join(HERE, '../../components/shared/kpi-card.module.css'), 'utf8')
+const table = readFileSync(join(HERE, '../../components/shared/table.module.css'), 'utf8')
+const page = readFileSync(join(HERE, '../../v8/webinars/list.tsx'), 'utf8')
 
 describe('ウェビナーの一覧は板 UyUMw の数字どおり', () => {
-  it('数の帯のマスは余白 16/20・間 8', () => {
-    expect(css).toMatch(/\.kpiCell \{[^}]*padding: 16px 20px/s)
-    expect(css).toMatch(/\.kpiCell \{[^}]*gap: 8px/s)
+  it('数の帯のマスは現役の共通の余白と間を使う', () => {
+    expect(page).toContain('<KpiBand>')
+    expect(kpi).toContain('gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side)')
   })
 
-  it('数の帯の題は 12・500・ink', () => {
-    expect(css).toMatch(/\.kpiLabel \{[^}]*font-size: 12px/s)
-    expect(css).toMatch(/\.kpiLabel \{[^}]*color: var\(--color-ink\)/s)
+  it('数の帯の題は現役の共通の13・500・ink', () => {
+    expect(kpi).toMatch(/\.label \{[^}]*color: var\(--color-ink\); font-size: 13px; font-weight: 500/s)
   })
 
   it('表の見出しの地は table-head', () => {
-    expect(css).toMatch(/\.table thead th \{[^}]*background: var\(--color-table-head\)/s)
+    expect(table).toMatch(/\.headRow \{[^}]*background: var\(--color-table-head\)/s)
   })
 
   it('探す欄の幅は 240', () => {
-    expect(css).toMatch(/\.searchWrap \{[^}]*width: 240px/s)
+    expect(page).toContain("search={{ placeholder: 'ウェビナー名で探す', label: 'ウェビナー名で探す', width: 240")
   })
 })

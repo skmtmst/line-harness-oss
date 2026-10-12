@@ -54,11 +54,11 @@ describe('CommandPalette（探す窓・F②）', () => {
     expect(screen.getByRole('dialog')).not.toBeNull()
   })
 
-  it('v7 では開かない', () => {
+  it('古いDOMの値で現役の探す窓を止めない', () => {
     document.documentElement.dataset.theme = 'v7'
     render(<CommandPalette items={items} />)
     openPalette()
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('dialog', { name: '機能と友だちを探す' })).not.toBeNull()
   })
 
   it('名前で絞り、Enter で行く', () => {

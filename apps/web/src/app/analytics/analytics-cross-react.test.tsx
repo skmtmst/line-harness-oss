@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
 import { createRoot, hydrateRoot, type Root } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
@@ -28,8 +29,8 @@ const net = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/analytics',
+  useSearchParams: () => new URLSearchParams({ tab: 'cross' }),
 }))
 
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -149,6 +150,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-09-09T00:00:00.000Z'))
   fixture.accountId = 'account-a'
@@ -239,7 +241,7 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     })
 
     await render()
-    await click('この30日を集計')
+    await click('集計する')
     expect(started).toBe(true)
     expect(host.textContent).toContain('集計を受け付けました')
 
@@ -292,7 +294,7 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     })
 
     await render()
-    await click('この30日を集計')
+    await click('集計する')
     expect(host.textContent).toContain('このLINEアカウント内の順番は2番目です')
     await wait(5_000)
     expect(host.textContent).toContain('猫')
@@ -308,13 +310,13 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     })
 
     await render()
-    await click('この30日を集計')
+    await click('集計する')
     expect(host.textContent).toContain('集計を受け付けました')
 
     // 受付の応答が返る前にアカウントを切り替える。
     fixture.accountId = 'account-b'
     await render()
-    expect(host.textContent).toContain('たて・よこの軸を選び')
+    expect(host.textContent).toContain('たて・よこの軸と期間を選び')
 
     // 前のアカウントの受付が後から返っても、待機表示もポーリングも始まらない。
     await act(async () => { accepted.resolve({ success: true, data: { id: 'run-a', state: 'pending' } }) })
@@ -322,7 +324,7 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     expect(crossResultCallsFor('run-a')).toBe(0)
     expect(host.textContent).not.toContain('集計を受け付けました')
     expect(host.textContent).not.toContain('犬')
-    expect(host.textContent).toContain('たて・よこの軸を選び')
+    expect(host.textContent).toContain('たて・よこの軸と期間を選び')
   })
 
   it('アカウントを切り替えた後、前のアカウントの結果応答を表へ入れない', async () => {
@@ -336,7 +338,7 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     })
 
     await render()
-    await click('この30日を集計')
+    await click('集計する')
     // 1本目の結果確認が返らないまま、アカウントを切り替える。
     expect(crossResultCallsFor('run-a')).toBe(1)
     fixture.accountId = 'account-b'
@@ -345,7 +347,7 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     await act(async () => { late.resolve(finished('run-a', '犬')) })
     await wait(30_000)
     expect(host.textContent).not.toContain('犬')
-    expect(host.textContent).toContain('たて・よこの軸を選び')
+    expect(host.textContent).toContain('たて・よこの軸と期間を選び')
     // 切替後に前のアカウントのrunを追いかけ直さない。
     expect(crossResultCallsFor('run-a')).toBe(1)
   })
@@ -362,7 +364,7 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
     })
 
     await render()
-    await click('この30日を集計')
+    await click('集計する')
     await wait(0)
     expect(sessionStorage.getItem(storedCrossRunKey('account-a'))).toContain('run-reload')
 
@@ -506,8 +508,8 @@ describe('クロス分析の待機表示の実挙動(#633)', () => {
 
     await render()
     await act(async () => {
-      button('この30日を集計').click()
-      button('この30日を集計').click()
+      button('集計する').click()
+      button('集計する').click()
     })
     expect(crossStartCalls()).toBe(1)
     await act(async () => { accepted.resolve({ success: true, data: { id: 'run-once', state: 'pending' } }) })

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'columns', 'new', 'column-new-v8.tsx'),
+  join(dirname(fileURLToPath(import.meta.url)), '../../v8/nen-campaigns/column-new.tsx'),
   'utf8',
 )
 

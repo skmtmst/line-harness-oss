@@ -12,6 +12,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import { formatNumber } from '@/lib/format'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
+import ActionMenu from '@/components/shared/action-menu'
 import { notifyToast } from '@/components/shared/toast'
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel'
@@ -491,6 +492,10 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   const [query, setQuery] = useListUrlValue('q', '')
   /** ページごとの「この日時より前」。1ページ目は null。 */
   const [cursors, setCursors] = useListUrlJsonValue<Array<string | null>>('libraryCursors', [null], isCursorHistory)
+  const [storedPageSize, setPageSize] = useListUrlValue('libraryPageSize', LIBRARY_PAGE)
+  const pageSize = [12, 10, 20, 50].includes(storedPageSize) ? storedPageSize : LIBRARY_PAGE
+  const [pageSizeOpen, setPageSizeOpen] = useState(false)
+  const pageSizeAnchor = useRef<HTMLSpanElement>(null)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [openImage, setOpenImage] = useState<BannerImage | null>(null)
@@ -515,14 +520,14 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
     setActionError('')
     try {
       const [imageRes, activeRes, archivedRes] = await Promise.all([
-        api.hqBanners.images.list({ ...filters, limit: LIBRARY_PAGE, ...(before ? { before } : {}) }),
+        api.hqBanners.images.list({ ...filters, limit: pageSize, ...(before ? { before } : {}) }),
         api.hqBanners.projects.list(),
         api.hqBanners.projects.list({ archived: true }),
       ])
       if (requestId !== requestRef.current) return
       if (!imageRes.success) throw new Error(imageRes.error)
       if(!activeRes.success || !archivedRes.success)throw new Error('projects unavailable')
-      setImages(imageRes.data)
+      setImages([...new Map(imageRes.data.map((image) => [image.id, image])).values()])
       setCounts(imageRes.counts ?? null)
       setNextBefore(imageRes.nextBefore ?? null)
       const map: Record<string, BannerProject> = {}
@@ -535,7 +540,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
 
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [filters, before, saveErrors])
+  }, [filters, before, pageSize, saveErrors])
 
   useEffect(() => {
     void load();
@@ -638,11 +643,26 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   )
 
   const total = counts ? (view === 'all' ? counts.all : counts[view]) : null
-  const first = images.length === 0 ? 0 : page * LIBRARY_PAGE + 1
-  const last = page * LIBRARY_PAGE + images.length
+  const first = images.length === 0 ? 0 : page * pageSize + 1
+  const last = page * pageSize + images.length
+
+  const pager = (
+      <div className={styles.pager}>
+        <span className={styles.range} ref={pageSizeAnchor} role="button" tabIndex={0} aria-label="画像の取得件数" aria-haspopup="menu" aria-expanded={pageSizeOpen}
+          onClick={() => setPageSizeOpen((open) => !open)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setPageSizeOpen((open) => !open) } }}>
+          {total === null ? `${first}–${last} 件` : `${first}–${last} 件 / ${total} 件`}
+        </span>
+        <ActionMenu open={pageSizeOpen} onClose={() => setPageSizeOpen(false)} anchorRef={pageSizeAnchor} ariaLabel="画像の取得件数"
+          note="一度に読み込む画像の枚数です。変えると最初のページへ戻ります。"
+          items={[12, 10, 20, 50].map((size) => ({ id: String(size), label: `${size}枚`, onSelect: () => { setPageSize(size); resetPage(); setPageSizeOpen(false) } }))} />
+        <span className={styles.spacer} />
+        {page > 0 ? <Button onClick={() => setCursors((prev) => prev.slice(0, -1))}>{`前の ${pageSize} 件`}</Button> : null}
+        {nextBefore ? <Button onClick={() => setCursors((prev) => [...prev, nextBefore])}>{`次の ${pageSize} 件`}</Button> : null}
+      </div>
+  )
 
   const body = status === 'loading' ? (
-    <ListState permissionScope="hq" kind="loading" title="画像を読み込んでいます" />
+    <><ListState permissionScope="hq" kind="loading" title="画像を読み込んでいます" />{images.length > 0 ? pager : null}</>
   ) : status === 'forbidden' ? (
     <ListState permissionScope="hq" kind="forbidden" description="バナー生成は統括の管理者・オーナーだけが使えます。" />
   ) : status === 'error' ? (
@@ -681,12 +701,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
           )
         })}
       </div>
-      <div className={styles.pager}>
-        <span className={styles.range}>{total === null ? `${first}–${last} 件` : `${first}–${last} 件 / ${total} 件`}</span>
-        <span className={styles.spacer} />
-        {page > 0 ? <Button onClick={() => setCursors((prev) => prev.slice(0, -1))}>{`前の ${LIBRARY_PAGE} 件`}</Button> : null}
-        {nextBefore ? <Button onClick={() => setCursors((prev) => [...prev, nextBefore])}>{`次の ${LIBRARY_PAGE} 件`}</Button> : null}
-      </div>
+      {pager}
     </>
   )
 

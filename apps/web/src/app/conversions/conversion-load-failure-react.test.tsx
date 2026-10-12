@@ -21,7 +21,7 @@ const mode = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
@@ -127,6 +127,7 @@ function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown) => {
     const raw = String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+    if (path.startsWith('/api/folders')) return jsonResponse({ success: true, data: [] }, 200)
     if (path.startsWith('/api/conversions/definitions')) {
       return mode.list === 'ok'
         ? jsonResponse(listBody(), 200)
@@ -143,6 +144,11 @@ function installFetch() {
 
 let container: HTMLDivElement
 let root: Root
+
+/** Text that is shown directly or available by hovering the V8 metric detail. */
+function screenText(): string {
+  return (container.textContent ?? '') + [...container.querySelectorAll('[title]')].map(node => node.getAttribute('title')).join(' ')
+}
 
 async function flush(times = 10) {
   for (let i = 0; i < times; i += 1) {
@@ -185,7 +191,7 @@ describe('R595 一覧だけ失敗しても0件と誤らない', () => {
   it('失敗パネルと再試行を出し、件数に0を出さない', async () => {
     mode.list = 'error'
     await mount()
-    const text = container.textContent ?? ''
+    const text = screenText()
     // 一覧の失敗は失敗パネルが担う。
     expect(text).toContain('成果地点を読み込めませんでした')
     expect(container.querySelector('table')).toBeNull()
@@ -194,7 +200,7 @@ describe('R595 一覧だけ失敗しても0件と誤らない', () => {
     expect(text).not.toContain('成果地点 0件')
     expect(text).not.toContain('0個の成果地点で金額を記録')
     expect(text).toContain('金額の内訳を読み込めませんでした')
-    expect(text).toContain('一覧を読み込めませんでした')
+    expect(text).toContain('数の帯は「—」です')
   })
 
   it('再試行で正しい6件と4個へ戻る', async () => {
@@ -203,7 +209,7 @@ describe('R595 一覧だけ失敗しても0件と誤らない', () => {
     expect(container.querySelector('table')).toBeNull()
     mode.list = 'ok'
     await clickByText('もう一度読み込む')
-    const text = container.textContent ?? ''
+    const text = screenText()
     expect(container.querySelector('table')).not.toBeNull()
     expect(text).toContain('購入A')
     expect(text).toContain('4個の成果地点で金額を記録')
@@ -215,25 +221,25 @@ describe('R596 集計だけ失敗しても一覧は残す', () => {
   it('行は残し、集計カードだけ失敗と再試行にする', async () => {
     mode.report = 'error'
     await mount()
-    const text = container.textContent ?? ''
+    const text = screenText()
     // 一覧は読めているので行が残る。
     expect(container.querySelector('table')).not.toBeNull()
     expect(text).toContain('購入A')
     expect(text).toContain('4個の成果地点で金額を記録')
     // 集計の失敗は数値カードに出る。
-    expect(text).toContain('この30日の集計を読み込めませんでした')
+    expect(text).toContain('集計を表示できませんでした')
     expect(text).not.toContain('前の30日 20件')
   })
 
   it('集計の再試行で行を消さず数値へ戻す', async () => {
     mode.report = 'error'
     await mount()
-    expect((container.textContent ?? '')).toContain('この30日の集計を読み込めませんでした')
+    expect((screenText())).toContain('集計を表示できませんでした')
     mode.report = 'ok'
-    await clickByText('集計を再読み込み')
-    const text = container.textContent ?? ''
+    await clickByText('集計を読み直す')
+    const text = screenText()
     expect(text).toContain('前の30日 20件')
-    expect(text).not.toContain('この30日の集計を読み込めませんでした')
+    expect(text).not.toContain('集計を表示できませんでした')
     // 再試行のあいだも行は残る。
     expect(container.querySelector('table')).not.toBeNull()
     expect(text).toContain('購入A')
@@ -243,7 +249,7 @@ describe('R596 集計だけ失敗しても一覧は残す', () => {
 describe('R595/R596 正常時は失敗を出さない', () => {
   it('両方200なら件数と集計が出て失敗文は無い', async () => {
     await mount()
-    const text = container.textContent ?? ''
+    const text = screenText()
     expect(text).toContain('購入A')
     expect(text).toContain('4個の成果地点で金額を記録')
     expect(text).toContain('前の30日 20件')

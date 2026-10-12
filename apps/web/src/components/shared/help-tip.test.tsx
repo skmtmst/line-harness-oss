@@ -90,16 +90,12 @@ describe('補足の「？」', () => {
 describe('？印の当たりは透明のはみ出しを持たない（G3・V8）', () => {
   it('V8 の札は透明な 28px、円は中の箱、::before は出さない', () => {
     const css = readFileSync(join(DIR, 'help-tip.module.css'), 'utf8')
-    expect(css).toMatch(/\[data-theme='v8'\] \.button \{[^}]*width:\s*28px/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.button \{[^}]*background:\s*transparent/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.mark \{[^}]*width:\s*16px/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.mark \{[^}]*border-radius:\s*var\(--radius-pill\)/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.button::before \{\s*content:\s*none;/s)
+    expect(css).toMatch(/:root \.button \{[^}]*width:\s*28px/s)
+    expect(css).toMatch(/:root \.button \{[^}]*background:\s*transparent/s)
+    expect(css).toMatch(/:root \.mark \{[^}]*width:\s*16px/s)
+    expect(css).toMatch(/:root \.mark \{[^}]*border-radius:\s*var\(--radius-pill\)/s)
+    expect(css).toMatch(/:root \.button::before \{\s*content:\s*none;/s)
   })
 
-  it('v7 の札は 18px 円＋::before のまま', () => {
-    const css = readFileSync(join(DIR, 'help-tip.module.css'), 'utf8')
-    const base = css.match(/\.button \{[^}]*\}/s)?.[0] ?? ''
-    expect(base).toMatch(/width:\s*18px/)
-  })
+
 })

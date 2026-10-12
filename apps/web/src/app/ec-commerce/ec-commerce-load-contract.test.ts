@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 
 describe('V6 23-1 EC連携の読み込み', () => {
   it('集計と取込一覧を別々に読み込み、片方の失敗で両方を消さない', () => {
@@ -68,7 +68,7 @@ describe('V6 23-1 EC連携のアカウント切替', () => {
   })
 
   it('ページとお知らせもアカウントと一体で持ち、切替で持ち越さない', () => {
-    expect(source).toContain('const page = pageSlot.accountId === accountId ? pageSlot.page : 1')
+    expect(source).toContain('const page = pageSlot.accountId === accountId ? urlPage : 1')
     expect(source).toContain('const notice = noticeSlot.accountId === accountId ? noticeSlot.notice : null')
   })
 })

@@ -58,8 +58,8 @@
 .colState { width: var(--tpl-fr-mig-col-state); }
 .colAction { width: var(--tpl-fr-mig-col-action); }
 
-:global([data-theme='v8']) .table thead tr { background: transparent; border-top: 0; }
-:global([data-theme='v8']) .table thead th.th {
+:global(:root) .table thead tr { background: transparent; border-top: 0; }
+:global(:root) .table thead th.th {
   height: var(--tpl-fr-dup-thead-h);
   padding: var(--tpl-fr-dup-thead-pad);
   background: transparent;
@@ -69,9 +69,9 @@
   line-height: var(--tpl-fr-desc-lh);
   vertical-align: top;
 }
-:global([data-theme='v8']) .table thead th.th:first-child { padding-left: var(--tpl-fr-cell-inset); }
-:global([data-theme='v8']) .table thead th.th:last-child { padding-right: var(--tpl-fr-cell-inset); }
-:global([data-theme='v8']) .table td.td {
+:global(:root) .table thead th.th:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global(:root) .table thead th.th:last-child { padding-right: var(--tpl-fr-cell-inset); }
+:global(:root) .table td.td {
   height: var(--tpl-fr-mig-row-h);
   padding: 0 var(--tpl-fr-stack-gap) 0 0;
   color: var(--color-ink);
@@ -79,9 +79,9 @@
   line-height: var(--tpl-fr-desc-lh);
   vertical-align: middle;
 }
-:global([data-theme='v8']) .table tr.rowTall td.td { height: var(--tpl-fr-mu-row-h); }
-:global([data-theme='v8']) .table td.td:first-child { padding-left: var(--tpl-fr-cell-inset); }
-:global([data-theme='v8']) .table td.td:last-child { padding-right: var(--tpl-fr-cell-inset); }
+:global(:root) .table tr.rowTall td.td { height: var(--tpl-fr-mu-row-h); }
+:global(:root) .table td.td:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global(:root) .table td.td:last-child { padding-right: var(--tpl-fr-cell-inset); }
 
 .mono { font-family: var(--font-mono); font-size: var(--text-micro); }
 .stateCell { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-fr-tag-gap); }
@@ -137,8 +137,8 @@
 .uidButton:hover { color: var(--color-action); text-decoration: underline; }
 .runButton { color: var(--color-ink); font-size: var(--text-caption); text-align: left; }
 .runButton:hover { color: var(--color-action); text-decoration: underline; }
-:global([data-theme='v8']) .table thead th.thHistory { height: var(--tpl-fr-uid-thead-h); }
-:global([data-theme='v8']) .table tr.rowRun td.td { height: var(--tpl-fr-uid-run-h); }
+:global(:root) .table thead th.thHistory { height: var(--tpl-fr-uid-thead-h); }
+:global(:root) .table tr.rowRun td.td { height: var(--tpl-fr-uid-run-h); }
 
 .pagerRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); }
 .cardHeadRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); }

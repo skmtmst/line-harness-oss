@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import React from 'react'
-import { cleanup, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import LiffDateTimePreview, { formatLiffDate } from './liff-preview'
+import { PhoneDatetimeStep, formatJpDay, phoneTime } from '@/v8/booking-staff/phone'
+import { LiffPhoneDatetimeStep } from '@/v8/booking-menus/liff-phone'
+import type { BookingMenu } from '@/lib/api'
 import type { BookingAvailabilitySlot } from '@/lib/api'
 
 /**
@@ -33,7 +35,7 @@ const LIFF_USER_MESSAGE_SOURCE = readFileSync(
   join(REPO_ROOT, 'apps/liff/src/lib/user-message.ts'),
   'utf8',
 )
-const PAGE_SOURCE = readFileSync(join(DIR, 'page.tsx'), 'utf8')
+const PAGE_SOURCE = readFileSync(join(DIR, '../../../../v8/booking-staff/shifts.tsx'), 'utf8')
 
 function slot(date: string, start: string): BookingAvailabilitySlot {
   return {
@@ -92,167 +94,71 @@ describe('前提: 実LIFFが「日時を選んでください」＋週／カレ�
   })
 })
 
-describe('プレビューが実LIFFと同じ構造で描画される', () => {
-  const slots = [
-    slot('2026-10-01', '10:00'),
-    slot('2026-10-01', '10:30'),
-    slot('2026-10-01', '11:00'),
-    slot('2026-10-01', '11:30'),
-    slot('2026-10-01', '13:00'),
-    slot('2026-10-03', '09:00'),
-    slot('2026-10-03', '09:30'),
-  ]
+describe('現役V8の携帯見本のデータ・失敗・読み直し', () => {
+  const menu = { id: 'menu-1', name: 'カット' } as BookingMenu
+  const slots = [slot('2026-10-01', '10:00'), slot('2026-10-01', '10:30'), slot('2026-10-01', '11:00'), slot('2026-10-01', '11:30'), slot('2026-10-01', '13:00'), slot('2026-10-03', '09:00')]
+  const props = { menu, staffName: '田中', slots, closedDates: [], closedWeekdays: [] }
 
-  it('実文言「日時を選んでください」と案内文が出る', () => {
-    render(
-      <LiffDateTimePreview
-        status="ready"
-        slots={slots}
-        menuName="カット"
-        staffName="田中"
-      />,
-    )
+  it('勤務画面と予約設定が、現役の見本を実データで描く', () => {
+    expect(PAGE_SOURCE).toContain('<PhoneDatetimeStep')
+    expect(PAGE_SOURCE).toContain('slots={slots}')
+    const { unmount } = render(<PhoneDatetimeStep {...props} />)
     expect(screen.getByText('日時を選んでください')).toBeTruthy()
-    expect(screen.getByText('確認画面で要望を入力してください')).toBeTruthy()
-    expect(screen.getByText('← 戻る')).toBeTruthy()
-    expect(screen.getByText('お客様のLINEではこう見えます')).toBeTruthy()
+    expect(screen.getByText('カット・田中')).toBeTruthy()
+    unmount()
+    render(<LiffPhoneDatetimeStep {...props} view="list" />)
+    expect(screen.getByText('カット・田中')).toBeTruthy()
   })
 
-  it('日付の札が横に並び、選んだ日の時刻ボタンが3列グリッド（実LIFFと同じ）', () => {
-    const { container } = render(
-      <LiffDateTimePreview
-        status="ready"
-        slots={slots}
-        menuName="カット"
-        staffName="田中"
-      />,
-    )
-    // LIFF formatJp と同じ見出し表記（2026-10-01 は木曜、10-03 は土曜）
-    expect(formatLiffDate('2026-10-01')).toBe('10/1(木)')
-    expect(formatLiffDate('2026-10-03')).toBe('10/3(土)')
+  it('先頭の日の時刻だけを表示し、満・休みを区別する', () => {
+    const { container } = render(<PhoneDatetimeStep {...props} closedDates={['2026-10-02']} />)
+    expect(formatJpDay('2026-10-01')).toBe('10月1日（木）')
+    expect(formatJpDay('2026-10-03')).toBe('10月3日（土）')
+    expect(screen.getByText('10月1日（木）の空き')).toBeTruthy()
+    expect(container.querySelectorAll('[data-tone="off"]')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-tone="full"]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[data-tone="open"]')).toHaveLength(2)
+    for (const time of ['10:00', '10:30', '11:00', '11:30', '13:00']) expect(within(container).getAllByText(time).length).toBeGreaterThan(0)
+    expect(container.textContent).not.toContain(phoneTime('09:00'))
+  })
 
-    // 実LIFFと同じく、日付の札が横に1列。枠の無い 10/2（金）は「満席」で押せない。
-    const strip = container.querySelector('[aria-label="日付"]')
-    expect(strip).not.toBeNull()
-    const dayButtons = strip!.querySelectorAll('button')
-    expect(dayButtons.length).toBe(3)
-    const closed = [...dayButtons].find((button) => button.textContent?.includes('10/2'))
-    expect(closed?.textContent).toContain('満席')
-    expect(closed?.disabled).toBe(true)
-
-    // 実LIFFと同じく、空きのある先頭の日（10/1）を選んだ状態で1つだけ <section>。
-    expect(screen.getByText('10/1(木) の空き')).toBeTruthy()
-    expect(container.querySelectorAll('section').length).toBe(1)
-    const grids = container.querySelectorAll('.grid.grid-cols-3')
-    expect(grids.length).toBe(1)
-    expect(container.querySelector('.grid-cols-4')).toBeNull()
-    // 選んだ日の時刻だけがボタンで並ぶ（10/3 の 09:00 は選ぶまで出ない）。
-    for (const time of ['10:00', '10:30', '11:00', '11:30', '13:00']) {
-      expect(within(container).getAllByText(time).length).toBeGreaterThan(0)
-    }
+  it('予約設定の見本も先頭の日だけを示し、別の日の枠を混ぜない', () => {
+    const { container } = render(<LiffPhoneDatetimeStep {...props} view="list" />)
+    expect(screen.getByText('10月1日（木）の空き')).toBeTruthy()
     expect(container.textContent).not.toContain('09:00')
-    expect(container.querySelectorAll('button').length).toBe(8)
-  })
-
-  it('リストの時は月の表（7列）・印の見方・内訳は出ない', () => {
-    const { container } = render(
-      <LiffDateTimePreview
-        status="ready"
-        slots={slots}
-        menuName="カット"
-        staffName="田中"
-      />,
-    )
-    expect(container.textContent).not.toContain('ご希望の日をえらんでください')
     expect(container.textContent).not.toContain('空き枠の内訳')
-    expect(container.textContent).not.toContain('あいています')
-    expect(container.textContent).not.toContain('満席です')
-    expect(container.querySelector('.grid-cols-7')).toBeNull()
     expect(container.querySelector('details')).toBeNull()
   })
 
-  it('カレンダーの時は月の表が7列で、リストの時は無い', () => {
-    const { container, unmount } = render(
-      <LiffDateTimePreview
-        status="ready"
-        slots={slots}
-        menuName="カット"
-        staffName="田中"
-        initialView="calendar"
-        closedDates={['2026-10-02']}
-      />,
-    )
-    // 月の表（2026年10月）・7列・印の見方・選んだ日の時刻3列が出る。
-    expect(screen.getByText('2026年10月')).toBeTruthy()
-    const grids = container.querySelectorAll('.grid.grid-cols-7')
-    expect(grids.length).toBe(1)
-    expect(container.textContent).toContain('空きあり')
-    expect(container.textContent).toContain('満席')
-    expect(container.textContent).toContain('お休み')
-    expect(screen.getByText('10/1(木) の空き')).toBeTruthy()
-    expect(container.querySelectorAll('.grid.grid-cols-3').length).toBe(1)
-    // 休みの日（10/2）は「休」の印になる。
-    const oct2 = [...container.querySelectorAll('.grid-cols-7 button')].find((button) =>
-      button.textContent?.startsWith('2'),
-    )
-    expect(oct2?.textContent).toContain('休')
-    unmount()
-    // リストに戻すと7列は消える。
-    const list = render(
-      <LiffDateTimePreview
-        status="ready"
-        slots={slots}
-        menuName="カット"
-        staffName="田中"
-        initialView="list"
-      />,
-    )
-    expect(list.container.querySelector('.grid-cols-7')).toBeNull()
-    expect(list.container.querySelectorAll('.grid.grid-cols-3').length).toBe(1)
-    list.unmount()
+  // 未使用の旧見本の「カレンダーなら月の表が7列」の外見契約1件は削除。
+  // 現役の採用済み携帯見本の骨格を旧コードの月表へ戻す要求にしない。
+
+  it('空きがないときは空きなしを示し、日時を選択済みにしない', () => {
+    render(<PhoneDatetimeStep {...props} slots={[]} />)
+    expect(screen.getByText('この期間に空きはありません。')).toBeTruthy()
+    expect(screen.getByText('内容を確かめる').getAttribute('data-off')).toBe('true')
+    expect(screen.queryByText('10月1日（木）の空き')).toBeNull()
   })
 
-  it('空きが無いときは実LIFFと同じ「この週は空きがありません」（★V8・ADutg）', () => {
-    render(
-      <LiffDateTimePreview status="ready" slots={[]} menuName="カット" staffName="田中" />,
-    )
-    expect(screen.getByText('この週は空きがありません')).toBeTruthy()
-    expect(
-      screen.getByText(
-        '次の週を見るか、担当を「指名なし」にすると見つかることがあります。',
-      ),
-    ).toBeTruthy()
-  })
-
-  it('取得中・失敗は実LIFFの共通部品と同じ文言とボタンで出す', () => {
-    const { container: loadingContainer, unmount } = render(
-      <LiffDateTimePreview status="loading" slots={[]} menuName="カット" staffName="田中" />,
-    )
-    expect(screen.getByText('読み込み中...')).toBeTruthy()
-    expect(loadingContainer.textContent).not.toContain('空き枠を取得中...')
+  it('取得中・失敗は満席と断定せず、失敗から読み直せる', () => {
+    const onRetry = vi.fn()
+    const { unmount } = render(<PhoneDatetimeStep {...props} status="loading" onRetry={onRetry} />)
+    expect(screen.queryAllByText('満')).toHaveLength(0)
+    expect(screen.getByText('内容を確かめる').getAttribute('data-off')).toBe('true')
     unmount()
-    const { container } = render(
-      <LiffDateTimePreview status="error" slots={[]} menuName="カット" staffName="田中" />,
-    )
-    // 実LIFFの LoadErrorView と同じ題＋本文（★V7）。
+    render(<PhoneDatetimeStep {...props} status="error" onRetry={onRetry} />)
     expect(screen.getByText('読み込めませんでした')).toBeTruthy()
-    expect(screen.getByText('電波のよいところで、もう一度お試しください。')).toBeTruthy()
-    expect(screen.getByText('もう一度読み込む')).toBeTruthy()
-    // 実LIFFの失敗表示と同じく赤は使わず、旧い案内文も残さない。
-    expect(container.querySelector('.text-danger')).toBeNull()
-    expect(container.textContent).not.toContain('時間をおいて、もう一度お試しください。')
-    expect(container.textContent).not.toContain('空き状況だけ読み込めませんでした。')
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    expect(onRetry).toHaveBeenCalledOnce()
+    expect(PAGE_SOURCE).toContain('onRetry={selectedAccountId && menuId')
+    expect(PAGE_SOURCE).toContain('void loadAvailability(selectedAccountId, menuId')
   })
 
-  it('どのメニュー・担当の画面かを枠の外に注記する', () => {
-    render(
-      <LiffDateTimePreview
-        status="ready"
-        slots={slots}
-        menuName="カット"
-        staffName="田中"
-      />,
-    )
-    expect(screen.getByText(/「カット」で担当「田中」/)).toBeTruthy()
+  it('どのメニュー・担当の見本かを示し、指名なしも区別する', () => {
+    const { unmount } = render(<PhoneDatetimeStep {...props} />)
+    expect(screen.getByText('カット・田中')).toBeTruthy()
+    unmount()
+    render(<PhoneDatetimeStep {...props} staffName={null} />)
+    expect(screen.getByText('カット・指名なし')).toBeTruthy()
   })
 })

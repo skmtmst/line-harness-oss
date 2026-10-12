@@ -165,8 +165,9 @@ export function AffiliateArchiveDialog({
             ))}
           </RadioCardGroup></SaveErrorField>
 
-          <Field label="確認のため「」と打ってください"><SaveErrorField names={["confirmationName","confirmation_name"]}><input
+          <Field label={`確認のため「${target?.name ?? ''}」と打ってください`}><SaveErrorField names={["confirmationName","confirmation_name"]}><input
                 type="text"
+                aria-label={`確認のため「${target?.name ?? ''}」と打ってください`}
                 value={confirmationName}
                 onChange={(event) => setConfirmationName(event.target.value)}
                 className="border-hairline rounded-control mt-2 w-full border px-3 py-2 font-normal"

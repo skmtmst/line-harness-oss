@@ -16,14 +16,14 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -67,7 +67,7 @@ async function flush() {
 }
 
 async function typeRuleName(value: string) {
-  const box = host.querySelector('input#sc-name') as HTMLInputElement
+  const box = host.querySelector('input#er-name') as HTMLInputElement
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
   await act(async () => {
     setter.call(box, value)
@@ -114,7 +114,7 @@ describe('mileage/earning-rules/new の未保存ガード', () => {
     await flush()
 
     expect(document.body.textContent).not.toContain('保存していない変更があります')
-    expect((host.querySelector('input#sc-name') as HTMLInputElement).value).toBe('来てくれたら 500 マイル')
+    expect((host.querySelector('input#er-name') as HTMLInputElement).value).toBe('来てくれたら 500 マイル')
   })
 
   it('「保存せずに移る」を押すと一覧へ進む', async () => {

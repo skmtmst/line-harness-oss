@@ -4,9 +4,9 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const OVERVIEW = fs.readFileSync(path.join(__dirname, 'nen-overview.tsx'), 'utf8')
+const OVERVIEW = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/list.tsx'), 'utf8')
 
-describe('V6 NEN配信の運用者向け文言契約', () => {
+describe('V8 NEN配信の運用者向け文言契約', () => {
   it('メニューと画面でNEN配信の名前をそろえる', () => {
     expect(PAGE).toContain("usePageTitle('NEN配信')")
     expect(PAGE).not.toContain('<Header')
@@ -19,11 +19,8 @@ describe('V6 NEN配信の運用者向け文言契約', () => {
   })
 
   it('コラムの状態を内部値のまま表示しない（★V6 37-6-A の LINE配信 列）', () => {
-    expect(OVERVIEW).toContain("draft: '未配信'")
-    expect(OVERVIEW).toContain("scheduled: '予約'")
-    expect(OVERVIEW).toContain("queued: '配信待ち'")
-    expect(OVERVIEW).toContain("sent: '配信済み'")
-    expect(OVERVIEW).toContain('{columnStatusLabel[column.deliveryStatus]}')
+    for (const label of ['送っていない', '予約中', '配信待ち', '送信済み']) expect(OVERVIEW).toContain(label)
+    expect(OVERVIEW).toContain('columnBadge(column, metric?.sent ?? null)')
     expect(OVERVIEW).not.toContain('{column.deliveryStatus}</span>')
   })
 

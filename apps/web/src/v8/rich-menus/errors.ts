@@ -1,9 +1,16 @@
 /*
  * リッチメニュー一覧の、失敗を運用者向けの文へ置き換える共有の関数。
- * ★V7（page.tsx）と★V8（list-v8.tsx）で同じ文を使うための1か所。
- * （page.tsx は Next.js の決まりで自由な export を持てない）
+ * 一覧・詳細の失敗を同じ文で案内する。
  */
 import { ApiError } from '@/lib/api'
+
+/** 部分的な取り下げ失敗は、内部のIDや英語を出さず種類ごとにまとめる。 */
+export function unpublishWarningText(warning: string): string {
+  if (warning.startsWith('delete alias ')) return '切り替え設定の一部を取り下げきれていません'
+  if (warning.startsWith('delete richmenu ')) return 'メニュー本体の一部を取り下げきれていません'
+  if (warning.startsWith('default lookup/clear')) return '標準表示の解除を確認できませんでした'
+  return '一部を取り下げきれていません'
+}
 
 export type RichMenuAction = 'load' | 'reorder' | 'delete' | 'unpublish' | 'externalDelete' | 'import'
 

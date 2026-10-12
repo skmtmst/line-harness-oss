@@ -15,7 +15,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {} }),
   useSearchParams: () => new URLSearchParams(currentParams),
@@ -89,7 +89,7 @@ describe('流入リンクのプール取得ゲート（#703）', () => {
     await mount(<InflowLinksPage />)
     await settle(300)
 
-    expect(host.textContent).toContain('流入経路')
+    expect(host.textContent).toContain('流入と計測')
     expect(fetchUrls.some((u) => u.includes('/api/traffic-pools'))).toBe(false)
   })
 
@@ -99,7 +99,7 @@ describe('流入リンクのプール取得ゲート（#703）', () => {
     await mount(<InflowLinksPage />)
     await settle(300)
 
-    expect(host.textContent).toContain('流入経路')
+    expect(host.textContent).toContain('流入と計測')
     expect(fetchUrls.some((u) => u.includes('/api/traffic-pools'))).toBe(true)
   })
 

@@ -52,6 +52,6 @@ describe('V5 B2 共通部品', () => {
       expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)/)
     }
     expect(read('card.module.css')).toMatch(/:focus-visible\s*\{[^}]*outline:\s*revert;/s)
-    expect(read('icon-button.module.css')).toMatch(/:focus-visible\s*\{[^}]*outline:\s*revert;/s)
+    expect(read('icon-button.module.css')).toMatch(/:root \.button:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\)/s)
   })
 })

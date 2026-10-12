@@ -1,5 +1,6 @@
 import type { CommonVarChangeImpact } from '@line-crm/shared'
 import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 import type { CommonVarDeleteImpact, CommonVarDeleteImpactItem } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
@@ -23,8 +24,8 @@ import {
   scheduleErrorText,
 } from './change-impact'
 
-const EDIT = readFileSync(new URL('./edit/page.tsx', import.meta.url), 'utf8')
-const IMPACT_REVIEW = readFileSync(new URL('./impact-review.tsx', import.meta.url), 'utf8')
+const EDIT = readUiSource(new URL('./edit/page.tsx', import.meta.url), 'utf8')
+const IMPACT_REVIEW = readUiSource(new URL('../../../v8/common-vars-edit/edit.tsx', import.meta.url), 'utf8')
 
 /**
  * **ファイル全体を `toContain` で見ない。** 画面のどこかに同じ字が
@@ -39,7 +40,8 @@ function sliceBetween(source: string, start: string, end: string): string {
 }
 
 const SAVE_FN = sliceBetween(EDIT, '  const save = async () => {', '  const remove = async () => {')
-const IMPACT_SECTION = sliceBetween(EDIT, '<section data-design-node="uNBlA">', '</section>')
+const IMPACT_SECTION = sliceBetween(EDIT, '<section className={styles.card} aria-labelledby="cv-edit-impact-heading">', '</section>')
+const IMPACT_ROWS = sliceBetween(EDIT, 'function ImpactRows(', 'export default function EditCommonVarV8')
 
 function usage(over: Partial<CommonVarDeleteImpactItem> = {}): CommonVarDeleteImpactItem {
   return {
@@ -261,7 +263,7 @@ describe('取れないものは、取れないと書く', () => {
   })
 })
 
-describe('共通情報編集（uNBlA）の画面', () => {
+describe('共通情報編集（V8）の画面', () => {
   it('保存の catch は一言で片付けず、理由を作る関数を通す', () => {
     expect(SAVE_FN).toContain('setError(saveErrorText(e))')
     expect(SAVE_FN).not.toContain("setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')")
@@ -273,38 +275,39 @@ describe('共通情報編集（uNBlA）の画面', () => {
   })
 
   it('入力を変えたら古い「保存しました。」を消す（#578 L9）', () => {
-    expect(EDIT).toContain('{saved &&')
+    expect(SAVE_FN).toContain('notifySaved()')
+    expect(EDIT).not.toContain('{saved &&')
     expect(EDIT).toContain('setSaved(false); setName')
     expect(EDIT).toContain('setSaved(false); setValue')
   })
 
   it('一覧の読み込み失敗は権限なしと通信障害で分ける（#578 L8）', () => {
-    const LIST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+    const LIST = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
     expect(LIST).toContain('見る権限がありません')
     expect(LIST).toContain('接続を確かめて')
   })
 
   it('影響確認の節を必ず出す。読めないときも節ごと消さない', () => {
-    expect(IMPACT_SECTION).toContain('影響確認')
-    expect(IMPACT_SECTION).toContain(': NOT_AVAILABLE')
+    expect(IMPACT_SECTION).toContain('変える前に影響を見る')
+    expect(IMPACT_ROWS).toContain('NOT_AVAILABLE')
     expect(IMPACT_SECTION).toContain('impactStateText(impactState)')
   })
 
   it('節の中で、変わる場所・送信済み・使用先の種類を書き分ける', () => {
-    expect(IMPACT_SECTION).toContain('changeSummaryText(impact)')
+    expect(IMPACT_SECTION).toContain('formatNumber(impact.total)')
     expect(IMPACT_SECTION).toContain('historicalText(impact)')
-    expect(IMPACT_SECTION).toContain('usageGroups.map')
-    expect(IMPACT_SECTION).toContain('formatNumber(group.count')
+    expect(IMPACT_ROWS).toContain('visible.map')
+    expect(IMPACT_ROWS).toContain('row.kindLabel')
   })
 
   it('1件ずつ見る画面では、保存後の文を作れない行を空文字で埋めない', () => {
     // 空で出すと「保存すると空になる」と読める。
-    expect(IMPACT_REVIEW).toContain("item.nextPreview ?? '—（未取得）'")
+    expect(IMPACT_REVIEW).toContain("row.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`")
   })
 
   it('1件ずつ見る画面では、上限を超える行の文字数を強調する', () => {
-    expect(IMPACT_REVIEW).toContain('item.exceedsCharacterLimit')
-    expect(IMPACT_REVIEW).toContain('characterCountText(item)')
+    expect(IMPACT_REVIEW).toContain('row.exceedsCharacterLimit')
+    expect(IMPACT_REVIEW).toContain('characterCountText(row)')
   })
 
   it('状態の語彙は口とそろえ、編集中・公開中・予約中の内訳を保存前に出す（IDEA-14）', () => {
@@ -321,7 +324,7 @@ describe('共通情報編集（uNBlA）の画面', () => {
   it('競合で入力を消さない。load()ではなく版だけ取り直す（IDEA-14）', () => {
     // load() は名前・値・メモまで初期化する。409/428で呼ぶと入力が消える。
     const CATCH = sliceBetween(SAVE_FN, '} catch (e) {', '} finally {')
-    expect(CATCH).toContain('void refreshBaseline(item.id, accountAtRequest, e)')
+    expect(CATCH).toContain('await refreshBaseline(item.id, accountAtRequest, e)')
     expect(CATCH).not.toContain('void load()')
   })
 
@@ -335,13 +338,14 @@ describe('共通情報編集（uNBlA）の画面', () => {
   })
 
   it('0か所確定のとき「1件ずつ見る」への案内を出さない（VAR-02）', () => {
-    // ボタンは blockingTotal > 0 かつ変更確認（canSave）のときだけ出る。
-    // 案内文も同じ条件にしないと、存在しない操作を探させる。
-    expect(IMPACT_SECTION).toContain("'canSave' in impact && impact.blockingTotal > 0")
+    // V8は一覧をこの節で表示する。0件で存在しない行を開く案内を出さない。
+    expect(IMPACT_SECTION).toContain('<ImpactRows impact={impact}')
+    expect(IMPACT_ROWS).toContain('rows.length === 0')
+    expect(IMPACT_ROWS).toContain('rest > 0')
   })
 
   it('見え方の節は、確認中・0件確定・使用先ありを分けて言う（VAR-02）', () => {
-    const PREVIEW_SECTION = sliceBetween(EDIT, '差し込んだときの見え方', '</section>')
+    const PREVIEW_SECTION = IMPACT_SECTION + IMPACT_ROWS
     // 0件が確定したあとも「確認中です」と出し続けない
     expect(PREVIEW_SECTION).toContain('impact.total === 0')
     expect(PREVIEW_SECTION).toContain('使われている場所がないため')

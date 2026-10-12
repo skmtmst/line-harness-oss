@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, Link as LinkIcon } from 'lucide-react'
 import type { Friend } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -251,6 +251,8 @@ export default function CreateAffiliateV8() {
       } catch (caught) {
         saveErrors.capture(caught);
 
+        if (caught instanceof ApiError) throw caught
+
         if (caught instanceof Error && caught.message.includes('既に使われています')) {
           throw new Error('この紹介コードは既に使われています。別のコードを入力してください。')
         }
@@ -300,7 +302,7 @@ export default function CreateAffiliateV8() {
       const fieldFailure = saveErrors.capture(caught);
 
 
-      const message = caught instanceof Error ? caught.message : '保存できませんでした'
+      const message = caught instanceof ApiError ? describeSaveFailure(caught) : caught instanceof Error ? caught.message : '保存できませんでした'
       if (message.includes('既に使われています')) {
         setFieldErrors({ code: message })
         focusField('code')

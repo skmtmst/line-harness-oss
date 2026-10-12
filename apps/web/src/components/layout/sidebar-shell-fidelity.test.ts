@@ -13,9 +13,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(HERE, 'sidebar.tsx'), 'utf8');
 
 describe('V8 統括の脇の頭と下（殻合わせ）', () => {
-  it('頭は店の画面と同じ部品（v7 の札は残す）', () => {
-    expect(source).toContain('統括コンソール')
-    expect(source).toContain('<div className="v8-only"><SidebarIdentity /></div>')
+  it('頭は店の画面と同じ部品だけを出す', () => {
+    expect(source).not.toContain('v7-only')
+    expect(source).toContain('<div><SidebarIdentity /></div>')
   })
 
   it('統括の下は「統括の設定」の入口（店舗側の「設定」は残す）', () => {
@@ -23,7 +23,7 @@ describe('V8 統括の脇の頭と下（殻合わせ）', () => {
     expect(source).toContain('href="/settings"')
   })
 
-  it('版は v7 の統括だけ出さない', () => {
-    expect(source).toContain('{preview || (isHq && !isV8) ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}')
+  it('版は統括と店のどちらも出し、見本では出さない', () => {
+    expect(source).toContain('{preview ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}')
   })
 });

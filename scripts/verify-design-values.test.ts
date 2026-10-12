@@ -34,13 +34,13 @@ describe('ビルド後CSSの設計照合', () => {
   it('数の帯はビルド済みのV8指定で照合し、旧カードや狭い幅の別状態を混ぜない', () => {
     const css = [
       '.kpi-card_card__A1{box-shadow:var(--card-shadow)}',
-      '[data-theme=v8] .kpi-card_strip__B2[data-kpi-presentation=band] .kpi-card_card__A1{box-shadow:none}',
-      '[data-theme=v8] .kpi-card_strip__B2[data-kpi-presentation=band]>:not(:last-child){border-right:1px solid var(--tpl-band-line)}',
-      '@container (max-width:500px){[data-theme=v8] .kpi-card_strip__B2[data-kpi-presentation=band]>:not(:last-child){border-right:0}}',
+      ':root .kpi-card_strip__B2[data-kpi-presentation=band] .kpi-card_card__A1{box-shadow:none}',
+      ':root .kpi-card_strip__B2[data-kpi-presentation=band]>:not(:last-child){border-right:1px solid var(--tpl-band-line)}',
+      '@container (max-width:500px){:root .kpi-card_strip__B2[data-kpi-presentation=band]>:not(:last-child){border-right:0}}',
     ].join('')
-    expect(builtRuleBody(css, 'kpi-card', 'card', "[data-theme='v8'] .strip[data-kpi-presentation='band'] .card")).toBe('box-shadow:none')
-    expect(builtRuleBody(css, 'kpi-card', 'strip', '[data-theme=v8] .strip[data-kpi-presentation=band] > *:not(:last-child)')).toBe('border-right:1px solid var(--tpl-band-line)')
-    expect(builtRuleBody(css, 'kpi-card', 'card', '[data-theme=v8] .strip[data-kpi-presentation=cards] .card')).toBe('')
+    expect(builtRuleBody(css, 'kpi-card', 'card', ":root .strip[data-kpi-presentation='band'] .card")).toBe('box-shadow:none')
+    expect(builtRuleBody(css, 'kpi-card', 'strip', ':root .strip[data-kpi-presentation=band] > *:not(:last-child)')).toBe('border-right:1px solid var(--tpl-band-line)')
+    expect(builtRuleBody(css, 'kpi-card', 'card', ':root .strip[data-kpi-presentation=cards] .card')).toBe('')
   })
 })
 
@@ -87,14 +87,14 @@ describe('固定HTMLとV8の選択状態の照合', () => {
   })
 
   it('選択中の合成クラスを読み、hover・未選択・別テーマの色を混ぜない', () => {
-    const css = '.card{background:white}[data-theme="v8"] .checked{background:#e8f5ec}.checked:hover{background:black}[data-theme="v7"] .checked{background:blue}.parent .checked{background:red}'
+    const css = '.card{background:white}:root .checked{background:#e8f5ec}.checked:hover{background:black}[data-theme="v7"] .checked{background:blue}.parent .checked{background:red}'
     const body = frozenSelectorBody(css, '.card.checked')
     expect(body).toContain('background:#e8f5ec')
     expect(body).not.toMatch(/black|blue|red/)
   })
 
   it('ラジオの通常枠と選択枠を区別し、狭い幅の上書きを混ぜない', () => {
-    const css = '.input{outline:1px solid gray}[data-theme="v8"] .input:checked{outline:1.5px solid green}.input:focus-visible{outline:2px solid blue}@media(max-width:600px){.input:checked{outline:5px solid red}}'
+    const css = '.input{outline:1px solid gray}:root .input:checked{outline:1.5px solid green}.input:focus-visible{outline:2px solid blue}@media(max-width:600px){.input:checked{outline:5px solid red}}'
     expect(frozenSelectorBody(css, '.input:checked')).toContain('outline:1.5px solid green')
     expect(frozenSelectorBody(css, '.input')).not.toContain('solid green')
     expect(frozenSelectorBody(css, '.input:checked')).not.toMatch(/blue|red/)

@@ -378,6 +378,9 @@ export default function WebhooksSheetsV8() {
         {connStatus === 'expired' ? (
           <Notice tone="warn">Googleとの許可が切れています。同期は止まっています。{canManage ? '「再接続する」から許可をやり直してください。' : null}</Notice>
         ) : null}
+        {staleRunningRun ? (
+          <Notice tone="warn">前の同期が途中で止まったまま残っています。「今すぐ同期」で残った記録を回収して、もう一度同期できます。</Notice>
+        ) : null}
         {canManage ? (
           <div className={styles.buttonRow}>
             {connStatus === 'expired' ? (
@@ -532,7 +535,7 @@ export default function WebhooksSheetsV8() {
         <Dialog
           open={disconnectFor !== null}
           title="Google Sheets との接続を解除しますか？"
-          description="書き出しを止め、連携設定・同期の記録・Google側の許可を消します。シートの中身は残ります。元に戻せません。"
+          description={`「${disconnectFor?.label ?? ''}」の書き出しを止め、連携設定・同期の記録・Google側の許可を消します。シートの中身は残ります。元に戻せません。`}
           descriptionBand="danger"
           tone="destructive"
           confirmation

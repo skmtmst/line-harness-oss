@@ -13,9 +13,9 @@ import styles from './list.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 共通情報の「CSVで書き出す」（v7 の app/contents/vars/export-panel.tsx の写し）。
+ * ★V8 共通情報の「CSVで書き出す」。
  * 板 FM94M では頭の右に箱が1つだけ。進み具合・最近の書き出しは、頭の高さを
- * 変えないよう箱の下に浮かせて出す（中身と動きは v7 と同じ）。
+ * 変えないよう箱の下に浮かせて出す。
  *
  * 共通情報の監査付きCSV出力（N-192）。
  *

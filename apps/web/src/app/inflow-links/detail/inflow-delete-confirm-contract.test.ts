@@ -2,16 +2,16 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(import.meta.dirname, '../../../v8/inflow-links/detail.tsx'), 'utf8')
 describe('V6 流入リンクの削除確認 UIaM7', () => {
   it('ブラウザ標準の確認ではなく画面内ダイアログを使う', () => {
     expect(PAGE).not.toMatch(/\b(?:window\.)?confirm\s*\(/)
-    expect(PAGE).toContain('data-design-node="UIaM7"')
-    expect(PAGE).toContain('role="dialog"')
+    expect(PAGE).toContain('designNode="UIaM7"')
+    expect(PAGE).toContain('<Dialog')
   })
 
   it('影響を示して停止・転送・削除の3つから選べる', () => {
-    expect(PAGE).toContain('「{route.name}」を削除しますか？')
+    expect(PAGE).toContain('「${route.name}」を削除しますか？')
     expect(PAGE).toContain('新しい人を受けるのをやめる（おすすめ）')
     expect(PAGE).toContain('別の流入リンクへ送るようにする')
     expect(PAGE).toContain('このまま削除する')

@@ -38,12 +38,11 @@ describe('③ 「…」のメニューの開き方', () => {
       .flatMap((r) => r.selector.split(','))
       .map((s) => s.trim())
       .filter((s) => s.includes('[data-design-part="action-menu"]'))
-    expect(menuSelectors.length).toBeGreaterThan(0) // v7 の動きは残す
-    for (const selector of menuSelectors) expect(selector).toMatch(/^:root:not\(\[data-theme="v8"\]\) /)
+    expect(menuSelectors).toEqual([])
   })
 
   it('V8 は押した角から 120ms・0.96→1 で開く（提案 F）', () => {
-    expect(menuCss).toMatch(/\[data-theme='v8'\] \.menu \{\s*animation:\s*action-menu-v8-enter var\(--motion-fast\) var\(--motion-ease-out\);\s*transform-origin:\s*top right;/)
+    expect(menuCss).toMatch(/:root \.menu \{\s*animation:\s*action-menu-v8-enter var\(--motion-fast\) var\(--motion-ease-out\);\s*transform-origin:\s*top right;/)
     expect(menuCss).toMatch(/@keyframes action-menu-v8-enter \{\s*from \{\s*opacity:\s*0;\s*transform:\s*scale\(0\.96\);/)
     expect(menuCss).toMatch(/\[data-placement='up'\] > \.menu \{\s*transform-origin:\s*bottom right;/)
     expect(menuCss).toMatch(/\[data-align='start'\] > \.menu \{\s*transform-origin:\s*top left;/)
@@ -64,19 +63,20 @@ describe('③ 「…」のメニューの開き方', () => {
     anchor.remove()
   })
 
-  it('旧アニメーションの選択子は実 DOM で v7 だけに一致する', () => {
+  it('テーマの印が無いDOMでも現役のメニュー規定が当たり、旧い動きは当たらない', () => {
     const selectors = rules(globals)
       .filter((rule) => /animation:\s*lh-surface-in/.test(rule.body))
       .flatMap((rule) => rule.selector.split(','))
       .filter((selector) => selector.includes('action-menu'))
-    // happy-dom は祖先の属性変更後も選択子の判定をキャッシュするので文書を分ける。
-    for (const theme of ['v7', 'v8']) {
+    for (const theme of [null, 'v7', 'v8']) {
       const fixture = document.implementation.createHTMLDocument()
-      fixture.documentElement.dataset.theme = theme
+      if (theme) fixture.documentElement.dataset.theme = theme
       const menu = fixture.createElement('div')
       menu.dataset.designPart = 'action-menu'
+      menu.className = 'menu'
       fixture.body.appendChild(menu)
-      expect(selectors.some((selector) => menu.matches(selector))).toBe(theme === 'v7')
+      expect(selectors.some((selector) => menu.matches(selector))).toBe(false)
+      expect(menu.matches(':root .menu')).toBe(true)
     }
   })
 })

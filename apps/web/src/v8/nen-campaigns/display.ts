@@ -1,10 +1,7 @@
 /*
  * NEN配信 V8 の表示の言葉と日付。
  *
- * src/v8 からは @/app を import できない（v8-boundary.test.ts）。今の画面
- * （app/nen-campaigns/campaign-display.ts・nen-period.ts・nen-overview.tsx・
- * columns/new/column-form.ts）と同じ決めごとを、ここへ写して持つ。
- * 今の画面の決めごとを変えたら、ここも同じに直す（V8 に切り替えるまでの二重管理）。
+ * 現役の一覧・編集の表示を共用する。日時の入力と保存は column-form.ts を使う。
  */
 import type { NenCampaignSetting } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'

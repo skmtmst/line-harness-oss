@@ -19,11 +19,11 @@ import { fireEvent } from '@testing-library/react'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..')
-const NEN_OVERVIEW = readFileSync(join(HERE, 'nen-campaigns', 'nen-overview.tsx'), 'utf8')
+const NEN_OVERVIEW = readFileSync(join(HERE, '..', 'v8', 'nen-campaigns', 'list.tsx'), 'utf8')
 // ★V8：入口（settings/page.tsx）は src/v8/settings/features の画面を出す。読み先をその画面へ向ける。
 const SETTINGS_PAGE_SRC = readFileSync(join(HERE, '..', 'v8', 'settings', 'features', 'screen.tsx'), 'utf8')
 const SETTINGS_CSS = readFileSync(join(HERE, '..', 'v8', 'settings', 'features', 'screen.module.css'), 'utf8')
-const BOOKING_MENUS_SRC = readFileSync(join(HERE, 'booking', 'menus', 'page.tsx'), 'utf8')
+const BOOKING_MENUS_SRC = readFileSync(join(HERE, '..', 'v8', 'booking-menus', 'tabs', 'menus-tab.tsx'), 'utf8')
 const SCROLLABLE_TABS_SRC = readFileSync(join(SRC, 'components', 'layout', 'scrollable-tabs.tsx'), 'utf8')
 const DATA_TABLE_CSS = readFileSync(join(SRC, 'components', 'shared', 'data-table.module.css'), 'utf8')
 
@@ -127,9 +127,10 @@ describe('21: 表は外枠で切り落とさず横スクロールで届く', () 
     expect(actionHeader?.className ?? '').toContain('sticky')
   })
 
-  it('nen-overviewの3表すべてに操作列stickyがある', () => {
-    expect(NEN_OVERVIEW.match(/sticky right-0 bg-surface-pearl/g)?.length).toBeGreaterThanOrEqual(3)
-    expect(NEN_OVERVIEW.match(/sticky right-0 bg-canvas/g)?.length).toBeGreaterThanOrEqual(3)
+  it('NENの現役3表の操作を共通の行末へ残す', () => {
+    expect(NEN_OVERVIEW.match(/<Th className=\{styles.colMenu\}/g)).toHaveLength(3)
+    expect(NEN_OVERVIEW.match(/<Td className=\{styles.colMenu\}/g)).toHaveLength(3)
+    expect(NEN_OVERVIEW).toContain('<SharedRowMenu')
   })
 })
 
@@ -189,13 +190,14 @@ describe('16: 6タブ行は続きの手がかりと送りを持つ', () => {
   })
 })
 
-describe('28: 予約メニューの操作列は右端へ留まる', () => {
-  it('表は横スクロール容器＋操作列sticky（ページ全体ではない最小単位）', () => {
-    // 横スクロールは共通 DataTable の外枠（CSS）が持つ。ページ側は DataTable と sticky を保つ。
-    expect(DATA_TABLE_CSS).toContain('overflow-x: auto')
-    expect(BOOKING_MENUS_SRC).toContain('<DataTable')
-    expect(BOOKING_MENUS_SRC).toContain('sticky right-0')
-    expect(BOOKING_MENUS_SRC).toContain('中身を見る')
-    expect(BOOKING_MENUS_SRC).toContain("label: m.is_active ? '止める' : '再開'")
+describe('28: V8予約メニューは狭い板でも操作を残す', () => {
+  it('名前の列を縮め、狭い板は担当と件数を畳む', () => {
+    const css = readFileSync(join(HERE, '..', 'v8', 'booking-menus', 'settings.module.css'), 'utf8')
+    expect(css).toMatch(/\.colName\s*\{[^}]*flex: 1 1 0;[^}]*min-width: 0;/)
+    expect(css).toMatch(/@container \(max-width: 1080px\)/)
+    expect(css).toMatch(/\.colStaff,\s*\.colCount\s*\{\s*display: none;/)
+    expect(BOOKING_MENUS_SRC).toContain('<RowMenu')
+    expect(BOOKING_MENUS_SRC).toContain('openMenuForm(menu)')
+    expect(BOOKING_MENUS_SRC).toContain("? '止める' : '出す'")
   })
 })

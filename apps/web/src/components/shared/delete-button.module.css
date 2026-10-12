@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 削除ボタン（Pencil ★V8 `prbOC`／`zopvP`）。
@@ -32,11 +32,6 @@
   cursor: pointer;
 }
 
-.tile:hover:not(:disabled) {
-  background: var(--color-canvas-sunken);
-  color: var(--color-status-danger);
-}
-
 .tile:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
@@ -48,12 +43,12 @@
 }
 
 /* ★V8（夕17・prbOC）：地は灰色 #f5f5f7（shell）・枠なし。 */
-[data-theme='v8'] .tile {
+:root .tile {
   border: 0;
   background: var(--color-shell);
 }
 
-[data-theme='v8'] .tile:hover:not(:disabled) {
+:root .tile:hover:not(:disabled) {
   background: var(--color-shell-gray);
   color: var(--color-status-danger);
 }
@@ -79,13 +74,7 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
   cursor: pointer;
-}
-
-.yes {
-  color: var(--color-status-danger);
 }
 
 .yes:hover {
@@ -110,8 +99,6 @@
  * 「動きを減らす」設定では globals の規定で一瞬になる。
  */
 .root[data-open] .tile {
-  opacity: 0;
-  transform: scale(0.9);
   pointer-events: none;
 }
 
@@ -129,17 +116,17 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .root { gap: 0; border-radius: var(--radius-panel); background: var(--color-shell); }
-[data-theme='v8'] .tile { flex: none; border-radius: var(--radius-panel); box-shadow: var(--shadow-board); }
-[data-theme='v8'] .tile > svg { width: 20px; height: 20px; }
-[data-theme='v8'] .root[data-open] .tile { opacity: 1; transform: none; box-shadow: none; border-radius: 16px 0 0 16px; }
-[data-theme='v8'] .root[data-open] .confirm { position: relative; width: 84px; padding: 0; justify-content: center; border: 0; border-radius: 0 16px 16px 0; background: var(--color-shell-gray); }
-[data-theme='v8'] .confirm button { flex: none; background: var(--color-canvas); box-shadow: var(--shadow-board); }
-[data-theme='v8'] .confirm button svg { width: 14px; height: 14px; }
-[data-theme='v8'] .yes { color: var(--color-danger); }
-[data-theme='v8'] .tile { gap: 0; }
-[data-theme='v8'] .root[data-open] { overflow: hidden; }
-[data-theme='v8'] .root[data-open] .tile { background: transparent; border-radius: 0; }
-[data-theme='v8'] .root[data-open] .confirm { border-radius: 0; }
-[data-theme='v8'] .confirm button { min-height: 0; gap: 0; border-radius: var(--polish-radius-control); }
+:root .root { gap: 0; border-radius: var(--radius-panel); background: var(--color-shell); }
+:root .tile { flex: none; border-radius: var(--radius-panel); box-shadow: var(--shadow-board); }
+:root .tile > svg { width: 20px; height: 20px; }
+:root .root[data-open] .tile { opacity: 1; transform: none; box-shadow: none; border-radius: 16px 0 0 16px; }
+:root .root[data-open] .confirm { position: relative; width: 84px; padding: 0; justify-content: center; border: 0; border-radius: 0 16px 16px 0; background: var(--color-shell-gray); }
+:root .confirm button { flex: none; background: var(--color-canvas); box-shadow: var(--shadow-board); }
+:root .confirm button svg { width: 14px; height: 14px; }
+:root .yes { color: var(--color-danger); }
+:root .tile { gap: 0; }
+:root .root[data-open] { overflow: hidden; }
+:root .root[data-open] .tile { background: transparent; border-radius: 0; }
+:root .root[data-open] .confirm { border-radius: 0; }
+:root .confirm button { min-height: 0; gap: 0; border-radius: var(--polish-radius-control); }
 }

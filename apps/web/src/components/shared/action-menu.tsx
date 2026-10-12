@@ -192,7 +192,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
               {item.sectionBefore}
             </p>
           ) : null}
-          <Item href={Item === 'a' && item.href ? navigationHref(item.href) : undefined}
+          {item.content ? <div className={styles.item}>{item.content}</div> : <Item href={Item === 'a' && item.href ? navigationHref(item.href) : undefined}
             target={Item === 'a' &&item.external ? '_blank' : undefined}
             rel={Item === 'a' && item.external ? 'noopener noreferrer' : undefined}
             type="button"
@@ -223,7 +223,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
             {Item === 'a' &&item.external ? (
               <ArrowUpRight size={14} aria-hidden="true" className={styles.externalIcon} />
             ) : null}
-          </Item>
+          </Item>}
         </div>
       )})}
       {note ? <p className={styles.note}>{note}</p> : null}

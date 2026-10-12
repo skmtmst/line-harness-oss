@@ -5,10 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsAuditPage from './page'
 import type { OpsAuditRow } from '@/lib/api'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-/** ★V6 37-8 監査ログ。監査 R158（日付範囲のはみ出し）と R159（CSVの範囲）を守る。 */
+/** 現役V8の日時の欄と、監査R159（CSVの全件）を守る。 */
 
 const row = (index: number): OpsAuditRow => ({
   id: `log-${index}`,
@@ -59,16 +61,15 @@ async function flush() {
 }
 
 describe('日付範囲の折返し（R158）', () => {
-  it('開始・終了の欄は狭い画面で2段になる形（折返し＋幅追従）', async () => {
+  it('開始・終了の欄はV8の折返す道具の段で幅を守る', async () => {
     await act(async () => { root.render(<OpsAuditPage />) })
     await flush()
     const from = document.querySelector('button[aria-label="開始日"]')!
-    // DateField の器（1段上）→ 欄の包み（w-full sm:w-52）→ 日付範囲の行（flex-wrap）
-    const fieldWrap = from.closest('div')!.parentElement!
-    const group = fieldWrap.parentElement!
-    expect(fieldWrap.className).toContain('w-full')
-    expect(fieldWrap.className).toContain('sm:w-52')
-    expect(group.className).toContain('flex-wrap')
+    expect(from).not.toBeNull()
+    expect(document.querySelector('button[aria-label="終了日"]')).not.toBeNull()
+    const css = readFileSync(join(process.cwd(), 'src/v8/ops/audit.module.css'), 'utf8')
+    expect(css).toMatch(/\.tools\s*\{[^}]*flex-wrap: wrap;/)
+    expect(css).toMatch(/\.date :global\(\*\)\s*\{[^}]*max-width: 100%;/)
   })
 })
 
@@ -85,7 +86,7 @@ describe('CSVで書き出す（R159）', () => {
     await act(async () => { root.render(<OpsAuditPage />) })
     await flush()
     // 範囲が画面に出る（一覧の件数の1か所。見出しの横では繰り返さない m22d）
-    expect(host.textContent).toContain('120件中 1〜50件を表示')
+    expect(host.querySelector('[title="120件中 1〜50件を表示"]')).not.toBeNull()
     expect(host.textContent).not.toContain('いまの条件の全')
 
     const csvButton = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.includes('CSVで書き出す'))!
@@ -99,7 +100,7 @@ describe('CSVで書き出す（R159）', () => {
     const text = await blob.text()
     // 見出し 1 行 + 全 120 行
     expect(text.trim().split('\n').length).toBe(121)
-    expect(anchorClicks[0]).toMatch(/^musubo-audit-\d{4}-\d{2}-\d{2}\.csv$/)
+    expect(anchorClicks[0]).toMatch(/^運営の操作履歴_\d{4}-\d{2}-\d{2}\.csv$/)
     expect(host.textContent).toContain('いまの条件の 120 件を書き出しました')
   })
 })

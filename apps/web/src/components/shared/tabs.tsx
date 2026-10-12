@@ -85,8 +85,8 @@ export function Tabs({
 
   /*
    * ★V8 仕上げ（M10）：選ばれている下線が滑って移る（120ms）。
-   * V8 のときだけ、今のタブの下に動く印を置く。測れないとき
-   * （v7・サーバ描画・タブ無し）は今までどおり枠線の下線が出る。
+   * 今のタブの下に動く印を置く。折り返すタブやサーバ描画・タブ無しでは
+   * 枠線の下線が出る。
    */
   const itemsRef = useRef<HTMLSpanElement>(null)
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null)
@@ -94,7 +94,7 @@ export function Tabs({
   const itemWidthsKey = JSON.stringify(items.map(({ label, count, countTone, errorCount }) => [label, count, countTone, errorCount]))
   useLayoutEffect(() => {
     const measure = () => {
-      if (wrap || typeof document === 'undefined' || document.documentElement?.dataset?.theme !== 'v8') {
+      if (wrap || typeof document === 'undefined') {
         setIndicator(null)
         return
       }

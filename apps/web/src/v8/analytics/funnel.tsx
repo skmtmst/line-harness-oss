@@ -274,7 +274,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
 
   /** 選んだ段の対象者を24時間の対象者として作り、その先（友だち一覧・配信）へ進む。 */
   const openAudience = async (to: 'friends' | 'broadcast') => {
-    if (!run?.runId || shownPick === null || !result?.[shownPick] || !activeGroup || selectedFunnel?.status !== 'active') return
+    if (!measurable || !run?.runId || shownPick === null || !result?.[shownPick] || !activeGroup || selectedFunnel?.status !== 'active') return
     const generation = viewGeneration.current
     setRunError(''); setAudienceBusy(true)
     try {
@@ -427,7 +427,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       open={statusTarget !== null}
       title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除しますか？` : 'ファネルを再開しますか'}
       description={statusTarget?.to === 'stopped' ? `「${statusTarget.funnel.name}」の再集計と対象者づくりを止めます。過去の結果は残り、あとから再開できます。`
-        : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。過去の結果は残ります。`
+        : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。あとから戻せません。過去の結果は残ります。`
         : statusTarget ? `「${statusTarget.funnel.name}」を再開します。再集計と対象者づくりがまた使えます。` : ''}
       confirmLabel={statusTarget?.to === 'stopped' ? '停止する' : statusTarget?.to === 'archived' ? '削除する' : '再開する'}
       destructive={statusTarget?.to === 'archived'}

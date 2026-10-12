@@ -28,7 +28,7 @@ describe('一覧の型：板が狭いときに畳む左の列（folderNav）', (
     expect(collapsed.contains(trigger)).toBe(true)
     expect(trigger.textContent).toContain('フォルダ：すべて')
     fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('button', { name: 'フォルダ：春の案内' }))
+    fireEvent.click(screen.getByRole('button', { name: '春の案内' }))
     expect(onSelect).toHaveBeenCalledWith('f1')
   })
 

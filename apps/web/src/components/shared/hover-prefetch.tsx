@@ -5,10 +5,6 @@ import { useEffect, useRef } from 'react'
 
 const INTENT_MS = 120 // 乗せた速さ（--motion-fast）に合わせ、少し置いてから読む
 
-function isV8(): boolean {
-  return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'v8'
-}
-
 /**
  * ① 左メニュー・一覧のリンクの先読み（V8「サクサク感」F）。
  * どの画面にも置かず、ここを外枠に1つ置くだけで、同じタブ内の
@@ -54,7 +50,6 @@ export default function HoverPrefetch() {
     }
 
     const onOver = (event: MouseEvent) => {
-      if (!isV8()) return
       const anchor = closestAnchor(event.target)
       if (!anchor || anchor === target) return
       window.clearTimeout(timer)

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -20,9 +21,11 @@ const fixture = vi.hoisted(() => ({
 const emptyList = () => Promise.resolve({ success: true, data: [] })
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
+  useAccount: () => ({ selectedAccountId: fixture.accountId, accounts: [{ id: 'account-a', name: 'A' }, { id: 'account-b', name: 'B' }], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 
 /*
  * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
@@ -42,6 +45,7 @@ vi.mock('@/components/shared/select', () => ({
 }))
 vi.mock('@/lib/api', () => ({
   api: {
+    folders: { list: emptyList },
     broadcastMessageAssets: {
       create: (input: { lineAccountId: string; kind: string; name: string; payload: Record<string, unknown> }) => {
         fixture.createCalls.push(input)
@@ -62,7 +66,11 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: TemplateAssetEditor } = await import('./template-asset-editor')
+const { default: TemplateRichEditor } = await import('@/v8/template-edit/rich')
+const { default: TemplateAssetEditorV8 } = await import('@/v8/template-edit/asset')
+function TemplateAssetEditor({ kind }: { kind: 'rich_message' | 'coupon' | 'research' }) {
+  return kind === 'rich_message' ? <TemplateRichEditor /> : <TemplateAssetEditorV8 kind={kind} />
+}
 
 let host: HTMLDivElement
 let root: Root
@@ -150,21 +158,14 @@ async function setDateTime(label: string, iso: string) {
     await settle()
   })
   const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
-    hourSelect.value = hour
-    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
-    minuteSelect.value = minute
-    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    await settle()
-  })
+  await setTimeControl(reopened.querySelector('input[role="combobox"]'), `${hour}:${minute}`)
   await act(async () => {
     const close = Array.from(reopened.querySelectorAll('button')).find((b) => b.textContent?.trim() === '閉じる')!
     close.click()
     await settle()
   })
 }
+import { setTimeControl } from '@/test-utils/time-control'
 
 function selectByLabel(label: string): HTMLSelectElement {
   const el = document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)
@@ -180,7 +181,7 @@ async function nameAndSave() {
     await settle()
   })
   await act(async () => {
-    buttonByText('テンプレートを保存する').click()
+    buttonByText('下書きを保存').click()
     await settle()
   })
 }
@@ -202,219 +203,141 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
+
 describe('NEXT-17: クーポンの設定が保存値へ入る', () => {
   it('回数・公開対象・期間・抽選なしを選ぶと、その値だけが保存される', async () => {
     await renderEditor('coupon')
-
     await setDateTime('使える期間の開始', '2026-10-01T09:00')
     await setDateTime('使える期間の終了', '2026-10-31T23:59')
     await act(async () => {
-      setSelectValue(selectByLabel('使える回数'), 'unlimited')
-      setSelectValue(selectByLabel('だれに見えるか'), 'link')
-      setSelectValue(selectByLabel('抽選にする'), 'off')
-      await settle()
+      fireEvent.click(screen.getByRole('button', { name: '期間中なら何回でも' }))
+      fireEvent.click(screen.getByRole('button', { name: 'リンクを知っている人' }))
     })
-
-    // 抽選なしでは確率・当選上限の入力欄自体が出ない（有効な設定に見せない）。
-    expect(document.querySelector('input[aria-label="当たる確率"]')).toBeNull()
-    expect(document.querySelector('input[aria-label="当選人数の上限"]')).toBeNull()
-
+    expect(screen.queryByRole('spinbutton', { name: /当たる確率/ })).toBeNull()
+    expect(screen.queryByRole('spinbutton', { name: /当選人数/ })).toBeNull()
     await nameAndSave()
     expect(fixture.createCalls).toHaveLength(1)
     const payload = fixture.createCalls[0].payload
-    expect(payload).toMatchObject({
-      startsAt: '2026-10-01T09:00',
-      endsAt: '2026-10-31T23:59',
-      oncePerFriend: false,
-      visibility: 'link',
-      lottery: false,
-    })
+    expect(payload).toMatchObject({ startsAt: '2026-10-01T09:00', endsAt: '2026-10-31T23:59', oncePerFriend: false, visibility: 'link', lottery: false })
     expect(payload).not.toHaveProperty('lotteryRate')
     expect(payload).not.toHaveProperty('winnerLimit')
   })
-
   it('抽選ありでは確率・当選上限の入力値がそのまま保存される', async () => {
     await renderEditor('coupon')
-    await act(async () => {
-      setSelectValue(selectByLabel('抽選にする'), 'on')
-      await settle()
-    })
+    await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: '抽選する' })) })
     await setDateTime('使える期間の開始', '2026-10-01T09:00')
     await setDateTime('使える期間の終了', '2026-11-30T23:59')
     await act(async () => {
-      setInputValue(input('input[aria-label="当たる確率"]'), '35')
-      setInputValue(input('input[aria-label="当選人数の上限"]'), '120')
-      await settle()
+      fireEvent.change(screen.getByRole('spinbutton', { name: /当たる確率/ }), { target: { value: '35' } })
+      fireEvent.change(screen.getByRole('spinbutton', { name: /当選人数の上限/ }), { target: { value: '120' } })
     })
     await nameAndSave()
-    expect(fixture.createCalls[0].payload).toMatchObject({
-      lottery: true,
-      lotteryRate: 35,
-      winnerLimit: 120,
-      oncePerFriend: true,
-      visibility: 'friends',
-    })
+    expect(fixture.createCalls[0].payload).toMatchObject({ lottery: true, lotteryRate: 35, winnerLimit: 120, oncePerFriend: true, visibility: 'friends' })
   })
-
   it('期間が未入力だと保存せず理由を出す', async () => {
     await renderEditor('coupon')
     await nameAndSave()
     expect(fixture.createCalls).toHaveLength(0)
-    expect(host.textContent).toContain('使える期間の開始と終了を入力してください')
+    expect(host.textContent).toContain('開始を入力してください')
+    expect(host.textContent).toContain('終了を入力してください')
   })
 })
 
+const areaList = () => screen.getByRole('list', { name: '面の一覧' })
+const chooseShape = async (name: RegExp) => { await act(async () => { fireEvent.click(screen.getByRole('radio', { name })) }) }
+const chooseArea = async (letter: string) => { await act(async () => { fireEvent.click(screen.getByLabelText(new RegExp('^面 ' + letter + '「'))) }) }
+
 describe('NEXT-18: リッチメッセージの面数と保存値が一致する', () => {
-  it('6面を選ぶと6面分の設定欄が出て、tapAreas も6件になる', async () => {
+  it('6面を選ぶと6面分の設定を選べて、tapAreasも6件になる', async () => {
     await renderEditor('rich_message')
+    await chooseShape(/^6面/)
+    expect(within(areaList()).getAllByRole('button')).toHaveLength(6)
+    expect(within(areaList()).getAllByText('未設定')).toHaveLength(6)
+    await chooseArea('A')
     await act(async () => {
-      buttonContaining('6面').click()
-      await settle()
-    })
-
-    const areaSelects = [...document.querySelectorAll<HTMLSelectElement>('select[aria-label^="面 "]')]
-    expect(areaSelects).toHaveLength(6)
-    // 未設定の面は警告に数える（A〜F全部）。
-    expect(host.textContent).toContain('面 A・面 B・面 C・面 D・面 E・面 Fのアクションが未設定です')
-
-    // 面 A を「URLを開く」にして URL を入れる。
-    await act(async () => {
-      setSelectValue(areaSelects[0], 'uri')
-      await settle()
+      setSelectValue(selectByLabel('面 A を押したら'), 'uri')
     })
     await act(async () => {
-      setInputValue(input('input[aria-label="面 A のURL"]'), 'https://example.com/campaign')
-      setInputValue(input('input[placeholder="画像URL"]'), 'https://cdn.example.test/rich.png')
-      await settle()
+      fireEvent.change(screen.getByLabelText('面 A のURL'), { target: { value: 'https://example.com/campaign' } })
+      fireEvent.change(screen.getByLabelText('画像のURL'), { target: { value: 'https://cdn.example.test/rich.png' } })
     })
-
     await nameAndSave()
+    expect(fixture.createCalls).toHaveLength(1)
     const payload = fixture.createCalls[0].payload
     expect(payload.shape).toBe('6')
     const tapAreas = payload.tapAreas as Array<Record<string, unknown>>
-    expect(tapAreas.map((area) => area.label)).toEqual(['A', 'B', 'C', 'D', 'E', 'F'])
-    // 座標が面ごとに明示されている（合計で画像全体を覆う）。
+    expect(tapAreas.map(area => area.label)).toEqual(['A', 'B', 'C', 'D', 'E', 'F'])
     expect(tapAreas[0]).toMatchObject({ actionType: 'uri', uri: 'https://example.com/campaign' })
     expect(tapAreas[5]).toMatchObject({ actionType: 'none' })
-    for (const area of tapAreas) {
-      expect(typeof area.x).toBe('number')
-      expect(typeof area.width).toBe('number')
-    }
+    for (const area of tapAreas) { expect(typeof area.x).toBe('number'); expect(typeof area.width).toBe('number') }
   })
-
   it('設定済みの面を消す形へ変えるときは確認し、承認すると設定が消える', async () => {
     await renderEditor('rich_message')
-    // 初期は 3面（A・B・C）。面 C に設定を入れる。
-    await act(async () => {
-      setSelectValue(selectByLabel('面 C の動き'), 'uri')
-      await settle()
-    })
-    await act(async () => {
-      setInputValue(input('input[aria-label="面 C のURL"]'), 'https://example.com/c')
-      await settle()
-    })
-
-    // 左右2面（A・B）へ変えると面 C が消えるので、確認が出る。
-    await act(async () => {
-      buttonContaining('左右2面').click()
-      await settle()
-    })
-    // destructive な確認窓は role="alertdialog" で出る（共通 Dialog の作り）。
-    const dialog = document.body.querySelector('[role="alertdialog"], [role="dialog"]')
-    expect(dialog?.textContent).toContain('面 C')
-    // まだ形状は変わっていない（設定欄が6つ→ではなく3つのまま）。
-    expect(document.querySelectorAll('select[aria-label^="面 "]')).toHaveLength(3)
-
-    await act(async () => {
-      buttonByText('面の数を変える', dialog as HTMLElement).click()
-      await settle()
-    })
-    expect(document.querySelectorAll('select[aria-label^="面 "]')).toHaveLength(2)
-    expect(document.querySelector('input[aria-label="面 C のURL"]')).toBeNull()
-
-    await act(async () => {
-      setInputValue(input('input[placeholder="画像URL"]'), 'https://cdn.example.test/rich.png')
-      await settle()
-    })
+    await chooseArea('C')
+    await act(async () => { setSelectValue(selectByLabel('面 C を押したら'), 'uri') })
+    await act(async () => { fireEvent.change(screen.getByLabelText('面 C のURL'), { target: { value: 'https://example.com/c' } }) })
+    await chooseShape(/^左右2面/)
+    const dialog = document.body.querySelector<HTMLElement>('[role="alertdialog"], [role="dialog"]')!
+    expect(dialog.textContent).toContain('C')
+    expect(within(areaList()).getAllByRole('button')).toHaveLength(3)
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '変える' })); await settle() })
+    expect(within(areaList()).getAllByRole('button')).toHaveLength(2)
+    expect(screen.queryByLabelText('面 C のURL')).toBeNull()
+    await act(async () => { fireEvent.change(screen.getByLabelText('画像のURL'), { target: { value: 'https://cdn.example.test/rich.png' } }) })
     await nameAndSave()
     const tapAreas = fixture.createCalls[0].payload.tapAreas as Array<Record<string, unknown>>
-    expect(tapAreas.map((area) => area.label)).toEqual(['A', 'B'])
+    expect(tapAreas.map(area => area.label)).toEqual(['A', 'B'])
   })
 })
 
+const questionSection = (number: number) => host.querySelector<HTMLElement>('section[aria-label="問 ' + number + '"]')!
 describe('NEXT-19: リサーチの質問が保存値へ入る', () => {
   it('質問の追加・本文・形式・必須・選択肢が保存され、順序も保つ', async () => {
     await renderEditor('research')
-    // 初期は1問。追加すると2問目が選ばれた状態になる。
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '質問を足す' })) })
+    expect(host.querySelectorAll('section[aria-label^="問 "]')).toHaveLength(2)
     await act(async () => {
-      buttonByText('質問を追加する（あと9問）').click()
-      await settle()
-    })
-    expect(host.textContent).toContain('2 / 10 問')
-
-    // 2問目（選択中）を「いくつでも選ぶ・任意」にし、選択肢を入れる。
-    await act(async () => {
-      setInputValue(document.querySelector<HTMLTextAreaElement>('textarea[aria-label="質問文"]')!, 'よく使っている商品を教えてください')
-      setSelectValue(selectByLabel('答え方'), 'multiple')
-      await settle()
-    })
-    const requiredCheckbox = input('input[aria-label="必ず答えてもらう"]')
-    await act(async () => {
-      requiredCheckbox.click()
-      await settle()
-    })
-    const choices = [...document.querySelectorAll<HTMLInputElement>('input[placeholder^="選択肢"]')]
-    await act(async () => {
-      setInputValue(choices[0], 'フード')
-      setInputValue(choices[1], 'おやつ')
-      await settle()
-    })
-
-    // 1問目を選んで本文を入れる。
-    await act(async () => {
-      buttonByText('1　1つだけ選ぶ　（未入力）').click()
-      await settle()
+      fireEvent.change(within(questionSection(2)).getByRole('textbox', { name: /質問文/ }), { target: { value: 'よく使っている商品を教えてください' } })
+      setSelectValue(selectByLabel('問 2 の答え方'), 'multiple')
+      fireEvent.click(screen.getByRole('checkbox', { name: '問 2 を必ず答えてもらう' }))
     })
     await act(async () => {
-      setInputValue(document.querySelector<HTMLTextAreaElement>('textarea[aria-label="質問文"]')!, '来月も定期便を続けたいと思いますか？')
-      await settle()
+      fireEvent.change(screen.getByLabelText('問 2 の選択肢 1'), { target: { value: 'フード' } })
+      fireEvent.change(screen.getByLabelText('問 2 の選択肢 2'), { target: { value: 'おやつ' } })
+      fireEvent.change(within(questionSection(1)).getByRole('textbox', { name: /質問文/ }), { target: { value: '来月も定期便を続けたいと思いますか？' } })
+      fireEvent.change(screen.getByLabelText('問 1 の選択肢 1'), { target: { value: '続けたい' } })
+      fireEvent.change(screen.getByLabelText('問 1 の選択肢 2'), { target: { value: '止めたい' } })
     })
-    const firstChoices = [...document.querySelectorAll<HTMLInputElement>('input[placeholder^="選択肢"]')]
-    await act(async () => {
-      setInputValue(firstChoices[0], '続けたい')
-      setInputValue(firstChoices[1], '止めたい')
-      await settle()
-    })
-
     await nameAndSave()
+    expect(fixture.createCalls).toHaveLength(1)
     const payload = fixture.createCalls[0].payload
     expect(payload.questionCount).toBe(2)
     expect(payload.questions).toEqual([
-      { text: '来月も定期便を続けたいと思いますか？', format: 'single', required: true, choices: ['続けたい', '止めたい'] },
-      { text: 'よく使っている商品を教えてください', format: 'multiple', required: false, choices: ['フード', 'おやつ'] },
+      { text: '来月も定期便を続けたいと思いますか？', format: 'single', required: true, choices: ['続けたい', '止めたい'], choiceTapExtras: [{}, {}] },
+      { text: 'よく使っている商品を教えてください', format: 'multiple', required: false, choices: ['フード', 'おやつ'], choiceTapExtras: [{}, {}] },
     ])
   })
-
   it('質問を消すと一覧・件数・保存値が揃う', async () => {
     await renderEditor('research')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '質問を足す' })) })
+    expect(host.querySelectorAll('section[aria-label^="問 "]')).toHaveLength(2)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '問 2 を消す' })) })
+    expect(host.querySelectorAll('section[aria-label^="問 "]')).toHaveLength(1)
     await act(async () => {
-      buttonByText('質問を追加する（あと9問）').click()
-      await settle()
+      fireEvent.change(within(questionSection(1)).getByRole('textbox', { name: /質問文/ }), { target: { value: '続けますか？' } })
+      fireEvent.change(screen.getByLabelText('問 1 の選択肢 1'), { target: { value: 'はい' } })
     })
-    expect(host.textContent).toContain('2 / 10 問')
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('button[aria-label="質問 2 を削除する"]')!.click()
-      await settle()
-    })
-    expect(host.textContent).toContain('1 / 10 問')
+    await nameAndSave()
+    expect(fixture.createCalls[0].payload.questionCount).toBe(1)
+    expect(fixture.createCalls[0].payload.questions).toHaveLength(1)
   })
 })
 
-describe('NEXT-24: 「自分に送って確かめる」は無反応にしない', () => {
-  it.each(['rich_message', 'coupon', 'research'] as const)('%s: 押せない形＋理由を出す', async (kind) => {
+describe('NEXT-24: 未対応の自分への送信を操作にしない', () => {
+  it.each(['rich_message', 'coupon', 'research'] as const)('%s: 操作を出さず理由を確認できる', async kind => {
     await renderEditor(kind)
-    const button = buttonByText('自分に送って確かめる')
-    expect(button.disabled).toBe(true)
-    expect(host.textContent).toContain('一斉配信に組み込むと、配信の画面からテスト送信できます')
+    expect(screen.queryByRole('button', { name: '自分に送って確かめる' })).toBeNull()
+    expect(screen.getByTitle(/一斉配信に組み込むと、配信の画面からテスト送信できます/)).toBeTruthy()
+    expect(fixture.createCalls).toEqual([])
   })
 })

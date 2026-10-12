@@ -1,6 +1,5 @@
 /*
- * ★V8 イベント予約の一覧で使う「目を向ける回」の決め方。src/v8 は src/app を import しない決まりなので、
- * src/app/events/event-attention.ts から写した（閾値・数え方は同じ。変えるときは両方を直す）。
+ * イベント一覧と申込者で使う、目を向ける回と残席の決め方。
  */
 import type { EventLifecycleStatus, EventListItem } from '@/lib/api'
 
@@ -126,4 +125,13 @@ export function isLowApplication(
   const parsed = item.next_slot_starts_at ? Date.parse(item.next_slot_starts_at) : NaN
   if (!Number.isFinite(parsed) || parsed > nowMs + 7 * DAY_MS) return false
   return item.total_active / item.total_capacity < 0.5
+}
+
+/** 残席と、次に声をかける目安。人数で数え、同行者を行数に戻さない。 */
+export function describeBookingCapacity(applied: number, capacity: number | null): string {
+  if (capacity === null || capacity <= 0) return '定員なし'
+  const remaining = Math.max(0, capacity - applied)
+  if (remaining === 0) return `定員 ${capacity} ・ 満席です`
+  if (remaining <= 3) return `あと${remaining}人で満席です。声をかけると埋まります`
+  return `定員 ${capacity} ・ 残り${remaining}`
 }

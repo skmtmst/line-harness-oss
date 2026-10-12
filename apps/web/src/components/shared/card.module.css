@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .card {
 
@@ -9,10 +9,8 @@
 }
 
 /* 枠を内側に引く段の箱。既定のカードの影・寸法は変えない。 */
-.inset { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
 
 .segment { border-radius: var(--radius-segment); }
-.paddingCompact { padding: 14px; }
 
 .vertical {
   display: flex;
@@ -24,22 +22,11 @@
   overflow: hidden;
 }
 
-.paddingDefault {
-  padding: 16px;
-}
-
-.paddingRoomy {
-  padding: 24px;
-}
-
 /*
  * 画面の絵での段の箱（d9xoI「段 基本」・T9gblG「箱 CSVで書き出す」・
  * JB8V1「推薦カード」）：内側の余白 20px。既定（16・18）の合格は
  * 変えない。変わり形として足す。
  */
-.paddingSpacious {
-  padding: 20px;
-}
 
 .card[data-card-surface='inset'], .card[data-card-surface='muted'] {
   border: 0; box-shadow: none;
@@ -58,7 +45,6 @@
   min-height: 48px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   padding: 0 16px;
 }
 
@@ -93,7 +79,6 @@
   flex: 0 0 auto;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  font-weight: 500;
 }
 
 /*
@@ -105,8 +90,6 @@
   flex-shrink: 0;
   align-items: center;
   color: var(--color-action);
-  font-size: var(--text-label);
-  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -120,7 +103,7 @@
 }
 
 /* V8 の段の箱（j8p3yj・r6dJFy）。指定された箱だけに効かせる。 */
-[data-theme='v8'] :is(.form, .aside, .panel) {
+:root :is(.form, .aside, .panel) {
   display: flex;
   flex-direction: column;
   border: 0;
@@ -128,38 +111,36 @@
   outline-offset: -1px;
   box-shadow: var(--card-shadow);
 }
-[data-theme='v8'] .form {
+:root .form {
   gap: var(--polish-space-field);
   padding: var(--tpl-cn-card-pad);
 }
-[data-theme='v8'] .aside {
+:root .aside {
   gap: var(--tpl-cn-side-card-gap);
   padding: var(--tpl-side-card-pad);
 }
-[data-theme='v8'] .panel {
+:root .panel {
   gap: var(--tpl-cn-panel-inner-gap);
   padding: var(--tpl-cn-panel-pad);
 }
-[data-theme='v8'] .card[data-appearance="outlined"] {  border-radius: var(--tpl-rt-card-radius);    min-width: 0;
+:root .card[data-appearance="outlined"] {  border-radius: var(--tpl-rt-card-radius);    min-width: 0;
   border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
 }
-[data-theme='v8'] .card[data-gap="normal"] { gap: var(--tpl-rt-section-gap); }
-[data-theme='v8'] .card[data-gap="tight"] { gap: var(--tpl-e49-section-gap); }
-[data-theme='v8'] .card[data-gap="loose"] { gap: var(--tpl-e1-sns-card-gap); }
+:root .card[data-gap="normal"] { gap: var(--tpl-rt-section-gap); }
+:root .card[data-gap="tight"] { gap: var(--tpl-e49-section-gap); }
+:root .card[data-gap="loose"] { gap: var(--tpl-e1-sns-card-gap); }
 /* 縦に積む小さな設定カード。指定したカードだけに適用。 */
-.gapTight { gap: 12px; }
 
 /* カード内の設定段。既定のカード頭には効かない。 */
-.inset { min-width: 0; border: 0; box-shadow: none; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 .headerStacked, .headerPanel { flex: 0 1 auto; min-width: 0; min-height: 0; align-items: flex-start; gap: var(--tpl-rs-panel-head-gap); padding: 0; }
 .headerStacked .titleGroup, .headerPanel .titleGroup { flex: 1 1 0; flex-direction: column; align-items: stretch; gap: var(--tpl-rs-panel-head-text-gap); }
-.headerStacked .title, .headerPanel .title { margin: 0; font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rs-lh-14); }
+.headerStacked .title, .headerPanel .title { margin: 0; line-height: var(--tpl-rs-lh-14); }
 .headerStacked .meta, .headerPanel .meta { color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; line-height: var(--tpl-rs-lh-11); }
 .headerPanel { padding: var(--tpl-rs-panel-head-pad); box-shadow: var(--tpl-rs-line-bottom); }
 
-[data-theme='v8'] .card[data-spacing='settings'] {
+:root .card[data-spacing='settings'] {
   display: flex; flex-direction: column; min-width: 0;
   gap: var(--tpl-rest3-ec-card-gap); padding: var(--tpl-rest3-ec-card-pad);
    border-radius: var(--tpl-rest3-ec-radius);
@@ -168,77 +149,77 @@
   background: var(--color-canvas);
 }
 /* 外部連携の設定・見本カードだけ（spacing='integration' | 'preview'）。既定のカードは変えない。 */
-[data-theme='v8'] .spacedInset {
+:root .spacedInset {
   display: flex; flex-direction: column;
   border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
 }
-[data-theme='v8'] .integration { gap: var(--tpl-rule-row-gap); padding: var(--tpl-cn-card-pad); }
-[data-theme='v8'] .preview { gap: var(--tpl-toolbar-gap); padding: var(--tpl-side-card-pad); }
+:root .integration { gap: var(--tpl-rule-row-gap); padding: var(--tpl-cn-card-pad); }
+:root .preview { gap: var(--tpl-toolbar-gap); padding: var(--tpl-side-card-pad); }
 
 /* NEN の設定フォーム。既定の面と余白は保つ。 */
-[data-theme='v8'] .inset { min-width: 0; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
-[data-theme='v8'] .bordered { min-width: 0;
+:root .inset { min-width: 0; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; box-shadow: none; }
+:root .bordered { min-width: 0;
   border: 1px solid var(--card-edge);
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
 }
-[data-theme='v8'] .spacingNormal { gap: var(--tpl-nm-card-gap); }
-[data-theme='v8'] .spacingRoomy { gap: var(--tpl-nc-card-gap-wide); }
+:root .spacingNormal { gap: var(--tpl-nm-card-gap); }
+:root .spacingRoomy { gap: var(--tpl-nc-card-gap-wide); }
 
-[data-theme='v8'] .paddingCompact { padding: var(--tpl-nc-side-pad); }
-[data-theme='v8'] .spacingTight { gap: var(--tpl-nc-field-gap); }
-[data-theme='v8'] .spacingControls { gap: var(--tpl-toolbar-gap); }
+:root .paddingCompact { padding: var(--tpl-nc-side-pad); }
+:root .spacingTight { gap: var(--tpl-nc-field-gap); }
+:root .spacingControls { gap: var(--tpl-toolbar-gap); }
 
 /* B-152・仕上げ1 */
-[data-theme='v8'] .paddingDefault, [data-theme='v8'] .paddingCompact { padding: var(--polish-space-card); }
-[data-theme='v8'] .paddingRoomy, [data-theme='v8'] .paddingSpacious { padding: var(--polish-space-section); }
-[data-theme='v8'] .header { padding-inline: var(--polish-space-card); gap: var(--polish-space-field); }
-[data-theme='v8'] .gapTight { gap: var(--polish-space-row); }
+:root .paddingDefault, :root .paddingCompact { padding: var(--polish-space-card); }
+:root .paddingRoomy, :root .paddingSpacious { padding: var(--polish-space-section); }
+:root .header { padding-inline: var(--polish-space-card); gap: var(--polish-space-field); }
+:root .gapTight { gap: var(--polish-space-row); }
 
 /* B-152・仕上げ2 */
-[data-theme='v8'] :is(.title, .headerStacked .title, .headerPanel .title) { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
-[data-theme='v8'] .meta { font-weight: var(--polish-weight-body); }
-[data-theme='v8'] .action { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }
+:root :is(.title, .headerStacked .title, .headerPanel .title) { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
+:root .meta { font-weight: var(--polish-weight-body); }
+:root .action { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }
 
 /* B-159：入れ子の面には影を重ねない。外のカードの内側だけをそろえる。 */
-[data-theme='v8'] .paddingCompact,
-[data-theme='v8'] .paddingDefault { padding: var(--tpl-card-pad); }
+:root .paddingCompact,
+:root .paddingDefault { padding: var(--tpl-card-pad); }
 
 /* B-180：中身の段の題は型や配置によらず15/700。 */
-[data-theme='v8'] .header .title,
-[data-theme='v8'] .headerStacked .title,
-[data-theme='v8'] .headerPanel .title {
+:root .header .title,
+:root .headerStacked .title,
+:root .headerPanel .title {
   font-size: var(--tpl-section-title-size);
   font-weight: var(--tpl-section-title-weight);
 }
-[data-theme='v8'] .headerRestaurant{min-height:58px;padding:20px 24px 15px;align-items:flex-start;}
-[data-theme='v8'] .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
-[data-theme='v8'] .headerRestaurant .title{font-size:15px;line-height:23px;}
-[data-theme='v8'] .headerRestaurant .meta{font-size:14px;line-height:21px;}
+:root .headerRestaurant{min-height:58px;padding:20px 24px 15px;align-items:flex-start;}
+:root .headerRestaurant .titleGroup{flex-direction:column;gap:2px;}
+:root .headerRestaurant .title{font-size:15px;line-height:23px;}
+:root .headerRestaurant .meta{font-size:14px;line-height:21px;}
 
 /* B-187・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
 /* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
-html[data-theme='v8'] .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']) {
+html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']) {
   border: 0;
   outline: 1px solid var(--card-edge);
   outline-offset: -0.5px;
 }
-html[data-theme='v8'] .paddingCompact { padding: var(--space-16); }
-html[data-theme='v8'] .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
+html:root .paddingCompact { padding: var(--space-16); }
+html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
 /* B-208 の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
-html[data-theme='v8'] .vertical { gap: max(var(--space-8), var(--card-content-gap, var(--space-16))); }
+html:root .vertical { gap: max(var(--space-8), var(--card-content-gap, var(--space-16))); }
 
 /* B-208：余白の口を持たない既存の箱にも、枠から16を確保する。表の器は平らなまま。 */
-html[data-theme='v8'] .card[data-card-padding='none'][data-card-variant='default']:not([data-card-unframed]):not([data-spacing]):not([data-card-spacing]):not(:has([data-shared-part='list-table'], table)) { padding: var(--space-16); }
+html:root .card[data-card-padding='none'][data-card-variant='default']:not([data-card-unframed]):not([data-spacing]):not([data-card-spacing]):not(:has([data-shared-part='list-table'], table)) { padding: var(--space-16); }
 
 /* 失敗した処理の箱。形と余白はCardのまま、状態だけ共通の赤。 */
-html[data-theme='v8'] .card[data-card-surface='danger'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-danger-bg); }
+html:root .card[data-card-surface='danger'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-danger-bg); }
 /* 回答など、頭・表・ページ送りの段がそれぞれ端の余白を持つ記録の箱。 */
-html[data-theme='v8'] .records {
+html:root .records {
   display: flex; flex-direction: column; gap: var(--polish-space-field);
   padding-block: var(--polish-space-section); border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px;
 }
-html[data-theme='v8'] .records > .header { padding-inline: var(--polish-space-section); }
-html[data-theme='v8'] .records > [data-card-footer] { padding-inline: var(--polish-space-section); }
+html:root .records > .header { padding-inline: var(--polish-space-section); }
+html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }

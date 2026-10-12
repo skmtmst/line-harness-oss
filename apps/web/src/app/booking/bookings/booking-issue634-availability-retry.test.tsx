@@ -11,10 +11,11 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   staffMe: vi.fn(),
+  getToday: vi.fn(), postVisitMark: vi.fn(), deleteVisitMark: vi.fn(),
   listRequests: vi.fn(),
   requestsSummary: vi.fn(),
   listMenus: vi.fn(),
@@ -26,7 +27,7 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
@@ -48,6 +49,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
       staff: { me: fixture.staffMe },
     },
     bookingApi: {
+      ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
+      getToday: fixture.getToday,
+      postVisitMark: fixture.postVisitMark,
+      deleteVisitMark: fixture.deleteVisitMark,
       listRequests: fixture.listRequests,
       requestsSummary: fixture.requestsSummary,
       listMenus: fixture.listMenus,
@@ -83,6 +88,7 @@ beforeEach(() => {
   fixture.listMenus.mockResolvedValue({ menus: [menu] })
   fixture.listStaff.mockResolvedValue({ staff: [staff] })
   fixture.availabilityBatch.mockResolvedValue({ by_menu: [] })
+  fixture.getToday.mockResolvedValue({ bookings: [] })
 })
 
 afterEach(cleanup)
@@ -127,4 +133,26 @@ describe('#634 予約管理の空き枠・一覧の再読み込み', () => {
     await waitFor(() => expect(fixture.listRequests.mock.calls.length).toBeGreaterThanOrEqual(before + 2))
     await waitFor(() => expect(screen.queryByText('予約を読み込めませんでした')).toBeNull())
   })
+})
+
+// 日の実物の入口から、人の来店印を操作できることを確かめる。
+it('日表示の一覧行から来店を付け、予約と印を読み直す', async () => {
+  fixture.staffMe.mockResolvedValue({ success: true, data: { role: 'owner', permissionKeys: [] } })
+  const row = { id: 'visit-1', starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 1800000).toISOString(), status: 'confirmed', friend_name: '花子', menu_name: 'カット', staff_name: '山田', staff_id: 'staff-1', source: 'phone', requested_at: new Date().toISOString() }
+  fixture.listRequests.mockResolvedValue({ requests: [row], total: 1 })
+  fixture.getToday.mockResolvedValue({ bookings: [{ ...row, visit_mark: null }] })
+  fixture.postVisitMark.mockImplementation(async () => {
+    fixture.getToday.mockResolvedValue({ bookings: [{ ...row, visit_mark: { kind: 'visited', late_minutes: null } }] })
+    return { status: 'completed', visit_mark: { kind: 'visited', late_minutes: null } }
+  })
+  render(<BookingsPage />)
+  fireEvent.click(within(await screen.findByRole('group', { name: '予約の軸' })).getByRole('button', { name: '一覧', exact: true }))
+  const mark = await screen.findByRole('button', { name: '来店した' })
+  await waitFor(() => expect((mark as HTMLButtonElement).disabled).toBe(false))
+  const reads = fixture.listRequests.mock.calls.length
+  fireEvent.click(mark)
+  await waitFor(() => expect(fixture.postVisitMark).toHaveBeenCalledWith('account-a', 'visit-1', { kind: 'visited' }))
+  await waitFor(() => expect(fixture.listRequests.mock.calls.length).toBeGreaterThan(reads))
+  expect(await screen.findByRole('button', { name: '取り消す' })).toBeTruthy()
+  expect(fixture.getToday.mock.calls.length).toBeGreaterThan(1)
 })

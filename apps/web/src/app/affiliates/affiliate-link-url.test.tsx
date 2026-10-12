@@ -21,7 +21,10 @@ Object.defineProperty(navigator, 'clipboard', {
   configurable: true,
 })
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
     affiliates: {
       list: async () => ({
@@ -69,7 +72,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { AffiliatorsTab } = await import('./tabs')
+const { AffiliatorsTab } = await import('@/test-utils/affiliate-tabs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -86,29 +89,29 @@ afterEach(() => {
 
 describe('R292 既存リンクの配布URLを取り出せる', () => {
   test('確認から来たら内訳が開き、配布URLとコピーがある', async () => {
-    render(<AffiliatorsTab accountId={null} focusAffiliateId="aff-a" />)
+    render(<AffiliatorsTab accountId="acc-1" focusAffiliateId="aff-a" />)
     await screen.findByText('候補A')
 
     // 押さなくても内訳が開き、リンク表に配布URLが出る。
-    await waitFor(() => expect(screen.queryByText('LINK_X1')).not.toBeNull())
-    expect(screen.queryByText('https://go.example.com/LINK_X1')).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'LINK_X1の配布URLをコピー' })).not.toBeNull()
+    await screen.findByTitle('https://go.example.com/LINK_X1')
+    expect(screen.queryByTitle('https://go.example.com/LINK_X1')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '紹介リンクをコピー' })).not.toBeNull()
 
     // コピーしても、取得の口は増えない（計測・発行を起こさない）。
     const before = fixture.detailCalls.length
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'LINK_X1の配布URLをコピー' }))
+      fireEvent.click(screen.getByRole('button', { name: '紹介リンクをコピー' }))
     })
     expect(fixture.writeText).toHaveBeenCalledWith('https://go.example.com/LINK_X1')
     expect(fixture.detailCalls.length).toBe(before)
-    await screen.findByRole('button', { name: 'LINK_X1の配布URLをコピー' })
+    await screen.findByRole('button', { name: '紹介リンクをコピー' })
   })
 
   test('短縮ドメインが無ければ Worker の /r/ で作る', async () => {
     fixture.baseUrlImpl = async () => ({ success: true, data: null })
-    render(<AffiliatorsTab accountId={null} focusAffiliateId="aff-a" />)
+    render(<AffiliatorsTab accountId="acc-1" focusAffiliateId="aff-a" />)
     await waitFor(() => expect(
-      screen.queryByText('https://worker.example.com/r/LINK_X1'),
+      screen.queryByTitle('https://worker.example.com/r/LINK_X1'),
     ).not.toBeNull())
   })
 })

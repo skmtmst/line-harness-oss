@@ -10,6 +10,7 @@ import {
   clearTwoFactorChallenge,
   storeAdminSession,
   takeTwoFactorNextPath,
+  type TwoFactorMethod,
 } from '@/lib/admin-session'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -42,7 +43,7 @@ export function opsTwoFactorFailureMessage(caught: unknown, fallback = '認証�
   return fallback
 }
 
-export default function OpsTwoFactorV8() {
+export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: 'ops' | 'admin'; brandName?: string }) {
   const saveErrors = useSaveFormErrors()
   const [typedCode, setCode] = useState('')
   const [succeeded, setSucceeded] = useState(false)
@@ -52,9 +53,10 @@ export default function OpsTwoFactorV8() {
   const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [method, setMethod] = useState<TwoFactorMethod>('line')
 
   // 方法の受け取りは合言葉より先に（合言葉の受け取りで hash が消えるため。v7 と同じ順）。
-  useEffect(() => { captureTwoFactorMethod(); setChallenge(captureTwoFactorChallenge()); setReady(true) }, [])
+  useEffect(() => { setMethod(captureTwoFactorMethod()); setChallenge(captureTwoFactorChallenge()); setReady(true) }, [])
 
   const missingChallenge = ready && !challenge
 
@@ -119,10 +121,11 @@ export default function OpsTwoFactorV8() {
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page}>
       <Card variant="form" gap="normal" className={styles.card} data-design-node="tOPeY" aria-labelledby="ops-two-factor-title">
-        <PageHeading inset="none" title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" help={<> パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。</>} />
+        <PageHeading inset="none" title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" help={scope === 'ops' ? <> パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。</> : <>認証アプリに表示されている6桁コードを入力してください。コードを入力できない場合はログインからやり直してください。</>} />
+        {scope === 'admin' ? <p className={styles.foot}>{brandName}{ready && challenge ? ` · ✓ ${method === 'password' ? 'メールログイン' : 'LINEログイン'}` : ''}</p> : null}
 
         {missingChallenge ? (
-          <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Link href="/ops/login" onClick={clearTwoFactorChallenge}>ログインに戻る</Link>} />
+          <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Link href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Link>} />
         ) : error ? <Notice tone="danger" id="ops-two-factor-error" message={error} /> : null}
         <Field density="input" optional={false} label={<span id="ops-two-factor-code-label">認証コード（6桁）</span>}>
           <SaveErrorField names={["typedCode","code"]} key={attempt}><OtpInput
@@ -143,12 +146,16 @@ export default function OpsTwoFactorV8() {
           variant="primary"
           className={styles.submit}
           onClick={() => void submit()}
-          disabled={loading || missingChallenge || succeeded}
+          disabled={loading || missingChallenge || succeeded || (scope === 'admin' && typedCode.length !== 6)}
           busy={loading || succeeded}
           busyLabel="確認しています…"
         >
           <LogIn aria-hidden="true" className={styles.icon} />ログイン
         </Button>
+        {scope === 'admin' ? <>
+          <p className={styles.foot}>コードは約30秒ごとに更新されます</p>
+          <Link href="/login" onClick={clearTwoFactorChallenge}>{missingChallenge || method === 'password' ? 'ログインに戻る' : '別のLINEアカウントでログイン'}</Link>
+        </> : null}
 
       </Card>
     </main></SaveErrorScope>

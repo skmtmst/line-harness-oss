@@ -10,7 +10,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { Copy, Eye } from 'lucide-react';
 import type { Folder } from '@line-crm/shared';
 import { api, ApiError, describeSaveFailure } from '@/lib/api';
-import { commonVarValueError, isSecretLikeVarValue } from '@/lib/common-vars';
+import { commonVarValueError, isSecretLikeVarValue, COMMON_VAR_VALUE_REQUIRED } from '@/lib/common-vars';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -561,7 +561,7 @@ export default function NewCommonVarV8() {
             )
           })}
         </RadioCardGroup>
-        <div className={styles.field}><Field density="input" label="中身" htmlFor="cv-value">{type === 'boolean' ? (
+        <div className={styles.field}><Field density="input" label="中身" htmlFor="cv-value" required={COMMON_VAR_VALUE_REQUIRED.has(type)}>{type === 'boolean' ? (
             <SaveErrorField names={["value"]}><Select size="full" aria-label="中身" id="cv-value" error={valueFieldError || undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
           ) : type === 'long_text' ? (
             <SaveErrorField names={["value"]}><textarea

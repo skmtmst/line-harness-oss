@@ -8,10 +8,11 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/contexts/account-context'
-import V8ScoreTab from './v8-score-tab'
+import { MileageShell } from '@/v8/mileage/frame'
+import V8ScoreTab from '@/v8/mileage/score'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=score'),
   usePathname: () => '/mileage',
@@ -141,10 +142,7 @@ async function waitForRows(): Promise<void> {
   await act(async () => {
     root.render(
       <AccountProvider>
-        <V8ScoreTab
-          readonly={false}
-          registerHeaderActions={() => {}}
-        />
+        <MileageShell.Provider value={{ tab: 'score', readonly: false, narrow: false, counts: {}, setCount: () => {} }}><V8ScoreTab /></MileageShell.Provider>
       </AccountProvider>,
     )
   })
@@ -176,6 +174,7 @@ describe('スコアの絵合わせ（板 `IRPw8`）', () => {
   it('脚注は空けて補足まで書く', async () => {
     await waitForRows()
     const body = container.textContent ?? ''
-    expect(body).toContain('「＋ できごとを足す」で増やせます（30日間反応がない、も選べる）')
+    await act(async () => { (container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement).click() })
+    expect(container.textContent ?? '').toContain('＋ できごとを足す（30日間反応がない、も選べる）')
   })
 })

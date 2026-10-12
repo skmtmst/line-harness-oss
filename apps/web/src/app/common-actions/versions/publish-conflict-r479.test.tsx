@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * 監査 R479: 版画面で公開が 409 reference_updated で止まったあと、
  * 自動の load() が setError('') で競合理由を消していた。
@@ -81,7 +82,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams('id=action-1'),
   usePathname: () => '/common-actions/versions',
@@ -97,7 +98,7 @@ vi.mock('@/components/automations/use-common-action-permission', () => ({
   useCanManageCommonActions: () => true,
 }))
 vi.mock('@/lib/use-manual-href', () => ({ useManualHref: () => null }))
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
   usePageChrome: () => ({ title: null }),
 }))
@@ -127,6 +128,7 @@ function alertText(): string | null {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   net.getCount = 0
   net.publishCount = 0
   net.publishResult = 'conflict'
@@ -147,7 +149,7 @@ async function renderAndPublish() {
     root.render(<VersionsPage />)
   })
   await flush()
-  const publish = findButton('この版を公開する')
+  const publish = findButton('公開する')
   expect(publish, '公開ボタンがある').toBeTruthy()
   await act(async () => {
     publish!.click()
@@ -166,7 +168,7 @@ describe('公開が 409 で止まったときの知らせ（監査 R479）', () 
     expect(container.textContent).toContain('保存し直してください')
     expect(alertText()).toContain('紹介クーポン')
     // 再試行の口も残る（操作中ではないので押せる）。
-    const retry = findButton('この版を公開する')
+    const retry = findButton('公開する')
     expect(retry, '再試行のボタンがある').toBeTruthy()
     expect(retry!.disabled).toBe(false)
   })
@@ -193,7 +195,7 @@ describe('公開が 409 で止まったときの知らせ（監査 R479）', () 
     expect(alertText()).toContain('紹介クーポン')
     net.publishResult = 'ok'
     await act(async () => {
-      findButton('この版を公開する')!.click()
+      findButton('公開する')!.click()
     })
     await flush()
     expect(net.publishCount).toBe(2)

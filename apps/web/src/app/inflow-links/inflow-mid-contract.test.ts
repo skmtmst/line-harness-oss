@@ -3,15 +3,15 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = import.meta.dirname
-const PAGE = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
-const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
-const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
-const DETAIL = readFileSync(join(ROOT, 'detail', 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
+const ADS = ['ads.tsx', 'ad-connections.tsx', 'ad-history.tsx', 'ad-shared.ts'].map(file => readFileSync(join(ROOT, '../../v8/inflow-links', file), 'utf8')).join('\n')
+const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
+const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
 // 削除の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
 // 削除の窓は詳細の画面（detail/page.tsx）の中にある。古い _components/inflow-delete-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
-const DELETE_DIALOG = readFileSync(join(ROOT, 'detail', 'page.tsx'), 'utf8')
-const MODAL = readFileSync(join(ROOT, '_components', 'edit-route-modal.tsx'), 'utf8')
-const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
+const DELETE_DIALOG = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
+const MODAL = readFileSync(join(ROOT, '../../v8/inflow-links/edit-route-dialog.tsx'), 'utf8')
+const SITE = readFileSync(join(ROOT, '../../v8/inflow-links/site-script.tsx'), 'utf8')
 const LIFF = readFileSync(join(ROOT, '..', '..', '..', '..', 'worker', 'src', 'routes', 'liff.ts'), 'utf8')
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
@@ -27,7 +27,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
     expect(ADS).toContain('LOG_PAGE_SIZE')
     expect(ADS).toContain('Pagination')
     expect(ADS).toContain('api.adPlatforms.logsPage')
-    expect(ADS).toContain('setLogTotal(logResponse.data.total)')
+    expect(ADS).toContain('setTotal(logRes.data.total)')
     expect(ADS).not.toContain('response.data.map((platform) => api.adPlatforms.logs')
   })
 
@@ -40,13 +40,13 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
   it('#514-8: 口の返す欄だけ読み、無い欄は「—」にする', () => {
     // 口は currentStatus を返す(友だち中・ブロック済み)。firstPage・conversion・miles は返さない。
     expect(LIFF).toContain("currentStatus: f.is_following === 0 ? 'ブロック済み' : '友だち中'")
-    expect(DETAIL).toContain("friend.currentStatus ?? '—'")
-    expect(DETAIL).toContain("friend.conversion ?? '—'")
+    expect(DETAIL).toContain("friend.currentStatus ?? emptyValue('unknown')")
+    expect(DETAIL).toContain("friend.conversion ?? emptyValue('unknown')")
     expect(DETAIL).not.toContain("currentStatus ?? '取得できません'")
     expect(DETAIL).not.toContain("conversion ?? '取得できません'")
     // 広告履歴は口の無い friendName・conversionName・nextRetryAt を読まない。
     expect(ADS).not.toContain('extraText')
-    expect(ADS).toContain('nextScheduleText')
+    expect(ADS).toContain("log.status === 'pending' ? '送信待ち'")
     expect(ADS).not.toContain('11:35 に送ります')
   })
 
@@ -74,7 +74,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
   it('#514-12: 段階の失敗は文と再読み込みで返し、読み込み中のままにしない', () => {
     expect(DETAIL).toContain('funnelError')
     expect(DETAIL).toContain('段階を再読み込み')
-    expect(DETAIL).toContain('段階を取得できませんでした')
+    expect(DETAIL).toContain('段階を読み込めませんでした')
   })
 
   it('#514-13: 押しても何も起きないボタンを出さない', () => {
@@ -86,7 +86,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
       expect(ADS).not.toContain(dead)
     }
     // 失敗理由は口の errorMessage を開いて見せる。
-    expect(ADS).toContain('理由を見る')
+    expect(ADS).toContain('断られた理由：${log.errorMessage}')
     expect(ADS).toContain('log.errorMessage')
   })
 
@@ -94,13 +94,13 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
     for (const fixed of ['1545', '11476', '前月 ¥438,000', '8/25 11:20 に同期', '8/25 06:00 に取り込みました', '夏キャンペーン（検索）', '体験申込フォームの送信\',\'Lead']) {
       expect(ADS).not.toContain(fixed)
     }
-    expect(ADS).toContain('未接続のため表示できません')
+    expect(ADS).toContain("emptyValue('unknown')")
   })
 
   it('#514-14: 計測先ホストとパスを口から受け取って表示する', () => {
     expect(SITE).not.toContain('new URL(page.path)')
     expect(SITE).not.toContain('unknown-')
-    expect(SITE).toContain('{page.host ?? \'以前の記録\'}')
+    expect(SITE).toContain('title={page.host ? `${page.host}${page.path}` : page.path}')
     expect(SITE).toContain('{page.path}')
     expect(FIXTURES).toContain("{ host: 'shop.example.com', path: '/', views:")
     expect(FIXTURES).not.toContain("path: 'https")

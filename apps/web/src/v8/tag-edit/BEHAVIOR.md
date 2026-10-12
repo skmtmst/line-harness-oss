@@ -1,7 +1,7 @@
 # タグ：タグの編集・保存した検索の編集の動き（BEHAVIOR.md）
 
 板：タグの編集 `Qat9s`・競合 `xn95q`（閲覧のみ `fkGUR`）／保存した検索の編集 `AqDWN`。
-写し元：`app/tags/edit-tag-page-v8.tsx`・`tag-editor-v8.tsx`（タグ）、`app/tags/search-editor-v8.tsx`（保存した検索）、`app/tags/edit/tag-conflict-diff.ts`・`app/tags/searches/edit/reference-options.ts` を写した（src/v8 から @/app は読まない）。共通部品（components/friend-fields の ArchivedTagEditor・DeleteDialog・ActionDrawer・RetroactiveDialog など）はそのまま使う。入口 `app/tags/edit/page.tsx`・`app/tags/searches/edit/page.tsx` の V8 の import だけ差し替えた。v7 は触らない。
+写し元：`src/v8/tag-edit/edit.tsx`・`src/v8/tag-edit/edit-form.tsx`（タグ）、`src/v8/tag-edit/search-edit.tsx`（保存した検索）、`app/tags/edit/tag-conflict-diff.ts`・`app/tags/searches/edit/reference-options.ts` を写した（src/v8 から @/app は読まない）。共通部品（components/friend-fields の ArchivedTagEditor・DeleteDialog・ActionDrawer・RetroactiveDialog など）はそのまま使う。入口 `app/tags/edit/page.tsx`・`app/tags/searches/edit/page.tsx` の V8 の import だけ差し替えた。旧表示への分岐と未使用の写しは廃止し、V8だけを使う。
 
 ## タグの編集（edit.tsx）
 - URL：`/tags/edit?id=<タグID>`（`visualQa=retroactive` で さかのぼり反映の確認を開いた形）。id 無し・見つからない・読めないときは TargetMissing。アカウント未選択は「選んでください」。保管済みのタグは ArchivedTagEditor（名前と説明だけ）。

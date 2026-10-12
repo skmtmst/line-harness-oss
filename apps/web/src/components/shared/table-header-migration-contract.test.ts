@@ -36,6 +36,7 @@ describe('表見出しの第1段階移行', () => {
     expect(migrated).toBeGreaterThan(0)
 
     for (const [path, source] of Object.entries(sources)) {
+      if (path in v8NativeHeaders) continue // V8の専用見出しは下で数を検査する。
       // 見出しだけでなく行・セルまで共通化した画面は、同じ入口から
       // { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } の形で入れる。
       expect(source, `${path} が共通表部品をimportしていない`).toMatch(

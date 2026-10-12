@@ -11,7 +11,7 @@
 :global([data-page-template='create'][data-design-node='ITBAB']):has(.root) { --tpl-preview-pad: var(--tpl-fe-rail-narrow-pad); }
 
 /* 競合の帯（J1pdB）は左右の列の上に横いっぱい。型の「狭い板の切り替え」の置き場を借りて、そこだけ出す。 */
-:global([data-theme='v8'] [data-page-template='create']) > div:has(> .bandSlot) { display: block; padding: 0; }
+:global(:root [data-page-template='create']) > div:has(> .bandSlot) { display: block; padding: 0; }
 .bandSlot { padding: var(--tpl-fe-band-slot-pad); }
 /* 帯そのものは共通の save-conflict（動きの点検 16 番）。 */
 
@@ -51,7 +51,7 @@
   display: flex; align-items: center; gap: var(--tpl-fe-row-gap); min-width: 0;
   padding: var(--tpl-fe-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring);
 }
-:global([data-theme='v8']) .grip { width: var(--tpl-fe-grip-w); height: var(--tpl-fe-more-h); min-height: 0; flex: none; }
+:global(:root) .grip { width: var(--tpl-fe-grip-w); height: var(--tpl-fe-more-h); min-height: 0; flex: none; }
 .blockOpen { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--tpl-fe-row-gap); padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
 .blockIcon {
   flex: none; width: var(--tpl-fe-icon-box); height: var(--tpl-fe-icon-box); display: inline-flex; align-items: center; justify-content: center;
@@ -133,7 +133,7 @@
 /* ---------- 受付と見た目 ---------- */
 
 .periodRow { display: flex; align-items: flex-end; gap: var(--tpl-fe-save-gap); }
-:global([data-theme='v8']) .periodRow :global(button) { height: var(--tpl-fe-control-h); min-height: 0; }
+:global(:root) .periodRow :global(button) { height: var(--tpl-fe-control-h); min-height: 0; }
 .periodRow > .field { flex: 1; }
 .periodRow .fieldLabel { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
 .periodSep { height: var(--tpl-fe-control-h); display: inline-flex; align-items: center; font-size: var(--tpl-fe-body-size); color: var(--color-ink-faint); }
@@ -250,12 +250,12 @@
 .tabs { display: flex; flex-direction: column; gap: var(--tpl-fe-tabs-gap); }
 .status { margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-faint); }
 /* 絵のタブは文字の行 19・下の余白 12（型のタブより 1 低い）。 */
-:global([data-theme='v8']) .tabs :global([role='tab']), :global([data-theme='v8']) .tabs :global([role='tab'] *) { line-height: var(--tpl-fe-body-lh); }
-:global([data-theme='v8']) .tabs :global([role='tablist']), :global([data-theme='v8']) .tabs :global([role='tab']) { height: var(--tpl-fe-tabs-h); }
+:global(:root) .tabs :global([role='tab']), :global(:root) .tabs :global([role='tab'] *) { line-height: var(--tpl-fe-body-lh); }
+:global(:root) .tabs :global([role='tablist']), :global(:root) .tabs :global([role='tab']) { height: var(--tpl-fe-tabs-h); }
 /* 行の「…」は絵どおり 28 角の枠付き（共通の「…」をこの画面の中だけ小さく）。 */
-:global([data-theme='v8']) .more :global(button) { min-height: 0; min-width: 0; width: var(--tpl-fe-more-h); height: var(--tpl-fe-more-h); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring); background: var(--color-canvas); }
+:global(:root) .more :global(button) { min-height: 0; min-width: 0; width: var(--tpl-fe-more-h); height: var(--tpl-fe-more-h); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring); background: var(--color-canvas); }
 /* 行の中の押せる文字は行の高さを増やさない（全体の押せる大きさの決まりは行そのものが満たす）。 */
-:global([data-theme='v8']) .actionText, :global([data-theme='v8']) .blockOpen { min-height: 0; }
+:global(:root) .actionText, :global(:root) .blockOpen { min-height: 0; }
 
 .phoneChoices { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); }
 .phoneChoices[data-inline] { flex-direction: row; flex-wrap: wrap; }

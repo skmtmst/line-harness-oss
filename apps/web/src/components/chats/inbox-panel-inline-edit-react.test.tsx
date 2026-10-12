@@ -94,8 +94,7 @@ async function renderPanel(notes: string | null = '前のメモ', friendId = 'fr
     )
   })
   await eventually(() => {
-    if (document.documentElement.dataset.theme === 'v8') expect(host.querySelector('[data-customer-info-panel] section[aria-label="対応"]')).toBeTruthy()
-    else expect(host.textContent).toContain('次の対応')
+    expect(host.querySelector('[data-customer-info-panel] section[aria-label="対応"]')).toBeTruthy()
   })
   // ふだんは値を読む形。以前からの保存・失敗・競合の検証は編集を開いて行う。
   if (document.documentElement.dataset.theme === 'v8') {
@@ -215,14 +214,16 @@ describe('B-26 右の欄でその場で直す', () => {
     expect(mocks.removeTag).not.toHaveBeenCalled()
   })
 
-  it('v7 は今までの札と付け外しの動きを保つ', async () => {
+  it('旧テーマ属性でもタグを外す前にV8の確認を挟む', async () => {
     document.documentElement.dataset.theme = 'v7'
     mocks.removeTag.mockResolvedValue({ success: true, data: null })
     await renderPanel()
-    expect(document.querySelector('[role="group"][aria-label="タグ「未契約」"]')).toBeNull()
+    expect(document.querySelector('[role="group"][aria-label="タグ「未契約」"]')).toBeTruthy()
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
+    expect(mocks.removeTag).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('『未契約』を外しますか？')
+    await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((b) => b.textContent === '外す')!.click() })
     expect(mocks.removeTag).toHaveBeenCalledWith('friend-0', 'tag-a')
-    expect(document.body.textContent).not.toContain('『未契約』を外しますか？')
   })
 
   describe('メモの同時編集（最後に直した方を残す）', () => {

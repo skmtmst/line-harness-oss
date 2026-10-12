@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const here = import.meta.dirname
 const page = readFileSync(join(here, 'photo-review-v8.tsx'), 'utf8')
-const detail = readFileSync(join(here, 'photo-review-detail.tsx'), 'utf8')
+const detail = readFileSync(join(here, '../../v8/nen-posts/detail.tsx'), 'utf8')
 const publications = readFileSync(join(here, 'photo-review-v8.tsx'), 'utf8')
 const api = readFileSync(join(here, '..', '..', 'lib', 'api.ts'), 'utf8')
 
@@ -19,11 +19,13 @@ describe('V8 写真審査の一枚表示と掲載管理', () => {
   it('separates loading, empty, error and permission states with ListState', () => {
     for (const source of [detail, publications]) {
       expect(source).toContain("import ListState from '@/components/shared/list-state'")
-      expect(source).toContain('kind="loading"')
       expect(source).toContain('kind="empty"')
       expect(source).toContain('kind="error"')
       expect(source).toContain('kind="forbidden"')
     }
+    expect(detail).toContain('if (loading)')
+    expect(detail).toContain('<DetailLoading label="写真を読み込んでいます"')
+    expect(publications).toContain('kind="loading"')
   })
 
   it('does not expose an original URL and only downloads it after photo-specific step-up', () => {

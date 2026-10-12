@@ -308,12 +308,12 @@ export default function SiteScriptV8() {
             <Td className={styles.colDomain}><span className={styles.cellText} title={site.domains.join('\n')}>{site.domains.join('、') || emptyValue('unknown')}</span></Td>
             <Td className={styles.colState}>
               {stopped ? (
-                <StatusBadge tone="neutral" size="compact">停止中</StatusBadge>
+                <StatusBadge tone="neutral" size="compact" title={site.stoppedReason ? `理由: ${site.stoppedReason}` : undefined}>停止中</StatusBadge>
               ) : (
                 <StatusBadge tone="success" size="compact">{site.lastReceivedAt ? '届いている' : '受信待ち'}</StatusBadge>
               )}
             </Td>
-            <Td className={styles.colLast}><span className={styles.cellText}>{last ?? emptyValue('unknown')}</span></Td>
+            <Td className={styles.colLast}><span className={styles.cellText} title={`最後に受け取った時刻: ${site.lastReceivedAt ? polishFormatDate(site.lastReceivedAt, { style: 'detail', fallback: 'まだ受け取っていません' }) : 'まだ受け取っていません'}`}>{last ?? emptyValue('unknown')}</span></Td>
             <Td className={styles.colMenu}>
               {manage ? (
                 <RowMenu
@@ -417,7 +417,7 @@ export default function SiteScriptV8() {
 
             <div className={styles.rail}>
               <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" aria-labelledby="ss-status">
-                <h2 className={styles.cardTitle} id="ss-status">いま届いているか</h2>
+                <h2 className={styles.cardTitle} id="ss-status" title={receiving ? `今日は ${formatNumber(summary?.todayEvents)}件、${formatNumber(summary?.pathCount)}種類のページから届いています。` : 'まだ受け取っていないため数字は出しません'}>いま届いているか</h2>
                 <div className={styles.statusBlock}>
                   {receiving ? (
                     <>

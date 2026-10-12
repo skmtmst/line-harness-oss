@@ -1,5 +1,5 @@
 /*
- * 7ページを v7 / v8 × 1152・1440・1920 で開き、崩れを数える。1つでもあれば終了コード 1。
+ * V8のページを1152・1440・1920で開き、崩れを数える。1つでもあれば終了コード1。
  *
  *   node apps/web/scripts/v8-guard/layout-overflow.mjs <baseUrl> [out.json]
  *
@@ -80,7 +80,7 @@ const stress = () => {
 const browser = await chromium.launch()
 const res = {}
 let bad = 0
-for (const theme of ['v7', 'v8']) {
+for (const theme of ['v8']) {
   for (const width of WIDTHS) {
     for (const [name, route] of Object.entries(ROUTES)) {
       const page = await openPage(browser, { baseUrl, route, width, theme })

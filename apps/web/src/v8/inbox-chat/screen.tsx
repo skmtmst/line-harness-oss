@@ -4105,7 +4105,7 @@ tabIndex={-1}>
               頭が隠れるので、×を板の右上に残す。
             */}
             {wideInfoPanel ? null : (
-            <Button variant="secondary" className="absolute top-[17px] right-3 z-10 h-8 w-8 items-center justify-center text-ink-faint whitespace-normal v8:top-3" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
+            <Button variant="secondary" className="absolute top-3 right-3 z-10 h-8 w-8 items-center justify-center text-ink-faint whitespace-normal" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
               <X aria-hidden="true" className="h-4 w-4" />
             </Button>
             )}

@@ -1,5 +1,7 @@
 'use client'
 import ReservationBoard from '@/components/shared/reservation-board'
+import PeopleDayList from '@/v8/booking-bookings/day-list'
+import { usePeopleVisitMarks } from '@/v8/booking-bookings/use-visit-marks'
 import {peopleBoardEntry} from '@line-crm/shared'
 import {reservationBoardApi,allBoardPages} from '@/lib/api-reservation-board'
 
@@ -860,6 +862,13 @@ export default function BookingsPage() {
 
   // タブの数はその期間の有効な予約だけ（取消・拒否・期限切れを除く）。
   // 旧Worker（タブ用未返却）では従来の集計に倒す。
+  const visitChanged = useCallback(() => {
+    setCalendarSeq(value => value + 1)
+    setSummarySeq(value => value + 1)
+    void load()
+  }, [load])
+  const visits = usePeopleVisitMarks(selectedAccountId, calendarFrom, view === 'day' && canOperate, visitChanged)
+
   const todayCount = summary.todayTabTotal ?? summary.todayTotal
   const weekCount = summary.weekTabTotal ?? summary.weekTotal
   const monthCount = summary.monthTabTotal ?? kpi.total
@@ -945,6 +954,7 @@ export default function BookingsPage() {
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
             resources={staffList.map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
+            renderList={view === 'day' ? () => <PeopleDayList rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
             onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);setCalendarSeq(n=>n+1);await load()}}
           />
         )}

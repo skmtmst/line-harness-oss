@@ -6,7 +6,6 @@ import type { BroadcastBubble } from '@line-crm/shared'
 vi.mock('@/components/scenarios/insert-toolbar', () => ({ default: () => null }))
 vi.mock('@/components/scenarios/message-kind-fields', () => ({ default: () => null, emptyMessageKindState: () => ({}) }))
 vi.mock('./message-composer-media', () => ({ default: () => null }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 import Composer, { ComposerCarouselPreview } from './message-composer'
 import { HqInsertRow, insertHqToken } from './hq-message-inserts'
 afterEach(cleanup)

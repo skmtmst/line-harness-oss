@@ -35,9 +35,7 @@ const route: EntryRoute = {
   updatedAt: '2026-09-01T09:00:00.000+09:00',
 }
 
-vi.mock('@/lib/use-admin-theme',()=>({useAdminTheme:()=> 'v8'}))
-
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: fixture.replace }),
   useSearchParams: () => new URLSearchParams('id=route-1'),
 }))

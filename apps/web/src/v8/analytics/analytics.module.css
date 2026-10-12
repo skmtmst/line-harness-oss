@@ -164,12 +164,12 @@
 }
 
 /* 期間の切り替え（器 3・項目 5/14・文 12）。 */
-:global([data-theme='v8']) .range {
+:global(:root) .range {
   padding: var(--tpl-an-range-pad);
   border-radius: var(--tpl-an-seg-radius);
   background: var(--color-surface-pearl);
 }
-:global([data-theme='v8']) .range button {
+:global(:root) .range button {
   min-height: 0;
   padding: var(--tpl-an-range-item-pad);
   font-size: var(--text-caption);
@@ -793,7 +793,7 @@
 .rowMenu {
   display: inline-flex;
 }
-:global([data-theme='v8']) .rowMenuButton {
+:global(:root) .rowMenuButton {
   width: var(--tpl-an-icon-btn);
   height: var(--tpl-an-icon-btn);
   flex: 0 0 var(--tpl-an-icon-btn);
@@ -854,7 +854,7 @@
 .trow[data-h='pill'] { min-height: var(--tpl-an-pill-row-h); }
 .trow[data-h='button'] { min-height: var(--tpl-an-button-row-h); }
 .rowActions[data-gap='wide'] { gap: var(--tpl-an-wide-gap); }
-:global([data-theme='v8']) .rowButton {
+:global(:root) .rowButton {
   min-height: 0;
 }
 .rowButton {
@@ -977,7 +977,7 @@
   text-align: left;
   cursor: pointer;
 }
-:global([data-theme='v8']) .funnelStep {
+:global(:root) .funnelStep {
   min-height: 0;
 }
 .funnelStep[data-selected] {
@@ -1170,7 +1170,7 @@
   font-weight: 700;
   cursor: pointer;
 }
-:global([data-theme='v8']) .gridCell {
+:global(:root) .gridCell {
   min-height: 0;
 }
 .gridCell[data-strong] { color: var(--color-canvas); }

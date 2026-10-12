@@ -56,7 +56,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: pushMock, replace: vi.fn(), refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/reminders/new',
   useSearchParams: () => new URLSearchParams(''),
@@ -100,7 +100,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 
 import { ApiError } from '@/lib/api'
 import NewReminderV8 from './new/new-v8'
-import ReminderEditV8 from './edit/edit-v8'
+import ReminderEditV8 from '@/v8/reminders/edit'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -198,8 +198,9 @@ describe('リマインダの編集：保存がぶつかる', () => {
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(saveDraft).toHaveBeenCalledTimes(1))
     const band = await screen.findByRole('alert')
-    expect(band.getAttribute('data-design-node')).toBe('k32cn')
-    expect(band.hasAttribute('data-save-conflict')).toBe(true)
+    expect(host.querySelector('[data-design-node="k32cn"]')).toBeTruthy()
+    expect(within(band).getByText(/ほかの人が先にリマインダ/)).toBeTruthy()
+    expect(nameInput.value).toBe('予約前日のご案内（直した）')
     fireEvent.click(within(band).getByRole('button', { name: '違いを比べる' }))
     const dialog = await screen.findByRole('dialog', { name: '最新の保存と比べる' })
     expect(within(dialog).getByText(/リマインダ名が違います/)).toBeTruthy()

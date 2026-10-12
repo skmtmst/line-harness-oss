@@ -58,7 +58,7 @@ async function enterCode(digits: string) {
 }
 
 function submitButton() {
-  return [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('確認してログイン')) as HTMLButtonElement
+  return [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'ログイン') as HTMLButtonElement
 }
 
 async function submit() {

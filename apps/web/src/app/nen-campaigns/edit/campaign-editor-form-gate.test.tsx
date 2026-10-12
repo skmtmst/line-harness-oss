@@ -29,7 +29,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...rest}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: navigation.push }),
 }))
 
@@ -49,9 +49,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => ({ ...(await importOriginal()), useStaffRole: () => 'owner' }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+
 const { AccountProvider } = await import('@/contexts/account-context')
-// 編集の入口（page.tsx）は campaign-editor-v8 を出す（古い campaign-editor.tsx はどこからも描かれないので 2026-10-07 に消した）。
-const { default: CampaignEditor } = await import('./campaign-editor-v8')
+const { default: CampaignEditor } = await import('@/v8/nen-campaigns/edit')
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -131,6 +133,7 @@ function fakeStorage(): Storage {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
   vi.stubGlobal('localStorage', fakeStorage())
   lineAccountsListApi.mockResolvedValue({
@@ -153,6 +156,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   if (root) await act(async () => { root.unmount() })
+  container.remove()
+  delete document.documentElement.dataset.theme
   localStorage.clear()
   vi.unstubAllGlobals()
 })
@@ -172,7 +177,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     await click(saveButton())
     await settle()
     expect(updateSettingApi).not.toHaveBeenCalled()
-    expect(container.textContent).toContain('選び直してから保存してください')
+    expect(container.querySelector('#nen-edit-form')?.getAttribute('aria-invalid')).toBe('true')
   })
 
   it('公開されていないフォームは候補つき入力で理由つきで選べない', async () => {
@@ -189,7 +194,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     })
     await mount()
 
-    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="回答フォームを開かせる（任意）"]')!
+    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="回答フォームを開かせる（任意）：選ぶ"]')!
     expect(toggle).toBeTruthy()
     await click(toggle)
     const options = [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')]
@@ -199,11 +204,14 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     expect(draft.disabled).toBe(true)
     expect(draft.closest('label')?.textContent).toContain('公開されていないため選べません')
     await click(draft)
-    expect(container.textContent).not.toContain('回答フォーム「下書きフォーム」を開かせる')
+    expect(container.querySelector('#nen-edit-form')?.parentElement?.textContent).not.toContain('下書きフォーム')
     await click(live)
     await click([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ')!)
     await settle()
-    expect(container.textContent).toContain('回答フォーム「公開中のフォーム」を開かせる')
+    expect(container.querySelector('#nen-edit-form')?.parentElement?.textContent).toContain('公開中のフォーム')
+    await click(saveButton())
+    await settle()
+    expect(updateSettingApi).toHaveBeenCalledWith(ACCOUNT_ID, CAMPAIGN_KEY, expect.objectContaining({ afterActions: [expect.objectContaining({ kind: 'open_form', formId: 'form-live', formName: '公開中のフォーム' })] }))
   })
 
   it('使えるフォームなら「つながる先」に名前と公開状態が出て保存できる', async () => {
@@ -215,7 +223,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     await mount()
 
     // ★V8 の編集（campaign-editor-v8）は「つながる先」の欄に公開状態を出さない。つないだ名前と、問題の知らせが無いことを見る。
-    expect(container.textContent).toContain('回答フォーム「口コミ」を開かせる')
+    expect(container.querySelector('#nen-edit-form')?.parentElement?.textContent).toContain('口コミ')
     expect(container.textContent).not.toContain('つなぐ回答フォームは公開されていません')
     await click(saveButton())
     await settle()

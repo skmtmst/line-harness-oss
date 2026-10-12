@@ -15,6 +15,11 @@ import { ApiError, describeSaveFailure } from '@/lib/api'
  * （二重の正本を作らない）。
  */
 export type PermissionScope = 'store' | 'hq'
+
+/** 保存先の409を判定する。特定の競合コードだけ扱う画面はcodeも渡す。 */
+export function isSaveConflict(error: unknown, code?: string): error is ApiError {
+  return error instanceof ApiError && error.status === 409 && (code === undefined || error.code === code)
+}
 const PERMISSION_REQUEST = { store: 'オーナーか管理者に頼んでください。', hq: '統括の管理者に頼んでください。' } as const
 /** 403を記録ではなく状態の名前で持つ画面も、同じ入口から文を出す。 */
 export const permissionDeniedMessage = (scope: PermissionScope = 'store') => describeApiFailure({ status: 403 }, '表示', { scope })

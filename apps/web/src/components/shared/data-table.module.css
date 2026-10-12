@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* ---------------------------------------------------------------------
  * 一覧表の外枠と行。Pencil V5 の `RwC76`「共通 標準一覧表」。★V5 で60回。
@@ -22,25 +22,16 @@
    * 横スクロールで届ける（PC幅では収まるので見た目は変わらない）。
    * 角丸の切り抜きは overflow-x:auto でも保たれる。 */
   overflow-x: auto; /* clip: true → 390pxでは送って見せる */
-  overflow-y: hidden;
-  border: 1px solid var(--card-edge); /* stroke: $hairline */
-  border-radius: var(--radius-card); /* cornerRadius: $radius-md */;
+  overflow-y: hidden; /* stroke: $hairline */ /* cornerRadius: $radius-md */;
   box-shadow: var(--card-shadow);
 }
 
-.row {
-  height: 58px; /* 行 height: 58 */
+.row { /* 行 height: 58 */
 }
 
 /* ★V7のゆったりした行（高さ64px）。付けないときは58pxのまま。 */
-.rowComfortable {
-  height: 64px;
-}
 
 /* ★V7：選んでいる行は薄い緑の地。色だけでなく aria-selected でも伝える。 */
-.rowSelected {
-  background: var(--color-accent-soft);
-}
 
 /* ★V7：押せる行・選べる行だけ、指を乗せたときに一段沈んだ地を敷く。 */
 .rowInteractive:hover {
@@ -51,7 +42,7 @@
  * ★V8 仕上げ（M10）：行に乗せたときの薄い背景の変化は 120ms。
  * v7 は今までどおり即時に変わる。
  */
-[data-theme='v8'] .rowInteractive {
+:root .rowInteractive {
   transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
@@ -59,26 +50,19 @@
   background: var(--color-accent-soft);
 }
 
-.row + .row .bodyCell {
-  border-top: 1px solid var(--color-hairline); /* strokeWidth: {top: 1} */
+.row + .row .bodyCell { /* strokeWidth: {top: 1} */
 }
 
-.bodyCell {
-  padding: 0 12px; /* padding: [0, 12] */
-  color: var(--color-ink); /* fill: $ink */
-  font-size: var(--text-body); /* fontSize: $size-body */
+.bodyCell { /* padding: [0, 12] */
+  color: var(--color-ink); /* fill: $ink */ /* fontSize: $size-body */
   vertical-align: middle; /* justifyContent: center */
 }
 
 /* 名前のセル。名前・副題・注記の3段。副題と注記は無くてよい。 */
-.name {
-  font-weight: 600; /* fontWeight: 600 */
+.name { /* fontWeight: 600 */
 }
 
-.sub {
-  margin-top: 2px; /* gap: 2 */
-  color: var(--color-ink-faint); /* fill: $ink-faint */
-  font-size: var(--text-label); /* fontSize: $size-label */
+.sub { /* gap: 2 */ /* fill: $ink-faint */ /* fontSize: $size-label */
   font-weight: 400;
 }
 
@@ -110,7 +94,7 @@
  * 細い線だけ。名前は 13px/500、補足は 12px ink-faint。外側のカード枠は
  * やめ、白い板の中に直接置く（箱の中に箱を作らない）。
  */
-[data-theme='v8'] .frame {
+:root .frame {
   border: 0;
   border-radius: var(--radius-flat);
   --color-divider: var(--color-hairline);
@@ -121,39 +105,39 @@
  * 行の高さは上下の余白12＋中身で決まる（下の bodyCell を見る）。
  * tr の高さは最小値。60/86 の切り替えは測り違いだったので使わない。
  */
-[data-theme='v8'] .row {
+:root .row {
   height: 52px;
 }
 
-[data-theme='v8'] .rowComfortable {
+:root .rowComfortable {
   height: 56px;
 }
 
 /* 店と同じひな形の板 i0Ao0R・wZPua に渡す密度。既定の行は変えない。 */
-[data-theme='v8'] .rowTemplate { height: 61px; }
-[data-theme='v8'] .rowTemplate .bodyCell { padding-block: 11px; }
+:root .rowTemplate { height: 61px; }
+:root .rowTemplate .bodyCell { padding-block: 11px; }
 
-[data-theme='v8'] .row + .row .bodyCell {
+:root .row + .row .bodyCell {
   border-top: 1px solid var(--color-divider);
 }
 
-[data-theme='v8'] .bodyCell {
+:root .bodyCell {
   padding: var(--tpl-row-pad-block) var(--tpl-row-pad-side);
 }
 
-[data-theme='v8'] .name {
+:root .name {
   font-size: var(--text-label);
   font-weight: 500;
   line-height: 1.35;
 }
 
-[data-theme='v8'] .sub {
+:root .sub {
   color: var(--color-ink-faint);
   font-size: var(--text-caption);
   line-height: 1.35;
 }
 
-[data-theme='v8'] .memo {
+:root .memo {
   line-height: 1.35;
 }
 
@@ -162,77 +146,77 @@
  * （--motion-exit。閉じる・消える系の速さ）。外す合図は画面側が
  * `leaving` で渡す。動きを減らす設定では globals の規定で一瞬になる。
  */
-[data-theme='v8'] .row[data-leaving='true'] {
+:root .row[data-leaving='true'] {
   opacity: 0;
   transition: opacity var(--motion-exit) var(--motion-ease-out);
 }
 
 
-[data-theme='v8'] .bodyCell {
+:root .bodyCell {
   /*
    * 行の下の線は行の内側に描く（絵：線を含めて1行 62）。border だと1行ごとに 1px 増えて
    * 下へ行くほどずれ、しかも読み込み順で Tailwind の border:0 に負けて線ごと消える画面があった。
    */
   border-bottom: 0; box-shadow: var(--shadow-row-line); font-size: 13px; line-height: 20px;
 }
-[data-theme='v8'] .row + .row .bodyCell { border-top: 0; }
-[data-theme='v8'] .name { line-height: 18px; }
-[data-theme='v8'] .sub { margin-top: var(--tpl-sub-gap); line-height: 16px; }
-[data-theme='v8'] .memo { line-height: 16px; }
-[data-theme='v8'] .row[data-table-layout='columns'] {
+:root .row + .row .bodyCell { border-top: 0; }
+:root .name { line-height: 18px; }
+:root .sub { margin-top: var(--tpl-sub-gap); line-height: 16px; }
+:root .memo { line-height: 16px; }
+:root .row[data-table-layout='columns'] {
   display: flex; align-items: center; gap: 16px; height: auto;
   padding: 9px 20px; border-bottom: 1px solid var(--color-divider);
 }
-[data-theme='v8'] .row[data-table-layout='columns'] .bodyCell {
+:root .row[data-table-layout='columns'] .bodyCell {
   display: block; padding: 0; border: 0; flex-shrink: 0; color: var(--color-ink-secondary);
 }
 
-[data-theme='v8'] .row { background: var(--color-canvas); }
-[data-theme='v8'] .rowSelected { background: var(--color-accent-soft); }
-[data-theme='v8'] .rowInteractive:hover:not(.rowSelected) { background: var(--color-table-head); }
+:root .row { background: var(--color-canvas); }
+:root .rowSelected { background: var(--color-accent-soft); }
+:root .rowInteractive:hover:not(.rowSelected) { background: var(--color-table-head); }
 }
 /* ★V8 一覧の行の「名前＋下の説明」（apLqS 行：名前 13/600 高さ19 → 間3 → 説明 11 高さ16、行 62）。説明の中の印で行を押し上げない（司令塔 2026-10-05） */
-[data-theme='v8'] .name { font-size: var(--tpl-row-name-size); font-weight: 600; line-height: var(--tpl-row-name-lh); }
-[data-theme='v8'] .sub { display: flex; align-items: center; gap: 6px; margin-top: var(--tpl-row-sub-gap); font-size: var(--tpl-row-sub-size); line-height: var(--tpl-row-sub-lh); min-height: 0; }
-[data-theme='v8'] .sub svg { flex: none; width: 12px; height: 12px; }
-[data-theme='v8'] .sub > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-[data-theme='v8'] .sub svg { display: inline-block; }
+:root .name { font-size: var(--tpl-row-name-size); font-weight: 600; line-height: var(--tpl-row-name-lh); }
+:root .sub { display: flex; align-items: center; gap: 6px; margin-top: var(--tpl-row-sub-gap); font-size: var(--tpl-row-sub-size); line-height: var(--tpl-row-sub-lh); min-height: 0; }
+:root .sub svg { flex: none; width: 12px; height: 12px; }
+:root .sub > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+:root .sub svg { display: inline-block; }
 /* ★V8 表の横の余白（Pencil の行：左右24・欄の間16）。各セルの左右24（欄の間48）を、欄の間16＝左右8・端だけ24 にする（司令塔 2026-10-06） */
-[data-theme='v8'] .bodyCell { padding-inline: var(--tpl-cell-gap-half); }
-[data-theme='v8'] .bodyCell:first-child { padding-left: var(--tpl-row-pad-side); }
-[data-theme='v8'] .bodyCell:last-child { padding-right: var(--tpl-row-pad-side); }
+:root .bodyCell { padding-inline: var(--tpl-cell-gap-half); }
+:root .bodyCell:first-child { padding-left: var(--tpl-row-pad-side); }
+:root .bodyCell:last-child { padding-right: var(--tpl-row-pad-side); }
 
 /* 連携画面の行の密度。画面からセルの見た目を上書きさせない。 */
-[data-theme='v8'] .frame[data-density='reviews'] {
+:root .frame[data-density='reviews'] {
   border-radius: var(--tpl-rt-card-radius); outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--card-shadow); }
-[data-theme='v8'] .frame[data-density='reviews'] table { display: block; }
-[data-theme='v8'] .frame[data-density='reviews'] :is(thead, tbody) { display: block; }
-[data-theme='v8'] .frame[data-density='reviews'] tr {
+:root .frame[data-density='reviews'] table { display: block; }
+:root .frame[data-density='reviews'] :is(thead, tbody) { display: block; }
+:root .frame[data-density='reviews'] tr {
   display: flex; align-items: center; gap: var(--tpl-rt-col-gap); min-width: 0; height: auto; border: 0;
 }
-[data-theme='v8'] .frame[data-density='reviews'] thead tr { padding: var(--tpl-rt-thead-pad); background: var(--color-table-head); }
-[data-theme='v8'] .frame[data-density='reviews'] tbody tr { padding: var(--tpl-rt-review-row-pad); box-shadow: var(--tpl-rt-line-top); }
-[data-theme='v8'] .frame[data-density='reviews'] :is(th, td) {
+:root .frame[data-density='reviews'] thead tr { padding: var(--tpl-rt-thead-pad); background: var(--color-table-head); }
+:root .frame[data-density='reviews'] tbody tr { padding: var(--tpl-rt-review-row-pad); box-shadow: var(--tpl-rt-line-top); }
+:root .frame[data-density='reviews'] :is(th, td) {
   display: flex; flex-direction: column; gap: var(--tpl-rt-cell-gap); min-width: 0; height: auto; padding: 0; border: 0; box-shadow: none;
   color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: normal; white-space: nowrap;
 }
-[data-theme='v8'] .frame[data-density='reviews'] th { font-size: var(--text-micro); font-weight: 600; }
-[data-theme='v8'] .frame[data-density='media'] th {
+:root .frame[data-density='reviews'] th { font-size: var(--text-micro); font-weight: 600; }
+:root .frame[data-density='media'] th {
   height: auto; padding: var(--tpl-e49-head-pad); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-e49-lh-18);
 }
-[data-theme='v8'] .frame[data-density='media'] td { height: var(--tpl-e49-row-h); padding: var(--tpl-e49-row-pad); }
-[data-theme='v8'] .frame[data-density='media'] :is(th, td):first-child { padding-left: var(--tpl-e49-edge); }
-[data-theme='v8'] .frame[data-density='media'] :is(th, td):last-child { padding-right: var(--tpl-e49-edge); }
-[data-theme='v8'] .frame[data-density='sample'] { overflow: hidden; border: 1px solid var(--card-edge); border-radius: var(--tpl-e1-radius-l); box-shadow: var(--card-shadow); }
-[data-theme='v8'] .frame[data-density='sample'] thead tr { border-top: 0; }
-[data-theme='v8'] .frame[data-density='sample'] :is(th, td) { height: auto; padding: 0; border: 0; box-shadow: none; }
-[data-theme='v8'] .frame[data-density='sample'] tbody tr { border-bottom: 0; box-shadow: var(--shadow-row-line); }
-[data-theme='v8'] .frame[data-density='sample'] tbody tr:last-child { box-shadow: none; }
-[data-theme='v8'] .frame[data-density='sample'] th { text-align: left; }
+:root .frame[data-density='media'] td { height: var(--tpl-e49-row-h); padding: var(--tpl-e49-row-pad); }
+:root .frame[data-density='media'] :is(th, td):first-child { padding-left: var(--tpl-e49-edge); }
+:root .frame[data-density='media'] :is(th, td):last-child { padding-right: var(--tpl-e49-edge); }
+:root .frame[data-density='sample'] { overflow: hidden; border: 1px solid var(--card-edge); border-radius: var(--tpl-e1-radius-l); box-shadow: var(--card-shadow); }
+:root .frame[data-density='sample'] thead tr { border-top: 0; }
+:root .frame[data-density='sample'] :is(th, td) { height: auto; padding: 0; border: 0; box-shadow: none; }
+:root .frame[data-density='sample'] tbody tr { border-bottom: 0; box-shadow: var(--shadow-row-line); }
+:root .frame[data-density='sample'] tbody tr:last-child { box-shadow: none; }
+:root .frame[data-density='sample'] th { text-align: left; }
 
-[data-theme='v8'] .frame[data-density='sample'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }
+:root .frame[data-density='sample'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }
 
-[data-theme='v8'] .frame[data-density='reviews'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }
+:root .frame[data-density='reviews'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }
 
 /*
  * ★V8 デリバリー受注の表（承認 v02 の kDQHr・OzHLO・h7OeT）。
@@ -263,82 +247,82 @@
  * 行が 22 のまま潰れていた（2026-10-11 実測）。`.row` を1つ足して強くしてある。
  * 簡単に見えても外さない。
  */
-[data-theme='v8'] .frame[data-table-presentation='delivery'] tr :is(th, .bodyCell):first-child:not(:last-child) { padding-left: 0; }
-[data-theme='v8'] .frame[data-table-presentation='delivery'] tr :is(th, .bodyCell):last-child:not(:first-child) { padding-right: 0; }
-[data-theme='v8'] .frame[data-table-presentation='delivery'] .row { height: auto; }
-[data-theme='v8'] .frame[data-table-presentation='delivery'] .row .bodyCell {
+:root .frame[data-table-presentation='delivery'] tr :is(th, .bodyCell):first-child:not(:last-child) { padding-left: 0; }
+:root .frame[data-table-presentation='delivery'] tr :is(th, .bodyCell):last-child:not(:first-child) { padding-right: 0; }
+:root .frame[data-table-presentation='delivery'] .row { height: auto; }
+:root .frame[data-table-presentation='delivery'] .row .bodyCell {
   padding-block: var(--tpl-row-pad-block) calc(var(--tpl-row-pad-block) + var(--tpl-rt-dlv-row-line));
 }
-[data-theme='v8'] .frame[data-table-presentation='delivery'] .row .bodyCell > * { vertical-align: top; }
-[data-theme='v8'] .frame[data-table-presentation='delivery'] tr :is(th, td)[data-align='right'] + :is(th, td) {
+:root .frame[data-table-presentation='delivery'] .row .bodyCell > * { vertical-align: top; }
+:root .frame[data-table-presentation='delivery'] tr :is(th, td)[data-align='right'] + :is(th, td) {
   padding-inline-start: var(--tpl-cell-gap-half);
 }
 
 /* 飲食店のカード内の表（Y8SjT2・hQQlt）。既定の表は変えない。 */
-[data-theme='v8'] .frame[data-table-presentation='inventory'],
-[data-theme='v8'] .frame[data-table-presentation='channels'] {
+:root .frame[data-table-presentation='inventory'],
+:root .frame[data-table-presentation='channels'] {
   border: 0; border-radius: var(--radius-control);
   outline: 1px solid var(--color-hairline); outline-offset: -1px;
 }
-[data-theme='v8'] .frame[data-table-presentation='channels'] { border-radius: var(--radius-card); }
-[data-theme='v8'] .frame[data-table-presentation='inventory'] thead tr,
-[data-theme='v8'] .frame[data-table-presentation='channels'] thead tr {
+:root .frame[data-table-presentation='channels'] { border-radius: var(--radius-card); }
+:root .frame[data-table-presentation='inventory'] thead tr,
+:root .frame[data-table-presentation='channels'] thead tr {
   height: auto; border: 0; background: var(--color-surface-pearl);
 }
-[data-theme='v8'] .frame[data-table-presentation='inventory'] th {
+:root .frame[data-table-presentation='inventory'] th {
   height: auto; padding: var(--tpl-rs-th-pad-block) var(--tpl-rs-inv-col-gap) var(--tpl-rs-th-pad-block) 0;
   border: 0; color: var(--color-ink-secondary); font-size: var(--text-micro);
   font-weight: 600; line-height: var(--tpl-rs-lh-11);
 }
-[data-theme='v8'] .frame[data-table-presentation='inventory'] .row { height: var(--tpl-rs-inv-row-h); }
-[data-theme='v8'] .frame[data-table-presentation='inventory'] .bodyCell {
+:root .frame[data-table-presentation='inventory'] .row { height: var(--tpl-rs-inv-row-h); }
+:root .frame[data-table-presentation='inventory'] .bodyCell {
   padding: 0 var(--tpl-rs-inv-col-gap) 0 0; border: 0; box-shadow: var(--tpl-rs-line-top);
   color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-rs-lh-12); white-space: nowrap;
 }
-[data-theme='v8'] .frame[data-table-presentation='inventory'] th:first-child,
-[data-theme='v8'] .frame[data-table-presentation='inventory'] .bodyCell:first-child { padding-left: var(--tpl-rs-inv-side-pad); }
-[data-theme='v8'] .frame[data-table-presentation='inventory'] th:nth-child(3),
-[data-theme='v8'] .frame[data-table-presentation='inventory'] .bodyCell:nth-child(3) { padding-right: var(--tpl-rs-inv-col-pad-num); }
-[data-theme='v8'] .frame[data-table-presentation='inventory'] th:last-child,
-[data-theme='v8'] .frame[data-table-presentation='inventory'] .bodyCell:last-child { padding-right: var(--tpl-rs-inv-col-pad-end); }
-[data-theme='v8'] .frame[data-table-presentation='channels'] thead tr { height: var(--tpl-rs-inv-ch-head-h); }
-[data-theme='v8'] .frame[data-table-presentation='channels'] th {
+:root .frame[data-table-presentation='inventory'] th:first-child,
+:root .frame[data-table-presentation='inventory'] .bodyCell:first-child { padding-left: var(--tpl-rs-inv-side-pad); }
+:root .frame[data-table-presentation='inventory'] th:nth-child(3),
+:root .frame[data-table-presentation='inventory'] .bodyCell:nth-child(3) { padding-right: var(--tpl-rs-inv-col-pad-num); }
+:root .frame[data-table-presentation='inventory'] th:last-child,
+:root .frame[data-table-presentation='inventory'] .bodyCell:last-child { padding-right: var(--tpl-rs-inv-col-pad-end); }
+:root .frame[data-table-presentation='channels'] thead tr { height: var(--tpl-rs-inv-ch-head-h); }
+:root .frame[data-table-presentation='channels'] th {
   height: auto; padding: 0 var(--tpl-rs-cell-gap) 0 0; border: 0; color: var(--color-ink-secondary);
   font-size: var(--text-caption); font-weight: 500; line-height: var(--tpl-rs-lh-12);
 }
-[data-theme='v8'] .frame[data-table-presentation='channels'] .row { height: var(--tpl-rs-inv-ch-row-h); }
-[data-theme='v8'] .frame[data-table-presentation='channels'] .bodyCell {
+:root .frame[data-table-presentation='channels'] .row { height: var(--tpl-rs-inv-ch-row-h); }
+:root .frame[data-table-presentation='channels'] .bodyCell {
   padding: 0 var(--tpl-rs-cell-gap) 0 0; border: 0; box-shadow: var(--tpl-rs-line-top);
   color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-rs-lh-12); white-space: nowrap;
 }
-[data-theme='v8'] .frame[data-table-presentation='channels'] th:first-child,
-[data-theme='v8'] .frame[data-table-presentation='channels'] .bodyCell:first-child { padding-left: var(--tpl-rs-cell-side); }
-[data-theme='v8'] .frame[data-table-presentation='channels'] th:last-child,
-[data-theme='v8'] .frame[data-table-presentation='channels'] .bodyCell:last-child { padding-right: var(--tpl-rs-cell-side); }
+:root .frame[data-table-presentation='channels'] th:first-child,
+:root .frame[data-table-presentation='channels'] .bodyCell:first-child { padding-left: var(--tpl-rs-cell-side); }
+:root .frame[data-table-presentation='channels'] th:last-child,
+:root .frame[data-table-presentation='channels'] .bodyCell:last-child { padding-right: var(--tpl-rs-cell-side); }
 /* YMVFD の列の並び。共通の行メニューと同じ高さの行。 */
-[data-theme='v8'] .frame[data-table-presentation='columns'] th,
-[data-theme='v8'] .frame[data-table-presentation='columns'] .bodyCell {
+:root .frame[data-table-presentation='columns'] th,
+:root .frame[data-table-presentation='columns'] .bodyCell {
   height: auto; padding: 0; border: 0; box-shadow: none;
 }
-[data-theme='v8'] .frame[data-table-presentation='columns'] .row {
+:root .frame[data-table-presentation='columns'] .row {
   height: auto; min-height: var(--tpl-e1-close-row-h); border-bottom: 0; box-shadow: var(--shadow-row-line);
 }
 @container v8-page (max-width: 1099px) {
-  [data-theme='v8'] .frame[data-table-presentation='columns'] th[data-cell-collapse='narrow'],
-  [data-theme='v8'] .frame[data-table-presentation='columns'] .bodyCell[data-cell-collapse='narrow'] { display: none; }
+  :root .frame[data-table-presentation='columns'] th[data-cell-collapse='narrow'],
+  :root .frame[data-table-presentation='columns'] .bodyCell[data-cell-collapse='narrow'] { display: none; }
 }
 /* 設定内の詰めた一覧。指定した表だけに効く（通常の一覧は変えない）。 */
-[data-theme='v8'] .frame[data-table-density] {
+:root .frame[data-table-density] {
   overflow: hidden;
   border-radius: var(--tpl-sb-card-radius);
   outline: 1px solid var(--card-edge);
   --table-pad: var(--tpl-st2-id-row-pad);
   box-shadow: var(--card-shadow);
 }
-[data-theme='v8'] .frame[data-table-density='records'] { --table-pad: var(--tpl-sb-ec-row-pad); }
-[data-theme='v8'] .frame[data-table-density] .table,
-[data-theme='v8'] .frame[data-table-density] :is(thead, tbody) { display: block; }
-[data-theme='v8'] .frame[data-table-density] tr {
+:root .frame[data-table-density='records'] { --table-pad: var(--tpl-sb-ec-row-pad); }
+:root .frame[data-table-density] .table,
+:root .frame[data-table-density] :is(thead, tbody) { display: block; }
+:root .frame[data-table-density] tr {
   display: grid;
   grid-template-columns: var(--table-columns);
   align-items: center;
@@ -347,14 +331,14 @@
   padding: var(--table-pad);
   box-shadow: var(--tpl-sb-line-top);
 }
-[data-theme='v8'] .frame[data-table-density] thead tr {
+:root .frame[data-table-density] thead tr {
   padding: var(--tpl-st2-id-row-pad);
   border: 0;
   box-shadow: none;
   background: var(--color-surface-pearl);
 }
-[data-theme='v8'] .frame[data-table-density='records'] thead tr { padding: var(--tpl-sb-ec-head-pad); }
-[data-theme='v8'] .frame[data-table-density] .table :is(th, td) {
+:root .frame[data-table-density='records'] thead tr { padding: var(--tpl-sb-ec-head-pad); }
+:root .frame[data-table-density] .table :is(th, td) {
   min-width: 0;
   height: auto;
   padding: 0;
@@ -363,43 +347,43 @@
   font-size: var(--text-caption);
   line-height: var(--tpl-sb-ec-lh);
 }
-[data-theme='v8'] .frame[data-table-density] .table th {
+:root .frame[data-table-density] .table th {
   color: var(--color-ink-secondary);
   font-size: var(--tpl-sb-row-sub);
   font-weight: 600;
   line-height: var(--tpl-sb-row-sub-lh);
 }
 
-[data-theme='v8'] .frame[data-table-density] .table :is(th, td)[data-align='right'] { padding-right: var(--tpl-rest3-ec-row-gap); }
+:root .frame[data-table-density] .table :is(th, td)[data-align='right'] { padding-right: var(--tpl-rest3-ec-row-gap); }
 
-[data-theme='v8'] .frame[data-table-density] .table td[colspan] { grid-column: 1 / -1; }
+:root .frame[data-table-density] .table td[colspan] { grid-column: 1 / -1; }
 /* 指定した列型一覧だけ。行の線・セルの余白を画面CSSで上書きしない。 */
-[data-theme='v8'] .frame[data-column-layout] .table,
-[data-theme='v8'] .frame[data-column-layout] .table tbody {
+:root .frame[data-column-layout] .table,
+:root .frame[data-column-layout] .table tbody {
   display: flex; flex-direction: column; gap: var(--table-row-gap);
 }
-[data-theme='v8'] .frame[data-column-layout] .table :is(thead, tbody) { width: 100%; }
-[data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] {
+:root .frame[data-column-layout] .table :is(thead, tbody) { width: 100%; }
+:root .frame[data-column-layout] .table tr[data-table-layout='columns'] {
   gap: var(--table-column-gap); padding: var(--table-column-padding); border: 0;
 }
-[data-theme='v8'] .frame[data-column-layout] .table thead tr[data-table-layout='columns'] {
+:root .frame[data-column-layout] .table thead tr[data-table-layout='columns'] {
   height: var(--table-head-height); padding: var(--table-head-padding); border-radius: var(--table-head-radius);
 }
-[data-theme='v8'] .frame[data-column-layout] .table tbody tr[data-table-layout='columns'] { height: var(--table-row-height); box-shadow: var(--shadow-row-line); }
-[data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] > :is(th, td) {
+:root .frame[data-column-layout] .table tbody tr[data-table-layout='columns'] { height: var(--table-row-height); box-shadow: var(--shadow-row-line); }
+:root .frame[data-column-layout] .table tr[data-table-layout='columns'] > :is(th, td) {
   height: auto; padding: 0; border: 0; box-shadow: none; line-height: normal; flex-shrink: 1; min-width: 0;
 }
-[data-theme='v8'] .frame[data-column-layout] .table th { font-size: var(--table-head-text-size); }
-[data-theme='v8'] .frame[data-column-layout] .table td { font-size: var(--table-body-text-size); }
-[data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] > [data-cell-grow] {
+:root .frame[data-column-layout] .table th { font-size: var(--table-head-text-size); }
+:root .frame[data-column-layout] .table td { font-size: var(--table-body-text-size); }
+:root .frame[data-column-layout] .table tr[data-table-layout='columns'] > [data-cell-grow] {
   flex: 1 1 0; min-width: 0; padding-inline-end: var(--table-name-inset);
 }
-[data-theme='v8'] .frame[data-column-layout] .table tr[data-table-layout='columns'] > [data-cell-align='right'] {
+:root .frame[data-column-layout] .table tr[data-table-layout='columns'] > [data-cell-align='right'] {
   padding-right: var(--table-number-inset); text-align: right;
 }
 
 /* 指定された列組みだけに適用。通常の一覧表の寸法は変えない。 */
-[data-theme='v8'] .frame[data-grid-table] {
+:root .frame[data-grid-table] {
   container-type: inline-size;
   container-name: shared-grid-table;
   overflow: hidden;
@@ -409,9 +393,9 @@
   outline-offset: -1px;
   box-shadow: var(--card-shadow);
 }
-[data-theme='v8'] .frame[data-grid-table] .table { display: block; }
-[data-theme='v8'] .frame[data-grid-table] .table :is(thead, tbody) { display: block; }
-[data-theme='v8'] .frame[data-grid-table] .table tr {
+:root .frame[data-grid-table] .table { display: block; }
+:root .frame[data-grid-table] .table :is(thead, tbody) { display: block; }
+:root .frame[data-grid-table] .table tr {
   display: grid;
   grid-template-columns: var(--table-columns);
   align-items: center;
@@ -423,13 +407,13 @@
   font-size: var(--tpl-sb-tbl-head);
   line-height: var(--tpl-sb-ec-lh);
 }
-[data-theme='v8'] .frame[data-grid-table] .table tbody tr {min-height:var(--table-grid-row-height,0px);}
-[data-theme='v8'] .frame[data-grid-table] .table thead tr {
+:root .frame[data-grid-table] .table tbody tr {min-height:var(--table-grid-row-height,0px);}
+:root .frame[data-grid-table] .table thead tr {
   padding: var(--table-head-padding);
   background: var(--color-surface-pearl);
   box-shadow: none;
 }
-[data-theme='v8'] .frame[data-grid-table] .table :is(th, td) {
+:root .frame[data-grid-table] .table :is(th, td) {
   min-width: 0;
   height: auto;
   padding: 0;
@@ -439,7 +423,7 @@
   font-size: inherit;
   line-height: inherit;
 }
-[data-theme='v8'] .frame[data-grid-table] .table th {
+:root .frame[data-grid-table] .table th {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -448,131 +432,131 @@
 
 /* 狭い板では同じ列を保ちながら、指定された比率で収める。 */
 @container shared-grid-table (max-width: 800px) {
-  [data-theme='v8'] .frame[data-grid-table] .table tr {
+  :root .frame[data-grid-table] .table tr {
     grid-template-columns: var(--table-compact-columns);
   }
 }
 /* カード内の表。既定の一覧には効かせず、部品側で余白と線を持つ。 */
-[data-theme='v8'] .frame[data-table-presentation='account-list'],
-[data-theme='v8'] .frame[data-table-presentation='account-handover'] {
+:root .frame[data-table-presentation='account-list'],
+:root .frame[data-table-presentation='account-handover'] {
   overflow: hidden; border-radius: var(--radius-card); box-shadow: var(--tpl-sa-ring);
 }
-[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) { display: block; }
-[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) :is(thead, tbody) { display: block; }
-[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tr {
+:root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) { display: block; }
+:root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) :is(thead, tbody) { display: block; }
+:root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tr {
   display: flex; align-items: center; gap: var(--tpl-sa-acc-gap); height: auto; min-width: 0;
 }
-[data-theme='v8'] .table[data-table-presentation='account-list'] thead tr { padding: var(--tpl-sa-acc-head-pad); }
-[data-theme='v8'] .table[data-table-presentation='account-list'] tbody tr { padding: var(--tpl-sa-acc-row-pad); }
-[data-theme='v8'] .table[data-table-presentation='account-handover'] thead tr { padding: var(--tpl-acd-ho-head-pad); }
-[data-theme='v8'] .table[data-table-presentation='account-handover'] tbody tr { padding: var(--tpl-acd-ho-row-pad); }
-[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) th {
+:root .table[data-table-presentation='account-list'] thead tr { padding: var(--tpl-sa-acc-head-pad); }
+:root .table[data-table-presentation='account-list'] tbody tr { padding: var(--tpl-sa-acc-row-pad); }
+:root .table[data-table-presentation='account-handover'] thead tr { padding: var(--tpl-acd-ho-head-pad); }
+:root .table[data-table-presentation='account-handover'] tbody tr { padding: var(--tpl-acd-ho-row-pad); }
+:root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) th {
   display: block; height: auto; padding: 0; font-size: var(--text-micro); font-weight: 600; line-height: var(--tpl-sa-label-lh);
 }
-[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) td {
+:root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) td {
   display: block; padding: 0; box-shadow: none; font-size: var(--text-caption); line-height: var(--tpl-sa-member-name-lh); min-width: 0;
 }
-[data-theme='v8'] .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tbody tr { box-shadow: var(--tpl-sa-line-top); }
-[data-theme='v8'] .table[data-table-presentation='account-list'] tbody tr:hover { background: var(--color-canvas-sunken); }
-[data-theme='v8'] .table[data-table-presentation='connection-check'] { border-collapse: collapse; }
-[data-theme='v8'] .table[data-table-presentation='connection-check'] tr { height: var(--tpl-htn-result-row-h); box-shadow: var(--tpl-htn-line-bottom); }
-[data-theme='v8'] .table[data-table-presentation='connection-check'] td {
+:root .table.table:is([data-table-presentation='account-list'], [data-table-presentation='account-handover']) tbody tr { box-shadow: var(--tpl-sa-line-top); }
+:root .table[data-table-presentation='account-list'] tbody tr:hover { background: var(--color-canvas-sunken); }
+:root .table[data-table-presentation='connection-check'] { border-collapse: collapse; }
+:root .table[data-table-presentation='connection-check'] tr { height: var(--tpl-htn-result-row-h); box-shadow: var(--tpl-htn-line-bottom); }
+:root .table[data-table-presentation='connection-check'] td {
   padding: 0; box-shadow: none; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-[data-theme='v8'] .table[data-table-presentation='connection-check'] td:first-child { width: var(--tpl-htn-result-label-w); color: var(--color-ink); font-weight: 700; }
-[data-theme='v8'] .table[data-table-presentation='connection-check'] td:last-child { width: var(--tpl-htn-result-badge-w); text-align: right; }
+:root .table[data-table-presentation='connection-check'] td:first-child { width: var(--tpl-htn-result-label-w); color: var(--color-ink); font-weight: 700; }
+:root .table[data-table-presentation='connection-check'] td:last-child { width: var(--tpl-htn-result-badge-w); text-align: right; }
 
-[data-theme='v8'] .table.table[data-table-presentation='account-list'] :is(th, td):nth-child(4) { padding-right: var(--tpl-sa-acc-friends-pad); }
+:root .table.table[data-table-presentation='account-list'] :is(th, td):nth-child(4) { padding-right: var(--tpl-sa-acc-friends-pad); }
 
 /* B-152・仕上げ3。列幅・権限・並べ替えは従来の口を保つ。 */
-[data-theme='v8'] .frame .row { height: var(--polish-table-row); min-height: var(--polish-table-row); }
-[data-theme='v8'] .frame .row .bodyCell { padding-block: 0; font-size: var(--polish-text-body); }
-[data-theme='v8'] .frame .row:hover:not(.rowSelected) { background: var(--polish-table-hover); }
-[data-theme='v8'] .frame .row { transition: background-color var(--motion-fast) var(--motion-ease-out); }
-[data-theme='v8'] .frame :is(th, td)[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
-[data-theme='v8'] .frame :is(th, td)[data-align='right'] + :is(th, td) { padding-inline-start: var(--polish-table-number-gap); }
-[data-theme='v8'] .frame thead tr { height: var(--polish-table-head); min-height: var(--polish-table-head); background: var(--polish-table-head-bg); }
-[data-theme='v8'] .frame thead th { height: var(--polish-table-head); padding-block: 0; color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
-[data-theme='v8'] .frame[data-column-layout] .row { padding-block: 0; }
-[data-theme='v8'] .frame[data-column-layout] .row .bodyCell { padding-block: 0; }
+:root .frame .row { height: var(--polish-table-row); min-height: var(--polish-table-row); }
+:root .frame .row .bodyCell { padding-block: 0; font-size: var(--polish-text-body); }
+:root .frame .row:hover:not(.rowSelected) { background: var(--polish-table-hover); }
+:root .frame .row { transition: background-color var(--motion-fast) var(--motion-ease-out); }
+:root .frame :is(th, td)[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+:root .frame :is(th, td)[data-align='right'] + :is(th, td) { padding-inline-start: var(--polish-table-number-gap); }
+:root .frame thead tr { height: var(--polish-table-head); min-height: var(--polish-table-head); background: var(--polish-table-head-bg); }
+:root .frame thead th { height: var(--polish-table-head); padding-block: 0; color: var(--color-ink-secondary); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
+:root .frame[data-column-layout] .row { padding-block: 0; }
+:root .frame[data-column-layout] .row .bodyCell { padding-block: 0; }
 /* Native tables use the same optional-column contract as column layouts. */
 @container v8-page (max-width: 1099px) {
-  [data-theme='v8'] .frame:not([data-table-presentation='columns']) .table [data-cell-collapse='narrow'] {
+  :root .frame:not([data-table-presentation='columns']) .table [data-cell-collapse='narrow'] {
     display: none;
   }
 }
 
 
 /* B-178：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr {
+:root :global([data-list-skeleton]) .table.table > thead > tr {
   height: var(--tpl-list-head-h);
 }
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr > th {
+:root :global([data-list-skeleton]) .table.table > thead > tr > th {
   height: var(--tpl-list-head-h); padding-block: 0;
   padding-inline: calc(var(--tpl-list-cell-side) / 2);
 }
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) {
+:root :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) {
   height: var(--tpl-list-row-h);
 }
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) > td {
+:root :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) > td {
   height: var(--tpl-list-row-h); padding-block: 0;
   padding-inline: calc(var(--tpl-list-cell-side) / 2);
 }
 
 /* 固定した絵の列間16は隣り合うセルの8＋8。表の両端だけ24を持つ。 */
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr:not([data-table-layout='columns']) > :is(th, td):first-child {
+:root :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr:not([data-table-layout='columns']) > :is(th, td):first-child {
   padding-inline-start: var(--tpl-list-inset);
 }
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr:not([data-table-layout='columns']) > :is(th, td):last-child {
+:root :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr:not([data-table-layout='columns']) > :is(th, td):last-child {
   padding-inline-end: var(--tpl-list-inset);
 }
 
 /* 列型も同じ行高。縦の余白は行が持ち、セルの高さを二重に足さない。 */
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] { padding-block: 0; box-sizing: border-box; }
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] > :is(th, td) { height: auto; padding-inline: 0; }
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr { min-height: var(--tpl-list-head-h); }
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--tpl-list-row-h); }
+:root :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] { padding-block: 0; box-sizing: border-box; }
+:root :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] > :is(th, td) { height: auto; padding-inline: 0; }
+:root :global([data-list-skeleton]) .table.table > thead > tr { min-height: var(--tpl-list-head-h); }
+:root :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--tpl-list-row-h); }
 
 /* 列型の見出しは指定の口を保つ。一覧の行は共通60、一般表は指定の口を使う。 */
-[data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--table-head-height, var(--tpl-list-head-h)); min-height: var(--table-head-height, var(--tpl-list-head-h)); }
-[data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); }
+:root :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--table-head-height, var(--tpl-list-head-h)); min-height: var(--table-head-height, var(--tpl-list-head-h)); }
+:root :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); }
 .row[data-highlighted] {
   background: var(--color-accent-soft);
 }
 
 /* e2ekFu：列の余白・行の高さは表の部品が持つ。 */
-[data-theme='v8'] .frame[data-table-presentation='event-list'] .table thead th:first-child,
-[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell:first-child {
+:root .frame[data-table-presentation='event-list'] .table thead th:first-child,
+:root .frame[data-table-presentation='event-list'] .bodyCell:first-child {
   padding-left: var(--tpl-ev-ls-first-pad);
 }
-[data-theme='v8'] .frame[data-table-presentation='event-list'] .table thead th:nth-child(5),
-[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell:nth-child(5) {
+:root .frame[data-table-presentation='event-list'] .table thead th:nth-child(5),
+:root .frame[data-table-presentation='event-list'] .bodyCell:nth-child(5) {
   padding-left: var(--tpl-ev-ls-state-pad);
 }
-[data-theme='v8'] .frame[data-table-presentation='event-list'] .bodyCell {
+:root .frame[data-table-presentation='event-list'] .bodyCell {
   height: var(--tpl-ev-ls-row-h);
   padding-block: 0;
 }
 
 /* B-217：一覧は平ら。見出しと線は全幅、中身だけ左右24。 */
-html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) {
+html:root .frame:not([data-table-presentation='calendar']) {
   border: 0; border-radius: var(--radius-flat); outline-color: transparent; box-shadow: none;
 }
-html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) { overflow-x: clip; }
-html[data-theme='v8'] .frame .row[data-table-layout='columns'] { padding-inline: var(--tpl-list-inset); }
-html[data-theme='v8'] .name { color: var(--color-ink); font-weight: 700; white-space: nowrap; }
-html[data-theme='v8'] .frame [data-list-name-cell] { min-width: var(--tpl-list-name-min); }
-html[data-theme='v8'] .actionCell > :is(button, a) { min-width: var(--row-action-width, max-content); }
+html:root .frame:not([data-table-presentation='calendar']) { overflow-x: clip; }
+html:root .frame .row[data-table-layout='columns'] { padding-inline: var(--tpl-list-inset); }
+html:root .name { color: var(--color-ink); font-weight: 700; white-space: nowrap; }
+html:root .frame [data-list-name-cell] { min-width: var(--tpl-list-name-min); }
+html:root .actionCell > :is(button, a) { min-width: var(--row-action-width, max-content); }
 
 /* 表に実際に残る幅で、補助列を畳む。名前と操作を潰して収めない。 */
 /* inline-size のコンテナは子の幅で広がらない。窓の flex-start 内でも幅を保つ。 */
-html[data-theme='v8'] .frame:not([data-table-presentation='calendar']) { width: 100%; min-width: 0; container-type: inline-size; container-name: v8-list-table; }
-@container v8-list-table (max-width: 1100px) { html[data-theme='v8'] .frame[data-shared-part='list-table']:not([data-collapse-scope='page']) .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
-html[data-theme='v8'] .actionCell { flex: none; min-width: max-content; }
-html[data-theme='v8'] .actionCell :is(button, a):not([data-row-menu]) { min-width: var(--row-action-width, max-content); }
+html:root .frame:not([data-table-presentation='calendar']) { width: 100%; min-width: 0; container-type: inline-size; container-name: v8-list-table; }
+@container v8-list-table (max-width: 1100px) { html:root .frame[data-shared-part='list-table']:not([data-collapse-scope='page']) .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
+html:root .actionCell { flex: none; min-width: max-content; }
+html:root .actionCell :is(button, a):not([data-row-menu]) { min-width: var(--row-action-width, max-content); }
 
 /* 既存の細いGridTableの判定も同じ器を使う。名前を置き換えない。 */
-html[data-theme='v8'] .frame[data-grid-table] { container-name: v8-list-table shared-grid-table; }
+html:root .frame[data-grid-table] { container-name: v8-list-table shared-grid-table; }
 
 /* 固定V8：名前の横に置く札を同じ1行にそろえる。 */
-html[data-theme='v8'] [data-list-name-cell] .name { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+html:root [data-list-name-cell] .name { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }

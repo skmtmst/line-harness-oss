@@ -128,7 +128,7 @@ function ruleChanged(rule: ActionScoreRule, published: ActionScoreRule | undefin
 
 type FriendsItem = ActionScoreOverview['items'][number]
 
-/** 手で直すときの失敗の言葉（app/mileage/action-score-adjustment-dialog.tsx から写した）。 */
+/** 手で直すときの失敗の言葉（現役の調整窓で使う）。 */
 function actionScoreAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 400) return error.message
@@ -437,7 +437,7 @@ export default function ScoreTab() {
       presentation="band"
       title={bandName(band, highMin, normalMin)}
       icon={icon}
-      value={ready ? value ?? 0 : null}
+      value={ready ? value ?? null : null}
       unit="人"
       detail={detail}
       onRetry={ready ? () => { setPage(1); setFilter(filter === band ? 'all' : band) } : undefined}
@@ -506,7 +506,7 @@ export default function ScoreTab() {
           <Bookmark size={15} aria-hidden="true" /> この分けかただと何人入るか
         </Button>
         <PerPageSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next) }} />
-        <Button href={broadcastHref}>
+        <Button href={broadcastHref} title={rangeQuery ? '点数がついている人のみ' : undefined}>
           <Send size={15} aria-hidden="true" /> この帯の人に送る
         </Button>
         {!readonly ? (
@@ -738,7 +738,11 @@ export default function ScoreTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
-      help="行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。"
+      help={<>
+        行の「…」から、点数の手直し・この人を見る。表の下の「できごとの決めごと」を開くと、できごとの編集・外す・＋ できごとを足す（30日間反応がない、も選べる）。公開中のルールを止めるときは、その題の横の「…」から。
+        スコアはマイルではありません。お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
+        {rangeQuery ? <Button variant="text" href={`/friends?${rangeQuery}`}>この帯の友だちを見る（点数がついている人のみ）</Button> : null}
+      </>}
       actions={readonly ? undefined : <div className={styles.headActions}>
         <Button href="/mileage/score-rules" title="決めごとの編集画面で1人分を試します">
           <UserRound size={15} aria-hidden="true" /> 1人で試す
@@ -992,7 +996,7 @@ export function ScoreAdjustDialog({
           /></SaveErrorField>
 <FieldError id="ml-score-reason-error">{fields.error('reason')}</FieldError></Field></div>
 
-        <p className={styles.dlgCaption}>この変更で起きること</p>
+        <p className={styles.dlgCaption} title="既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。">この変更で起きること</p>
         <div className={styles.delta3}>
           <div className={styles.deltaCell}>
             <p className={styles.deltaLabel}>変更前</p>
@@ -1125,7 +1129,7 @@ function ScoreHistoryDialog({
             {items.map((item) => (
               <tr key={item.id}>
                 <td className={styles.miniOneLine}><time dateTime={item.occurredAt}>{formatScoreHistoryTime(item.occurredAt)}</time></td>
-                <td className={styles.miniOneLine} title={actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}>{actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}</td>
+                <td className={styles.miniOneLine} title={`${actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}・${item.scoreBefore == null || item.scoreAfter == null ? '前後の点数は未取得' : `${formatMileageNumber(item.scoreBefore)} 点 → ${formatMileageNumber(item.scoreAfter)} 点`}・${item.mode === 'manual' ? `手で変更（${item.executedByStaffName ?? '担当者は未取得'}）` : '自動で加算'}`}>{actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}</td>
                 <td className={styles.miniNum}>
                   <span data-score-delta={item.scoreChange > 0 ? 'positive' : item.scoreChange < 0 ? 'negative' : 'zero'}>
                     {formatMileageChange(item.scoreChange)}

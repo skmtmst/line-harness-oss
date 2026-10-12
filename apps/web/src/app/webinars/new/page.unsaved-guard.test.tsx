@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 // @vitest-environment-options { "url": "http://localhost/webinars/new" }
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
@@ -23,7 +25,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -56,6 +58,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
   fixture.push.mockClear()
   fixture.create.mockReset()
   fixture.create.mockResolvedValue({ success: true, data: { id: 'new-webinar' } })
@@ -84,7 +87,7 @@ async function flush() {
 }
 
 function backLink(): HTMLAnchorElement {
-  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('ウェビナーへ'))
+  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('キャンセル'))
   if (!link) throw new Error('一覧への戻りリンクが見つかりません')
   return link as HTMLAnchorElement
 }
@@ -94,7 +97,7 @@ function dialog(): HTMLElement | null {
 }
 
 async function typeTitle(value: string) {
-  const titleInput = host.querySelector('#webinar-v8-title')! as HTMLInputElement
+  const titleInput = host.querySelector('#webinar-new-title')! as HTMLInputElement
   await act(async () => {
     fireEvent.change(titleInput, { target: { value } })
   })
@@ -164,6 +167,6 @@ describe('ウェビナー作成の未保存離脱確認（R18）', () => {
     await flush()
     expect(dialog()).toBeNull()
     expect(fixture.push).not.toHaveBeenCalled()
-    expect((host.querySelector('#webinar-v8-title') as HTMLInputElement).value).toBe('QAウェビナー')
+    expect((host.querySelector('#webinar-new-title') as HTMLInputElement).value).toBe('QAウェビナー')
   })
 })

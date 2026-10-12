@@ -19,7 +19,8 @@ describe('受信箱A-2 右パネルでその場で直す', () => {
 
   it('担当は選ぶ欄、タグは×で外す・＋で探して付ける・↑↓Enter・新規作成', () => {
     expect(SIDEBAR).toContain('inbox-panel-assignee')
-    expect(SIDEBAR).toContain('を外す')
+    expect(SIDEBAR).toContain('onRemove={canEditFriend')
+    expect(SIDEBAR).toContain('setTagToRemove')
     expect(SIDEBAR).toContain('探して付ける')
     expect(SIDEBAR).toContain('ArrowDown')
     expect(SIDEBAR).toContain('ArrowUp')

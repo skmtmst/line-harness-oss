@@ -938,6 +938,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onRenamePage={renameSection}
             onDuplicatePage={duplicateSection}
             onRemovePage={removeSection}
+            canUndoPageRemoval
             onSelectBlock={setSelectedBlockId}
             onAddBlock={addBlock}
             onPatchBlock={patchBlock}
@@ -966,6 +967,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
               setName(next)
               if (next.trim()) setNameError(null)
             }}
+            onBlurName={() => setNameError(name.trim() ? null : 'フォーム名を入力してください')}
             onChangeDescription={setDescription}
             onChangeOgTitle={setOgTitle}
             onChangeOgDescription={setOgDescription}

@@ -11,12 +11,8 @@
  */
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
-import Button from '@/components/shared/button'
-import { isImeComposing } from './ime'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import FolderEditorDialog from './folder-editor-dialog'
 import { describeFolderFailure } from './folder-failure'
 import { folderDisplayColor } from './folder-dot'
@@ -79,9 +75,9 @@ export default function FolderAddDialog({
   onAdded,
   onReload,
 }: FolderAddDialogProps) {
-  const theme = useAdminTheme()
+
   const [name, setName] = useState(folder?.name ?? '')
-  const [color, setColor] = useState<string | null>(theme === 'v8' ? (folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value) : folder?.color ?? FOLDER_COLORS[0])
+  const [color, setColor] = useState<string | null>((folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [nameError, setNameError] = useState('')
@@ -122,7 +118,7 @@ export default function FolderAddDialog({
     }
   }
 
-  if (theme === 'v8') return <FolderEditorDialog open
+  return <FolderEditorDialog open
     title={folder ? 'フォルダを直す' : 'フォルダを追加'} description={note}
     name={name} onNameChange={(next) => { setName(next); setNameError('') }} color={color} onColorChange={setColor}
     nameError={nameError || undefined}
@@ -131,67 +127,4 @@ export default function FolderAddDialog({
     onCancel={onClose} onConfirm={() => void add()} confirmLabel={folder ? '保存する' : '追加する'}
   />
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
-      <div className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-float">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-ink text-base font-bold">{folder ? 'フォルダを直す' : 'フォルダを追加'}</h2>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        {note && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{note}</p>}
-
-        <label className="mt-4 block">
-          <span className="text-ink-secondary mb-1 block text-xs font-medium">
-            フォルダ名 <span className="text-danger">*</span>
-          </span>
-          <input
-            type="text"
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              // 変換の確定の Enter で書きかけの名前を作らない。
-              if (e.key === 'Enter' && !isImeComposing(e) && name.trim()) void add()
-            }}
-            placeholder={placeholder}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-          />
-        </label>
-
-        <div className="mt-3">
-          <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
-          <div className="flex flex-wrap gap-2">
-            {FOLDER_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                aria-label={`色 ${c}`}
-                aria-pressed={color === c}
-                style={{ backgroundColor: c }}
-                className={`rounded-pill h-7 w-7 ${color === c ? 'ring-accent ring-2 ring-offset-2' : ''}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {error && <p className="text-danger mt-3 text-xs">{error}</p>}
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
-          >
-            キャンセル
-          </button>
-          <Button variant="primary" className="px-4 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void add()} disabled={saving || !name.trim()}>
-            {saving ? (folder ? '保存中…' : '追加中…') : (folder ? '保存する' : '追加する')}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
 }

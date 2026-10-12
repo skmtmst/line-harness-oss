@@ -19,7 +19,6 @@ import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
-/* ★V8 写し：src/app/contents/media-upload-dialog.tsx から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 
 type UploadState = 'ready' | 'preparing' | 'uploading' | 'verifying' | 'done' | 'error'
 

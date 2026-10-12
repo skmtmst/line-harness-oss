@@ -48,13 +48,15 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
 }))
 
 const navigation = vi.hoisted(() => ({ query: 'id=var-1' }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -135,12 +137,13 @@ const baseVar = {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
   navigation.query = 'id=var-1'
   api.foldersList.mockResolvedValue({ success: true, data: [] })
   api.schedules.mockResolvedValue({ success: true, data: [] })
-  api.impactPreview.mockResolvedValue({ success: true, data: { impactProof: 'proof-1' } })
-  api.deleteImpact.mockResolvedValue({ success: true, data: { total: 0, blockingTotal: 0, byKind: {}, items: [], checkedAt: '2026-09-16T00:00:00Z' } })
+  api.impactPreview.mockResolvedValue({ success: true, data: { impactProof: 'proof-1', canSave: true, total: 0, blockingTotal: 0, byKind: {}, items: [], unavailableReferences: [], checkedAt: '2026-09-16T00:00:00Z' } })
+  api.deleteImpact.mockResolvedValue({ success: true, data: { total: 0, blockingTotal: 0, byKind: {}, items: [], unavailableReferences: [], checkedAt: '2026-09-16T00:00:00Z' } })
   api.update.mockResolvedValue({ success: true, data: { id: 'var-1' } })
   api.addSchedule.mockResolvedValue({ success: true, data: { id: 's-1' } })
   api.deleteSchedule.mockResolvedValue({ success: true, data: null })
@@ -160,8 +163,8 @@ describe('共通情報の編集：フォルダ・予定の取得失敗は本体�
 
     // 本体は出る。
     expect((byId('cv-name') as HTMLInputElement).value).toBe('期間案内')
-    expect(document.body.textContent).toContain('はじめて登録')
-    expect(document.body.textContent).toContain('開店前のため')
+    expect(document.body.textContent).toContain('作成・担当')
+    expect(document.querySelector('[title="開店前のため"]')).not.toBeNull()
     // 画面全体の失敗にならない。
     expect(document.body.textContent).not.toContain('共通情報を読み込めませんでした')
     // フォルダ欄だけ失敗と再試行。
@@ -192,8 +195,8 @@ describe('共通情報の編集：フォルダ・予定の取得失敗は本体�
 
     // 本体は出たまま。
     expect((byId('cv-name') as HTMLInputElement).value).toBe('期間案内')
-    expect(document.body.textContent).toContain('はじめて登録')
-    expect(document.body.textContent).toContain('開店前のため')
+    expect(document.body.textContent).toContain('作成・担当')
+    expect(document.querySelector('[title="開店前のため"]')).not.toBeNull()
     expect(document.body.textContent).not.toContain('この共通情報は見つかりません')
     // 予定欄だけ失敗と再試行。
     expect(document.querySelector('[data-schedules-state="error"]')?.textContent).toContain('更新の予定')

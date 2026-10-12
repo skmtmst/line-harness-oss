@@ -106,6 +106,53 @@ function canRetryNow(item: WebhookInteraction, allowed: boolean): boolean {
   return allowed && item.canRetry && item.direction === 'outgoing' && item.status === 'failed'
 }
 
+function failureDetail(
+  items: WebhookInteraction[],
+  summary: WebhookInteractionList['summary'],
+): string {
+  if (summary.failed === 0) return '失敗はありません'
+  const parts: string[] = []
+  const incomingFailed = Math.max(0, summary.failed - summary.outgoingFailed)
+  if (summary.retryable > 0) {
+    const visibleFailures = items.filter((item) => item.status === 'failed' && item.direction === 'outgoing')
+    const firstDestination = visibleFailures[0]?.webhookName.split('／')[0]?.trim()
+    const sameDestination = firstDestination
+      && visibleFailures.length > 0
+      && visibleFailures.every((item) => item.webhookName.startsWith(firstDestination))
+    parts.push(sameDestination
+      ? `すべて${firstDestination}へ。うち${summary.retryable}件はここから送り直せます`
+      : `うち${summary.retryable}件はここから送り直せます`)
+  } else if (summary.outgoingFailed > 0) {
+    parts.push('ここからまとめて送り直せる失敗はありません。行ごとの理由を確かめてください')
+  }
+  const excluded = summary.outgoingFailed - summary.retryable
+  if (excluded > 0) {
+    parts.push(`${excluded}件は送り先の停止・削除・自動の送り直し中などで対象外です`)
+  }
+  if (summary.resultUnknown > 0) {
+    parts.push(`うち${summary.resultUnknown}件は届いたか分からないため、相手先で確かめてからやり直します`)
+  }
+  if (incomingFailed > 0) {
+    parts.push(`受け取りの失敗${incomingFailed}件は相手側で送り直してもらってください`)
+  }
+  return parts.join('。') || '失敗はありません'
+}
+
+/**
+ * 遅れと成功率の対象期間をカードの補足へ書く(IDEA-26)。
+ * 「いつからいつまでの数字か」が分からないと、遅い・悪いの判断が付かない。
+ */
+function durationDetail(
+  items: WebhookInteraction[],
+  averageDurationMs: number | null,
+  periodDays: number,
+): string {
+  if (averageDurationMs == null) return `この${periodDays}日は未取得`
+  const durations = items.flatMap((item) => item.durationMs == null ? [] : [item.durationMs])
+  if (durations.length === 0) return `この${periodDays}日の送受信の処理時間`
+  return `この${periodDays}日でいちばん遅くて ${Math.round(Math.max(...durations) / 100) / 10}秒`
+}
+
 export default function WebhooksInteractionsV8() {
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -253,12 +300,12 @@ export default function WebhooksInteractionsV8() {
     {
       key: 'failed', title: '失敗', icon: <TriangleAlert size={13} aria-hidden="true" />,
       value: known ? known.failed : null, unit: '件',
-      detail: known ? `やり直せるもの ${formatNumber(known.retryable)}` : '集計を読み込めませんでした',
+      detail: known ? <span title={failureDetail(data.items, summary)}>{`やり直せるもの ${formatNumber(known.retryable)}`}</span> : '集計を読み込めませんでした',
     },
     {
       key: 'all', title: 'すべて', icon: <LayoutList size={13} aria-hidden="true" />,
       value: known ? known.total : null, unit: '回',
-      detail: known ? `この${periodDays}日` : '集計を読み込めませんでした',
+      detail: known ? <span title={`この${periodDays}日で ${formatNumber(known.total > 0 ? Math.round(known.succeeded / known.total * 1000) / 10 : 0)}%成功。平均 ${seconds(known.averageDurationMs)}。${durationDetail(data.items, known.averageDurationMs, periodDays)}`}>{`この${periodDays}日`}</span> : '集計を読み込めませんでした',
     },
   ]
 

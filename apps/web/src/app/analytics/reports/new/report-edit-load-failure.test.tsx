@@ -58,7 +58,7 @@ describe('なおす対象の読み込み失敗（WEB308）', () => {
     net.runsStatus = 503
     await view.render(<Page />)
     await settle()
-    expect(view.host.textContent).toContain('定期レポートを表示できませんでした')
+    expect(view.host.textContent).toContain('定期レポートを読み込めませんでした')
     expect(view.host.textContent).not.toContain('見つかりませんでした')
   })
 

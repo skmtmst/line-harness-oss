@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const health = vi.hoisted(() => ({ health: vi.fn(), healthSummary: vi.fn() }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -23,7 +23,7 @@ vi.mock('@/lib/api', () => ({
   ApiError: class extends Error { status?: number; code?: string },
 }))
 
-import HealthPageV8 from './health-v8'
+import HealthPageV8 from '@/v8/nen-health/health'
 
 const flush = () => act(async () => { await Promise.resolve() })
 
@@ -97,14 +97,14 @@ describe('健康日記 V8', () => {
     expect(container.querySelector('[data-design-node="z2tvtX"]')).toBeTruthy()
     expect(screen.getByText('記録の形')).toBeTruthy()
     expect(screen.getByText('「気になる変化」に出る条件')).toBeTruthy()
-    expect(screen.getByText('30日のまとめ', { selector: 'th' })).toBeTruthy()
+    expect(screen.getByText('30日のまとめ', { selector: '[role=columnheader]' })).toBeTruthy()
   })
 
   it('行の「…」に飼い主を開く・トークで声をかけるが出る', async () => {
     health.health.mockResolvedValue({ success: true, data: listData })
     render(<HealthPageV8 accountId="account-a" tab="logs" onChangeTab={() => undefined} />)
     await screen.findByText('こむぎ')
-    fireEvent.click(screen.getByRole('button', { name: 'こむぎのその他操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '「こむぎ」の操作' }))
     expect(await screen.findByRole('menuitem', { name: '飼い主を開く' })).toBeTruthy()
     expect(await screen.findByRole('menuitem', { name: '飼い主にトークで声をかける' })).toBeTruthy()
   })
@@ -114,10 +114,10 @@ describe('健康日記 V8', () => {
     health.healthSummary.mockResolvedValue({ success: true, data: summaryData })
     const { container } = render(<HealthPageV8 accountId="account-a" tab="logs" onChangeTab={() => undefined} />)
     await screen.findByText('こむぎ')
-    fireEvent.click(screen.getByRole('button', { name: 'こむぎのその他操作' }))
+    fireEvent.click(screen.getByRole('button', { name: '「こむぎ」の操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: '30日のまとめ' }))
     expect(await screen.findByText('健康日記 30日のまとめ')).toBeTruthy()
-    expect(container.querySelector('[data-design-node="BVuYh"]')).toBeTruthy()
+    expect(document.querySelector('[data-design-node="BVuYh"]')).toBeTruthy()
     expect(screen.getByText('印刷・PDF に保存する')).toBeTruthy()
   })
 })

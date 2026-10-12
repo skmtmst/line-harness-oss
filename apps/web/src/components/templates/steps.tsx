@@ -17,7 +17,7 @@ type DotState = 'done' | 'current' | 'todo' | 'attention'
  * - 済みの段（と直すところがある段）は押して戻れる。まだの段・今の段は押せない
  * - 入らない幅では、今の段だけ名を出し、ほかは丸だけにして1行を守る（名は読み上げと title に残す）
  *
- * 渡し方は v7 の Stepper と同じ（label・steps・currentKey）。v7 の画面は Stepper のまま。
+ * 渡し方は共通の型（label・steps・currentKey）。手順の見た目はこのV8部品だけを使う。
  */
 export function Steps({
   label,

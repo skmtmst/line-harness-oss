@@ -23,7 +23,7 @@
 }
 
 /* 競合の帯（tJqST）：頭の下・左右の列の上に板いっぱい。型の「頭と本文の間の段」に置く。 */
-:global([data-theme='v8'] [data-page-template='create']) > :global(div):has(> .conflictBand) {
+:global(:root [data-page-template='create']) > :global(div):has(> .conflictBand) {
   display: block;
 }
 .conflictBand {

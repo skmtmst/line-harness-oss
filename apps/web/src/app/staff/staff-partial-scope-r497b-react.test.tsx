@@ -12,6 +12,7 @@
  * - 行を触った保存は触った行だけ変え、分析の1キーを残す
  * - 保存後の読み直しが保存内容と一致する
  */
+import '@/test-utils/staff-location-reset'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
@@ -23,7 +24,8 @@ const fixture = vi.hoisted(() => ({
   updated: [] as Array<{ id: string; data: unknown }>,
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}`),
@@ -33,7 +35,7 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => <nav aria-label="ログインユーザーのタブ" />,
   useMergedTab: () => fixture.tab,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/components/staff/login-audit', () => ({ default: () => <div /> }))
 vi.mock('qrcode', () => ({ default: { toDataURL: vi.fn().mockResolvedValue('') } }))
 
@@ -112,10 +114,10 @@ const { default: StaffPage } = await import('./page')
 async function openScopeView() {
   await act(async () => { render(<StaffPage />) })
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: '中身を見る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /の中身を見る$/ })).toBeTruthy()
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: '中身を見る' }))
+    fireEvent.click(screen.getByRole('button', { name: /の中身を見る$/ }))
   })
   await waitFor(() => {
     expect(screen.getByText('この決め方で、この人にはこう見えます')).toBeTruthy()
@@ -157,7 +159,7 @@ describe('R497b 一部だけ許可の表示と保存', () => {
     // 機能11行（来店スタンプを含む）のうち出るのは受信箱だけ、一部（分析）はどちらにも数えない。
     expect(screen.getByText(/メニューに出るのは1項目/)).toBeTruthy()
     expect(screen.getByText(/出さないのは9項目/)).toBeTruthy()
-    expect(screen.getByText(/一部だけ許可が1行あります/)).toBeTruthy()
+    expect(screen.getByText(/一部だけ許可が1\s*行あります/)).toBeTruthy()
   })
 
   test('何も変えない保存は更新要求を送らず、窓だけ閉じる', async () => {
@@ -224,7 +226,7 @@ describe('R497b 一部だけ許可の表示と保存', () => {
       expect(screen.queryByText('この決め方で、この人にはこう見えます')).toBeNull()
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '中身を見る' }))
+      fireEvent.click(screen.getByRole('button', { name: /の中身を見る$/ }))
     })
     await waitFor(() => {
       expect(screen.getByText('この決め方で、この人にはこう見えます')).toBeTruthy()

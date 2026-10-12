@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -8,7 +9,7 @@ const MENU = readFileSync(
   join(HERE, '..', '..', 'components', 'forms', 'block-editor.tsx'),
   'utf8',
 )
-const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const EDITOR = readFileSync(
   join(HERE, '..', '..', 'components', 'forms', 'block-editor.tsx'),
   'utf8',
@@ -24,8 +25,9 @@ describe('F11 5段階評価・住所の板', () => {
     expect(MENU).toContain("{ kind: 'input', type: 'address', label: '住所', group: '入力' }")
   })
 
-  it('足す口に WOPjZ の板IDが付く', () => {
-    expect(EDIT_PAGE).toContain('data-design-node="WOPjZ"')
+  it('現役の足す口も5段階評価と住所を選べる', () => {
+    expect(EDIT_PAGE).toContain("'rating'")
+    expect(EDIT_PAGE).toContain("'address'")
   })
 
   it('足す口に予約を入れるがあり、設定に ijxur の板IDが付く', () => {

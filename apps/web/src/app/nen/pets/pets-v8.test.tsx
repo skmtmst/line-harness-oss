@@ -12,7 +12,7 @@ const pets = vi.hoisted(() => ({ pets: vi.fn() }))
 const feeding = vi.hoisted(() => ({ feeding: vi.fn(), saveFeeding: vi.fn() }))
 const staffMe = vi.hoisted(() => ({ me: vi.fn() }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -28,7 +28,7 @@ vi.mock('@/lib/api', () => ({
   describeSaveFailure: () => '保存できませんでした。',
 }))
 
-import PetsPageV8 from './pets-v8'
+import PetsPageV8 from '@/v8/nen-pets/pets'
 
 const flush = () => act(async () => { await Promise.resolve() })
 
@@ -77,7 +77,7 @@ describe('マイペット V8', () => {
       expect(screen.getByText(head)).toBeTruthy()
     }
     expect(screen.getByText('田中 明子')).toBeTruthy()
-    expect(await screen.findByText('マイページで更新を促す', { exact: false })).toBeTruthy()
+    expect(await screen.findByText('マイページで更新を促す', { exact: false, selector: 'p' })).toBeTruthy()
   })
 
   it('ごはんの目安は h7A2F の印で節と計算のカードを出す', async () => {

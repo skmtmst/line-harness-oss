@@ -6,7 +6,7 @@
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { MembersKpiBand } from './members-v8'
+import { MembersKpiBand } from '@/v8/nen-members/members'
 
 afterEach(cleanup)
 
@@ -37,6 +37,8 @@ describe('会員の数の帯（F-19）', () => {
     expect(screen.getByText('5')).toBeTruthy()
     expect(screen.getByText('¥10,000')).toBeTruthy()
     expect(screen.getByText('会員 2 人')).toBeTruthy()
+    expect(screen.getByTitle(/通年の購入 合計 ¥211,000/).title).toContain('マイル残高 3,960')
+    expect(screen.getByTitle(/通年の購入 合計 ¥211,000/).title).toContain('今月使ったマイル 500')
   })
 
   it('読み込み中は数を伏せる', () => {

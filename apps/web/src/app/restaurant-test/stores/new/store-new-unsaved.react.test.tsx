@@ -9,10 +9,10 @@ const fixture = vi.hoisted(() => ({
   agreeToTerms: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.routerPush }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1' }),
 }))
@@ -22,14 +22,12 @@ vi.mock('@/lib/restaurant-test-api', () => ({
     agreeToTerms: fixture.agreeToTerms,
   },
 }))
-// 規約の読み進めは部品自身の試験が持つ。ここでは同意ボタンのみ出す。
-vi.mock('./terms-consent', () => ({
-  default: ({ onAgree }: { onAgree: () => Promise<void> }) => (
-    <button type="button" onClick={() => void onAgree()}>規約に同意する</button>
-  ),
-}))
-
 import NewRestaurantStorePage from './page'
+
+async function agree() {
+  fireEvent.click(await screen.findByRole('checkbox', { name: /上記の利用規約/ }))
+  fireEvent.click(screen.getByRole('button', { name: '同意して次へ進む' }))
+}
 
 beforeEach(() => {
   fixture.termsAgreement.mockResolvedValue({ data: { agreedVersion: null, agreedAt: null } })
@@ -44,30 +42,28 @@ afterEach(() => {
 describe('R161: 店舗追加の書きかけがある間の離脱確認', () => {
   it('店舗名を入れて統括へ戻ると確認が出て、入力継続で内容が残る', async () => {
     render(<NewRestaurantStorePage />)
-    fireEvent.click(await screen.findByRole('button', { name: '規約に同意する' }))
-    await screen.findByText('店舗の基本情報')
-    // この画面の Field は label と input が組づけされていないため、先頭の入力欄を店舗名として掴む。
-    const nameBox = screen.getAllByRole('textbox')[0]
+    await agree()
+    await screen.findByRole('heading', { name: '店舗の基本情報' })
+    const nameBox = screen.getByRole('textbox', { name: '店舗名' })
     fireEvent.change(nameBox, { target: { value: '渋谷店' } })
 
-    fireEvent.click(screen.getByRole('link', { name: '統括へ戻る' }))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await screen.findByText('保存していない変更があります')
     expect(fixture.routerPush).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
     await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
-    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('渋谷店')
+    expect((screen.getByRole('textbox', { name: '店舗名' }) as HTMLInputElement).value).toBe('渋谷店')
   })
 
   it('破棄を選んだときだけ統括へ進む', async () => {
     render(<NewRestaurantStorePage />)
-    fireEvent.click(await screen.findByRole('button', { name: '規約に同意する' }))
-    await screen.findByText('店舗の基本情報')
-    // この画面の Field は label と input が組づけされていないため、先頭の入力欄を店舗名として掴む。
-    const nameBox = screen.getAllByRole('textbox')[0]
+    await agree()
+    await screen.findByRole('heading', { name: '店舗の基本情報' })
+    const nameBox = screen.getByRole('textbox', { name: '店舗名' })
     fireEvent.change(nameBox, { target: { value: '渋谷店' } })
 
-    fireEvent.click(screen.getByRole('link', { name: '統括へ戻る' }))
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
     await screen.findByText('保存していない変更があります')
 
     fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
@@ -78,9 +74,9 @@ describe('R161: 店舗追加の書きかけがある間の離脱確認', () => {
 describe('faGn4: 店舗の基本情報の案内', () => {
   it('プロバイダーの注意・同意済み・キャンセルが出る', async () => {
     render(<NewRestaurantStorePage />)
-    fireEvent.click(await screen.findByRole('button', { name: '規約に同意する' }))
-    await screen.findByText('店舗の基本情報')
-    await screen.findByText('店舗ごとに、新しいプロバイダーを作ってください。')
+    await agree()
+    await screen.findByRole('heading', { name: '店舗の基本情報' })
+    await screen.findByText(/^店舗ごとに、新しいプロバイダーを作ってください。/)
     await screen.findByText(/利用規約に同意済み/)
     expect(screen.getByRole('link', { name: 'キャンセル' })).toBeTruthy()
   })

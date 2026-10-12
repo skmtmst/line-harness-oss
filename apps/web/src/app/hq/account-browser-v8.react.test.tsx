@@ -1,67 +1,82 @@
 // @vitest-environment happy-dom
-import React, { act } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import React from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
-import type { HqBrowserAccount } from './account-browser-v8'
-import AccountBrowser from './account-browser-v8'
-vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
-vi.mock('@/lib/api', () => ({
-  api: { lineAccountTags: { list: async () => ({ success: true, data: [] }) } },
-}))
-afterEach(cleanup)
-const baseProps = {
-  onDetail: vi.fn(),
-  onRestore: vi.fn(),
-  onRefreshConnection: vi.fn(),
-  checkingConnections: false as boolean,
-  onChanged: vi.fn(),
-}
+import type { AccountWithStats } from '@/contexts/account-context'
+import AccountBrowser from '@/v8/hq/home'
+
+const mocks = vi.hoisted(() => ({ list: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), restore: vi.fn(), stepUp: vi.fn() }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: mocks.push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() }) }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: mocks.select, refreshAccounts: mocks.refresh }) }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+vi.mock('@/lib/api', async (original) => {
+  const actual = await original<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api,
+    lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, restore: mocks.restore },
+    lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
+    tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '統括' } })) },
+    auth: { ...actual.api.auth, stepUp: mocks.stepUp },
+  } }
+})
+
 const accounts = Array.from({ length: 23 }, (_, i): AccountWithStats => ({ id: `a${i}`, name: `店舗${String(i).padStart(2, '0')}`, channelId: `channel${i}`, basicId: `@shop${i}`, isActive: true, country: null, role: i === 11 ? 'viewer' : 'owner', displayOrder: i, connection: { status: i === 11 ? 'warn' : 'ok', checkedAt: null }, stats: { friendCount: i, messagesThisMonth: i * 2, activeScenarios: 0, staffCount: 1 } }))
+beforeEach(() => {
+  vi.clearAllMocks(); window.history.replaceState(null, '', '/hq'); window.dispatchEvent(new PopStateEvent('popstate'))
+  mocks.list.mockResolvedValue({ success: true, data: accounts })
+  mocks.refresh.mockResolvedValue(undefined)
+  mocks.restore.mockResolvedValue({ success: true, data: {} })
+  mocks.stepUp.mockResolvedValue({ success: true, data: { token: 'grant-1' } })
+})
+afterEach(() => { cleanup(); window.history.replaceState(null, '', '/') })
+
 describe('V8 統括のアカウントを探す', () => {
-  it('2ページ目のアカウントへ入る時は表示した行のIDを渡す', () => {
-    const select = vi.fn()
-    render(<AccountBrowser accounts={accounts} onSelect={select} onSettings={vi.fn()} {...baseProps} />)
+  it('2ページ目のアカウントへ入る時は表示した行のIDを渡す', async () => {
+    render(<AccountBrowser />); await screen.findByText('店舗22')
     expect(screen.queryByText('店舗00')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' }))
     fireEvent.click(screen.getAllByRole('button', { name: / へ入る$/ })[0])
-    expect(select).toHaveBeenCalledWith('a2')
-    expect(screen.getByText(/21〜23件/)).toBeTruthy()
+    expect(mocks.select).toHaveBeenCalledWith('a2')
+    expect(screen.getByText(/21〜23\s*件/)).toBeTruthy()
   })
-  it('LINE ID検索でページを戻し、閲覧者の設定ボタンを無効にする', async () => {
-    const settings = vi.fn()
-    render(<AccountBrowser accounts={accounts} onSelect={vi.fn()} onSettings={settings} {...baseProps} />)
+  it('LINE ID検索でページを戻し、閲覧者の設定操作を出さない', async () => {
+    render(<AccountBrowser />); await screen.findByText('店舗22')
     fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' }))
-    fireEvent.change(screen.getByRole('searchbox', { name: 'アカウント名・LINE ID・タグで探す' }), { target: { value: '@shop11' } })
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
-    expect(screen.getByText('店舗11')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '店舗11 の設定' }).hasAttribute('disabled')).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: '店舗11 の設定' }))
-    expect(settings).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByRole('searchbox', { name: 'アカウント名・LINE ID・タグで探す' }), { target: { value: '' } })
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
-    expect(screen.getByText('店舗22')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '1ページ目へ' }).getAttribute('aria-current')).toBe('page')
+    fireEvent.change(screen.getByRole('searchbox', { name: '名前・LINE ID・フォルダで探す' }), { target: { value: '@shop11' } })
+    await screen.findByText('店舗11')
+    expect(screen.queryByRole('button', { name: '店舗11 の設定' })).toBeNull()
+    expect(screen.getByRole('button', { name: '店舗11 へ入る' })).toBeTruthy()
+    fireEvent.change(screen.getByRole('searchbox', { name: '名前・LINE ID・フォルダで探す' }), { target: { value: '' } })
+    await screen.findByText('店舗22')
+    await waitFor(() => expect(screen.getByRole('button', { name: '1ページ目へ' }).getAttribute('aria-current')).toBe('page'))
   })
-  it('タグを追加する窓が開く', () => {
-    render(<AccountBrowser accounts={accounts} onSelect={vi.fn()} onSettings={vi.fn()} {...baseProps} />)
-    fireEvent.click(screen.getByRole('button', { name: 'タグを追加' }))
-    expect(screen.getByText('タグの名前')).toBeTruthy()
+  it('分類のフォルダを追加する窓が開く', async () => {
+    render(<AccountBrowser />); await screen.findByText('店舗22')
+    fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
+    expect(screen.getByRole('textbox', { name: 'フォルダの名前' })).toBeTruthy()
   })
-  it('アーカイブは詳細と戻すだけを出す', () => {
+  it('アーカイブは詳細と戻すだけを出し、本人確認して戻す', async () => {
     const archived: AccountWithStats = { id: 'old', name: '旧キャンペーン', channelId: 'c-old', basicId: '@nen-old', isActive: false, country: null, role: 'owner', displayOrder: 99, archivedAt: '2026-01-01', stats: { friendCount: 0, messagesThisMonth: 0, activeScenarios: 0, staffCount: 0 } }
-    const restore = vi.fn()
-    const detail = vi.fn()
-    render(<AccountBrowser accounts={[archived]} onSelect={vi.fn()} onSettings={vi.fn()} {...baseProps} onDetail={detail} onRestore={restore} />)
+    mocks.list.mockResolvedValue({ success: true, data: [archived] })
+    render(<AccountBrowser />); await screen.findByText('旧キャンペーン')
     fireEvent.click(screen.getByRole('button', { name: /^アーカイブ/ }))
     expect(screen.getByRole('button', { name: '詳細' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '戻す' }))
-    expect(restore).toHaveBeenCalledWith(archived)
     expect(screen.queryByRole('button', { name: / へ入る$/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '戻す' }))
+    const dialog = await screen.findByRole('dialog', { name: '「旧キャンペーン」をアーカイブから戻しますか？' })
+    expect(mocks.restore).not.toHaveBeenCalled()
+    const digits = within(dialog).getAllByRole('textbox')
+    expect(digits).toHaveLength(6)
+    digits.forEach((digit, index) => fireEvent.change(digit, { target: { value: String(index + 1) } }))
+    await waitFor(() => expect(mocks.restore).toHaveBeenCalledWith('old', 'grant-1'))
+    expect(mocks.stepUp).toHaveBeenCalledWith({ method: 'totp', value: '123456', purpose: 'line_account.archive' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
-  it('接続状態の絞り込みと表へ切り替えても同じアカウントを表示する', () => {
-    render(<AccountBrowser accounts={accounts} onSelect={vi.fn()} onSettings={vi.fn()} {...baseProps} />)
+  it('接続状態の絞り込みと表へ切り替えても同じアカウントを表示する', async () => {
+    render(<AccountBrowser />); await screen.findByText('店舗22')
     fireEvent.click(screen.getByRole('button', { name: /^要確認/ }))
-    fireEvent.click(screen.getByRole('button', { name: '表で見る' }))
+    fireEvent.click(screen.getByRole('button', { name: '表' }))
     expect(screen.getAllByRole('row')).toHaveLength(2)
     expect(screen.getByText('店舗11')).toBeTruthy()
     expect(screen.queryByText('店舗00')).toBeNull()

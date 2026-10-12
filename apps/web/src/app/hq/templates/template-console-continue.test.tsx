@@ -11,7 +11,7 @@ import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import TemplateConsole from './template-console'
+import TemplateConsole from '@/test-utils/hq-template-console'
 
 const calls = vi.hoisted(() => ({
   context: vi.fn(),

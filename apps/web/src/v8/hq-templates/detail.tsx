@@ -29,6 +29,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import { ListEmptyMessage } from '@/components/shared/list-state'
 
 /** 「8月21日 18:02」（日本時間）。 */
 function stamp(iso: string): string {
@@ -133,7 +134,7 @@ export default function HqTemplateDetail({
   }
   const compareBox = compare ? (
     compare.error ? <Notice tone="danger" >{compare.error}</Notice>
-      : !compare.result ? <p className={styles.empty} role="status">比べています…</p>
+      : !compare.result ? <ListEmptyMessage role="status">比べています…</ListEmptyMessage>
       : (
         <ChangeBox
           title={`比べる（版${compare.from} → 版${compare.to}）`}
@@ -293,9 +294,9 @@ export default function HqTemplateDetail({
                   {enterButton(accountIdOf(name))}
                 </div>
               ))}
-              {more > 0 ? <div className={styles.moreRow}><span className={styles.empty}>{`ほか ${more} アカウント`}</span></div> : null}
+              {more > 0 ? <div className={styles.moreRow}><ListEmptyMessage as="span">{`ほか ${more} アカウント`}</ListEmptyMessage></div> : null}
             </>
-          ) : <p className={styles.empty}>まだ配っていません</p>}
+          ) : <ListEmptyMessage>まだ配っていません</ListEmptyMessage>}
           {canEdit ? (
             <div className={styles.moreRow}>
               <button type="button" className={styles.ghostButton} onClick={onDistribute} disabled={busy}>配る先を変える</button>

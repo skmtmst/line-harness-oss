@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
-import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState } from '@/components/ops/knowledge-format'
+import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState, knowledgeArticleKind } from '@/components/ops/knowledge-format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import KpiCard from '@/components/shared/kpi-card'
@@ -161,7 +161,7 @@ export default function OpsKnowledgeV8() {
               return (
                 <div key={article.id} className={`${parts.miniRow} ${styles.row}`} role="row">
                   <span className={parts.grow} role="cell" title={article.title}>{article.title}</span>
-                  <span className={`${parts.fixed} ${styles.colKind}`} role="cell">{shortKind(article.kind)}</span>
+                  <span className={`${parts.fixed} ${styles.colKind}`} role="cell" title={knowledgeArticleKind(article.articleKind).label}>{shortKind(article.kind)}</span>
                   <span className={`${parts.fixed} ${styles.colKind}`} role="cell"><StatusBadge tone={STATE_TONE[label] ?? 'neutral'}>{label}</StatusBadge></span>
                   <span className={`${parts.num} ${styles.colKind}`} role="cell">{article.usedCount ? article.usedCount : emptyValue('unknown')}</span>
                   <span className={`${parts.num} ${styles.colShort}`} role="cell">{article.helpfulCount ? article.helpfulCount : emptyValue('unknown')}</span>

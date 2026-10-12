@@ -54,11 +54,13 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (url: string) => { mockNet.pushed.push(url) }, replace: () => {}, back: () => {} }),
   useSearchParams: () => new URLSearchParams(mockNet.query),
   usePathname: () => '/tags/new',
 }))
+
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'a1', selectedAccount: { id: 'a1', name: '店舗A' } }),
@@ -78,10 +80,10 @@ describe('D011 フォルダ一覧の取得失敗', () => {
   test('通常作成では複製元の文言を出さず、フォルダ欄に理由と読み直しを出す', async () => {
     mockNet.query = ''
     mockNet.foldersMode = 'fail'
-    const { default: NewTagPageV4 } = await import('./new-tag-page-v4')
-    render(<NewTagPageV4 />)
+    const { default: TagCreate } = await import('@/v8/tags/create')
+    render(<TagCreate />)
 
-    await screen.findByText('フォルダを読み込めませんでした。未分類で作るか、読み直してください。')
+    await screen.findByText('フォルダを読み込めませんでした。未分類のまま作れます。')
     expect(screen.getByRole('button', { name: 'フォルダを読み直す' })).not.toBeNull()
     // 複製していないのに複製元の失敗は出さない。
     expect(screen.queryByText('複製元のタグを読み込めませんでした')).toBeNull()
@@ -92,8 +94,8 @@ describe('D011 フォルダ一覧の取得失敗', () => {
   test('読み直しで回復したら失敗表示が消える', async () => {
     mockNet.query = ''
     mockNet.foldersMode = 'fail'
-    const { default: NewTagPageV4 } = await import('./new-tag-page-v4')
-    render(<NewTagPageV4 />)
+    const { default: TagCreate } = await import('@/v8/tags/create')
+    render(<TagCreate />)
     const retry = await screen.findByRole('button', { name: 'フォルダを読み直す' })
 
     mockNet.foldersMode = 'ok'
@@ -101,14 +103,14 @@ describe('D011 フォルダ一覧の取得失敗', () => {
       fireEvent.click(retry)
     })
     await act(async () => {})
-    expect(screen.queryByText('フォルダを読み込めませんでした。未分類で作るか、読み直してください。')).toBeNull()
+    expect(screen.queryByText('フォルダを読み込めませんでした。未分類のまま作れます。')).toBeNull()
   })
 
   test('複製元の取得失敗は複製元の文言で出し、入力欄は残す', async () => {
     mockNet.query = 'copy=t9'
     mockNet.definitionMode = 'fail'
-    const { default: NewTagPageV4 } = await import('./new-tag-page-v4')
-    render(<NewTagPageV4 />)
+    const { default: TagCreate } = await import('@/v8/tags/create')
+    render(<TagCreate />)
 
     await screen.findByText('複製元のタグを読み込めませんでした')
     expect(screen.getByRole('button', { name: 'タグを作る' })).not.toBeNull()
@@ -118,9 +120,9 @@ describe('D011 フォルダ一覧の取得失敗', () => {
 describe('D012 保存して続けて作る', () => {
   test('成功後に作ったタグ名を残し、再読み込みしても分かる', async () => {
     mockNet.query = ''
-    const { default: NewTagPageV4 } = await import('./new-tag-page-v4')
-    const { rerender } = render(<NewTagPageV4 />)
-    const nameInput = await screen.findByLabelText('タグ名', { exact: false })
+    const { default: TagCreate } = await import('@/v8/tags/create')
+    const { rerender } = render(<TagCreate />)
+    const nameInput = await screen.findByRole('textbox', { name: 'タグ名', exact: true })
     await act(async () => {
       fireEvent.change(nameInput, { target: { value: 'リピーター' } })
     })
@@ -134,7 +136,7 @@ describe('D012 保存して続けて作る', () => {
 
     // URL に残った名前で開き直すと、成功の帯に作った名前が出る。
     mockNet.query = 'created=リピーター'
-    rerender(<NewTagPageV4 />)
+    rerender(<TagCreate />)
     await screen.findByText('「リピーター」を作成しました。続けて新しいタグを作れます。')
   })
 })

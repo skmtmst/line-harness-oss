@@ -16,7 +16,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8 ウェビナーの編集 ①基本設定（並びは作る j7PP04 と同じ）。
- * 保存の決まり（版のある設定を先・競合したら基本情報は書き換えない）は app/webinars/edit/basic-v8.tsx と同じ。
+ * 版のある設定を先に保存し、競合したら基本情報は書き換えない。
  */
 
 export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: { ctx: EditContext; chrome: WizardChrome } & PaneSaveProps) {
@@ -161,7 +161,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       boardId="j7PP04"
       title={chrome.title}
       actions={chrome.actions}

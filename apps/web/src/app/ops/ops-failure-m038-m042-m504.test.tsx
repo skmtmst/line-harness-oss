@@ -10,11 +10,11 @@ import OpsInvitePage from './invite/page'
 import OpsLoginPage from './login/page'
 import OpsTwoFactorPage from './two-factor/page'
 import OpsTenantsPage from './tenants/page'
-import KnowledgeList from '@/components/ops/knowledge-list'
+import KnowledgeList from '@/v8/ops/knowledge'
 import { qrToDataURL } from '@/lib/qr-image'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/ops/announcements',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }))
@@ -35,12 +35,12 @@ class MemoryStorage implements Storage {
 }
 
 const src = (...parts: string[]) => readFileSync(join(process.cwd(), 'src', ...parts), 'utf8')
-const ANN = src('app', 'ops', 'announcements', 'page.tsx')
-const INV = src('app', 'ops', 'invite', 'page.tsx')
-const LOG = src('app', 'ops', 'login', 'page.tsx')
-const TEN = src('app', 'ops', 'tenants', 'page.tsx')
-const TFA = src('app', 'ops', 'two-factor', 'page.tsx')
-const KNL = src('components', 'ops', 'knowledge-list.tsx')
+const ANN = src('v8', 'ops', 'announcements.tsx')
+const INV = src('v8', 'ops', 'invite.tsx')
+const LOG = src('v8', 'ops', 'login.tsx')
+const TEN = src('v8', 'ops', 'tenants.tsx')
+const TFA = src('v8', 'ops', 'two-factor.tsx')
+const KNL = src('v8', 'ops', 'knowledge.tsx')
 
 /**
  * M038・M040・M042・M039・M041・M504 の失敗表示の契約。

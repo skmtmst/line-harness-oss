@@ -76,13 +76,6 @@
 
 @media (min-width: 1024px) {
   /* 本文の上余白は14px。★V6 260枚すべてで例外がなかった値（§4）。 */
-  .content {
-    padding: 14px 40px 32px;
-  }
-
-  .contentFull {
-    padding: 14px 40px 32px;
-  }
 }
 
 /*
@@ -136,7 +129,7 @@
  * PC 幅（1024px 以上）だけの見た目で、モバイルの引き出しは v7 のまま。
  * ------------------------------------------------------------------- */
 @media (min-width: 1024px) {
-  [data-theme="v8"] .main {
+  :root .main {
     /* 左メニュー（240）が右に12の余白を持つので、板の左は0。右12・下12（zUg8S）。
        左にも12を足すと間が二重（24）になり、板が狭くなって表がはみ出す。 */
     margin: 0 12px 12px 0;
@@ -147,8 +140,8 @@
   }
 
   /* 板の中の余白は板が持つ。内容の左右は 24px。 */
-  [data-theme="v8"] .content,
-  [data-theme="v8"] .contentFull {
+  :root .content,
+  :root .contentFull {
     padding: 20px 24px 28px;
   }
 }
@@ -161,13 +154,13 @@
  * PC 幅（1024px 以上）だけ。スマホは固定ヘッダーとページ全体の送りのまま。
  */
 @media (min-width: 1024px) {
-  [data-theme="v8"] .shell {
+  :root .shell {
     height: 100dvh;
     min-height: 0;
   }
 
   /* 中の絶対配置（読み上げ用の隠し文字など）が板の外へ出てページを伸ばさないよう、板を基準にする。 */
-  [data-theme="v8"] .main {
+  :root .main {
     position: relative;
     min-height: 0;
     overscroll-behavior: contain;
@@ -182,11 +175,11 @@
 /* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの
    固定ヘッダー分の上余白は 1024px から要らない。 */
 @media (min-width: 1024px) and (max-width: 1279.98px) {
-  [data-theme="v8"] .side {
+  :root .side {
     padding-top: 0;
   }
 
-  [data-theme="v8"] .workspace > .main {
+  :root .workspace > .main {
     padding-top: 0;
   }
 }
@@ -198,7 +191,7 @@
  * 1280px 未満では中のメニューは上の帯（1024〜1279）か畳み（1024 未満）
  * になるので、板の中は上下に積む（MIGRATION-RISKS §4）。
  * ------------------------------------------------------------------- */
-[data-theme="v8"] .contentSettings {
+:root .contentSettings {
   padding: 0;
 }
 
@@ -207,7 +200,7 @@
    `SettingsInnerNav` ではないため、上の `contentSettings`（道で決まる）は
    使えない。画面側が付ける `data-board-bleed` を目印にして、板の余白だけ
    取る。余白は画面側（頭と中身）が持つ。 */
-[data-theme="v8"] .content:has(> [data-board-bleed]) {
+:root .content:has(> [data-board-bleed]) {
   padding: 0;
 }
 
@@ -216,25 +209,25 @@
   display: contents;
 }
 
-[data-theme="v8"] .settingsBody {
+:root .settingsBody {
   min-width: 0;
   padding: 24px 16px;
 }
 
 @media (min-width: 640px) {
-  [data-theme="v8"] .settingsBody {
+  :root .settingsBody {
     padding-inline: 24px;
   }
 }
 
 @media (min-width: 1024px) {
-  [data-theme="v8"] .settingsBody {
+  :root .settingsBody {
     padding: 20px 24px 28px; /* .content の v8 の余白と同じ */
   }
 }
 
 @media (min-width: 1280px) {
-  [data-theme="v8"] .settingsSplit {
+  :root .settingsSplit {
     display: flex;
     align-items: stretch;
     /* 上の帯 60 + 板の下余白 12 + 板の枠 2。中身が短い画面でも
@@ -242,7 +235,7 @@
     min-height: calc(100dvh - 74px);
   }
 
-  [data-theme="v8"] .settingsBody {
+  :root .settingsBody {
     flex: 1;
   }
 }

@@ -6,6 +6,7 @@
  * - 道具：名前で探す、2つの札、よく使う絞り込み、期間
  * - 行：いちばん多い案件、成果・売上、報酬（先月より）の差分、操作の見出しなし
  */
+import { AffiliateShell } from '@/v8/affiliates/frame'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 // 見本を作る前に時計を固定。日付以外の待ち合わせは実時間で動かす。
@@ -21,7 +22,8 @@ afterEach(() => vi.useRealTimers())
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const thisMonth = '2026-10-12T00:09:00+09:00'
-const lastMonth = '2026-09-15T12:00:00+09:00'
+// V8の過去30日（9/13〜10/12）の、さらに前の30日に置く。
+const lastMonth = '2026-08-28T12:00:00+09:00'
 
 const ITEMS = [
   {
@@ -49,7 +51,10 @@ const AFFILIATES = [
 
 const fixture = vi.hoisted(() => ({ failed: false, truncated: false, missingReward: false }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   api: {
     affiliates: {
       list: () => Promise.resolve({ success: !fixture.failed, data: AFFILIATES }),
@@ -57,39 +62,45 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('./tabs', () => ({
+vi.mock('@/v8/affiliates/display', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/v8/affiliates/display')>(),
   listAllConversionApprovals: async () => ({ items: fixture.missingReward ? ITEMS.map((item) => ({ ...item, rewardAmount: null })) : ITEMS, truncated: fixture.truncated }),
 }))
 
-vi.mock('./v8-drawer', () => ({ default: () => null }))
+vi.mock('@/v8/affiliates/drawer', () => ({ default: () => null }))
 
-const { default: ReportTabV8 } = await import('./v8-report-tab')
+const { default: ReportTabV8 } = await import('@/v8/affiliates/report')
 
-beforeEach(() => { fixture.failed = false; fixture.truncated = false; fixture.missingReward = false })
+beforeEach(() => {
+  fixture.failed = false; fixture.truncated = false; fixture.missingReward = false
+  window.history.replaceState(null, '', '/affiliates')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+})
 
 afterEach(() => {
   cleanup()
 })
 
 function renderTab() {
-  render(<ReportTabV8 canEdit accountId="acc-1" registerHeaderActions={() => {}} />)
+  render(<AffiliateShell.Provider value={{ tab: 'report', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><ReportTabV8 /></AffiliateShell.Provider>)
 }
 
-describe('Eo56k レポートタブの絵合わせ', () => {
+describe.each(['2026-10-11T15:09:00Z', '2026-10-11T23:59:00Z'])('Eo56k レポートタブ（日本時間00:09・08:59、時計 %s）', (now) => {
+  beforeEach(() => vi.setSystemTime(new Date(now)))
   test('紹介者の取得失敗をゼロ件に見せず、再読み込みで回復する', async () => {
     fixture.failed = true
     renderTab()
-    await waitFor(() => expect(screen.getByText('紹介者を読み込めませんでした。集計は表示していません。')).toBeTruthy())
+    await waitFor(() => expect(screen.getAllByText('紹介者を読み込めませんでした。集計は出していません。').length).toBeGreaterThan(0))
     expect(screen.queryByText('田中 明')).toBeNull()
     fixture.failed = false
-    fireEvent.click(screen.getByRole('button', { name: /もう一度試す/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await waitFor(() => expect(screen.getByText('田中 明')).toBeTruthy())
   })
 
   test('全件を取れないときに部分合計を確定値として表示しない', async () => {
     fixture.truncated = true
     renderTab()
-    await waitFor(() => expect(screen.getByText(/成果が取得上限を超えています/)).toBeTruthy())
+    await waitFor(() => expect(screen.getAllByText(/成果が取得の上限を超えています/).length).toBeGreaterThan(0))
     expect(screen.queryByText('田中 明')).toBeNull()
   })
 
@@ -99,7 +110,7 @@ describe('Eo56k レポートタブの絵合わせ', () => {
     await waitFor(() => expect(screen.getByText('田中 明')).toBeTruthy())
     expect(screen.getAllByText('未確定の報酬があります')).toHaveLength(2)
     expect(screen.queryByText('売上の 100.0%')).toBeNull()
-    expect(screen.getByText(/未確定の報酬は金額を表示せず/)).toBeTruthy()
+    expect(screen.getByText(/未確定の報酬は金額を出さず/)).toBeTruthy()
   })
 
   test('数の帯と青帯が絵どおり', async () => {
@@ -108,10 +119,10 @@ describe('Eo56k レポートタブの絵合わせ', () => {
       expect(screen.getByText('1件あたりの報酬')).toBeTruthy()
     })
     // 今月 2件 − 先月 1件
-    expect(screen.getByText('先月より +1')).toBeTruthy()
+    expect(screen.getByText('前の期間より +1')).toBeTruthy()
     expect(screen.getByText('成果になった注文の合計')).toBeTruthy()
     expect(screen.getByText('売上の 8.2%')).toBeTruthy()
-    expect(screen.getByText(/期間は今月（/)).toBeTruthy()
+    expect(screen.getByText(/期間は過去30日/)).toBeTruthy()
     expect(screen.getByText(/数は「認めた成果」だけ/)).toBeTruthy()
     expect(screen.getByText(/分析 › レポート/)).toBeTruthy()
   })
@@ -124,21 +135,24 @@ describe('Eo56k レポートタブの絵合わせ', () => {
     expect(screen.getByRole('button', { name: 'アフィリエイターごと' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '案件ごと' })).toBeTruthy()
     expect(screen.getAllByLabelText('よく使う絞り込み')[0]).toBeTruthy()
-    expect(screen.getByLabelText('期間')).toBeTruthy()
+    expect(screen.getByRole('group', { name: '集計期間' })).toBeTruthy()
   })
 
   test('行に差分と操作の見出しなしが出る', async () => {
     renderTab()
     await waitFor(() => {
-      expect(screen.getByText('定期便の初回')).toBeTruthy()
+      expect(screen.getByText('田中 明')).toBeTruthy()
     })
     // a1：今月 28,000 − 先月 24,000
-    expect(screen.getByText('（+¥4,000）')).toBeTruthy()
+    expect(screen.getByText('¥28,000（+¥4,000）')).toBeTruthy()
     // a2：先月なし → 初めて
-    expect(screen.getByText('（初めて）')).toBeTruthy()
+    expect(screen.getByText('¥31,400（初めて）')).toBeTruthy()
     // a3：0件
     expect(screen.getByText('0件')).toBeTruthy()
-    expect(screen.queryByText('操作')).toBeNull()
+    expect(screen.getByRole('columnheader', { name: '操作' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '成果とアフィリエイトの説明' }))
     expect(screen.getByText(/行を押すと、その人の成果の明細/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '案件ごと' }))
+    await screen.findByText('定期便の初回')
   })
 })

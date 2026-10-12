@@ -15,7 +15,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(currentParams),
@@ -89,8 +89,8 @@ describe('site_tracking の画面ゲート(#859)', () => {
     await settle(200)
 
     expect(host.textContent).not.toContain('サイトスクリプト')
-    expect(host.textContent).toContain('流入経路')
-    expect(host.textContent).toContain('広告連携')
+    expect(host.textContent).toContain('流入と計測')
+    expect(host.textContent).toContain('広告とのつなぎ')
   })
 
   it('offで ?tab=script の直URLは停止画面へ切り替わり、計測APIを呼ばない', async () => {

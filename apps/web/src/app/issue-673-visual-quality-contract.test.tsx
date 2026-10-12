@@ -32,24 +32,24 @@ describe('#673 A. カード・パネルの立体感', () => {
 
   it('浮く面はV8の8px・24pxの影', () => {
     const float = GLOBALS_CODE.match(/--shadow-float:\s*([^;]+);/)?.[1] ?? ''
-    expect(float).toBe('0 8px 24px #1d1d1f1f')
+    expect(float).toBe('var(--shadow-controls-pop)')
+    expect(GLOBALS_CODE).toContain('--shadow-controls-pop: 0 8px 24px rgba(29, 29, 31, 0.12)')
   })
 
   it('モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む', () => {
     // components/shared/ は変更できないため、globals.css の属性規定で上書きする。
     // ★V7: ダイアログは最前面（段3）の影 `--shadow-overlay`。
     expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-overlay\)/)
-    expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\]\s*\{[^}]*var\(--card-shadow\)/)
+    expect(GLOBALS_CODE).toMatch(/:root aside\[aria-label="フォルダ"\]\s*\{[^}]*box-shadow:\s*none/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\] \.shadow-lg\s*\{[^}]*var\(--shadow-float\)/)
   })
 
   it('主要画面の任意値 shadow をトークンへ寄せた', () => {
     const migrated = [
-      ['components/chats/template-picker.tsx', 'shadow-card'],
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
-      ['components/dashboard/dashboard-editor.tsx', 'shadow-card'],
+      ['v8/dashboard/dashboard-editor.module.css', 'var(--shadow-card)'],
       ['app/chats/page.tsx', 'shadow-card'],
-      ['app/duplicates/page.tsx', 'shadow-card-surface'],
+      ['app/friends/friends-v8.module.css', 'var(--card-shadow)'],
     ] as const
     for (const [file, token] of migrated) {
       const source = readFileSync(join(SRC, file), 'utf8')
@@ -57,8 +57,10 @@ describe('#673 A. カード・パネルの立体感', () => {
       expect(source, `${file} に旧カード影が残っている`).not.toContain('shadow-[1px_1px_2px')
     }
     // ダッシュボード編集の引き出しは方向付きの直書きをやめ、浮く面の影へ。
-    const editor = readFileSync(join(SRC, 'components/dashboard/dashboard-editor.tsx'), 'utf8')
-    expect(editor).toContain('shadow-float')
+    const editor = readFileSync(join(SRC, 'v8/dashboard/dashboard-editor.tsx'), 'utf8')
+    const drawer = readFileSync(join(SRC, 'components/shared/drawer.module.css'), 'utf8')
+    expect(editor).toContain('width="editor"')
+    expect(drawer).toContain('box-shadow: var(--shadow-controls-pop)')
   })
 })
 
@@ -81,10 +83,13 @@ describe('#673 B. 触った感触', () => {
     expect(GLOBALS_CODE).toMatch(/tbody tr:hover\s*\{[^}]*var\(--color-canvas-sunken\)/)
   })
 
-  it('メニュー・モーダルの出入りは150〜250msの ease-out', () => {
-    expect(GLOBALS_CODE).toMatch(/@keyframes lh-surface-in/)
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="action-menu"\][\s\S]*?animation:\s*lh-surface-in var\(--motion-base\)/)
-    expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\s*\{[^}]*animation:\s*lh-surface-in/)
+  it('メニュー・窓は共通部品の開閉を使い、全体の旧い動きを重ねない', () => {
+    const menu = readFileSync(join(SRC, 'components/shared/action-menu.module.css'), 'utf8')
+    const dialog = readFileSync(join(SRC, 'components/shared/dialog.module.css'), 'utf8')
+    expect(menu).toMatch(/animation:\s*action-menu-v8-enter var\(--motion-fast\) var\(--motion-ease-out\)/)
+    expect(dialog).toMatch(/:root \.panel\[data-closing\]/)
+    expect(dialog).toContain('transition-duration: var(--motion-exit)')
+    expect(GLOBALS_CODE).not.toMatch(/\[data-design-part="(?:action-menu|dialog)"\]\s*\{[^}]*animation:\s*lh-surface-in/)
   })
 
   it('動きを減らす設定で位置移動系が止まる', () => {

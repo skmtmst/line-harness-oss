@@ -1,8 +1,8 @@
 # オートメーション（V8）の動き（BEHAVIOR.md）
 
 対象：src/v8/automations の画面。今までの V8（`app/automations/list-v8.tsx`・`runs-v8.tsx`・
-`app/common-actions/common-actions-v8.tsx`・`common-action-versions-v8.tsx`）から動きを写し、
-見た目だけを型（ListPage・DetailPage）で絵どおりに組み直した。v7 の画面・試験は触らない。
+共通アクションの一覧・版の既存API）から動きを写し、
+見た目だけを型（ListPage・DetailPage）で絵どおりに組み直した。一覧と見本の入口はV8へ固定し、旧一覧の本体を除去した。確認/取得/権限/失敗の契約は現役の一覧を検査する。
 
 | 画面 | ファイル | 絵 | 入口 |
 |---|---|---|---|
@@ -47,7 +47,7 @@
 - 版と使われている場所：下書きがある間は「この版から新しい版」を押せない形で出す（サーバが draft_exists で断るため。理由は title）。
 
 ## 共通アクションを作る（common-action-new.tsx・絵 j2hfkS）
-今の V8（`app/common-actions/common-action-new-v8.tsx`）と同じ口と動き：`api.commonActions.resources`（選択肢。失敗は帯と「もう一度読み込む」）、
+今の V8（共通アクションの作成の既存API）と同じ口と動き：`api.commonActions.resources`（選択肢。失敗は帯と「もう一度読み込む」）、
 `api.commonActions.create`（名前・説明・処理・要求キー）→ `/common-actions/versions?id=`。閲覧のみ（権限なし）は作らせない。
 - 入口：`app/common-actions/new/page.tsx`（`/common-actions/new`）
 - 見せ方：処理は「番号・何を・どれを」の1行で並べ、押すとその処理の設定（今の部品 CommonActionEditor／分岐は BranchEditors の写し）を開く。↑↓と削除は閉じた行の右端から使える。設定を開かなくても並べ替え・削除でき、保存する順番に反映する。

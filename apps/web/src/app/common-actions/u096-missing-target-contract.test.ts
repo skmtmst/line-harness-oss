@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -44,10 +44,12 @@ describe('対象が分からないときの言い方（#975 U096）', () => {
   it('リッチメニュー編集は、対象未指定・対象なし・権限なし・失敗を分けて案内する', () => {
     expect(RICH_MENUS).toContain('編集するリッチメニューが指定されていません')
     expect(RICH_MENUS).toContain('このリッチメニューは見つかりません')
-    expect(RICH_MENUS).toContain('権限のある人に確認するか、別のLINEアカウントを選んでください')
+    expect(RICH_MENUS).toContain('permissionScope="store"')
+    expect(RICH_MENUS).toContain('<ListState kind="forbidden"')
     expect(RICH_MENUS).toContain('backHref="/rich-menus"')
     // 再読み込みは ★V7 TargetMissing の error（文言は部品が持つ。取り直し口があることだけ見る）。
-    expect(RICH_MENUS).toContain('onRetry={() => void reload()}')
+    expect(RICH_MENUS).toContain('onRetry={() => void loadGroup()}')
+    expect(RICH_MENUS).toContain("loadState === 'forbidden'")
     // 旧来の技術的な言い回しは残さない。
     expect(RICH_MENUS).not.toContain('対象が指定されていません')
   })

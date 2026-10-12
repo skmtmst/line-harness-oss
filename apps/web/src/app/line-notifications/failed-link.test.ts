@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { canOpenCustomerNotificationKpi, customerNotificationKpis } from './customer-kpis'
+import { canOpenCustomerNotificationKpi, customerNotificationKpis } from '@/v8/settings/line-notifications/customer-kpis'
 
-const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(__dirname, '../../v8/settings/line-notifications/screen.tsx'), 'utf8')
 
 /** 「送れなかった」から対応一覧へ渡す（設計 `festr`）。 */
 describe('V6 LINE通知（festr）', () => {
@@ -18,8 +18,8 @@ describe('V6 LINE通知（festr）', () => {
     expect(failed.href).toBe('/line-notifications?tab=failures')
     expect(canOpenCustomerNotificationKpi(failed)).toBe(true)
     // 板 g3iDs：共通の数カードの行き先として付ける。
-    expect(PAGE).toContain('送れなかったものを見る')
-    expect(PAGE).toContain("action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '送れなかったものを見る', href: kpi.href } : undefined}")
+    expect(PAGE).toContain('見る')
+    expect(PAGE).toContain("action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '見る', href: kpi.href } : undefined}")
   })
 
   it('渡す先のタブが実在する', () => {
@@ -53,7 +53,7 @@ describe('V6 LINE通知（festr）', () => {
       quota: { state: 'available', total: 500, used: 0, remaining: 500, asOf: '2026-09-15T00:00:00Z' },
     })
     // 板 g3iDs：送信枠は「使った / 全体」の1枚。
-    expect(ready.find((kpi) => kpi.label === '今月の送信枠')?.valueText).toBe('0 / 500通')
+    expect(ready.find((kpi) => kpi.label === '今月の送信枠')?.valueText).toBe('0 / 500')
   })
 
   it('LINEが送信枠を返せないときは0を作らず取得不能理由を出す', () => {

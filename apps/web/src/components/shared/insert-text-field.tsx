@@ -23,7 +23,7 @@
  *   textarea と同じ形で ref に出す（今の差し込みの処理をそのまま使える）
  * - 試験・自動操作のため、箱の要素にも value（読み書き）を持たせ、change / input で拾う
  *
- * v7 の見た目は変えない：data-theme が v8 でないときは、今までどおりの textarea を描く。
+ * テーマ指定にかかわらず、現在の差し込みの札を描く。
  */
 import {
   forwardRef,
@@ -41,9 +41,9 @@ import {
   type TextareaHTMLAttributes,
 } from 'react'
 import { Ellipsis, Plus } from 'lucide-react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import {
   splitInsertTokens,
+  splitResolvedInsertTokens,
   type InsertPiece,
   type InsertTokenIcon,
   type InsertTokenNames,
@@ -251,10 +251,6 @@ const InsertTextField = forwardRef<InsertTextFieldHandle | HTMLTextAreaElement, 
   { value, onValueChange, extraTokens, tokenNames, compact, ...rest },
   ref,
 ) {
-  const theme = useAdminTheme()
-  if (theme !== 'v8') {
-    return <textarea ref={ref as React.Ref<HTMLTextAreaElement>} {...rest} value={value} onChange={(event) => onValueChange(event.target.value)} />
-  }
   return <ChipEditor ref={ref as React.Ref<InsertTextFieldHandle>} value={value} onValueChange={onValueChange} extraTokens={extraTokens} tokenNames={tokenNames} compact={compact} {...rest} />
 })
 
@@ -693,8 +689,9 @@ export const InsertButton = forwardRef<HTMLButtonElement, {
 
 
 /** 閲覧用の本文。差し込みの札は入力欄と同じ形で、元の文字列を変えずに描く。 */
-export function InsertText({ value, tokenNames = EMPTY_NAMES }: { value: string; tokenNames?: InsertTokenNames }) {
-  return <>{splitInsertTokens(value, EMPTY_TOKENS, tokenNames).map((piece, index) => piece.kind === 'text' ? piece.text : (
+export function InsertText({ value, resolvedValue, tokenNames = EMPTY_NAMES }: { value: string; resolvedValue?: string; tokenNames?: InsertTokenNames }) {
+  const pieces = resolvedValue === undefined ? splitInsertTokens(value, EMPTY_TOKENS, tokenNames) : splitResolvedInsertTokens(value, resolvedValue, tokenNames)
+  return <>{pieces.map((piece, index) => piece.kind === 'text' ? piece.text : (
     <span key={index} className={styles.chip} title={piece.spec.hint} data-token={piece.spec.token}>
       <svg className={styles.chipIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_PATHS[piece.spec.icon] }} />
       <span className={styles.chipLabel}>{piece.spec.label}</span>

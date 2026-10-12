@@ -21,8 +21,7 @@ import {
   type NenFlowMetrics,
 } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import type { ColumnDeliveryPlan, FriendOption, NenCoupon, NenKpis, NenTab } from '@/v8/nen-campaigns/display'
 import NenCampaignsV8 from '@/v8/nen-campaigns/list'
 import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
@@ -447,13 +446,7 @@ export default function NenCampaignsPage() {
     if (!loadedTabs.current.has(next)) void loadTab(next)
   }
 
-  /*
-   * フックは早期 return より前で全部呼ぶ。読み込み中の早期 return の
-   * あとに置くと、読み込み完了でフックの数が変わり React が落ちる。
-   */
-  const theme = useAdminTheme()
-
-  if (loading && loadedTabs.current.size === 0) return <div className="p-6"><ListState kind="loading" /></div>
+  if (loading && loadedTabs.current.size === 0) return <ListState kind="loading" />
 
   /*
     ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
@@ -499,49 +492,9 @@ export default function NenCampaignsPage() {
     </>
   )
 
-  /*
-   * ★V8-B：data-theme="v8" のときだけ新しいNEN配信画面
-   * （src/v8/nen-campaigns/list.tsx：MuhWR・Jxmqh・Tj7n4・oqSJP）へ切り替える。v7 の見た目はそのまま。
-   * 取得・保存の持ち方は変えない（page.tsx が持ったまま）。
-   */
-  if (theme === 'v8') {
-    return (
-      <>
-        <NenCampaignsV8
-          topAction={headerAction}
-          tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
-          tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
-          kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
-          flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
-          friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
-          loading={loading} notice={notice}
-          saving={saving} testing={testing}
-          previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
-          onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
-          coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
-          selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
-          columnsTotal={columnsTotal}
-          onLoadMoreColumns={loadMoreColumns}
-          plan={plan} onPlanChange={setPlan}
-          introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
-          onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
-          onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
-          onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
-          onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
-        />
-        {leaveDialogs}
-      </>
-    )
-  }
-
   return (
     <>
-      {/*
-        ★V7 `x63W5x`：タブの失敗をページ上の帯に出さない。一覧の場所の
-        ListState error だけにまとめる（同じ失敗を2回出さない）。
-        失敗の文言（`tabErrors`）と取り直し（`loadTab`）は NenOverview へ渡す。
-      */}
-      <NenOverview
+      <NenCampaignsV8
         topAction={headerAction}
         tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
         tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
@@ -555,6 +508,7 @@ export default function NenCampaignsPage() {
         coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
         selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
         columnsTotal={columnsTotal}
+        onLoadMoreColumns={loadMoreColumns}
         plan={plan} onPlanChange={setPlan}
         introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
         onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}

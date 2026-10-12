@@ -1,7 +1,8 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 
 /**
  * 分析の未取得表記を共通契約へ揃える(Issue #606)。
@@ -27,7 +28,7 @@ describe('分析の未取得表記', () => {
     expect(PAGE).toContain("unavailable: '未取得'")
     // ANALYTICS-05: 「定義が古い」は版ずれだけを数える。
     // 未取得・失敗は集計状態であり、定義の新旧とは別の軸。
-    expect(PAGE).toContain('いまの定義でまだ集計していないもの')
+    expect(PAGE).toContain('更新後まだ集計していない')
     expect(PAGE).not.toContain('未取得・失敗の最新結果')
   })
 })

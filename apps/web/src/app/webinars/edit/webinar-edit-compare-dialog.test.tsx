@@ -4,8 +4,8 @@
  */
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import WebinarEditConflictBand from './webinar-edit-conflict-band'
-import { buildCompareRows, describeCard } from './webinar-edit-compare-dialog'
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { buildCompareRows, describeCard } from '@/v8/webinar-edit/cta-compare'
 import type { WebinarCtaCard } from '@/lib/api'
 
 const card = (over: Partial<WebinarCtaCard> = {}): WebinarCtaCard => ({
@@ -45,15 +45,15 @@ describe('buildCompareRows', () => {
 })
 
 describe('WebinarEditConflictBand の比べ口', () => {
-  it('onCompare があるときだけ「比べてから保存」を出す', () => {
+  it('onCompare があるときだけ「違いを比べる」を出す', () => {
     const onCompare = vi.fn()
     const { rerender } = render(
-      <WebinarEditConflictBand message="競合" reloading={false} onReload={() => {}} onCompare={onCompare} onClose={() => {}} />,
+      <SaveConflictBand title="競合" compareBusy={false} onReload={() => {}} onCompare={onCompare} />,
     )
-    const button = screen.getByRole('button', { name: '比べてから保存' })
+    const button = screen.getByRole('button', { name: '違いを比べる' })
     button.click()
     expect(onCompare).toHaveBeenCalledTimes(1)
-    rerender(<WebinarEditConflictBand message="競合" reloading={false} onReload={() => {}} onClose={() => {}} />)
-    expect(screen.queryByRole('button', { name: '比べてから保存' })).toBeNull()
+    rerender(<SaveConflictBand title="競合" compareBusy={false} onReload={() => {}} />)
+    expect(screen.queryByRole('button', { name: '違いを比べる' })).toBeNull()
   })
 })

@@ -11,7 +11,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
-import EventWizard from './event-wizard'
+import EventForm from '@/v8/events/edit-form'
 import { EVENT_DEFAULT_DRAFT } from './event-draft-shared'
 
 // api.ts は import 時に NEXT_PUBLIC_API_URL を要求する。
@@ -43,6 +43,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 vi.mock('@/components/shared/image-uploader', () => ({ default: () => null }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, accounts: [] }) }))
 /*
  * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
  * ここで見たいのは選んだ期限の値なので、素の <select> に置き換える。
@@ -88,7 +89,7 @@ beforeEach(() => {
   root = createRoot(host)
   st.getEvent.mockResolvedValue(ev)
   st.createEvent.mockResolvedValue(ev)
-  st.updateEvent.mockResolvedValue(ev)
+  st.updateEvent.mockImplementation(async (_account: string, _id: string, payload: Record<string, unknown>, version: number) => ({ ...ev, ...payload, version: version + 1 }))
   st.listSlots.mockResolvedValue({ items: [slot] })
   st.createSlots.mockResolvedValue({ items: [slot] })
   st.updateSlot.mockResolvedValue(slotCap2)
@@ -98,89 +99,83 @@ afterEach(async () => {
   host.remove()
 })
 
-async function render(step: 1 | 2 | 3, eventId: string | null = 'event-1') {
-  await act(async () => root.render(<EventWizard accountId="account-a" eventId={eventId} step={step} />))
-}
-async function change(id: string, value: string) {
-  await act(async () => { fireEvent.change(host.querySelector('#' + id)!, { target: { value } }) })
+async function renderSettings() {
+  await act(async () => root.render(<EventForm accountId="account-a" eventId="event-1" />))
+  await click('3. 公開設定')
 }
 async function click(text: string) {
-  const b = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === text)!
-  expect(b).toBeTruthy()
-  await act(async () => b.click())
-}
-function buttonLabels(): string[] {
-  return Array.from(host.querySelectorAll('button')).map((b) => b.textContent?.trim() ?? '')
+  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === text)!
+  expect(button).toBeTruthy()
+  await act(async () => { button.click() })
 }
 
-it('EVENT-01: ①で枠の定員を保存→②へ進むと一覧・残席が新しい値になる', async () => {
-  await render(1, 'event-1') // 初回ロード: 定員1
-  await change('first-slot-capacity', '2')
-  // 保存後の読み直しでは新しい定員を返す。
+it('EVENT-01: 枠の定員を保存すると一覧・残席が新しい値になる', async () => {
+  await act(async () => root.render(<EventForm accountId="account-a" eventId="event-1" />))
+  await click('2. 予約枠')
+  await act(async () => { (host.querySelector('[aria-label="そのほかの操作"]') as HTMLButtonElement).click() })
+  await act(async () => { (document.querySelector('[role="menuitem"]') as HTMLButtonElement).click() })
+  const dialog = document.querySelector('[role="dialog"]')!
+  await act(async () => { fireEvent.change(dialog.querySelector('input[type="number"]')!, { target: { value: '2' } }) })
   st.listSlots.mockResolvedValueOnce({ items: [slotCap2] })
-  await click('概要を保存して次へ')
+  const save = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '保存する')!
+  await act(async () => { save.click() })
   expect(st.updateSlot).toHaveBeenCalledTimes(1)
-  // 更新の戻り値だけでなく一覧を再取得していること
-  // （PUT 応答は active_count を持たないため）。
-  expect(st.listSlots.mock.calls.length).toBeGreaterThanOrEqual(2)
-
-  // ②の一覧・残席が新しい定員2を反映する（再読込なし）。
-  await render(2, 'event-1')
-  expect(host.textContent).toContain('2名')
+  expect(st.updateSlot).toHaveBeenCalledWith('account-a', 'event-1', 'slot-1', expect.objectContaining({ capacity: 2 }), 1)
+  expect(st.listSlots).toHaveBeenCalledTimes(2)
+  expect(host.querySelector('tbody tr td:nth-child(2)')?.textContent).toBe('2')
 })
 
-it('EVENT-02: 公開OFFでは主ボタンが「下書きとして保存」になる', async () => {
+it('EVENT-02: 公開OFFを保存しても公開されない', async () => {
   st.getEvent.mockResolvedValue({ ...ev, is_published: 0 })
-  await render(3, 'event-1')
-  expect(buttonLabels()).toContain('下書きを保存する')
-  expect(buttonLabels()).not.toContain('保存して公開')
+  await renderSettings()
+  expect(host.querySelector<HTMLInputElement>('input[name="event-publish-state"][value="draft"]')?.checked).toBe(true)
+  await click('公開設定を保存する')
+  expect(st.updateEvent).toHaveBeenCalledWith('account-a', 'event-1', expect.objectContaining({ is_published: 0 }), 1)
 })
 
-it('EVENT-02: 公開ONでは主ボタンが「保存して公開」になる', async () => {
+it('EVENT-02: 公開ONの保存は公開状態を維持する', async () => {
   st.getEvent.mockResolvedValue({ ...ev, is_published: 1 })
-  await render(3, 'event-1')
-  expect(buttonLabels()).toContain('保存して公開')
-  expect(buttonLabels()).not.toContain('下書きを保存する')
+  await renderSettings()
+  expect(host.querySelector<HTMLInputElement>('input[name="event-publish-state"][value="published"]')?.checked).toBe(true)
+  await click('公開設定を保存する')
+  expect(st.updateEvent).toHaveBeenCalledWith('account-a', 'event-1', expect.objectContaining({ is_published: 1 }), 1)
 })
 
-it('EVENT-03: 取消期限の null は作成画面でも「不可」と表示し、開始直前までの選択肢がある', async () => {
-  // 保存値 null（旧作成画面では「いつでもキャンセルできる」と読めた）。
+it('EVENT-03: 取消期限のnullは不可として表示し、開始直前までの選択肢がある', async () => {
   st.getEvent.mockResolvedValue({ ...ev, cancel_deadline_hours_before: null })
-  await render(2, 'event-1')
-  const select = host.querySelector<HTMLSelectElement>('#cancel-deadline')!
-  expect(select).toBeTruthy()
+  await renderSettings()
+  const select = host.querySelector<HTMLSelectElement>('select[aria-label="キャンセル期限（友だち側）"]')!
   expect(select.value).toBe('none')
-  const labels = Array.from(select.options).map((o) => o.textContent ?? '')
+  const labels = [...select.options].map((option) => option.textContent ?? '')
   expect(labels[0]).toContain('不可')
   expect(labels).toContain('開始直前までキャンセルできる')
-  // 「いつでもキャンセルできる」= 許可と読める旧ラベルは残さない。
   expect(labels.join('')).not.toContain('いつでも')
 })
 
-it('EVENT-03: 取消期限を往復させても保存値が変わらない', async () => {
+it('EVENT-03: 取消期限を往復させても保存値の意味が変わらない', async () => {
   st.getEvent.mockResolvedValue({ ...ev, cancel_deadline_hours_before: 2 })
-  await render(2, 'event-1')
-  const select = host.querySelector<HTMLSelectElement>('#cancel-deadline')!
+  await renderSettings()
+  const select = host.querySelector<HTMLSelectElement>('select[aria-label="キャンセル期限（友だち側）"]')!
   expect(select.value).toBe('2')
-  await change('cancel-deadline', '0')
+  await act(async () => { fireEvent.change(select, { target: { value: '0' } }) })
   expect(select.value).toBe('0')
+  await click('公開設定を保存する')
+  expect(st.updateEvent).toHaveBeenCalledWith('account-a', 'event-1', expect.objectContaining({ cancel_deadline_hours_before: 0 }), 1)
 })
 
-it('EVENT-04: 締切「開始の2時間前」が選択肢にあり、保存値をそのまま表示する', async () => {
+it('EVENT-04: 締切の2時間前が選択肢にあり、保存値をそのまま表示する', async () => {
   st.getEvent.mockResolvedValue({ ...ev, entry_cutoff_hours_before: 2 })
-  await render(3, 'event-1')
-  const select = host.querySelector<HTMLSelectElement>('#entry-cutoff')!
+  await renderSettings()
+  const select = host.querySelector<HTMLSelectElement>('select[aria-label="申込の締め切り"]')!
   expect(select.value).toBe('2')
-  const labels = Array.from(select.options).map((o) => o.textContent ?? '')
-  expect(labels).toContain('開始の2時間前まで')
-  // 先頭項目（開始まで受け付ける）を選んだように見せない。
+  expect([...select.options].map((option) => option.textContent)).toContain('開始の2時間前まで')
   expect(select.options[select.selectedIndex]?.textContent).toBe('開始の2時間前まで')
 })
 
-it('EVENT-04: 選択肢に無い保存値は「保存済み」として明示する', async () => {
+it('EVENT-04: 選択肢にない保存値は保存済みとして明示する', async () => {
   st.getEvent.mockResolvedValue({ ...ev, entry_cutoff_hours_before: 5 })
-  await render(3, 'event-1')
-  const select = host.querySelector<HTMLSelectElement>('#entry-cutoff')!
+  await renderSettings()
+  const select = host.querySelector<HTMLSelectElement>('select[aria-label="申込の締め切り"]')!
   expect(select.value).toBe('5')
   expect(select.options[select.selectedIndex]?.textContent).toBe('保存済み：開始の5時間前まで')
 })

@@ -44,14 +44,15 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => undefine
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: m.account }),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams({ id: m.id }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async () => ({
   ApiError: m.ApiErrorMock,
   api: { staff: { me: async () => ({ success: true, data: { role: 'owner' } }) } },
   bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     getBooking: m.get,
     decideRequest: vi.fn(async () => ({ status: 'confirmed' })),
     listMenus: vi.fn(async () => ({ menus: [] })),

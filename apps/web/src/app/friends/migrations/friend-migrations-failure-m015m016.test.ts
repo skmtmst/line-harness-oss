@@ -4,7 +4,6 @@ import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source
 const PAGE = [
   'page.tsx',
   'use-friend-migrations.ts',
-  'migrations-v8.tsx',
 ].map((name) => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8')).join('\n')
 
 /**

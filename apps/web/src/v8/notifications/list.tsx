@@ -46,9 +46,9 @@ export default function NotificationsV8() {
   const filter: DashboardNotificationFilter =
     categoryParam === 'error' || categoryParam === 'update' ? categoryParam : 'all'
   const [items, setItems] = useState<NotificationCenterItem[]>([])
-  // 未読が先・新しい順。口が作成日の新しい順で返すので、未読と既読に分けるだけ（それぞれの中は口の順のまま）。
+  // 読み込んだ範囲を未読が先・新しい順にする。追加取得後も同じ順を保つ。
   const orderedItems = useMemo(
-    () => [...items.filter((row) => !row.isRead), ...items.filter((row) => row.isRead)],
+    () => [...items].sort((a, b) => a.isRead !== b.isRead ? (a.isRead ? 1 : -1) : b.createdAt.localeCompare(a.createdAt)),
     [items],
   )
   const [counts, setCounts] = useState<NotificationCenterData['counts'] | null>(null)

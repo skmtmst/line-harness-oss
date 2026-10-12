@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const WEEKDAY = readFileSync(new URL('./weekday-select.tsx', import.meta.url), 'utf8')
-const FRIENDS = readFileSync(new URL('./friend-multi-select.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/automations/create/create.tsx', import.meta.url), 'utf8')
+const WEEKDAY = readFileSync(new URL('../../../v8/automations/create/weekday-select.tsx', import.meta.url), 'utf8')
+const PICKER = readFileSync(new URL('../../../components/shared/friend-picker-field.tsx', import.meta.url), 'utf8')
+const FRIENDS = readFileSync(new URL('../../../v8/automations/create/friend-multi-select.tsx', import.meta.url), 'utf8')
 
 /*
  * R21・R22 の画面の契約。動き（保存・検証・権限）を守る試験は別にあり、
@@ -26,9 +27,10 @@ describe('オートメーション作成の曜日・対象の直し（R21・R22�
   it('対象は名前で探して選ぶ（IDの手入力はさせない）', () => {
     expect(PAGE).toContain('<FriendMultiSelect')
     expect(FRIENDS).toContain('対象の友だち（')
-    expect(FRIENDS).toContain('友だちを名前で探す')
-    expect(FRIENDS).toContain('api.friends')
-    expect(FRIENDS).toContain('.list({ accountId, search: word, limit: 20 })')
+    expect(FRIENDS).toContain('<FriendPickerField')
+    expect(PICKER).toContain('onQueryChange:')
+    expect(PICKER).toContain('api.friends')
+    expect(PICKER).toContain('.list({ accountId: props.accountId!, search: query.trim(), limit: 20, offset: String(offset), includeTags: false })')
     expect(PAGE).toContain('対象の友だちを選んでください')
   })
 

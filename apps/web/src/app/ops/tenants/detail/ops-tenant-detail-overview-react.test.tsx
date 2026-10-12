@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsTenantDetailPage from './page'
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/ops/tenants/detail', useSearchParams: () => new URLSearchParams('id=t1') }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/tenants/detail', useSearchParams: () => new URLSearchParams('id=t1') }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -39,6 +39,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
+    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url.endsWith('/api/ops/tenants/t1')) {
       return new Response(JSON.stringify({ success: true, data: payload }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
@@ -66,7 +67,7 @@ describe('契約先の詳細の概要', () => {
     const text = host.textContent ?? ''
     expect(text).toContain('契約先の情報')
     expect(text).toContain('契約の状況')
-    for (const row of ['統括名', '登録日', '店舗数', '権限者数', '最終ログイン', '機能パック']) {
+    for (const row of ['統括名', '登録日', '使用量', '店舗 1', '権限者 1', '最終ログイン', '飲食店機能']) {
       expect(text, `行「${row}」がない`).toContain(row)
     }
     expect(text).toContain('検証商事')
@@ -78,8 +79,8 @@ describe('契約先の詳細の概要', () => {
     const lists = Array.from(host.querySelectorAll('dl'))
     expect(lists.length).toBe(2)
     for (const dl of lists) {
-      expect(dl.className).toContain('px-4')
-      expect(dl.className).toContain('pb-4')
+      expect(dl.className).toContain('kvs')
+      expect(dl.closest('section')?.className).toContain('panel')
     }
   })
 })
@@ -90,6 +91,7 @@ describe('契約先の詳細：飲食店機能トグル', () => {
     let getCount = 0
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
         getCount += 1
         return new Response(JSON.stringify({
@@ -121,6 +123,7 @@ describe('契約先の詳細：飲食店機能トグル', () => {
     let patchBody: unknown = null
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
         return new Response(JSON.stringify({
           success: true,
@@ -148,6 +151,7 @@ describe('契約先の詳細：飲食店機能トグル', () => {
   it('保存に失敗するとエラーを表示し、featurePacksは変わらない', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
+    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
         return new Response(JSON.stringify({
           success: true,

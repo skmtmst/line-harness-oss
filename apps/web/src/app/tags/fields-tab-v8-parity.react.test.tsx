@@ -50,17 +50,23 @@ vi.mock('@/lib/api', () => ({
 afterEach(cleanup)
 
 describe('友だち情報欄V8一覧', () => {
-  test('共通項目の行に錠の印を出す（v7と同じ区別）', async () => {
+  test('共通項目は並び替えと削除を許さず、独自の項目と区別する', async () => {
     fixture.fields = [fieldItem('f1', '会員番号', true), fieldItem('f2', '好きな色', false)]
-    const { default: FieldsTabV8 } = await import('./fields-tab-v8')
+    const { default: FieldsTabV8 } = await import('@/v8/tags/fields-tab')
     const rendered = render(<FieldsTabV8 accountId="account-a" canEdit />)
-    const lock = await rendered.findByLabelText('共通項目のため削除できません')
-    expect(lock).toBeTruthy()
+    await rendered.findByText('会員番号')
+    expect(rendered.getAllByTitle('共通項目は移行後に並び替えできます').length).toBeGreaterThan(0)
+    fireEvent.click(rendered.getByRole('button', { name: '項目「会員番号」の操作' }))
+    const menu = await rendered.findByRole('menu')
+    expect(menu.textContent).not.toContain('削除する')
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    fireEvent.click(rendered.getByRole('button', { name: '項目「好きな色」の操作' }))
+    expect(await rendered.findByRole('menuitem', { name: '削除する' })).toBeTruthy()
   })
 
-  test('表示件数に30件・40件がある（v7と同じ刻み）', async () => {
+  test('表示件数に30件・40件を選べる', async () => {
     fixture.fields = [fieldItem('f1', '会員番号', false)]
-    const { default: FieldsTabV8 } = await import('./fields-tab-v8')
+    const { default: FieldsTabV8 } = await import('@/v8/tags/fields-tab')
     const rendered = render(<FieldsTabV8 accountId="account-a" canEdit />)
     await rendered.findByText('会員番号')
     const box = rendered.container.querySelector('[aria-label="表示件数"]')

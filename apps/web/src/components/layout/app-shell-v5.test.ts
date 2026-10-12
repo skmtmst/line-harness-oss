@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest'
 import FriendTrendTable from '../dashboard/friend-trend-table'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
-const DASHBOARD_EDITOR = join(ROOT, '..', 'dashboard', 'dashboard-editor.tsx')
 const PENDING_INBOX = join(ROOT, '..', 'support', 'pending-inbox-card.tsx')
 const FRIEND_TREND = join(ROOT, '..', 'dashboard', 'friend-trend-table.tsx')
 const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
@@ -26,7 +25,6 @@ const ALL_ESTIMATED_SAMPLE = [
 ]
 
 describe('Pen.dev V6を共通レイアウトの正本にする', () => {
-  const dashboardEditor = readFileSync(DASHBOARD_EDITOR, 'utf8')
   const pendingInbox = readFileSync(PENDING_INBOX, 'utf8')
   const friendTrend = readFileSync(FRIEND_TREND, 'utf8')
   const chats = readFileSync(CHATS, 'utf8')

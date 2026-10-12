@@ -23,7 +23,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -97,7 +97,7 @@ function buttonByText(label: string): HTMLButtonElement {
 
 async function typeTitle(value: string) {
   await act(async () => {
-    fireEvent.change(host.querySelector('#webinar-v8-title')!, { target: { value } })
+    fireEvent.change(host.querySelector('#webinar-new-title')!, { target: { value } })
   })
 }
 
@@ -114,7 +114,7 @@ describe('ウェビナー作成の保存失敗文（D002）', () => {
     expect(fixture.push).not.toHaveBeenCalled()
     expect(host.textContent).not.toContain('API error')
     expect(host.textContent).toContain('もう一度お試しください')
-    expect((host.querySelector('#webinar-v8-title') as HTMLInputElement).value).toBe('残したい名前')
+    expect((host.querySelector('#webinar-new-title') as HTMLInputElement).value).toBe('残したい名前')
   })
 })
 
@@ -126,11 +126,11 @@ describe('ウェビナー作成のフォルダ取得失敗（D003）', () => {
 
     // 「未分類」だけが残り、失敗の表示と再読み込みが出る。
     expect(host.textContent).toContain('フォルダを読み込めませんでした')
-    expect(host.querySelector('#webinar-v8-folder')).not.toBeNull()
+    expect(host.querySelector('#webinar-new-folder')).not.toBeNull()
 
     // 読み込めていない間は保存先を確定させない。保存ボタンは押せない。
     expect(buttonByText('下書きを保存').disabled).toBe(true)
-    expect(buttonByText('→ 動画の設定へ').disabled).toBe(true)
+    expect(buttonByText('動画の設定へ').disabled).toBe(true)
     await act(async () => { buttonByText('下書きを保存').click() })
     await flush()
     expect(fixture.create).not.toHaveBeenCalled()
@@ -156,21 +156,19 @@ describe('ウェビナー作成のフォルダ取得失敗（D003）', () => {
     await act(async () => { buttonByText('下書きを保存').click() })
     await flush()
     expect(fixture.create).toHaveBeenCalledTimes(1)
-    expect(fixture.push).toHaveBeenCalledWith('/webinars')
+    expect(fixture.push).toHaveBeenCalledWith('/webinars?highlight=new-webinar')
   })
 })
 
 describe('ウェビナー作成の権限表示（D001）', () => {
-  it('閲覧だけの担当者の保存ボタンは理由付きで押せない', async () => {
+  it('閲覧だけの担当者には保存の口を隠し、理由を示す', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff'); rememberStaffIdentity({ role: 'staff' } as StaffMember)
     await render()
 
-    expect(buttonByText('下書きを保存').disabled).toBe(true)
-    expect(buttonByText('→ 動画の設定へ').disabled).toBe(true)
+    expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('下書きを保存'))).toBe(false)
+    expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('動画の設定へ'))).toBe(false)
     expect(host.textContent).toContain('オーナーか管理者')
-
-    await act(async () => { buttonByText('下書きを保存').click() })
-    await flush()
+    expect(host.querySelector('#webinar-new-title')).toBeNull()
     expect(fixture.create).not.toHaveBeenCalled()
   })
 })

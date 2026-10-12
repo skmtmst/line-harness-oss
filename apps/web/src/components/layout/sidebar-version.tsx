@@ -58,10 +58,10 @@ export default function SidebarVersion() {
           v7 は帯が出るので出さない（v8-only）。
         */}
         {update.kind === 'upgrade' ? (
-          <TextLink href="/updates" className="v8-only shrink-0">更新あり</TextLink>
+          <TextLink href="/updates" className="shrink-0">更新あり</TextLink>
         ) : null}
         {update.kind === 'fork' ? (
-          <TextLink href="/updates" className="v8-only shrink-0">手動で更新</TextLink>
+          <TextLink href="/updates" className="shrink-0">手動で更新</TextLink>
         ) : null}
       </p>
       {lines.line2 ? <p className="mt-0.5 text-micro text-ink-faint">{lines.line2}</p> : null}

@@ -111,7 +111,7 @@ export default function PaymentTab() {
         api.affiliates.settlementCurrent(accountId, period),
       ])
       if (seq !== loadSeq.current) return
-      if(!summaries.success || !current.success)throw new Error('payment data unavailable')
+      if(!summaries.success || !Array.isArray(summaries.data) || !current.success)throw new Error('payment data unavailable')
       if (!settlement.success || !Array.isArray(settlement.data.affiliates)) throw new Error('payment data malformed')
       setItems(summaries.data)
       setPreview(settlement.data)

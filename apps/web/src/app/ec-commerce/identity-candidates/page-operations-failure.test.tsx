@@ -38,7 +38,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn() }),
   usePathname: () => '/ec-commerce/identity-candidates',
   useSearchParams: () => new URLSearchParams(),
@@ -114,13 +114,14 @@ const REVIEW_EMPTY = {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'; window.history.replaceState({}, '', '/ec-commerce/identity-candidates'); window.dispatchEvent(new Event('popstate'))
   vi.clearAllMocks()
   mocks.overview.mockResolvedValue({ success: true, data: { total: 7, subscriptions: 3 } })
   mocks.operations.mockResolvedValue(OPERATIONS_OK)
   mocks.list.mockResolvedValue(REVIEW_OK)
 })
 
-afterEach(() => { cleanup() })
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
 describe('R600 運用集計の失敗でも会員候補を残す', () => {
   test('正常：候補の行・判定入口・集計の数を出す', async () => {
@@ -144,7 +145,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     expect(screen.getAllByText('読み込めませんでした').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     // 候補の読み口の汎用エラー（全面）は出さない。
-    expect(screen.queryByText('本人照合の候補を表示できませんでした')).toBeNull()
+    expect(screen.queryByText('本人照合の候補を読み込めませんでした')).toBeNull()
     // 読めていない集計を 0件と書かない。
     expect(screen.queryByText('0件')).toBeNull()
   })
@@ -173,7 +174,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
   test('候補だけ503：従来どおり全面エラーにし、候補は出さない', async () => {
     mocks.list.mockRejectedValue(new ApiError(503))
     render(<EcIdentityCandidatesPage />)
-    expect(await screen.findByText('本人照合の候補を表示できませんでした')).toBeTruthy()
+    expect(await screen.findByText('本人照合の候補を読み込めませんでした')).toBeTruthy()
     expect(screen.queryByText('山田 太郎')).toBeNull()
   })
 
@@ -186,6 +187,9 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
 
  test('candidate-free people and revenue come from independent full summaries', async () => {
   render(<EcIdentityCandidatesPage />); await screen.findByText('山田 太郎');
-  expect(screen.getAllByText('候補なし').find(element => element.parentElement?.textContent?.includes('7'))?.parentElement?.textContent).toContain('7');
+  expect(screen.getByText('候補なし').closest('[data-kpi-presentation]')?.textContent).toContain('7');
   expect(screen.getByText(/50,000/)).toBeTruthy();
  });
+
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/staff-role', async (importOriginal) => ({...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole: () => 'owner'}))

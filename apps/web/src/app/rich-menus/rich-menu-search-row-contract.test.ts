@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
 
 /**
  * U015 → ★V7 `Xn1Mz`（2026-09-27 オーナー指摘）。
@@ -15,13 +15,14 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  * （狭い時は240まで）で折り返し、読めないほど潰さない。幅の実数は
  * 共通 ListToolbar の契約テストで守る。
  */
-const barBlock = PAGE.slice(PAGE.indexOf('data-design="Bar"'), PAGE.indexOf('data-design="Saved"'))
+const barBlock = PAGE.slice(PAGE.indexOf('const wideToolbar'), PAGE.indexOf('/* ===== 一覧の中身'))
 
 describe('リッチメニューの検索行（U015 → ★V7 Xn1Mz）', () => {
   it('検索は共通 ListToolbar の1行目に置く', () => {
-    expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
+    expect(PAGE).toContain("from '@/components/shared/list-toolbar'")
     expect(barBlock).toContain('<ListToolbar')
-    expect(barBlock).toContain("search={{ placeholder: 'メニュー名・ボタン名で検索'")
+    expect(barBlock).toContain("placeholder: 'メニュー名・ボタン名'")
+    expect(barBlock).toContain("label: 'メニュー名・ボタン名で探す'")
   })
 
   it('検索を横いっぱいに伸ばさない（裸の全幅 input を置かない）', () => {
@@ -37,14 +38,16 @@ describe('リッチメニューの検索行（U015 → ★V7 Xn1Mz）', () => {
   it('作成操作→検索→絞り込み→並び順・表示件数の順に並べる', () => {
     // 既存契約（rich-menus-v6-contract.test.ts）の道具列順を保ったまま、
     // 検索は作成操作の次、絞り込み・並び順の前に置く。
-    expect(barBlock.indexOf('メニューを作る')).toBeLessThan(barBlock.indexOf('<ListToolbar'))
+    const narrow = PAGE.slice(PAGE.indexOf('const narrowToolbar'), PAGE.indexOf('const wideToolbar'))
+    expect(narrow.indexOf('{createButton}')).toBeLessThan(narrow.indexOf('<SearchField'))
     const toolbarAt = barBlock.indexOf('<ListToolbar')
     const filtersAt = barBlock.indexOf('filters={', toolbarAt)
     const trailingAt = barBlock.indexOf('trailing={', toolbarAt)
     expect(filtersAt).toBeGreaterThan(toolbarAt)
     expect(trailingAt).toBeGreaterThan(filtersAt)
-    expect(barBlock.indexOf('よく使う絞り込み', filtersAt)).toBeGreaterThan(filtersAt)
-    expect(barBlock.indexOf('aria-label="並び順"', trailingAt)).toBeGreaterThan(trailingAt)
-    expect(barBlock.indexOf('aria-label="表示件数"', trailingAt)).toBeGreaterThan(trailingAt)
+    expect(barBlock).toContain('filters={filterChips}')
+    expect(barBlock).toContain('trailing={<>{sortBox}{perPageBox}</>}')
+    expect(PAGE).toContain('aria-label="並び順"')
+    expect(PAGE).toContain('aria-label="1ページに出す件数"')
   })
 })

@@ -25,14 +25,15 @@ vi.mock('@/contexts/account-context', () => ({
     selectedAccountId: accountState.selectedAccountId,
     selectedAccount: accountState.selectedAccount,
     loading: false,
+    accounts: [],
   }),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(searchParams.value),
 }))
 
-import GoogleSheetsPanel from './google-sheets-panel'
+import GoogleSheetsPanel from '@/v8/webhooks/sheets'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -153,8 +154,8 @@ describe('#838 Google Sheets 連携パネル', () => {
     }
     await render()
 
-    expect(host.querySelector('#sheets-target')).toBeTruthy()
-    expect(text()).toContain('未設定')
+    expect(host.querySelector('#wh-sheets-target')).toBeTruthy()
+    expect(text()).toContain('まだ決めていません')
   })
 
   it('接続中: シート名リンク・前回同期・「今すぐ同期」を出し、同期を呼ぶ', async () => {
@@ -180,7 +181,7 @@ describe('#838 Google Sheets 連携パネル', () => {
 
     const link = host.querySelector('a[href="https://docs.google.com/spreadsheets/d/sheet-123"]')
     expect(link?.textContent).toContain('LINE連携シート')
-    expect(text()).toContain('接続中')
+    expect(text()).toContain('接続しています')
     expect(text()).toContain('同期の記録')
 
     const syncButton = button('今すぐ同期')
@@ -198,7 +199,7 @@ describe('#838 Google Sheets 連携パネル', () => {
     }
     await render()
 
-    expect(text()).toContain('要再接続')
+    expect(button('再接続する')).toBeTruthy()
     expect(text()).toContain('許可が切れています')
     expect(button('再接続する')).toBeTruthy()
     expect(button('今すぐ同期')).toBeFalsy()
@@ -217,7 +218,7 @@ describe('#838 Google Sheets 連携パネル', () => {
     await render()
 
     expect(button('Googleアカウントを接続する')).toBeFalsy()
-    expect(text()).toContain('統括の管理者だけが変更できます')
+    expect(text()).toContain('統括だけが変更できます')
   })
 
   it('OAuthの戻り: 成功・失敗を人の言葉で出す', async () => {
@@ -248,13 +249,13 @@ describe('#838 Google Sheets 連携パネル', () => {
 
     expect(text()).not.toContain('読み込んでいます…')
     expect(text()).toContain('連携の状態を読み込めませんでした')
-    expect(text()).toContain('確かめ方')
+    expect(text()).toContain('LINEアカウントが合っているか確かめてください')
     expect(button('もう一度読み込む')).toBeTruthy()
 
     legacy = false
     await act(async () => { button('もう一度読み込む')!.click() })
     await settle()
-    expect(text()).toContain('接続中')
+    expect(text()).toContain('接続しています')
   })
 
   it('解除は確認ダイアログを通し、confirmed 付きでPOSTする', async () => {
@@ -315,7 +316,7 @@ describe('#838 Google Sheets 連携パネル', () => {
     await render()
 
     // 連携の状態は正常に出る
-    expect(text()).toContain('接続中')
+    expect(text()).toContain('接続しています')
     expect(text()).toContain('同期の記録を読み込めませんでした')
     expect(button('記録を読み直す')).toBeTruthy()
 
@@ -323,7 +324,7 @@ describe('#838 Google Sheets 連携パネル', () => {
     await act(async () => { button('記録を読み直す')!.click() })
     await settle()
     expect(text()).not.toContain('同期の記録を読み込めませんでした')
-    expect(text()).toContain('3行')
+    expect(text()).toContain('友だち 3')
   })
 
   it('30分以上前に始まった実行中の記録は、回収できることを伝え「今すぐ同期」を止めない（R444）', async () => {
@@ -365,7 +366,7 @@ describe('#838 Google Sheets 連携パネル', () => {
 
     await act(async () => { button('出力先を変更')!.click() })
     await settle()
-    const input = host.querySelector('#sheets-target') as HTMLInputElement
+    const input = host.querySelector('#wh-sheets-target') as HTMLInputElement
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
       setter.call(input, 'sheet-xyz')
@@ -430,3 +431,5 @@ describe('#838 Google Sheets 連携パネル', () => {
     expect(calls.some((c) => c.path === '/api/integrations/google-sheets/disconnect')).toBe(false)
   })
 })
+
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

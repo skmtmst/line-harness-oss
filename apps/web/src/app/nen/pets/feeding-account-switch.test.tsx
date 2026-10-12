@@ -14,9 +14,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const m = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn() }))
 vi.mock('@/lib/api', () => ({ ApiError: class extends Error { status?: number } }))
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { feeding: m.get, saveFeeding: m.save } }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }) }))
 
-import FeedingTab from './feeding-tab'
+import FeedingTab from '@/v8/nen-pets/feeding'
 
 const data = (a: string) => ({
   products: [{ id: `product-${a}`, name: `${a}フード`, kcalPer100g: 350, isDefault: true, kind: 'staple' }],
@@ -28,23 +28,45 @@ const flush = () => act(async () => { await Promise.resolve() })
 afterEach(cleanup)
 beforeEach(() => {
   vi.clearAllMocks()
+  m.get.mockReset()
+  m.save.mockReset()
   m.save.mockResolvedValue({ success: false, error: 'mock-stop' })
 })
 
 describe('DEEP-22 主食のカロリー', () => {
+  it('切替前の保存失敗はBの入力と案内を変えない', async () => {
+    let rejectA!: (reason: Error) => void
+    m.get.mockResolvedValueOnce({ success: true, data: data('A') }).mockResolvedValueOnce({ success: true, data: data('B') })
+    m.save.mockImplementationOnce(() => new Promise((_, reject) => { rejectA = reject }))
+    const view = render(<FeedingTab canEdit accountId="A" />)
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: 'Aフード' }))
+    fireEvent.change(screen.getByLabelText('商品名'), { target: { value: 'A編集中' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await flush()
+    view.rerender(<FeedingTab canEdit accountId="B" />)
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: 'Bフード' }))
+    fireEvent.change(screen.getByLabelText('商品名'), { target: { value: 'B編集中' } })
+    await act(async () => rejectA(new Error('old A failed')))
+    expect(screen.getByLabelText('商品名')).toHaveProperty('value', 'B編集中')
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('button', { name: '保存する' })).toHaveProperty('disabled', false)
+  })
   it('Aを編集したままBへ切り替えると、B読込中にAのフォームと保存は残らない', async () => {
     m.get
       .mockResolvedValueOnce({ success: true, data: data('A') })
       .mockImplementationOnce(() => new Promise(() => {}))
-    const v = render(<FeedingTab accountId="A" />)
+    const v = render(<FeedingTab canEdit accountId="A" />)
     await flush()
-    fireEvent.change(screen.getByLabelText('商品名 1'), { target: { value: 'A編集中' } })
+    fireEvent.click(screen.getByRole('button', { name: /^[AB]フード$/ }))
+    fireEvent.change(screen.getByLabelText('商品名'), { target: { value: 'A編集中' } })
 
-    v.rerender(<FeedingTab accountId="B" />)
+    v.rerender(<FeedingTab canEdit accountId="B" />)
     await flush()
 
     // Bの読み込み中はAのフォームを出さない。保存手段も無い
-    expect(screen.queryByLabelText('商品名 1')).toBeNull()
+    expect(screen.queryByLabelText('商品名')).toBeNull()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
     expect(m.save).not.toHaveBeenCalled()
     // 未保存だったので破棄したことは画面へ出る
@@ -56,26 +78,28 @@ describe('DEEP-22 主食のカロリー', () => {
     m.get
       .mockImplementationOnce(() => new Promise((resolve) => { resolveA = resolve }))
       .mockResolvedValueOnce({ success: true, data: data('B') })
-    const v = render(<FeedingTab accountId="A" />)
-    v.rerender(<FeedingTab accountId="B" />)
+    const v = render(<FeedingTab canEdit accountId="A" />)
+    v.rerender(<FeedingTab canEdit accountId="B" />)
     await flush()
     // Bの応答で画面が埋まる
-    expect((screen.getByLabelText('商品名 1') as HTMLInputElement).value).toBe('Bフード')
+    expect(screen.getByRole('button', { name: 'Bフード' })).toBeTruthy()
     // 遅れて届いたAの応答は破棄される
     await act(async () => resolveA({ success: true, data: data('A') }))
-    expect((screen.getByLabelText('商品名 1') as HTMLInputElement).value).toBe('Bフード')
+    expect(screen.getByRole('button', { name: 'Bフード' })).toBeTruthy()
   })
 
   it('切替後にBを編集して保存すると、BのIDでBへ送られる', async () => {
     m.get
       .mockResolvedValueOnce({ success: true, data: data('A') })
       .mockResolvedValueOnce({ success: true, data: data('B') })
-    const v = render(<FeedingTab accountId="A" />)
+    const v = render(<FeedingTab canEdit accountId="A" />)
     await flush()
-    fireEvent.change(screen.getByLabelText('商品名 1'), { target: { value: 'A編集中' } })
-    v.rerender(<FeedingTab accountId="B" />)
+    fireEvent.click(screen.getByRole('button', { name: /^[AB]フード$/ }))
+    fireEvent.change(screen.getByLabelText('商品名'), { target: { value: 'A編集中' } })
+    v.rerender(<FeedingTab canEdit accountId="B" />)
     await flush()
-    fireEvent.change(screen.getByLabelText('商品名 1'), { target: { value: 'B編集中' } })
+    fireEvent.click(screen.getByRole('button', { name: /^[AB]フード$/ }))
+    fireEvent.change(screen.getByLabelText('商品名'), { target: { value: 'B編集中' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await flush()
     expect(m.save).toHaveBeenCalledWith('B', expect.arrayContaining([expect.objectContaining({ id: 'product-B', name: 'B編集中' })]), 10)

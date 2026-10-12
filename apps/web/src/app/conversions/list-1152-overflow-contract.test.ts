@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 /**
  * 1152幅の横はみ出し契約（コンバージョン一覧）。
  * QA 1003-1459 で `サイトの「https://example.com/downl…」に到達` が
@@ -7,11 +8,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const PAGE = readFileSync(resolve(__dirname, "page.tsx"), "utf-8");
+const PAGE = readUiSource(resolve(__dirname, "page.tsx"), "utf-8");
 
 describe("conversions 一覧の1152幅", () => {
   it("短い行文は1行省略し、全文はtitleで確認できる", () => {
-    expect(PAGE).toMatch(/block truncate" title=\{sourceTriggerLabel\(point\)\}/);
-    expect(PAGE).toMatch(/block truncate" title=\{usageLabel\(point\)\}/);
+    expect(PAGE).toContain('title={sourceTriggerLabel(point)}');
+    expect(PAGE).toContain('title={usageLabel(point)}');
+    const css = readFileSync(resolve(__dirname, "../../v8/conversions/list.module.css"), "utf8");
+    expect(css).toContain("text-overflow: ellipsis;");
+    expect(css).toContain("white-space: nowrap;");
   });
 });

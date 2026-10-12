@@ -9,7 +9,8 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
-import EventWizard from './event-wizard'
+import EventForm, { formatJpSlotRange } from '@/v8/events/edit-form'
+import EventsCreate from '@/v8/events/create'
 import { EVENT_DEFAULT_DRAFT } from './event-draft-shared'
 import { EventSlotsPartialError } from '@/lib/api'
 
@@ -27,7 +28,9 @@ const st = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
 }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: st.push, replace: st.replace }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: st.push, replace: st.replace }) }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, accounts: [] }) }))
 vi.mock('next/link', () => ({
   default: ({ children, ...p }: { children?: React.ReactNode } & Record<string, unknown>) => (
     <a {...(p as React.AnchorHTMLAttributes<HTMLAnchorElement>)}>{children}</a>
@@ -37,7 +40,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...original,
-    api: { tags: { list: async () => ({ success: true, data: [] }) } },
+    api: { ...original.api, tags: { list: async () => ({ success: true, data: [] }) }, staff: { ...original.api.staff, me: vi.fn().mockResolvedValue({ success: true, data: { id: 'me', role: 'owner', isActive: true } }) } },
     eventsApi: st,
   }
 })
@@ -74,6 +77,7 @@ const early = {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   host = document.createElement('div')
@@ -89,10 +93,12 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount())
   host.remove()
+  delete document.documentElement.dataset.theme
 })
 
-async function render(step: 1 | 2 | 3, eventId: string | null = 'event-1') {
-  await act(async () => root.render(<EventWizard accountId="account-a" eventId={eventId} step={step} />))
+async function renderSlots() {
+  await act(async () => root.render(<EventForm accountId="account-a" eventId="event-1" />))
+  await click('2. 予約枠')
 }
 async function change(id: string, value: string) {
   await act(async () => { fireEvent.change(document.querySelector('#' + id)!, { target: { value } }) })
@@ -102,7 +108,7 @@ async function change(id: string, value: string) {
 async function pickDate(id: string, iso: string) {
   const [y, mo, d] = iso.split('-').map(Number)
   const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
-  await act(async () => { fireEvent.click(document.querySelector('#' + id)!) })
+  await act(async () => { fireEvent.click(document.getElementById(id) ?? document.querySelector(`[aria-label="${id}"]`)!) })
   for (let i = 0; i < 36; i += 1) {
     const grid = document.querySelector('[role="grid"]')
     const label = grid?.getAttribute('aria-label')
@@ -123,13 +129,22 @@ async function pickDate(id: string, iso: string) {
 
 /** 時刻の選択（★V7）で HH:mm を選ぶ。 */
 async function pickTime(id: string, hhmm: string) {
+  const field = document.getElementById(id) ?? document.querySelector(`[aria-label="${id}"]`)!
+  if (field instanceof HTMLInputElement) {
+    await act(async () => { fireEvent.change(field, { target: { value: hhmm } }) })
+    await act(async () => { fireEvent.blur(field) })
+    return
+  }
   const [hour, minute] = hhmm.split(':')
-  await act(async () => { fireEvent.click(document.querySelector('#' + id)!) })
+  await act(async () => { fireEvent.click(field) })
   const picker = document.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')!
   await act(async () => {
     fireEvent.change(picker.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
+  })
+  await act(async () => {
     fireEvent.change(picker.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
   })
+  await act(async () => { fireEvent.keyDown(picker, { key: 'Escape' }) })
 }
 
 /** 日付の選択を空にする。 */
@@ -146,10 +161,10 @@ async function click(text: string) {
 }
 
 it('D08: 定員0では作成/更新APIを一切呼ばない', async () => {
-  await render(1, null)
-  await change('ev-name', 'Audit Event')
-  await change('first-slot-capacity', '0')
-  await click('概要を保存して次へ')
+  await act(async () => root.render(<EventsCreate />))
+  await change('ev-new-name', 'Audit Event')
+  await change('ev-new-cap', '0')
+  await click('下書きを保存')
   expect(host.textContent).toContain('定員は1以上')
   expect(st.createEvent).not.toHaveBeenCalled()
   expect(st.updateEvent).not.toHaveBeenCalled()
@@ -158,94 +173,83 @@ it('D08: 定員0では作成/更新APIを一切呼ばない', async () => {
 })
 
 it('D08: 日付が空でも作成/更新APIを呼ばない', async () => {
-  await render(1, null)
-  await change('ev-name', 'Audit Event')
-  await clearDate('first-slot-date')
-  await click('概要を保存して次へ')
-  expect(host.textContent).toContain('開催日と開始時刻を入力してください')
+  await act(async () => root.render(<EventsCreate />))
+  await change('ev-new-name', 'Audit Event')
+  await change('ev-new-cap', '10')
+  await clearDate('ev-new-date')
+  await click('下書きを保存')
+  expect(host.textContent).toContain('日付を選んでください')
   expect(st.createEvent).not.toHaveBeenCalled()
   expect(st.createSlots).not.toHaveBeenCalled()
 })
 
 it('D08: 所要時間が不正でも作成/更新APIを呼ばない', async () => {
-  await render(1, null)
-  await change('ev-name', 'Audit Event')
-  await change('first-slot-duration', '5')
-  await click('概要を保存して次へ')
+  await act(async () => root.render(<EventsCreate />))
+  await change('ev-new-name', 'Audit Event')
+  await change('ev-new-cap', '10')
+  await pickTime('ev-new-end', '14:05')
+  await click('下書きを保存')
   expect(host.textContent).toContain('開催時間は15分以上')
   expect(st.createEvent).not.toHaveBeenCalled()
   expect(st.createSlots).not.toHaveBeenCalled()
 })
 
-it('D09: 早い日時の枠を追加して次へ進んでも既存枠を書き換えない', async () => {
-  await render(2)
-  await pickDate('slot-date', '2026-09-21')
-  await pickTime('slot-start', '10:00')
-  await pickTime('slot-end', '11:00')
-  await change('slot-cap', '7')
+async function addEarlierSlot() {
+  await click('＋ 枠を追加する')
+  await pickDate('日付（JST）', '2026-09-21')
+  await pickTime('開始', '10:00')
+  await pickTime('終了', '11:00')
+  await act(async () => { fireEvent.change(document.querySelector('[role="dialog"] input[type="number"]')!, { target: { value: '7' } }) })
   st.listSlots.mockResolvedValue({ items: [early, old] })
-  await click('この枠を追加する')
-  await click('保存して公開設定へ')
-  // ②→③の保存はイベント設定だけ。枠一覧の追加とは分離し、
-  // slots[0](=追加した早い枠)へ古い枠の日時・定員を送らない。
+  await click('追加する')
+}
+
+it('D09: 早い日時の枠を追加して公開設定を保存しても既存枠を書き換えない', async () => {
+  await renderSlots()
+  await addEarlierSlot()
+  expect(st.createSlots).toHaveBeenCalledWith('account-a', 'event-1', [expect.objectContaining({ starts_at: early.starts_at, ends_at: early.ends_at, capacity: 7 })])
+  await click('3. 公開設定')
+  await click('公開設定を保存する')
   expect(st.updateSlot).not.toHaveBeenCalled()
   expect(st.updateEvent).toHaveBeenCalledTimes(1)
 })
 
-it('D09: ①に戻って保存しても、更新先は概要段階で確定した枠IDだけ', async () => {
-  await render(2)
-  await pickDate('slot-date', '2026-09-21')
-  await pickTime('slot-start', '10:00')
-  await pickTime('slot-end', '11:00')
-  await change('slot-cap', '7')
-  st.listSlots.mockResolvedValue({ items: [early, old] })
-  await click('この枠を追加する')
-  // ①へ戻って保存。firstSlotの値は old-slot から読んだものなので、
-  // 早い枠(early-slot)ではなく old-slot へだけ送る。
-  await render(1, 'event-1')
-  await click('概要を保存して次へ')
+it('D09: 早い枠が先頭へ入っても、選んだ元の枠IDだけを更新する', async () => {
+  await renderSlots()
+  await addEarlierSlot()
+  const row = [...host.querySelectorAll('tbody tr')].find((row) => row.textContent?.includes(formatJpSlotRange(old.starts_at, old.ends_at)))!
+  await act(async () => { (row.querySelector('[aria-label="そのほかの操作"]') as HTMLButtonElement).click() })
+  await act(async () => { (document.querySelector('[role="menuitem"]') as HTMLButtonElement).click() })
+  await click('保存する')
+  await click('1. 概要')
+  await click('概要を保存する')
   expect(st.updateSlot).toHaveBeenCalledTimes(1)
-  expect(st.updateSlot).toHaveBeenCalledWith(
-    'account-a', 'event-1', 'old-slot',
-    expect.objectContaining({ starts_at: old.starts_at, ends_at: old.ends_at, capacity: 12 }),
-    1,
-  )
+  expect(st.updateSlot).toHaveBeenCalledWith('account-a', 'event-1', 'old-slot', expect.objectContaining({ starts_at: old.starts_at, ends_at: old.ends_at, capacity: 12 }), 1)
+  expect(st.updateSlot.mock.calls[0][2]).not.toBe('early-slot')
 })
 
-it('D11: 一括追加の途中失敗後は、残りだけを再送する', async () => {
-  await render(2)
-  // 3枠をまとめて追加する下見を作る。初期曜日は土日のみなので木・金を足し、
-  // 10/1(木)・10/2(金)・10/3(土)が一致するようにする。
-  await pickDate('bulk-start', '2026-10-01')
-  await pickDate('bulk-end', '2026-10-03')
-  for (const label of ['木', '金']) {
-    const b = Array.from(document.querySelectorAll('button')).find((x) => x.textContent?.trim() === label)!
-    await act(async () => b.click())
-  }
-  // 時間帯を90分ちょうどにして1日1枠にする。
-  await pickTime('band-end', '15:30')
-  await change('bulk-cap', '10')
-  await click('まとめて追加する')
-  // 確認ダイアログは document.body への portal で描かれる。
-  expect(document.body.textContent).toContain('3件の予約枠を追加しますか？')
-
-  // 最初の送信は部分的に失敗したとみなす(1件だけ作成済み)。
-  st.createSlots.mockRejectedValueOnce(
-    new EventSlotsPartialError('1件まで追加されました', [early]),
-  )
-  const dialogClick = async (text: string) => {
-    const b = Array.from(document.body.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button'))
-      .find((x) => x.textContent?.trim() === text)!
-    expect(b).toBeTruthy()
-    await act(async () => b.click())
-  }
-  await dialogClick('まとめて追加する')
+it('D11: 一括追加の途中失敗後は、残りだけを同じ鍵で再送する', async () => {
+  await renderSlots()
+  await click('一括追加する')
+  await pickDate('開始日', '2026-10-01')
+  await pickDate('終了日', '2026-10-03')
+  await click('土')
+  await act(async () => { document.querySelector<HTMLInputElement>('[role="dialog"] input[type="checkbox"]')!.click() })
+  await pickTime('時間帯の終了', '15:30')
+  await act(async () => { fireEvent.change(document.querySelector('[role="dialog"] input[type="number"]')!, { target: { value: '10' } }) })
+  await click('生成')
+  expect(document.body.textContent).toContain('3件の予約枠を作りますか？')
+  expect(st.createSlots).not.toHaveBeenCalled()
+  st.createSlots.mockRejectedValueOnce(new EventSlotsPartialError('1件まで追加されました', [early]))
+  await click('まとめて作る')
   expect(document.body.textContent).toContain('1件は追加済みです')
-
-  // 再送では成功済みの分を送り直さない。
+  const original = st.createSlots.mock.calls[0][2] as Array<{ client_key: string }>
+  expect(original).toHaveLength(3)
   st.createSlots.mockResolvedValueOnce({ items: [early, early], created_count: 2, deduplicated_count: 0 })
-  await dialogClick('まとめて追加する')
-  const resent = st.createSlots.mock.calls.at(-1)![2] as Array<{ client_key?: string }>
-  expect(resent.length).toBe(2)
-  expect(resent.every((s) => typeof s.client_key === 'string' && s.client_key.length > 0)).toBe(true)
+  await click('まとめて作る')
+  const resent = st.createSlots.mock.calls.at(-1)![2] as Array<{ client_key: string }>
+  expect(st.createSlots).toHaveBeenCalledTimes(2)
+  expect(resent).toEqual(original.slice(1))
+  expect(new Set(original.map((slot) => slot.client_key)).size).toBe(3)
+  expect(resent.every((slot) => typeof slot.client_key === 'string' && slot.client_key.length > 0)).toBe(true)
 })

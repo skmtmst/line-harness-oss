@@ -13,7 +13,7 @@ const overview = vi.hoisted(() => vi.fn())
 const loginUsers = vi.hoisted(() => vi.fn())
 const updateSetting = vi.hoisted(() => vi.fn())
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -36,7 +36,10 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-import CampaignEditorV8 from './campaign-editor-v8'
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => ({ ...(await importOriginal()), useStaffRole: () => 'owner' }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+
+import CampaignEditorV8 from '@/v8/nen-campaigns/edit'
 
 const setting = {
   campaignKey: 'review_request',
@@ -58,7 +61,7 @@ const setting = {
   updatedAt: 'v1',
 }
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.unstubAllGlobals() })
 
 /* happy-dom には localStorage が無い。InsertToolbar の表示判定が裸で読むので当てる。 */
 function fakeStorage(): Storage {
@@ -75,6 +78,7 @@ function fakeStorage(): Storage {
 
 describe('配信を直す V8', () => {
   it('w5pwG の印で節と保存を出す', async () => {
+    document.documentElement.dataset.theme = 'v8'
     vi.stubGlobal('localStorage', fakeStorage())
     settings.mockResolvedValue({ success: true, data: [setting] })
     formsList.mockResolvedValue({ success: true, data: [] })
@@ -86,11 +90,12 @@ describe('配信を直す V8', () => {
     for (const title of ['いつ送りますか', '送るもの', '押されたあとにすること']) {
       expect(screen.getByText(title)).toBeTruthy()
     }
-    expect(screen.getByText('お客さまにはこう届きます')).toBeTruthy()
+    expect(screen.getByText('LINEでの見え方')).toBeTruthy()
     expect(screen.getByRole('button', { name: '配信内容を保存する' })).toBeTruthy()
   })
 
   it('付与数が不正なら送らず、直した数を既存のフォームと一緒に保存する', async () => {
+    document.documentElement.dataset.theme = 'v8'
     vi.stubGlobal('localStorage', fakeStorage())
     updateSetting.mockReset()
     const actions = [
@@ -103,12 +108,16 @@ describe('配信を直す V8', () => {
     loginUsers.mockResolvedValue({ success: true, data: [] })
     updateSetting.mockResolvedValue({ success: true, data: { ...setting, afterActions: actions } })
     render(<CampaignEditorV8 campaignKey="review_request" />)
+    fireEvent.click(await screen.findByRole('button', { name: '回答後にマイルを付ける' }))
+    const other = screen.getByRole('option', { name: 'ほかの数を入れる' })
+    fireEvent.click(other.querySelector('button') ?? other)
     const input = await screen.findByRole('spinbutton', { name: '回答後に付けるマイル' })
     fireEvent.change(input, { target: { value: '0' } })
-    fireEvent.click(screen.getByRole('button', { name: '配信内容を保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この数にする' }))
     expect(screen.getByText('付けるマイルは1〜1,000,000の整数で入力してください')).toBeTruthy()
     expect(updateSetting).not.toHaveBeenCalled()
     fireEvent.change(input, { target: { value: '350' } })
+    fireEvent.click(screen.getByRole('button', { name: 'この数にする' }))
     fireEvent.click(screen.getByRole('button', { name: '配信内容を保存する' }))
     await waitFor(() => expect(updateSetting).toHaveBeenCalledWith('account-a', 'review_request', expect.objectContaining({
       afterActions: [actions[0], { ...actions[1], amount: 350 }], expectedUpdatedAt: 'v1',

@@ -18,11 +18,13 @@ import TapActionField from '@/components/shared/tap-action-field'
 import type { TapActionKind } from '@/lib/tap-actions'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
+import { buildCompareRows } from './cta-compare'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { ErrorCountBadge } from '@/components/shared/error-count-badge'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import { ReadValue } from './parts'
+import { cardFieldProblems, fmtMinSec, parseMinSec } from './cta-validation'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './cta.module.css'
@@ -37,39 +39,16 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * ★V8 ウェビナーの ③CTA・フォーム（Pencil Q0Jrk・同時編集の帯 pvimJ）。
  * CTA カードの並び（時刻・見出し・種類・「…」）→ 選んでいるカードの中身 → 申込に使う回答フォーム。
  * 右はカードの見え方。
- * 口・保存前の確かめ・同時編集（409）の扱いは app/webinars/edit/cta-v8.tsx と同じ（BEHAVIOR.md）。
+ * 口・保存前の確かめ・同時編集（409）の扱いは BEHAVIOR.md。
  */
 
 type FormCandidates = { state: 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'; items: Array<{ id: string; name: string; isActive: boolean }> }
 
-function fmtMinSec(total: number): string {
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
-}
-function parseMinSec(text: string): number | null {
-  const match = /^(\d{1,4}):([0-5]?\d)$/.exec(text.trim())
-  return match ? Number(match[1]) * 60 + Number(match[2]) : null
-}
 /** CTA の押したら：URL を開く・回答フォーム。 */
 const WEBINAR_CTA_KINDS: readonly TapActionKind[] = ['uri', 'form']
 const EMPTY_CARD = (atSeconds: number): WebinarCtaCard => ({ atSeconds, kind: 'form', title: '', body: null, buttonLabel: '', autoOpen: false, formId: null, url: null })
 
-/** 1枚のカードの欄ごとの誤り（B-139）。欄の真下に出すので「n枚目」は付けない。 */
-function cardFieldProblems(card: WebinarCtaCard, time: string, durationSeconds: number): { time: string | null; title: string | null; button: string | null; link: string | null } {
-  const at = parseMinSec(time)
-  const url = card.url?.trim() ?? ''
-  return {
-    time: at === null
-      ? '出す時刻は 分:秒 で入れてください（例：45:00）'
-      : durationSeconds > 0 && at > durationSeconds ? `出す時刻が動画の長さ（${Math.floor(durationSeconds / 60)}分）を超えています。動画の中の時刻に直してください` : null,
-    title: card.title?.trim() ? null : 'カードの見出しを入れてください',
-    button: card.buttonLabel?.trim() ? null : 'ボタンに出す文字を入れてください',
-    link: card.kind === 'form'
-      ? (card.formId ? null : '公開中のフォームを選ぶか、種類を URL へ変えてください')
-      : !url ? 'https:// から始まる URL を入れてください' : !/^https:\/\//.test(url) ? 'URL は https:// で始めてください（http は使えません）' : null,
-  }
-}
-
-function isConflict(cause: unknown): boolean {
+export function isConflict(cause: unknown): boolean {
   return cause instanceof ApiError && cause.status === 409 && (!cause.code || /version_conflict/i.test(cause.code))
 }
 
@@ -91,6 +70,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const [forms, setForms] = useState<FormCandidates>({ state: 'idle', items: [] })
   const [registrationError, setRegistrationError] = useState('')
   const [conflict, setConflict] = useState(false)
+  const [conflictScope, setConflictScope] = useState<'cards' | 'form'>('cards')
   const [latest, setLatest] = useState<{ editor: WebinarEditor; ctas: WebinarCtaCard[] | null } | null>(null)
   const [compareOpen, setCompareOpen] = useState(false)
   const [reading, setReading] = useState(false)
@@ -186,7 +166,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause);
 
-      if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
+      if (isConflict(cause)) { setConflictScope('cards'); setConflict(true); setLatest(null); return false }
       { if (!fieldFailure)
       setMessage('CTA カードを保存できませんでした。入力は残っています。もう一度保存してください。') }
       return false
@@ -208,7 +188,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause);
 
-      if (isConflict(cause)) { setConflict(true); setLatest(null); return false }
+      if (isConflict(cause)) { setConflictScope('form'); setConflict(true); setLatest(null); return false }
       if (cause instanceof ApiError && ['form_inactive_or_missing', 'form_account_mismatch'].includes(cause.code ?? '')) loadForms()
       { if (!fieldFailure)
       setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。入力は残っています。')) }
@@ -218,15 +198,17 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
 
   const cardsDirty = savedCards !== null && JSON.stringify([ctas, times]) !== savedCards
   const formDirty = registrationFormId !== savedForm
+  const formsReadyForSave = forms.state === 'ready' || (forms.state === 'error' && !formDirty && ctas !== null && ctas.every(card => card.kind !== 'form'))
+  const canSave = !readOnly && ctas !== null && formsReadyForSave && !conflict
   const saveCurrent = useRef<() => Promise<boolean>>(async () => false)
   saveCurrent.current = async () => {
-    if (readOnly || ctas === null || lock.current || conflict) return false
+    if (!canSave || lock.current) return false
+    if (fields.submit().length > 0) { setMessage(null); return false }
     lock.current = true
     setSaving(true)
     try {
-      if (!(await saveCards())) return false
       if (formDirty && !(await saveForm())) return false
-      return true
+      return await saveCards()
     } finally {
       lock.current = false
       setSaving(false)
@@ -235,12 +217,12 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   useEffect(() => { onDirtyChange(cardsDirty || formDirty) }, [cardsDirty, formDirty, onDirtyChange])
   useEffect(() => () => onDirtyChange(false), [onDirtyChange])
   useEffect(() => {
-    if (readOnly) { registerSave(null); return }
+    if (!canSave) { registerSave(null); return }
     registerSave(() => saveCurrent.current())
     return () => registerSave(null)
-  }, [registerSave, readOnly])
+  }, [registerSave, canSave])
 
-  /* 同時編集：最新を読んで見比べる → 最新を読み込んで続ける（自分のカードの入力は残さない／申込フォームは最新へ）。 */
+  /* 同時編集：申込フォームだけの競合ではカードの入力を残す。カード自体の競合は確認して最新版へ置き換える。 */
   const readLatest = async () => {
     if (reading) return
     setReading(true)
@@ -267,7 +249,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     setConflict(false)
     setLatest(null)
     setCompareOpen(false)
-    await loadCtas()
+    if (conflictScope === 'cards') await loadCtas()
   }
 
   const currentIndex = ctas === null ? 0 : Math.min(selected, Math.max(ctas.length - 1, 0))
@@ -277,7 +259,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const busy = saving || reading
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       boardId={conflict ? 'pvimJ' : 'Q0Jrk'}
       title={chrome.title}
       actions={chrome.actions}
@@ -302,7 +284,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
           <div className={styles.ctaCard}>
             <p className={styles.ctaTitle}>{current?.title || '（見出しなし）'}</p>
             {current?.body ? <p className={styles.ctaBody}>{current.body}</p> : null}
-            <p className={styles.ctaButton}>{current?.buttonLabel || 'ボタン'}</p>
+            {current?.buttonLabel.trim() ? <p className={styles.ctaButton} title="動画の下にボタンが出ます。">{current.buttonLabel}</p> : null}
           </div>
         </div>
       </>}
@@ -404,19 +386,13 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         {registrationError ? <p className={form.fieldError} role="alert">{registrationError}</p> : null}
       </Card>
 
-      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description="保存されている最新の CTA カードと申込フォームに置き換えます。この画面で直したところは消えます。" confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
+      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description={conflictScope === 'form' ? '申込フォームを保存されている最新版に置き換えます。CTA カードの入力は残します。' : '保存されている最新の CTA カードと申込フォームに置き換えます。この画面で直したところは消えます。'} confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
       {compareOpen && latest ? (
-        <Dialog open title="違いを比べる" description="左がこの画面の入力、右が保存されている最新です。" confirmLabel="最新を読み込んで続ける" onConfirm={() => acceptLatest()} onCancel={() => setCompareOpen(false)}>
+        <Dialog open title="違いを比べる" description="左がこの画面の入力、右が保存されている最新です。" confirmLabel="最新を読み込んで続ける" onConfirm={() => { setCompareOpen(false); setReplaceConfirm(true) }} onCancel={() => setCompareOpen(false)}>
           <DataTable className={styles.compare}>
             <thead><TableHeadRow><Th>項目</Th><Th>この画面</Th><Th>最新</Th></TableHeadRow></thead>
             <tbody>
-              <Tr><Td>申込フォーム</Td><Td>{formName(registrationFormId)}</Td><Td>{latest.editor.publicPage.form?.name ?? formName(latest.editor.registrationFormId)}</Td></Tr>
-              {Array.from({ length: Math.max(ctas?.length ?? 0, latest.ctas?.length ?? 0) }, (_, i) => {
-                const mine = ctas?.[i]
-                const theirs = latest.ctas?.[i]
-                const describe = (card: WebinarCtaCard | undefined, time?: string) => (card ? `「${card.title || '（見出しなし）'}」／${time ?? fmtMinSec(card.atSeconds)}から` : '（なし）')
-                return <Tr key={i}><Td>{`カード${i + 1}`}</Td><Td>{describe(mine, times[i])}</Td><Td>{latest.ctas ? describe(theirs) : emptyValue('unknown')}</Td></Tr>
-              })}
+              {buildCompareRows({ formName: formName(registrationFormId), cards: ctas ?? [], times }, latest.editor.publicPage.form?.name ?? formName(latest.editor.registrationFormId), latest.ctas).map(row => <Tr key={row.key}><Td>{row.label}</Td><Td>{row.mine}</Td><Td>{row.theirs}</Td></Tr>)}
             </tbody>
           </DataTable>
         </Dialog>

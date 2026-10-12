@@ -22,9 +22,9 @@ describe('V8 の窓：絵の幅を画面が渡せる', () => {
     const html = render({ designWidth: 600 })
     expect(html).toContain('data-design-width=""')
     expect(html).toContain('--dialog-design-width:560px')
-    expect(css).toMatch(/\[data-theme='v8'\] \.panel\[data-design-width\] \{\s*width: min\(var\(--dialog-design-width\), 100%\);/)
+    expect(css).toMatch(/:root \.panel\[data-design-width\] \{\s*width: min\(var\(--dialog-design-width\), 100%\);/)
     // 層（@layer components）の外で、「幅 560」「大きい窓 800」の規則より後ろに置く（前に置くと負けて効かない）。
-    expect(css.indexOf("[data-theme='v8'] .panel[data-design-width]")).toBeGreaterThan(css.indexOf("[data-theme='v8'] .panel[data-size='large']"))
+    expect(css.indexOf(":root .panel[data-design-width]")).toBeGreaterThan(css.indexOf(":root .panel[data-size='large']"))
   })
 
   it.each([[844, 720], [640, 560], [480, 480], [960, 960]])('幅 %i は %i で描く', (given, expected) => {
@@ -38,6 +38,6 @@ describe('V8 の窓：絵の幅を画面が渡せる', () => {
   })
 
   it('上からの位置は背景（overlay）で受ける', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.overlay\[data-design-top\] \{\s*align-items: flex-start;\s*padding-top: var\(--dialog-design-top\);/)
+    expect(css).toMatch(/:root \.overlay\[data-design-top\] \{\s*align-items: flex-start;\s*padding-top: var\(--dialog-design-top\);/)
   })
 })

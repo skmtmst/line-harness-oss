@@ -34,7 +34,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton } from '@/components/shared/skeleton';
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected';
 import { notifyToast } from '@/components/shared/toast';
-import PageSizeSelect, { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
+import PageSizeSelect from '@/components/shared/page-size-select';
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils';
@@ -51,7 +51,7 @@ import Notice from '@/components/shared/notice'
  * ★V8 タグ「友だち情報欄」タブ（Pencil `q5gbcM`）。
  *
  * 動き（読み込み・数の帯・絞り込み・フォルダ・並べ替え・削除の安全確認・移行への入口・
- * 行の詳細パネル・名前のその場の直し・右クリック）は今の V8 タブ（app/tags/fields-tab-v8.tsx）から写した。
+ * 行の詳細パネル・名前のその場の直し・右クリック）は現役の V8 タブ（src/v8/tags/fields-tab.tsx）から写した。
  * 見た目は絵に合わせた：数の帯は板の端から端、左にフォルダの列（いちばん上が「項目を作る」）、
  * 右の上に案内の帯、表は名前の前にフォルダの色の丸（表にフォルダ列は置かない）、行の右端は必ず「…」、
  * 表の下に操作の説明。
@@ -61,7 +61,7 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /** 未分類の印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
-const PAGE_SIZES = STANDARD_PAGE_SIZES
+import { EXTENDED_PAGE_SIZES as PAGE_SIZES } from '@/components/shared/page-size-options'
 
 /** 種類の言葉（絵：選ぶ種類は「1つ選ぶ」「いくつも選ぶ」）。ほかは今の言葉。 */
 export function fieldTypeWord(type: FriendFieldType): string {

@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * 監査 WEB-117：V8 の見た目のときは、入口で V8 の画面へ分け、v7 の画面の取得
- * （一覧・見本・共通アクション）を始めない。V8 の画面が自分で取るので、二重に取らない。
- * v7 の見た目では今までどおり v7 の画面が取る（対照）。
+ * WEB-117：現役の画面が自分で取るので、入口では二重に取らない。
+ * 旧の設定や印が残っていても現役へ固定する。
  */
 import React from 'react'
 import { act, cleanup, render } from '@testing-library/react'
@@ -59,10 +58,13 @@ it('V8 の見た目では v7 の画面の一覧・見本・共通アクション
   expect(calls.commonActions).not.toHaveBeenCalled()
 })
 
-it('v7 の見た目では今までどおり v7 の画面が取る（対照）', async () => {
+it('旧の印が残っていても現役へ固定し、別の一覧を取得しない', async () => {
   vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', '')
   document.documentElement.dataset.theme = 'v7'
-  render(<AutomationsPage />)
+  const { container } = render(<AutomationsPage />)
   await act(async () => { await Promise.resolve() })
-  expect(calls.list).toHaveBeenCalledTimes(1)
+  expect(container.textContent).toContain('V8 の一覧')
+  expect(calls.list).not.toHaveBeenCalled()
+  expect(calls.templates).not.toHaveBeenCalled()
+  expect(calls.commonActions).not.toHaveBeenCalled()
 })

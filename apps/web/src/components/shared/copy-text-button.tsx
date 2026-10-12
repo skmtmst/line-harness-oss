@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import Button from './button'
 import styles from './copy-text-button.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 省略表示される識別子（差し込みキー・フォーム名など）を1操作で全文
@@ -45,7 +44,7 @@ export default function CopyTextButton({
   const timerRef = useRef<number | null>(null)
   const pendingRef = useRef(false)
   const generationRef = useRef(0)
-  const v8 = useAdminTheme() === 'v8'
+
 
   useEffect(
     () => {
@@ -131,14 +130,14 @@ export default function CopyTextButton({
       onClick={(event) => { event.stopPropagation(); void copy() }}
       aria-label={ariaLabel}
       title={state === 'copied' ? 'コピーしました' : label}
-      style={v8 ? { width: 'max-content', minWidth: 'calc(7em + 20px)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, whiteSpace: 'nowrap' } : undefined}
+      style={{ width: 'max-content', minWidth: 'calc(7em + 20px)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, whiteSpace: 'nowrap' }}
       className={`${styles.button} w-16 shrink-0 cursor-pointer px-1 py-0.5 text-center text-xs ${
         state === 'copied'
           ? 'text-success font-semibold'
           : 'text-action hover:underline'
       }`}
     >
-      {state === 'copied' && v8 ? <Check size={14} aria-hidden /> : icon}
+      {state === 'copied' ? <Check size={14} aria-hidden /> : icon}
       {state === 'copied' ? 'コピーしました' : label}
     </button>
   )

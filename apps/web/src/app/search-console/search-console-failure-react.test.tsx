@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   performance: vi.fn(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => '/search-console',
   useSearchParams: () => new URLSearchParams(),
