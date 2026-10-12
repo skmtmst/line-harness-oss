@@ -42,13 +42,6 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/app/chats/page.tsx",
-    "fingerprint": "6061c887bbb74014",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
     "filename": "src/app/duplicates/use-duplicates-data.ts",
     "fingerprint": "88fde07726bec066",
     "disposition": "error-visible",

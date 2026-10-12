@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -278,7 +279,7 @@ function EventsCreateV8Inner() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {!selectedAccountId ? <Notice tone="info">上のバーでLINE公式アカウントを選んでください</Notice> : null}
 
-      <section className={styles.card} aria-labelledby="ev-new-body">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-body">
         <h2 className={styles.cardTitle} id="ev-new-body">イベントの中身</h2>
         <div className={styles.field}><Field label="イベント名" htmlFor="ev-new-name" required><SaveErrorField names={["name","draft.name"]}><TextField
             id="ev-new-name"
@@ -314,10 +315,6 @@ function EventsCreateV8Inner() {
               onChange={(event) => update('venue_name', event.target.value || null)}
             /></SaveErrorField></Field></div>
           <div className={styles.field}>
-            <span className={styles.labelRow}>
-
-
-            </span>
             <Field label="オンラインの URL" htmlFor="ev-new-url"><SaveErrorField names={["venue_url","draft.venue_url"]}><TextField
               id="ev-new-url"
               type="url"
@@ -330,9 +327,9 @@ function EventsCreateV8Inner() {
             {fieldErrors['ev-new-url'] ? <p id="ev-new-url-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-url']}</p> : null}
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-target">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-target">
         <h2 className={styles.cardTitle} id="ev-new-target">公開対象</h2>
         <SaveErrorField names={["ev-new-target","target_type","draft.target_type"]}><RadioCardGroup legend="公開対象" className={styles.cardRow}>
           <RadioCard
@@ -354,9 +351,9 @@ function EventsCreateV8Inner() {
             note="同じ人に重ねて出しません"
           />
         </RadioCardGroup></SaveErrorField>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-slot">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-slot">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="ev-new-slot">最初の予約枠</h2>
           <p className={styles.cardNote}>あとから回を足せます（中身を見る → 回を足す）</p>
@@ -364,15 +361,15 @@ function EventsCreateV8Inner() {
         <div className={`${styles.pair} ${styles.datePair}`}>
           <div className={styles.field}><Field label="日付" htmlFor="ev-new-date"><SaveErrorField names={["date"]}><DateField id="ev-new-date" value={date} invalid={Boolean(fieldErrors['ev-new-date'])} aria-describedby={fieldErrors['ev-new-date'] ? 'ev-new-date-error' : undefined} onChange={(value) => { setDate(value); clearFieldError('ev-new-date') }} /></SaveErrorField>
 {fieldErrors['ev-new-date'] ? <p id="ev-new-date-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-date']}</p> : null}</Field></div>
-          <div className={styles.field}>
-            <span className={styles.label} id="ev-new-time-label">開始</span>
+          <Field label={<span id="ev-new-time-label">開始</span>} htmlFor="ev-new-start">
+
             <div className={styles.timeRow} role="group" aria-labelledby="ev-new-time-label">
               <SaveErrorField names={["startTime","start_time"]}><TimeField id="ev-new-start" aria-label="開始の時刻" invalid={Boolean(fieldErrors['ev-new-start'])} aria-describedby={fieldErrors['ev-new-start'] ? 'ev-new-time-error' : undefined} value={startTime} onChange={(value) => { setStartTime(value); clearFieldError('ev-new-start'); clearFieldError('ev-new-end') }} /></SaveErrorField>
               <span className={styles.timeSep} aria-hidden="true">〜</span>
               <SaveErrorField names={["endTime","end_time"]}><TimeField id="ev-new-end" aria-label="終わりの時刻" invalid={Boolean(fieldErrors['ev-new-end'])} aria-describedby={fieldErrors['ev-new-end'] ? 'ev-new-time-error' : undefined} value={endTime} onChange={(value) => { setEndTime(value); clearFieldError('ev-new-end') }} /></SaveErrorField>
             </div>
             {fieldErrors['ev-new-start'] || fieldErrors['ev-new-end'] ? <p id="ev-new-time-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-start'] || fieldErrors['ev-new-end']}</p> : null}
-          </div>
+          </Field>
         </div>
         <div className={styles.pair}>
           <div className={styles.field}><Field label="定員" htmlFor="ev-new-cap"><SaveErrorField names={["capacity"]}><NumberInput numericText
@@ -385,8 +382,8 @@ function EventsCreateV8Inner() {
               onChange={(event) => { setCapacity(event.target.value.replace(/[^0-9]/g, '')); clearFieldError('ev-new-cap') }}
             /></SaveErrorField>
 {fieldErrors['ev-new-cap'] ? <p id="ev-new-cap-error" className={styles.fieldError} role="alert">{fieldErrors['ev-new-cap']}</p> : null}</Field></div>
-          <div className={styles.field}>
-            <span className={styles.pickLabel}>1人あたりの予約回数</span>
+          <Field label="1人あたりの予約回数" htmlFor="ev-new-per-friend">
+
             <SaveErrorField names={["NONE","max_bookings_per_friend","draft.max_bookings_per_friend","_n_o_n_e"]}><Select
               aria-label="1人あたりの予約回数"
               size="full"
@@ -394,15 +391,15 @@ function EventsCreateV8Inner() {
               onChange={(value) => update('max_bookings_per_friend', value === NONE ? null : Number(value))}
               options={PER_FRIEND_OPTIONS}
             /></SaveErrorField>
-          </div>
+          </Field>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-rules">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-rules">
         <h2 className={styles.cardTitle} id="ev-new-rules">申し込みのきまり</h2>
         <div className={styles.pair}>
-          <div className={styles.field}>
-            <span className={styles.pickLabel}>申し込みの上限</span>
+          <Field label="申し込みの上限" htmlFor="ev-new-cutoff">
+
             <SaveErrorField names={["NONE","entry_cutoff_hours_before","draft.entry_cutoff_hours_before","_n_o_n_e"]}><Select
               aria-label="申し込みの上限"
               size="full"
@@ -410,9 +407,9 @@ function EventsCreateV8Inner() {
               onChange={(value) => update('entry_cutoff_hours_before', value === NONE ? null : Number(value))}
               options={ENTRY_CUTOFF_OPTIONS}
             /></SaveErrorField>
-          </div>
-          <div className={styles.field}>
-            <span className={styles.pickLabel}>承認</span>
+          </Field>
+          <Field label="承認" htmlFor="ev-new-approval">
+
             <SaveErrorField names={["approval_deadline_hours","draft.approval_deadline_hours"]}><Select
               aria-label="承認"
               size="full"
@@ -426,11 +423,11 @@ function EventsCreateV8Inner() {
               }}
               options={APPROVAL_OPTIONS}
             /></SaveErrorField>
-          </div>
+          </Field>
         </div>
         <div className={styles.pair}>
-          <div className={styles.field}>
-            <span className={styles.pickLabel}>満席になったとき</span>
+          <Field label="満席になったとき" htmlFor="ev-new-waitlist">
+
             <SaveErrorField names={["waitlist_enabled","draft.waitlist_enabled"]}><Select
               aria-label="満席になったとき"
               size="full"
@@ -438,12 +435,12 @@ function EventsCreateV8Inner() {
               onChange={(value) => update('waitlist_enabled', Number(value))}
               options={WAITLIST_OPTIONS}
             /></SaveErrorField>
-          </div>
+          </Field>
           <span className={styles.field} aria-hidden="true" />
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-questions">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-questions">
         <h2 className={styles.cardTitle} id="ev-new-questions">申し込みのときに聞くこと</h2>
         {questions.length > 0 ? (
           <ul className={styles.questionList}>
@@ -488,9 +485,9 @@ function EventsCreateV8Inner() {
             <button type="button" className={styles.linkButton} onClick={() => setAdding({ label: '', required: true })}>＋ 質問を足す</button>
           </div>
         )}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="ev-new-after-apply">
+      <Card variant="form" gap="normal" aria-labelledby="ev-new-after-apply">
         <h2 className={styles.cardTitle} id="ev-new-after-apply">申し込んだ人にすること</h2>
         <div className={styles.checks}>
           <div className={styles.checkItem}>
@@ -506,7 +503,7 @@ function EventsCreateV8Inner() {
             前日に思い出してもらう
           </Checkbox></SaveErrorField>
         </div>
-      </section>
+      </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したイベント" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <ConfirmDialog open={publishOpen} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} onConfirm={() => save(true)} onCancel={() => setPublishOpen(false)} />

@@ -5,6 +5,7 @@ import EntitySelect from '@/components/shared/entity-select'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
@@ -1060,12 +1061,12 @@ function AnalyticsReportFormPage() {
       <div className="report-v8-columns">
         <fieldset className="report-v8-fields" disabled={!canManage || saving || compareBusy || latestBusy}>
           <legend className="sr-only">レポートの設定</legend>
-          <section className="report-v8-card">
+          <Card variant="form" gap="normal">
             <h2 className="report-v8-cardTitle">名前を付けます</h2>
             <Field label="名前" required><TextField id="report-name" aria-describedby={nameError ? 'report-name-error' : undefined} value={name} onChange={(event) => { setName(event.target.value); setNameError(''); setValidation(null) }} placeholder="例：週次まとめ" aria-invalid={nameError ? true : undefined} /></Field>
             {nameError && <p id="report-name-error" className="report-v8-fieldError" role="alert">{nameError}</p>}
-          </section>
-          <section className="report-v8-card">
+          </Card>
+          <Card variant="form" gap="normal">
             {/* 絵に無い「使われ方」は、段の頭の右に小さく置く（落とさない）。 */}
             <div className="report-v8-cardHead">
               <h2 className="report-v8-cardTitle">何を入れますか <HelpTip label="レポートに入れるもの">チェックしたものが、この順にレポートへ並びます。</HelpTip></h2>
@@ -1082,15 +1083,15 @@ function AnalyticsReportFormPage() {
                 </div>
               })}
             </div>
-          </section>
-          <section className="report-v8-card">
+          </Card>
+          <Card variant="form" gap="normal">
             <div className="report-v8-cardHeadStack">
               <h2 className="report-v8-cardTitle">保存した分析を添えます</h2>
               <p className="report-v8-cardSub">選んだ分析は、そのときの数で添えます</p>
             </div>
             <EntitySelect aria-label="保存した分析" noun="保存した分析" values={savedAnalysisIds} onChange={setSavedAnalysisIds} readOnly={!canManage} options={options.savedAnalyses.map((item) => ({ value: item.id, label: item.name, description: item.kind === 'cross' ? 'クロス分析' : 'ファネル' }))} />
-          </section>
-          <section className="report-v8-card">
+          </Card>
+          <Card variant="form" gap="normal">
             <h2 className="report-v8-cardTitle">だれに送りますか<span className="report-v8-required">必須</span></h2>
             {editing && editing.recipients.some((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)) && <Notice tone="warn" message={`前に選んでいた${editing.recipients.filter((item) => item.kind === 'staff' && item.staffId && !options.recipients.some((person) => person.id === item.staffId)).map((item) => `「${item.label}」`).join('・')}は、いまは受け取れません（利用停止・閲覧範囲外の可能性があります）。このまま保存すると宛先から外れます。`} />}
             <EntitySelect aria-label="レポートを受け取る人" noun="担当者" values={staffIds} onChange={setStaffIds} readOnly={!canManage} options={options.recipients.map((person) => ({ value: person.id, label: person.name, description: `${ROLE_LABEL[person.role]}${person.lineLinked ? ' ／ LINE連携済み' : ''}` }))} />
@@ -1120,8 +1121,8 @@ function AnalyticsReportFormPage() {
                 <Checkbox checked={lineEnabled} onCheckedChange={setLineEnabled} description="ログインユーザーのLINEに、要点だけを短くまとめて送ります。"><strong>LINEでも同じ内容を送る</strong></Checkbox>
               </div>
             </div>
-          </section>
-          <section className="report-v8-card">
+          </Card>
+          <Card variant="form" gap="normal">
             <h2 className="report-v8-cardTitle">いつ送りますか<HelpTip label="送信時刻の基準">時刻は {options.timeZone} で計算します。</HelpTip></h2>
             <div className="report-v8-scheduleGrid">
               <Field label="間かく" required><Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></Field>
@@ -1129,8 +1130,8 @@ function AnalyticsReportFormPage() {
               <Field label="送る時刻" required><TimeField id="report-send-time" invalid={!!fieldMessage('report-send-time')} aria-describedby={fieldMessage('report-send-time') ? 'report-send-time-error' : undefined} value={sendTime} onChange={(value) => { setSendTime(value); setValidation(null) }} aria-label="送る時刻" />{fieldMessage('report-send-time') && <p id="report-send-time-error" className="report-v8-fieldError" role="alert">{fieldMessage('report-send-time')}</p>}</Field>
               <Field label="集計する期間" required><PeriodPicker days={Number(periodDays)} onChange={(days) => setPeriodDays(String(days))} /></Field>
             </div>
-          </section>
-          <section className="report-v8-card">
+          </Card>
+          <Card variant="form" gap="normal">
             {/* 全体の入り切りは段の頭の右に小さく置く（絵は条件ごとのチェックだけ）。 */}
             <div className="report-v8-cardHead">
               <div className="report-v8-cardHeadStack">
@@ -1153,7 +1154,7 @@ function AnalyticsReportFormPage() {
                 </li>
               })}
             </ul>
-          </section>
+          </Card>
         </fieldset>
         <aside className="report-v8-rail" aria-label="届き方の見本と注意">
           <section className="report-v8-railCard">

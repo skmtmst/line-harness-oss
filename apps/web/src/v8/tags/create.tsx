@@ -26,6 +26,7 @@ import styles from './create.module.css'
 import { tagNameProblem } from './tag-name'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { Field } from '@/components/shared/form-controls'
+import Card from '@/components/shared/card'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
@@ -233,7 +234,7 @@ function TagCreate() {
         {createdName ? <Notice tone="success" message={`「${createdName}」を作成しました。続けて新しいタグを作れます。`} /> : null}
         {error || copyError ? <Notice tone="danger" message={error || copyError} /> : null}
 
-        <section className={styles.card} aria-labelledby="tag-new-basic">
+        <Card variant="form" gap="normal" aria-labelledby="tag-new-basic">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="tag-new-basic">基本</h2>
           </div>
@@ -250,8 +251,7 @@ function TagCreate() {
             /></SaveErrorField>
 {nameError ? <p id="tag-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
 <DuplicateNameNote duplicates={duplicates} kindLabel="タグ" /></Field>
-          <div className={styles.field}>
-            <span className={styles.label} id="tag-new-folder">所属フォルダ</span>
+          <Field label="所属フォルダ">
             <span className={styles.selectBox}>
               <SaveErrorField names={["groupId","group_id"]}><FolderSelect size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} /></SaveErrorField>
             </span>
@@ -261,7 +261,7 @@ function TagCreate() {
                 <Button type="button" variant="text" onClick={() => setFoldersReloadKey((key) => key + 1)}>フォルダを読み直す</Button>
               </div>
             ) : null}
-          </div>
+          </Field>
           <div className={styles.switchRow}>
             <span className={styles.switchText}>
               <span className={styles.switchTitle}>友だち一覧に出す</span>
@@ -269,9 +269,9 @@ function TagCreate() {
             </span>
             <SaveErrorField names={["isStarred","is_starred"]}><SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>
           </div>
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="tag-new-ways">
+        <Card variant="form" gap="normal" aria-labelledby="tag-new-ways">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="tag-new-ways">付け方（どこで付けるか）</h2>
             <p className={styles.cardNote}>作ったあとに、回答フォーム・オートメーション・タグ連動からこのタグを付けられます</p>
@@ -293,7 +293,7 @@ function TagCreate() {
               <span className={styles.wayNote}>付いたら次の動きをする</span>
             </div>
           </div>
-        </section>
+        </Card>
       </CreatePage>
       <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="入力したタグ" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     </></SaveErrorScope>

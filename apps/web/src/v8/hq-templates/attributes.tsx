@@ -12,6 +12,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage, CreatePage } from '@/components/templates'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -247,6 +248,6 @@ function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onS
   }
   return <><CreatePage title="対応マークのひな形" notice={notices} footerActions={footer(submit, () => guarded(onCancel))} dirty={false}>
     <MarkBasicFields name={name} color={color} onName={setName} onColor={setColor} disabled={busy || locked} error={error || undefined} />
-    <section className={createStyles.card}><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><SaveErrorField names={["autoOnInbound","auto_on_inbound"]}><Checkbox checked={autoOnInbound} onCheckedChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</Checkbox></SaveErrorField><SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} onCheckedChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</Checkbox></SaveErrorField></section>
+    <Card variant="form" gap="normal"><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><SaveErrorField names={["autoOnInbound","auto_on_inbound"]}><Checkbox checked={autoOnInbound} onCheckedChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</Checkbox></SaveErrorField><SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} onCheckedChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</Checkbox></SaveErrorField></Card>
   </CreatePage><UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} /></>
 }

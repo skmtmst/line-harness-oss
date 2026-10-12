@@ -1,5 +1,6 @@
 'use client'
 
+
 import Card from '@/components/shared/card'
 import { useRef, useState } from 'react'
 import { Sparkles, Link2 } from 'lucide-react'

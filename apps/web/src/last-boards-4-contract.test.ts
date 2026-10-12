@@ -44,8 +44,8 @@ describe('最後の細かい板の印', () => {
     expect(BOOKING_DETAIL).toMatch(/(?:data-design-node|boardId|designNode)="If9Mh"/)
   })
 
-  it('受信箱にM0393・ダッシュボードにd8X09・mcOqKを付ける', () => {
-    expect(CHATS).toMatch(/(?:data-design-node|boardId|designNode)="M0393"/)
+  it('受信箱にeovoG・ダッシュボードにd8X09・mcOqKを付ける', () => {
+    expect(CHATS).toMatch(/(?:data-design-node|boardId|designNode)="eovoG"/)
     expect(DASHBOARD).toMatch(/(?:data-design-node|boardId|designNode)="WQmep"/)
     expect(DASHBOARD_EDITOR).toMatch(/(?:data-design-node|boardId|designNode)="mcOqK"/)
   })

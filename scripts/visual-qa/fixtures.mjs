@@ -48,6 +48,10 @@ const TAG_GROUPS_ALL = [
  * フォルダ名で出るが、件数の「未分類 20」は groupId が空のタグだけを数えるので変わらない）。
  */
 export const TAG_GROUPS = TAG_GROUPS_ALL.slice(0, 3)
+/** 編集の下書きが持つ購入フォルダも、編集板の撮影時だけ返す。 */
+export const TAG_EDIT_GROUPS = TAG_GROUPS_ALL
+  .filter((group) => TAG_GROUPS.some((listed) => listed.id === group.id) || group.id === 'g-purchase')
+  .map((group) => ({ ...group, accountId: 'visual-qa-account' }))
 
 /** 機能4のCSV取込。DBを変えず、同じ入力には同じ判定を返す。 */
 export const TAG_IMPORT_SAMPLE_ROWS = [

@@ -20,6 +20,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/inbox-chat/screen.tsx',
   'v8/settings/customer-look/screen.tsx',
   'v8/hq-deliveries/console.tsx',
   'v8/webhooks/incoming-actions.tsx',
@@ -340,8 +341,6 @@ const EDITOR_MIN_INPUTS = 3
  */
 const UNTRIAGED: Record<string, string> = {
   /* 予約設定V8化でスタッフ編集窓を staff-edit-dialog.tsx へ切り出し、page.tsx から編集画面の印が無くなったので行を消した。 */
-  'app/chats/page.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   /* ★V7: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
   // 統括の入口はV8の再exportだけ。v8/hq/support.tsx の番兵を上の契約で点検する。
   'v8/inflow-links/edit-route-dialog.tsx':

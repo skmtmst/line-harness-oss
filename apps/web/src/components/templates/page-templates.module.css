@@ -86,7 +86,7 @@
 :global(:root) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
 :global(:root) .preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }
 :global(:root) .preview[data-preview-surface='plain'] { background: transparent; }
-:global(:root) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); border-bottom: 1px solid var(--color-hairline); flex-wrap: wrap; }
+:global(:root) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); box-shadow: var(--shadow-row-line); flex-wrap: wrap; }
 :global(:root) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
 /*
  * 来た道の案内（crumbs）は題と説明の下の行で、操作のボタンと同じ行の左。
@@ -113,6 +113,20 @@
   :global(:root) [data-template-layout='record-detail'] .detailSummary { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
 }
 :global(:root) .inbox { display: flex; flex: 1; min-height: 0; min-width: 0; }
+:global(:root) .frame[data-page-template='inbox'] { position: relative; height: var(--tpl-inbox-panes-h); min-height: 0; overflow: hidden; }
+:global(:root) .inboxList { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+:global(:root) .conversation { position: relative; min-height: 0; overflow: hidden; }
+:global(:root) .inboxMessages { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: var(--tpl-inbox-thread-pad); background: var(--color-table-head); }
+/* 枠の強調で会話の高さを変えず、検索の移動位置を保つ。 */
+.inboxMessages :global([data-search-hit='current']) { box-shadow: var(--tpl-inbox-search-hit-current); }
+.inboxMessages :global([data-search-hit='other']) { box-shadow: var(--tpl-inbox-search-hit-other); }
+:global(:root) .inboxComposer { position: relative; z-index: 10; flex: none; padding: var(--tpl-inbox-composer-pad); border-top: 1px solid var(--color-hairline); background: var(--color-canvas); }
+:global(:root) .inboxSummaryPane { padding: var(--polish-space-section); width: var(--tpl-inbox-summary-width); max-width: 100%; flex: none; height: 100%; overflow: hidden; background: var(--color-canvas); border-left: 1px solid var(--color-hairline); }
+:global(:root) .inboxSummaryPane:not([data-wide]) { position: fixed; inset: 0 0 0 auto; z-index: 70; box-shadow: var(--shadow-overlay); }
+@media (max-width: 1023px) {
+  :global(:root) .inboxList[data-selected], :global(:root) .conversation:not([data-selected]) { display: none; }
+  :global(:root) .inboxList { width: 100%; }
+}
 :global(:root) .inboxList { width: var(--tpl-inbox-list-width); flex-shrink: 0; border-right: 1px solid var(--color-hairline); }
 :global(:root) .conversation { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-table-head); }
 :global(:root) .conversationHeader { padding: var(--tpl-conv-head-pad-block) var(--tpl-conv-head-pad-side); display: flex; align-items: center; gap: var(--tpl-conv-head-gap); flex-shrink: 0; }
@@ -129,12 +143,17 @@
 .customerLookSplit { display:flex; flex:1; min-width:0; }
 .customerLookMain { flex:1; min-width:0; padding:var(--customer-look-pane-padding); }
 .customerLookPreview { width:var(--customer-look-preview-width); flex-shrink:0; padding:var(--customer-look-pane-padding); border-left:1px solid var(--color-hairline); }
+/* 入力とカードの見本。寸法は既存の設定・カードの共通値から使う。 */
+.customerLookSplit[data-preview-layout='cards'] { align-items:flex-start; gap:var(--polish-space-card); }
+.customerLookSplit[data-preview-layout='cards'] > .customerLookMain { padding:0; }
+.customerLookSplit[data-preview-layout='cards'] > .customerLookPreview { width:var(--tpl-st2-pc-side-w); padding:0; border-left:0; }
 @container v8-page (max-width:1099px) { .customerLookPreview { display:none; } }
 :global(:root) .period { padding: var(--polish-space-field) var(--polish-space-section); display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-field); }
 :global(:root) .analyticsContent { flex: 1; min-width: 0; padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--polish-space-field); }
 :global(:root) .analyticsAside { width: 300px; flex-shrink: 0; padding: var(--polish-space-card); border-left: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: var(--polish-space-field); }
 :global(:root) .asideToggle { display: none; padding: var(--polish-space-field) var(--polish-space-section); }
 :global(:root) .createNotice { padding: var(--tpl-create-notice-pad); }
+:global(:root) .createNotice:empty { display: none; }
 :global(:root) .createNotice[data-notice-spacing='band'] { padding: var(--tpl-fe-band-slot-pad); }
 
 :global(:root) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--polish-space-row); }
@@ -195,11 +214,21 @@
 :global(:root) .frame[data-has-footer] > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
 :global(:root) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global(:root) .footer { flex-shrink: 0; }
+/* 本文末尾の余白へ浮かせる。カード内の下余白と本文の下余白を重ねて使う。 */
+:global(:root) .footer[data-footer-placement='floating'] {
+  margin-top: calc(-1 * (var(--polish-space-section) + var(--polish-space-row)));
+}
 
 /* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */
 :global(:root) [data-page-template='create'][data-has-footer] > .split { align-items: flex-start; overflow: hidden; }
+@media (min-width: 1024px) {
+  :global(:root) [data-page-template='create'][data-has-footer] > .split {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr);
+    align-items: start;
+  }
+}
 :global(:root) [data-page-template='create'][data-has-footer] .createContent {
-  max-height: 100%; min-height: 0; overflow-y: auto;
+  align-self: stretch; max-height: 100%; min-height: 0; overflow-y: auto;
 }
 :global(:root) [data-page-template='create'][data-has-footer] .preview {
   min-height: 0; overflow-y: auto; overflow-x: hidden;
@@ -275,6 +304,9 @@
 :global(:root) [data-page-template='create'] .heading > .headingText > .titleRow { flex: 1 1 0; order: 1; }
 :global(:root) [data-page-template='create'] .heading > .actions { order: 1; margin-left: auto; }
 :global(:root) [data-page-template='create'] .heading > .headingText > .description { flex-basis: 100%; order: 3; }
+/* 状態の短い補足も題の下の行。compact の間2を display:contents で失わない。 */
+:global(:root) [data-page-template='create'] .heading > .headingText > .subtitle { flex-basis: 100%; order: 3; }
+:global(:root) [data-page-template='create'] .heading[data-heading-size='compact'] { row-gap: var(--tpl-compact-gap); }
 :global(:root) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
 :global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-top-gap); }
 
@@ -408,7 +440,7 @@
 :global(:root) [data-list-skeleton] .content :global(div:has(> [data-shared-part='list-table'])) { margin: 0; padding-inline: 0; border: 0; border-radius: var(--radius-flat); box-shadow: none; }
 
 /* B-233：白い板の下は24。操作の帯は専用の下端を持つ。 */
-:global(:root) .frame:not(:has([data-shared-part="sticky-bar"])) { padding-bottom: var(--polish-space-section); }
+:global(:root) .frame:not([data-page-template="inbox"]):not(:has([data-shared-part="sticky-bar"])) { padding-bottom: var(--polish-space-section); }
 
 /* B-237：PC では目次と型を横に置き、狭い白い板では見本だけを畳む。 */
 :global(:root) .frame[data-template-layout='customer-look'] .settings { flex-direction: row; gap: var(--tpl-settings-gap); }

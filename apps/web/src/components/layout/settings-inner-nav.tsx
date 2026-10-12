@@ -183,7 +183,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
           className={`${styles.item} ${active ? styles.itemActive : ''}`}
           aria-current={active ? 'page' : undefined}
         >
-          {Icon ? <Icon size={14} aria-hidden="true" className={styles.icon} /> : null}
+          {Icon ? <Icon size={16} aria-hidden="true" className={styles.icon} /> : null}
           {item.label}
         </Link>
         {children.length > 0 && (

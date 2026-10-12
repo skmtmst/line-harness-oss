@@ -33,6 +33,19 @@ describe('V8 の型へ渡す操作', () => {
     expect(screen.getAllByRole('button', { name: '保存' })).toHaveLength(1)
   })
 
+  it('畳んだ設定の見本を開閉しても入力と保存を保持する', () => {
+    const save = vi.fn()
+    render(<SettingsPage title="プールを作る" navigation="目次" previewLayout="cards" preview={<p>受け入れ先の見本</p>} saveActions={<button onClick={save}>保存</button>}><input aria-label="プール名" defaultValue="渋谷" /></SettingsPage>)
+    fireEvent.change(screen.getByRole('textbox', { name: 'プール名' }), { target: { value: '中目黒' } })
+    fireEvent.click(screen.getByRole('button', { name: 'プレビューを開く' }))
+    expect(screen.getByRole('dialog', { name: 'プレビュー' }).textContent).toContain('受け入れ先の見本')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect((screen.getByRole('textbox', { name: 'プール名' }) as HTMLInputElement).value).toBe('中目黒')
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    expect(save).toHaveBeenCalledOnce()
+  })
+
   it('設定の変更があるときだけ保存口を出し、渡された処理を実行する', () => {
     const save = vi.fn()
     const { rerender } = render(<SettingsPage title="設定" navigation={<a href="#delivery">配信</a>}><section id="delivery">配信設定</section></SettingsPage>)

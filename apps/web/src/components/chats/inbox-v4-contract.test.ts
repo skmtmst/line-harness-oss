@@ -6,6 +6,7 @@ import { buildSupportEmailInboxQuery } from '../../app/chats/support-email-query
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
+const THREAD = readFileSync(join(HERE, '..', 'shared', 'inbox-thread.tsx'), 'utf8')
 const HEAD_MENUS = readFileSync(join(HERE, '..', '..', 'v8', 'inbox-chat', 'head-menus.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
@@ -64,7 +65,8 @@ describe('受信箱V4の画面契約', () => {
   it('一括確認を画面に出さず、送信元と担当者を分けて表示する', () => {
     expect(PAGE).not.toContain('すべて確認済みにする')
     expect(PAGE).toContain('pictureUrl={chatDetail.friendPictureUrl}')
-    expect(PAGE).toContain('{msg.sentByStaffName} が送信')
+    expect(PAGE).toContain('senderName={msg.sentByStaffName}')
+    expect(THREAD).toContain('{senderName} が送信')
   })
 
   it('担当変更では、絞り込み用の「すべて」を担当者として送らない', () => {
@@ -83,8 +85,8 @@ describe('受信箱V4の画面契約', () => {
     // 覆う窓のままだと、直前のやり取りを見ながら書けない。
     expect(PAGE).toContain('handleSaveMemo')
     expect(PAGE).toContain('aria-labelledby="chat-internal-memo-title"')
-    expect(EMAIL_THREAD).toContain('createPortal(')
-    expect(EMAIL_THREAD).toContain('aria-labelledby="email-internal-memo-title"')
+    expect(EMAIL_THREAD).toContain('<Dialog open={showMemoEditor}')
+    expect(EMAIL_THREAD).toContain('title="内部メモ"')
     expect(EMAIL_THREAD).toContain('/notes`')
     expect(EMAIL_THREAD).toContain('担当者だけに表示され、相手には送信されません。')
     expect(EMAIL_THREAD).not.toContain('>閉じる</button>')

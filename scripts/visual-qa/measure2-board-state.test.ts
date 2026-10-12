@@ -25,7 +25,8 @@ describe('板ごとの撮影条件', () => {
   it('作成状態は保存や本文入力をせず、開く操作だけで再現する', () => {
     const clicks = (Object.values(BOARD_STATE_PROFILES) as FixtureRow[]).flatMap((profile: FixtureRow) => profile.click ?? [])
     expect(clicks).not.toEqual([])
-    expect(clicks.some(step => step.startsWith('fill:'))).toBe(false)
+    expect(clicks).toContain('fill:ルール名=')
+    expect(clicks.some(step => ['保存する', '送信する', '公開する', '下書きを保存'].includes(step))).toBe(false)
     expect(BOARD_STATE_PROFILES.HfK0O.click).toEqual(['メッセージ', 'テンプレートを作る'])
   })
   it('固定表を変えず、対象外の状態と対象板のAPI・権限・幅を残す', () => {

@@ -2,10 +2,10 @@
 
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { ApiError, fetchApi } from '@/lib/api'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Dialog from '@/components/shared/dialog'
+import { InboxInputBox } from '@/components/shared/inbox-composer'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import TemplatePicker from '@/components/chats/template-picker'
@@ -500,7 +500,6 @@ export default function EmailThread({
    * フォーカス、Tab は窓の中で回り、Escape で閉じ、閉じたら
    * 「内部メモ」ボタンへフォーカスを戻す。保存中は Escape で閉じない。
    */
-  const memoDialogRef = useOverlayFocus(showMemoEditor, closeMemoEditor, memoSaving)
 
   /*
    * INBOX-25/26: メモの保存は「保存を始めたスレッドと版」に結びつける。
@@ -710,58 +709,19 @@ export default function EmailThread({
           </div>
         )}
 
-        {showMemoEditor && typeof document !== 'undefined' && createPortal(
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/45 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="email-internal-memo-title"
-            onClick={closeMemoEditor}
-          >
-            <div
-              ref={memoDialogRef}
-              className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-card border border-hairline bg-canvas shadow-overlay"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-3 border-b border-hairline px-5 py-4">
-                <div>
-                  <h2 id="email-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
-                  <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeMemoEditor}
-                  disabled={memoSaving}
-                  aria-label="閉じる"
-                  className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
-                >
-                  <X aria-hidden="true" className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="px-5 py-4">
-                <label htmlFor="email-internal-memo" className="text-xs font-semibold text-ink-faint">メモ内容</label>
-                <textarea
-                  id="email-internal-memo"
-                  value={memoDraft}
-                  disabled={memoSaving}
-                  onChange={(event) => setMemoDraft(event.target.value)}
-                  rows={7}
-                  autoFocus
-                  placeholder="メモを追加"
-                  className="mt-2 w-full resize-y rounded-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
-                />
-                {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
-              </div>
-              <div className="flex justify-end gap-2 border-t border-hairline px-5 py-4">
-                <Button variant="secondary" className="px-4 py-2 text-ink-faint h-auto whitespace-normal" type="button" disabled={memoSaving} onClick={closeMemoEditor}>キャンセル</Button>
-                <Button variant="primary" className="px-4 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={() => void saveMemo()} disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}>
-                  {memoSaving ? '保存中...' : '保存する'}
-                </Button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+        <Dialog open={showMemoEditor} title="内部メモ" busy={memoSaving}
+          description="担当者だけに表示され、相手には送信されません。"
+          onCancel={closeMemoEditor}
+          footer={<>
+            <Button type="button" disabled={memoSaving} onClick={closeMemoEditor}>キャンセル</Button>
+            <Button variant="primary" type="button" busy={memoSaving} busyLabel="保存中..." onClick={() => void saveMemo()} disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}>保存する</Button>
+          </>}>
+          <label htmlFor="email-internal-memo" className="text-xs font-semibold text-ink-faint">メモ内容</label>
+          <textarea id="email-internal-memo" value={memoDraft} disabled={memoSaving}
+            onChange={(event) => setMemoDraft(event.target.value)} rows={7} autoFocus placeholder="メモを追加"
+            className="mt-2 w-full resize-y rounded-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15" />
+          {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
+        </Dialog>
 
         {threadStalled && (
           <p className="text-danger mb-2 text-xs">
@@ -776,7 +736,7 @@ export default function EmailThread({
           </p>
         )}
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
-        <div className="rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
+        <InboxInputBox>
           <textarea
             value={reply}
             onChange={(e) => setReplyDraft(e.target.value)}
@@ -821,7 +781,7 @@ export default function EmailThread({
               {sending ? '送信中...' : 'メールで返信'}
             </Button>
           </div>
-        </div>
+        </InboxInputBox>
       </div>
 
       {/* 選ぶと本文が入力欄に入る。送る前に直せる（LINE 側と同じ部品）。 */}

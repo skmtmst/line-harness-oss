@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { readUiSource } from '../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -9,15 +10,17 @@ import { describe, expect, it } from 'vitest'
  * いた崩れの戻し検知。直しを戻すと赤くなる。
  */
 function read(rel: string): string {
-  return fs.readFileSync(path.join(__dirname, rel), 'utf8')
+  return readUiSource(path.join(__dirname, rel), 'utf8')
 }
 
 describe('m22c 札・ボタンの折り返し', () => {
-  it('受信箱の上の行は札も操作も高さ32で1行（言葉は変えない）', () => {
+  it('受信箱の札はV8の共通部品で高さ36・折り返しなし（言葉は変えない）', () => {
     const source = read('app/chats/page.tsx')
-    // 札3つは h-8（32px）。py-1.5（約30px）に戻すと上端がずれて2行に見える。
-    expect(source).toContain('h-8 shrink-0 items-center whitespace-nowrap rounded-pill border')
-    // 右の操作も compact（32px）でそろえる。
+    // B-159の36px。画面の旧いTailwind指定ではなく、札の持ち主を確かめる。
+    const chipCss = fs.readFileSync(path.join(__dirname, 'components/shared/filter-chip.css'), 'utf8')
+    expect(source).toContain('<FilterChip')
+    expect(chipCss).toMatch(/:root \.v6-filter-chip\s*{[^}]*height:\s*36px/s)
+    expect(chipCss).toMatch(/\.v6-filter-chip\s*{[^}]*white-space:\s*nowrap/s)
     expect(source).toContain('保存した検索')
     expect(source).not.toContain('<Button href="/tags?tab=marks" className="h-10 shrink-0">')
   })

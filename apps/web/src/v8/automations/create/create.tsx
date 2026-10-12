@@ -2573,7 +2573,7 @@ export function NewAutomationV8({
         </div>
       ) : null}
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="名前">
+      <Card variant="form" gap="normal" aria-label="名前">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '1. どのルールか' : '名前'}</h2>
           <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
@@ -2589,7 +2589,7 @@ export function NewAutomationV8({
         </Field>
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どんなときに動かしますか">
+      <Card variant="form" gap="normal" aria-label="どんなときに動かしますか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '2. 何が起きたら動かすか' : 'どんなときに動かしますか'}</h2>
         </div>
@@ -2676,7 +2676,7 @@ export function NewAutomationV8({
         ) : null}
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="だれに動かしますか">
+      <Card variant="form" gap="normal" aria-label="だれに動かしますか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>だれに動かしますか</h2>
         </div>
@@ -2712,7 +2712,7 @@ export function NewAutomationV8({
         )}
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="何をするか">
+      <Card variant="form" gap="normal" aria-label="何をするか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '3. 何をするか' : '何をするか'}</h2>
           <p className={styles.cardDesc}>上から順に動きます</p>

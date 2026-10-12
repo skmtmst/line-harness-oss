@@ -3015,6 +3015,80 @@
         ],
         "needed": ""
       }
+    },
+    {
+      "id": "inbox-frame",
+      "name": "受信箱の列・入力・補助面",
+      "role": "受信箱の列と会話の媒体、返信入力、保存した検索と内部メモの補助面",
+      "rules": [
+        "§2",
+        "§6.12",
+        "B-152",
+        "B-172"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/templates/inbox-page.tsx",
+            "apps/web/src/components/shared/inbox-composer.tsx",
+            "apps/web/src/components/shared/inbox-composer.module.css",
+            "apps/web/src/components/shared/inbox-content.tsx",
+            "apps/web/src/components/shared/inbox-content.module.css",
+            "apps/web/src/components/shared/inbox-list.tsx",
+            "apps/web/src/components/shared/inbox-list.module.css",
+            "apps/web/src/components/shared/inbox-thread.tsx",
+            "apps/web/src/components/shared/inbox-thread.module.css"
+          ],
+          "components": [
+            "InboxPage",
+            "InboxListPane",
+            "InboxConversationPane",
+            "InboxMessages",
+            "InboxComposer",
+            "InboxSummaryPane",
+            "InboxComposerTools",
+            "InboxToolButton",
+            "InboxInputBox",
+            "InboxDraftArea",
+            "InboxDraftCount",
+            "InboxComposerBottom",
+            "InboxComposerActions",
+            "InboxMedia",
+            "InboxFlexContent",
+            "InboxFloatingPanel",
+            "InboxInfoBackdrop",
+            "InboxEmailHeading",
+            "InboxListHeader",
+            "InboxListHeadline",
+            "InboxListSearch",
+            "InboxFilterControls",
+            "InboxMessage",
+            "InboxMessageDay",
+            "InboxQuotedMessage"
+          ],
+          "vars": []
+        },
+        "pen": [
+          {
+            "id": "eovoG",
+            "name": "受信箱"
+          }
+        ]
+      },
+      "code": {
+        "overrideSelectors": [],
+        "signals": []
+      },
+      "pen": {
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/app/chats/quote-schedule-react.test.tsx",
+          "apps/web/src/components/support/email-thread-react.test.tsx"
+        ],
+        "needed": "絵との照合はF組の測定と左右画像で確認する。"
+      }
     }
   ]
 }

@@ -84,7 +84,7 @@ describe('ListRange 統一（監査6 #667）', () => {
         expect(source).toContain('data.pagination.offset + 1')
         expect(source).toContain('data.pagination.offset + data.items.length')
         expect(source).toContain('formatNumber(total)')
-        expect(source).toContain('pageCount > 1')
+        expect(source).toContain('<Pagination')
       } else if (path === '../../v8/conversions/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + current.length')
         expect(source).toContain('<ListRange total={shown.length}')
@@ -96,7 +96,7 @@ describe('ListRange 統一（監査6 #667）', () => {
         expect(source).toContain('const pager = hasListData ?')
       } else if (path === '../../v8/nen-campaigns/list.tsx') {
         expect(source).toContain('`\u0024{formatNumber(total)} 件中 \u0024{(page - 1) * size + 1}〜\u0024{Math.min(total, page * size)} 件`')
-        expect(source).toContain('pageCount > 1')
+        expect(source).toContain('<Pagination')
       } else expect(source, `${path} に ListRange がない`).toContain('ListRange')
     },
   )

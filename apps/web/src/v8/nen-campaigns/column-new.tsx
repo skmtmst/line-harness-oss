@@ -193,7 +193,7 @@ export default function ColumnNew() {
       {failure ? <Notice tone="danger" message={failure.message} data-failure-kind={failure.kind} /> : null}
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-title-heading" data-nen-part="title">
+      <Card variant="form" gap="normal" aria-labelledby="nen-col-title-heading" data-nen-part="title">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-title-heading">題名と分類</h2>
         <Field label="題名"><SaveErrorField names={["title","draft.title"]}><TextField id="nen-col-title" aria-describedby={errorFor('title') ? 'nen-col-title-error' : undefined} aria-label="題名" value={draft.title} maxLength={TITLE_MAX} placeholder={`LINE の通知には${TITLE_NOTICE_LENGTH}文字まで出ます`} invalid={Boolean(errorFor('title'))} onChange={(event) => set({ title: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-title-error">{errorFor('title')}</FieldError></Field>
@@ -209,7 +209,7 @@ export default function ColumnNew() {
 <FieldError id="nen-col-excerpt-error">{errorFor('excerpt')}</FieldError></Field>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-link" data-nen-part="article">
+      <Card variant="form" gap="normal" aria-labelledby="nen-col-link" data-nen-part="article">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-link">記事のリンク</h2>
         <Field label="記事の URL"><SaveErrorField names={["articleUrl","draft.articleUrl","article_url","draft.article_url"]}><TextField id="nen-col-articleUrl" aria-describedby={errorFor('articleUrl') ? 'nen-col-articleUrl-error' : undefined} aria-label="記事の URL" value={draft.articleUrl} placeholder="https://example.com/columns/..." invalid={Boolean(errorFor('articleUrl'))} onChange={(event) => set({ articleUrl: event.target.value })} /></SaveErrorField>
 <FieldError id="nen-col-articleUrl-error">{errorFor('articleUrl')}</FieldError></Field>
@@ -230,7 +230,7 @@ export default function ColumnNew() {
         </div>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-kind">
+      <Card variant="form" gap="normal" aria-labelledby="nen-col-kind">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-kind">届く形</h2>
         {/* 届く形は画像の URL で決まる（写真つき＝画像あり、文字だけ＝画像なし）。文字だけを選ぶと画像の URL を外し、写真つきを選ぶと画像の URL の欄へ移る。 */}
         <div className={styles.pickRow} role="radiogroup" aria-label="届く形">
@@ -239,7 +239,7 @@ export default function ColumnNew() {
         </div>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-when" data-nen-part="publish">
+      <Card variant="form" gap="normal" aria-labelledby="nen-col-when" data-nen-part="publish">
         <div className={styles.cardHead}>
           <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-when">いつ・だれに出しますか</h2>
           <p className={`${styles.cardNote} ${styles.cardNoteDark}`}>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります</p>
@@ -284,7 +284,7 @@ export default function ColumnNew() {
         ) : null}
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="roomy" aria-labelledby="nen-col-read">
+      <Card variant="form" gap="normal" aria-labelledby="nen-col-read">
         <h2 className={`${styles.cardTitle} ${styles.cardTitleLarge}`} id="nen-col-read">読んだ人にすること</h2>
         <div className={styles.row}>
           <Field label="読了イベント名"><SaveErrorField names={["completionEventName","draft.completionEventName","completion_event_name","draft.completion_event_name"]}><TextField aria-label="読了イベント名" value={draft.completionEventName} placeholder="例：秋の食事コラムを読了" onChange={(event) => set({ completionEventName: event.target.value })} /></SaveErrorField></Field>

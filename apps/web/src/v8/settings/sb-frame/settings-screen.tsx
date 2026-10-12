@@ -21,6 +21,7 @@ export function SbSettingsScreen({
   help,
   actions,
   children,
+  preview,
   saveActions,
   saveStatus,
   savePlacement,
@@ -38,6 +39,7 @@ export function SbSettingsScreen({
   identity?: ReactNode
   actions?: ReactNode
   children: ReactNode
+  preview?: ReactNode
   saveActions?: ReactNode
   saveStatus?: ReactNode
   savePlacement?: 'content'
@@ -50,6 +52,8 @@ export function SbSettingsScreen({
       help={help}
       actions={actions}
       navigation={<SettingsInnerNav inline />}
+      preview={preview}
+      previewLayout={preview ? 'cards' : undefined}
       saveActions={saveActions}
       saveStatus={saveStatus}
       savePlacement={savePlacement}

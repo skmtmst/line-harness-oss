@@ -9,6 +9,7 @@ import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -178,7 +179,7 @@ export default function SavedViewDialog({
                 {/* 残りではなく「11 / 40文字」。上限が何文字かが分かる。 */}
                 <span className="text-ink-faint text-micro tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
               </div>
-              <input
+              <SaveErrorField names={["name"]}><input
                 id="saved-view-name"
                 value={name}
                 onChange={(event) => { setName(event.target.value); setNameTouched(true); setError('') }}
@@ -193,7 +194,7 @@ export default function SavedViewDialog({
                 aria-invalid={nameInvalid}
                 aria-describedby={error ? 'saved-view-error' : nameMissing ? 'saved-view-name-hint' : undefined}
                 className={`rounded-control text-ink mt-1.5 h-11 w-full border px-3 text-sm outline-none ${nameInvalid ? 'border-danger' : 'border-hairline'}`}
-              />
+              /></SaveErrorField>
             </div>
 
             <div>

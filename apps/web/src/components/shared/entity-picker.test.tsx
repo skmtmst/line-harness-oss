@@ -23,6 +23,18 @@ function Single({ initial = '', readOnly = false, onChange = vi.fn() }: { initia
 }
 
 describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
+  it('項目名を欄に残しても窓の候補名と確定するIDは変えない', async () => {
+    const onChange = vi.fn()
+    render(<EntityPickerField label="担当者" noun="担当者" items={items} value="a" valuePrefix="担当者：" onChange={onChange} />)
+    expect(screen.getByText('担当者：来店アンケート')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '担当者：変える' }))
+    const dialog = await screen.findByRole('dialog', { name: '担当者を選ぶ' })
+    expect(within(dialog).queryByText('担当者：来店アンケート')).toBeNull()
+    fireEvent.click(within(dialog).getByRole('radio', { name: '初回カウンセリング' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+    expect(onChange).toHaveBeenCalledWith('b')
+  })
+
   it('欄は空なら［選ぶ］、選ぶと名前とフォルダ＋［変える］。窓の中で押しただけでは変わらない', async () => {
     const onChange = vi.fn()
     render(<Single onChange={onChange} />)

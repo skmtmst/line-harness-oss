@@ -2768,6 +2768,33 @@ const HQ_RUN_SENT = {
   ],
 }
 
+/* 作成③の撮影状態。既存APIから5つの吹き出しを戻す。未選択の素材は下書きのまま。 */
+const VISUAL_COMPOSE_BUBBLES = [
+  { id: 'visual-text', type: 'text', content: { text: '{{name}}さん、いつもありがとうございます。\n定期便のお客さま限定で、秋の新商品を先行でご案内します🍂' } },
+  { id: 'visual-sticker', type: 'sticker', content: { state: {
+    location: { title: '', address: '', latitude: '', longitude: '' },
+    video: { originalContentUrl: '', previewImageUrl: '' },
+    audio: { originalContentUrl: '', duration: '' },
+    sticker: { packageId: '11537', stickerId: '52002734' },
+  } } },
+  { id: 'visual-carousel', type: 'carousel', content: { templateName: '秋の新商品 3種', inline: true,
+    columnsJson: JSON.stringify(['秋の新商品', '定期便', 'お試しセット'].map((title, index) => ({
+      title, text: '秋のおすすめ商品をご案内します',
+      actions: [{ type: 'uri', label: index === 1 ? '申し込む' : '商品を見る', uri: `https://example.com/products/autumn-${index + 1}` }],
+    }))),
+  } },
+  { id: 'visual-audio', type: 'audio', content: { fileName: '秋のごあいさつ.m4a', state: {
+    location: { title: '', address: '', latitude: '', longitude: '' },
+    video: { originalContentUrl: '', previewImageUrl: '' },
+    audio: { originalContentUrl: 'https://example.com/autumn-greeting.m4a', duration: '42' },
+    sticker: { packageId: '', stickerId: '' },
+  } } },
+  { id: 'visual-rich', type: 'rich_message', content: {} },
+]
+const HQ_VISUAL_COMPOSE_DRAFT = { ...HQ_RUN_DRAFT, id: 'hq-visual-compose', input: { ...HQ_RUN_INPUT, messageBubblesJson: JSON.stringify(VISUAL_COMPOSE_BUBBLES) } }
+const HQ_VISUAL_SENT = { ...HQ_RUN_SENT, id: 'hq-visual-sent', title: '新商品発売のお知らせ', status: 'sent' }
+const VISUAL_COMPOSE_DRAFT = { ...BROADCASTS[1], id: 'visual-compose', targetType: 'all', messageBubbles: VISUAL_COMPOSE_BUBBLES }
+
 const HQ_BROADCAST_FOLDERS = [
   { id: 'hqbf-reserve', name: '予約配信', revision: 1, item_count: 0 },
   { id: 'hqbf-campaign', name: 'キャンペーン', revision: 1, item_count: 1 },
@@ -2850,7 +2877,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/approval$/.test(pathname)) return { success: true, data: HQ_APPROVAL_NONE }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/activity$/.test(pathname)) return { success: true, data: { rows: [{ id: 'act-2', accountId: '', actorId: 'stf-1', action: 'scheduled', createdAt: '2026-01-14T09:00:00.000Z' }, { id: 'act-1', accountId: '', actorId: 'stf-1', action: 'target_fixed', createdAt: '2026-01-14T08:40:00.000Z' }], nextCursor: null } }
   if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+\/targets\/[^/]+\/recipients$/.test(pathname)) return { success: true, data: { rows: [{ friendId: 'f-1', displayName: '山田 花子', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:10.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }, { friendId: 'f-2', displayName: '佐藤 健二', state: 'sent', attemptNo: 1, sentAt: '2026-01-15T02:00:11.000Z', claimedAt: '2026-01-15T02:00:00.000Z', errorCode: null }], total: 2, nextCursor: null } }
-  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
+  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-visual-compose') ? HQ_VISUAL_COMPOSE_DRAFT : pathname.endsWith('/hq-visual-sent') ? HQ_VISUAL_SENT : pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
   /*
     友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
     絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。
@@ -3709,7 +3736,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 統括の名前（絵 `JKjsE` の説明・`K7HYu` の欄）。 */
   if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
   if (method === 'GET' && pathname === '/api/tenants/me/company-contact') return { success: true, data: {
-    legalCompanyName: 'Shed Products株式会社', postalCode: '1500001', address: '東京都渋谷区神宮前1-2-3',
+    legalCompanyName: 'Shed Products株式会社', postalCode: '150-0001', address: '東京都渋谷区神宮前1-2-3',
     building: null, phone: '03-1234-5678', contactName: '山田 太郎', contactEmail: 'yamada@shed.example', invoiceAddressee: null, revision: 0,
   } }
   if (method === 'GET' && pathname === '/api/postal-code/search') return { success: true, data: {
@@ -3929,6 +3956,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ['email', 'メール', 'email', 'sample@example.test'],
       ['tel', '電話', 'tel', '09012345678'],
       ['address', '住所', 'textarea', '東京都新宿区1-2'],
+      // B-235：基本の8つ目。値の中身は絵へ合わせず、複数の状態を見せる。
+      ['allergy', 'アレルギー', 'checkbox', JSON.stringify(['小麦', 'えび', 'くるみ'])],
     ]
     const basics = specs.map(([fixedKey, name, type, value], index) => ({
       id: `fixed-${fixedKey}`, fixedKey, name, fieldKey: `fixed_${fixedKey}`, type, value,
@@ -4698,7 +4727,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
-    const found = BROADCASTS.find((item) => item.id === broadcastOne[1])
+    const found = broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1])
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/broadcasts') {

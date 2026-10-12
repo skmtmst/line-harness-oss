@@ -569,7 +569,7 @@ function ConversionCreate() {
           <h2 className={styles.cardTitle} id="cv-new-what">何が起きたら数えますか</h2>
           <p className={styles.cardNote}>名前は一覧で見分けるため。お客さまには見えません</p>
         </div>
-        <Field label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
+        <Field density="input" label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
           <SaveErrorField names={["name","fieldIssue","field_issue"]}><TextField
             aria-label="成果地点の名前"
             value={name}
@@ -597,7 +597,7 @@ function ConversionCreate() {
           </div>
         </div>
         {measureMethod === 'url_reach' ? (
-          <Field label="数えてよいページ" htmlFor="cv-url" error={fieldIssue?.field === 'cv-url' ? fieldIssue.message : undefined}>
+          <Field density="input" label="数えてよいページ" htmlFor="cv-url" error={fieldIssue?.field === 'cv-url' ? fieldIssue.message : undefined}>
             <SaveErrorField names={["targetUrl","fieldIssue","target_url","field_issue"]}><TextField
               aria-label="数えてよいページ"
               inputMode="url"
@@ -693,7 +693,7 @@ function ConversionCreate() {
         </div>
         {valueModeNotice ? <p className={styles.fieldNote} role="status">{valueModeNotice}</p> : null}
         {valueMode === 'fixed' ? (
-          <Field label="1件あたりの金額（円）" htmlFor="cv-value" error={fieldIssue?.field === 'cv-value' ? fieldIssue.message : undefined}>
+          <Field density="input" label="1件あたりの金額（円）" htmlFor="cv-value" error={fieldIssue?.field === 'cv-value' ? fieldIssue.message : undefined}>
             <SaveErrorField names={["value","fieldIssue","field_issue"]}><NumberInput numericText unit="円"
               aria-label="決まった金額"
               inputMode="numeric"
@@ -710,7 +710,7 @@ function ConversionCreate() {
           <h2 className={styles.cardTitle} id="cv-new-exclusion">数えない条件</h2>
           <p className={styles.cardNote}>任意。テスト用の注文などを除きます</p>
         </div>
-        <Field label="メモ"><SaveErrorField names={["exclusionMemo","fieldIssue","exclusion_memo","field_issue"]}><TextField
+        <Field density="input" label="メモ"><SaveErrorField names={["exclusionMemo","fieldIssue","exclusion_memo","field_issue"]}><TextField
             id="cv-memo"
             aria-label="数えない条件のメモ"
             invalid={fieldIssue?.field === 'cv-memo'}
@@ -722,7 +722,7 @@ function ConversionCreate() {
           /></SaveErrorField></Field>
         {fieldIssue?.field === 'cv-memo' ? <p id="cv-memo-error" className={styles.fieldError} role="alert">{fieldIssue.message}</p> : null}
         <div id="cv-exclusion-fields" aria-invalid={fieldIssue?.field === 'cv-exclusion-fields' || undefined}>
-          <Field label="除く条件" error={fieldIssue?.field === 'cv-exclusion-fields' ? fieldIssue.message : undefined}>
+          <Field density="input" label="除く条件" error={fieldIssue?.field === 'cv-exclusion-fields' ? fieldIssue.message : undefined}>
           {canEdit ? (
             <ConditionBuilder value={exclusion} onChange={(next) => { setFieldIssue((current) => current?.field === 'cv-exclusion-fields' ? null : current); setExclusion(next) }} label="数えない条件" showCount={false} />
           ) : (
@@ -744,7 +744,7 @@ function ConversionCreate() {
         >まだ計測せず、下書きとして保存する</Checkbox></SaveErrorField>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
           <div className={styles.fieldRow}>
-            <Field note={<>空欄なら既定の90日です。</>} label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
+            <Field density="input" note={<>空欄なら既定の90日です。</>} label="友だち追加からの計測期間（日）" htmlFor="cv-days" error={fieldIssue?.field === 'cv-days' ? fieldIssue.message : undefined}>
               <SaveErrorField names={["attributionDays","fieldIssue","attribution_days","field_issue"]}><NumberInput numericText unit="日"
                 aria-label="友だち追加からの計測期間"
                 inputMode="numeric"
