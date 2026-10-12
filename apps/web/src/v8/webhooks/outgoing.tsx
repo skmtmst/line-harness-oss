@@ -16,7 +16,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
-import ListToolbar from '@/components/shared/list-toolbar'
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -492,20 +492,18 @@ export default function WebhooksOutgoingV8() {
   )
   /* 1152 の板（AsfFB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
   const narrowToolbar = (
-    <div className={styles.narrowTools}>
+    <ListToolbarFrame layout="stacked">
       {notice}
-      <div className={styles.narrowRow}>
+      <ListToolbarRow>
         {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <div className={styles.narrowSearch}>{searchBox}</div>
-      </div>
-      <div className={styles.narrowRow}>
+        {folderSelect}
+        <ListToolbarSearchSlot>{searchBox}</ListToolbarSearchSlot>
+      </ListToolbarRow>
+      <ListToolbarRow>
         {chips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {savedBox}
-        {perPage}
-      </div>
-    </div>
+        <ListToolbarEnd>{savedBox}{perPage}</ListToolbarEnd>
+      </ListToolbarRow>
+    </ListToolbarFrame>
   )
   const wideToolbar = (
     <>

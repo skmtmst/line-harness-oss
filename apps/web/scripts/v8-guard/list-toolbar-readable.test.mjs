@@ -257,3 +257,16 @@ test('V1: readable stacked rows keep the count in the last row on the right; upp
     assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('V1 件数は最後の道具行の右'))
   } finally { await browser.close() }
 })
+
+test('V2: a collapsed folder reserves its readable selected width instead of a fixed narrow wrapper', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    const templateCss = read('../../src/components/templates/page-templates.module.css').replace(/:global\(([^)]+)\)/g, '$1')
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${templateCss}\n${css('select')}\n*{box-sizing:border-box}.tools{display:flex;gap:8px;width:852px}</style><div class="tools"><span class="collapsedSelect"><div class="root content" style="--list-select-content-width:240px"><button class="trigger" aria-haspopup="listbox"><span class="value" data-select-value>フォルダ：渋谷エリアのご案内</span><svg class="chevron"></svg></button></div></span><button>探す</button></div></html>`)
+    const fit = () => page.locator('.collapsedSelect').evaluate(el => el.getBoundingClientRect().width >= el.querySelector('button').getBoundingClientRect().width)
+    assert.equal(await fit(), true)
+    await page.locator('.collapsedSelect').evaluate(el => { el.style.width='150px';el.style.minWidth='0' })
+    assert.equal(await fit(), false, 'the former narrow wrapper must be exposed')
+  } finally { await browser.close() }
+})

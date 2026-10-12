@@ -3,7 +3,7 @@
 import ListDateTime from '@/components/shared/list-date-time'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -939,9 +939,7 @@ export default function BroadcastListV8() {
       </ListToolbarRow>
       <ListToolbarRow>
         {narrow ? statusSelect : statusChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {pageSizeBox}
-        {sortButton}
+        <ListToolbarEnd>{pageSizeBox}{sortButton}</ListToolbarEnd>
       </ListToolbarRow>
       {savedViewOpen ? (
         <div className={styles.saveRow}>

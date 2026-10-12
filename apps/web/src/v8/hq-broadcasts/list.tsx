@@ -4,7 +4,7 @@ import ListDateTime from '@/components/shared/list-date-time'
 
 import { canManageRole } from '@/lib/staff-role';
 import { RowNameLink } from '@/components/shared/table';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import { ListToolbarSort } from '@/components/shared/list-toolbar';
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useTenantWideAccess } from '@/lib/staff-role';
@@ -280,7 +280,7 @@ export default function HqBroadcastList() {
             </FilterChip>
           ))}
         </div>
-        <span className={styles.spacer} aria-hidden="true" />
+        <ListToolbarEnd>
         <div className={styles.pageSizeBox}>
           <SaveErrorField names={["pageSize","page_size"]}><Select
             aria-label="表示件数"
@@ -291,6 +291,7 @@ export default function HqBroadcastList() {
           /></SaveErrorField>
         </div>
 <ListToolbarSort value={sortKey} onChange={(value) => { setSortKey(value as typeof sortKey); setPage(1) }} options={[{ value: 'newest', label: '新しい順' }, { value: 'oldest', label: '古い順' }]} />
+        </ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )
