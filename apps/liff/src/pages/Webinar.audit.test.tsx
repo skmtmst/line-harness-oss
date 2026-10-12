@@ -111,7 +111,9 @@ describe('共通の頭・読み込み・失敗の表示', () => {
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }));
     const input = await screen.findByRole('textbox', { name: 'コメントを書く' });
     expect(screen.getAllByRole('banner')).toHaveLength(1);
-    expect(document.title).toBe('秋の説明会 | musubo');
+    // 画面の題は帯の useEffect で入れる。入力欄が出た瞬間には効果がまだ動いておらず、
+    // 読み直す前の「ウェビナー」のままのことがある。入れ替わるまで再試行して待つ。
+    await waitFor(() => { expect(document.title).toBe('秋の説明会 | musubo'); });
     fireEvent.change(input, { target: { value: '質問です' } });
     expect(screen.getByText('4/500文字')).toBeTruthy();
   });
