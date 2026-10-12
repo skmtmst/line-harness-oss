@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { ArrowRight, ChartNoAxesColumn } from 'lucide-react'
+import { ArrowRight, ChartNoAxesColumn, MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import { isKpiNumberText } from './kpi-number-text'
@@ -17,6 +17,20 @@ function hasDetail(node: ReactNode): boolean {
     if (typeof child === 'string' || typeof child === 'number') return String(child).trim().length > 0
     return React.isValidElement<{ children?: ReactNode }>(child) && hasDetail(child.props.children)
   })
+}
+
+/** B-145・B-158：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
+function staticMenuDescription(menu: ReactNode): string | undefined {
+  if (!React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(menu) || menu.type !== 'button') return
+  const props = menu.props
+  if (props.type !== 'button' || typeof props.title !== 'string' || !Object.keys(props).every(key => ['type', 'title', 'className', 'aria-label', 'children'].includes(key))) return
+  const child = props.children
+  const decorativeDots = React.isValidElement<Record<string, unknown>>(child)
+    && child.type === MoreHorizontal
+    && (child.props['aria-hidden'] === true || child.props['aria-hidden'] === 'true')
+    && Object.keys(child.props).every(key => ['size', 'aria-hidden'].includes(key))
+  if (child !== '…' && child !== '...' && !decorativeDots) return
+  return props.title.trim() || undefined
 }
 
 export type KpiCardProps = {
@@ -162,7 +176,8 @@ export default function KpiCard({
   const textIsNumber = valueText === undefined || isKpiNumberText(valueText)
   const statusText = textIsNumber ? undefined : valueText
   const numberText = textIsNumber ? valueText : undefined
-  const tip = help ?? description
+  const menuDescription = help == null && description == null ? staticMenuDescription(menu) : undefined
+  const tip = help ?? description ?? menuDescription
   const hasTip = tip !== undefined && tip !== null
 
   const numberAndUnit = <>
@@ -204,7 +219,7 @@ export default function KpiCard({
             </HelpTip>
           ) : null}
         </p>
-        {menu ? <span className={`${styles.menu} v8-only`}>{menu}</span> : null}
+        {menu && !menuDescription ? <span className={`${styles.menu} v8-only`}>{menu}</span> : null}
         {badge ? (
           <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
         ) : action ? (
