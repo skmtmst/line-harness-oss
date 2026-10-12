@@ -304,27 +304,8 @@ a.way:hover {
   min-width: 0;
 }
 
-.colorRow {
-  display: flex;
-  align-items: center;
-  height: var(--tpl-tg2-swatch);
-  gap: var(--tpl-tg2-swatch-gap);
-}
 
-.colorSwatch {
-  width: var(--tpl-tg2-swatch);
-  height: var(--tpl-tg2-swatch);
-  min-height: 0; /* 全体のボタンの最小の高さ（32）で縦に伸びて楕円になっていた */
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
 
-.colorSwatch[aria-pressed='true'] {
-  outline: var(--tpl-tg2-swatch-ring) solid var(--color-ink);
-  outline-offset: var(--tpl-tg2-swatch-ring);
-}
 
 .infoNote {
   display: flex;

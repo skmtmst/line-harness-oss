@@ -490,6 +490,8 @@
 
 - **10-12の変わり形（F組・B-260）**：同じ入力欄の前後に固定文字を置く`AffixedTextField`は`text-field.tsx`／`text-field.module.css`が持つ。値は入力部分だけ、前後の文字は保存しない。Fieldの必須・誤り・説明・フォーカスと同じ契約を保つ。画面で別の枠や焦点の輪を作らない。
 
+- **10-12の色選択の変わり形（F組）**：固定色をその場で選ぶ欄は`FolderColorButton`の`appearance="palette"`。色の名前・選択・矢印キーは同じ正本が持つ。既定のフォルダ色メニューは保つ。
+
 <a id="field-error"></a>
 ## field-error 欄の赤表示
 

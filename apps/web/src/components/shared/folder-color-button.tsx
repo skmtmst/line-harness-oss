@@ -10,13 +10,15 @@ import styles from './folder-color-button.module.css'
 export type FolderColorOption = { value: string; name: string }
 
 /** IjVpM・iBuZH 共通：今の色の丸＋矢印。色なしは薄い灰の丸。 */
-export default function FolderColorButton({ value, onChange, colors = FOLDER_SELECT_COLORS, disabled = false, compact = false, allowClear = false }: {
+export default function FolderColorButton({ value, onChange, colors = FOLDER_SELECT_COLORS, disabled = false, compact = false, allowClear = false, appearance = 'button', label = 'フォルダの色' }: {
   value: string | null
   onChange: (color: string | null) => void
   colors?: ReadonlyArray<FolderColorOption>
   disabled?: boolean
   compact?: boolean
   allowClear?: boolean
+  appearance?: 'button' | 'palette'
+  label?: string
 }) {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -54,7 +56,7 @@ export default function FolderColorButton({ value, onChange, colors = FOLDER_SEL
     close()
   }
   const palette = (
-    <div ref={paletteRef} id={paletteId} className={styles.palette} role="radiogroup" aria-label="フォルダの色" onKeyDown={escape}>
+    <div ref={paletteRef} id={paletteId} className={[styles.palette, appearance === 'palette' && styles.paletteFlat].filter(Boolean).join(' ')} role="radiogroup" aria-label={label} onKeyDown={escape}>
       {choices.map((item, index) => (
         <button key={item.value} type="button" role="radio"
           aria-label={item.name} title={item.name} aria-checked={selected(item)}
@@ -75,10 +77,11 @@ export default function FolderColorButton({ value, onChange, colors = FOLDER_SEL
       ))}
     </div>
   )
+  if (appearance === 'palette') return palette
   return (
     <span ref={rootRef} className={styles.root} onKeyDown={escape} data-folder-color-button="" data-compact={compact || undefined}>
       <button ref={buttonRef} type="button" className={styles.button}
-        aria-label={`フォルダの色：${colorName}`} aria-expanded={open}
+        aria-label={`${label}：${colorName}`} aria-expanded={open}
         aria-controls={open ? paletteId : undefined} aria-haspopup="true" disabled={disabled}
         onClick={() => setOpen((currentOpen) => !currentOpen)}>
         <span className={styles.dot} style={value ? { backgroundColor: value } : undefined} aria-hidden="true" />
