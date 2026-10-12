@@ -343,13 +343,6 @@
   justify-content: flex-end;
 }
 
-:global(:root) .menuBox .rowMenuButton {
-  width: var(--tpl-cv-row-menu);
-  min-width: 0;
-  height: var(--tpl-cv-row-menu);
-  min-height: 0;
-}
-
 /* まとめての帯（選ぶと表の下に出る）。 */
 .bulkRow {
   display: flex;

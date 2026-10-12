@@ -1201,7 +1201,8 @@ function CommonVarsListInner() {
                           閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す）。 */}
                       <div className={styles.menuBox}>
                         <RowMenu
-                          className={styles.rowMenuButton}
+                          appearance="box"
+                          size="row"
                           label={`共通情報「${item.name}」の操作`}
                           items={rowMenuItems(item)}
                           open={openMenuId === item.id}

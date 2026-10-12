@@ -1114,7 +1114,8 @@ export default function RichMenusListV8() {
                   <Td className={styles.menuCell}>
                     <div className={styles.menuBox}>
                       <RowMenu
-                        className={styles.menuBtn}
+                        appearance="box"
+                        size="row"
                         label={menuLabel}
                         items={rowMenuItems(g)}
                         open={openMenuId === g.id}

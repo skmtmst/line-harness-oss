@@ -138,8 +138,6 @@
 
 .menuCell { text-align: right; }
 .menuBox { display: flex; align-items: center; justify-content: flex-end; }
-/* 行の「…」は28（絵どおり。共通の印ボタンは36）。 */
-.menuCell .menuBox .menuBtn { width: var(--tpl-rml-icon-btn); height: var(--tpl-rml-icon-btn); }
 
 /* 表の下の件数（型の pagination 枠の中。件数は左、ページ送りは右）。 */
 .pagerRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); }
