@@ -509,9 +509,9 @@ export default function HqStoreList(props: HqStoreListProps) {
   )
 
   const summary = `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)} 件`
-  const pager = !ready || filtered.length === 0 ? null : pageCount > 1 ? (
+  const pager = !ready || filtered.length === 0 ? null : (
     <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={<span className={storeStyles.pagerCount}>{summary}</span>} />
-  ) : <p className={storeStyles.pagerSolo}>{summary}</p>
+  )
 
   if (type === 'tag' && attribute.tab !== 'tags') {
     return <SaveErrorScope errors={saveErrors}><OtherTabPanel tab={attribute.tab} title={words.title} description={words.description} onSelect={(key) => { attribute.select(key); setPage(1) }} /></SaveErrorScope>

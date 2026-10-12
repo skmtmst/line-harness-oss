@@ -1295,10 +1295,8 @@ function CommonVarsListInner() {
     : pageCount > 1
       ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)} 件`
       : `${formatNumber(filtered.length)} 件`
-  const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : pageCount > 1 ? (
+  const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : (
     <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
-  ) : (
-    <p className={styles.pagerSolo}>{pagerSummary}</p>
   )
 
   /* 数の帯。取れていない数字は「—」（0 とは言わない）。 */
@@ -1819,7 +1817,7 @@ function CommonVarsListInner() {
         <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
       stats={
-        <KpiBand data-design="KPIs" aria-label="共通情報の集計" className={styles.kpiStrip}>
+        <KpiBand data-design="KPIs" aria-label="共通情報の集計">
           {kpis.map((kpi) => (
             <KpiCard
               key={kpi.key}
