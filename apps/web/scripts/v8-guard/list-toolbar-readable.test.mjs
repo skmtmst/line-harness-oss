@@ -27,6 +27,21 @@ test('KPI filtering and navigation actions have the same line height; a normal b
   } finally { await browser.close() }
 })
 
+test('a compact registration action keeps the existing one-line row height; a tall action expands it', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<html data-theme="v8"><style>${read('../../src/app/globals.css')}\n${css('button')}\ntable{border-collapse:collapse}tr{height:52px}td{padding:0}</style><table><tbody><tr><td>登録済みの経路</td></tr><tr><td><button class="button secondary compact" data-row-quick-action>登録する</button></td></tr></tbody></table></html>`)
+    const heights = () => page.locator('tr').evaluateAll(rows => rows.map(el => el.getBoundingClientRect().height))
+    assert.deepEqual(await heights(), [52, 52])
+    assert.equal(await page.locator('button').evaluate(el => el.getBoundingClientRect().height), 32)
+    await page.locator('button').evaluate(el => el.style.height = '64px')
+    const [registered, oversized] = await heights()
+    assert.equal(registered, 52)
+    assert.ok(oversized > registered)
+  } finally { await browser.close() }
+})
+
 test('B-191: list placeholders remain readable at both widths; fixed-width regression is detected', async () => {
   const browser = await chromium.launch()
   try {

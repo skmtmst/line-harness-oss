@@ -48,6 +48,7 @@ export default function scanPendec2Rules() {
     if(gap<23) add('canvasbottom',board,{deficit:Math.ceil(24-gap)})
   }
   for(const band of all('[data-kpi-strip],[data-kpi-band]')) {
+    for (const menu of [...band.querySelectorAll('[data-row-menu],button[aria-haspopup="menu"]')].filter(visible)) add('kpimenu',menu,{count:1})
     const details=[...band.querySelectorAll('[data-kpi-detail]')]
     const hasDetail=details.some(el=>el.hasAttribute('data-kpi-detail-present') || el.textContent.trim() || el.querySelector('a[href],button'))
     if(!hasDetail && details.some(visible)) add('kpiblank',band,{count:1})

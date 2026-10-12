@@ -949,3 +949,5 @@
 - **見張り**：共通の書式と部品の試験（別年の時刻、SQL UTC、店舗時間帯、無効値）と一覧の実幅測定。Pen の変更は司令塔へ渡す。
 
 - **L4 差し戻しI**：操作の「直す／編集」は `shared/action-words.ts` が「編集する」へ統一し、Button（actionWording）・ActionMenu・FolderEditorDialog・KpiCard が読む。任意の値・名前を出すボタンや窓の題はそのまま保つ。「読み直す／作り直す／最新を取り込んで直す」は別の動きのため保つ。KPIの操作は共通 `action` へ渡す（リンク・既存の処理の両方を受ける）。
+
+- **L4 差し戻しJ**：数の帯に行メニューを置かず、絞り込みと行き先は `KpiCard.action`／`valueAction` へ。別の行き先の入口は残す。行の登録は共通 `Button` の `size="compact"` を使い、表の52/60を変更しない。CIの `pendec2-rules` が帯の中の行メニューを検出する（故障注入あり）。

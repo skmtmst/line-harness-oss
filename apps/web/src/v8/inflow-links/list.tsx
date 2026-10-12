@@ -154,7 +154,6 @@ export default function InflowListV8({
   const toggleLocks = useRef(new Set<string>())
   const [bulkAction, setBulkAction] = useState<BulkRouteAction | null>(null)
   // 数の帯のマスの「…」。開いているマスの名前。
-  const [openTileMenu, setOpenTileMenu] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadRequestRef.current
@@ -771,6 +770,8 @@ export default function InflowListV8({
                           <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">{emptyValue('unknown')}</span>
                         ) : (
                           <Button
+                            size="compact"
+                            data-row-quick-action=""
                             onClick={() => setEditing({ register: r.refCode })}
                             title="未登録 ref を登録します。流入実績はそのまま引き継がれます。"
                           >
@@ -880,19 +881,10 @@ export default function InflowListV8({
             unit={routeCountAvailable ? '件' : ''}
             loading={loading}
             detail="友だちになっても何も起きない"
-            menu={<TileMenu
-              id="unconfigured"
-              title="動きが未設定"
-              openId={openTileMenu}
-              onOpenChange={setOpenTileMenu}
-              items={[{
-                id: 'filter',
-                label: '動きが未設定の経路だけに絞る',
-                disabled: !routeCountAvailable || unconfiguredCount === 0,
-                disabledReason: !routeCountAvailable || unconfiguredCount === 0 ? '動きが未設定の経路はありません' : undefined,
-                onSelect: () => { setFilter('unconfigured'); setPage(1) },
-              }]}
-            />}
+            action={routeCountAvailable && unconfiguredCount > 0 ? {
+              label: '未設定を見る',
+              onClick: () => { setFilter('unconfigured'); setPage(1) },
+            } : undefined}
           />
           <KpiCard
             presentation="band"
@@ -901,16 +893,7 @@ export default function InflowListV8({
             value={adConnected ? adConnected.total : null}
             unit={adConnected ? '件' : ''}
             detail={adNamesSub}
-            menu={<TileMenu
-              id="ads"
-              title="広告とつないだ"
-              openId={openTileMenu}
-              onOpenChange={setOpenTileMenu}
-              items={[
-                { id: 'ads', label: '広告連携を開く', external: false, href: '/inflow-links?tab=ads', onSelect: () => router.push('/inflow-links?tab=ads') },
-                { id: 'connections', label: '広告とのつなぎを開く', external: false, href: '/inflow-links?tab=connections', onSelect: () => router.push('/inflow-links?tab=connections') },
-              ]}
-            />}
+            action={{ label: '広告連携を開く', href: '/inflow-links?tab=ads' }}
           />
         </KpiBand>
       </>}
@@ -978,33 +961,5 @@ export default function InflowListV8({
     >
       {listBody}
     </ListPage></SaveErrorScope>
-  )
-}
-
-/** 数の帯のマスの右上の「…」（絵のマスの「…」）。押すとそのマスから行ける操作を出す。 */
-function TileMenu({
-  id,
-  title,
-  items,
-  openId,
-  onOpenChange,
-}: {
-  id: string
-  title: string
-  items: ActionMenuItem[]
-  openId: string | null
-  onOpenChange: (id: string | null) => void
-}) {
-  const open = openId === id
-  const label = `「${title}」のほかの操作`
-  return (
-      <RowMenu
-        appearance="box"
-        size="small"
-        label={label}
-        open={open}
-        onOpenChange={(next) => onOpenChange(next ? id : null)}
-        items={items.map((item) => ({ ...item, onSelect: () => { onOpenChange(null); item.onSelect?.() } }))}
-      />
   )
 }
