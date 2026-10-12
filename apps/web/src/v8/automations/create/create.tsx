@@ -1,5 +1,12 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("ルール名を入力してください"),
+  row_message: requiredText("送る文面を入力してください"),
+}
+
+
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
@@ -1493,7 +1500,7 @@ export function NewAutomationV8({
       setInputError({ target, message })
       return message
     }
-    if (!name.trim()) return invalid('v8-rule-name', 'ルール名を入力してください')
+    if ((b244Requirements.name.check(name) !== null)) return invalid('v8-rule-name', 'ルール名を入力してください')
     if (eventType === 'tag_change' && !String(triggerConfig.tagId ?? '').trim()) return invalid('v8-trigger-tag', 'きっかけのタグを選んでください')
     /*
      * 古い形で保存された条件を読めなかった下書きは、付け直すまで保存させない。
@@ -1514,7 +1521,7 @@ export function NewAutomationV8({
       if (row.type === 'add_tag' && !row.tagId) return invalid(`v8-tag-${row.key}`, '付けるタグを選んでください', row.key)
       if (row.type === 'start_scenario' && !row.scenarioId) return invalid(`v8-scenario-${row.key}`, '始めるシナリオを選んでください', row.key)
       if (row.type === 'common_action' && !row.commonActionId) return invalid(`v8-common-action-${row.key}`, '使う共通アクションを選んでください', row.key)
-      if (row.type === 'send_message' && !row.message.trim()) return invalid(`v8-message-${row.key}`, '送る文面を入力してください', row.key)
+      if (row.type === 'send_message' && (b244Requirements.row_message.check(row.message) !== null)) return invalid(`v8-message-${row.key}`, '送る文面を入力してください', row.key)
       if (row.type === 'notify_staff'
         && (!String(row.kept?.notificationRuleId ?? '').trim() || !String(row.kept?.message ?? '').trim())) {
         return invalid(`v8-action-${row.key}`, '担当へ知らせる中身が読めません。することを選び直してください', row.key)
@@ -2573,12 +2580,12 @@ export function NewAutomationV8({
         </div>
       ) : null}
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="名前">
+      <Card variant="form" gap="normal" aria-label="名前">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '1. どのルールか' : '名前'}</h2>
           <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
         </div>
-        <Field label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined}>
+        <Field label={isDraft ? 'ルール名' : '名前'} htmlFor="v8-rule-name" error={inputError?.target === 'v8-rule-name' ? inputError.message : undefined} requirement={b244Requirements.name}>
           <SaveErrorField names={["name"]}><TextField
             id="v8-rule-name"
             value={name}
@@ -2589,7 +2596,7 @@ export function NewAutomationV8({
         </Field>
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どんなときに動かしますか">
+      <Card variant="form" gap="normal" aria-label="どんなときに動かしますか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '2. 何が起きたら動かすか' : 'どんなときに動かしますか'}</h2>
         </div>
@@ -2676,7 +2683,7 @@ export function NewAutomationV8({
         ) : null}
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="だれに動かしますか">
+      <Card variant="form" gap="normal" aria-label="だれに動かしますか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>だれに動かしますか</h2>
         </div>
@@ -2712,7 +2719,7 @@ export function NewAutomationV8({
         )}
       </Card>
 
-      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="何をするか">
+      <Card variant="form" gap="normal" aria-label="何をするか">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>{isDraft ? '3. 何をするか' : '何をするか'}</h2>
           <p className={styles.cardDesc}>上から順に動きます</p>
@@ -2777,7 +2784,7 @@ export function NewAutomationV8({
                 知らせる相手と文面は、見本から作ったときのまま保ちます。変えるときは、することを選び直してください。
               </p>
             ) : (
-              <Field label="送る文面" htmlFor={`v8-message-${row.key}`}><SaveErrorField names={["message","editingRow.message","editing_row.message"]}><TextArea
+              <Field label="送る文面" htmlFor={`v8-message-${row.key}`} requirement={b244Requirements.row_message}><SaveErrorField names={["message","editingRow.message","editing_row.message"]}><TextArea
                   invalid={inputError?.target === `v8-message-${row.key}`}
                   aria-describedby={inputError?.target === `v8-message-${row.key}` ? 'v8-action-error' : undefined}
                   id={`v8-message-${row.key}`}

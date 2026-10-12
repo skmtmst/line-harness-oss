@@ -48,7 +48,7 @@ export function HeadOperatorMenu({
 }) {
   const rows = buildOperatorRows(operators, false, value)
   return (
-    <SaveErrorField names={["value"]}><EntitySelect
+    <SaveErrorField names={["value", "operatorId", "operator_id"]}><EntitySelect
       aria-label={ariaLabel}
       label="担当"
       width={OPERATOR_WIDTH}
@@ -69,7 +69,7 @@ export function HeadStatusMenu({
   ariaLabel?: string
 }) {
   return (
-    <SaveErrorField names={["value"]}><Select
+    <SaveErrorField names={["value", "status"]}><Select
       aria-label={ariaLabel}
       width={STATUS_FIXED_WIDTH + STATUS_CHAR_WIDTH * HEAD_STATUS_LABEL[value].length}
       treatment="pill"

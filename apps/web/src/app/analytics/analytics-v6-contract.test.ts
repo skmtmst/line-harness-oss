@@ -116,6 +116,8 @@ describe('V6 機能20 分析', () => {
 
   it('未集計のファネルは壊れた表示にせず案内を出す(点検#508軽13)', () => {
     expect(PAGE).toContain('setNoRun')
-    expect(PAGE).toContain('まだ集計がありません。下の「定義の操作と集計の詳細」から「この${funnelDays}日を再集計」を押してください')
+    expect(PAGE).toContain('<AggregationStatus')
+    expect(PAGE).toContain("{ kind: 'empty' }")
+    expect(PAGE).toContain('onRun={() => void runNow()}')
   })
 })

@@ -74,6 +74,10 @@ export interface SelectProps {
    * 渡さない箱は今までどおり。
    */
   valueAlign?: 'start'
+  /** 栞付きの絞り込みなど、既存の絵が矢印を持たない欄。開く操作と読み上げは共通。 */
+  showChevron?: boolean
+  /** 狭い道具の段では印だけにする。値・候補・読み上げ名は保持する。 */
+  iconOnly?: boolean
   /**
    * ★V8 だけ：開いた中身の一番下に区切りと「＋ 〇〇」を置き、押すと同じ板で作れるようにする
    * （dLffh・iBuZH。ふつうは FolderSelect が渡す）。渡さなければ出ない（閲覧のみ・権限なし）。
@@ -107,6 +111,8 @@ export default function Select({
   onChange,
   icon,
   valueAlign,
+  showChevron = true,
+  iconOnly = false,
   options,
   size = 'standard',
   value,
@@ -307,6 +313,9 @@ export default function Select({
         className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
         data-tone={treatment === 'pill' ? selected?.tone ?? 'neutral' : undefined}
         data-value-align={valueAlign}
+        data-chevron={showChevron || undefined}
+        data-icon-only={iconOnly || undefined}
+        title={iconOnly ? ariaLabel : undefined}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}
@@ -327,13 +336,13 @@ export default function Select({
         ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
         <span className={styles.value} title={selected?.label ?? undefined}>
-          {label ? `${label}：` : ''}{selected?.label ?? ''}
+          {label ? `${label}：${selected?.label ?? ''}` : selected?.label ?? ''}
         </span>
-        {open ? (
+        {showChevron && !iconOnly && (open ? (
           <ChevronUp className={styles.chevron} aria-hidden="true" />
         ) : (
           <ChevronDown className={styles.chevron} aria-hidden="true" />
-        )}
+        ))}
       </button>
       {open ? (
         <SelectMenu

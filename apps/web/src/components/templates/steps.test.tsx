@@ -25,7 +25,7 @@ const STEPS: StepperStep[] = [
 
 /**
  * ★V8 の手順（共通部品 Fa8ED・決まりの板 q1xNMz。2026-10-08 オーナー）。
- * 丸22（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・線24×1.5。
+ * 丸24（済み＝緑に白い✓・今＝墨に白い数字・まだ＝薄い枠に灰の数字）・名13（今だけ太字）・線24×1.5。
  */
 describe('手順（型の共通部品 Steps）', () => {
   it('段ごとに済み・今・まだの印を付け、今の段だけ aria-current="step"', () => {
@@ -92,14 +92,14 @@ describe('手順（型の共通部品 Steps）', () => {
     vi.restoreAllMocks()
   })
 
-  it('見た目：丸22・数11・名13・線24×1.5・間8・丸と名6。折り返さず、狭いときは今の段以外の名を隠す', () => {
+  it('見た目：丸22・数11・名13・線24×1.5・間8・丸と名8。折り返さず、狭いときは今の段以外の名を隠す', () => {
     expect(globals).toMatch(/--tpl-steps-dot:\s*22px/)
     expect(globals).toMatch(/--tpl-steps-text-size:\s*var\(--polish-text-body\);/)
     expect(globals).toMatch(/--tpl-steps-num-size:\s*11px/)
     expect(globals).toMatch(/--tpl-steps-line-w:\s*24px/)
     expect(globals).toMatch(/--tpl-steps-line-h:\s*1\.5px/)
     expect(globals).toMatch(/--tpl-steps-gap:\s*8px/)
-    expect(globals).toMatch(/--tpl-steps-dot-gap:\s*6px/)
+    expect(globals).toMatch(/--tpl-steps-dot-gap:\s*var\(--polish-space-row\)/)
     expect(css).toMatch(/\.list \{[^}]*flex-wrap:\s*nowrap/s)
     expect(css).toMatch(/\.dot\[data-step-dot='done'\] \{[^}]*background:\s*var\(--color-accent-deep\)/s)
     expect(css).toMatch(/\.dot\[data-step-dot='current'\] \{[^}]*background:\s*var\(--color-ink\)/s)

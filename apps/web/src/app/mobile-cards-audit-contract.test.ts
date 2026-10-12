@@ -43,7 +43,7 @@ describe('1: 共通の表に「スマホではカード」の形がある', () =
 describe('2: テンプレート・成果地点の一覧はこの形になる', () => {
   it('テンプレート一覧は狭いV8の板でも名前と操作を残す', () => {
     expect(TEMPLATES).toContain('useNarrowViewport()')
-    expect(TEMPLATES).toContain('<DataTable>')
+    expect(TEMPLATES).toContain('<DataTable presentation="template-list">')
     expect(TEMPLATES).toContain('{!narrow && <Th className={styles.headCell}>使っている所</Th>}')
     // 名前欄の max-w-0 を残したCSS畳み込みは名前が消える原因。戻したら赤くなる。
     expect(TEMPLATES).not.toContain('data-template-list')
@@ -57,7 +57,7 @@ describe('2: テンプレート・成果地点の一覧はこの形になる', (
   })
 
   it('成果地点の現役一覧は共通の表と省略した全文を使う', () => {
-    expect(CONVERSIONS).toContain('<DataTable className={styles.table}>')
+    expect(CONVERSIONS).toContain('<DataTable columnLayout={{')
     expect(CONVERSIONS).toContain('title={point.name}')
     expect(CONVERSIONS).toContain('title={usageLabel(point)}')
     expect(CONVERSIONS).toContain('<ListPage')

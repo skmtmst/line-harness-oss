@@ -8,10 +8,10 @@
 .action { color: var(--color-action); font-size: var(--text-caption); white-space: nowrap; }
 .action:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 .rows { display: flex; flex-direction: column; gap: var(--tpl-fdt-group-gap); margin: 0; }
-.row { display: grid; grid-template-columns: var(--tpl-customer-label) minmax(0, 1fr); gap: var(--tpl-fdt-group-gap); font-size: var(--text-caption); line-height: var(--tpl-fdt-text-lh); }
+.row { display: grid; grid-template-columns: var(--tpl-customer-label) minmax(0, 1fr); gap: var(--tpl-fdt-group-gap); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
 .row dt { color: var(--color-ink-secondary); white-space: nowrap; }
 .row dd { display: flex; align-items: center; gap: var(--space-8); margin: 0; min-width: 0; }
-.value { display: block; min-width: 0; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-label); }
+.value { display: block; min-width: 0; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--polish-text-body); }
 .row small { display: block; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-micro--line-height); overflow-wrap: anywhere; }
 .note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .content, .more { min-width: 0; overflow-wrap: anywhere; }
@@ -21,12 +21,13 @@
 
 .basicOptions { display: flex; flex-direction: column; gap: var(--tpl-fdt-group-gap); padding-top: var(--tpl-fdt-summary-gap); border-top: 1px solid var(--color-hairline); }
 .allergies { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-fdt-group-gap); min-width: 0; }
+.row dd > .allergies { flex: 1; min-width: 0; }
 .other { display: flex; gap: var(--tpl-fdt-group-gap); align-items: center; min-width: 0; }
 .editActions { display: flex; gap: var(--tpl-fdt-group-gap); justify-content: flex-end; }
 }
 
 /* B-212：欄の内側は16以上。基本の値と出どころの印を横に並べる。 */
-.panel { padding: var(--space-24); border: 0; border-radius: var(--radius-flat); box-shadow: none; }
+.panel { padding: var(--polish-space-section); border: 0; border-radius: var(--radius-flat); box-shadow: none; }
 .profile { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
 .profileName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; }
 .profileDate { flex: none; color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
@@ -41,4 +42,8 @@
 .profileDate { margin-left: auto; }
 
 /* B-212：追加した連絡欄も72の見出し幅で1行。 */
-.content dl dt { font-size: var(--text-label); white-space: nowrap; }
+.content dl dt { font-size: var(--polish-text-body); white-space: nowrap; }
+
+/* B-152/B-212: 段は16、段内は8。節の線・上下の余白を重ねない。 */
+.panel { gap: var(--space-16); }
+.section + .section { padding-top: 0; border-top: 0; }

@@ -20,6 +20,9 @@ import { DetailPage } from '@/components/templates'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import FilterChip from '@/components/shared/filter-chip'
+import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import Dialog from '@/components/shared/dialog'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -472,7 +475,7 @@ function InflowDetailContent() {
       {!route ? (
         <DetailLoading />
       ) : <>
-        <div className={styles.kpis}>
+        <div >
           {route.couponEnabled ? <KpiBand aria-label={`${route.name}のクーポン概要`}>
             <KpiCard presentation="band" icon={null} title="読み取り" value={funnel?.click_count ?? null} unit="回" detail="累計" />
             <KpiCard presentation="band" icon={null} title="友だち追加" value={funnel?.new_friend_add_count ?? null} unit="人" detail="新しく友だちになった人" />
@@ -491,7 +494,7 @@ function InflowDetailContent() {
         </div>
 
         <div className={styles.afterWrap}>
-          <section className={styles.afterCard} aria-labelledby="inflow-after-title">
+          <Card variant="panel" contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="inflow-after-title">
             <div className={styles.afterHead}>
               <h2 className={styles.afterTitle} id="inflow-after-title">その後（この経路から来た人）</h2>
               {readonly ? null : (
@@ -573,7 +576,7 @@ function InflowDetailContent() {
               <Button onClick={() => setShowOrders((current) => !current)} aria-expanded={showOrders}>注文を見る</Button>
             </div>
             {showOrders ? <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} /> : null}
-          </section>
+          </Card>
         </div>
 
         <div className={styles.happenBand}>
@@ -594,7 +597,7 @@ function InflowDetailContent() {
           </>}
         </div>
 
-        <section className={styles.card} aria-label="この経路から来た友だち">
+        <Card overflow="hidden" aria-label="この経路から来た友だち">
           <div className={styles.tools}>
             <div className={styles.searchBox}>
               <SearchField
@@ -612,15 +615,13 @@ function InflowDetailContent() {
                 ['blocked', `ブロック ${formatNumber(blockedFriends.length)}`],
                 ['converted', `成果あり ${formatNumber(convertedFriends.length)}`],
               ] as Array<[FriendChip, string]>).map(([value, label]) => (
-                <button
+                <FilterChip
                   key={value}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={friendChip === value}
-                  onClick={() => { setFriendChip(friendChip === value && value !== 'all' ? 'all' : value); setFriendPage(1) }}
+                  selected={friendChip === value}
+                  onChange={() => { setFriendChip(friendChip === value && value !== 'all' ? 'all' : value); setFriendPage(1) }}
                 >
                   {label}
-                </button>
+                </FilterChip>
               ))}
             </div>
             <span className={styles.toolsSpacer} aria-hidden="true" />
@@ -657,14 +658,14 @@ function InflowDetailContent() {
               description={friends.length > 0 ? '検索や絞り込みを変えてください。' : '友だちになった人がここに並びます。'}
             />
           ) : (
-            <DataTable className={styles.table}>
+            <DataTable columnLayout={INFLOW_TABLE_LAYOUT}>
               <thead>
-                <TableHeadRow className={styles.headRow} data-table-layout="columns">
+                <TableHeadRow data-table-layout="columns">
                   <Th className={styles.colWhen}>日時</Th>
                   <Th className={styles.colFriend}>友だち</Th>
-                  <Th className={styles.colAccount}>入った LINE アカウント</Th>
+                  <Th className={styles.colAccount} collapseAt="narrow">入った LINE アカウント</Th>
                   <Th className={styles.colState}>今の状態</Th>
-                  <Th className={styles.colTags}>付いたタグ・その後</Th>
+                  <Th grow collapseAt="narrow">付いたタグ・その後</Th>
                   <Th className={styles.colResult}>成果</Th>
                   <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
                 </TableHeadRow>
@@ -673,7 +674,7 @@ function InflowDetailContent() {
                 {friendPageRows.map((friend) => {
                   const blocked = isBlockedFriend(friend)
                   return (
-                    <Tr key={friend.id} className={styles.row} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
+                    <Tr key={friend.id} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
                       <Td className={styles.colWhen}>
                         <span className={styles.when}>
                           {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/').replace(/^0/, '') : '日時不明'}
@@ -681,11 +682,11 @@ function InflowDetailContent() {
                       </Td>
                       <Td className={styles.colFriend}>
                         <span className={styles.face} aria-hidden="true">{friend.displayName.slice(0, 1)}</span>
-                        <RowNameLink className={styles.friendName} href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>
+                        <RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={friend.displayName}>
                           {friend.displayName}
                         </RowNameLink>
                       </Td>
-                      <Td className={styles.colAccount}><span className={styles.cellText} title={accountName}>{accountName}</span></Td>
+                      <Td className={styles.colAccount} collapseAt="narrow"><span className={styles.cellText} title={accountName}>{accountName}</span></Td>
                       <Td className={styles.colState}>
                         {blocked ? (
                           <StatusBadge tone="neutral" size="compact">ブロック</StatusBadge>
@@ -696,7 +697,7 @@ function InflowDetailContent() {
                         )}
                       </Td>
                       {/* 経路の設定タグは、個々の友だちへ付いたタグの実績ではない。口が返すまで代用しない。 */}
-                      <Td className={styles.colTags}><span className={styles.cellSub}>{emptyValue('unknown')}</span></Td>
+                      <Td grow collapseAt="narrow"><span className={styles.cellSub}>{emptyValue('unknown')}</span></Td>
                       <Td className={styles.colResult}><span className={styles.cellFaint}>{friend.conversion ?? emptyValue('unknown')}</span></Td>
                       <Td className={styles.colMenu}>
                         <div className={styles.menuBox}>
@@ -727,18 +728,18 @@ function InflowDetailContent() {
               )}
             </div>
           ) : null}
-        </section>
+        </Card>
 
         <div className={styles.bottom}>
-          <section className={styles.box} aria-labelledby="inflow-links-to">
+          <Card variant="panel" className={styles.box} contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="inflow-links-to">
             <h2 className={styles.boxTitle} id="inflow-links-to">この経路のつながる先</h2>
             <dl className={styles.kv}>
               <div className={styles.kvRow}><dt>コンバージョン</dt><dd>{funnel ? `${formatNumber(funnel.cv_count)}件` : emptyValue('unknown')}</dd></div>
               <div className={styles.kvRow}><dt>シナリオ配信</dt><dd>{scenarioName ?? emptyValue('none')}</dd></div>
               <div className={styles.kvRow}><dt>マイル</dt><dd>{emptyValue('none')}</dd></div>
             </dl>
-          </section>
-          <section className={styles.box} aria-labelledby="inflow-qr">
+          </Card>
+          <Card variant="panel" className={styles.box} contentPadding="var(--polish-space-section)" gap="var(--polish-space-card)" aria-labelledby="inflow-qr">
             <h2 className={styles.boxTitle} id="inflow-qr">QR コード</h2>
             <dl className={styles.kv}>
               <div className={styles.kvRow}><dt>大きさ</dt><dd className={styles.kvAccent}>320 × 320</dd></div>
@@ -748,7 +749,7 @@ function InflowDetailContent() {
             <div className={styles.boxFoot}>
               <Button variant="text" href={qrDownloadUrl} download={`referral-${route.refCode}.png`}>→ QR コードを保存</Button>
             </div>
-          </section>
+          </Card>
         </div>
       </>}
 

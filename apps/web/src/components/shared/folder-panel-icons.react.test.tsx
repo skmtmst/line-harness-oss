@@ -69,11 +69,13 @@ describe('V8 フォルダの列の共通の印（faSbC）', () => {
     expect(icon.style.color).toBe(color)
   })
 
-  it.each(['キャンペーン', 'すべて', '未分類'])('作ったフォルダ「%s」は名前に関係なく、そのフォルダの色の丸を出す', async (label) => {
+  it.each(['キャンペーン', 'すべて', '未分類'])('作ったフォルダ「%s」は名前に関係なく、そのフォルダの色のフォルダを出す', async (label) => {
     const { button } = await render({ id: 'folder', kind: 'folder', label, count: 3, color: 'rebeccapurple', icon: callerIcon })
-    const dot = button.querySelector('[data-folder-dot]') as HTMLElement
-    expect(dot.style.backgroundColor).toBe('rebeccapurple')
-    expect(dot.getAttribute('aria-label')).toBe(`フォルダ：${label}`)
+    const folder = button.querySelector('.' + styles.folderIcon + ' svg') as SVGElement
+    expect(folder.classList.contains('lucide-folder')).toBe(true)
+    expect(folder.style.color).toBe('rebeccapurple')
+    expect(button.querySelector('[data-folder-dot]')).toBeNull()
+    expect(folder.getAttribute('fill')).toBe('currentColor')
     expect(button.querySelector('.' + styles.folderIcon + ' [data-caller-icon]')).toBeNull()
   })
 
@@ -95,7 +97,7 @@ describe('フォルダの行ごとに追加する操作', () => {
     const items = [...document.querySelectorAll('[role="menuitem"]')]
     expect(items[0].textContent).toBe('このフォルダを配る')
     expect(items[0].querySelector('strong')).not.toBeNull()
-    expect(items[1].parentElement?.querySelector('hr')).not.toBeNull()
+    expect(items[1].parentElement?.querySelector('hr')).toBeNull() // B-244：同じ整理の組の中は区切らない。
     await act(async () => (items[0] as HTMLButtonElement).click())
     expect(distribute).toHaveBeenCalledTimes(1)
   })

@@ -17,6 +17,8 @@ import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import styles from './two-factor-ops.module.css'
 import { PageHeading } from '@/components/templates/page-frame'
+import Card from '@/components/shared/card'
+import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
@@ -118,15 +120,14 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
 
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page}>
-      <section className={styles.card} data-design-node="tOPeY" aria-labelledby="ops-two-factor-title">
-        <PageHeading title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" help={scope === 'ops' ? <> パスワードを確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。</> : <>認証アプリに表示されている6桁コードを入力してください。コードを入力できない場合はログインからやり直してください。</>} />
+      <Card variant="form" gap="normal" className={styles.card} data-design-node="tOPeY" aria-labelledby="ops-two-factor-title">
+        <PageHeading inset="none" title="6桁の確認" titleId="ops-two-factor-title" titleAs="h1" subtitleSize="body" subtitle={scope === 'ops' ? <>パスワードを確かめました。認証アプリに出ている6桁を入れてください。</> : undefined} help={scope === 'admin' ? <>認証アプリに表示されている6桁コードを入力してください。コードを入力できない場合はログインからやり直してください。</> : undefined} />
         {scope === 'admin' ? <p className={styles.foot}>{brandName}{ready && challenge ? ` · ✓ ${method === 'password' ? 'メールログイン' : 'LINEログイン'}` : ''}</p> : null}
 
         {missingChallenge ? (
           <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Link href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Link>} />
         ) : error ? <Notice tone="danger" id="ops-two-factor-error" message={error} /> : null}
-        <div className={styles.field}>
-          <p id="ops-two-factor-code-label" className={styles.label}>認証コード（6桁）</p>
+        <Field density="input" optional={false} label={<span id="ops-two-factor-code-label">認証コード（6桁）</span>}>
           <SaveErrorField names={["typedCode","code"]} key={attempt}><OtpInput
             key={attempt}
             value={typedCode}
@@ -140,7 +141,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
             disabled={missingChallenge || succeeded}
             autoFocus
           /></SaveErrorField>
-        </div>
+        </Field>
         <Button
           variant="primary"
           className={styles.submit}
@@ -151,12 +152,13 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
         >
           <LogIn aria-hidden="true" className={styles.icon} />ログイン
         </Button>
+        {scope === 'ops' ? <p className={styles.foot}>認証アプリが使えないときは、運営のオーナーに連絡してください。</p> : null}
         {scope === 'admin' ? <>
           <p className={styles.foot}>コードは約30秒ごとに更新されます</p>
           <Link href="/login" onClick={clearTwoFactorChallenge}>{missingChallenge || method === 'password' ? 'ログインに戻る' : '別のLINEアカウントでログイン'}</Link>
         </> : null}
 
-      </section>
+      </Card>
     </main></SaveErrorScope>
   )
 }

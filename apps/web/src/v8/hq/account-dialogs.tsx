@@ -1,4 +1,6 @@
 'use client'
+import { requiredText } from '@/lib/form-requirement'
+const accountNameRequirement = requiredText('名前を入力してください。')
 
 import { useEffect, useState } from 'react'
 import { CircleHelp, RotateCcw, Users } from 'lucide-react'
@@ -78,7 +80,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
 
   const save = async () => {
     if (busy) return
-    if (!name.trim()) {
+    if (accountNameRequirement.check(name)) {
       setNameError('名前を入力してください。')
       setError('')
       const input = document.getElementById('hq-account-settings-name')
@@ -153,7 +155,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
       }
     >
       <div className={head.head}>
-        <div className={styles.field}><Field label="名前" htmlFor="hq-account-settings-name"><SaveErrorField names={["name"]}><TextField
+        <div className={styles.field}><Field label="名前" htmlFor="hq-account-settings-name" requirement={accountNameRequirement}><SaveErrorField names={["name"]}><TextField
             id="hq-account-settings-name"
             value={name}
             maxLength={100}

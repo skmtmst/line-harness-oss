@@ -22,6 +22,7 @@ it('形と面の文字を読み上げ、共通カードのラジオを1つだけ
   expect(radio.checked).toBe(true)
   expect(within(group).getAllByRole('radio').filter((input) => (input as HTMLInputElement).checked)).toHaveLength(1)
   expect(radio.closest('[data-choice-card]')).toBeTruthy()
+  expect(radio.closest('[data-choice-card]')?.getAttribute('data-content-placement')).toBe('below-indicator')
   expect(radio.parentElement?.textContent).toContain('上下2面')
   const areas = radio.parentElement!.querySelectorAll('span[style]') as NodeListOf<HTMLElement>
   expect(Array.from(areas).map((area) => [area.textContent, area.style.top, area.style.height])).toEqual([['A', '0%', '50%'], ['B', '50%', '50%']])

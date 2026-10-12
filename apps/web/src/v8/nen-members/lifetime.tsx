@@ -1,4 +1,10 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  editing_title: requiredText("称号を入れてください。"),
+}
+
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
@@ -67,7 +73,7 @@ export default function LifetimeV8({
   const fields = useFieldValidation(editing ? [
     ...(!Number.isFinite(parseYen(editing.threshold)) || parseYen(editing.threshold) <= 0
       ? [{ id: 'milestone-threshold', message: '節目の金額は1円以上で入れてください。' }] : []),
-    ...(!editing.title.trim() ? [{ id: 'milestone-title', message: '称号を入れてください。' }] : []),
+    ...((b244Requirements.editing_title.check(editing.title) !== null) ? [{ id: 'milestone-title', message: '称号を入れてください。' }] : []),
   ] : [])
 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
@@ -247,7 +253,7 @@ export default function LifetimeV8({
           <div className={styles.editBody}>
             <Field label="節目（累計の金額）"><SaveErrorField names={["threshold","editing.threshold"]}><NumberInput numericText {...fields.bind('milestone-threshold')} inputMode="numeric" placeholder="¥50,000" value={editing.threshold} onChange={(event) => setEditing({ ...editing, threshold: event.target.value })} /></SaveErrorField>
 <FieldError id="milestone-threshold-error">{fields.error('milestone-threshold')}</FieldError></Field>
-            <Field label="称号"><SaveErrorField names={["title","editing.title"]}><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></SaveErrorField>
+            <Field label="称号" requirement={b244Requirements.editing_title}><SaveErrorField names={["title","editing.title"]}><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></SaveErrorField>
 <FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError></Field>
             <div className={styles.editToggle}>
               <SaveErrorField names={["notify","editing.notify"]}><SettingCheckbox checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} /></SaveErrorField>

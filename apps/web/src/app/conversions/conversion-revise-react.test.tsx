@@ -161,7 +161,7 @@ async function type(node: HTMLInputElement, value: string) {
 /** 一覧から詳細を開き、編集の窓まで進める。詳細は行の「その他操作」メニューの中。 */
 async function openEditDialog() {
   await click(byLabel('成果地点「購入」の操作'))
-  await click(byText('中身を見る'))
+  await click(byText('成果地点の詳細を見る'))
   await click(byText('編集'))
   expect(editNavigation.query).toContain('id=')
   await act(async () => { root.render(React.createElement(EditPage)) })
@@ -297,7 +297,7 @@ describe('編集も起点に合う金額の決め方にする', () => {
 
   async function openEditDialogFor(name: string) {
     await click(byLabel(`成果地点「${name}」の操作`))
-    await click(byText('中身を見る'))
+    await click(byText('成果地点の詳細を見る'))
     await click(byText('編集'))
   expect(editNavigation.query).toContain('id=')
   await act(async () => { root.render(React.createElement(EditPage)) })
@@ -415,7 +415,7 @@ describe('停止済み成果地点の編集導線', () => {
     })
     await mount()
     await click(byLabel('成果地点「購入」の操作'))
-    await click(byText('中身を見る'))
+    await click(byText('成果地点の詳細を見る'))
     // 詳細は開いている（この判定が空振りしないことを先に確かめる）。
     // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
     expect(byLabel('閉じる')).toBeTruthy()

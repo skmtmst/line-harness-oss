@@ -17,6 +17,17 @@ import styles from './affiliates.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
+/** 5つの一覧が同じ共通表の口へ渡す寸法。 */
+export const AFFILIATE_TABLE_LAYOUT = {
+  headHeight: 'var(--tpl-af-head-h)',
+  rowHeight: 'var(--tpl-af-row-h)',
+  gap: 'var(--tpl-af-col-gap)',
+  padding: '0 var(--tpl-list-inset)',
+  numberInset: 'var(--tpl-af-num-pad-end)',
+  bodyTextSize: 'var(--polish-text-body)',
+  collapseScope: 'page' as const,
+}
+
 export const AFFILIATE_TABS = [
   { key: 'affiliates', label: 'アフィリエイター', board: 'nJlxX' },
   { key: 'offers', label: '案件', board: 'h7dmB' },
@@ -69,7 +80,7 @@ export function ViewerBand() {
 
 /**
  * 作るボタン。閲覧のみの人には出さない（2026-10-06 オーナー：押せない形で
- * 残さず隠す）。フォルダの列の上（full）は場所だけ空けて並びを絵どおりに保つ。
+ * 残さず隠す）。隠した作成操作のための空白も置かない。
  */
 export function CreateButton({
   href,
@@ -84,7 +95,7 @@ export function CreateButton({
   full?: boolean
   children: ReactNode
 }) {
-  if (readonly) return full ? <span className={styles.viewerCreateSpace} aria-hidden="true" /> : null
+  if (readonly) return null
   return (
     <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href} onClick={onClick}>
       {children}
@@ -117,6 +128,7 @@ export function AffiliateFrame({ help, actions, stats, folders, folderNav, toolb
   return (
     <ListPage
       help={<>{"紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"}{help}</>}
+      skeleton
       boardId={board}
       headingSize="regular"
       title="成果とアフィリエイト"

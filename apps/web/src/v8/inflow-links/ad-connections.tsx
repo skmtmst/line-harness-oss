@@ -6,6 +6,8 @@ import { api } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
+import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -14,7 +16,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { adMappingReturns, groupAdMappings, useAdLogs, type AdMappingRow } from './ad-shared'
 import adsStyles from './ads.module.css'
 import styles from './ad-pages.module.css'
-import { PageHeading } from '@/components/templates/page-frame'
+import { DetailPage } from '@/components/templates'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -186,37 +188,37 @@ export default function AdConnectionsV8() {
     table = <ListState kind="empty" title="成果地点がまだありません" description="成果地点を作ると、ここで広告に返す名前を決められます。" />
   } else {
     table = (
-      <div className={styles.table} role="table" aria-label="成果地点と、広告に返す名前の対応">
-        <div className={styles.tableHead} role="row">
-          <span className={styles.colPoint} role="columnheader">成果地点</span>
-          <span className={styles.colName} role="columnheader">Google広告に返す名前</span>
-          <span className={styles.colName} role="columnheader">Meta広告に返す名前</span>
-          <span className={styles.colState} role="columnheader">状態</span>
-        </div>
+      <DataTable aria-label="成果地点と、広告に返す名前の対応" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
+        <TableHeadRow data-table-layout="columns">
+          <Th grow>成果地点</Th>
+          <Th className={styles.colName}>Google広告に返す名前</Th>
+          <Th className={styles.colName}>Meta広告に返す名前</Th>
+          <Th className={styles.colState}>状態</Th>
+        </TableHeadRow></thead><tbody>
         {mapping.rows.map((row) => {
           const returns = adMappingReturns(row.google) || adMappingReturns(row.meta)
           return (
-            <div key={row.pointId} className={styles.tableRow} role="row">
-              <span className={styles.colPoint} role="cell"><span className={styles.cellText} title={row.pointName}>{row.pointName}</span></span>
-              <span className={styles.colName} role="cell">{nameCell(row.google, 'Google広告')}</span>
-              <span className={styles.colName} role="cell">{nameCell(row.meta, 'Meta広告')}</span>
-              <span className={styles.colState} role="cell">
+            <Tr key={row.pointId} data-table-layout="columns">
+              <Td grow><span className={styles.cellText} title={row.pointName}>{row.pointName}</span></Td>
+              <Td className={styles.colName}>{nameCell(row.google, 'Google広告')}</Td>
+              <Td className={styles.colName}>{nameCell(row.meta, 'Meta広告')}</Td>
+              <Td className={styles.colState}>
                 <StatusBadge tone={returns ? 'success' : 'neutral'} size="compact">{returns ? '返している' : '返していない'}</StatusBadge>
-              </span>
-            </div>
+              </Td>
+            </Tr>
           )
         })}
-      </div>
+      </tbody></DataTable>
     )
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><div className={adsStyles.board} data-design-node="FDBsG">
-      {editing && manage ? <AdMappingDialog key={`${accountId}:${editing.pointId}:${editing.provider}`} item={editing} onClose={() => setEditing(null)} onSave={(values) => saveMapping(editing, values)} /> : null}
-      <PageHeading title={<>広告とのつなぎ</>}
+    <SaveErrorScope errors={saveErrors}><DetailPage boardId="FDBsG" contentPadding="0 var(--tpl-head-pad-side)" title={<>広告とのつなぎ</>}
         help={<>LINE で出た成果を広告へ返し、広告の配信を賢くします。お客様の名前やメールアドレスは広告へ送りません。</>}
-        actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>} />
+        actions={<><Button href="/inflow-links?tab=connections&view=history"><History size={15} aria-hidden="true" />送信履歴を見る</Button></>}>
+
       <div className={adsStyles.body}>
+        {editing && manage ? <AdMappingDialog key={`${accountId}:${editing.pointId}:${editing.provider}`} item={editing} onClose={() => setEditing(null)} onSave={(values) => saveMapping(editing, values)} /> : null}
         {readonly ? (
           <div className={adsStyles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
         ) : null}
@@ -255,6 +257,6 @@ export default function AdConnectionsV8() {
           気をつけること：広告側で成果の名前を先に作ってから対応を決めてください。失敗した送信のやり直しは、送信履歴から行えます。
         </p>
       </div>
-    </div></SaveErrorScope>
+    </DetailPage></SaveErrorScope>
   )
 }

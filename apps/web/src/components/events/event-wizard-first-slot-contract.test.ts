@@ -19,10 +19,12 @@ describe('イベント作成の最初の予約枠', () => {
     const createEvent = SOURCE.indexOf('eventsApi.createEvent(selectedAccountId, payload)')
     // #1000: 初回枠には固定の再送防止キーを付け、作成済みの枠ID
     // (firstSlotId)だけを更新対象にする。slots[0] の位置では識別しない。
-    const createSlot = SOURCE.indexOf('eventsApi.createSlots(selectedAccountId, eventId, [')
+    const createSlot = SOURCE.indexOf('await saveInitialSlot({')
     expect(createEvent).toBeGreaterThanOrEqual(0)
     expect(createSlot).toBeGreaterThan(createEvent)
-    expect(SOURCE).toContain('createdRef.current = { accountId: selectedAccountId, event: saved! }')
+    expect(SOURCE).toContain('createdRef.current = { accountId: selectedAccountId, event: saved!, payload: JSON.stringify(payload) }')
+    const slots = readFileSync(new URL('../../v8/events/save-initial-slot.ts', import.meta.url), 'utf8')
+    expect(slots).toContain('api.createSlots(accountId, eventId, [input])')
     expect(SOURCE).toContain('client_key: `first-slot:${eventId}`')
     expect(EDIT).toContain('slot.id, body, slot.version ?? 1')
   })

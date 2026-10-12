@@ -42,7 +42,7 @@ import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
@@ -692,7 +692,7 @@ export default function BroadcastListV8() {
      */
     if (isFromHeadquarters(broadcast)) {
       return [
-        { id: 'view', label: '見る', external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
+        { id: 'view', label: "配信の詳細を見る", external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
         ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={14} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
       ]
     }
@@ -927,16 +927,14 @@ export default function BroadcastListV8() {
   const toolbar = (
     <ListToolbarFrame>
       <ListToolbarRow>
-        {narrow ? createButton(false) : null}
-        {narrow ? folderSelect : null}
         {searchBox}
         {dateBox}
-        {narrow ? null : saveCurrentButton}
+        {saveCurrentButton}
         <span className={styles.spacer} aria-hidden="true" />
         {savedSearchBox}
       </ListToolbarRow>
       <ListToolbarRow>
-        {narrow ? statusSelect : statusChips}
+        {statusChips}
         <span className={styles.spacer} aria-hidden="true" />
         {pageSizeBox}
         {sortButton}
@@ -1122,14 +1120,8 @@ export default function BroadcastListV8() {
 
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {pageCount > 1
-          ? `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件中 ${rangeFirst}〜${rangeLast} 件`
-          : `${formatNumber(resultTotal ?? visibleBroadcasts.length)} 件`}
-      </span>
-      {pageCount > 1 ? (
-        <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" />
-      ) : null}
+      <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り"
+        summary={paginationSummary(resultTotal ?? visibleBroadcasts.length, rangeFirst, rangeLast)} />
     </ListPagePagination>
   ) : null
 
@@ -1137,6 +1129,7 @@ export default function BroadcastListV8() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      heightMode="content"
       skeleton
       boardId={boardId}
       headingSize="compact"
@@ -1161,8 +1154,8 @@ export default function BroadcastListV8() {
           ))}
         </KpiBand>
       </>}
-      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
-      folders={narrow ? undefined : (
+      folderNav={error ? undefined : { rows: folderRows, activeId: folderFilter, onSelect: setFolderFilter, createAction: createButton(false) }}
+      folders={error ? undefined : (
         <FolderPanel
           createAction={createButton(true)}
           activeId={folderFilter}

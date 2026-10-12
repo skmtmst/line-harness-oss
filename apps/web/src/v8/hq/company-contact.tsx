@@ -1,7 +1,7 @@
 'use client'
 
 import { notifySaved } from '@/components/shared/toast'
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Check, Search } from 'lucide-react'
 import { COMPANY_CONTACT_FIELDS, parseTenantCompanyContact, type TenantCompanyContact } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -128,15 +128,16 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     } finally { setFinding(false) }
   }
 
-  const field = (key: keyof TenantCompanyContact) => {
+  const field = (key: keyof TenantCompanyContact, action?: ReactNode) => {
     const meta = COMPANY_CONTACT_FIELDS.find(item => item.key === key)!
+    const control = <TextField id={`${uid}-${key}`} value={values[key] ?? ''} maxLength={meta.max}
+      type={key === 'contactEmail' ? 'email' : key === 'phone' ? 'tel' : 'text'}
+      inputMode={key === 'postalCode' ? 'numeric' : undefined}
+      placeholder={key === 'building' ? '例：〇〇ビル 5階' : key === 'invoiceAddressee' ? '例：Shed Products株式会社 経理部' : undefined}
+      disabled={loading || saving} readOnly={!canEdit} onChange={event => change(key, event.target.value)} />
     return <Field key={key} label={meta.label} htmlFor={`${uid}-${key}`} required={meta.required} requiredAppearance="text" optional={!meta.required}
       error={fieldError?.key === key ? fieldError.message : undefined}>
-      <TextField id={`${uid}-${key}`} value={values[key] ?? ''} maxLength={meta.max}
-        type={key === 'contactEmail' ? 'email' : key === 'phone' ? 'tel' : 'text'}
-        inputMode={key === 'postalCode' ? 'numeric' : undefined}
-        placeholder={key === 'building' ? '例：〇〇ビル 5階' : key === 'invoiceAddressee' ? '例：Shed Products株式会社 経理部' : undefined}
-        disabled={loading || saving} readOnly={!canEdit} onChange={event => change(key, event.target.value)} />
+      {action ? <SettingsFormRow postal>{control}{action}</SettingsFormRow> : control}
     </Field>
   }
 
@@ -144,8 +145,8 @@ export default function CompanyContactCard({ canEdit }: { canEdit: boolean }) {
     actions={canEdit ? <Button variant="primary" type="submit" busy={saving} disabled={loading || finding || revision === null}>
       <Check aria-hidden size={14} />会社と連絡先を保存する</Button> : undefined}>
     {field('legalCompanyName')}
-    <SettingsFormRow postal>{field('postalCode')}{canEdit ? <Button type="button" size="field" onClick={() => void findAddress()}
-      disabled={loading || saving || finding || revision === null} busy={finding} busyLabel="検索中…"><Search aria-hidden size={14} />住所を探す</Button> : null}</SettingsFormRow>
+    {field('postalCode', canEdit ? <Button type="button" size="field" onClick={() => void findAddress()}
+      disabled={loading || saving || finding || revision === null} busy={finding} busyLabel="検索中…"><Search aria-hidden size={14} />住所を探す</Button> : null)}
     {postalNote ? <p role="status" className={styles.hint}>{postalNote}</p> : null}
     {canEdit && candidates.length ? <SettingsFormRow>{candidates.map((candidate, index) => {
       const address = `${candidate.prefecture}${candidate.city}${candidate.town}`

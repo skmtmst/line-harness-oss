@@ -447,7 +447,7 @@ export default function RankSettingsV8({
       <Dialog
         open={removeTarget !== null && removeRow !== null && removeRow.id !== null}
         designNode="dEv6G"
-        designWidth={520}
+        size="medium"
         designTop={300}
         designHeaderPadding="var(--tpl-fm2-rank-dialog-head-pad)"
         confirmation

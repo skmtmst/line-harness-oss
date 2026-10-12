@@ -256,6 +256,8 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
       headingSize="regular"
       title="NEN配信"
       help="ネットショップの注文や誕生日に合わせて、決まったメッセージやコラムを自動で送ります。"
+      toolbarSpacing="section"
+      explanation={tab === 'columns' ? "コラムは外部サイトの記事へつなぐカードです。書いたあと、一覧の「この内容で予約する」で LINE に配信します。" : tab === 'history' ? "いつ・だれに・何を送ったかの記録です。届かなかったものも、ここで理由が分かります。" : "自動配信は、注文・発送・誕生日などのきっかけで送ります。止めると、そのあとのきっかけでは送りません。"}
       actions={actions}
       tabs={tabs}
       stats={stats}
@@ -301,6 +303,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const [page, setPage] = useListUrlValue('page', 1)
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [savedOpen, setSavedOpen] = useState(false)
+  const [stopTarget, setStopTarget] = useState<NenCampaignSetting | null>(null)
   const savedRef = useRef<HTMLSpanElement | null>(null)
 
   const followUpCount = autoSettings.filter((s) => s.category === 'follow_up').length
@@ -337,12 +340,12 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
   const menuFor = (setting: NenCampaignSetting): ActionMenuItem[] => {
     const items: ActionMenuItem[] = []
     if (canEdit) items.push({ id: 'edit', label: '編集', external: false, href: `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`, onSelect: () => { router.push(`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`) } })
-    items.push({ id: 'preview', label: '中身を見る', onSelect: () => props.onPreviewCampaign(setting.campaignKey) })
+    items.push({ id: 'preview', label: "配信の文面を見る", onSelect: () => props.onPreviewCampaign(setting.campaignKey) })
     if (canEdit) {
       items.push({ id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestSend(setting) })
       if (setting.campaignKey === 'birthday_coupon') items.push({ id: 'coupon', label: 'クーポンの決めごと', onSelect: () => props.onCouponOpenChange(true) })
       items.push(setting.isEnabled
-        ? { id: 'stop', label: '止める', disabled: props.saving === setting.campaignKey, onSelect: () => props.onToggleSetting(setting) }
+        ? { id: 'stop', label: '止める', disabled: props.saving === setting.campaignKey, onSelect: () => setStopTarget(setting) }
         : { id: 'start', label: '動かす', disabled: props.saving === setting.campaignKey, onSelect: () => props.onToggleSetting(setting) })
     } else if (setting.campaignKey === 'birthday_coupon') {
       items.push({ id: 'coupon', label: 'クーポンの決めごと', onSelect: () => props.onCouponOpenChange(true) })
@@ -353,9 +356,7 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
 
   return (
     <>
-      <div className={styles.noteRow}>
-        <Notice tone="info" message="自動配信は、注文・発送・誕生日などのきっかけで送ります。止めると、そのあとのきっかけでは送りません。" />
-      </div>
+
       <div className={styles.toolsRow}>
         <ListToolbar
           search={{ placeholder: '配信名で探す', width: 240, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
@@ -442,6 +443,10 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
           <p className={styles.hint}>{canEdit ? '行の「…」から 編集・テスト送信・止める・送った履歴を見る。' : '行の「…」から 中身・送った履歴を見る。'}</p>
         </>
       )}
+      <ConfirmDialog open={stopTarget !== null} title={`「${stopTarget?.label ?? ''}」を止めますか？`}
+        description="止めると、そのあとの注文・発送・誕生日などのきっかけでは、この自動配信を送りません。すでに送った配信は取り消されません。"
+        confirmLabel="止める" destructive busy={Boolean(stopTarget && props.saving === stopTarget.campaignKey)}
+        onCancel={() => setStopTarget(null)} onConfirm={() => { if (stopTarget) props.onToggleSetting(stopTarget); setStopTarget(null) }} />
       <CampaignPreviewDrawer {...props} canEdit={canEdit} />
     </>
   )
@@ -452,6 +457,7 @@ function CampaignPreviewDrawer(props: NenCampaignsListProps & { canEdit: boolean
   const setting = props.previewCampaignKey ? props.settings.find((item) => item.campaignKey === props.previewCampaignKey) ?? null : null
   return (
     <Drawer
+      width="narrow"
       open={setting !== null}
       title={setting ? `${setting.label}の中身` : '配信の中身'}
       description="お客様ごとの情報は見本に置き換えています。"
@@ -518,6 +524,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   if (!canEdit) {
     return (
       <Drawer
+      width="narrow"
         open={open}
         title="誕生日クーポンの決めごと"
         description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
@@ -535,6 +542,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   }
   return (
     <Drawer
+      width="narrow"
       open={open}
       title="誕生日クーポンの決めごと"
       description="誕生日は3日前の10:00に送ります。名前と誕生日は、マイページで登録されたペット情報を使います。"
@@ -648,15 +656,13 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
     { id: 'test', label: 'テスト送信', disabled: props.testing !== null, onSelect: () => props.onTestColumn(column) },
     { id: 'preview', label: 'LINEでの見え方', onSelect: () => setPreviewId(column.id) },
   ] : [
-    { id: 'open', label: '中身を見る', onSelect: () => props.onSelectColumn(column.id) },
+    { id: 'open', label: "配信の文面を見る", onSelect: () => props.onSelectColumn(column.id) },
     { id: 'preview', label: 'LINEでの見え方', onSelect: () => setPreviewId(column.id) },
   ]
 
   return (
     <div className={styles.inset}>
-      <div className={styles.noteRow}>
-        <Notice tone="info" message="コラムは外部サイトの記事へつなぐカードです。書いたあと、一覧の「この内容で予約する」で LINE に配信します。" />
-      </div>
+
       <div className={styles.toolsRow}>
         <ListToolbar
           search={{ placeholder: 'コラムを探す', width: 240, value: query, onChange: (value) => { setQuery(value); setPage(1) } }}
@@ -891,9 +897,7 @@ function HistoryTab(props: NenCampaignsListProps & { canEdit: boolean }) {
 
   return (
     <div className={styles.inset}>
-      <div className={styles.noteRow}>
-        <Notice tone="info" message="いつ・だれに・何を送ったかの記録です。届かなかったものも、ここで理由が分かります。" />
-      </div>
+
       <div className={styles.toolsRow}>
         <ListToolbar
           search={{ placeholder: '友だち・配信の名前で探す', width: 240, value: query, onChange: changeQuery }}

@@ -1,5 +1,13 @@
 'use client'
 
+import StatusBadge from '@/components/shared/status-badge'
+import { mileageStatusTone } from './parts'
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  reason: requiredText("理由を入力してください。"),
+}
+
+
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
@@ -39,7 +47,7 @@ import {
   formatMileageMonthDay,
   formatMileageNumber,
 } from './display'
-import { MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { mileagePaginationTotal } from './display'
 import styles from './mileage.module.css'
@@ -79,11 +87,6 @@ const FRIEND_BAND_LABELS: Record<ActionScoreBand, string> = {
   low: '低い',
 }
 
-const BAND_TONE: Record<ActionScoreBand, 'active' | 'neutral' | 'warn'> = {
-  high: 'active',
-  normal: 'neutral',
-  low: 'warn',
-}
 
 function bandName(band: ActionScoreBand, highMin: number, normalMin: number) {
   if (band === 'high') return `点が高い（${formatMileageNumber(highMin)} 点〜）`
@@ -521,14 +524,14 @@ export default function ScoreTab() {
 
   const friendsTable = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tableScore}`}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
-            <Th className={styles.colName}>友だち</Th>
-            <Th className={styles.colScore}>いまの点数</Th>
+          <TableHeadRow data-table-layout="columns">
+            <Th grow>友だち</Th>
+            <Th align="right" className={styles.colScore}>いまの点数</Th>
             <Th className={styles.colBand}>帯</Th>
-            <Th className={styles.colTrend}>30日間の変化</Th>
-            <Th className={styles.colReact}>最後の反応</Th>
+            <Th align="right" className={styles.colTrend}>30日間の変化</Th>
+            <Th collapseAt="narrow" className={styles.colReact}>最後の反応</Th>
             <Th className={styles.colOpsBalance}>操作</Th>
           </TableHeadRow>
         </thead>
@@ -538,21 +541,18 @@ export default function ScoreTab() {
             const day = formatMileageMonthDay(item.lastChangedAt)
             const reason = actionScoreReasonLabel(item.lastReason)
             return (
-              <Tr data-row-id={item.friendId} key={item.friendId} className={styles.row} data-table-layout="columns">
-                <Td className={styles.colName}><FolderDotName><span className={styles.rowName} title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
-                <Td className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
+              <Tr data-row-id={item.friendId} key={item.friendId} data-table-layout="columns">
+                <Td grow><FolderDotName><span  title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
+                <Td align="right" className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
-                  <span className={styles.pill} data-tone={BAND_TONE[item.band]}>
-                    <span className={styles.pillDot} aria-hidden="true" />
-                    {FRIEND_BAND_LABELS[item.band]}
-                  </span>
+                  <StatusBadge tone="neutral" dot={false}>{FRIEND_BAND_LABELS[item.band]}</StatusBadge>
                 </Td>
-                <Td className={styles.colTrend}>
+                <Td align="right" className={styles.colTrend}>
                   <span className={styles.scoreNum} data-score-delta={change === null || change === 0 ? 'zero' : change > 0 ? 'positive' : 'negative'}>
                     {change === null ? emptyValue('unknown') : formatMileageChange(change)}
                   </span>
                 </Td>
-                <Td className={styles.colReact}>
+                <Td collapseAt="narrow" className={styles.colReact}>
                   <span className={styles.cellMain} title={reason}>{day === '—' ? reason : `${day} ${reason}`}</span>
                 </Td>
                 <Td className={styles.colOpsBalance}>
@@ -663,10 +663,10 @@ export default function ScoreTab() {
         ) : rules.length === 0 ? (
           <StateCard title="条件に合うできごとはありません" description="検索や絞り込みを外すと、すべて出ます" action={<Button type="button" onClick={resetRuleFilters}>条件を外す</Button>} />
         ) : (
-          <DataTable className={styles.table}>
+          <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
             <thead>
-              <TableHeadRow className={styles.headRow} data-table-layout="columns">
-                <Th className={styles.colName}>できごと（数え方）</Th>
+              <TableHeadRow data-table-layout="columns">
+                <Th grow>できごと（数え方）</Th>
                 <Th className={styles.colGives}>点・今月当てはまった人</Th>
                 <Th className={styles.colStateWide}>状態</Th>
                 <Th className={styles.colOpsMenu}>操作</Th>
@@ -677,17 +677,14 @@ export default function ScoreTab() {
                 const changed = ruleChanged(rule, publishedRules.get(rule.id))
                 const stopped = !rule.enabled
                 return (
-                  <Tr data-row-id={rule.id} key={rule.id} className={styles.row} data-table-layout="columns">
-                    <Td className={styles.colName}><FolderDotName>
-                      <span className={styles.rowNameInk} title={rule.name}>{rule.name}</span>
+                  <Tr data-row-id={rule.id} key={rule.id} data-table-layout="columns">
+                    <Td grow><FolderDotName>
+                      <span  title={rule.name}>{rule.name}</span>
 
                     </FolderDotName></Td>
                     <Td className={styles.colGives}><span className={styles.cellMain}>{ruleValueText(rule)}</span></Td>
                     <Td className={styles.colStateWide}>
-                      <span className={styles.pill} data-tone={stopped ? 'neutral' : changed ? 'warn' : 'active'}>
-                        <span className={styles.pillDot} aria-hidden="true" />
-                        {stopped ? '停止中' : changed ? '下書きで変更' : '公開中'}
-                      </span>
+                      <StatusBadge tone={mileageStatusTone(stopped ? 'neutral' : changed ? 'warn' : 'active')}>{stopped ? '停止中' : changed ? '下書きで変更' : '公開中'}</StatusBadge>
                     </Td>
                     <Td className={styles.colOpsMenu}>
                       {!readonly ? (
@@ -900,8 +897,8 @@ export function ScoreAdjustDialog({
   const bandChanges = validAmount && bandAfter !== band
   /* 確定で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
   const fields = useFormErrors()
-  fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'))
-  fields.define('reason', '理由', () => (!reason.trim() ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null))
+  fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'), { required: true })
+  fields.define('reason', '理由', () => ((b244Requirements.reason.check(reason) !== null) ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null), { required: true })
 
   const submit = async () => {
     if (fields.submit().length > 0) {
@@ -979,7 +976,7 @@ export function ScoreAdjustDialog({
           </div>
         </div>
 
-        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount"><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
+        <div className={styles.dlgGroup}><Field label="点数" htmlFor="ml-score-amount" requirement={fields.requirement('amount')}><SaveErrorField names={["amountText","amount_text"]}><NumberInput numericText
             id="ml-score-amount"
             className={styles.dlgInput}
             inputMode="numeric"
@@ -991,7 +988,7 @@ export function ScoreAdjustDialog({
           /></SaveErrorField>
 <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></div>
 
-        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason"><SaveErrorField names={["reason"]}><textarea
+        <div className={styles.dlgGroup}><Field label="理由" htmlFor="ml-score-reason" requirement={b244Requirements.reason}><SaveErrorField names={["reason"]}><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}

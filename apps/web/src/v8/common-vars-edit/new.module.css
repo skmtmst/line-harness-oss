@@ -4,18 +4,6 @@
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
 
-/* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-section-gap);
-  padding: var(--tpl-section-pad);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-cv-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
@@ -85,36 +73,8 @@
   field-sizing: content;
 }
 
-/* 種別：4つずつ2段・間8。選んだカードは緑の地・1.5の枠。 */
+/* 種別：4つずつ2段。選択カードの形は共通 RadioCard が持つ。 */
 .typeGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-body-gap); }
-.typeCard {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--tpl-sub-gap);
-  min-width: 0;
-  padding: var(--tpl-rule-row-gap);
-  border: 0;
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  text-align: left;
-  cursor: pointer;
-}
-.typeCard[aria-checked='true'] { outline: var(--tpl-fm-option-outline) solid var(--color-accent); background: var(--color-success-bg); }
-.typeTop { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); color: var(--color-ink); }
-.typeCard[aria-checked='true'] .typeTop { color: var(--color-success); }
-.typeLabel { font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-text-sm-lh); }
-.typeDesc {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-ar-cv-type-desc-size);
-  line-height: var(--tpl-ar-cv-type-desc-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* 使える期間：見出しの段と欄の段（始まり・終わり・期間の外では 220）。 */
 .periodGrid {

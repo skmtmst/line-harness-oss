@@ -12,10 +12,10 @@ const LIST = readFileSync(resolve(__dirname, '../../v8/automations/list.tsx'), '
 const TABLE_CSS = readFileSync(resolve(__dirname, '../../components/shared/table.module.css'), 'utf-8');
 
 describe("automations 一覧の板の数字", () => {
-  it("KPI見出しは共通の帯で13px・ink・粗500を使う", () => {
+  it("KPI見出しは共通の帯で12px・ink・粗500を使う", () => {
     expect(SHELL).toContain('<KpiBand');
     expect(SHELL).toContain('<KpiCard');
-    expect(KPI_CSS).toMatch(/:root \.label \{[^}]*color: var\(--color-ink\); font-size: 13px; font-weight: 500/s);
+    expect(KPI_CSS).toMatch(/:root \.label \{[^}]*color: var\(--color-ink\); font-size: var\(--text-caption\); font-weight: 500/s);
   });
 
   it("KPI数字は現役の帯の寸法トークンと粗600を使う", () => {

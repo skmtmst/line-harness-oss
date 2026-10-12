@@ -10,8 +10,8 @@ const css = readFileSync(join(HERE, 'page-templates.module.css'), 'utf8')
 /*
  * 一覧の型の寸法（design/v8/LIST-TEMPLATE-SPEC.md・絵 apLqS）。
  * 頭87（20/24/12・題22/700/32・間4・説明13/19）・帯116で頭の直下・
- * フォルダ200・道具64（14/24/36/間8）・見出し40（12/24）・行62
- * （12/24・名18＋間4＋補足16）・下は上下10。v7 には効かない。
+ * フォルダ200・道具64（14/24/36/間8）・見出し40（12/24）・行はB-254で中身1行52／2行以上60
+ * （実寸はlist-row-height.test.mjsで確認）・下は上下10。v7 には効かない。
  */
 describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
   it('表の見出しは中身で40（上下12・左右24・中身16）', () => {
@@ -21,7 +21,7 @@ describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
     expect(table).toMatch(/:root \.headRow \.cell \{[^}]*line-height:\s*var\(--tpl-thead-lh\)/s)
   })
 
-  it('表の行は余白＋中身で62（名18＋間4＋補足16・固定の高さなし）', () => {
+  it('一覧の行は共通の中身判定で52／60を選ぶ（古いセルの余白は一覧で二重に足さない）', () => {
     const dataTable = shared('data-table.module.css')
     expect(dataTable).toMatch(/:root \.bodyCell \{[^}]*padding:\s*var\(--tpl-row-pad-block\) var\(--tpl-row-pad-side\)/s)
     expect(dataTable).toMatch(/:root \.name \{[^}]*line-height:\s*18px/s)
@@ -30,6 +30,8 @@ describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
     expect(dataTable).not.toMatch(/:root \.row \{[^}]*height:\s*(60|86)px/s)
     expect(dataTable).not.toMatch(/\.rowDouble/)
     expect(dataTable).not.toMatch(/:has\(\.sub/)
+    expect(dataTable).toContain('--list-content-row-h: var(--tpl-list-row-multi-h)')
+    expect(dataTable).toContain('[data-list-content-lines]')
   })
 
   it('数の帯は上下の線だけ・数は22（帯116の式）', () => {

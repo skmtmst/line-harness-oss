@@ -200,11 +200,9 @@ describe('PERF-01 補足データはカードごとに独立して反映する',
     const bookingsCard = Array.from(host.querySelectorAll('[data-kpi-presentation] p[title]'))
       .find((node) => node.textContent?.trim() === '今日の予約')
     expect(bookingsCard?.closest('[data-kpi-presentation]')?.textContent).toContain('1')
-    // V8の初期配置では予約の内訳は数のメニューから開く。
-    const card = bookingsCard!.closest('[data-kpi-presentation]')!
-    const menu = card.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!
-    await act(async () => { menu.click() })
-    const detail = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find((button) => button.textContent?.trim() === '内訳を見る')!
+    // B-145：帯の数から同じ予約の内訳を開く。
+    const card = host.querySelector('[data-kpi-presentation="band"][aria-label="今日の予約"]') ?? Array.from(host.querySelectorAll('[data-kpi-presentation="band"]')).find(node => node.textContent?.includes('今日の予約'))!
+    const detail = card.querySelector<HTMLButtonElement>('button[aria-label="今日の予約の内訳を見る"]')!
     await act(async () => { detail.click() })
     expect(host.querySelector('[role="region"][aria-label="内訳"]')?.textContent).toContain('相談')
     // 健全性依存のカードは未取得と偽らず、確認中のまま待つ。

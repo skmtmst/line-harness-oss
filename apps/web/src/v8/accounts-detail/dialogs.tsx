@@ -522,14 +522,14 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
 
   /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
   const fields = useFormErrors()
-  fields.define('name', 'アカウント名', () => (name.trim() ? null : 'アカウント名を入れてください。'))
-  fields.define('cap', '友だちの上限', () => (Number.isNaN(parseCount(capacity)) ? '数字で入れてください。' : null))
+  fields.define('name', 'アカウント名', () => (name.trim() ? null : 'アカウント名を入れてください。'), { required: true })
+  fields.define('cap', '友だちの上限', () => (Number.isNaN(parseCount(capacity)) ? '数字で入れてください。' : null), { required: false })
   fields.define('warn', '警告を出す人数', () => {
     const capacityNext = parseCount(capacity)
     const warnNext = parseCount(warnAt)
     if (Number.isNaN(warnNext)) return '数字で入れてください。'
     return capacityNext !== null && !Number.isNaN(capacityNext) && warnNext !== null && warnNext > capacityNext ? '警告を出す人数は上限以下にしてください。上限を超える値は鳴りません。' : null
-  })
+  }, { required: false })
   const fieldProps = (key: string) => ({ ...fields.bind(key), invalid: fields.invalid(key) })
 
   const save = async (stepUpToken?: string) => {
@@ -599,7 +599,7 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
         </>}
       >
         <div className={styles.pair}>
-          <Field label="アカウント名" htmlFor={ids.name} error={fields.error('name')}>
+          <Field label="アカウント名" htmlFor={ids.name} error={fields.error('name')} requirement={fields.requirement('name')}>
             <SaveErrorField names={["name"]}><TextField {...fieldProps('name')} id={ids.name} required maxLength={100} value={name} onChange={(event) => setName(event.target.value)} disabled={busy} /></SaveErrorField>
           </Field>
           {canEditTimezone ? (
@@ -644,10 +644,10 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
           </>
         ) : null}
         <div className={styles.pair}>
-          <Field label="友だちの上限" htmlFor={ids.cap} error={fields.error('cap')}>
+          <Field label="友だちの上限" htmlFor={ids.cap} error={fields.error('cap')} requirement={fields.requirement('cap')}>
             <SaveErrorField names={["capacity"]}><NumberInput numericText {...fieldProps('cap')} id={ids.cap} inputMode="numeric" placeholder="管理しない" value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={busy} /></SaveErrorField>
           </Field>
-          <Field label="警告を出す人数" htmlFor={ids.warn} error={fields.error('warn')}>
+          <Field label="警告を出す人数" htmlFor={ids.warn} error={fields.error('warn')} requirement={fields.requirement('warn')}>
             <SaveErrorField names={["warnAt","warn_at"]}><NumberInput numericText {...fieldProps('warn')} id={ids.warn} inputMode="numeric" placeholder="警告しない" value={warnAt} onChange={(event) => setWarnAt(event.target.value)} disabled={busy} /></SaveErrorField>
           </Field>
         </div>

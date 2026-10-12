@@ -1,7 +1,7 @@
 /*
  * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 `jjFNi`・閲覧のみ `NtCE3`）。
  * 枠・見出し・数の帯・フォルダの列・道具の段の外側は型（ListPage）が持つ。
- * 値は globals.css の `[data-theme="v8"]` の `--tpl-bc-*`。
+ * 値は globals.css の `:root` の `--tpl-bc-*`。
  */
 
 /* 閲覧のみの帯（NtCE3）。数の帯の上。薄い青の地・目の印・枠なし。 */
@@ -57,9 +57,7 @@
 .statusSelect :global(*) { max-width: 100%; }
 .statusSelect :global(button) { width: 100%; }
 
-.pageSizeBox { width: var(--tpl-bc-page-size-w); }
-.pageSizeBox :global(*) { max-width: 100%; }
-.pageSizeBox :global(button) { width: 100%; }
+.pageSizeBox { display: inline-flex; width: max-content; flex-shrink: 0; }
 
 .savedBox { position: relative; flex-shrink: 0; }
 
@@ -222,12 +220,12 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 500;
+  font-weight: 700;
   line-height: var(--tpl-bc-cell-lh);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cellTitle:hover { color: var(--color-action); text-decoration: underline; }
+.cellTitle:hover { text-decoration: underline; }
 
 .cellMain {
   display: block;

@@ -174,6 +174,9 @@ export interface MediaSlotProps {
   size?: 'regular' | 'compact'
   /** 決まった縦横（「1 / 1」「20 / 13」など）。 */
   aspectRatio?: string
+  /** 固定した小さい画像枠では、URL・登録済みの操作を枠の下に置く。 */
+  controlsBelow?: boolean
+  framePart?: 'image-frame'
   /** 貼り付け（Cmd+V）でも受ける。 */
   acceptPaste?: boolean
   /** 枠の下に足す補足（URL の入力欄など）。 */
@@ -214,6 +217,8 @@ export default function MediaSlot({
   disabled = false,
   size = 'regular',
   aspectRatio,
+  controlsBelow = false,
+  framePart,
   acceptPaste = false,
   children,
   'data-testid': testId,
@@ -469,7 +474,7 @@ export default function MediaSlot({
             ) : null}
           </span>
         )}
-        {error ? <span className={styles.filledError} role="alert">{error}</span> : null}
+        {error && !controlsBelow ? <span className={styles.filledError} role="alert">{error}</span> : null}
       </>
     )
   } else {
@@ -477,14 +482,14 @@ export default function MediaSlot({
       <>
         <FileUp aria-hidden="true" className={styles.icon} />
         <span className={styles.title}>{readOnly ? `${noun}はありません` : title}</span>
-        {readOnly ? null : drag === 'reject' ? (
+        {readOnly || controlsBelow && compact ? null : drag === 'reject' ? (
           <span className={styles.reason}>{formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`}</span>
         ) : error ? (
           <>
             <span className={styles.reason} role="alert">{error}</span>
             {limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{limit}</span> : null}
           </>
-        ) : !canFile ? (
+        ) : controlsBelow && compact ? null : !canFile ? (
           limit ? <span className={`${styles.desc} ${styles.limit}`} title={limit}>{compact ? limit : `（${limit}）`}</span> : null
         ) : (
           <>
@@ -507,7 +512,7 @@ export default function MediaSlot({
             {inner}
           </button>
         )}
-        {drag === 'idle' ? links : null}
+        {drag === 'idle' && !controlsBelow ? links : null}
       </span>
     )
   }
@@ -544,6 +549,8 @@ export default function MediaSlot({
         aria-invalid={state === 'error' || undefined}
         data-design-node="Z7vd2"
         data-media-slot=""
+        data-shared-part={framePart}
+        data-image-frame={framePart === 'image-frame' || undefined}
         data-state={state}
         data-size={size}
         data-kind={kind}
@@ -566,6 +573,8 @@ export default function MediaSlot({
         {extraHelp ? <HelpTip label={`${title}の補足`}>{extraHelp}</HelpTip> : null}
         {picker}
       </div>
+      {controlsBelow && !readOnly && (error || drag === 'reject') ? <span className={styles.reason} role="alert">{error ?? (formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`)}</span> : null}
+      {controlsBelow && drag === 'idle' ? <>{!filled && canFile && !readOnly ? <small className={styles.desc}>ドラッグ＆ドロップ またはクリック</small> : null}{links}{!readOnly && limit ? <span className={styles.desc}>{limit}</span> : null}</> : null}
       {urlEntry && urlOpen && !readOnly ? (
         <TextField
           id={urlEntry.id}

@@ -223,7 +223,7 @@ describe('N-025 引用返信と送信予約', () => {
     })
 
     await typeText(host, '1,980円です')
-    const sendButton = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '送信')!
+    const sendButton = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '送信する')!
     await act(async () => { sendButton.click() })
     await eventually(() => {
       expect(fixture.sentBodies).toHaveLength(1)
@@ -430,7 +430,7 @@ describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付'
     })
     expect(host.textContent).toContain('期限30日のリンクで届く')
     await typeText(host, '資料をお送りします')
-    const send = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === '送信') as HTMLButtonElement
+    const send = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === '送信する') as HTMLButtonElement
     await act(async () => { send.click() })
     await eventually(() => { expect(fixture.sentBodies).toHaveLength(2) })
     expect(fixture.sentBodies[0]).toMatchObject({ messageType: 'file', content: JSON.stringify({ attachmentId: '11111111-2222-4333-8444-555555555555' }) })

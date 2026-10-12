@@ -13,6 +13,7 @@ import type { SelectOption } from './select'
 import selectStyles from './select.module.css'
 
 export type EntitySelectOption = SelectOption & {
+  color?: string | null
   hint?: string
   locked?: boolean
   folderId?: string | null
@@ -49,6 +50,8 @@ type CommonProps = {
   id?: string
   name?: string
   label?: string
+  /** 絞り込みの欄で、選んだ値の前に項目名を残す。窓の候補名は変えない。 */
+  valuePrefix?: string
   placeholder?: string
   loading?: boolean
   createLabel?: (query: string) => string
@@ -56,6 +59,8 @@ type CommonProps = {
   defaultOpen?: boolean
   size?: 'standard' | 'page-size' | 'full'
   width?: number
+  /** 選択した名前が長い小さな設定欄だけ、札を小さい口で出す。 */
+  compact?: boolean
   /** 呼び出し元の印は欄に入れず、窓を開く操作の意味を共通にする。 */
   icon?: ReactNode
   /** 移行前のSelectと同じ呼び出し口。 */
@@ -79,18 +84,18 @@ export default function EntitySelect(props: EntitySelectProps) {
   const errorId = `${useId()}-error`
   const { folders: loadedFolders, failed, load } = useEntityFolders(kind ?? 'staff', account?.selectedAccountId)
   const heads = splitOptionHeads(options, props.label)
-  const items = options.map((option) => ({ id: option.value, name: heads.labelOf(option), disabled: option.disabled, locked: option.locked,
+  const items = options.map((option) => ({ id: option.value, name: heads.labelOf(option), color: option.color, disabled: option.disabled, locked: option.locked,
     folderId: option.folderId, content: option.content, meta: option.description ?? option.hint }))
   const localFolders: EntityPickerFolder[] = [...new Map(options.filter((option) => option.folderId && option.folderName)
     .map((option) => [option.folderId!, { id: option.folderId!, name: option.folderName!, color: option.folderColor }])).values()]
   const hasFolderInfo = items.some((item) => item.folderId !== undefined)
   const noun = props.noun ?? (kind ? ENTITY_KINDS[kind].noun : props.label ?? label.replace(/で絞り込む.*$|を変える$|を選ぶ$/, ''))
   const common = {
-    label, ariaLabel: label, noun, items, createHref: kind ? ENTITY_KINDS[kind].createHref : undefined, createLabel: kind ? ENTITY_KINDS[kind].createLabel : undefined, folders: loadedFolders ?? localFolders, foldersFailed: failed,
+    compact: props.compact, label, ariaLabel: label, noun, items, createHref: kind ? ENTITY_KINDS[kind].createHref : undefined, createLabel: kind ? ENTITY_KINDS[kind].createLabel : undefined, folders: loadedFolders ?? localFolders, foldersFailed: failed,
     onOpen: hasFolderInfo && kind ? load : undefined, disabled, readOnly, invalid: Boolean(error) || invalid, id,
     placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
-    describedBy: error ? errorId : undefined, defaultOpen: props.defaultOpen,
+    describedBy: error ? errorId : undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix,
   }
   return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%' } : undefined} data-entity-picker-field>
     {name ? <input type="hidden" name={name} value={props.values ? props.values.join(',') : props.value} disabled={disabled} /> : null}

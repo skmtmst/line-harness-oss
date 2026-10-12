@@ -12,12 +12,12 @@ const CSS = readFileSync(resolve(__dirname, "../../v8/conversions/list.module.cs
 const TOKENS = readFileSync(resolve(__dirname, "../globals.css"), "utf-8");
 
 describe("conversions 一覧の板の数字", () => {
-  it("V8一覧の行セルは左右20・上下9（従来の一覧の余白は変更しない）", () => {
+  it("B-217 の平らな表は共通部品に寸法を渡し、画面からセルを上書きしない", () => {
     const listCells = PAGE.split("<tbody").at(-1)!.split("</tbody>")[0];
     expect(listCells).toContain('<Td');
-    expect(PAGE).toContain('className={styles.table}');
-    expect(CSS).toContain('padding: var(--tpl-cn-row-pad)');
-    expect(TOKENS).toMatch(/--tpl-cn-row-pad:\s*9px 20px/);
+    expect(PAGE).toContain("padding: '0 var(--tpl-list-inset)'");
+    expect(PAGE).toContain('columnLayout={{');
+    expect(CSS).not.toMatch(/:global\([^)]*\).*\.table/);
     expect(listCells).not.toMatch(/\bpx-\d+\s+py-/);
   });
 

@@ -17,7 +17,27 @@ export function scanListSkeleton() {
     }
     for (const row of root.querySelectorAll('[data-shared-part="list-row"], [data-shared-part="list-table"] tbody > tr')) {
       if (visible(row) && !row.querySelector('[colspan]')) coverage.rows++
-      if (visible(row) && !row.querySelector('[colspan]') && !near(row.getBoundingClientRect().height, 60)) fail('B-178 行60', row)
+      // B-254: read actual text geometry; don't trust the component's density marker.
+      let contentLines = 1
+      for (const cell of row.children) {
+        if ([...cell.querySelectorAll('img, video, [aria-hidden="true"]')].some(el =>
+          !el.closest('button, a, [role="button"], .sr-only') && el.getBoundingClientRect().height > 36)) contentLines = Math.max(contentLines, 2)
+        const centers = [], walker = document.createTreeWalker(cell, 4)
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const parent = node.parentElement
+          if (!node.textContent?.trim() || !parent || parent.closest('svg, script, style, [hidden], .sr-only, [role="menu"], [role="dialog"], [role="tooltip"]')) continue
+          const css = getComputedStyle(parent)
+          if (css.display === 'none' || css.visibility === 'hidden') continue
+          const range = document.createRange(); range.selectNodeContents(node)
+          for (const rect of range.getClientRects()) {
+            const center = rect.top + rect.height / 2
+            if (rect.width > 0 && rect.height > 0 && !centers.some(value => Math.abs(value - center) < 7)) centers.push(center)
+          }
+        }
+        contentLines = Math.max(contentLines, centers.length)
+      }
+      const rowHeight = contentLines > 1 ? 60 : 52
+      if (visible(row) && !row.querySelector('[colspan]') && !near(row.getBoundingClientRect().height, rowHeight)) fail(`B-178 行${rowHeight}`, row)
     }
     for (const cell of root.querySelectorAll('[data-kpi-strip]:not([data-kpi-density="compact"]) > [data-design-version]')) {
       if (visible(cell) && !near(cell.getBoundingClientRect().height, 116)) fail('B-178 数の帯116', cell)

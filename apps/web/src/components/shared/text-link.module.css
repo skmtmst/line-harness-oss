@@ -49,6 +49,6 @@
 }
 
 /* B-152②：役割ごとの文字の段。 */
-:root .label { font-weight: var(--polish-weight-body); }
+:root .label { font-weight: var(--polish-weight-label); }
 
 @layer components { .root[data-tone='action']{color:var(--color-accent-deep);} }

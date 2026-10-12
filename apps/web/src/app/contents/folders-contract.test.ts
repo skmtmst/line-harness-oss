@@ -51,7 +51,7 @@ describe('R37 フォルダの名前変更・削除の接続', () => {
     // 狭い幅では縦パネルが出ないため、選んでいるフォルダの操作口を置く。
     expect(VARS).toContain('フォルダ名を変える')
     expect(VARS).toContain('フォルダを削除する')
-    expect(VARS).toContain('...(selectedUserFolder ? [')
+    expect(VARS).toContain('leadingActions: canWrite && selectedUserFolder?.id === row.id ? [')
     expect(VARS).toContain('folderControlRef.current?.startEdit(selectedUserFolder)')
     expect(VARS).toContain('folderControlRef.current?.startDelete(selectedUserFolder)')
   })

@@ -171,6 +171,8 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(buttons().some((text) => text.includes('初回案内を作る'))).toBe(false)
     expect(buttons().some((text) => text.includes('フォルダを追加'))).toBe(false)
+    expect(host.querySelector('[data-reorder-handle]')).toBeNull()
+    expect(host.querySelector('[data-row-id="rule-shop"] [data-reorder-disabled]')).not.toBeNull()
     const menu = await openMenu('店頭QRの初回案内')
     expect(menu).toEqual(['実行結果を見る'])
   })

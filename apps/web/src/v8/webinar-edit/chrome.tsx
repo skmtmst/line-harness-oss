@@ -45,7 +45,7 @@ export function DetailHead({
 }) {
   return (
     <>
-      <PageHeading title={title} help={subtitle} actions={actions || menuActions ? <>{actions}{menuActions}</> : undefined} />
+      <PageHeading title={title} explanationKey={`webinar:${current}`} help={<>{subtitle}{current === 'participants' ? <p>「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</p> : null}</>} actions={actions || menuActions ? <>{actions}{menuActions}</> : undefined} />
       <div className={styles.tabsRow}>
         <nav className={styles.tabs} aria-label="設定・参加者・分析・コメント演出" data-wc-tabs="true">
           {DETAIL_TABS.map((tab) => {

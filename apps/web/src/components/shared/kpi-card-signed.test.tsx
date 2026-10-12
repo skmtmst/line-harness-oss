@@ -24,4 +24,9 @@ describe('KpiCard の符号つきの数', () => {
     expect(text({})).toContain('47人')
     expect(text({})).not.toContain('+47')
   })
+  it('整形した数の単位は指定したときだけ添え、上限なしの状態へは添えない', () => {
+    expect(text({ valueText: '38 / 1,000', unit: '通', valueTextWithUnit: true })).toContain('38 / 1,000通')
+    expect(text({ valueText: '38 / 1,000', unit: '通' })).not.toContain('38 / 1,000通')
+    expect(text({ valueText: '上限なし', unit: '通', valueTextWithUnit: true })).not.toContain('上限なし通')
+  })
 })

@@ -272,7 +272,7 @@ async function goToDone() {
 async function openListAction(label: string) {
   await act(async () => { root.render(<AutoReplyListPage />) })
   await flush()
-  const more = container.querySelector<HTMLButtonElement>('button[aria-label$="の操作"]')!
+  const more = container.querySelector<HTMLButtonElement>('tbody button[aria-label$="の操作"]')!
   await act(async () => { more.click() })
   await click(label, document)
 }

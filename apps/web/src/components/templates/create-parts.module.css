@@ -34,10 +34,10 @@
   justify-content: space-between;
   gap: var(--tpl-label-tag-gap);
   padding: var(--tpl-side-row-pad) 0;
-  border-bottom: 1px solid var(--color-hairline);
+  box-shadow: var(--shadow-row-line);
 }
 .row:last-child {
-  border-bottom: 0;
+  box-shadow: none;
 }
 .rowLabel {
   min-width: 0;
@@ -68,6 +68,12 @@
 .summary[data-variant='link'] .row { padding: var(--tpl-af-cr-kv-pad); border: 0; }
 .summary[data-variant='link'] .rowLabel { flex-shrink: 0; line-height: var(--tpl-wa-af-note-lh); }
 .summary[data-variant='link'] .rowValue { font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-wa-af-preview-lh); }
+/* 実行の記録の小箱：行の線は寸法を増やさず、段の間は4。 */
+.summary[data-variant='record'] { gap: var(--tpl-fm2-rd-box-gap); }
+.summary[data-variant='record'] .rows { gap: var(--tpl-fm2-rd-box-gap); }
+.summary[data-variant='record'] .row { border: 0; box-shadow: var(--shadow-row-line); }
+.summary[data-variant='record'] .row:last-child { box-shadow: none; }
+.summary[data-variant='record'] .rowValue { font-weight: 700; }
 
 /* 箱の外の淡い案内。 */
 .note {
@@ -111,7 +117,7 @@
 .starterCard {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-label-tag-gap);
+  gap: var(--polish-space-row);
   min-width: 0;
   min-height: var(--tpl-starter-card-h);
   padding: var(--tpl-side-card-pad);
@@ -135,6 +141,12 @@
   line-height: var(--tpl-side-title-lh);
 }
 .starterLine {
+  /* B-152⑩：条件と返信の説明は省略せず、必要な行数で読む。 */
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: var(--tpl-text-sm-lh);

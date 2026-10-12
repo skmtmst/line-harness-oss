@@ -76,7 +76,8 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
   })
 
   it('読めていないときはページ送りを出さない', () => {
-    expect(PAGE).toContain('hasListData && pageCount > 1')
+    expect(PAGE).toContain('const pager = hasListData ? (')
+    expect(PAGE).not.toContain('hasListData && pageCount > 1')
   })
 
   it('読込・失敗・権限不足を共通部品で描く', () => {

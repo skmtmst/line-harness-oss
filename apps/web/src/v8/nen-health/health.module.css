@@ -1,7 +1,7 @@
 /*
  * ★V8-B 健康日記（mIwA4・BVuYh・z2tvtX）。
  * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
- * 数字は app/globals.css の [data-theme="v8"] の --tpl-nph-* に置く（マイペットと同じ物差し）。
+ * 数字は app/globals.css の :root の --tpl-nph-* に置く（マイペットと同じ物差し）。
  */
 
 /* タブ（絵：高さ28・文字の下10）。 */
@@ -304,16 +304,6 @@
  * 30日のまとめ（BVuYh）。共通の引き出し（幅 660・頭に線）を、絵の幅 600・
  * 頭の線なし・余白 24・間 16 に合わせる（NEN配信の oqSJP と同じやり方）。
  */
-:global(:root [data-design-part='drawer']):has(.summaryBody) {
-  width: min(var(--tpl-nph-drawer-w), 100%);
-}
-:global(:root [data-design-part='drawer']):has(.summaryBody) > :global(header) {
-  padding: var(--tpl-nph-drawer-head-pad);
-  border-bottom: 0;
-}
-:global(:root [data-design-part='drawer']):has(.summaryBody) > :global(div) {
-  padding: var(--tpl-nph-drawer-body-pad);
-}
 .summaryBody {
   display: flex;
   flex-direction: column;

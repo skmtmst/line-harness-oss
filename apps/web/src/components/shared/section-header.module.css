@@ -38,8 +38,7 @@
   align-items: center;
 }
 :root .title { line-height: 23px; }
-/* 当たり28pxは保持し、見える円だけ CugIm の16pxに合わせる。 */
-:root .help button > span[aria-hidden] { border: 0; border-radius: var(--polish-radius-pill); outline: 1px solid var(--color-ink-faint); outline-offset: -.5px; background: transparent; color: var(--color-ink-faint); }
+/* 補足の円と当たりは HelpTip が持つ。包みの span に二重の円を描かない。 */
 
 }
 

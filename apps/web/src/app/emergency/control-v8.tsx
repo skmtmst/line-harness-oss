@@ -7,9 +7,10 @@ import { api, ApiError, type OperationCapability, type OperationControl, type Op
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import { formatOperationDate } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
-import { formatNumber } from '@/lib/format'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Button from '@/components/shared/button'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -525,53 +526,17 @@ const EmergencyControlV8 = (
       <EmergencyControlFeedback message={feedback} needsReload={needsReload} reloading={reloading} stopBlockers={stopBlockers} onReload={() => void reloadControl()} />
 
       {/* 数の帯。取れていない数字は「—」（0 とは言わない）。 */}
-      <div className={styles.kpis} aria-label="緊急停止の集計">
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}>
-            <span className={styles.kpiTile} aria-hidden="true"><ShieldCheck size={14} /></span>
-            <span className={styles.kpiLabel}>緊急停止状態</span>
-          </div>
-          <p className={`${styles.kpiValue} ${isStopped ? styles.kpiValueDanger : ''}`}>
-            {/* WEB312：状態が読めていないときは「動いている」と言わない。 */}
-            {previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
-          </p>
-          <p className={styles.kpiDetail}>
-            {impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'}
-          </p>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}>
-            <span className={styles.kpiTile} aria-hidden="true"><PauseCircle size={14} /></span>
-            <span className={styles.kpiLabel}>止めた回数</span>
-          </div>
-          <p className={styles.kpiValue}>
-            {historyState === 'ready' ? formatNumber(recent90.length) : emptyValue('unknown')}<span className={styles.kpiUnit}>回</span>
-          </p>
-          <p className={styles.kpiDetail}>この90日</p>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}>
-            <span className={styles.kpiTile} aria-hidden="true"><Timer size={14} /></span>
-            <span className={styles.kpiLabel}>いちばん長かった停止</span>
-          </div>
-          <p className={styles.kpiValue}>
-            {historyState === 'ready' ? (longest.entry ? formatMinutesRough(longest.minutes) : emptyValue('unknown')) : emptyValue('unknown')}
-          </p>
-          <p className={styles.kpiDetail}>
-            {longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'}
-          </p>
-        </div>
-        <div className={styles.kpi}>
-          <div className={styles.kpiHead}>
-            <span className={styles.kpiTile} aria-hidden="true"><Tag size={14} /></span>
-            <span className={styles.kpiLabel}>いまの版</span>
-          </div>
-          <p className={styles.kpiValue}>{historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}</p>
-          <p className={styles.kpiDetail}>
-            {latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'}
-          </p>
-        </div>
-      </div>
+      <KpiBand aria-label="緊急停止の集計">
+        <KpiCard title="緊急停止状態" icon={<ShieldCheck size={14} />} value={null} unit=""
+          valueText={previewSettled && control ? (isStopped ? '停止中' : '有効') : emptyValue('unknown')}
+          valueTone={isStopped ? 'danger' : 'default'}
+          detail={impactFailed && !control ? '確認できませんでした' : calculatedAt ? `${formatOperationDate(calculatedAt)}に確認` : '確認中'} />
+        <KpiCard title="止めた回数" icon={<PauseCircle size={14} />} value={historyState === 'ready' ? recent90.length : null} unit="回" detail="この90日" />
+        <KpiCard title="いちばん長かった停止" icon={<Timer size={14} />} value={historyState === 'ready' && longest.entry ? longest.minutes : null} unit="分"
+          detail={longest.entry ? `${formatMonthDay(longest.entry.stoppedAt)} ${longest.entry.reason.slice(0, 8)}` : '記録なし'} />
+        <KpiCard title="いまの版" icon={<Tag size={14} />} value={null} unit="" valueText={historyState === 'ready' ? (currentVersion ?? emptyValue('unknown')) : emptyValue('unknown')}
+          detail={latestReleaseAt ? `管理画面の更新 ${formatMonthDay(latestReleaseAt)}` : '管理画面の更新 —'} />
+      </KpiBand>
 
       <section className={styles.card} aria-labelledby="emergency-targets-heading">
         <h2 id="emergency-targets-heading" className={styles.cardTitle}>何を止めますか</h2>

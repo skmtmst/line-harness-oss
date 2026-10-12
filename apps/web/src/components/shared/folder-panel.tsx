@@ -4,8 +4,8 @@ import { useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
 import HelpTip from './help-tip'
-import FolderDot from './folder-dot'
-import { ArrowDown, ArrowUp, Ellipsis, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Trash2 } from 'lucide-react'
+import { folderDisplayColor } from './folder-dot'
+import { ArrowDown, ArrowUp, Ellipsis, Folder, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Trash2 } from 'lucide-react'
 import { RowMenu } from './row-actions'
 import styles from './folder-panel.module.css'
 import noteStyles from './managed-folder-panel.module.css'
@@ -197,9 +197,12 @@ export default function FolderPanel({
       </div> : null}
       <nav aria-label={heading} className={styles.rows}>
         {rows.map((row) => {
-          const hasActions = !readOnly && Boolean(row.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
           const isActive = activeId === row.id
           const kind = row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')
+          const menuRow = kind === 'all' && onAddFolder && !addFolderDisabled ? { ...row, leadingActions: [
+            ...(row.leadingActions ?? []), { id: 'add-folder', label: addFolderLabel, icon: <FolderPlus size={14} aria-hidden="true" />, onSelect: onAddFolder },
+          ] } : row
+          const hasActions = !readOnly && Boolean(menuRow.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
 
           return (
             <div
@@ -228,7 +231,7 @@ export default function FolderPanel({
               >
                 {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
                     色が面で乗って名前より目立ってしまう。 */}
-                <span className={styles.folderIcon} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <FolderDot folder={{ name: row.label, color: row.color }} />}</span>
+                <span className={styles.folderIcon} aria-hidden="true">{kind === 'all' ? <Inbox size={15} style={{ color: 'var(--color-ink)' }} /> : kind === 'unfiled' ? <FolderOpen size={15} style={{ color: 'var(--color-ink-secondary)' }} /> : <Folder size={15} fill="currentColor" style={{ color: folderDisplayColor({ name: row.label, color: row.color }) }} />}</span>
                 <span className={`${styles.label} min-w-0 flex-1 truncate`}>{row.label}</span>
                 {row.count === null ? null : <span className={`${styles.count} text-ink-faint shrink-0`}>{row.count}</span>}
               </button>
@@ -264,7 +267,7 @@ export default function FolderPanel({
                     open={openMenuId === row.id}
                     onClose={() => setOpenMenuId(null)}
                     ariaLabel={`フォルダ「${row.label}」の操作`}
-                    items={folderMenuItems(row, runAction)}
+                    items={folderMenuItems(menuRow, runAction)}
                   />
                 </div>
               )}

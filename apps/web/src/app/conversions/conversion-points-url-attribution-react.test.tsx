@@ -166,7 +166,7 @@ async function openDetail(name: string) {
   await act(async () => { root.render(React.createElement(ConversionsPage)) })
   await act(async () => { await Promise.resolve() })
   await click(byLabel(`成果地点「${name}」の操作`) as HTMLButtonElement)
-  await click(byText('中身を見る'))
+  await click(byText('成果地点の詳細を見る'))
 }
 
 async function openEdit(name: string) {

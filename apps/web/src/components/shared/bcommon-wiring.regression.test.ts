@@ -43,10 +43,12 @@ it('共通点検8: 共通情報のまとめ操作はBulkBar', () => {
   expect(source).toContain('<BulkBar')
   expect(source).not.toContain('className={styles.bulkRow}')
 })
-it('共通点検9: 紹介者の右面は620幅の共通Drawer', () => {
+it('共通点検9: 紹介者の右面は共通Drawerの編集幅540', () => {
   const source = read('v8/affiliates/drawer.tsx')
   expect(source).toContain('<Drawer')
-  expect(source).toContain('designWidth={620}')
+  const drawerTag = source.match(/<Drawer\b[^>]*>/)?.[0] ?? ''
+  expect(drawerTag).toContain('width="editor"')
+  expect(drawerTag).not.toContain('designWidth=')
   expect(source).not.toContain('className={styles.drawer}')
 })
 

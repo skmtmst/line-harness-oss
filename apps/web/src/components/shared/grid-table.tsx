@@ -1,6 +1,7 @@
 'use client'
 
 import { useTableActionWidth } from './use-table-action-width'
+import { useListRowDensity } from './use-list-row-density'
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import { Children, cloneElement, isValidElement, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import styles from './grid-table.module.css'
@@ -33,6 +34,7 @@ export function GridTable({ children, label, design, framed = true, className }:
   className?: string
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
+  useListRowDensity(actionWidthRef)
   const variables = Object.fromEntries(Object.entries(design).map(([key, value]) => [`--grid-table-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value]))
   return <div ref={actionWidthRef} data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={framed || undefined} style={variables as CSSProperties}>{children}</div>
 }

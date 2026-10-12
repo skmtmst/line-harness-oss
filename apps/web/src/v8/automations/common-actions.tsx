@@ -296,9 +296,7 @@ export default function CommonActionsV8() {
   )
   const toolbar = (
     <>
-      <div className={styles.noticeRow}>
-        <Notice tone="info">共通アクションは、ルール・シナリオ・自動応答・回答フォーム・リッチメニューから呼び出せる「処理のまとまり」です。公開しても、使っている所は今の版のまま。使う所ごとに新しい版へ切り替えます。</Notice>
-      </div>
+
       {actionError ? <div className={styles.noticeRow}><Notice tone="danger">{actionError}</Notice></div> : null}
       <ListToolbar
         search={{ placeholder: '共通アクションを探す', label: '共通アクションを検索', width: 240, value: query, onChange: setQuery }}
@@ -400,6 +398,7 @@ export default function CommonActionsV8() {
       help={<>{AUTOMATIONS_DESCRIPTION}{canEdit
             ? '行の「…」から 版と使われている場所を見る・下書きの中身を編集・複製・保管。'
             : '行の「…」から 版と使われている場所を見る。'}</>}
+      explanation="共通アクションは、ルール・シナリオ・自動応答・回答フォーム・リッチメニューから呼び出せる「処理のまとまり」です。公開しても、使っている所は今の版のまま。使う所ごとに新しい版へ切り替えます。"
       boardId="LnGNw"
       headingSize="regular"
       title="オートメーション"

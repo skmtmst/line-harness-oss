@@ -95,3 +95,17 @@
 html:root [data-kpi-strip][data-kpi-presentation='band']:not(:has([data-kpi-detail-present])) [data-kpi-detail] { display: none; }
 html:root [data-kpi-strip][data-kpi-presentation='band']:has([data-kpi-detail-present]) [data-kpi-detail] { display: flex; min-height: var(--tpl-band-detail-h); }
 html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']):not(:has([data-kpi-detail-present])) > [data-design-version] { min-height: var(--tpl-list-band-no-detail-h); }
+
+/* 帯の寸法は帯が持つ。画面の親から古い詰め方の変数を継承しない。
+   明示的にcompactを選んだ段・引き出しは既存の小さい口を保つ。 */
+html:root [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) {
+  --tpl-band-cell-pad-block: var(--space-16);
+  --tpl-band-cell-pad-side: var(--tpl-list-inset);
+  --tpl-band-cell-gap: var(--space-8);
+}
+
+/* 題の文字も帯が持つ。画面側の本文サイズを継承させない。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-label] {
+  font-size: var(--text-caption);
+  line-height: 18px;
+}

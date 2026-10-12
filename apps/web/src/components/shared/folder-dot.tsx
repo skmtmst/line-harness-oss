@@ -58,15 +58,16 @@ function nameText(node: ReactNode): string {
  * 丸＋名前の1行。名前は1行のまま省略する（全文は呼ぶ側の title で見せる）。
  * B-194: どの幅でも丸を出す。旧い dot 指定は受け取るだけ。
  */
-export function FolderDotName({ folder, children }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode }) {
+export function FolderDotName({ folder, children, annotation }: { folder?: FolderDotFolder | null; dot?: boolean; children: ReactNode; annotation?: ReactNode }) {
   const parts = Children.toArray(children)
   const selection = parts.filter(child => isValidElement(child) && child.type === Checkbox)
   const name = parts.filter(child => !isValidElement(child) || child.type !== Checkbox)
   return (
-    <span className={styles.line} data-list-name="" title={nameText(name)}>
+    <span className={styles.line} data-list-name="" data-has-annotation={annotation ? true : undefined} title={nameText(name)}>
       {selection}
       <FolderDot folder={folder} />
       {typeof children === 'string' ? <TruncatedText className={styles.name} value={children} /> : <span className={styles.name}>{name}</span>}
+      {annotation}
     </span>
   )
 }

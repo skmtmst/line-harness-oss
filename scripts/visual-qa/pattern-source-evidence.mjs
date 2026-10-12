@@ -47,6 +47,10 @@ export function sourceEvidence(file, source, offset, length = 1) {
     return entry.printed.get(node)
   }
   const shapeProps = opening?.attributes.properties.filter(node => ts.isJsxAttribute(node) && ['className', 'style', 'role', 'aria-modal', 'aria-pressed'].includes(node.name.getText(entry.tree))) ?? []
+  const accessibleName = opening?.attributes.properties.find(node => ts.isJsxAttribute(node) && ['aria-label', 'aria-labelledby'].includes(node.name.getText(entry.tree)))
+  const dialogIdentity = accessibleName ? digest(JSON.stringify([opening.tagName.getText(entry.tree), print(accessibleName)])) : undefined
+  const descendantTags = []
+  if (jsx) { const descendants = node => { if (node !== jsx && (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node))) descendantTags.push((ts.isJsxElement(node) ? node.openingElement : node).tagName.getText(entry.tree)); ts.forEachChild(node, descendants) }; descendants(jsx) }
   const shape = opening && JSON.stringify([opening.tagName.getText(entry.tree), shapeProps.map(print)])
   const statement = parents.findLast(ts.isVariableStatement)
   const initializer = statement?.declarationList.declarations[0]?.initializer
@@ -97,7 +101,7 @@ export function sourceEvidence(file, source, offset, length = 1) {
   }
   return {
     comment: false,
-    searchString: Boolean(literal && !attribute),
+    searchString: Boolean(literal && (!attribute || (literal !== attribute.initializer && !(ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression === literal)))),
     tag: opening?.tagName.getText(entry.tree),
     emptyElement: Boolean(jsx && (ts.isJsxSelfClosingElement(jsx) || jsx.children.every(child => ts.isJsxText(child) && !child.text.trim()))),
     attribute: attribute?.name.getText(entry.tree),
@@ -106,6 +110,9 @@ export function sourceEvidence(file, source, offset, length = 1) {
     ancestorTags: parents.filter(node => ts.isJsxElement(node)).map(node => node.openingElement.tagName.getText(entry.tree)),
     visualPropCount: shapeProps.length,
     shapeIdentity: shape && digest(shape),
+    dialogIdentity,
+    jsxStart: jsx?.getStart(entry.tree),
+    descendantTags,
     returnsJsx,
     returnTags,
     payloadType: Boolean(literal && ts.isPropertyAssignment(literal.parent) && literal.parent.name.getText(entry.tree) === 'type' && ts.isObjectLiteralExpression(literal.parent.parent) && literal.parent.parent.properties.some(node => ts.isPropertyAssignment(node) && node.name.getText(entry.tree) === 'uri')),

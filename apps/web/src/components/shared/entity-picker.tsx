@@ -28,6 +28,8 @@ import TagPill from './tag-pill'
 export interface EntityPickerItem {
   id: string
   name: string
+  /** 候補自身の印の色。指定しない候補は既存の札の色を使う。 */
+  color?: string | null
   /** 置き場のフォルダ。null は未分類。undefined はフォルダを持たない種類。 */
   folderId?: string | null
   /** 種類の札（テキスト・カルーセル など）。渡した窓だけ札の列と絞り込みを出す。 */
@@ -377,6 +379,8 @@ type FieldBase = {
   listFooter?: ReactNode
   state?: ReactNode
   placeholder?: string
+  valuePrefix?: string
+  compact?: boolean
   disabled?: boolean
   readOnly?: boolean
   invalid?: boolean
@@ -422,9 +426,10 @@ type MultiField = FieldBase & {
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, compact = false }: {
   label: string; noun: string; icon?: LucideIcon
   name?: string; meta?: string; placeholder?: string
+  color?: string | null
   disabled?: boolean; readOnly?: boolean; invalid?: boolean; id?: string
   buttonRef?: Ref<HTMLButtonElement>
   describedBy?: string
@@ -433,12 +438,14 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, place
   onClear?: () => void
   selection?: ReactNode
   ariaLabel?: string
+  valuePrefix?: string
+  compact?: boolean
 }) {
   const field = useFieldContext()
   const empty = !name
   const actionLabel = readOnly ? '見る' : empty ? '選ぶ' : '変える'
   const isInvalid = invalid || Boolean(field?.invalid)
-  return <div className={styles.field} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
+  return <div className={styles.field} data-value-prefix={valuePrefix ? '' : undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
     {readOnly && empty ? null : <button type="button" className={styles.fieldTrigger} ref={buttonRef} id={id ?? field?.controlId}
       disabled={disabled} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
       aria-invalid={isInvalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy)} onClick={onOpen} />}
@@ -446,12 +453,12 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, meta, place
     {selection ? <span className={styles.fieldChips}>{selection}</span> :
     <span className={styles.fieldValue}>
       {empty ? <span className={styles.fieldPlaceholder}>{placeholder ?? `${noun}を選ぶ`}</span> : <>
-        <strong className={styles.fieldName} title={name}>{name}</strong>
+        <>{valuePrefix ? <span className={styles.fieldName} title={name}>{name}</span> : <TagPill size={compact ? 'sm' : 'md'} name={name} color={color} aria-label={`選択中の${noun}：${name}`} />}</>
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}
     {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
-    {readOnly && empty ? null : <span className={styles.fieldAction} aria-hidden="true"><ChevronRight size={16} /></span>}
+    {readOnly && empty ? null : <span className={styles.fieldAction} aria-hidden="true">{!empty && !valuePrefix ? actionLabel : null}<ChevronRight size={16} /></span>}
   </div>
 }
 
@@ -475,10 +482,11 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const [open, setOpen] = useState(props.defaultOpen ??false)
   const title = props.title ?? `${noun}を選ぶ`
   const picked = describePicked(items, folders, props.value, props.multiple ? props.unit : undefined, props.multiple ? props.summarize : undefined)
+  const pickedColor = props.multiple ? undefined : items.find(item => item.id === props.value)?.color
   const close = () => setOpen(false)
   return <>
-    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
-      ariaLabel={props.ariaLabel}
+    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
+      ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix} compact={props.compact}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)
         const folder = item ? folderOf(item, folders) : null

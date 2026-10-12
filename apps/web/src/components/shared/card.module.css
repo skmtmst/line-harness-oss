@@ -112,7 +112,7 @@
   box-shadow: var(--card-shadow);
 }
 :root .form {
-  gap: var(--tpl-cn-card-gap);
+  gap: var(--polish-space-field);
   padding: var(--tpl-cn-card-pad);
 }
 :root .aside {
@@ -199,10 +199,27 @@
 :root .headerRestaurant .title{font-size:15px;line-height:23px;}
 :root .headerRestaurant .meta{font-size:14px;line-height:21px;}
 
-/* B-187・208：枠のある箱・縦のまとまりは最低16。部分ごとに余白を持つカードは継続。 */
+/* B-187・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
+/* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
+html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']) {
+  border: 0;
+  outline: 1px solid var(--card-edge);
+  outline-offset: -0.5px;
+}
 html:root .paddingCompact { padding: var(--space-16); }
 html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
-html:root .vertical { gap: max(var(--space-16), var(--card-content-gap, 0px)); }
+/* B-208 の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
+html:root .vertical { gap: max(var(--space-8), var(--card-content-gap, var(--space-16))); }
 
 /* B-208：余白の口を持たない既存の箱にも、枠から16を確保する。表の器は平らなまま。 */
 html:root .card[data-card-padding='none'][data-card-variant='default']:not([data-card-unframed]):not([data-spacing]):not([data-card-spacing]):not(:has([data-shared-part='list-table'], table)) { padding: var(--space-16); }
+
+/* 失敗した処理の箱。形と余白はCardのまま、状態だけ共通の赤。 */
+html:root .card[data-card-surface='danger'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-danger-bg); }
+/* 回答など、頭・表・ページ送りの段がそれぞれ端の余白を持つ記録の箱。 */
+html:root .records {
+  display: flex; flex-direction: column; gap: var(--polish-space-field);
+  padding-block: var(--polish-space-section); border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px;
+}
+html:root .records > .header { padding-inline: var(--polish-space-section); }
+html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }

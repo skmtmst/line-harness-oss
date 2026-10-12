@@ -451,6 +451,7 @@ export default function WebhooksInteractionsV8() {
   return (
     <ListPage
       help={<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
+      explanation="失敗したものは「もう一度送る」でやり直せます。相手が止まっていたときは、自動で3回までやり直します。"
       boardId="Uv9AA"
       headingSize="regular"
       title="外部連携"
@@ -461,9 +462,7 @@ export default function WebhooksInteractionsV8() {
         <WebhookBand cells={bandCells} />
       </>}
       toolbar={<>
-        <div className={styles.noticeRow}>
-          <Notice tone="info">失敗したものは「もう一度送る」でやり直せます。相手が止まっていたときは、自動で3回までやり直します。</Notice>
-        </div>
+
         {notice ? <div className={styles.noticeRow}><Notice tone="danger" message={notice} onClose={() => setNotice('')} /></div> : null}
         <ListToolbar
           search={{ placeholder: '送り先・友だちで探す', label: '送り先・友だちで探す', width: 240, value: search, onChange: (value) => { setSearch(value); setPage(1) } }}

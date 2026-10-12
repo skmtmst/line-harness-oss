@@ -73,10 +73,10 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     })
   }, [reservation])
   const fields = useFormErrors()
-  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。')
-  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。')
-  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。')
-  fields.define('end', '終了日時', () => Number.isFinite(Date.parse(draft.endsAt)) && Date.parse(draft.endsAt) > Date.parse(draft.startsAt) ? null : '終了日時は開始日時より後にしてください。')
+  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。', { required: true })
+  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
+  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。', { required: true })
+  fields.define('end', '終了日時', () => Number.isFinite(Date.parse(draft.endsAt)) && Date.parse(draft.endsAt) > Date.parse(draft.startsAt) ? null : '終了日時は開始日時より後にしてください。', { required: true })
   if (!reservation) return null
   const hold = isHold(reservation)
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
@@ -138,7 +138,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       ) : (
         <>
           <div className={styles.pair}>
-            <Field label="お客様名" htmlFor="rs-edit-name" error={fields.error('name')}>
+            <Field label="お客様名" htmlFor="rs-edit-name" error={fields.error('name')} requirement={fields.requirement('name')}>
               <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-edit-name" invalid={fields.invalid('name')} required readOnly={!canWrite} value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
             </Field>
             <Field label="電話番号" htmlFor="rs-edit-phone">
@@ -146,7 +146,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             </Field>
           </div>
           <div className={styles.pair}>
-            <Field label="人数" htmlFor="rs-edit-guests" error={fields.error('count')}>
+            <Field label="人数" htmlFor="rs-edit-guests" error={fields.error('count')} requirement={fields.requirement('count')}>
               <SaveErrorField names={["guestCount","draft.guestCount","guest_count","draft.guest_count"]}><NumberInput id="rs-edit-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required readOnly={!canWrite} value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} /></SaveErrorField>
             </Field>
             <Field labelSize="compact" label="卓">
@@ -156,10 +156,10 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             </Field>
           </div>
           <div className={styles.pair}>
-            <Field label="開始日時" htmlFor="rs-edit-start" error={fields.error('start')}>
+            <Field label="開始日時" htmlFor="rs-edit-start" error={fields.error('start')} requirement={fields.requirement('start')}>
               <SaveErrorField names={["startsAt","draft.startsAt","starts_at","draft.starts_at"]}><DateTimeField id="rs-edit-start" invalid={fields.invalid('start')} required readOnly={!canWrite} value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} /></SaveErrorField>
             </Field>
-            <Field label="終了日時" htmlFor="rs-edit-end" error={fields.error('end')}>
+            <Field label="終了日時" htmlFor="rs-edit-end" error={fields.error('end')} requirement={fields.requirement('end')}>
               <SaveErrorField names={["endsAt","draft.endsAt","ends_at","draft.ends_at"]}><DateTimeField id="rs-edit-end" invalid={fields.invalid('end')} required readOnly={!canWrite} value={draft.endsAt} onChange={(next) => setDraft({ ...draft, endsAt: next })} /></SaveErrorField>
             </Field>
           </div>
@@ -214,10 +214,10 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
 }) {
   const [draft, setDraft] = useState({ provider: 'restaurant_board', externalId: '', customerName: '', guestCount: '2', startsAt: '' })
   const fields = useFormErrors()
-  fields.define('externalId', '外部予約ID', () => draft.externalId.trim() ? null : '外部予約IDを入れてください。')
-  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。')
-  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。')
-  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。')
+  fields.define('externalId', '外部予約ID', () => draft.externalId.trim() ? null : '外部予約IDを入れてください。', { required: true })
+  fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。', { required: true })
+  fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
+  fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。', { required: true })
   useEffect(() => { if (open) setDraft({ provider: 'restaurant_board', externalId: `DEMO-${Date.now()}`, customerName: '', guestCount: '2', startsAt: '' }) }, [open])
   return (
     <RsDialog
@@ -253,18 +253,18 @@ export function InboundTrialDialog({ open, busy, onClose, onSubmit }: {
           { value: 'tabelog', label: '食べログ' },
         ]} /></SaveErrorField>
       </Field>
-      <Field label="外部予約ID" htmlFor="rs-trial-id" error={fields.error('externalId')}>
+      <Field label="外部予約ID" htmlFor="rs-trial-id" error={fields.error('externalId')} requirement={fields.requirement('externalId')}>
         <SaveErrorField names={["externalId","draft.externalId","external_id","draft.external_id"]}><TextField id="rs-trial-id" invalid={fields.invalid('externalId')} required value={draft.externalId} onChange={(event) => setDraft({ ...draft, externalId: event.target.value })} /></SaveErrorField>
       </Field>
       <div className={styles.pair}>
-        <Field label="お客様名" htmlFor="rs-trial-name" error={fields.error('name')}>
+        <Field label="お客様名" htmlFor="rs-trial-name" error={fields.error('name')} requirement={fields.requirement('name')}>
           <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-trial-name" invalid={fields.invalid('name')} required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
         </Field>
-        <Field label="人数" htmlFor="rs-trial-guests" error={fields.error('count')}>
+        <Field label="人数" htmlFor="rs-trial-guests" error={fields.error('count')} requirement={fields.requirement('count')}>
           <SaveErrorField names={["guestCount","draft.guestCount","guest_count","draft.guest_count"]}><NumberInput id="rs-trial-guests" invalid={fields.invalid('count')} type="number" min={1} max={100} required value={draft.guestCount} onChange={(event) => setDraft({ ...draft, guestCount: event.target.value })} /></SaveErrorField>
         </Field>
       </div>
-      <Field label="開始日時" htmlFor="rs-trial-start" error={fields.error('start')}>
+      <Field label="開始日時" htmlFor="rs-trial-start" error={fields.error('start')} requirement={fields.requirement('start')}>
         <SaveErrorField names={["startsAt","draft.startsAt","starts_at","draft.starts_at"]}><DateTimeField id="rs-trial-start" invalid={fields.invalid('start')} required value={draft.startsAt} onChange={(next) => setDraft({ ...draft, startsAt: next })} /></SaveErrorField>
       </Field>
       <DialogNote>試した予約は台帳に入ります。予約媒体へは何も送りません。</DialogNote>

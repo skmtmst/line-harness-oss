@@ -12,7 +12,10 @@ const CSS = readFileSync(resolve(__dirname, "../../v8/webinar-edit/form.module.c
 
 describe("webinar 作成の板の数字", () => {
   it("段カードは採用した共通の余白を使う", () => {
-    expect(CSS).toMatch(/\.card \{[^}]*padding: var\(--tpl-wc-an-card-pad\);/s);
+    const page = readFileSync(resolve(__dirname, '../../v8/webinar-edit/basic-form.tsx'), 'utf8');
+    expect(page).toContain('<Card');
+    const card = readFileSync(resolve(__dirname, '../../components/shared/card.module.css'), 'utf8');
+    expect(card).toContain('padding: var(--card-content-padding');
   });
 
   it("入力の枠は共通の高さ36と角を使う", () => {

@@ -1,39 +1,11 @@
-/*
- * ★V8-B `D0AOyx` プールを作る。左の2枚（残り）と右のプレビュー（340）、間 14。カードは角丸 12・枠・余白 18・間 12。
- * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-st2-pc-*・--tpl-sb-*）。
- */
-.columns {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-sb-conflict-gap);
-}
-
+/* ★V8-B D0AOyx。左右の配置はSettingsPage、段の面と余白はCardが持つ。
+ * ここは受け入れ先とプレビューの中身だけ。 */
 .main {
   display: flex;
   min-width: 0;
   flex: 1;
   flex-direction: column;
   gap: var(--tpl-sb-group-gap);
-}
-
-.side {
-  display: flex;
-  width: var(--tpl-st2-pc-side-w);
-  flex-shrink: 0;
-  flex-direction: column;
-  gap: var(--tpl-sb-group-gap);
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-sb-group-gap);
-  padding: var(--tpl-st2-pc-card-pad);
-  border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
 }
 
 .cardHead {

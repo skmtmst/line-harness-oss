@@ -1,7 +1,11 @@
 
+'use client'
+
+import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
 import type { ReactNode } from 'react'
 import { CollapsedFolderActions, type FolderPanelRow } from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
+import { ListToolbarLeading } from '@/components/shared/list-toolbar'
 import HelpTip from '@/components/shared/help-tip'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
@@ -48,30 +52,39 @@ export interface ListPageBodyProps {
   /** 小窓の一覧は、ページの幅と独立してフォルダを横に並べる。 */
   dialogLayout?: boolean
   toolbar?: ReactNode
+  /** 固定した絵で道具の上下余白が16の一覧。通常の14は変えない。 */
+  toolbarSpacing?: 'section'
+  /** 案内の帯と道具の段の間を16にする固定絵。既定の段間は変えない。 */
+  noticeSpacing?: 'section'
+  /** 案内と道具を別の行に置く一覧。行同士はカードの間隔（16）。 */
+  toolbarRowGap?: 'card'
   /** 表の操作説明。本文に長い文を置かず、道具の段の「？」から読む。 */
+  explanation?: ReactNode
   listHelp?: ReactNode
   children: ReactNode
   pagination?: ReactNode
   overlays?: ReactNode
 }
 export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
+  heightMode?: 'viewport' | 'content'
   boardId?: string
   layout?: 'event-list'
   standalone?: boolean
   tabs?: ReactNode
 }
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, listHelp, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, listHelp, children, pagination, overlays }: ListPageBodyProps) {
   const navs = folderNav ? (Array.isArray(folderNav) ? folderNav : [folderNav]) : []
-  const collapsed = collapsedFolders ?? (folders && navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
+  const collapsed = collapsedFolders ?? (navs.length > 0 ? navs.map((nav, index) => <CollapsedFolderNav key={nav.label ?? index} {...nav} />) : null)
   return <div className={styles.listBody} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} style={fillWidth ? { width: '100%' } : undefined}>
     {readOnly ? <ReadOnlyNotice /> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     <div className={styles.split} data-template-region="body">
       {folders ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
-        {toolbar || collapsed || listHelp ? <div className={styles.toolbar} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp ? undefined : ''}>
-          {collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}{toolbar}
+        {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation ? undefined : ''}>
+          {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted inset="notice">{explanation}</PageExplanationBody></div> : null}
+          {toolbar ? <ListToolbarLeading leading={collapsed}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders">{collapsed}</div> : null}
           {listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null}
         </div> : null}
         <div className={styles.content} data-template-region="content" data-content-inset={contentInset || undefined}>{children}</div>
@@ -91,12 +104,13 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = '�
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, layout, standalone, tabs, title, help, identity, actions, crumbs, steps, headingSize, ...body }: ListPageProps) {
-  return <PageFrame kind="list" boardId={boardId} layout={layout} standalone={standalone} skeleton={body.skeleton}>
-    <PageHeading {...{ title, help, identity, actions, crumbs, steps, headingSize }} />
+export function ListPage({ boardId, layout, heightMode, standalone, tabs, title, help, explanation, explanationKey, titleAccessory, identity, actions, crumbs, steps, headingSize, bottomSpacing, ...body }: ListPageProps) {
+  const page = <PageFrame kind="list" boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone} skeleton={body.skeleton}>
+    <PageHeading {...{ title, help, titleAccessory: explanation ? <>{titleAccessory}<PageExplanationToggle /></> : titleAccessory, identity, actions, crumbs, steps, headingSize, bottomSpacing }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
-    <ListPageBody {...body} />
+    <ListPageBody {...body} explanation={explanation} />
   </PageFrame>
+  return explanation ? <PageExplanationProvider pageKey={explanationKey ?? `list:${typeof title === 'string' ? title : boardId ?? 'screen'}`}>{page}</PageExplanationProvider> : page
 }
 
 /** 読込・空・失敗の条件を画面側に残したままページ送りの余白を型へ寄せる。 */
