@@ -1,5 +1,5 @@
 'use client'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 
 import { api, type CommonActionResources } from '@/lib/api';
 import Toggle from '@/components/shared/toggle';
@@ -359,16 +359,13 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       </>}
     >
       <Card variant="form" gap="normal" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
-        <div className={form.cardHeadRow}>
-          <h2 id="webinar-notify-title" className={form.cardTitle}>通知とリマインド</h2>
-          <HelpTip label="送った数と通知の対象">{`予定 ${countWithUnit(overview?.pending)}・取消 ${countWithUnit(overview?.cancelled)}・合計 ${countWithUnit(overview?.total)}。通知の対象：${audienceText(overview?.audience)}`}<br /><NotificationStateBadge state={notificationRowState(settings ? SETTINGS_KEYS.filter(key => key.endsWith("Enabled")).some(key => Boolean(settings[key])) : undefined, loadState !== 'loading', loadState === 'error')} /><br />{deliveryTimingSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{missedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{completedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}</HelpTip>
-        </div>
+        <CardHeader size="stacked" titleId="webinar-notify-title" title="通知とリマインド" action={<HelpTip label="送った数と通知の対象">{`予定 ${countWithUnit(overview?.pending)}・取消 ${countWithUnit(overview?.cancelled)}・合計 ${countWithUnit(overview?.total)}。通知の対象：${audienceText(overview?.audience)}`}<br /><NotificationStateBadge state={notificationRowState(settings ? SETTINGS_KEYS.filter(key => key.endsWith("Enabled")).some(key => Boolean(settings[key])) : undefined, loadState !== 'loading', loadState === 'error')} /><br />{deliveryTimingSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{missedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{completedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}</HelpTip>} />
         <p className={styles.desc}>LINE で送るお知らせです。テストは全部をまとめて自分に送ります。</p>
         {notificationBody}
       </Card>
 
       <Card variant="form" gap="normal" aria-labelledby="webinar-after-title">
-        <h2 id="webinar-after-title" className={form.cardTitle}>視聴後にすること</h2>
+        <CardHeader size="stacked" titleId="webinar-after-title" title="視聴後にすること" />
         <p className={styles.desc}>見たかどうかで、タグを付けたりシナリオを始めたりします。</p>
         {actionError ? (
           <Notice tone="info" action={<Button onClick={() => setActionAttempt((value) => value + 1)}>もう一度読み込む</Button>}>視聴後の設定を読み込めませんでした。</Notice>
@@ -376,7 +373,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           <div>
             {resourcesError ? <Notice tone="danger" action={<Button onClick={() => setResourceAttempt(n => n + 1)}>もう一度読み込む</Button>}>動きの対象を読み込めませんでした。</Notice> : null}
             {TRIGGERS.map(trigger => <div key ={trigger.key}>
-              <h3 className={form.cardTitle}>{trigger.label}</h3>
+              <CardHeader size="stacked" headingLevel={3} title={trigger.label} />
               { actions === null? <ListState kind="loading" /> : <ActionList<WebinarAction> value={actions.filter(action => action.trigger === trigger.key)} readOnly={readOnly || saving}
                 onChange={next => setActions(current => [...(current ?? []).filter(action => action.trigger !== trigger.key), ...next])}
                 idOf={(action, index) => action.id ?? String(index)} titleOf={action =>{
