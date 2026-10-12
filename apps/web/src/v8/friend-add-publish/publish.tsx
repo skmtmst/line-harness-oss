@@ -158,7 +158,7 @@ function FriendAddPublish() {
         }
         const loaded: RuleDetail = { rule: res.data.rule, staffNotification: res.data.staffNotification }
         setDetail(loaded)
-        await readChecks(selectedAccountId, loaded.rule, isCurrent)
+        if (canEdit) await readChecks(selectedAccountId, loaded.rule, isCurrent)
         if (!isCurrent()) return
         setPhase('ready')
       } catch (caught) {
@@ -178,11 +178,11 @@ function FriendAddPublish() {
       }
     })()
     return () => { alive = false }
-  }, [ruleId, selectedAccountId, reloadKey, readChecks, saveErrors])
+  }, [ruleId, selectedAccountId, reloadKey, readChecks, saveErrors, canEdit])
 
   /** テストする（送らずに判定）。本番の登録・タグ・マイルは変えない。終わったら確認を読み直す。 */
   const runTest = async () => {
-    if (!selectedAccountId || !detail || testing) return
+    if (!canEdit || !selectedAccountId || !detail || testing) return
     const at = { accountId: selectedAccountId, generation: requestRef.current.generation }
     const stillHere = () => requestRef.current.accountId === at.accountId && requestRef.current.generation === at.generation
     setTesting(true)
@@ -446,7 +446,7 @@ function FriendAddPublish() {
 
       <Card variant="form" gap="normal" className={styles.card} aria-label="有効にする前の確認">
         <CardHeader size="stacked" title={<>有効にする前の確認</>} />
-        <ul className={styles.checkList}>
+        {canEdit ? <ul className={styles.checkList}>
           {checks.map((check) => (
             <li key={check.title} className={styles.checkRow}>
               <span className={styles.checkMark} data-ok={check.ok || undefined} aria-hidden="true">
@@ -463,7 +463,7 @@ function FriendAddPublish() {
               ) : null}
             </li>
           ))}
-        </ul>
+        </ul> : <Notice tone="info">有効にする前の確認は、編集できる人が行います。</Notice>}
         {otherFailed.length > 0 ? (
           <Notice tone="warn" message={`${otherFailed.map((check) => check.detail || check.label).join('・')}`} />
         ) : null}
