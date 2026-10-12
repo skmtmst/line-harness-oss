@@ -474,7 +474,9 @@
     "520_incoming_webhook_receipt_plan.sql",
     "521_incoming_webhook_receipt_body_hash.sql",
     "532_webhook_interaction_secret_unavailable.sql",
-    "535_tiktok_pnl.sql"
+    "535_tiktok_pnl.sql",
+    "603_instagram_connections.sql",
+    "611_instagram_cross_post.sql"
   ],
-  "migrationCount": 475
+  "migrationCount": 477
 }

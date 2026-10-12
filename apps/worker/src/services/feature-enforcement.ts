@@ -381,6 +381,15 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'instagram transient data retention',
+    classification: { kind: 'core', reason: '期限切れの認可待ちと、受信メッセージの控えの保存期限（90日）' },
+    enforcement: {
+      mode: 'exempt',
+      reason:
+        '外部送信をせず、機能の有効・無効にかかわらず保存期限を守る。offにした店舗の古いコピーを残すほうがMetaの利用者データポリシー違反になる',
+    },
+  },
+  {
     name: 'automation deliveries',
     dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'automations' },

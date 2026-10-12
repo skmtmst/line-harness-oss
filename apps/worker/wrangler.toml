@@ -63,6 +63,13 @@ D1_DATABASE_ID = "5b0fcea8-e05e-42bf-9efa-f2bc4c459552"
 MANIFEST_URL = "https://github.com/Shudesu/line-harness-oss/releases/latest/download/release-manifest.json"
 WORKER_PUBLIC_URL = "https://api.musubo.jp"
 ADMIN_PUBLIC_URL = "https://admin.musubo.jp"
+# Instagram（Instagram直接ログイン方式）の折り返し先と API の版。検証環境と同じアプリを使い、
+# Meta側「InstagramログインによるAPI設定」の OAuth リダイレクトURI にこの本番URLを追記して使う。
+# INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET / META_TOKEN_ENCRYPTION_KEY は [vars] に書かず、
+# 本番Workerのシークレットとして登録する（同名のvarsはシークレットを上書きするため）。
+# 手順は docs/instagram-production-rollout.md を参照。
+META_GRAPH_API_VERSION = "v24.0"
+META_REDIRECT_URI = "https://api.musubo.jp/api/instagram/oauth/callback"
 LIFF_PUBLIC_URL = "https://api.musubo.jp"
 CF_ACCOUNT_ID = "55f40f5577bd68828d67716f8d900642"
 MEDIA_R2_BUCKET_NAME = "nen-line-images"
