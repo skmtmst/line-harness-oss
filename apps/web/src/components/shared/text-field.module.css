@@ -81,7 +81,7 @@
 }
 
 @media (pointer: coarse) {
-  [data-theme='v8'] .field { font-size: var(--text-lead); }
+  :root .field { font-size: var(--text-lead); }
 }
 
 :root .invalid {

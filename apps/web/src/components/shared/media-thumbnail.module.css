@@ -6,4 +6,4 @@
 .failure { color: var(--color-ink-faint); font-size: var(--text-caption); }
 }
 
-html[data-theme='v8'] .placeholder[data-media-thumbnail] > :global(svg.lucide) { width: var(--tpl-media-thumbnail-icon); height: var(--tpl-media-thumbnail-icon); }
+html:root .placeholder[data-media-thumbnail] > :global(svg.lucide) { width: var(--tpl-media-thumbnail-icon); height: var(--tpl-media-thumbnail-icon); }

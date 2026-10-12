@@ -167,7 +167,7 @@
   }
 
   /* 短い板は内容の下で止める。長い内容は同じmainの中で送り、外枠は伸ばさない。 */
-  [data-theme="v8"] .main:has(> .content > [data-frame-height='content']) {
+  :root .main:has(> .content > [data-frame-height='content']) {
     flex: 0 1 auto;
   }
 }
@@ -241,7 +241,7 @@
 }
 
 /* 運営の板も固定絵の外側24を共通の外枠が持つ。 */
-[data-theme='v8'] .content[data-content-layout='ops'] { padding: var(--polish-space-section); }
+:root .content[data-content-layout='ops'] { padding: var(--polish-space-section); }
 
 /* 固定絵が内容の下で終わる板。送りは main 内に保つ。 */
-[data-theme='v8'] .main:has([data-height-mode='content']) { flex: 0 1 auto; }
+:root .main:has([data-height-mode='content']) { flex: 0 1 auto; }

@@ -13,6 +13,6 @@
 }
 
 /* リッチメッセージの6面を1段に置く。右上のラジオの下へ見本を置き、重ねない（B-203/229）。 */
-html[data-theme='v8'] .list[data-preview='message'] .tile {
+html:root .list[data-preview='message'] .tile {
   width: 104px;
 }
