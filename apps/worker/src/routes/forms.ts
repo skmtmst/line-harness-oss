@@ -1,3 +1,4 @@
+import { callFormWebhook } from '../services/form-webhook.js';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
@@ -3737,59 +3738,6 @@ async function runFormPostEffects(input: {
     'destination_status',
   ];
   return claim ? claim.settle(required) : [];
-}
-
-async function callFormWebhook(
-  form: Pick<DbForm, 'on_submit_webhook_url' | 'on_submit_webhook_headers'>,
-  submissionData: Record<string, unknown>,
-  eventId: string | null,
-): Promise<{ passed: boolean; data: unknown }> {
-  if (!form.on_submit_webhook_url) return { passed: true, data: null };
-
-  try {
-    // Replace {field_name} placeholders in URL with submitted values
-    let url = form.on_submit_webhook_url;
-    for (const [key, value] of Object.entries(submissionData)) {
-      url = url.replace(`{${key}}`, encodeURIComponent(String(value ?? '')));
-    }
-
-    // Parse headers
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    // 安定 event id。同じ送信の呼び直しは同じ値になるので、受け側は
-    // この値で重複を除ける(durable outbox の片割れ)。
-    if (eventId) headers['X-Form-Event-Id'] = eventId;
-    if (form.on_submit_webhook_headers) {
-      try {
-        const parsed = JSON.parse(form.on_submit_webhook_headers) as Record<string, string>;
-        Object.assign(headers, parsed);
-      } catch { /* ignore invalid headers */ }
-    }
-
-    // Determine method: GET if URL has {placeholders} replaced, POST otherwise
-    const isGet = form.on_submit_webhook_url.includes('{');
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(url, {
-      method: isGet ? 'GET' : 'POST',
-      headers,
-      signal: controller.signal,
-      ...(isGet ? {} : { body: JSON.stringify(submissionData) }),
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      return { passed: false, data: { error: `HTTP ${res.status}` } };
-    }
-
-    const data = await res.json() as Record<string, unknown>;
-
-    // Check for eligibility — support both { eligible: bool } and { success: bool, data: { eligible: bool } }
-    const eligible = data.eligible ?? (data.data as Record<string, unknown> | undefined)?.eligible ?? data.success;
-    return { passed: Boolean(eligible), data };
-  } catch (err) {
-    console.error('Form webhook error:', err);
-    return { passed: false, data: { error: String(err) } };
-  }
 }
 
 export { forms };
