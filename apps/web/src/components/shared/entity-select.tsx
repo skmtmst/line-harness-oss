@@ -49,6 +49,8 @@ type CommonProps = {
   id?: string
   name?: string
   label?: string
+  /** 絞り込みの欄で、選んだ値の前に項目名を残す。窓の候補名は変えない。 */
+  valuePrefix?: string
   placeholder?: string
   loading?: boolean
   createLabel?: (query: string) => string
@@ -90,7 +92,7 @@ export default function EntitySelect(props: EntitySelectProps) {
     onOpen: hasFolderInfo && kind ? load : undefined, disabled, readOnly, invalid: Boolean(error) || invalid, id,
     placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
-    describedBy: error ? errorId : undefined, defaultOpen: props.defaultOpen,
+    describedBy: error ? errorId : undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix,
   }
   return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%' } : undefined} data-entity-picker-field>
     {name ? <input type="hidden" name={name} value={props.values ? props.values.join(',') : props.value} disabled={disabled} /> : null}

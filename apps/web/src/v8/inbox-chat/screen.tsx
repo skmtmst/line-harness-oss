@@ -4,6 +4,8 @@ import { jstDate, jstCalendar } from '@/lib/jst-datetime'
 
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { PageTitle } from '@/components/templates/page-frame'
+import FilterChip from '@/components/shared/filter-chip'
+import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls } from '@/components/shared/inbox-list'
 
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton'
 import Avatar from '@/components/shared/avatar'
@@ -2697,13 +2699,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         <InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
           {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
-                <section
+                <InboxListHeader
         data-design="Filters"
         data-inbox-v4="quick-filters"
-        className={`relative flex flex-wrap items-center gap-1.5 border-b border-hairline p-3 ${styles.headTop}`}
         aria-label="受信箱のクイック絞り込み"
       >
-        <div className={`flex w-full items-center gap-2 ${styles.titleRow}`}><PageTitle className="mr-auto text-lg font-semibold">受信箱</PageTitle>
+        <InboxListHeadline><PageTitle>受信箱</PageTitle>
         {/*
           設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
           右から420pxのパネルが出る（`bXyEA`）。
@@ -2822,7 +2823,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            */
           <InboxRulesPopover accountId={selectedAccountId ?? null} />
         )}
-        </div>
+        </InboxListHeadline>
         {[
           { key: 'all' as const, label: 'すべて', title: undefined, icon: null },
           { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話', icon: Reply },
@@ -2837,18 +2838,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            */
           { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
         ].map((filter) => (
-          <Button variant="secondary" className={`h-8 shrink-0 items-center whitespace-nowrap rounded-pill border px-2 text-xs font-semibold transition-colors ${
-              quickFilter === filter.key
-                ? 'border-accent-deep bg-accent-soft text-accent-deep'
-                : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-            } ${styles.chip}`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title} >
-            {/* V8 の絵の札は 要返信＝reply・1時間以上待ち＝clock-3 の印を文字の前に置く。v7 では出さない。 */}
-            {filter.icon ? <filter.icon aria-hidden className={styles.chipIcon} /> : null}
+          <FilterChip key={filter.key} selected={quickFilter === filter.key} onChange={() => { setQuickFilter(filter.key); dropSavedViewParam() }} title={filter.title} showCheck={false} icon={filter.icon ? <filter.icon aria-hidden size={14} /> : undefined}>
             {filter.label}
-            {/* 件数がまだ無い時は「—」を出さない（★V7：意味の無い記号を置かない）。 */}
-            {/* ★V8（eovoG）：札に件数は出さない（要返信＝下の「未対応」と同じ数）。読み上げと検査のため文字は残す。 */}
-            {quickCountsNow ? <span className={`tabular-nums ${'sr-only'} ${styles.chipCount}`}>{quickCountsNow[filter.key]}</span> : null}
-          </Button>
+            {quickCountsNow ? <span className="sr-only tabular-nums">{quickCountsNow[filter.key]}</span> : null}
+          </FilterChip>
         ))}
         <SavedViewDialog
           open={saveDialogOpen}
@@ -2902,9 +2895,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           }}
           onClose={() => setFilterOpen(false)}
         />
-      </section>
+      </InboxListHeader>
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
-          <div className={`border-b border-hairline p-4 ${styles.searchBlock}`}>
+          <InboxListSearch>
             {(
               /* ★V8：共通の検索欄（自作の入力欄をやめる）。 */
               <SearchField
@@ -2912,7 +2905,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 onChange={(value) => { setNameQuery(clampSearchQuery(value)); dropSavedViewParam() }}
                 onClear={() => { setNameQuery(''); dropSavedViewParam() }}
                 maxLength={SEARCH_QUERY_MAX_LENGTH}
-                placeholder="名前・メールアドレス・内容で検索"
+                placeholder="名前・メールアドレス・内容で探す"
                 aria-label="名前・メールアドレス・内容で検索"
               />
             )}
@@ -2920,9 +2913,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
               プルダウンが自分で名乗るため、外の字は置かない。
             */}
-            <div className={styles.filterRow}>
-            <label className={`mt-3 inline-flex items-center text-micro font-semibold text-ink-secondary ${styles.filterCell}`}>
-              <span className="min-w-0 flex-1">
+            <InboxFilterControls>
+            <>
                 {/*
                   未読数は集計の口から渡す。**画面に見えている行から数えない**
                   ——一覧はページ送りされるので、2ページ目の未読が落ちる。
@@ -2933,6 +2925,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <EntitySelect
                     aria-label="担当者で絞り込む"
                     label="担当者"
+                    valuePrefix="担当者："
+                    width={138}
                     size="full"
                     value={assigneeFilter}
                     onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
@@ -2943,13 +2937,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     })}
                   />
                 )}
-              </span>
-            </label>
-            <div className={`ml-2 inline-block min-w-0 align-bottom ${styles.filterCell}`}>
-              <Select aria-label="受信経路で絞り込む" value={channel} onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))} options={CHANNELS.map((item) => ({value:item.key,label:`経路：${item.label}`}))} />
-            </div>
-            </div>
-          </div>
+</>
+              <Select width={124} aria-label="受信経路で絞り込む" value={channel} onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))} options={CHANNELS.map((item) => ({value:item.key,label:`経路：${item.label}`}))} />
+            </InboxFilterControls>
+          </InboxListSearch>
 
           {/*
             状態の絞り込みは5等分の切り替え。左の欄（開いている間は288px）でも

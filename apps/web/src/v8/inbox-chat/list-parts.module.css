@@ -5,17 +5,6 @@
  * まとめ、線は並び順の下の1本だけ。v7 は段ごとに線で区切る作りのままにするので、
  * ここは v8 のときだけ効かせる。値は globals.css の [data-theme="v8"] の --tpl-inbox-*。
  */
-:global(:root) .headTop {
-  column-gap: var(--tpl-inbox-head-tools-gap);
-  row-gap: var(--tpl-inbox-head-gap);
-  padding: var(--tpl-inbox-head-pad-top) var(--tpl-inbox-head-pad-x) 0;
-  border-bottom: 0;
-}
-
-:global(:root) .titleRow {
-  gap: var(--tpl-inbox-head-tools-gap);
-}
-
 :global(:root) .tool {
   width: var(--tpl-inbox-tool-size);
   height: var(--tpl-inbox-tool-size);
@@ -32,103 +21,8 @@
 }
 
 /* 札：選んでいない＝白地・薄い枠・墨の字、選んだ＝墨の地・白い字（共通の札 O2fCAt・XGJDa と同じ形）。 */
-:global(:root) .chip {
-  gap: var(--tpl-inbox-chip-gap);
-  height: var(--tpl-inbox-control-h);
-  padding: var(--tpl-inbox-chip-pad);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: var(--text-caption--line-height);
-}
-
-:global(:root) .chip[aria-pressed='true'] {
-  border-color: var(--color-ink);
-  background: var(--color-ink);
-  color: var(--color-on-accent);
-}
-
-.chipIcon {
-  display: none;
-}
-
-:global(:root) .chipIcon {
-  display: inline-flex;
-  flex: none;
-  width: var(--tpl-inbox-icon-sm);
-  height: var(--tpl-inbox-icon-sm);
-}
-
 /* 件数は共通の札と同じ：小さく・普通の太さ・薄い字。選んだ札では白。 */
-:global(:root) .chipCount {
-  margin-left: var(--tpl-inbox-none);
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  font-weight: 500;
-}
-
-:global(:root) .chip[aria-pressed='true'] .chipCount {
-  color: var(--color-on-accent);
-}
-
-:global(:root) .searchBlock {
-  padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0;
-  border-bottom: 0;
-}
-
-:global(:root) .searchInput {
-  height: var(--tpl-inbox-control-h);
-  border-color: var(--color-control-border);
-  font-size: var(--text-label);
-}
-
-:global(:root) .searchInput::placeholder {
-  color: var(--color-ink-faint);
-}
-
 /* 担当者と経路：列の幅に半分ずつ・間8。どちらも同じ選ぶ欄の形（高さ36・枠 control-border・13/500）。 */
-:global(:root) .filterRow {
-  display: flex;
-  gap: var(--tpl-inbox-filter-gap);
-  margin-top: var(--tpl-inbox-head-gap);
-}
-
-:global(:root) .filterCell {
-  display: block;
-  flex: 1 1 0;
-  width: auto;
-  min-width: 0;
-  margin: var(--tpl-inbox-none);
-}
-
-:global(:root) .filterCell > * {
-  width: 100%;
-  min-width: 0;
-}
-
-:global(:root) .filterCell button[aria-label='担当者で絞り込む'] {
-  gap: var(--tpl-inbox-chip-gap);
-  height: var(--tpl-inbox-control-h);
-  padding: var(--tpl-inbox-control-pad);
-  border-color: var(--color-control-border);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 500;
-}
-
-:global(:root) .filterCell button[aria-label='担当者で絞り込む'] > span:first-child {
-  color: var(--color-ink);
-}
-
-:global(:root) .filterCell button[aria-label='担当者で絞り込む'] svg {
-  width: var(--tpl-inbox-icon-md);
-  height: var(--tpl-inbox-icon-md);
-  color: var(--color-ink-faint);
-}
-
 :global(:root) .statusBlock {
   padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0;
   border-bottom: 0;
@@ -151,10 +45,6 @@
 :global(:root) .sortLine {
   padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) var(--tpl-inbox-head-pad-bottom);
   color: var(--color-ink-faint);
-}
-
-:global(:root) .filterCell button[aria-label='担当者で絞り込む'][aria-expanded='true'] {
-  border-color: var(--color-accent);
 }
 
 /*
@@ -232,14 +122,6 @@
   display: none;
 }
 
-:global(:root) .filterCell button[aria-label='担当者で絞り込む'] {
-  gap: 0;
-}
-
-:global(:root) .filterCell button[aria-label='担当者で絞り込む'] > span:last-child {
-  padding-left: var(--tpl-inbox-chip-gap);
-}
-
 /* 一覧の列の幅：PC 幅では 340〜372 の間で、3つの列の幅の 32%（1440 で絵の 372）。 */
 @media (min-width: 1024px) {
   :global(:root) .listCol {
@@ -272,5 +154,3 @@
 
 /* hold：右の友だち情報は320。狭い板では今までどおり重ねて開く。 */
 :global(:root) .infoPanel { width: var(--tpl-inbox-summary-width); }
-
-:global(:root) .titleRow > :first-child { margin-inline-start: var(--tpl-inbox-title-inset); }

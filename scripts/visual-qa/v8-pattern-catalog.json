@@ -3027,7 +3027,9 @@
             "apps/web/src/components/shared/inbox-composer.tsx",
             "apps/web/src/components/shared/inbox-composer.module.css",
             "apps/web/src/components/shared/inbox-content.tsx",
-            "apps/web/src/components/shared/inbox-content.module.css"
+            "apps/web/src/components/shared/inbox-content.module.css",
+            "apps/web/src/components/shared/inbox-list.tsx",
+            "apps/web/src/components/shared/inbox-list.module.css"
           ],
           "components": [
             "InboxPage",
@@ -3047,7 +3049,11 @@
             "InboxFlexContent",
             "InboxFloatingPanel",
             "InboxInfoBackdrop",
-            "InboxEmailHeading"
+            "InboxEmailHeading",
+            "InboxListHeader",
+            "InboxListHeadline",
+            "InboxListSearch",
+            "InboxFilterControls"
           ],
           "vars": []
         },

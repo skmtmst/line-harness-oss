@@ -933,6 +933,6 @@
 ## 受信箱の列・入力・補助面（inbox-frame）
 
 - **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。
-- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
+- **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
 - **持ち主（Pen）**：受信箱 eovoG。媒体と補助面の従来寸法は共通トークンへ移し、画面から上書きしない。
 - **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。

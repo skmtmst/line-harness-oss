@@ -377,6 +377,7 @@ type FieldBase = {
   listFooter?: ReactNode
   state?: ReactNode
   placeholder?: string
+  valuePrefix?: string
   disabled?: boolean
   readOnly?: boolean
   invalid?: boolean
@@ -477,7 +478,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const picked = describePicked(items, folders, props.value, props.multiple ? props.unit : undefined, props.multiple ? props.summarize : undefined)
   const close = () => setOpen(false)
   return <>
-    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
+    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} meta={picked.meta} placeholder={placeholder} disabled={disabled} readOnly={readOnly}
       ariaLabel={props.ariaLabel}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)

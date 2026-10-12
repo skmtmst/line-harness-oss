@@ -9,4 +9,4 @@ export function InboxDraftArea(props: TextareaHTMLAttributes<HTMLTextAreaElement
 export function InboxDraftCount(props: HTMLAttributes<HTMLParagraphElement>) { return <p {...props} className={styles.count} /> }
 export function InboxComposerBottom(props: PartProps) { return <div {...props} className={styles.bottom} /> }
 export function InboxComposerActions(props: HTMLAttributes<HTMLSpanElement>) { return <span {...props} className={styles.actions} /> }
-export function InboxToolButton(props: ButtonProps) { return <Button {...props} variant="secondary" size="compact" className={styles.tool} /> }
+export function InboxToolButton(props: ButtonProps) { return <Button {...props} variant="secondary" size="inbox-tool" className={styles.tool} /> }

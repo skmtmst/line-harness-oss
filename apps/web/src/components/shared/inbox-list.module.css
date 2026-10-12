@@ -1,0 +1,5 @@
+.header { position: relative; display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-8); row-gap: var(--tpl-inbox-head-gap); padding: var(--tpl-inbox-head-pad-top) var(--tpl-inbox-head-pad-x) 0; }
+.headline { display: flex; width: 100%; min-width: 0; align-items: center; gap: var(--tpl-inbox-head-tools-gap); }
+.headline > h2 { flex: 1; min-width: 0; padding-left: var(--tpl-inbox-title-inset); }
+.search { padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0; }
+.filters { display: flex; flex-wrap: wrap; gap: var(--space-8); margin-top: var(--tpl-inbox-head-gap); }
