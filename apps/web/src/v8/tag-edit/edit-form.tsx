@@ -1,5 +1,5 @@
 'use client'
-import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert , Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react';
 import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
