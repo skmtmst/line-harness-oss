@@ -1,5 +1,6 @@
 'use client'
 import Card, { CardHeader } from '@/components/shared/card'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -76,9 +77,16 @@ function conflictWho(data: unknown): { who: string | null; at: string | null } {
 }
 
 export default function EarningRuleCreateV8() {
-  const saveErrors = useSaveFormErrors()
+  const canManage = canManageRole(useStaffRole())
   usePageTitle('たまる決めごとを作る')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'マイル', href: LIST_HREF }])
+  if (!canManage) return <CreatePage boardId="ctLwT" title="たまる決めごとを作る" readOnly dirty={false} children={null}
+    footerActions={<Button href={LIST_HREF}>一覧へ戻る</Button>} />
+  return <EarningRuleCreateBody />
+}
+
+function EarningRuleCreateBody() {
+  const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
