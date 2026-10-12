@@ -254,6 +254,8 @@ export default function AffiliateOfferCreateV8() {
     </>
   )
 
+  if (!canEdit) return <CreatePage boardId="Td4TN" title="案件を作る" readOnly footerActions={<Button href="/affiliates">一覧へ戻る</Button>}>{null}</CreatePage>
+
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
       hidePreviewWhenNarrow
@@ -319,7 +321,7 @@ export default function AffiliateOfferCreateV8() {
       <Card variant="form" aria-labelledby="af-new-after">
         <CardHeader size="stacked" titleId="af-new-after" title="成果を認めたときにすること" meta="任意" />
         <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-          <SaveErrorField names={["tagEnabled","tag_enabled"]}><Checkbox checked={tagEnabled} aria-label="タグを付ける" disabled={!canEdit} onCheckedChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} description={tagName ?? 'まだ決めていません'}>タグを付ける</Checkbox></SaveErrorField>
+          <SaveErrorField names={["tagEnabled","tag_enabled"]}><Checkbox checked={tagEnabled} aria-label="タグを付ける" onCheckedChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} description={tagName ?? 'まだ決めていません'}>タグを付ける</Checkbox></SaveErrorField>
             {tagEnabled ? (
               <div {...fields.bind('tag')}>
                 <SaveErrorField names={["tagId"]}><EntityKindField
@@ -342,7 +344,7 @@ export default function AffiliateOfferCreateV8() {
             {tagsFetch === 'failed' ? retry('タグ') : null}
         </Card>
         <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-          <SaveErrorField names={["scenarioEnabled","scenario_enabled"]}><Checkbox checked={scenarioEnabled} aria-label="シナリオ配信を始める" disabled={!canEdit} onCheckedChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} description={scenarioName ?? 'まだ決めていません'}>シナリオ配信を始める</Checkbox></SaveErrorField>
+          <SaveErrorField names={["scenarioEnabled","scenario_enabled"]}><Checkbox checked={scenarioEnabled} aria-label="シナリオ配信を始める" onCheckedChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} description={scenarioName ?? 'まだ決めていません'}>シナリオ配信を始める</Checkbox></SaveErrorField>
             {scenarioEnabled ? (
               <div {...fields.bind('scenario')}>
                 <SaveErrorField names={["scenarioId"]}><EntityKindField

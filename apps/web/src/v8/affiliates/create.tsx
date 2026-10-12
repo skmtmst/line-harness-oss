@@ -348,6 +348,8 @@ export default function CreateAffiliateV8() {
     </div>
   )
 
+  if (!canEdit) return <CreatePage boardId="RaMf3" title="アフィリエイターを作る" readOnly footerActions={<Button href="/affiliates?tab=affiliates">一覧へ戻る</Button>}>{null}</CreatePage>
+
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
       hidePreviewWhenNarrow
@@ -465,7 +467,7 @@ export default function CreateAffiliateV8() {
         <CardHeader size="stacked" title="いくら払い、いつ締めるか" meta="報酬の決め方は、案件ごとの額より先にこの人の決まりが使われます" />
         <SaveErrorField names={["affiliate-payout-kind","value","kind.value","payoutKind"]}><RadioCardGroup legend="報酬の決め方" className={styles.choiceGrid}>
           {PAYOUT_KINDS.map((kind) => (
-            <RadioCard disabled={!canEdit}
+            <RadioCard
               key={kind.value}
               name="affiliate-payout-kind"
               value={kind.value}
@@ -485,7 +487,7 @@ export default function CreateAffiliateV8() {
         <SettingsFormRow>
           <Field label="締めと支払い" htmlFor="af-cycle"><SaveErrorField names={["payoutCycle","payout_cycle"]}><TextField readOnly={!canEdit} id="af-cycle" value={payoutCycle} onChange={(event) => setPayoutCycle(event.target.value)} placeholder="例：月末締め・翌月末払い" maxLength={100} /></SaveErrorField></Field>
           <Field label="保留期間" htmlFor="af-hold" error={fieldErrors.hold} help="返品・キャンセルを待つ期間です。過ぎた成果が次の締めに入ります。">
-            <SaveErrorField names={["holdDays","hold_days"]}><Select disabled={!canEdit} id="af-hold" aria-label="保留期間" size="full" value={holdDays} onChange={(value) => { setHoldDays(value); clearField('hold') }} options={holdOptions} /></SaveErrorField>
+            <SaveErrorField names={["holdDays","hold_days"]}><Select id="af-hold" aria-label="保留期間" size="full" value={holdDays} onChange={(value) => { setHoldDays(value); clearField('hold') }} options={holdOptions} /></SaveErrorField>
           </Field>
         </SettingsFormRow>
       </Card>
@@ -493,10 +495,10 @@ export default function CreateAffiliateV8() {
       <Card variant="form" aria-label="成果が出たときにすること">
         <CardHeader size="stacked" title="成果が出たときにすること" meta="任意" />
         <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-          <SaveErrorField names={["notifyOnConversion","notify_on_conversion"]}><Checkbox disabled={!canEdit} checked={notifyOnConversion} aria-label="本人に LINE で知らせる" onCheckedChange={setNotifyOnConversion} description="成果 1 件ごとに">本人に LINE で知らせる</Checkbox></SaveErrorField>
+          <SaveErrorField names={["notifyOnConversion","notify_on_conversion"]}><Checkbox checked={notifyOnConversion} aria-label="本人に LINE で知らせる" onCheckedChange={setNotifyOnConversion} description="成果 1 件ごとに">本人に LINE で知らせる</Checkbox></SaveErrorField>
         </Card>
         <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
-          <SaveErrorField names={["startTracking","isActive","start_tracking"]}><Checkbox disabled={!canEdit} checked={startTracking} aria-label="すぐに計測を始める" onCheckedChange={setStartTracking} description={startTracking ? '登録したらすぐに数え始めます' : 'オフでもリンクは発行されます'}>すぐに計測を始める</Checkbox></SaveErrorField>
+          <SaveErrorField names={["startTracking","isActive","start_tracking"]}><Checkbox checked={startTracking} aria-label="すぐに計測を始める" onCheckedChange={setStartTracking} description={startTracking ? '登録したらすぐに数え始めます' : 'オフでもリンクは発行されます'}>すぐに計測を始める</Checkbox></SaveErrorField>
         </Card>
       </Card>
 
