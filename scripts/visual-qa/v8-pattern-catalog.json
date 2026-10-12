@@ -744,6 +744,11 @@
         ],
         "signals": [
           {
+            "id": "own-range-text",
+            "re": "(?:summary=\\{\\s*|\\b(?:const|let)\\s+(?:pagerSummary|summary)\\s*=\\s*)`[^`]{0,500}(?:件中|人中)",
+            "why": "ページ送りの件数文を画面で組む（Pagination.rangeへ数値を渡す）"
+          },
+          {
             "id": "own-size",
             "re": "\\b(const|let)\\s+\\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\\w*\\s*=",
             "why": "件数の定数を画面ごとに持つ"

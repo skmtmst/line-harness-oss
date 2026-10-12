@@ -726,10 +726,7 @@ export default function WebhooksOutgoingV8() {
 
   const pager = ready && visible.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="送り先一覧のページ送り" range={{ total: filtered.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + visible.length }} />
     </ListPagePagination>
   ) : null
 

@@ -59,7 +59,7 @@ import InlineEdit from '@/components/shared/inline-edit'
 import { TextField } from '@/components/shared/text-field';
 import { withViewTransition } from '@/components/shared/view-transition';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs';
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario';
@@ -1024,7 +1024,7 @@ export default function ScenariosListV8() {
   const listPager = scenarioList.loaded && !scenarioList.error ? (
     <ListPagePagination>
       <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage}
-        summary={paginationSummary(scenarioList.total, (scenarioList.page - 1) * scenarioList.limit + 1, Math.min(scenarioList.page * scenarioList.limit, scenarioList.total))} />
+        range={{ total: scenarioList.total, first: (scenarioList.page - 1) * scenarioList.limit + 1, last: Math.min(scenarioList.page * scenarioList.limit, scenarioList.total) }} />
     </ListPagePagination>
   ) : null
 

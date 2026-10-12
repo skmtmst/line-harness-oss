@@ -33,7 +33,7 @@ import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-er
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
@@ -784,7 +784,7 @@ export default function TagsTab({
       {/* 件数とページ送り（絵：左に件数・右にページ送り）。表示件数は道具の段の右端。 */}
       <ListPager>
         <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り"
-          summary={paginationSummary(filtered.length, (currentPage - 1) * pageSize + 1, Math.min(currentPage * pageSize, filtered.length))} />
+          range={{ total: filtered.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, filtered.length) }} />
       </ListPager>
     </DelayedSkeleton>
   )

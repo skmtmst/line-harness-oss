@@ -510,9 +510,8 @@ export default function HqStoreList(props: HqStoreListProps) {
     </div>
   )
 
-  const summary = `${formatNumber(filtered.length)} 件中 ${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)} 件`
   const pager = !ready || filtered.length === 0 ? null : (
-    <Pagination page={current} pageCount={pageCount} onPageChange={setPage} summary={<span className={storeStyles.pagerCount}>{summary}</span>} />
+    <Pagination page={current} pageCount={pageCount} onPageChange={setPage} range={{ total: filtered.length, first: (current - 1) * pageSize + 1, last: Math.min(current * pageSize, filtered.length) }} />
   )
 
   if (type === 'tag' && attribute.tab !== 'tags') {

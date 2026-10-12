@@ -39,7 +39,7 @@ import InlineEdit from '@/components/shared/inline-edit'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { withViewTransition } from '@/components/shared/view-transition';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -943,7 +943,7 @@ function WebinarList() {
   const pager = hasListData ? (
     <ListPagePagination>
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り"
-        summary={paginationSummary(visibleTotal, (currentPage - 1) * pageSize + 1, (currentPage - 1) * pageSize + visibleItems.length)} />
+        range={{ total: visibleTotal, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + visibleItems.length }} />
     </ListPagePagination>
   ) : null
 

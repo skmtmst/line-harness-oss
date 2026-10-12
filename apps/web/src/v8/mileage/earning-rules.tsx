@@ -902,10 +902,7 @@ export default function EarningRulesTab() {
 
   const pager = ready && visible.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {`${shown.length} 件中 ${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, shown.length)} 件`}
-      </span>
-      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} range={{ total: shown.length, first: (page - 1) * pageSize + 1, last: Math.min(page * pageSize, shown.length) }} />
     </ListPagePagination>
   ) : undefined
 

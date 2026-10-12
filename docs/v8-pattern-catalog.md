@@ -276,6 +276,7 @@
   - 注：PageSizeSelect は shared が持つ（B-172）。
 - **見つけ方（コード）**：
   - own-size：`\b(const|let)\s+\w*(PAGE_SIZE|PAGE_SIZES|PER_PAGE|pageSizes|perPageOptions)\w*\s*=` — 件数の定数を画面ごとに持つ
+  - own-range-text：`summary`／`pagerSummary` で件数文を組む — `Pagination.range` へ総数・先頭・末尾・単位だけを渡す（L組差し戻しB）。
   - size-100：`\[\s*20\s*,\s*50\s*,\s*100\s*\]` — 件数が 20・50・100（決まりは 10・20・50）
   - more：`(?:>|['"'])[^<'"']{0,40}(?:もっと読む|さらに読み込む|もっと見る)` — 「もっと読む」（ページ送りにする）
   - prev-next：`(?:>|['"'])[^<'"']{0,40}(?:前へ|次へ)`（持ち主の部品を読んでいないファイルだけ） — 前へ・次へを手で置く

@@ -386,10 +386,7 @@ export default function CommonActionsV8() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const pager = !loading && !loadFailed && items.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(page - 1) * pageSize + 1}〜{Math.min(page * pageSize, total)} / {formatNumber(total)} 件
-      </span>
-      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="共通アクション一覧のページ送り" />
+      <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="共通アクション一覧のページ送り" range={{ total: total, first: (page - 1) * pageSize + 1, last: Math.min(page * pageSize, total) }} />
     </ListPagePagination>
   ) : null
 

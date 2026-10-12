@@ -1164,7 +1164,7 @@ export default function RichMenusListV8() {
   const listPager = selectedAccount && !listLoading && !error && groups.length > 0 ? (
     <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage}
       ariaLabel="リッチメニューのページ送り"
-      summary={`${formatNumber(groupTotal)}件中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, groupTotal)}件`} />
+      range={{ total: groupTotal, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, groupTotal) }} />
   ) : null
 
   /* ===== 削除の窓（yOyCg：消せない理由を外す順に。読めないときは消させない） ===== */

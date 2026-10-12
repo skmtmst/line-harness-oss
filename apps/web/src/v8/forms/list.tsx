@@ -44,7 +44,6 @@ import { withViewTransition } from '@/components/shared/view-transition';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Pagination from '@/components/shared/pagination'
-import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { notifyToast } from '@/components/shared/toast';
@@ -1299,15 +1298,7 @@ export default function FormsListV8() {
       pageCount={pageCount}
       onPageChange={(next) => updateListState({ page: next })}
       ariaLabel="回答フォームのページ送り"
-      summary={(
-        <ListRange
-          bare
-          className={styles.pagerCount}
-          total={listTotal}
-          first={pageStart + 1}
-          last={Math.min(pageStart + visibleForms.length, listTotal)}
-        />
-      )}
+      range={{ total: listTotal, first: pageStart + 1, last: Math.min(pageStart + visibleForms.length, listTotal) }}
     />
   )
 

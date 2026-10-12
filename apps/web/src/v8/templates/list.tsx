@@ -1250,9 +1250,8 @@ export default function TemplatesListV8() {
 
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
-  const pagerSummary = `${formatNumber(filteredTemplates.length)} 件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)} 件`
   const listPager = !showPager ? null : (
-    <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
+    <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} range={{ total: filteredTemplates.length, first: (safePage - 1) * pageSize + 1, last: Math.min(safePage * pageSize, filteredTemplates.length) }} />
   )
 
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'

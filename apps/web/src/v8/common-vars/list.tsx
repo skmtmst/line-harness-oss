@@ -1290,13 +1290,8 @@ function CommonVarsListInner() {
     </>
   )
 
-  const pagerSummary = filtered.length === 0
-    ? '0件'
-    : pageCount > 1
-      ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)} / ${formatNumber(filtered.length)} 件`
-      : `${formatNumber(filtered.length)} 件`
   const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : (
-    <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
+    <Pagination page={page} pageCount={pageCount} onPageChange={setPage} range={{ total: filtered.length, first: (page - 1) * pageSize + 1, last: Math.min(page * pageSize, filtered.length) }} />
   )
 
   /* 数の帯。取れていない数字は「—」（0 とは言わない）。 */

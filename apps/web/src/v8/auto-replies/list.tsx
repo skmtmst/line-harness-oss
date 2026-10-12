@@ -56,7 +56,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { compareEvaluationOrder, movePriorityUpdates } from './order';
 import QuickCreateV8 from './quick-create'
@@ -1373,7 +1373,7 @@ export default function AutoRepliesListV8() {
   const listPager = ready ? (
     <ListPagePagination>
       <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage}
-        summary={paginationSummary(sortedItems.length, (safePage - 1) * pageSize + 1, Math.min(safePage * pageSize, sortedItems.length))} />
+        range={{ total: sortedItems.length, first: (safePage - 1) * pageSize + 1, last: Math.min(safePage * pageSize, sortedItems.length) }} />
     </ListPagePagination>
   ) : null
 

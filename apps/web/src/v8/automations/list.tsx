@@ -601,10 +601,7 @@ export default function AutomationListV8() {
 
   const pager = ready && paged.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(current - 1) * pageSize + 1}〜{(current - 1) * pageSize + paged.length} / {formatNumber(visible.length)} 件
-      </span>
-      <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="ルール一覧のページ送り" />
+      <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="ルール一覧のページ送り" range={{ total: visible.length, first: (current - 1) * pageSize + 1, last: (current - 1) * pageSize + paged.length }} />
     </ListPagePagination>
   ) : null
 

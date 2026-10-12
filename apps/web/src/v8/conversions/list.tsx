@@ -43,7 +43,6 @@ import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
-import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -1154,8 +1153,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
 
   const pager = !loading && !loadFailed && shown.length > 0 ? (
     <ListPager>
-      <ListRange total={shown.length} first={(currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + current.length} />
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="成果地点の一覧のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="成果地点の一覧のページ送り" range={{ total: shown.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + current.length }} />
     </ListPager>
   ) : null
 

@@ -796,12 +796,9 @@ export default function InflowListV8({
     )
   }
 
-  const pager = !loading && !loadFailed && pageCount > 1 ? (
+  const pager = !loading && !loadFailed && currentRows.length > 0 ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + currentRows.length} / {formatNumber(sortedRows.length)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="流入経路のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="流入経路のページ送り" range={{ total: sortedRows.length, first: (currentPage - 1) * pageSize + 1, last: (currentPage - 1) * pageSize + currentRows.length }} />
     </ListPagePagination>
   ) : null
 

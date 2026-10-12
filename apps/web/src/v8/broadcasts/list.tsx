@@ -42,7 +42,7 @@ import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
@@ -1123,7 +1123,7 @@ export default function BroadcastListV8() {
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
       <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り"
-        summary={paginationSummary(resultTotal ?? visibleBroadcasts.length, rangeFirst, rangeLast)} />
+        range={{ total: resultTotal ?? visibleBroadcasts.length, first: rangeFirst, last: rangeLast }} />
     </ListPagePagination>
   ) : null
 
