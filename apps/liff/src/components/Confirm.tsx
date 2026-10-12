@@ -74,6 +74,10 @@ export default function Confirm({
         idemKey,
       );
       if (!request.isCurrent(generation)) return;
+      if (created.payment_required && !created.payment?.id) {
+        setError('予約できませんでした。もう一度お試しください');
+        return;
+      }
       onSubmitted({
         bookingId: created.booking_id,
         status: created.status,
@@ -87,7 +91,7 @@ export default function Confirm({
       if (err.status === 409 && err.body?.error === 'slot_conflict') {
         setError('この時間枠は他の方の予約と重なりました。日時を選び直してください。');
       } else {
-        setError('予約リクエストの送信に失敗しました。時間をおいて再度お試しください。');
+        setError('予約できませんでした。もう一度お試しください');
       }
     } finally {
       if (request.isCurrent(generation)) setSubmitting(false);

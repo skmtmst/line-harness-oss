@@ -87,6 +87,17 @@ beforeEach(() => {
 afterEach(() => { sqlite.close(); vi.unstubAllGlobals(); });
 
 describe('予約の支払いの共通口', () => {
+  it.each(['webhook', 'cron'])('REV-H1: %sで支払い確定した予約に確定リマインダと同期記録を作る', async (entry) => {
+    seedBooking();
+    sqlite.exec(`INSERT INTO booking_payments
+      (id,line_account_id,booking_id,amount,provider,provider_payment_id,idempotency_key,status,created_at,updated_at)
+      VALUES ('pay-a','account-a','booking-a',8000,'fake','fake-a','booking:booking-a','paid','2026-10-01','2026-10-01');`);
+    if (entry === 'webhook') await applyPaidBookingPayment(db, 'fake-a');
+    else await runExpirer(db, { now: new Date('2026-10-12T00:00:00Z'), sender: vi.fn() });
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM booking_reminders WHERE booking_id='booking-a'").get()).toEqual({ n: 2 });
+    expect(sqlite.prepare("SELECT COUNT(*) n FROM booking_operation_runs WHERE booking_id='booking-a' AND kind='google_calendar'").get()).toEqual({ n: 1 });
+  });
+
   it('BK-P02: 支払い反映の途中失敗を次の読込で回復し、監査は一度だけ', async () => {
     seedBooking();
     sqlite.exec(`INSERT INTO booking_payments
