@@ -51,5 +51,16 @@ export default function scanFormRules() {
       if (Math.abs(delta) > 1 / 64) add('form-row-end', control, '並んだ最後の欄を行の右端へそろえる', { delta: Math.abs(delta) })
     }
   }
+  for (const frame of root.querySelectorAll('[data-page-template="create"]')) {
+    if (!visible(frame) || frame.getBoundingClientRect().width >= 1100) continue
+    for (const preview of frame.querySelectorAll('[data-template-region="preview"]')) {
+      if (visible(preview)) add('form-shrink', preview, '狭い白い板では右欄を畳む', { width: preview.getBoundingClientRect().width })
+    }
+    for (const row of frame.querySelectorAll('[data-form-row="name-folder"]')) {
+      if (!visible(row)) continue
+      const children = [...row.children].filter(visible)
+      if (children.length > 1 && children[1].getBoundingClientRect().top < children[0].getBoundingClientRect().bottom) add('form-shrink', row, '狭い白い板では名前とフォルダを1列へ', { columns: children.length })
+    }
+  }
   return findings
 }

@@ -394,6 +394,17 @@ describe('V8 クーポン・リサーチを作る', () => {
   })
 })
 
+it('畳んだ右欄は共通の窓で見え方を読め、保存せずに閉じられる', async () => {
+  await mount()
+  expect(host.querySelector('[data-template-region="preview"]')?.getAttribute('data-preview-narrow')).toBe('hidden')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'LINEの見え方を確認' })) })
+  expect(screen.getByRole('dialog', { name: 'LINEの見え方' })).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '閉じる' })) })
+  expect(screen.queryByRole('dialog', { name: 'LINEの見え方' })).toBeNull()
+  expect(templatesApi.create).not.toHaveBeenCalled()
+  expect(templatesApi.update).not.toHaveBeenCalled()
+})
+
 it('リサーチの回答後の処理は未動作と知らせ、設定は保存する', async () => {
   assetsCreate.mockResolvedValue({success:true,data:{id:'research'}})
   await mount('kind=research&visual=1')

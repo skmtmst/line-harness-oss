@@ -301,3 +301,24 @@ test('F組の色・左操作・任意・欄の右端を、正しい形と故障�
     }
   } finally { await browser.close() }
 })
+test('作る型の実CSS：1152は右欄を畳み名前とフォルダを1列、1440は2列', async () => {
+  const { default: scanFormRules } = await import('./form-rules-browser.mjs')
+  const rowCss = readFileSync(new URL('../../src/components/shared/settings-form-card.module.css', import.meta.url), 'utf8')
+  const tplCss = readFileSync(new URL('../../src/components/templates/page-templates.module.css', import.meta.url), 'utf8').replaceAll(':global(:root)', ':root')
+  const html = (row, template) => `<style>*{box-sizing:border-box}body{margin:0}.frame{container:v8-page/inline-size;width:calc(100vw - 248px)}.nameFolderRow>div{height:80px}input{width:100%;height:32px}${row}${template}</style><main><div class="frame" data-page-template="create"><div class="nameFolderRow" data-form-row="name-folder"><div><input aria-label="名前"></div><div><input aria-label="フォルダ"></div></div><aside style="width:280px;height:100px" data-template-region="preview" data-preview-narrow="hidden">見え方</aside></div></main>`
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    for (const width of [1440, 1152]) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.setContent(html(rowCss, tplCss))
+      assert.deepEqual(await page.evaluate(scanFormRules), [])
+      if (width === 1152) {
+        await page.setContent(html(rowCss.replace('@container v8-page (width < 1100px)', '@container v8-page (width < 1px)'), ''))
+        const faults = await page.evaluate(scanFormRules)
+        assert.ok(faults.some(f => f.text === '狭い白い板では右欄を畳む'))
+        assert.ok(faults.some(f => f.text === '狭い白い板では名前とフォルダを1列へ'))
+      }
+    }
+  } finally { await browser.close() }
+})

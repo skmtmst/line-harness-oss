@@ -13,6 +13,7 @@ it('名前とフォルダは共通の2列。通常の横並びと郵便番号の
   expect(css).toMatch(/\.nameFolderRow\s*\{[^}]*grid-template-columns:\s*minmax\(0, 2fr\) minmax\(0, 1fr\)/)
   expect(css).toMatch(/\.nameFolderRow\s*\{[^}]*gap:\s*var\(--polish-space-field\)/)
   expect(css).toMatch(/@media \(max-width: 640px\).*\.nameFolderRow.*grid-template-columns:\s*minmax\(0, 1fr\)/)
+  expect(css).toMatch(/@container v8-page \(width < 1100px\).*\.nameFolderRow.*grid-template-columns:\s*minmax\(0, 1fr\)/)
   expect(css).toContain('.postalRow > :first-child')
 })
 it('同じ並びの3つの画面は共通の行へ、フォルダは行の全幅へ渡す', () => {
