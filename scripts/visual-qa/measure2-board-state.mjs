@@ -9,6 +9,7 @@ const createTemplate = (kind) => ({
 
 export const BOARD_STATE_PROFILES = {
   K7HWG: { url: '/auto-replies/edit?id=ar-new', click: ['fill:ルール名='] },
+  d4adD4: { url: '/events/new', click: ['fill:イベント名=秋のしつけ教室（第1回）', '1人あたりの予約回数', '1 回まで', '申し込みの上限', '開始の 1 日前まで', '承認', '承認してから確定（期限 24 時間）', '満席になったとき', 'キャンセル待ちを受ける（空いたら順番に案内）', '＋ 質問を足す', 'fill:聞くこと=ペットの名前と年齢', '足す'] },
   Qat9s: { url: '/tags/edit?id=tag-ec-customer', api: { match: 'GET /api/tag-groups$', body: { success: true, data: TAG_EDIT_GROUPS } } },
   iN6np: { url: '/broadcasts/new?step=message&draft=visual-compose' },
   pIHp3: { url: '/hq/broadcasts/new?step=message&id=hq-visual-compose' },
