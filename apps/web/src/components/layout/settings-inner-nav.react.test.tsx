@@ -109,13 +109,22 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByText('会社とロゴ')).toBeNull()
   })
 
-  it('飲食のテスト機能を有効にした時だけ予約サイト・グルメ媒体へ進める', async () => {
+  // 2026-10-12：デリバリー連携（承認案 DL-1 `dF4Ov`）を予約サイト・グルメ媒体の下に足した
+  it('飲食のテスト機能を有効にした時だけ予約サイト・グルメ媒体とデリバリー連携へ進める', async () => {
     vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    const link = view.getByRole('link', { name: '予約サイト・グルメ媒体' })
-    expect(link.getAttribute('href')).toBe('/settings/booking-media')
-    expect(view.getAllByRole('link').at(-1)).toBe(link)
+    const booking = view.getByRole('link', { name: '予約サイト・グルメ媒体' })
+    const delivery = view.getByRole('link', { name: 'デリバリー連携' })
+    expect(booking.getAttribute('href')).toBe('/settings/booking-media')
+    expect(delivery.getAttribute('href')).toBe('/settings/delivery')
+    expect(view.getAllByRole('link').slice(-2)).toEqual([booking, delivery])
+  })
+
+  it('飲食のテスト機能が無い環境ではデリバリー連携を出さない', async () => {
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
   })
 
   it('SNS 連携の画面では SNS 連携が今の画面になり、機能設定の下の2つは出さない', async () => {
