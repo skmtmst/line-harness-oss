@@ -37,6 +37,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    fetchApi: vi.fn(async () => ({ data: { identityRetentionDays: 90 } })),
     api: {
       ...actual.api,
       staff: {
@@ -102,6 +103,75 @@ beforeEach(() => {
 })
 
 describe('ファイルの検査の設定画面', () => {
+  const externalConfig = {
+    externalProvider: 'scanner', externalEndpointUrl: 'https://scan.example.com/check',
+    externalSecretRef: 'FILE_SCAN_SECRET_PRIMARY', externalEnabled: true,
+    externalTimeoutMs: 10000, maxBytesOverride: null, maxPixelsOverride: null, updatedAt: '2026-10-12T00:00:00Z',
+  }
+  async function openConfig(config = externalConfig) {
+    ready()
+    mocks.getConfig.mockResolvedValue({ success: true, data: { config } })
+    mocks.list.mockResolvedValue({ success: true, data: { items: [], total: 0 } })
+    render(<FileScanSettingsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '設定を編集' }))
+  }
+  test.each(['externalProvider', 'externalEndpointUrl', 'externalSecretRef'])('400の%sの理由を該当欄へ出し、入力と編集を保つ', async key => {
+    await openConfig()
+    const labels: Record<string, string> = { externalProvider: '提供元', externalEndpointUrl: '送り先（https）', externalSecretRef: '鍵の名前' }
+    const message = `${labels[key]}を確認してください（サーバーの理由）`
+    mocks.saveConfig.mockRejectedValueOnce(new ApiError(400, message, undefined, undefined, undefined, undefined, { [key]: message }))
+    fireEvent.click(screen.getByRole('button', { name: '外の検査の設定を保存する' }))
+    const input = screen.getByLabelText(labels[key]) as HTMLInputElement
+    await waitFor(() => { expect(input.getAttribute('aria-invalid')).toBe('true') })
+    const described = input.getAttribute('aria-describedby')!.split(' ').map(id => document.getElementById(id)?.textContent).join(' ')
+    expect(described).toContain(message)
+    await waitFor(() => { expect(document.activeElement).toBe(input) })
+    expect(screen.getByLabelText('鍵の名前').getAttribute('value')).toBe(externalConfig.externalSecretRef)
+    fireEvent.change(input, { target: { value: input.value + 'A' } })
+    await waitFor(() => { expect(screen.queryByText(message)).toBeNull() })
+    expect(screen.getByRole('button', { name: '外の検査の設定を保存する' })).toBeTruthy()
+  })
+  test('古い鍵の名前では送信停止の案内を出し、保存せず欄へ誘導する', async () => {
+    await openConfig({ ...externalConfig, externalSecretRef: 'FILE_SCAN_API_KEY', externalEnabled: false })
+    expect(screen.getByText(/古い鍵の名前は使えません/)).toBeTruthy()
+    expect(screen.getByText(/外の検査への送信は停止中です/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '外の検査の設定を保存する' }))
+    await waitFor(() => { expect(screen.getByLabelText('鍵の名前').getAttribute('aria-invalid')).toBe('true') })
+    expect(mocks.saveConfig).not.toHaveBeenCalled()
+  })
+  test('保存済みの宛先があっても、Workerが無効と返したら送信中と表示しない', async () => {
+    await openConfig({ ...externalConfig, externalEnabled: false })
+    expect(screen.getByText(/外の検査への送信は停止中です/)).toBeTruthy()
+    expect(screen.queryByText(/使っています/)).toBeNull()
+    expect(screen.queryByText(/外の検査への送信は有効です/)).toBeNull()
+  })
+  test('送信が有効でも、疎通を確認済みとは表示しない', async () => {
+    await openConfig()
+    expect(screen.getByText(/外の検査への送信は有効です/)).toBeTruthy()
+    expect(screen.getByText(/接続先の稼働状況を確認した表示ではありません/)).toBeTruthy()
+  })
+  test('設定保存が通信で失敗しても編集と入力を残す', async () => {
+    await openConfig()
+    mocks.saveConfig.mockRejectedValueOnce(new Error('offline'))
+    fireEvent.click(screen.getByRole('button', { name: '外の検査の設定を保存する' }))
+    expect(await screen.findByText('設定を保存できませんでした。通信状態を確認して、もう一度お試しください。')).toBeTruthy()
+    expect((screen.getByLabelText('鍵の名前') as HTMLInputElement).value).toBe(externalConfig.externalSecretRef)
+    expect(screen.getByRole('button', { name: '外の検査の設定を保存する' })).toBeTruthy()
+  })
+  test('保存に成功したら閉じて読み直し、現在の送信状態を反映する', async () => {
+    await openConfig()
+    fireEvent.change(screen.getByLabelText('提供元'), { target: { value: 'updated-scanner' } })
+    mocks.saveConfig.mockResolvedValueOnce({ success: true, data: { lineAccountId: 'acc-1' } })
+    mocks.getConfig.mockResolvedValueOnce({ success: true, data: { config: { ...externalConfig, externalProvider: 'updated-scanner', externalEnabled: false } } })
+    fireEvent.click(screen.getByRole('button', { name: '外の検査の設定を保存する' }))
+    await waitFor(() => { expect(screen.getByText(/外の検査への送信は停止中です/)).toBeTruthy() })
+    expect(mocks.saveConfig).toHaveBeenCalledWith('acc-1', {
+      externalProvider: 'updated-scanner', externalEndpointUrl: externalConfig.externalEndpointUrl,
+      externalSecretRef: externalConfig.externalSecretRef,
+    })
+    expect(screen.queryByLabelText('鍵の名前')).toBeNull()
+    expect(screen.getByRole('button', { name: '設定を編集' })).toBeTruthy()
+  })
   test('正常時は表の行と件数と操作が出る', async () => {
     ready()
     mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
@@ -185,7 +255,7 @@ describe('ファイルの検査の設定画面', () => {
     })
   })
 
-  test('外の検査の有効表示は保存済み設定に従い、止めると設定を消す (監査R133)', async () => {
+  test('送信状態が未取得でも保存済みの古い設定を確認して消せる (監査R133)', async () => {
     ready()
     mocks.getConfig.mockResolvedValue({
       success: true,
@@ -204,9 +274,9 @@ describe('ファイルの検査の設定画面', () => {
     mocks.saveConfig.mockResolvedValue({ success: true, data: { lineAccountId: 'acc-1' } })
     mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
     render(<FileScanSettingsPage />)
-    // 設定済みなら「使っています」と出る。畳んでいても実行状態の表示は変わらない。
+    // 古い名前の設定は送信停止。畳んでいても古い設定は削除できる。
     await waitFor(() => {
-      expect(screen.getByText(/使っています。送り先：/)).toBeTruthy()
+      expect(screen.getByText(/外の検査への送信状態を確認できません/)).toBeTruthy()
     })
     expect(screen.getByRole('button', { name: '設定を編集' })).toBeTruthy()
     // 止める操作は確認を経て、実際に設定を消す。
