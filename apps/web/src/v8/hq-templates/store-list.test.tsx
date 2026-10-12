@@ -83,7 +83,8 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
       row('legacy', '古い応答', 0),
     ] })
     const cells = [...host.querySelectorAll('tbody tr')].map((tr) => tr.querySelectorAll('td')[1].textContent)
-    expect(cells).toEqual(['テキスト', 'カード型', '画像', '種類を確認できません'])
+    expect(cells).toEqual(['テキスト', 'カード型', '画像', '—'])
+    expect(host.querySelectorAll('tbody tr')[3].querySelectorAll('td')[1].querySelector('span')).toBeNull()
   })
 
   it.each([true, false])('フォルダの取得失敗でも作る操作と閲覧時の場所を保つ（編集=%s）', async canEdit => {

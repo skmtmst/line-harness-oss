@@ -1,4 +1,5 @@
 import { messageTypeText } from '../templates/words'
+import { emptyValue } from '@/components/shared/empty-value'
 import type { HqTemplate } from '@/lib/hq-templates-api'
 
 /**
@@ -22,5 +23,5 @@ export function distributedAccountsLine(row: Pick<HqTemplate, 'distributed_accou
 
 /** メッセージのタブでも、保存された形はテキスト・画像・カード型と異なる。 */
 export function hqMessageTypeLabel(row: Pick<HqTemplate, 'message_type'>): string {
-  return row.message_type ? messageTypeText(row.message_type) : '種類を確認できません'
+  return row.message_type ? messageTypeText(row.message_type) : emptyValue('unknown')
 }

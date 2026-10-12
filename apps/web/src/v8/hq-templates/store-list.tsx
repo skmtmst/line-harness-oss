@@ -414,7 +414,10 @@ export default function HqStoreList(props: HqStoreListProps) {
   const plainTd = (key: string, text: ReactNode, title?: string) => <Td key={key} className={storeStyles.cellPlain} title={title}>{text}</Td>
   const boxedTd = (key: string, inner: ReactNode) => <Td key={key}>{inner}</Td>
   const columns: Column[] = type === 'template' ? [
-    { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => boxedTd('kind', <TagPill name={!row.kind || row.kind === 'message' ? hqMessageTypeLabel(row) : KIND_LABEL[row.kind]} />) },
+    { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => {
+      const label = !row.kind || row.kind === 'message' ? hqMessageTypeLabel(row) : KIND_LABEL[row.kind] ?? emptyValue('unknown')
+      return boxedTd('kind', label === emptyValue('unknown') ? label : <TagPill name={label} />)
+    } },
     { key: 'state', head: '公開', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'sent', head: '今月送った数', col: <col key="sent" className={storeStyles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
