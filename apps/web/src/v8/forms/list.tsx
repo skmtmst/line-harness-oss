@@ -1211,10 +1211,9 @@ export default function FormsListV8() {
                     <Td className={styles.destCell} title={destination}>{destination}</Td>
                   )}
                   <Td>
-                    <span className={styles.statusPill} data-tone={form.isActive ? 'live' : 'draft'}>
-                      <span className={styles.dot} aria-hidden="true" />
+                    <StatusBadge tone={form.isActive ? 'success' : 'neutral'}>
                       {form.isActive ? '公開中' : '下書き'}
-                    </span>
+                    </StatusBadge>
                     {reviewMode && form.accountScopeReviewRequired ? <span className={styles.reviewBadge}>管理者確認</span> : null}
                   </Td>
                   <Td className={styles.answerCell}>
