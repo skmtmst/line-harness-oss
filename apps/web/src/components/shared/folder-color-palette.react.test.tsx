@@ -41,7 +41,7 @@ it('保存色が候補外でも選択を1つ表示し、候補色を選んだら
   expect(screen.getByRole('radio', { name: '青' }).getAttribute('data-selected')).toBe('true')
 })
 it('その場の丸は24pxと選択の輪。開くメニューの見本点は既存の寸法を保つ', () => {
-  const css = readFileSync(new URL('./folder-color-button.module.css', import.meta.url), 'utf8')
+  const css = readFileSync(`${__dirname}/folder-color-button.module.css`, 'utf8')
   expect(css).toMatch(/\.paletteFlat \.swatch\s*\{[^}]*width:\s*24px;[^}]*height:\s*24px;/)
   expect(css).toMatch(/\.paletteFlat \.swatch\[data-selected\]\s*\{[^}]*outline-color:\s*var\(--color-ink\);[^}]*outline-offset:\s*2px;/)
   expect(css).toMatch(/\.swatch\s*\{[^}]*width:\s*var\(--select-menu-swatch\);/)
