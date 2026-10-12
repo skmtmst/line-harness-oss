@@ -240,3 +240,14 @@ it('B-241：見本の取得失敗を見本なしとして消さず、同じ窓�
  expect(fetchApi).toHaveBeenCalledTimes(2)
  expect(screen.queryByText('見本を読み込めませんでした')).toBeNull()
 })
+
+it('U2：題の共通説明を開いて閉じ、一覧の操作を保つ', async () => {
+  await renderList()
+  const help = screen.getByRole('button', { name: 'テンプレートの説明' })
+  fireEvent.click(help)
+  const descriptionId = help.getAttribute('aria-describedby')!
+  expect(document.getElementById(descriptionId)?.textContent).toContain('直して公開すると、使っている所に反映されます。')
+  fireEvent.keyDown(help, { key: 'Escape' })
+  expect(document.getElementById(descriptionId)).toBeNull()
+  expect(screen.getByText('予約前日のご案内')).toBeTruthy()
+})
