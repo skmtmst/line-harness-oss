@@ -2,7 +2,7 @@
 import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -1516,12 +1516,10 @@ export default function AutoRepliesListV8() {
           />
         </ListToolbarSearchSlot>
         <span className={styles.narrowSpacer} aria-hidden="true" />
-        {perPageBox}
       </ListToolbarRow>
       <ListToolbarRow>
         {filterChips}
-        {sortBox}
-        <ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
+        <ListToolbarEnd>{sortBox}<ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>{perPageBox}</ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )

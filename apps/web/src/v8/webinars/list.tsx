@@ -1,7 +1,7 @@
 'use client'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { RowNameLink } from '@/components/shared/table';
 
 
@@ -812,7 +812,7 @@ function WebinarList() {
   )
   /* 1152 の板（uBMuB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … 並び・よく使う絞り込み・件数」。 */
   const narrowToolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       {notice}
       <ListToolbarRow>
         {createButton}
@@ -821,10 +821,7 @@ function WebinarList() {
       </ListToolbarRow>
       <ListToolbarRow>
         {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {sortBox}
-        {savedBox}
-        {perPageBox}
+        <ListToolbarEnd>{sortBox}{savedBox}{perPageBox}</ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )

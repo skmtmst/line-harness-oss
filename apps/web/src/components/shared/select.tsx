@@ -52,6 +52,8 @@ export interface SelectProps {
   onChange: (value: string) => void
   options: SelectOption[]
   size?: 'standard' | 'page-size' | 'full' | 'content'
+  /** 表示の幅をcontentへ変えても、一覧の表示件数の役目は保つ。 */
+  pageSizeControl?: boolean
   value: string
   /**
    * 箱の幅（px）。渡すと size の幅を上書きする
@@ -116,6 +118,7 @@ export default function Select({
   iconOnly = false,
   options,
   size = 'standard',
+  pageSizeControl = false,
   value,
   width,
   treatment = 'box',
@@ -318,6 +321,7 @@ export default function Select({
         setOpen(false)
       }}
       data-design-node={open ? 'Gfsb4' : size === 'page-size' ? 'niGPF' : 'rpot9'}
+      data-list-page-size={pageSizeControl || size === 'page-size' || undefined}
     >
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
       <button

@@ -1,7 +1,7 @@
 'use client'
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import ListToolbar, { ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useFeatureAccess } from '@/lib/use-feature-access';
@@ -1026,7 +1026,7 @@ export default function FormsListV8() {
 
   /* 1152 の板（GrnO4）：1段目「作る・フォルダ・探す … 件数」、2段目「札・並び」。 */
   const narrowToolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         {reviewMode ? null : createButton(false)}
         {reviewMode ? null : (
@@ -1044,11 +1044,10 @@ export default function FormsListV8() {
           />
         </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
-        {perPageBox}
       </ListToolbarRow>
       <ListToolbarRow>
         {filterChips}
-        {sortBox}
+        <ListToolbarEnd>{sortBox}{perPageBox}</ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )

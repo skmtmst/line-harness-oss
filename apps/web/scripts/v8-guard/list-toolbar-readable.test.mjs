@@ -242,3 +242,18 @@ test('U6/V3: full KPI notes wrap, actions get their next line and the strip keep
     }
   } finally { await browser.close() }
 })
+
+test('V1: readable stacked rows keep the count in the last row on the right; upper and left counts fail', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{height:36px;width:100px;flex:none}</style><section data-list-skeleton style="width:852px"><div class="slots" data-list-toolbar data-toolbar-layout="slots-stacked"><div class="slotsRow" data-toolbar-row data-toolbar-fit="single"><button>作る</button><button>探す</button></div><div class="slotsRow" data-toolbar-row data-toolbar-fit="single"><button>絞り込む</button><span class="slotsEnd" data-toolbar-end><span data-list-page-size><button>20件表示</button></span></span></div></div></section></html>`)
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('V1 件数は最後の道具行の右'))
+    assert.equal(await page.locator('[data-toolbar-row]').first().evaluate(el => getComputedStyle(el).flexWrap), 'nowrap')
+    assert.equal(await page.locator('[data-toolbar-row]').first().evaluate(el => el.getBoundingClientRect().height), 36)
+    await page.locator('[data-toolbar-end]').evaluate(el => { el.style.marginLeft='0' })
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('V1 件数は最後の道具行の右'))
+    await page.locator('[data-toolbar-end]').evaluate(el => { el.style.marginLeft='';el.closest('.slots').firstElementChild.append(el) })
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('V1 件数は最後の道具行の右'))
+  } finally { await browser.close() }
+})

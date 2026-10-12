@@ -4,7 +4,7 @@ import ListDateTime from '@/components/shared/list-date-time'
 import { useDeferredDelete } from '@/lib/use-deferred-delete';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { RowMenu } from '@/components/shared/row-actions';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -1312,8 +1312,8 @@ export default function RemindersListV8() {
           />
         </> : (
           /* 1152 の板（Iffil）：1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び」。部品と動きは広い板と同じ。 */
-          <div className={styles.narrowTools}>
-            <div className={styles.narrowRow}>
+          <ListToolbarFrame layout="stacked">
+            <ListToolbarRow>
               {canEdit ? (
                 <Button href="/reminders/new" variant="primary"><Plus size={15} aria-hidden="true" />リマインダを作る</Button>
               ) : null}
@@ -1328,13 +1328,12 @@ export default function RemindersListV8() {
                 />
               </ListToolbarSearchSlot>
               <span className={styles.narrowSpacer} aria-hidden="true" />
-              {perPageSelect}
-            </div>
-            <div className={styles.narrowRow}>
+            </ListToolbarRow>
+            <ListToolbarRow>
               {statusChips}
-              {sortSelect}
-            </div>
-          </div>
+              <ListToolbarEnd>{sortSelect}{perPageSelect}</ListToolbarEnd>
+            </ListToolbarRow>
+          </ListToolbarFrame>
         )}>
 
           {filterActive && reminderList.loaded && (

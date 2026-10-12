@@ -1114,11 +1114,10 @@ export default function ScenariosListV8() {
               onClear={() => setNameQuery('')}
             />
           </ListToolbarSearchSlot>
-          <ListToolbarEnd>{perPageBox}</ListToolbarEnd>
         </ListToolbarRow>
         <ListToolbarRow>
           {filterChips}
-          {savedBox}
+          <ListToolbarEnd>{savedBox}{perPageBox}</ListToolbarEnd>
         </ListToolbarRow>
         {filteredCount}
       </ListToolbarFrame>

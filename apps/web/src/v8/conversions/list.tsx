@@ -889,7 +889,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   )
   /* 1152 の板（BygrU）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
   const narrowToolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       {notice}
       <ListToolbarRow>
         {createInRow}
@@ -898,9 +898,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       </ListToolbarRow>
       <ListToolbarRow>
         <div className={styles.narrowChips}>{filterChips}</div>
-        <span className={styles.spacer} aria-hidden="true" />
-        <ListToolbarOptional compact label="保存した絞り込み">{savedBox}</ListToolbarOptional>
-        {perPageBox}
+        <ListToolbarEnd><ListToolbarOptional compact label="保存した絞り込み">{savedBox}</ListToolbarOptional>{perPageBox}</ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )

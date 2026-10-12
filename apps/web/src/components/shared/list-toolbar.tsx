@@ -115,7 +115,7 @@ export default function ListToolbar({
       {filters || trailing || sort ? (
         <div className={styles.row2} data-toolbar-row>
           {filters ? <div className={styles.filters} data-toolbar-tools>{compactFilterGroups(filters)}</div> : null}
-          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</div> : null}
+          {trailing || sort ? <div className={styles.trailing} data-toolbar-tools data-toolbar-end>{sort ? <ListToolbarSort {...sort} /> : null}{compactFilterGroups(trailing)}</div> : null}
         </div>
       ) : null}
       {secondary ? <div className={styles.secondary} data-toolbar-secondary>{secondary}</div> : null}
@@ -138,7 +138,7 @@ export function ListToolbarSearchSlot({ children, width }: { children: ReactNode
 }
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {
-  return <span {...props} className={styles.slotsEnd}>{children}</span>
+  return <span {...props} className={styles.slotsEnd} data-toolbar-end>{children}</span>
 }
 
 /** 優先度の低い道具。帯に入らないときだけ「…」から同じ操作へ到達する。 */
@@ -187,7 +187,7 @@ function compactFilterGroups(node: ReactNode): ReactNode {
     return <ResponsiveFilterChips>{children}</ResponsiveFilterChips>
   return children.map(child => {
     if (isValidElement<SelectProps>(child) && child.type === Select && !child.props.iconOnly)
-      return cloneElement(child, { size: 'content', width: undefined })
+      return cloneElement(child, { size: 'content', width: undefined, pageSizeControl: child.props.pageSizeControl || child.props.size === 'page-size' })
     if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
       const nested = compactFilterGroups(child.props.children)
       // Field wrappers receive one control, not a one-element children array.
@@ -202,8 +202,9 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
   const [collapsed, setCollapsed] = useState(false)
   useLayoutEffect(() => {
     const choices = ref.current
-    const toolbar = choices?.closest<HTMLElement>('[data-toolbar-layout="band"], [data-toolbar-layout="slots"], [data-toolbar-layout="stacked"], [data-toolbar-layout="slots-stacked"]')
-    if (!choices || !toolbar || !window.ResizeObserver || toolbar.dataset.toolbarLayout?.includes('stacked')) return
+    const owner = choices?.closest<HTMLElement>('[data-toolbar-layout="band"], [data-toolbar-layout="slots"], [data-toolbar-layout="stacked"], [data-toolbar-layout="slots-stacked"]')
+    const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') ? choices?.closest<HTMLElement>('[data-toolbar-row]') ?? owner : owner
+    if (!choices || !toolbar || !window.ResizeObserver) return
     const measure = () => {
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)

@@ -230,6 +230,7 @@ html:root :is(.toolbar, .slots) [data-toolbar-tools] :is(.search, .searchSlot)[d
 html:root :is(.slots, .toolbar)[data-toolbar-fit='single']:is([data-toolbar-layout='slots'], [data-toolbar-layout='band']):not(:has([data-design-part='notice'], [data-toolbar-secondary])) { flex-wrap: nowrap; }
 html:root :is(.slots, .toolbar)[data-toolbar-fit='wrap']:is([data-toolbar-layout='slots'], [data-toolbar-layout='band']) { flex-wrap: wrap; }
 html:root :is(.slots, .toolbar) [data-toolbar-row][data-toolbar-fit='wrap'] { flex-wrap: wrap; }
+html:root :is(.slots, .toolbar) [data-toolbar-row][data-toolbar-fit='single'] { flex-wrap: nowrap; }
 :root .slots > :is([data-design-part='notice'], div:has(> [data-design-part='notice'])) { flex: 1 0 100%; }
 
 /* A readable Select also owns its old sort/page-size wrapper's width. */

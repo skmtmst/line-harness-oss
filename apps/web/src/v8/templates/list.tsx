@@ -4,7 +4,7 @@ import ListDateTime from '@/components/shared/list-date-time'
 
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional } from '@/components/shared/list-toolbar';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -1000,7 +1000,7 @@ export default function TemplatesListV8() {
 
   /* 1152 の板（L7zA7C）：1段目「作る・フォルダ・探す … 件数」、2段目「札・よく使う絞り込み（印だけ）」。 */
   const narrowToolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>
@@ -1024,11 +1024,10 @@ export default function TemplatesListV8() {
           />
         </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
-        {perPageBox}
       </ListToolbarRow>
       <ListToolbarRow>
         {filterChips}
-        {savedBox(true)}
+        <ListToolbarEnd>{savedBox(true)}{perPageBox}</ListToolbarEnd>
       </ListToolbarRow>
     </ListToolbarFrame>
   )

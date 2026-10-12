@@ -2,7 +2,7 @@
 
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -1010,7 +1010,7 @@ function CommonVarsListInner() {
    * フォルダの追加・名前変更・削除は、縦の列が無いぶん、フォルダの印のメニューから。
    */
   const narrowToolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         {createButton(false)}
         <div className={styles.narrowFolder}>
@@ -1066,10 +1066,8 @@ function CommonVarsListInner() {
           </>
         ) : null}
         <span className={styles.spacer} aria-hidden="true" />
-        {orderBox}
-        {perPageBox}
       </ListToolbarRow>
-      <ListToolbarRow>{filterChips}</ListToolbarRow>
+      <ListToolbarRow>{filterChips}<ListToolbarEnd>{orderBox}{perPageBox}</ListToolbarEnd></ListToolbarRow>
     </ListToolbarFrame>
   )
 

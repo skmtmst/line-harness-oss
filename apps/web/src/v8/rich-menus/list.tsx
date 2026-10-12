@@ -1,7 +1,7 @@
 'use client'
 
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort } from '@/components/shared/list-toolbar';
 import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
@@ -913,7 +913,7 @@ export default function RichMenusListV8() {
 
   /* 1152 の板（Y9ASp）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札」。 */
   const narrowToolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       {priorityNotice}
       <ListToolbarRow>
         {createButton}
@@ -931,10 +931,8 @@ export default function RichMenusListV8() {
           />
         </ListToolbarSearchSlot>
         <span className={styles.spacer} aria-hidden="true" />
-        {sortBox}
-        {perPageBox}
       </ListToolbarRow>
-      <ListToolbarRow>{filterChips}</ListToolbarRow>
+      <ListToolbarRow>{filterChips}<ListToolbarEnd>{sortBox}{perPageBox}</ListToolbarEnd></ListToolbarRow>
     </ListToolbarFrame>
   )
 

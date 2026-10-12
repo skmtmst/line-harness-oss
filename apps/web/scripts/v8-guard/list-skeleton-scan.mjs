@@ -90,6 +90,18 @@ export function scanListSkeleton() {
     for (const folder of root.querySelectorAll('[data-template-region="folders"]')) {
       if (visible(folder) && width < 1100) fail('B-178 フォルダの畳み忘れ', folder)
     }
+    if (width < 1100) for (const size of root.querySelectorAll('[data-list-page-size]')) {
+      if (!visible(size)) continue
+      const toolbar = size.closest('[data-toolbar-layout="slots-stacked"],[data-toolbar-layout="stacked"],[data-toolbar-layout="slots"],[data-toolbar-layout="band"]')
+      if (!toolbar) continue
+      const controls = [...toolbar.querySelectorAll('[data-toolbar-row] input,[data-toolbar-row] button')].filter(el => visible(el)
+        && !el.closest('[role="menu"],[role="listbox"],[role="dialog"]')
+        && !el.closest('[data-toolbar-optional][data-collapsed] [data-toolbar-optional-content]'))
+      const lastY = Math.max(...controls.map(el => el.getBoundingClientRect().top))
+      const end = size.closest('[data-toolbar-end]') ?? size
+      const right = toolbar.getBoundingClientRect().right - parseFloat(getComputedStyle(toolbar).paddingRight)
+      if (size.getBoundingClientRect().top < lastY - 1 || Math.abs(end.getBoundingClientRect().right - right) > 1) fail('V1 件数は最後の道具行の右', size)
+    }
     for (const pager of root.querySelectorAll('[data-list-pager], [data-template-region="pagination"]')) {
       const nav = pager.querySelector('nav')
       if (visible(pager) && nav && visible(nav) && Math.abs(nav.getBoundingClientRect().right - pager.getBoundingClientRect().right + parseFloat(getComputedStyle(pager).paddingRight)) > 2) fail('B-178 ページ送りの右寄せ', pager)
