@@ -20,3 +20,13 @@ it('本文の中で文字数を1つだけ表示し、狭い幅でもその他の
   expect(screen.queryByRole('button', { name: 'その他' })).toBeNull()
   expect(screen.getByRole('button', { name: '配信日' })).toBeTruthy()
 })
+
+it('閲覧のみでは差し込む操作を置かず文字数だけを表示する', () => {
+  const insert = vi.fn()
+  render(<MessageInsertRow readOnly count="5 / 5,000" more={<MessageInsertButton kind="date" label="配信日" onClick={insert} />}><MessageInsertButton kind="name" label="名前" onClick={insert} /></MessageInsertRow>)
+  expect(screen.getByRole('group', { name: '文字数' })).toBeTruthy()
+  expect(screen.getAllByText('5 / 5,000')).toHaveLength(1)
+  expect(screen.queryAllByRole('button')).toHaveLength(0)
+  expect(screen.queryByText('差し込む')).toBeNull()
+  expect(insert).not.toHaveBeenCalled()
+})
