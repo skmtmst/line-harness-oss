@@ -50,10 +50,12 @@ export default function WaitlistSheet({
   const [failed, setFailed] = useState(false);
   const [errorMessage,setErrorMessage]=useState<string|null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
+  const [readAttempt, setReadAttempt] = useState(0);
   const startsAt = waitlistStartsAt(date, start, startUtc);
 
   useEffect(() => {
     let alive = true;
+    setFailed(false); setErrorMessage(null); setEntryId(undefined);
     api
       .waitlistMine(staff.id, menu.id, startsAt)
       .then((res) => {
@@ -68,7 +70,7 @@ export default function WaitlistSheet({
     return () => {
       alive = false;
     };
-  }, [staff.id, menu.id, startsAt]);
+  }, [staff.id, menu.id, startsAt, readAttempt]);
 
   async function register() {
     setWorking(true);
@@ -144,11 +146,11 @@ export default function WaitlistSheet({
         {errorMessage&&<p className="mt-3 text-[13px] font-semibold text-danger" role="alert">{errorMessage}</p>}
         {failed && (
           <p className="mt-3 text-[13px] font-semibold text-danger" role="alert">
-            読み込めませんでした。電波の良い所でもう一度開いてください。
+            読み込めませんでした。電波の良い所でもう一度お試しください。
           </p>
         )}
         <div className="mt-4 flex gap-2">
-          {entryId ? (
+          {failed && entryId === undefined ? <Button onClick={() => setReadAttempt(n => n + 1)}>もう一度</Button> : entryId ? (
             <Button onClick={cancel} disabled={working} variant="secondary" className="flex-1">
               {working ? '取り消しています…' : '取り消す'}
             </Button>

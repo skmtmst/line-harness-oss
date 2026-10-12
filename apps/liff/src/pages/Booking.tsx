@@ -97,8 +97,9 @@ export default function Booking() {
     setStaff(s);
   }
 
+  const steps = paymentDue ? [...STEPS, 'お支払い'] : STEPS;
   const stepIndex =
-    step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : STEPS.length - 1;
+    step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : step === 'payment' ? 4 : 3;
   /**
    * メニュー・担当の読み込み中と失敗の間は、手順の印を出さない
    * (★V8 AcTHQ・zz9R3 は上の帯の下がすぐ骨組み・失敗の案内)。
@@ -109,7 +110,7 @@ export default function Booking() {
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="ご予約" />
       {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}} />}
-      {step !== 'done' && !waiting && <Stepper steps={STEPS} current={stepIndex} />}
+      {step !== 'done' && !waiting && <Stepper steps={steps} current={stepIndex} />}
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">

@@ -1,3 +1,4 @@
+import { useRequestGeneration } from '../lib/use-request-generation.js';
 import BookingIntake from './BookingIntake.js';
 import { bookingPriceText } from '../lib/booking-price.js';
 import { useState } from 'react';
@@ -49,7 +50,16 @@ export default function Confirm({
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
 
+  const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
+  function back() {
+    request.invalidate();
+    setSubmitting(false);
+    onBack();
+  }
+
   async function handleSubmit() {
+    if (submitting) return;
+    const generation = request.begin();
     setSubmitting(true);
     setError(null);
     try {
@@ -63,6 +73,7 @@ export default function Confirm({
         },
         idemKey,
       );
+      if (!request.isCurrent(generation)) return;
       onSubmitted({
         bookingId: created.booking_id,
         status: created.status,
@@ -70,6 +81,7 @@ export default function Confirm({
         prepayNotice: created.prepayNotice ?? null,
       });
     } catch (e) {
+      if (!request.isCurrent(generation)) return;
       logFailure('create-request', e);
       const err = e as { status?: number; body?: { error?: string } };
       if (err.status === 409 && err.body?.error === 'slot_conflict') {
@@ -78,7 +90,7 @@ export default function Confirm({
         setError('予約リクエストの送信に失敗しました。時間をおいて再度お試しください。');
       }
     } finally {
-      setSubmitting(false);
+      if (request.isCurrent(generation)) setSubmitting(false);
     }
   }
 
@@ -120,7 +132,7 @@ export default function Confirm({
         </Button>
         <Button variant="text"
           type="button"
-          onClick={onBack}
+          onClick={back}
         >
           ← 日時を選び直す
         </Button>

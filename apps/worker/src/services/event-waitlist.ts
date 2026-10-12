@@ -5,6 +5,7 @@ import {
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
+import { dispatchPendingEventWaitlistOffers, eventWaitlistDeliveryStatements } from './event-waitlist-delivery.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 
@@ -13,6 +14,7 @@ const JOB_RETRY_MAX_MINUTES = 60;
 
 export type EventWaitlistOfferSender = (offer: {
   waitlistId: string;
+  retryKey?: string;
   lineAccountId: string;
   friendId: string;
   eventName: string;
@@ -494,6 +496,32 @@ export async function enqueueEventWaitlistPromotion(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+/** 期限切れと次の促進を同じ取引へ入れる。通知の結果不明も期限までは保持する。 */
+async function expireEventWaitlistOffer(
+  db: D1Database,
+  offer: { id: string; version: number; slot_id: string; line_account_id: string; event_id: string },
+  now: Date,
+  occurrenceVersion?: number,
+): Promise<boolean> {
+  const nowIso = now.toISOString();
+  const sourceKey = `offer-expired:${offer.id}:${offer.version}`;
+  const [expired] = await db.batch([
+    db.prepare(`UPDATE event_waitlist SET status = 'expired', version = version + 1, updated_at = ?
+      WHERE id = ? AND status = 'offered' AND version = ? AND offer_expires_at <= ?
+        AND (? IS NULL OR (SELECT version FROM event_slots WHERE id = event_waitlist.slot_id) = ?)`)
+      .bind(nowIso, offer.id, offer.version, nowIso, occurrenceVersion ?? null, occurrenceVersion ?? null),
+    db.prepare(`UPDATE event_slots SET version = version + 1, updated_at = ? WHERE id = ? AND changes() = 1`)
+      .bind(nowIso, offer.slot_id),
+    db.prepare(`INSERT OR IGNORE INTO event_waitlist_promotion_jobs
+      (id,line_account_id,event_id,slot_id,source_key,status,attempts,available_at,created_at,updated_at)
+      SELECT ?,?,?,?,?,'pending',0,?,?,? WHERE EXISTS (
+        SELECT 1 FROM event_waitlist WHERE id = ? AND status = 'expired' AND version = ?)`)
+      .bind(crypto.randomUUID(), offer.line_account_id, offer.event_id, offer.slot_id,
+        sourceKey, nowIso, nowIso, nowIso, offer.id, offer.version + 1),
+  ]);
+  return (expired.meta?.changes ?? 0) === 1;
+}
+
 async function sha256(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -837,26 +865,15 @@ export async function promoteEventWaitlist(
     .bind(occurrence.id, nowIso)
     .first<{ id: string; version: number }>();
   if (dueOffer) {
-    const versionUpdate = await db
-      .prepare(
-        `UPDATE event_slots SET version = version + 1, updated_at = ?
-          WHERE id = ? AND version = ?`,
-      )
-      .bind(nowIso, occurrence.id, occurrenceVersion)
-      .run();
-    if ((versionUpdate.meta?.changes ?? 0) === 0) {
+    const expired = await expireEventWaitlistOffer(db, {
+      ...dueOffer, slot_id: occurrence.id, event_id: occurrence.event_id, line_account_id: params.lineAccountId,
+    }, now, occurrenceVersion);
+    if (!expired) {
       const latest = await loadOccurrence(db, occurrence.id, params.lineAccountId);
       return { kind: 'conflict', currentVersion: latest?.version ?? occurrenceVersion };
     }
     occurrenceVersion++;
-    await db
-      .prepare(
-        `UPDATE event_waitlist
-            SET status = 'expired', version = version + 1, updated_at = ?
-          WHERE id = ? AND status = 'offered' AND version = ?`,
-      )
-      .bind(nowIso, dueOffer.id, dueOffer.version)
-      .run();
+
   }
 
   const pendingOffer = await db
@@ -868,6 +885,7 @@ export async function promoteEventWaitlist(
     .bind(occurrence.id, nowIso)
     .first<{ id: string }>();
   if (pendingOffer) {
+    await dispatchPendingEventWaitlistOffers(db, { now, sender: params.sender, waitlistId: pendingOffer.id });
     return { kind: 'noop', reason: 'offer_pending', occurrenceVersion, promoted: null };
   }
 
@@ -906,15 +924,25 @@ export async function promoteEventWaitlist(
   const expiresAt = new Date(
     now.getTime() + (params.offerHours ?? DEFAULT_OFFER_HOURS) * 3600_000,
   ).toISOString();
+  const snapshot = parseSnapshot(waiting.event_snapshot_json) as Record<string, unknown> | null;
+  const offer: Parameters<EventWaitlistOfferSender>[0] = {
+    waitlistId: waiting.id, lineAccountId: waiting.line_account_id, friendId: waiting.friend_id,
+    eventName: typeof snapshot?.eventName === 'string' ? snapshot.eventName : occurrence.event_name,
+    startsAt: typeof snapshot?.slotStartsAt === 'string' ? snapshot.slotStartsAt : occurrence.starts_at,
+    venueName: snapshot?.venueName === null || typeof snapshot?.venueName === 'string' ? snapshot.venueName : occurrence.venue_name,
+    venueUrl: snapshot?.venueUrl === null || typeof snapshot?.venueUrl === 'string' ? snapshot.venueUrl : occurrence.venue_url,
+    token, expiresAt,
+  };
   // 事前SELECTの空席は他の予約・繰上げで変わる。人数分の容量確認と
   // offered（期限付き席保留）への遷移を、同じSQLの中で確定する。
   // 案内なし判定も再検査し、古い読取結果で次の待ちを追い越さない。
-  const claimed = await db
+  const claimStatement = db
     .prepare(
       `UPDATE event_waitlist
           SET status = 'offered', offered_at = ?, offer_expires_at = ?,
               offer_token_hash = ?, version = version + 1, updated_at = ?
         WHERE id = ? AND status = 'waiting' AND version = ?
+          AND (SELECT version FROM event_slots WHERE id = event_waitlist.slot_id) = ?
           AND EXISTS (
             SELECT 1 FROM event_slots slot
              WHERE slot.id = event_waitlist.slot_id AND slot.capacity IS NOT NULL
@@ -948,8 +976,15 @@ export async function promoteEventWaitlist(
               ) < e.max_bookings_per_friend)
           )`,
     )
-    .bind(nowIso, expiresAt, tokenHash, nowIso, waiting.id, waiting.version, nowIso)
-    .run();
+    .bind(nowIso, expiresAt, tokenHash, nowIso, waiting.id, waiting.version, occurrenceVersion, nowIso);
+  const [claimed] = await db.batch([
+    claimStatement,
+    db.prepare(`UPDATE event_slots SET version = version + 1, updated_at = ?
+      WHERE id = ? AND version = ? AND EXISTS (
+        SELECT 1 FROM event_waitlist WHERE id = ? AND status = 'offered' AND offer_token_hash = ?)`)
+      .bind(nowIso, occurrence.id, occurrenceVersion, waiting.id, tokenHash),
+    ...eventWaitlistDeliveryStatements(db, offer, tokenHash, nowIso),
+  ]);
   if ((claimed.meta?.changes ?? 0) === 0) {
     // 競合負けでは席も通知も確保しない。待ち順・版・申込内容を残す。
     // 以下の再読取は表示理由だけに使い、席の確保判断には使わない。
@@ -977,66 +1012,7 @@ export async function promoteEventWaitlist(
     return { kind: 'conflict', currentVersion: latest?.version ?? occurrence.version };
   }
 
-  const versionUpdate = await db
-    .prepare(
-      `UPDATE event_slots
-          SET version = version + 1, updated_at = ?
-        WHERE id = ? AND version = ?`,
-    )
-    .bind(nowIso, occurrence.id, occurrenceVersion)
-    .run();
-  if ((versionUpdate.meta?.changes ?? 0) === 0) {
-    await db
-      .prepare(
-        `UPDATE event_waitlist
-            SET status = 'waiting', offered_at = NULL, offer_expires_at = NULL,
-                offer_token_hash = NULL, version = version + 1, updated_at = ?
-          WHERE id = ? AND status = 'offered' AND offer_token_hash = ?`,
-      )
-      .bind(nowIso, waiting.id, tokenHash)
-      .run();
-    const latest = await loadOccurrence(db, occurrence.id, params.lineAccountId);
-    return { kind: 'conflict', currentVersion: latest?.version ?? occurrenceVersion };
-  }
-
-  try {
-    const snapshot = parseSnapshot(waiting.event_snapshot_json) as Record<string, unknown> | null;
-    await params.sender({
-      waitlistId: waiting.id,
-      lineAccountId: waiting.line_account_id,
-      friendId: waiting.friend_id,
-      eventName: typeof snapshot?.eventName === 'string'
-        ? snapshot.eventName : occurrence.event_name,
-      startsAt: typeof snapshot?.slotStartsAt === 'string'
-        ? snapshot.slotStartsAt : occurrence.starts_at,
-      venueName: snapshot?.venueName === null || typeof snapshot?.venueName === 'string'
-        ? snapshot.venueName : occurrence.venue_name,
-      venueUrl: snapshot?.venueUrl === null || typeof snapshot?.venueUrl === 'string'
-        ? snapshot.venueUrl : occurrence.venue_url,
-      token,
-      expiresAt,
-    });
-  } catch (error) {
-    // LINEへ届かなかった保留は成立扱いにしない。待機へ戻してjobを再試行する。
-    await db
-      .prepare(
-        `UPDATE event_waitlist
-            SET status = 'waiting', offered_at = NULL, offer_expires_at = NULL,
-                offer_token_hash = NULL, version = version + 1, updated_at = ?
-          WHERE id = ? AND status = 'offered' AND offer_token_hash = ?`,
-      )
-      .bind(nowIso, waiting.id, tokenHash)
-      .run();
-    throw error;
-  }
-
-  await db
-    .prepare(
-      `UPDATE event_waitlist SET notified_at = ?, updated_at = ?
-        WHERE id = ? AND status = 'offered' AND offer_token_hash = ?`,
-    )
-    .bind(nowIso, nowIso, waiting.id, tokenHash)
-    .run();
+  await dispatchPendingEventWaitlistOffers(db, { now, sender: params.sender, waitlistId: waiting.id });
 
   return {
     kind: 'promoted',
@@ -1101,27 +1077,23 @@ export async function processEventWaitlistPromotionJobs(
       version: number;
     }>();
   for (const offer of dueOffers.results ?? []) {
-    const expired = await db
-      .prepare(
-        `UPDATE event_waitlist
-            SET status = 'expired', version = version + 1, updated_at = ?
-          WHERE id = ? AND status = 'offered' AND version = ?`,
-      )
-      .bind(nowIso, offer.id, offer.version)
-      .run();
-    if ((expired.meta?.changes ?? 0) === 0) continue;
-    await db
-      .prepare(`UPDATE event_slots SET version = version + 1, updated_at = ? WHERE id = ?`)
-      .bind(nowIso, offer.slot_id)
-      .run();
-    await enqueueEventWaitlistPromotion(db, {
-      lineAccountId: offer.line_account_id,
-      eventId: offer.event_id,
-      occurrenceId: offer.slot_id,
-      sourceKey: `offer-expired:${offer.id}:${offer.version}`,
-      now,
-    });
+    await expireEventWaitlistOffer(db, offer, now);
   }
+
+  // 旧版の expired だけ保存された中断も回収する。一意な source_key でjobを重ねない。
+  await db.prepare(`INSERT OR IGNORE INTO event_waitlist_promotion_jobs
+    (id,line_account_id,event_id,slot_id,source_key,status,attempts,available_at,created_at,updated_at)
+    SELECT 'offer-expired-repair:' || w.id || ':' || (w.version - 1), w.line_account_id,
+      w.event_id, w.slot_id, 'offer-expired:' || w.id || ':' || (w.version - 1), 'pending', 0, ?, ?, ?
+    FROM event_waitlist w WHERE w.status = 'expired' AND w.offered_at IS NOT NULL
+      AND w.offer_expires_at <= ? AND EXISTS (
+        SELECT 1 FROM event_waitlist next WHERE next.slot_id = w.slot_id AND next.status = 'waiting')
+      AND NOT EXISTS (SELECT 1 FROM event_waitlist_promotion_jobs j
+        WHERE j.source_key = 'offer-expired:' || w.id || ':' || (w.version - 1))
+    ORDER BY w.offer_expires_at, w.id LIMIT ?`)
+    .bind(nowIso, nowIso, nowIso, nowIso, limit).run();
+
+  await dispatchPendingEventWaitlistOffers(db, { now, sender: params.sender, limit });
 
   await db.prepare(
     `UPDATE event_waitlist_promotion_jobs
@@ -1412,6 +1384,7 @@ export function createEventWaitlistOfferSender(
       channelAccessToken: accessToken,
       toLineUserId: row.line_user_id,
       kind: 'waitlist_offer',
+      retryKey: offer.retryKey,
       ctx: {
         eventName: offer.eventName,
         startsAtJst: formatJst(offer.startsAt),

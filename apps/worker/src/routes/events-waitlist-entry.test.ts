@@ -328,18 +328,22 @@ describe('繰上げと即時予約の席確保は原子的', () => {
     raw.prepare("UPDATE event_slots SET capacity = 2 WHERE id = 'slot-1'").run();
     const secondBefore = raw.prepare("SELECT * FROM event_waitlist WHERE friend_id = 'friend-2'").get();
     const candidateGate = pauseBefore(db, sql => /SELECT id, line_account_id, friend_id, party_size, version, created_at/.test(sql), 'first');
-    const versionGate = pauseBefore(db, sql => /UPDATE event_slots/.test(sql));
+    // 原子的な確保の途中へ別の書込みを差し込まない。確保を確定した後、
+    // 送信の直前で止めて、古い案内なし判定を持ったもう一人を再開する。
+    const deliveryGate = pauseBefore(db, sql => /UPDATE notification_deliveries/.test(sql) && /attempts/.test(sql));
     const { promoteEventWaitlist } = await import('../services/event-waitlist.js');
     const sender = vi.fn(async () => {});
     const staleReader = promoteEventWaitlist(candidateGate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
     await candidateGate.ready;
-    const first = promoteEventWaitlist(versionGate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
-    await versionGate.ready;
+    const first = promoteEventWaitlist(deliveryGate.db, { occurrenceId: 'slot-1', lineAccountId: 'account-1', sender });
+    await deliveryGate.ready;
     candidateGate.resume();
     expect(await staleReader).toMatchObject({ kind: 'noop', reason: 'offer_pending' });
-    versionGate.resume();
+    deliveryGate.resume();
     expect(await first).toMatchObject({ kind: 'promoted', promoted: { friendId: 'friend-1' } });
     expect(sender).toHaveBeenCalledTimes(1);
+    expect(raw.prepare("SELECT version FROM event_slots WHERE id='slot-1'").get()).toEqual({version:2});
+    expect(raw.prepare("SELECT COUNT(*) n FROM notification_deliveries").get()).toEqual({n:1});
     expect(raw.prepare("SELECT * FROM event_waitlist WHERE friend_id = 'friend-2'").get()).toEqual(secondBefore);
     raw.close();
   });

@@ -7,3 +7,20 @@
 @source "./";
 
 body.sb-active { margin:0; line-height:normal; color:var(--color-ink); background:var(--color-canvas); font-family:"Noto Sans JP", "Inter", system-ui, sans-serif; }
+
+/* Workerの登録案内用HTMLから共通画面へ切り替えるときの外側。 */
+body.sb-active { display:block !important; align-items:stretch !important; }
+body.sb-active #app { max-width:none !important; padding:0 !important; width:100% !important; }
+/* 既存の予約以外の入口には効かせない。utilityより先の層で素の装飾を外す。 */
+@layer base {
+  :where(body.sb-active), :where(body.sb-active) *, :where(body.sb-active) *::before, :where(body.sb-active) *::after { box-sizing:border-box; }
+  :where(body.sb-active) :is(h1,h2,h3,h4,h5,h6) { font-size:inherit; font-weight:inherit; margin:0; }
+  :where(body.sb-active) :is(p,dl,dd,dt,ol,ul,figure,blockquote) { margin:0; }
+  :where(body.sb-active) :is(ol,ul) { list-style:none; padding:0; }
+  :where(body.sb-active) button { font:inherit; color:inherit; margin:0; padding:0; background:transparent; border:0; cursor:pointer; }
+  :where(body.sb-active) button:disabled { cursor:not-allowed; }
+  :where(body.sb-active) :is(input,textarea,select) { font:inherit; color:inherit; margin:0; }
+  :where(body.sb-active) textarea { resize:vertical; }
+  :where(body.sb-active) :is(img,svg,video,canvas) { display:block; max-width:100%; }
+  :where(body.sb-active) a { color:inherit; text-decoration:inherit; }
+}
