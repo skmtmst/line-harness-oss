@@ -819,14 +819,15 @@ export default function BroadcastListV8() {
 
   /* 閲覧のみは保存できないので置かない。場所だけ空けて「保存した検索」までの並びを保つ。 */
   const saveCurrentButton = canEdit ? (
-    <button
+    <Button
       type="button"
-      className={styles.ghostButton}
+      variant="text"
+      textTone="quiet"
       onClick={() => setSavedViewOpen((open) => !open)}
     >
       <Bookmark size={14} aria-hidden="true" />
       この条件を保存する
-    </button>
+    </Button>
   ) : (
     <span className={`${styles.ghostButton} ${styles.viewerSpace}`} aria-hidden="true">
       <Bookmark size={14} aria-hidden="true" />

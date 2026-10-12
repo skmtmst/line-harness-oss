@@ -2,6 +2,23 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
+import { sharedControlOwners } from './fix-pattern-owners.mjs'
+
+test('F5 checks rendered toolbar control ownership without board exceptions', async () => {
+  const owners = sharedControlOwners()
+  assert.ok(owners.includes('button'))
+  assert.ok(owners.includes('v6-filter-chip'))
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-page-template="list" data-list-skeleton="templates"><div data-template-region="toolbar"><button class="button_button__abc">作成する</button><button class="v6-filter-chip">公開中</button><button class="page_ghostButton__abc">保存する</button></div></section>')
+    const before = await page.evaluate(scanFixPatterns, {cssOwners:owners})
+    assert.equal(before.counts.F5, 1)
+    assert.equal(before.findings.find(f=>f.pattern==='F5').text, '保存する')
+    await page.locator('.page_ghostButton__abc').evaluate(el=>el.className='button_text__abc')
+    assert.equal((await page.evaluate(scanFixPatterns,{cssOwners:owners})).counts.F5,0)
+  } finally { await browser.close() }
+})
 
 test('F1/F2/F3/F7/F9/F10 count defects, preserve presence and ignore truncated names', async () => {
   const browser = await chromium.launch()

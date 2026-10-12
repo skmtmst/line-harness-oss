@@ -5,6 +5,7 @@ import { chromium } from '@playwright/test'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import scanFixPatterns from './fix-patterns-browser.mjs'
+import { sharedControlOwners } from './fix-pattern-owners.mjs'
 import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { measurePage, assess } from './layout-defects.mjs'
 import { WIDTHS } from './browser-env.mjs'
@@ -41,7 +42,7 @@ try {
       const response = await page.goto(new URL(entry.route,base).href)
       if (!response?.ok()) throw Error(`HTTP ${response?.status()}`)
       await page.waitForLoadState('networkidle'); await page.evaluate(()=>document.fonts.ready); await page.waitForTimeout(2500)
-      const patterns = await page.evaluate(scanFixPatterns), skeleton = await page.evaluate(scanListSkeleton)
+      const patterns = await page.evaluate(scanFixPatterns,{cssOwners:sharedControlOwners()}), skeleton = await page.evaluate(scanListSkeleton)
       Object.assign(result,{...patterns,skeleton,layout:assess(await measurePage(page),entry.route,width,[])})
       result.overflow = await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)
       failed ||= !!result.findings.length || !!result.layout.failures.length || !!result.overflow

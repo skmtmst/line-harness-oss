@@ -1,6 +1,6 @@
 /** B-267/268: rendered evidence. Presence is separate from defects; API/rights
  * differences require a stated reason, never an allowance or a guessed zero. */
-export default function scanFixPatterns() {
+export default function scanFixPatterns({ cssOwners = [] } = {}) {
   const counts = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`F${i + 1}`, 0]))
   const findings = [], inventory = []
   const visible = el => !!el && el.getBoundingClientRect().width > 1 && el.getBoundingClientRect().height > 1
@@ -73,6 +73,12 @@ export default function scanFixPatterns() {
       const value = el.querySelector('[data-select-value]')
       if (!visible(value) || !/^並び[：:].+/.test(value.textContent.trim())) add('F8', el, 'sort has no visible current value')
     }
+    const owned = el => !!el && [...el.classList].some(cls => cssOwners.some(name => cls === name || cls.startsWith(`${name}_`)))
+    if (cssOwners.length) for (const el of all('[data-template-region="toolbar"] button,[data-template-region="toolbar"] input,[data-template-region="toolbar"] select,[data-template-region="toolbar"] summary')) {
+      if (owned(el) || el.matches('summary') && owned(el.closest('[data-toolbar-optional]'))
+        || el.matches('input[type="checkbox"],input[type="radio"]') && owned(el.closest('label'))) continue
+      add('F5', el, 'tool has no shared or template CSS owner')
+    }
     for (const el of all('[data-template-region="toolbar"] button:disabled,[data-template-region="toolbar"] input:disabled')) {
       const explained = el.title || (el.getAttribute('aria-describedby') || '').split(/\s+/).some(id => document.getElementById(id)?.textContent.trim())
       if (!explained && !el.closest('[aria-busy="true"]') && !/読み込|保存中|送信中|処理中/.test(el.textContent)) add('F8', el, 'disabled tool has no reason')
@@ -105,5 +111,5 @@ export default function scanFixPatterns() {
       }
     }
   }
-  return { counts, findings, inventory, coverage: { listPages: roots.length, DOM: ['F1','F2','F3','F7','F8','F9','F10'], presence: 'F4', sourceAudit: 'F5', layoutAndValues: 'F6' } }
+  return { counts, findings, inventory, coverage: { listPages: roots.length, DOM: ['F1','F2','F3','F4','F7','F8','F9','F10'], sharedControlOwners: cssOwners.length, sourceAudit: 'F5 styles and conditional states', layoutAndValues: 'F6' } }
 }
