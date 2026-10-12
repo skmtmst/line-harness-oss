@@ -733,7 +733,7 @@ export default function WebhooksOutgoingV8() {
     )
   }
 
-  const pager = ready && pageCount > 1 ? (
+  const pager = ready && visible.length > 0 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
         {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visible.length} / {formatNumber(filtered.length)} 件

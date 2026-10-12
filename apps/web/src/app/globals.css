@@ -1180,7 +1180,7 @@
   /* マイルの V8（OC0gy・ZJIyl・E2Any・S35pO・CJlf4・oRbJi・IRPw8）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 56）。 */
   --tpl-ml-col-gap: 16px; --tpl-ml-head-h: var(--polish-table-head); --tpl-ml-head-pad: 13px 20px; --tpl-ml-row-h: var(--polish-table-row); --tpl-ml-row-pad: 9px 20px;
   --tpl-ml-viewer-create-h: 55px; /* 閲覧のみで隠した作るボタン（＋下の間）の高さ */
-  --tpl-ml-col-event: 140px; --tpl-ml-col-miles: 72px; --tpl-ml-col-validity: 96px; --tpl-ml-col-recent: 64px; --tpl-ml-col-state: 92px; --tpl-ml-col-ops: 108px;
+  --tpl-ml-col-event: 140px; --tpl-ml-col-miles: 72px; --tpl-ml-col-validity: 96px; --tpl-ml-col-recent: 64px; --tpl-ml-col-state: calc(6 * var(--text-caption) + var(--tpl-badge-dot) + var(--polish-status-gap) + 2 * var(--space-8)); --tpl-ml-col-ops: 108px;
   --tpl-ml-col-need: 88px; --tpl-ml-col-gives: 150px; --tpl-ml-col-month: 92px; --tpl-ml-col-state-wide: 96px; --tpl-ml-col-ops-wide: 160px;
   --tpl-ml-col-rank: 72px; --tpl-ml-col-balance: 76px; --tpl-ml-col-change: 72px; --tpl-ml-col-last: 140px; --tpl-ml-col-ops-balance: 150px;
   --tpl-ml-col-delta: 56px; --tpl-ml-col-why: 180px; --tpl-ml-col-after: 62px; --tpl-ml-col-who: 90px; --tpl-ml-col-ops-history: 140px;
@@ -1247,7 +1247,7 @@
   --tpl-am-tab-h: 28.5px; --tpl-am-band-top-line: inset 0 1px 0 var(--color-hairline); --tpl-am-ro-row-pad: 12px 24px;
   --tpl-am-create-after: 14px; --tpl-am-create-w: 135px; --tpl-am-add-space: 31px; --tpl-am-note-lh: 17px; --tpl-am-notice-after: 5px;
   --tpl-am-col-gap: 16px; --tpl-am-head-h: var(--polish-table-head); --tpl-am-head-pad: 13px 20px; --tpl-am-row-h: var(--polish-table-row); --tpl-am-narrow-row-h: var(--polish-table-row); --tpl-am-row-pad: 9px 20px; --tpl-am-cell-gap: 3px; --tpl-am-num-pad-end: 8px;
-  --tpl-am-col-trigger: 130px; --tpl-am-col-who: 110px; --tpl-am-col-do: 140px; --tpl-am-col-runs: 80px; --tpl-am-col-state: 92px; --tpl-am-col-ops: 110px;
+  --tpl-am-col-trigger: 130px; --tpl-am-col-who: 110px; --tpl-am-col-do: 140px; --tpl-am-col-runs: 80px; --tpl-am-col-state: calc(6 * var(--text-caption) + var(--tpl-badge-dot) + var(--polish-status-gap) + 2 * var(--space-8)); --tpl-am-col-ops: 110px;
   --tpl-am-pill-gap: 5px; --tpl-am-pill-pad: 2px 8px; --tpl-am-pill-lh: 18px; --tpl-am-ops-gap: 6px; --tpl-am-edit-w: 81px; --tpl-am-foot-pad: 12px 24px;
   --tpl-am-run-row-h: var(--polish-table-row); --tpl-am-run-col-rule: 170px; --tpl-am-run-col-result: 110px; --tpl-am-run-col-done: 150px; --tpl-am-run-col-time: 84px; --tpl-am-run-col-ops: 120px; --tpl-am-pager-h: 32px; --tpl-am-pager-pad: 12px 20px; --tpl-am-run-foot-pad: 34px 0 0;
   --tpl-am-ca-row-h: var(--polish-table-row); --tpl-am-ca-col-steps: 200px; --tpl-am-ca-col-used: 96px; --tpl-am-ca-col-version: 90px;

@@ -619,7 +619,7 @@ export default function AffiliatorsTab() {
     </>
   )
 
-  const pager = ready && shownRows.length > 0 && pageCount > 1 ? (
+  const pager = ready && shownRows.length > 0 ? (
     <ListPagePagination>
       <span className={styles.pagerCount}>
         {`${formatNumber(shownRows.length)} 人中 ${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, shownRows.length)} 人`}
