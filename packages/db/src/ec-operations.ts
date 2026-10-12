@@ -158,24 +158,28 @@ export async function upsertEcEventReadModels(
        detail_url = COALESCE(excluded.detail_url, ec_orders.detail_url),
        last_event_id = excluded.last_event_id,
        version = ec_orders.version + CASE WHEN ec_orders.last_event_id = excluded.last_event_id THEN 0 ELSE 1 END,
-       updated_at = excluded.updated_at`,
+       updated_at = excluded.updated_at
+     WHERE ec_orders.last_event_id = excluded.last_event_id OR julianday(?) > (
+       SELECT julianday(json_extract(CASE WHEN json_valid(payload) THEN payload ELSE '{}' END, '$.occurred_at'))
+       FROM ec_events WHERE id = ec_orders.last_event_id
+     )`,
   ).bind(
     proposedId, event.lineAccountId, event.sourceKey, orderNumber,
     event.customerId, event.friendId ?? null, orderNumber, orderState(event.eventType),
     event.eventType, event.order?.currency?.trim() || 'JPY',
     integerOrNull(event.order?.total), integerOrNull(event.refund?.amount),
     event.order?.date ?? event.occurredAt, event.order?.detail_url ?? null,
-    event.eventId, now, now,
+    event.eventId, now, now, event.occurredAt,
   ).run();
 
   const order = await db.prepare(
-    `SELECT id FROM ec_orders
+    `SELECT id, last_event_id FROM ec_orders
       WHERE line_account_id = ? AND source_key = ? AND external_order_id = ?`,
-  ).bind(event.lineAccountId, event.sourceKey, orderNumber).first<{ id: string }>();
-  if (!order || !Array.isArray(event.order?.items)) return;
+  ).bind(event.lineAccountId, event.sourceKey, orderNumber).first<{ id: string; last_event_id: string }>();
+  if (!order || order.last_event_id !== event.eventId || !Array.isArray(event.order?.items)) return;
 
   const statements: D1PreparedStatement[] = [
-    db.prepare('DELETE FROM ec_order_lines WHERE order_id = ?').bind(order.id),
+    db.prepare('DELETE FROM ec_order_lines WHERE order_id = ? AND EXISTS (SELECT 1 FROM ec_orders WHERE id=? AND last_event_id=?)').bind(order.id, order.id, event.eventId),
   ];
   event.order.items.slice(0, 100).forEach((item, index) => {
     const quantity = Math.max(1, Math.round(Number(item.quantity) || 1));
@@ -184,13 +188,14 @@ export async function upsertEcEventReadModels(
       `INSERT INTO ec_order_lines
          (id, order_id, line_index, external_product_id, product_name, quantity,
           unit_amount_minor, line_amount_minor, product_url, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       WHERE EXISTS (SELECT 1 FROM ec_orders WHERE id=? AND last_event_id=?)`,
     ).bind(
       crypto.randomUUID(), order.id, index,
       item.product_id == null ? null : String(item.product_id),
       item.name.trim().slice(0, 200) || '商品', quantity, unitAmount,
       integerOrNull(item.line_amount) ?? (unitAmount === null ? null : unitAmount * quantity),
-      item.product_url ?? null, now,
+      item.product_url ?? null, now, order.id, event.eventId,
     ));
   });
   await db.batch(statements);

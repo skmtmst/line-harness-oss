@@ -1,3 +1,4 @@
+import {createBroadcastRetryKey} from './broadcast-retry-key.js';
 import PostalMime, { type Address } from 'postal-mime';
 import {
   completeOutboundSendStatement,
@@ -28,6 +29,7 @@ export type SupportInboundEmail = {
   bodyText?: string | null;
   bodyHtml?: string | null;
   messageId?: string | null;
+  sentAt?:string|null;
   inReplyTo?: string | null;
   references?: string | null;
 };
@@ -109,12 +111,17 @@ export async function storeSupportEmail(
   const customerName = input.customerName?.trim() || null;
   const subject = (input.subject || '(件名なし)').trim();
   const normalizedSubject = normalizeEmailSubject(subject);
-  const messageId = input.messageId?.trim() || null;
+  let messageId = input.messageId?.trim() || null;
   const inReplyTo = input.inReplyTo?.trim() || undefined;
   const references = input.references?.trim() || undefined;
   const body = (input.bodyText?.trim()
     || (input.bodyHtml ? stripHtml(input.bodyHtml) : '')
     || '(本文なし)').slice(0, MAX_BODY_CHARS);
+
+  // Source time (never retry time) makes the fingerprint stable on redelivery.
+  if(!messageId)messageId=`fallback:${await hashOutboundPayload(JSON.stringify([
+    customerEmail,subject,input.sentAt?.trim()||'',input.bodyText??'',input.bodyHtml??'',
+  ]))}`;
 
   if (messageId) {
     const duplicate = await env.DB.prepare(
@@ -153,71 +160,27 @@ export async function storeSupportEmail(
     inReplyTo,
     references,
   );
-  const threadId = existingThreadId ?? crypto.randomUUID();
+  const threadId = existingThreadId ?? await createBroadcastRetryKey('support-initial-thread',customerEmail);
   const messageRowId = crypto.randomUUID();
-
-  const statements = existingThreadId
-    ? [
-        env.DB.prepare(
-          `UPDATE support_email_threads
-           SET customer_name = COALESCE(?, customer_name), subject = ?, normalized_subject = ?,
-               status = 'unread',
-               last_message_at = ?, last_incoming_at = ?, last_customer_message_at = ?,
-               resolved_at = NULL, revision = revision + 1, updated_at = ?
-           WHERE id = ?`,
-        ).bind(customerName, subject, normalizedSubject, now, now, now, now, threadId),
-      ]
-    : [
-        env.DB.prepare(
-          `INSERT INTO support_email_threads
-           (id, customer_email, customer_name, subject, normalized_subject, status,
-            last_message_at, last_incoming_at, last_customer_message_at, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, 'unread', ?, ?, ?, ?, ?)`,
-        ).bind(
-          threadId,
-          customerEmail,
-          customerName,
-          subject,
-          normalizedSubject,
-          now,
-          now,
-          now,
-          now,
-          now,
-        ),
-      ];
-
-  statements.push(
-    env.DB.prepare(
-      `INSERT INTO support_email_messages
-       (id, thread_id, direction, sender_email, sender_name, recipient_email, subject,
-        body_text, message_id, in_reply_to, references_header, created_at)
-       VALUES (?, ?, 'incoming', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      messageRowId,
-      threadId,
-      customerEmail,
-      customerName,
-      contactEmail,
-      subject,
-      body,
-      messageId,
-      inReplyTo ?? null,
-      references ?? null,
-      now,
-    ),
-  );
-  statements.push(inboxEventStatement(env.DB, {
-    channel: 'email',
-    conversationId: threadId,
-    eventType: 'status',
-    before: existingThreadId ? { status: 'previous' } : null,
-    after: { status: 'unread', source: 'customer_message' },
-    actorStaffId: null,
-    correlationId: messageRowId,
-    createdAt: now,
-  }));
-  await env.DB.batch(statements);
+  const results=await env.DB.batch([
+    env.DB.prepare(`INSERT OR IGNORE INTO support_email_threads
+      (id,customer_email,customer_name,subject,normalized_subject,status,last_message_at,last_incoming_at,last_customer_message_at,created_at,updated_at,revision)
+      VALUES(?,?,?,?,?,'unread',?,?,?,?,?,0)`).bind(threadId,customerEmail,customerName,subject,normalizedSubject,now,now,now,now,now),
+    env.DB.prepare(`INSERT OR IGNORE INTO support_email_messages
+      (id,thread_id,direction,sender_email,sender_name,recipient_email,subject,body_text,message_id,in_reply_to,references_header,created_at)
+      VALUES(?,?,'incoming',?,?,?,?,?,?,?,?,?)`).bind(messageRowId,threadId,customerEmail,customerName,contactEmail,subject,body,messageId,inReplyTo??null,references??null,now),
+    env.DB.prepare(`UPDATE support_email_threads SET customer_name=COALESCE(?,customer_name),subject=?,normalized_subject=?,status='unread',
+      last_message_at=?,last_incoming_at=?,last_customer_message_at=?,resolved_at=NULL,revision=revision+1,updated_at=?
+      WHERE id=? AND EXISTS(SELECT 1 FROM support_email_messages WHERE id=?)`).bind(customerName,subject,normalizedSubject,now,now,now,now,threadId,messageRowId),
+    inboxEventStatement(env.DB, {channel:'email',conversationId:threadId,eventType:'status',
+      before:existingThreadId?{status:'previous'}:null,after:{status:'unread',source:'customer_message'},
+      actorStaffId:null,correlationId:messageRowId,createdAt:now,messageGuardId:messageRowId}),
+  ]);
+  if(results[1].meta.changes!==1){
+    const saved=await env.DB.prepare('SELECT thread_id FROM support_email_messages WHERE message_id=?').bind(messageId).first<{thread_id:string}>();
+    if(!saved)throw new Error('SUPPORT_MESSAGE_NOT_SAVED');
+    return {threadId:saved.thread_id,duplicate:true};
+  }
 
   console.log(JSON.stringify({ event: 'support_email_received', threadId, from: customerEmail }));
   return { threadId, duplicate: false };
@@ -259,6 +222,7 @@ export async function receiveSupportEmail(
     subject: parsed.subject || message.headers.get('subject'),
     bodyText: parsed.text,
     bodyHtml: parsed.html,
+    sentAt: parsed.date || message.headers.get('date') || message.headers.get('received'),
     messageId: parsed.messageId || message.headers.get('message-id'),
     inReplyTo: parsed.inReplyTo || message.headers.get('in-reply-to'),
     references: parsed.references || message.headers.get('references'),

@@ -1,3 +1,7 @@
+import { acquireWorkflow } from '../services/workflow-execution.js';
+import { sendRecordedNotification,NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
+import { prepareWorkflowStep, getWorkflowStep,ensureWorkflowStep,claimWorkflowStep,finishWorkflowStep,failWorkflowStep } from '@line-crm/db';
+import { patchFriendMetadata,friendMetadataPatchStatement } from '../services/friend-metadata.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
@@ -62,7 +66,6 @@ app.post('/api/meet-callback', async (c) => {
     if (existing.payload_hash !== payloadHash) {
       return c.json({ success: false, error: 'Session payload conflict' }, 409);
     }
-    return c.json({ success: true, duplicate: true });
   }
 
   const scenario = await getScenarioById(c.env.DB, body.scenario_id);
@@ -75,11 +78,41 @@ app.post('/api/meet-callback', async (c) => {
     return c.json({ success: false, error: 'friend not found' }, 404);
   }
 
-  const receipt = await c.env.DB.prepare(
-    `INSERT OR IGNORE INTO meet_callback_receipts (session_id, payload_hash, received_at)
-     VALUES (?, ?, ?)`,
-  ).bind(body.session_id, payloadHash, new Date().toISOString()).run();
-  if (!receipt.meta.changes) return c.json({ success: true, duplicate: true });
+  const ref = {scopeId:`line:${friend.line_account_id ?? 'default'}`,processKind:'meet_callback',subjectId:body.session_id};
+  if (existing && !await getWorkflowStep(c.env.DB,{...ref,stepKey:'__run'})) {
+    // Old receipts do not prove whether LINE accepted a notification. Repair only the result.
+    await patchFriendMetadata(c.env.DB,friend.id,{meet_hearing:body});
+    return c.json({success:false,code:'MEET_DELIVERY_REVIEW_REQUIRED'},202);
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare(`INSERT OR IGNORE INTO meet_callback_receipts(session_id,payload_hash,received_at) VALUES(?,?,?)`)
+      .bind(body.session_id,payloadHash,new Date().toISOString()),
+    prepareWorkflowStep(c.env.DB,{...ref,stepKey:'__run'},{input:{payloadHash},maxAttempts:50}),
+  ]);
+  const actualReceipt=await c.env.DB.prepare('SELECT payload_hash FROM meet_callback_receipts WHERE session_id=?').bind(body.session_id).first<{payload_hash:string}>();
+  if(actualReceipt?.payload_hash!==payloadHash)return c.json({success:false,error:'Session payload conflict'},409);
+  const execution=await acquireWorkflow(c.env.DB,ref);
+  if(!execution){
+    const finished=await getWorkflowStep(c.env.DB,{...ref,stepKey:'__run'});
+    return finished?.status==='succeeded'?c.json({success:true,duplicate:true}):c.json({success:false,code:finished?.status==='unknown'?'MEET_DELIVERY_REVIEW_REQUIRED':'MEET_PROCESSING_INCOMPLETE'},202);
+  }
+  try {
+    const metadataRef={...execution.ref,stepKey:'metadata'};
+    const priorMetadata=await ensureWorkflowStep(execution.db,metadataRef,{maxAttempts:50});
+    if(priorMetadata.status!=='succeeded'){
+      const owned=await claimWorkflowStep(execution.db,metadataRef);
+      if(!owned)throw new Error('metadata_processing_incomplete');
+      try{
+        await finishWorkflowStep(execution.db,metadataRef,owned.lease_owner!,{statements:[
+          execution.db.prepare("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM friends WHERE id=?) THEN 'true' ELSE 'friend_unavailable' END)").bind(friend.id),
+          friendMetadataPatchStatement(execution.db,friend.id,{meet_hearing:{
+            session_id:body.session_id,status:body.status,context:body.context,transcripts:body.transcripts,
+            requirements_doc:body.requirements_doc,completed_at:body.completed_at,
+          }}),
+        ]});
+      }catch(error){await failWorkflowStep(execution.db,metadataRef,owned.lease_owner!,{delayMs:0});throw error;}
+    }
+
 
   // Resolve LINE access token (multi-account support)
   let accountToken: string | null = null;
@@ -131,36 +164,20 @@ app.post('/api/meet-callback', async (c) => {
     },
   };
 
-  try {
-    await lineClient.pushMessage(friend.line_user_id, [
-      { type: 'flex', altText: 'ヒアリング結果', contents: resultFlex },
-    ]);
-  } catch (e) {
-    console.error('Failed to send meet callback message:', e);
-  }
-
-  // Save to friend metadata
-  try {
-    const existing = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
-    const updated = {
-      ...existing,
-      meet_hearing: {
-        session_id: body.session_id,
-        status: body.status,
-        context: body.context,
-        transcripts: body.transcripts,
-        requirements_doc: body.requirements_doc,
-        completed_at: body.completed_at,
-      },
-    };
-    await c.env.DB.prepare('UPDATE friends SET metadata = ?, updated_at = datetime(\'now\') WHERE id = ?')
-      .bind(JSON.stringify(updated), friend.id)
-      .run();
-  } catch (e) {
-    console.error('Failed to save meet hearing to metadata:', e);
-  }
-
+  const messages = [{type:'flex' as const,altText:'ヒアリング結果',contents:resultFlex}];
+  await sendRecordedNotification(execution.db,{
+    sourceId:`meet:${body.session_id}`,channel:'line',recipient:friend.line_user_id,
+    lineAccountId:friend.line_account_id,payload:JSON.stringify(messages),
+    send:key=>lineClient.pushMessage(friend.line_user_id,messages,key),
+  });
+  await execution.complete();
   return c.json({ success: true });
+  } catch(error) {
+    const unknown=error instanceof NotificationDeliveryIncomplete&&error.deliveryStatus==='unknown';
+    if(unknown)await failWorkflowStep(c.env.DB,execution.ref,execution.owner,{unknown:true,code:'delivery_unknown'}).catch(()=>undefined);
+    else await execution.fail().catch(()=>undefined);
+    return c.json({success:false,code:unknown?'MEET_DELIVERY_REVIEW_REQUIRED':'MEET_PROCESSING_INCOMPLETE'},202);
+  }
 });
 
 export { app as meetCallback };

@@ -605,7 +605,7 @@ describe('N-042 型検証の接続(#702) F1旧項目対応表', () => {
 
   test('F1 型に合わない回答は保存せず、回答自体は受け付ける', async () => {
     const { res, body } = await submitLegacy({ visits: 'あいう' }, KEY1);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(202);
     expect(body.data.destinationWrite).toMatchObject({ attempted: 1, succeeded: 0, failed: 1 });
     expect(fieldValue('ff-num')).toBeNull();
     expect(count('form_submissions')).toBe(1);
