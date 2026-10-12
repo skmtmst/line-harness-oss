@@ -1120,6 +1120,11 @@ export async function insertFormSubmissionRecord(
       db.prepare(`UPDATE form_submission_files SET submission_id = ? WHERE id IN (${placeholders}) AND submission_id IS NULL
         AND EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
         .bind(id, ...(fileIds.length ? sqlIdSet(fileIds).binds : []), id),
+      // Only a conclusively absent answer releases capacity. This transaction also
+      // excludes a concurrent successful save; transport failures keep the reservation.
+      db.prepare(`DELETE FROM form_capacity_claims WHERE form_id = ? AND submission_id = ?
+        AND NOT EXISTS (SELECT 1 FROM form_submissions WHERE id = ?)`)
+        .bind(input.formId, id, id),
     ]);
     if (results[0].meta.changes !== 1 || results[1].meta.changes !== fileIds.length) throw new Error('document_attachment_conflict');
     return (await db.prepare('SELECT * FROM form_submissions WHERE id = ?').bind(id).first<FormSubmission>())!;
@@ -1197,6 +1202,7 @@ export async function claimFormCapacitySlot(
   slotKey: string,
   submissionId: string,
   limit: number,
+  choice?: { fieldName: string; label: string; isOther: boolean; labels: string[] },
 ): Promise<boolean> {
   const result = await db
     .prepare(
@@ -1205,11 +1211,25 @@ export async function claimFormCapacitySlot(
         WHERE EXISTS (
           SELECT 1 FROM form_capacity_claims
            WHERE form_id = ? AND slot_key = ? AND submission_id = ?
-        ) OR (SELECT COUNT(*) FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?) < ?
+        ) OR (SELECT COUNT(*) FROM (
+          SELECT submission_id AS id FROM form_capacity_claims WHERE form_id = ? AND slot_key = ?
+          UNION SELECT s.id FROM form_submissions s
+           WHERE s.form_id = ? AND s.is_test = 0 AND (
+             ? = '__total__' OR EXISTS (
+               SELECT 1 FROM json_each(CASE WHEN json_valid(s.data) THEN s.data ELSE '{}' END) field,
+                 json_each(CASE WHEN field.type='array' THEN field.value ELSE json_array(field.value) END) answer
+               WHERE field.key = ? AND (answer.value = ? OR
+                 (? = 1 AND answer.type='text' AND answer.value <> ''
+                   AND answer.value NOT IN (SELECT value FROM json_each(?))))
+             )
+           )
+        )) < ?
        ON CONFLICT(form_id, slot_key, submission_id)
        DO UPDATE SET created_at = form_capacity_claims.created_at`,
     )
-    .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, submissionId, formId, slotKey, limit)
+    .bind(formId, slotKey, submissionId, jstNow(), formId, slotKey, submissionId, formId, slotKey,
+      formId, slotKey, choice?.fieldName ?? '', choice?.label ?? '', choice?.isOther ? 1 : 0,
+      JSON.stringify(choice?.labels ?? []), limit)
     .run();
   if ((result.meta?.changes ?? 0) > 0) return true;
   const owned = await db.prepare(`SELECT 1 AS owned FROM form_capacity_claims

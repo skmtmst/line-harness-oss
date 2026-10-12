@@ -1478,6 +1478,7 @@ async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'line webhook recovery',run:async()=>{const {processDueLineWebhookRetries}=await import('./services/line-webhook-recovery.js');await processDueLineWebhookRetries(env);}},
     {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('./services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
     {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('./services/banner-jobs.js');await processDueBannerGenerations(env);}},
     {
