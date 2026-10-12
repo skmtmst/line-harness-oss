@@ -112,6 +112,17 @@
   :global([data-theme='v8']) [data-template-layout='record-detail'] .detailSummary { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
 }
 :global([data-theme='v8']) .inbox { display: flex; flex: 1; min-height: 0; min-width: 0; }
+:global([data-theme='v8']) .frame[data-page-template='inbox'] { position: relative; height: var(--tpl-inbox-panes-h); min-height: 0; overflow: hidden; }
+:global([data-theme='v8']) .inboxList { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+:global([data-theme='v8']) .conversation { position: relative; min-height: 0; overflow: hidden; }
+:global([data-theme='v8']) .inboxMessages { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: var(--tpl-inbox-thread-pad); background: var(--color-table-head); }
+:global([data-theme='v8']) .inboxComposer { position: relative; z-index: 10; flex: none; padding: var(--tpl-inbox-composer-pad); border-top: 1px solid var(--color-hairline); background: var(--color-canvas); }
+:global([data-theme='v8']) .inboxSummaryPane { padding: var(--polish-space-section); width: var(--tpl-inbox-summary-width); max-width: 100%; flex: none; height: 100%; overflow: hidden; background: var(--color-canvas); border-left: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .inboxSummaryPane:not([data-wide]) { position: fixed; inset: 0 0 0 auto; z-index: 70; box-shadow: var(--shadow-overlay); }
+@media (max-width: 1023px) {
+  :global([data-theme='v8']) .inboxList[data-selected], :global([data-theme='v8']) .conversation:not([data-selected]) { display: none; }
+  :global([data-theme='v8']) .inboxList { width: 100%; }
+}
 :global([data-theme='v8']) .inboxList { width: var(--tpl-inbox-list-width); flex-shrink: 0; border-right: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .conversation { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-table-head); }
 :global([data-theme='v8']) .conversationHeader { padding: var(--tpl-conv-head-pad-block) var(--tpl-conv-head-pad-side); display: flex; align-items: center; gap: var(--tpl-conv-head-gap); flex-shrink: 0; }
@@ -423,7 +434,7 @@
 :global([data-theme='v8']) [data-list-skeleton] .content :global(div:has(> [data-shared-part='list-table'])) { margin: 0; padding-inline: 0; border: 0; border-radius: var(--radius-flat); box-shadow: none; }
 
 /* B-233：白い板の下は24。操作の帯は専用の下端を持つ。 */
-:global([data-theme="v8"]) .frame:not(:has([data-shared-part="sticky-bar"])) { padding-bottom: var(--polish-space-section); }
+:global([data-theme="v8"]) .frame:not([data-page-template="inbox"]):not(:has([data-shared-part="sticky-bar"])) { padding-bottom: var(--polish-space-section); }
 
 /* B-237：PC では目次と型を横に置き、狭い白い板では見本だけを畳む。 */
 :global([data-theme='v8']) .frame[data-template-layout='customer-look'] .settings { flex-direction: row; gap: var(--tpl-settings-gap); }

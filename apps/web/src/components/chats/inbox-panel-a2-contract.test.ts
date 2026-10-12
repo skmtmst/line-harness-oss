@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -56,8 +56,8 @@ describe('受信箱A-2 右パネルでその場で直す', () => {
     expect(SIDEBAR).toContain('isContentEditable')
   })
 
-  it('右パネルは340幅、狭い幅では畳んで頭のボタンで出す', () => {
-    expect(PAGE).toContain('w-[340px]')
+  it('右パネルは共通の320幅、狭い幅では畳んで頭のボタンで出す', () => {
+    expect(PAGE).toContain('<InboxSummaryPane wide={wideInfoPanel}')
     expect(PAGE).toContain('panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}')
   })
 

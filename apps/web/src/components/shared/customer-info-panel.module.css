@@ -42,3 +42,7 @@
 
 /* B-212：追加した連絡欄も72の見出し幅で1行。 */
 .content dl dt { font-size: var(--text-label); white-space: nowrap; }
+
+/* B-152/B-212: 段は16、段内は8。節の線・上下の余白を重ねない。 */
+.panel { gap: var(--space-16); }
+.section + .section { padding-top: 0; border-top: 0; }

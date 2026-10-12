@@ -97,6 +97,14 @@ async function renderPanel(notes: string | null = '前のメモ', friendId = 'fr
     if (document.documentElement.dataset.theme === 'v8') expect(host.querySelector('[data-customer-info-panel] section[aria-label="対応"]')).toBeTruthy()
     else expect(host.textContent).toContain('次の対応')
   })
+  // ふだんは値を読む形。以前からの保存・失敗・競合の検証は編集を開いて行う。
+  if (document.documentElement.dataset.theme === 'v8') {
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="対応を編集"]')?.click()
+      host.querySelector<HTMLButtonElement>('button[aria-label="メモを編集"]')?.click()
+      host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')?.click()
+    })
+  }
 }
 
 beforeEach(() => {

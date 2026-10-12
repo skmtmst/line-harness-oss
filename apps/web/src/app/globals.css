@@ -1998,12 +1998,12 @@
   --tpl-inbox-bubble-text: var(--polish-text-body);
   --tpl-inbox-bubble-lh: 21px;
   --tpl-inbox-bubble-out: var(--color-chat-outgoing); /* こちらから送った吹き出しの地 */
-  --tpl-inbox-composer-pad: 12px 20px 16px;/* 書く欄の内側 */
+  --tpl-inbox-composer-pad: 12px 24px 16px;/* 書く欄の内側 */
   --tpl-inbox-composer-gap: 8px;
   --tpl-inbox-composer-btn-h: 32px;       /* 書く欄の道具・予約・送信の高さ */
   --tpl-inbox-composer-btn-pad: 0 14px;
   --tpl-inbox-composer-btn-icon: 15px;
-  --tpl-inbox-composer-input-pad: 10px 12px;
+  --tpl-inbox-composer-input-pad: 12px;
   --tpl-inbox-composer-input-radius: var(--polish-radius-card);
   --tpl-inbox-composer-input-h: 40px;     /* 書く欄の文の高さ（2行） */
   --tpl-inbox-sendkey-pad: 12px;          /* 送信の設定の箱の内側 */
