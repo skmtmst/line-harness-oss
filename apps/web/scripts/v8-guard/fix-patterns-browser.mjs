@@ -44,8 +44,8 @@ export default function scanFixPatterns({ cssOwners = [] } = {}) {
       rows: all('tbody tr:not(:has([colspan]))').map(el => el.getBoundingClientRect().height),
       pageSizes: all('[data-list-page-size]').length,
     })
-    for (const el of all('[data-select-value],[data-design-node="xRvDB"] > span,[data-kpi-detail] [role="note"],th,button:not(:has([data-list-name]))')) {
-      if (el.closest('[data-list-name-cell]') || el.closest('tbody td') && !el.matches('[data-select-value]') && !el.closest('[data-design-node="xRvDB"]')) continue
+    for (const el of all('[data-select-value],[data-list-number],[data-design-node="xRvDB"] > span,[data-kpi-detail] [role="note"],th,button:not(:has([data-list-name]))')) {
+      if (el.closest('[data-list-name-cell]') || el.closest('tbody td') && !el.matches('[data-select-value],[data-list-number]') && !el.closest('[data-design-node="xRvDB"]')) continue
       if (el.closest('[data-kpi-number]')) continue
       const css = getComputedStyle(el)
       if (!el.textContent.trim() || css.display === 'contents') continue

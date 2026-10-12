@@ -45,7 +45,7 @@ export function fitListColumns(frame) {
     const cells = rows.map(row => row.children[index]).filter(Boolean).filter(cell => cell.getBoundingClientRect().width)
     // A genuinely long secondary value keeps its existing truncation budget.
     const required = Math.max(0, ...cells.map(intrinsic))
-    const unbroken = cells.some(cell => cell.querySelector('button, input, [data-design-node="xRvDB"], [data-list-date-time]'))
+    const unbroken = cells.some(cell => cell.matches('[data-list-number]') || cell.querySelector('button, input, [data-design-node="xRvDB"], [data-list-date-time]'))
     return Math.ceil(unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
   })
   // A native fixed-layout table reads <col> before the first row's cell width.

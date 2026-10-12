@@ -7,6 +7,22 @@ import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
 import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth } from '../../src/components/shared/list-toolbar-fit.mjs'
 import { fitSelectContent } from '../../src/components/shared/select-content-size.mjs'
+
+test('numeric support columns reserve the full note instead of the old truncation budget', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>${css('data-table')}*{box-sizing:border-box}.frame{width:400px}table{width:100%;table-layout:fixed}td,th{padding:0 8px;font:13px sans-serif}td:nth-child(2),th:nth-child(2){width:44px}td:nth-child(3),th:nth-child(3){width:60px}span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style><section data-page-template="list" data-list-skeleton="templates"><div class="frame" data-column-sizing="content"><table class="table"><thead><tr><th>名前</th><th>この30日</th><th>操作</th></tr></thead><tbody><tr><td data-cell-grow><span data-list-name>決めごとの名前</span></td><td data-list-number><span>1,900</span><span>対象外 12 回</span></td><td><button>…</button></td></tr></tbody></table></div></section>`)
+    const before = await page.locator('[data-list-number]').evaluate(el=>el.lastElementChild.scrollWidth>el.lastElementChild.clientWidth)
+    assert.equal(before,true)
+    await page.locator('.frame').evaluate(fitListColumns)
+    assert.equal(await page.locator('[data-list-number]').evaluate(el=>el.lastElementChild.scrollWidth>el.lastElementChild.clientWidth),false)
+    assert.equal(await page.locator('[data-list-number]').innerText(),'1,900\n対象外 12 回')
+    await page.locator('[data-list-number]').evaluate(el=>el.removeAttribute('data-list-number'))
+    await page.locator('.frame').evaluate(fitListColumns)
+    assert.equal(await page.locator('tbody td').nth(1).evaluate(el=>el.lastElementChild.scrollWidth>el.lastElementChild.clientWidth),true)
+  } finally { await browser.close() }
+})
 import scanFixPatterns from './fix-patterns-browser.mjs'
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')

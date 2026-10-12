@@ -802,7 +802,7 @@ export default function EarningRulesTab() {
   /* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 56）。1152 も同じ列（先頭の列が縮む）。 */
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT}>
+      <DataTable columnLayout={MILEAGE_TABLE_LAYOUT} columnSizing="content">
         <thead>
           <TableHeadRow data-table-layout="columns">
             <Th grow>何をしてくれたら</Th>
@@ -834,7 +834,7 @@ export default function EarningRulesTab() {
                 </Td>
                 <Td align="right" className={styles.colMiles}><span className={styles.cellMain}>{formatMileageNumber(rule.draft.amount)}</span></Td>
                 <Td collapseAt="narrow" className={styles.colValidity}><span className={styles.cellMain}>{validityText(rule)}</span></Td>
-                <Td align="right" className={styles.colRecent}>
+                <Td align="right" className={styles.colRecent} data-list-number="">
                   <span className={styles.cellMain}>{formatMileageNumber(grantedMiles30d(rule))}</span>
                   <span className={styles.cellSub}>{`対象外 ${formatMileageNumber(rule.metrics30d.excluded)} 回`}</span>
                 </Td>

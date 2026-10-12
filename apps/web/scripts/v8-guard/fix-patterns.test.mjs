@@ -4,6 +4,17 @@ import { chromium } from '@playwright/test'
 import scanFixPatterns from './fix-patterns-browser.mjs'
 import { sharedControlOwners } from './fix-pattern-owners.mjs'
 
+test('F1 counts clipped numeric notes independently from truncatable names and body', async () => {
+  const browser=await chromium.launch()
+  try {
+    const page=await browser.newPage()
+    await page.setContent('<style>td{width:40px}span{display:block;width:40px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style><section data-page-template="list" data-list-skeleton="templates"><table><tbody><tr><td data-list-number><span>1,900</span><span>対象外 12 回</span></td></tr></tbody></table></section>')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1,1)
+    await page.addStyleTag({content:'td,span{width:140px}'})
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F1,0)
+  } finally {await browser.close()}
+})
+
 test('F7 counts unknown annotations in a cell and KPI note while retaining known values', async () => {
   const browser = await chromium.launch()
   try {
