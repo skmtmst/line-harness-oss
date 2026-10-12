@@ -293,7 +293,7 @@ export default function AffiliateOfferCreateV8() {
       </Card>
 
       <Card variant="form" aria-labelledby="af-new-point">
-        <CardHeader size="stacked" titleId="af-new-point" title="何を成果として数えるか" meta="コンバージョンで作った成果地点から選びます" />
+        <CardHeader size="stacked" titleId="af-new-point" title="何を成果として数えるか" />
         <Notice tone="info" action={<Button href="/conversions" variant="text">成果地点を見る</Button>}>
           成果地点と案件をつなぐ設定は、まだ保存できません。今は案件ごとの報酬を決められます。
         </Notice>

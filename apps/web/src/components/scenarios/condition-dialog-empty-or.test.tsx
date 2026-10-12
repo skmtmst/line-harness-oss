@@ -5,7 +5,7 @@
  * 中身を入れたかたまり・条件なし（null）は送れる。
  */
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConditionDialog } from './scenario-dialogs'
 import type { SegmentCondition } from '@/lib/segment-condition'
@@ -56,7 +56,7 @@ function renderDialog({
  * 探して押せる（happy-dom の開閉に依存しない）。
  */
 function orAddButton() {
-  return screen.getByRole('button', { name: /いずれか1つ以上を満たす.*を追加/, hidden: true })
+  return screen.getByRole('button', { name: 'いずれか条件のかたまりを足す', hidden: true })
 }
 
 function groupRemovers() {
@@ -64,14 +64,14 @@ function groupRemovers() {
 }
 
 function kindPickers() {
-  return screen.getAllByRole('combobox', { name: '追加する条件を選ぶ', hidden: true })
+  return screen.getAllByRole('button', { name: '追加する条件を選ぶ', hidden: true })
 }
 
 function pickKind(field: HTMLElement, query: string) {
-  fireEvent.focus(field)
-  fireEvent.change(field, { target: { value: query } })
-  fireEvent.keyDown(field, { key: 'ArrowDown' })
-  fireEvent.keyDown(field, { key: 'Enter' })
+  fireEvent.click(field)
+  const dialog = screen.getByRole('dialog', { name: '条件を選ぶ', hidden: true })
+  fireEvent.click(within(dialog).getByRole('radio', { name: query, hidden: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '条件を足す', hidden: true }))
 }
 
 async function reflect() {

@@ -60,7 +60,7 @@ describe('Td4TN 作る画面の絵合わせ', () => {
     await waitFor(() => {
       expect(screen.getByText('案件を作る')).toBeTruthy()
     })
-    expect(screen.getByText('コンバージョンで作った成果地点から選びます')).toBeTruthy()
+    expect(screen.getByText('何を成果として数えるか')).toBeTruthy()
     expect(screen.queryByLabelText('成果地点')).toBeNull()
     expect(screen.getByText(/成果地点と案件をつなぐ設定は、まだ保存できません/)).toBeTruthy()
     expect(screen.getByRole('link', { name: '成果地点を見る' }).getAttribute('href')).toBe('/conversions')
