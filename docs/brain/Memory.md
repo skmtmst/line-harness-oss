@@ -52,7 +52,7 @@ tags: [memory, core]
 
 ## 進行中（2026-10-12）
 
-- 列車26b：列車25・27入り本線 `4aea06f85e` から新しい専用枝で組み直し中。L→F→L2→b244をローカルの指定枝からmerge commitで取り込み、固定写しで本線141枚の前後比較を行う。旧列車26は積まない。新しいmigration・Pen変更・push・PR・DB更新・配備はしない。進捗と検証の証拠は `~/lh-work/design/v8/review/TRAIN26B-1012/`。
+- 列車26b：専用枝 `codex/kenta-train-26b-1012` へL→F→L2→b244をmerge commitで再統合。試験前本線 `2f001bd31a`、最終コード `5d674634ca`。固定写し141枚は上昇96・同点45・低下0、WQmep 1440は98.9を維持。web全試験12,877・scripts1,026・型検査・ビルド・必須の画面検査は合格。速度の参考値だけ一斉配信75ms/50ms未達を記録。コミットまでで止め、push・PR・統合は司令塔。報告 `docs/qa/train26b-1012.md`、証拠 `~/lh-work/design/v8/review/TRAIN26B-1012/`。旧枝は積まず、migration・Pen変更・DB更新・配備なし。
 
 - measure2・L組続行：前回f3f02cb8f5から再開、doctor合格・クリーン。追加の最新本線4aea06f85e（列車27）をmerge commit 2fab03102aへ取り込み、修正指示の追記競合は両方を保持。型・全Web2168ファイル12836件・ビルド・設計値124件・差分成功。候補再測定はWQmep98.9／欠け1（機能待ち）、axFrW96.9／欠け0で低下なし。次は1152幅wjfLe（40.7・欠け2）の骨組みを共通部品で作り直す。6時間枠の期限18:24 JSTを継続。push・PR・D1・配備なし。
 
