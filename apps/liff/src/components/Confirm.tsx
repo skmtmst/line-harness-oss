@@ -74,8 +74,7 @@ export default function Confirm({
         idemKey,
       );
       if (!request.isCurrent(generation)) return;
-      if ((created.payment_required || (menu.payment_mode === 'online' && staff.price > 0)
-        || (autoConfirm && created.status === 'requested')) && !created.payment?.id) {
+      if (created.payment_required && !created.payment?.id) {
         setError('予約できませんでした。もう一度お試しください');
         return;
       }
