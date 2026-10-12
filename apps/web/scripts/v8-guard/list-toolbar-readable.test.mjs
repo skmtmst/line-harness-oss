@@ -11,6 +11,22 @@ import { fitSelectContent } from '../../src/components/shared/select-content-siz
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
 
+test('KPI filtering and navigation actions have the same line height; a normal button minimum stretches the band', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const card = action => `<div class="card" data-kpi-presentation="band"><div class="head"><p class="label">空のまま使われている</p></div><p class="value"><span class="number">1</span><span class="unit">件</span></p><p class="detail"><span class="detailText">空欄のまま送られます</span>${action}</p></div>`
+    await page.setContent(`<html data-theme="v8"><style>${read('../../src/app/globals.css')}\n${css('kpi-card')}</style><main><div class="strip" data-kpi-presentation="band">${card('<a class="link" href="/history">詳しく見る</a>')}${card('<button class="link" type="button">編集する</button>')}</div></main></html>`)
+    const heights = () => page.locator('.detail').evaluateAll(elements => elements.map(el => el.getBoundingClientRect().height))
+    const [link, button] = await heights()
+    assert.equal(button, link, 'filtering must not change the KPI band height')
+    await page.locator('button.link').evaluate(el => el.style.minHeight = '32px')
+    const [unchanged, stretched] = await heights()
+    assert.equal(unchanged, link)
+    assert.ok(stretched > button, 'the old minimum must expose the height regression')
+  } finally { await browser.close() }
+})
+
 test('B-191: list placeholders remain readable at both widths; fixed-width regression is detected', async () => {
   const browser = await chromium.launch()
   try {
