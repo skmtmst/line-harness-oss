@@ -223,3 +223,6 @@ html:root .records {
 }
 html:root .records > .header { padding-inline: var(--polish-space-section); }
 html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }
+
+/* 段の中の頭はCardの余白を使う。通常の頭の左右16を重ねない。 */
+html:root .headerStacked { padding: 0; }
