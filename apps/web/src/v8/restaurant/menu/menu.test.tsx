@@ -137,3 +137,19 @@ it('閲覧のみでも提供時間と所要時間を詳細で読み、保存は�
   expect(fixture.updateMenu).not.toHaveBeenCalled()
   expect(fixture.createMenu).not.toHaveBeenCalled()
 })
+
+it('閲覧窓では現在の価格と変更予定の価格を別々に読む', async () => {
+  role.value = 'staff'
+  const data = snapshotOf()
+  data.menuItems[0] = { ...data.menuItems[0], price: 1200, pendingPrice: 2500 }
+  fixture.snapshot.mockResolvedValue({ data })
+  render(<MenuPage />)
+  await screen.findByText('メニュー一覧')
+  const name = screen.getAllByRole('button').find(button => button.getAttribute('title') === data.menuItems[0].name)!
+  fireEvent.click(name)
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText('¥1,200')).toBeTruthy()
+  expect(within(dialog).getByText('変更予定の価格')).toBeTruthy()
+  expect(within(dialog).getByText('¥2,500')).toBeTruthy()
+  expect(fixture.updateMenu).not.toHaveBeenCalled()
+})

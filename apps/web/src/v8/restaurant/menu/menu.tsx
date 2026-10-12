@@ -262,10 +262,11 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             ? `価格を変えると承認ワークフローへ申請されます。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
             : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。あとから価格を変えるときは承認ワークフローへ申請されます。'}
         </DialogNote>
-        </fieldset> : <CreateSummaryCard title="メニューの内容" rows={[
+        </fieldset> : <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? '変更予定の価格は承認後に反映します。開始日時が未設定のときは、承認後すぐに反映します。' : undefined} rows={[
           { label: '種類', value: draft.kind === 'course' ? 'コース' : '単品' },
           { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
-          { label: '価格（税込）', value: draft.price.trim() ? formatYen(Number(draft.price)) : emptyValue('unconfigured') },
+          { label: '価格（税込）', value: editing ? formatYen(editing.price) : draft.price.trim() ? formatYen(Number(draft.price)) : emptyValue('unconfigured') },
+          ...(editing?.pendingPrice != null ? [{ label: '変更予定の価格', value: formatYen(editing.pendingPrice) }] : []),
           { label: '提供時間', value: editing ? periodLabel(safeArray(editing.service_periods_json)) : periodLabel([draft.period]) },
           { label: '所要時間', value: editing?.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown') },
           { label: 'アレルギー', value: draft.allergens || emptyValue('none') },
