@@ -116,8 +116,8 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-:root .root { gap: 0; border-radius: var(--polish-radius-control); background: var(--color-shell); }
-:root .tile { flex: none; border-radius: var(--polish-radius-control); box-shadow: var(--shadow-board); }
+:root .root { gap: 0; border-radius: var(--radius-panel); background: var(--color-shell); }
+:root .tile { flex: none; border-radius: var(--radius-panel); box-shadow: var(--shadow-board); }
 :root .tile > svg { width: 20px; height: 20px; }
 :root .root[data-open] .tile { opacity: 1; transform: none; box-shadow: none; border-radius: 16px 0 0 16px; }
 :root .root[data-open] .confirm { position: relative; width: 84px; padding: 0; justify-content: center; border: 0; border-radius: 0 16px 16px 0; background: var(--color-shell-gray); }

@@ -90,7 +90,7 @@ afterEach(() => {
 describe('R292 既存リンクの配布URLを取り出せる', () => {
   test('確認から来たら内訳が開き、配布URLとコピーがある', async () => {
     render(<AffiliatorsTab accountId="acc-1" focusAffiliateId="aff-a" />)
-    await screen.findByText('候補A')
+    await screen.findByRole('link', { name: '候補A', exact: true })
 
     // 押さなくても内訳が開き、リンク表に配布URLが出る。
     await screen.findByTitle('https://go.example.com/LINK_X1')

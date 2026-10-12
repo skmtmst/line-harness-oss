@@ -5,7 +5,7 @@
  *
  * そろっている一覧（一斉配信・回答フォーム・テンプレート・タグ・友だち情報・ウェビナー・統括のホーム）と同じ形：
  *   ［作る］ボタン（列の上）→「フォルダ」の見出し → すべて → 各フォルダ（色の丸・数・「…」）→ 未分類
- *   →「フォルダを追加」→「フォルダを消しても、中の〇〇は未分類に残ります」
+ *   →「フォルダを追加」。削除後の扱いは操作直前の確認窓で説明する（B-245）。
  * 「…」の中は 名前を変える・色を変える・並べ替える（上へ・下へ）・消す（共通の useFolderRowActions）。
  *
  * 保存先は共通の `/api/folders`（kind ごと・packages/db/src/folders.ts の FOLDER_KINDS）。
@@ -193,7 +193,7 @@ export default function ManagedFolderPanel({
   unfiledCount = null,
   countOf,
   createAction,
-  reserveCreateSpace = true,
+  reserveCreateSpace = canManage && Boolean(createAction),
   onDeleted,
   error,
   placeholder,
@@ -256,7 +256,6 @@ export default function ManagedFolderPanel({
         disabled={disabled}
       >
         {error ? <p role="alert" className={styles.note}>{error}</p> : null}
-        {managed ? <p className={styles.note}>{managedFolderNote(itemLabel)}</p> : null}
         {children}
       </FolderPanel>
       {adding && kind ? (

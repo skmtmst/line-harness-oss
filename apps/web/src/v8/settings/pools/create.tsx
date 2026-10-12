@@ -1,9 +1,16 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("名前を入力してください"),
+}
+
+
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
@@ -106,7 +113,7 @@ export default function PoolCreateV8() {
   }
 
   const validate = (): { target: string; message: string } | null => {
-    if (!name.trim()) return { target: 'pl-name', message: '名前を入力してください' }
+    if ((b244Requirements.name.check(name) !== null)) return { target: 'pl-name', message: '名前を入力してください' }
     if (!slugValid) return { target: 'pl-slug', message: 'URLに使う名前は、半角英小文字・数字・ハイフンで2〜32文字にしてください' }
     if (accountIds.length === 0) return { target: 'pl-add-account', message: '受け入れ先のアカウントを選んでください' }
     return null
@@ -145,6 +152,23 @@ export default function PoolCreateV8() {
       layout="narrow-nav"
       title={TITLE}
       help={DESCRIPTION}
+      preview={(
+        <>
+          <Card variant="form" gap="normal">
+            <h2 className={styles.cardTitle}>プレビュー</h2>
+            <dl className={styles.facts}>
+              <div className={styles.fact}>
+                <dt>友だち追加URL</dt>
+                <dd>{slugValid ? publicUrl : 'まだURLは発行されていません。「URLに使う名前」を入れて保存すると、正式なURLが発行されます。'}</dd>
+              </div>
+              <div className={styles.fact}>
+                <dt>現在の受け入れ先</dt>
+                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（有効の所属先からランダムに振り分け）` : '未選択'}</dd>
+              </div>
+            </dl>
+          </Card>
+        </>
+      )}
       savePlacement="content"
       saveActions={(
         <>
@@ -155,12 +179,11 @@ export default function PoolCreateV8() {
         </>
       )}
     >
-      <form id="pool-create-form" className={styles.columns} onSubmit={(event) => void save(event)} noValidate>
-        <div className={styles.main}>
+      <form id="pool-create-form" className={styles.main} onSubmit={(event) => void save(event)} noValidate>
           {error ? <Notice tone="danger" >{error}</Notice> : null}
-          <section className={styles.card} aria-labelledby="pool-create-what">
+          <Card variant="form" gap="normal" aria-labelledby="pool-create-what">
             <h2 id="pool-create-what" className={styles.cardTitle}>1. どのプールか</h2>
-            <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined}>
+            <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined} requirement={b244Requirements.name}>
               <SaveErrorField names={["name"]}><TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例：渋谷エリア" maxLength={100} /></SaveErrorField>
             </Field>
             <Field note={<>
@@ -171,9 +194,9 @@ export default function PoolCreateV8() {
               <SaveErrorField names={["slug"]}><TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} /></SaveErrorField>
             </Field>
 
-          </section>
+          </Card>
 
-          <section className={styles.card} aria-labelledby="pool-create-where">
+          <Card variant="form" gap="normal" aria-labelledby="pool-create-where">
             <div className={styles.cardHead}>
               <h2 id="pool-create-where" className={styles.cardTitle}>2. いまの受け入れ先</h2>
               <p className={styles.cardSub}>友だちが開く追加先と、現在の受け入れ先です</p>
@@ -209,24 +232,7 @@ export default function PoolCreateV8() {
             {accountsError ? (
               <Notice tone="danger" >{accountsError}{' '}<button type="button" className={styles.retry} onClick={() => void loadAccounts()}>もう一度読み込む</button></Notice>
             ) : null}
-          </section>
-        </div>
-
-        <aside className={styles.side} aria-label="プレビュー">
-          <section className={styles.card}>
-            <h2 className={styles.cardTitle}>プレビュー</h2>
-            <dl className={styles.facts}>
-              <div className={styles.fact}>
-                <dt>友だち追加URL</dt>
-                <dd>{slugValid ? publicUrl : 'まだURLは発行されていません。「URLに使う名前」を入れて保存すると、正式なURLが発行されます。'}</dd>
-              </div>
-              <div className={styles.fact}>
-                <dt>現在の受け入れ先</dt>
-                <dd>{selectedAccounts.length > 0 ? `${selectedAccounts.map((account) => account.name).join('・')}（有効の所属先からランダムに振り分け）` : '未選択'}</dd>
-              </div>
-            </dl>
-          </section>
-        </aside>
+          </Card>
       </form>
     </SbSettingsScreen>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="入力したプールの内容" busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />

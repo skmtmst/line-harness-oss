@@ -200,7 +200,11 @@ test('v8 の下では Pencil r6dJFy の新しい一覧に切り替わる', async
   expect(host.textContent).toContain('商品を買った')
   expect(host.textContent).toContain('動いている')
   expect(host.textContent).toContain('止めている')
-  expect(host.textContent).toContain('使う場所を足す')
+  // B-200：使う場所を足す操作は行の「…」に残す。
+  const menu = host.querySelector<HTMLButtonElement>('[aria-label="成果地点「商品を買った」の操作"]')
+  await act(async () => menu!.click())
+  await settle()
+  expect(document.querySelector('[role="menu"]')?.textContent).toContain('使う場所を足す')
 })
 
 test('行から右の詳細を開き、停止の確認では理由を必須にする', async () => {

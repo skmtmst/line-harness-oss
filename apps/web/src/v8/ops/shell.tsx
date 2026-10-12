@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import TopBar from '@/components/shared/top-bar'
+import { PageHeading } from '@/components/templates/page-frame'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import { logoutAndGoToLogin } from '@/lib/logout'
@@ -194,7 +195,7 @@ export default function OpsShellV8({
             />
           </div>
           <main id="ops-main" tabIndex={-1} className={shellStyles.main}>
-            <div className={shellStyles.content}>{children}</div>
+            <div className={shellStyles.content} data-content-layout="ops">{children}</div>
           </main>
         </div>
       </div>
@@ -220,13 +221,7 @@ export function OpsHead({
 }) {
   return (
     <div className={styles.head}>
-      <div className={styles.headRow}>
-        <div className={styles.headText}>
-          <h2 className={styles.headTitle} title={title}>{title}</h2>
-          {description ? <p className={styles.headDesc}>{description}</p> : null}
-        </div>
-        {actions ? <div className={styles.headActions}>{actions}</div> : null}
-      </div>
+      <PageHeading title={title} help={description} actions={actions} inset="none" />
       <p className={styles.caution} data-ops-env={environment}>
         <ShieldCheck aria-hidden="true" />
         <span>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</span>

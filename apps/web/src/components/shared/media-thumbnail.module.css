@@ -1,0 +1,9 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.image { width: 100%; height: 100%; object-fit: cover; }
+.placeholder { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: var(--tpl-media-file-surface); color: var(--color-ink-secondary); }
+.placeholder[data-kind='video'] { background: var(--tpl-media-video-surface); color: var(--color-canvas); }
+.failure { color: var(--color-ink-faint); font-size: var(--text-caption); }
+}
+
+html:root .placeholder[data-media-thumbnail] > :global(svg.lucide) { width: var(--tpl-media-thumbnail-icon); height: var(--tpl-media-thumbnail-icon); }

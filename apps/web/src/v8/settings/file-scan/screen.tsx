@@ -189,7 +189,8 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
+      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -221,8 +222,9 @@ export default function FileScanScreen() {
   const legacySecret = Boolean(config?.externalSecretRef && !/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(config.externalSecretRef))
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}>
-      <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
+      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
+
 
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <p role="status" className={styles.doneBand}>{actionDone}</p> : null}
@@ -344,13 +346,13 @@ export default function FileScanScreen() {
         {externalConfigured && !externalOn && config?.externalEnabled === false && !legacySecret ? <Notice tone="warn">現在の設定では外の検査へ送信できません。送り先と鍵の名前の組を運営に確認してください。</Notice> : null}
         {configOpen ? (
           <div className={styles.form}>
-            <Field label="提供元" htmlFor="file-scan-provider" error={configFields.error('externalProvider')}>
+            <Field label="提供元" htmlFor="file-scan-provider" requirement={configFields.requirement('externalProvider')} error={configFields.error('externalProvider')}>
               <SaveErrorField names={["externalProvider","provider"]}><TextField {...configFields.bind('externalProvider')} id="file-scan-provider" value={provider} onChange={(event) => setProvider(event.target.value)} placeholder="例：example-scan" /></SaveErrorField>
             </Field>
-            <Field label="送り先（https）" htmlFor="file-scan-endpoint" error={configFields.error('externalEndpointUrl')} note="運営が許可した送り先と鍵の名前の組だけ使えます。転送する宛先は使えません。">
+            <Field label="送り先（https）" htmlFor="file-scan-endpoint" requirement={configFields.requirement('externalEndpointUrl')} error={configFields.error('externalEndpointUrl')} note="運営が許可した送り先と鍵の名前の組だけ使えます。転送する宛先は使えません。">
               <SaveErrorField names={["externalEndpointUrl","endpoint"]}><TextField {...configFields.bind('externalEndpointUrl')} id="file-scan-endpoint" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="https://example.com/scan" /></SaveErrorField>
             </Field>
-            <Field label="鍵の名前" htmlFor="file-scan-secret-ref" error={configFields.error('externalSecretRef')} note="FILE_SCAN_SECRET_ で始まる大文字・数字・下線、120文字以内。送り先と同じ組の名前を指定します。鍵の値は入力しません。">
+            <Field label="鍵の名前" htmlFor="file-scan-secret-ref" requirement={configFields.requirement('externalSecretRef')} error={configFields.error('externalSecretRef')} note="FILE_SCAN_SECRET_ で始まる大文字・数字・下線、120文字以内。送り先と同じ組の名前を指定します。鍵の値は入力しません。">
               <SaveErrorField names={["externalSecretRef","secretRef","secret_ref"]}><TextField {...configFields.bind('externalSecretRef')} id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_SECRET_PRIMARY" /></SaveErrorField>
             </Field>
             <div>

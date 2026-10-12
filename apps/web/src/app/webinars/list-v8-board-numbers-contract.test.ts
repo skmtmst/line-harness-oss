@@ -19,7 +19,7 @@ describe('ウェビナーの一覧は板 UyUMw の数字どおり', () => {
   })
 
   it('数の帯の題は現役の共通の13・500・ink', () => {
-    expect(kpi).toMatch(/\.label \{[^}]*color: var\(--color-ink\); font-size: 13px; font-weight: 500/s)
+    expect(kpi).toMatch(/\.label \{[^}]*color: var\(--color-ink\); font-size: var\(--text-caption\); font-weight: 500/s)
   })
 
   it('表の見出しの地は table-head', () => {

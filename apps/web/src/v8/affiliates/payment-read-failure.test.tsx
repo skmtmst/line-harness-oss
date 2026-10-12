@@ -3,7 +3,7 @@ import React from 'react'
 import {afterEach,beforeEach,it,expect,vi} from 'vitest'
 import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react'
 const f=vi.hoisted(()=>({summaries:vi.fn(),current:vi.fn()}))
-vi.mock('./frame',()=>({useAffiliateShell:()=>({readonly:false,narrow:false,accountId:'a'}),AffiliateFrame:({children,toolbar}:{children:React.ReactNode;toolbar:React.ReactNode})=><div>{toolbar}{children}</div>}))
+vi.mock('./frame',async original=>({...await original<typeof import('./frame')>(),useAffiliateShell:()=>({readonly:false,narrow:false,accountId:'a'}),AffiliateFrame:({children,toolbar}:{children:React.ReactNode;toolbar:React.ReactNode})=><div>{toolbar}{children}</div>}))
 vi.mock('next/navigation',()=>({useSearchParams:()=>new URLSearchParams(),usePathname:()=>'/affiliates',useRouter:()=>({replace:vi.fn(),push:vi.fn()})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}))
 vi.mock('@/lib/api',async original=>{const actual=await original<typeof import('@/lib/api')>();return {...actual,api:{...actual.api,affiliates:{...actual.api.affiliates,settlementPreview:async()=>({success:true,data:{affiliates:[],totalAmount:0,conversionCount:0}}),paymentSummaries:f.summaries,settlementCurrent:f.current}}}})

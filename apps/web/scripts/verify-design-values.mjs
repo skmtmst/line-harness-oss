@@ -317,7 +317,7 @@ const V8_MEASURE = [
   { id: 'x4FeKG', file: 'shared/activity-item.module.css', cls: 'marker', skipText: true },
   { id: 'EsjP2', file: 'shared/activity-item.module.css', cls: 'row', textCls: 'title' },
   { id: 'CugIm', file: 'shared/section-header.module.css', cls: 'root', textCls: 'title' },
-  { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: 'card', textCls: 'title' },
+  { id: 'w6uYMd', file: 'shared/check-card.module.css', cls: ['card', 'checked'], textCls: 'title' },
   { id: 'dtJVi', file: 'shared/segmented.module.css', cls: 'root', textCls: ['item', 'selected'] },
   { id: 'RfHCo', file: 'shared/otp-input.module.css', cls: 'group', node: '桁の並び', skipText: true },
   { id: 'prbOC', file: 'shared/delete-button.module.css', cls: 'tile', skipText: true },
@@ -330,13 +330,13 @@ const V8_MEASURE = [
 ]
 
 /** 現在の実効値を宣言順で読む。clsは同じ要素に付く合成クラス。 */
-function v8EffectiveBody(css, cls) {
+export function v8EffectiveBody(css, cls) {
   return frozenSelectorBody(css, (Array.isArray(cls) ? cls : [cls]).map(c => '.' + c).join(''))
 }
 
 /** 固定HTMLの色・選択状態の照合。同じ要素の合成クラスとv8上書きだけを読む。 */
 export function frozenSelectorBody(css, selector) {
-  const clean = s => s.trim().replace(/^(?:(?:html)?:root|:global\(:root\))\s+/, '').replace(/\[data-theme=["']?v8["']?\]\s*/g, '').replace(/["']/g, '')
+  const clean = s => s.trim().replace(/^(?:(?:html)?:root|:global\(:root\)|(?:html)?\[data-theme=["']?v8["']?\])\s+/, '').replace(/["']/g, '')
   const wanted = clean(selector)
   const classes = [...wanted.matchAll(/\.([\w-]+)/g)].map(m => m[1])
   const rest = wanted.replace(/\.[\w-]+/g, '')

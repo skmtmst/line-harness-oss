@@ -153,6 +153,19 @@ test('実物CSS：差し込み行の項目は8px、印と字は4px。未定義�
   } finally { await browser.close() }
 })
 
+// 閉じた details は Chrome の高さアニメーションで本文の寸法だけが残る。
+// 見えていない本文は除外し、開いたあとの実際のはみ出しは検出する。
+test('閉じた詳細設定の本文をカードのはみ出しに数えず、開いた時は検査する', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(shell(card('<details><summary>詳細設定</summary><div style="height:200px">本文</div></details>', 'height:80px') + '<style>details::details-content { height:0; overflow:clip; content-visibility:visible } details[open]::details-content { height:auto }</style>'))
+    assert.equal((await page.evaluate(scan)).some(f => ['cardspill','cardbottom'].includes(f.kind)), false)
+    await page.locator('summary').click()
+    assert.equal((await page.evaluate(scan)).some(f => f.kind === 'cardspill'), true)
+  } finally { await browser.close() }
+})
+
 // 現役のworkerのHTMLは登録案内用の中央寄せを持つ。共通化後も予約を狭めない。
 test('共通LIFF CSSはWorker入口の中央寄せ・余白を外し、操作の素の枠を消す', async () => {
   const embedded = readFileSync(new URL('../../../liff/src/embedded.css', import.meta.url), 'utf8').replace(/^@import[^;]+;/gm, '').replace(/^@source[^;]+;/gm, '');
@@ -164,3 +177,21 @@ test('共通LIFF CSSはWorker入口の中央寄せ・余白を外し、操作の
     assert.deepEqual(values, { display: 'block', padding: '0px', border: '0px' });
   } finally { await browser.close(); }
 });
+
+// B-245：説明文の移動で、同じ板の同じ下余白を新しい場所と誤認しない。
+test('板の下余白は題で照合し、説明文が変わっても実寸の悪化を止める', async () => {
+  const { assessAgainstBase } = await import('./layout-defects.mjs')
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const board = (description, padding) => shell(`<section data-page-template="create" style="padding-bottom:${padding}px"><header><h2>レポートを作る</h2>${description}</header><div>内容</div></section>`)
+    await page.setContent(board('',12))
+    const base = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    await page.setContent(board('<button data-screen-explanation-toggle>この画面の説明</button><p data-screen-explanation>説明の本文</p>',12))
+    const same = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    assert.equal(assessAgainstBase(same,base,'/fixture',1152,[]).failures.length,0)
+    await page.setContent(board('<p data-screen-explanation>説明の本文</p>',0))
+    const worse = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
+    assert.equal(assessAgainstBase(worse,base,'/fixture',1152,[]).failures.length,1)
+  } finally { await browser.close() }
+})

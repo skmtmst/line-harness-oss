@@ -526,11 +526,12 @@ function Bookings({ eventId }: { eventId: string }) {
       layout="event-roster"
       help={subLine || '開催回ごとの申込・承認・キャンセル待ちを確認できます。'}
       contentPadding="var(--tpl-roster-body-pad)"
-      stats={ <KpiBand><KpiCard icon={<CalendarClock size={13}/>} title="開催回" value={slotsStatus === 'ready' ? slots.length : null} unit="回" detail="このイベントの回" />
-        <KpiCard icon={<Users size={13} />} title="全回の申込" value={slotsStatus === 'ready' && slots.every((slot) => typeof slot.active_count === 'number') ? slots.reduce((sum, slot) => sum + slot.active_count!, 0) : null} unit="人" detail="全開催回の合計" />
-        <KpiCard icon={<Armchair size={13} />} title="全回の定員" value={slotsStatus === 'ready' && slots.every((slot) => slot.capacity !== null) ? slots.reduce((sum, slot) => sum + slot.capacity!, 0) : null} unit="人" detail="定員なしの回があるときは —" />
-        <KpiCard icon={<CalendarX size={13} />} title="取消期限" value={event?.cancel_deadline_hours_before} unit="時間前" detail="開始時刻から数えます" />
-        </KpiBand>}
+      stats={<KpiBand data-design="KPIs">
+        <KpiCard presentation="band" title="申込" icon={<Users size={13} />} value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} valueTextWithUnit unit="人・この回" detail="" />
+        <KpiCard presentation="band" title="承認待ち" icon={<CalendarClock size={13} />} value={ready ? requestedSeats : null} unit="件" detail="" />
+        <KpiCard presentation="band" title="キャンセル待ち" icon={<Armchair size={13} />} value={ready ? waitingSeats + offeredSeats : null} unit="人" detail="" />
+        <KpiCard presentation="band" title="キャンセル" icon={<CalendarX size={13} />} value={ready ? cancelledCount : null} unit="件" detail="" />
+      </KpiBand>}
       actions={(
         <div className={styles.headActions}>
           <Button onClick={() => void exportCsv()} disabled={csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
@@ -558,13 +559,7 @@ function Bookings({ eventId }: { eventId: string }) {
       ) : null}
       {actionError ? <Notice tone="danger" >{actionError}</Notice> : null}
 
-      {/* 数の帯。絵（Mu8qW）は4枚のカードなので、共通の KpiCard をカードの見せ方で並べる。 */}
-      <KpiBand data-design="KPIs">
-        <KpiCard presentation="band" title="申込" icon={<Users size={13} />} value={ready ? (occurrence?.activeSeats ?? confirmedSeats + requestedSeats) : null} valueText={ready ? `${occurrence?.activeSeats ?? confirmedSeats + requestedSeats}${capacity !== null ? ` / ${capacity}` : ''}` : undefined} valueTextWithUnit unit="人・この回" detail="" />
-        <KpiCard presentation="band" title="承認待ち" icon={<CalendarClock size={13} />} value={ready ? requestedSeats : null} unit="件" detail="" />
-        <KpiCard presentation="band" title="キャンセル待ち" icon={<Armchair size={13} />} value={ready ? waitingSeats + offeredSeats : null} unit="人" detail="" />
-        <KpiCard presentation="band" title="キャンセル" icon={<CalendarX size={13} />} value={ready ? cancelledCount : null} unit="件" detail="" />
-      </KpiBand>
+
 
       <EventRosterCard title="申込者" id="ev-bk-applicants" splitAction
         note="承認待ちは期限までに承認か断るを選びます。断る・キャンセルにすると LINE でお知らせが届き、枠が空きます"

@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import styles from './two-factor-ops.module.css'
+import { Field } from '@/components/shared/form-controls'
 import { Steps } from '@/components/templates/steps'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
@@ -127,8 +128,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
         {missingChallenge ? (
           <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Link href={scope === 'ops' ? '/ops/login' : '/login'} onClick={clearTwoFactorChallenge}>ログインに戻る</Link>} />
         ) : error ? <Notice tone="danger" id="ops-two-factor-error" message={error} /> : null}
-        <div className={styles.field}>
-          <p id="ops-two-factor-code-label" className={styles.label}>{recovery ? '回復コード（8文字）' : '認証コード（6桁）'}</p>
+        <Field density="input" contentGap={12} optional={false} label={<span id="ops-two-factor-code-label">{recovery ? '回復コード（8文字）' : '認証コード（6桁）'}</span>}>
           <SaveErrorField names={["typedCode","code"]} key={`${recovery}-${attempt}`}><OtpInput
             length={recovery ? 8 : 6} format={recovery ? 'recovery' : 'digits'} id={recovery ? 'recovery-code' : undefined}
             value={typedCode} onComplete={recovery ? undefined : entered => void submit(entered)}
@@ -136,7 +136,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
             describedBy={missingChallenge ? 'ops-two-factor-missing' : error ? 'ops-two-factor-error' : undefined}
             invalid={Boolean(error)} success={succeeded} busy={loading} disabled={missingChallenge || succeeded} autoFocus
           /></SaveErrorField>
-        </div>
+        </Field>
         {recovery ? <><p>控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。</p><p>回復コードも無い時は、オーナー（運営）に連絡して、登録をやり直します。</p></> : scope === 'admin' ? <p className={styles.foot}>コードは約30秒ごとに更新されます</p> : null}
         <Button
           variant="primary" fullWidth

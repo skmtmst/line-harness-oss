@@ -1,4 +1,11 @@
 'use client'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  draft_code: requiredText("卓番を入れてください。"),
+  draft_label: requiredText("表示名を入れてください。"),
+}
+
 import {reservationBoardApi} from '@/lib/api-reservation-board'
 import {seatBoardEntry,type RestaurantFloor} from '@line-crm/shared'
 import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
@@ -128,8 +135,8 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   const save = async () => {
     if (!draft || !selectedAccountId) return
     const errors: Partial<Record<keyof Draft, string>> = {}
-    if (!draft.code.trim()) errors.code = '卓番を入れてください。'
-    if (!draft.label.trim()) errors.label = '表示名を入れてください。'
+    if ((b244Requirements.draft_code.check(draft.code) !== null)) errors.code = '卓番を入れてください。'
+    if ((b244Requirements.draft_label.check(draft.label) !== null)) errors.label = '表示名を入れてください。'
     const min = Number(draft.minCapacity), max = Number(draft.maxCapacity)
     if (!Number.isInteger(min) || min < 1) errors.minCapacity = '最小人数は1以上の整数にしてください。'
     if (!Number.isInteger(max) || max < min || max < 1) errors.maxCapacity = '最大人数は最小人数以上の整数にしてください。'
@@ -299,10 +306,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         {draft ? (
           <div ref={editorRef} className={styles.editorFields}>
             <div className={styles.pair}>
-              <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code}>
+              <Field label="卓番" htmlFor="rs-table-code" error={fieldErrors.code} requirement={b244Requirements.draft_code}>
                 <SaveErrorField names={["code","draft.code"]}><TextField id="rs-table-code" value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} /></SaveErrorField>
               </Field>
-              <Field label="表示名" htmlFor="rs-table-label" error={fieldErrors.label}>
+              <Field label="表示名" htmlFor="rs-table-label" error={fieldErrors.label} requirement={b244Requirements.draft_label}>
                 <SaveErrorField names={["label","draft.label"]}><TextField id="rs-table-label" value={draft.label} onChange={(event) => setDraft({ ...draft, label: event.target.value })} /></SaveErrorField>
               </Field>
             </div>

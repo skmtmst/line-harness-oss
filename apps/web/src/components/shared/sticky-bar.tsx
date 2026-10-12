@@ -102,7 +102,7 @@ export default function StickyBar({
     >
       <div className={styles.lead} data-sticky-lead>
         {destructive}
-        {status ? <p className={styles.status}>{status}</p> : null}
+        {status ? <p className={styles.status} title={typeof status === 'string' ? status : undefined}>{status}</p> : null}
       </div>
       {info ? <div className={styles.info}>{info}</div> : null}
       <div className={styles.actions} data-sticky-actions>{actions}</div>

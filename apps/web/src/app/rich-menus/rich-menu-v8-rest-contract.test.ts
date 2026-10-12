@@ -43,7 +43,7 @@ describe('リッチメニューの残り板', () => {
   it('1152（Y9ASp・kmTab）は板1100px未満で畳む', () => {
     // 新しい一覧は CSS の @container ではなく狭い板の判定（narrow）で、フォルダの列を道具の段へ畳む。
     expect(LIST).toContain('folders={narrow ? undefined : folderPanel}')
-    expect(LIST).toContain('toolbar={narrow ? narrowToolbar : wideToolbar}')
+    expect(LIST).toContain('toolbar={wideToolbar}')
     expect(CREATE_CSS).toContain('@container (max-width: 1100px)')
   })
 })

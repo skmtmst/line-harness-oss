@@ -12,7 +12,7 @@ const token = (name: string) => GLOBALS.match(new RegExp(`${name}:\\s*([^;]+);`)
 
 /*
  * V8 一斉配信の数字合わせ（NtCE3）。見本 `NtCE3.html` の寸法に合わせる。
- * 見出し 13px/500・余白13px 20px、行の余白9px 20px、題13px/500。
+ * 10-11固定版とB-207：名前は黒・700。件数・金額は実データを出す。
  * 件数・金額などの中身は API の実データを出す（絵の数は写さない）。
  */
 describe('一斉配信の数字合わせ', () => {
@@ -32,9 +32,10 @@ describe('一斉配信の数字合わせ', () => {
     expect(CSS).toMatch(/\.table th:last-child,\s*\.table td:last-child \{ padding-right: var\(--tpl-bc-edge-pad\)/)
   })
 
-  it('題は12px・500', () => {
+  it('名前は12px・黒・700（B-207）', () => {
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-size: var\(--text-label\)/)
     expect(token('--text-label')).toBe('12px')
-    expect(CSS).toMatch(/\.cellTitle \{[^}]*font-weight: 500/)
+    expect(CSS).toMatch(/\.cellTitle \{[^}]*font-weight: 700/)
+    expect(CSS).toMatch(/\.cellTitle \{[^}]*color: var\(--color-ink\)/)
   })
 })

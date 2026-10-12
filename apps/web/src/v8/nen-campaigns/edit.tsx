@@ -449,7 +449,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       {error ? <Notice tone="danger" message={error} /> : null}
       {notice ? <Notice tone="success" message={notice} /> : null}
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-flow">
+      <Card variant="form" gap="normal" aria-labelledby="nen-edit-flow">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-flow">配信フロー</h2>
           <p className={styles.cardNote}>{formAction && mileageAction ? '回答フォームへの送信をきっかけにマイルを付けます' : 'きっかけから届くまでの流れです'}</p>
@@ -463,7 +463,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         </ol>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-when">
+      <Card variant="form" gap="normal" aria-labelledby="nen-edit-when">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-when">いつ送りますか</h2>
           <p className={styles.cardNote}>このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます</p>
@@ -525,7 +525,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         )}
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-what">
+      <Card variant="form" gap="normal" aria-labelledby="nen-edit-what">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-what">送るもの</h2>
           <p className={styles.cardNote}>この配信は1通で届きます</p>
@@ -559,7 +559,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         <p className={styles.caution}>差し込む名前が長いと、送るときに長すぎる場合があります。1回にたくさんの吹き出しを送るとブロックされやすい傾向があります（一般的な目安）。</p>
       </Card>
 
-      <Card layout="vertical" padding="spacious" surface="standard" spacing="normal" aria-labelledby="nen-edit-after">
+      <Card variant="form" gap="normal" aria-labelledby="nen-edit-after">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="nen-edit-after">押されたあとにすること</h2>
           <p className={styles.cardNote}>{`メッセージの「${merged.buttonLabel?.replace(/（.*?）/, '') || 'ボタン'}」を押した人に何をするかです`}</p>

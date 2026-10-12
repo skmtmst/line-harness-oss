@@ -1,5 +1,6 @@
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, ReactNode, Ref } from 'react'
 import HelpTip from '@/components/shared/help-tip'
+import ScreenExplanation from '@/components/shared/screen-explanation'
 import StickyBar from '@/components/shared/sticky-bar'
 import styles from './page-templates.module.css'
 
@@ -28,9 +29,15 @@ export interface PageHeadingProps {
   titleSize?: 'sub'
   /** 説明の文字を本文の大きさ（13/20）にする。渡さないときは補足の 12/19 のまま。 */
   subtitleSize?: 'body'
-  /** 詳細の説明とタブを詰める口。指定しない画面には効かない。 */
+  /** 一覧・詳細の頭と本文の間を詰める口。指定しない画面には効かない。 */
   bottomSpacing?: 'compact'
+  /** B-245：画面全体の説明。題の横から開閉し、人ごと・画面ごとに覚える。 */
   help?: ReactNode
+  /** 詳細の顔など、題の前に置く識別の印。 */
+  leading?: ReactNode
+  /** いつも出る画面全体の説明。短い用語の説明 help とは別に渡す。 */
+  explanation?: ReactNode
+  explanationKey?: string
   /** 題の隣の状態の札・名前を変える操作。 */
   titleAccessory?: ReactNode
   /**
@@ -61,7 +68,7 @@ export function PageTitle({ children, as: Tag = 'h2', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', titleId, titleTabIndex, help, titleAccessory, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   /*
    * 絵の値を渡された分だけ、この頭の中だけに効く変数で下へ流す。`.heading`・`.title` は
@@ -76,10 +83,9 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', title
         ...(titleSize === 'sub' ? { '--tpl-title-size': '18px', '--tpl-title-lh': '27px' } : null),
       } as CSSProperties)
   return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
+    {leading}
     <div className={styles.headingText}>
-      <div className={styles.titleRow}><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}
-        {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}
-      </div>
+      <ScreenExplanation titleClassName={styles.titleRow} panelClassName={styles.description} screenKey={explanationKey} title={<><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}{help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}</>}>{explanation}</ScreenExplanation>
       {subtitle?<p className={styles.subtitle}>{subtitle}</p>:null}
       {tabs ? <div className={styles.headingTabs} data-template-region="heading-tabs">{tabs}</div> : null}
     </div>
@@ -89,10 +95,10 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h2', title
   </header>
 }
 
-export function PageFrame({ kind, children, boardId, layout, standalone = false, hasFooter = false, skeleton = false }: {
-  kind: string; children: ReactNode; boardId?: string; layout?: string; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean
+export function PageFrame({ kind, children, boardId, layout, heightMode, standalone = false, hasFooter = false, skeleton = false, elementRef }: {
+  kind: string; children: ReactNode; boardId?: string; layout?: string; heightMode?: 'viewport' | 'content'; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean; elementRef?: Ref<HTMLDivElement>
 }) {
-  return <div className={styles.frame} data-list-skeleton={skeleton ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+  return <div ref={elementRef} className={styles.frame} data-frame-height={heightMode} data-height-mode={heightMode} data-list-skeleton={skeleton ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
 }
 
 /** 型が保存帯の置き場所と追従を持つ。画面は操作と状態だけを渡す。 */

@@ -30,10 +30,12 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   await centered(page.getByRole('button', { name: 'パスワードを設定してログインへ' }))
   await page.goto('/login/two-factor#lh_2fa=fixture-challenge&lh_method=password')
   await expect(page.getByRole('textbox')).toHaveCount(6)
+  expect(await page.getByRole('group', { name: '認証コード（6桁）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await centered(page.getByRole('button', { name: '確認してログイン', exact: true }))
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`verify-${width}.png`) })
   await page.getByRole('button', { name: '回復コードを使う' }).click()
   await expect(page.getByRole('textbox')).toHaveCount(8)
+  expect(await page.getByRole('group', { name: '回復コード（8文字）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await page.getByRole('textbox', { name: '1文字目' }).evaluate(el => {
     const event = new Event('paste', { bubbles: true }); Object.defineProperty(event, 'clipboardData', { value: { getData: () => '7k2q-9fxm' } }); el.dispatchEvent(event)
   })

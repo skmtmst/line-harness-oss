@@ -488,30 +488,55 @@
 
 
 /* B-178：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
+:root :global([data-page-template='list'] [data-template-region='content']) .frame:not([data-table-presentation]):not([data-column-layout]):not([data-grid-table]) .row:not(:has([colspan])) {
+  height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h));
+}
 :root :global([data-list-skeleton]) .table.table > thead > tr {
   height: var(--tpl-list-head-h);
 }
 :root :global([data-list-skeleton]) .table.table > thead > tr > th {
   height: var(--tpl-list-head-h); padding-block: 0;
-  padding-inline: var(--tpl-list-cell-side);
+  padding-inline: calc(var(--tpl-list-cell-side) / 2);
 }
 :root :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) {
-  height: var(--tpl-list-row-h);
+  height: var(--list-content-row-h, var(--tpl-list-row-h));
 }
 :root :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) > td {
-  height: var(--tpl-list-row-h); padding-block: 0;
-  padding-inline: var(--tpl-list-cell-side);
+  height: var(--list-content-row-h, var(--tpl-list-row-h)); padding-block: 0;
+  padding-inline: calc(var(--tpl-list-cell-side) / 2);
+}
+
+/* 固定した絵の列間16は隣り合うセルの8＋8。表の両端だけ24を持つ。 */
+:root :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr:not([data-table-layout='columns']) > :is(th, td):first-child {
+  padding-inline-start: var(--tpl-list-inset);
+}
+:root :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr:not([data-table-layout='columns']) > :is(th, td):last-child {
+  padding-inline-end: var(--tpl-list-inset);
+}
+
+/* 選択＋並び替えの列は、端24・選択16・列間の半分8を確保する。
+   古い40pxのcol指定で名前の開始位置を8px左へ詰めない。 */
+:root :global([data-list-skeleton]) .table:has(> tbody > tr > td:first-child input[type='checkbox']):has([data-reorder-handle], [data-reorder-disabled]) > colgroup > col:first-child {
+  width: calc(var(--tpl-list-inset) + var(--polish-icon-control) + var(--tpl-cell-gap-half));
+}
+
+/* 通常の見出しは空欄。全選択は指を乗せる・キーボードで入る・選択中に出す。
+   inputを残すので、Spaceと読み上げによる全選択も従来どおり使える。 */
+@media (hover: hover) and (pointer: fine) {
+  html:root :global(:is([data-list-skeleton], [data-page-template='list'])) .table > thead > tr:not(:hover):not(:focus-within) > th:first-child:has(input[type='checkbox']:not(:checked):not(:indeterminate)) label {
+    opacity: 0;
+  }
 }
 
 /* 列型も同じ行高。縦の余白は行が持ち、セルの高さを二重に足さない。 */
 :root :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] { padding-block: 0; box-sizing: border-box; }
 :root :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] > :is(th, td) { height: auto; padding-inline: 0; }
 :root :global([data-list-skeleton]) .table.table > thead > tr { min-height: var(--tpl-list-head-h); }
-:root :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--tpl-list-row-h); }
+:root :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--list-content-row-h, var(--tpl-list-row-h)); }
 
-/* headHeight/rowHeightを持つ列型でも、一覧の骨組みが高さを決める。 */
-:root :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--tpl-list-head-h); min-height: var(--tpl-list-head-h); }
-:root :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); }
+/* 列型の見出しは指定の口を保つ。一覧はB-254の中身52/60、一般表は指定の口。 */
+:root :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--table-head-height, var(--tpl-list-head-h)); min-height: var(--table-head-height, var(--tpl-list-head-h)); }
+:root :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h)); }
 .row[data-highlighted] {
   background: var(--color-accent-soft);
 }
@@ -543,9 +568,27 @@ html:root .actionCell > :is(button, a) { min-width: var(--row-action-width, max-
 /* 表に実際に残る幅で、補助列を畳む。名前と操作を潰して収めない。 */
 /* inline-size のコンテナは子の幅で広がらない。窓の flex-start 内でも幅を保つ。 */
 html:root .frame:not([data-table-presentation='calendar']) { width: 100%; min-width: 0; container-type: inline-size; container-name: v8-list-table; }
-@container v8-list-table (max-width: 1100px) { html:root .frame[data-shared-part='list-table'] .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
+@container v8-list-table (max-width: 1100px) { html:root .frame[data-shared-part='list-table']:not([data-collapse-scope='page']) .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
 html:root .actionCell { flex: none; min-width: max-content; }
 html:root .actionCell :is(button, a):not([data-row-menu]) { min-width: var(--row-action-width, max-content); }
 
 /* 既存の細いGridTableの判定も同じ器を使う。名前を置き換えない。 */
 html:root .frame[data-grid-table] { container-name: v8-list-table shared-grid-table; }
+
+/* 固定V8：名前の横に置く札を同じ1行にそろえる。 */
+html:root [data-list-name-cell] .name { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+
+/* B-254: one rendered line is 52; two or three are 60. The table sets the count. */
+html:root .table.table > tbody > tr[data-list-content-lines] {
+  --list-content-row-h: var(--tpl-list-row-h);
+  height: var(--list-content-row-h); min-height: var(--list-content-row-h);
+}
+html:root .table.table > tbody > tr[data-list-content-lines]:is([data-list-content-lines='2'], [data-list-content-lines='3']) {
+  --list-content-row-h: var(--tpl-list-row-multi-h);
+}
+
+/* Card-contained general tables keep their own 56px density inside a list page. */
+html:root .frame[data-list-density-scope='general'] .table.table > tbody > tr:not(:has([colspan])),
+html:root .frame[data-list-density-scope='general'] .table.table > tbody > tr:not(:has([colspan])) > td {
+  height: var(--polish-table-row); min-height: var(--polish-table-row);
+}

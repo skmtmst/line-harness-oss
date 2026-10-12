@@ -79,7 +79,7 @@ export default function CustomerInfoPanel({
     {!hidden.includes('names') ? <section className={styles.section} aria-label="基本">
       <div className={styles.head}>
         <h3>基本</h3>
-        {canEdit && state === 'ready' && !editing ? <Button variant="text" onClick={() => { setDraft(Object.fromEntries(shownFields.map(field => [field.id, field.value ?? '']))); setSaveError(''); setEditing(true) }}>編集</Button> : null}
+        {canEdit && state === 'ready' && !editing ? <Button variant="text" size="inline" onClick={() => { setDraft(Object.fromEntries(shownFields.map(field => [field.id, field.value ?? '']))); setSaveError(''); setEditing(true) }}>編集</Button> : null}
       </div>
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>

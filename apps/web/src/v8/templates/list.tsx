@@ -35,7 +35,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
+import { FolderDotName, folderDisplayColor, type FolderDotFolder } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -58,6 +58,8 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import TagPill from '@/components/shared/tag-pill'
+import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import { useTemplatePanelDetail } from './panel-detail'
@@ -1000,39 +1002,7 @@ export default function TemplatesListV8() {
   )
 
   /* 1152 の板（L7zA7C）：1段目「作る・フォルダ・探す … 件数」、2段目「札・よく使う絞り込み（印だけ）」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      <ListToolbarRow>
-        {createButton(false)}
-        <div className={styles.narrowFolder}>
-          <SaveErrorField names={["selectedCategory","selected_category"]}><Select
-            aria-label="フォルダ"
-            value={selectedCategory}
-            onChange={(value) => {
-              setSelectedCategory(value)
-              setPage(1)
-            }}
-            options={folderSelectOptions}
-          /></SaveErrorField>
-        </div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            aria-label="テンプレートを検索"
-            placeholder="名前・本文で探す"
-            value={templateQuery}
-            onChange={onSearch}
-            onClear={() => onSearch('')}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.spacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        {savedBox(true)}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   const wideToolbar = (
     <ListToolbarFrame>
@@ -1091,7 +1061,7 @@ export default function TemplatesListV8() {
         shouldOpen={(event) => Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))}
       >
         <div className={styles.tableWrap}>
-          <DataTable>
+          <DataTable presentation="template-list">
             <colgroup>
               <col className={styles.colSelect} />
               <col />
@@ -1128,6 +1098,7 @@ export default function TemplatesListV8() {
               {duplicateFeedback.order(shownItems, templates).map((t, saveFieldIndex) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
+                const folder = folderDotOf(t)
                 const excerpt = excerptOf(t)
                 return (
                   <Tr
@@ -1157,16 +1128,15 @@ export default function TemplatesListV8() {
                             </RowNameLink>
                           </>
                         </div>
-                      } folder={folderDotOf(t)}
+                      } folder={folder}
                     />
                     <Td>
-                      <span className={styles.kindBadge}>{isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}</span>
+                      <TagPill name={isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)} color={folder ? folderDisplayColor(folder) : undefined} aria-label={`種類：${isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)}`} />
                     </Td>
                     <Td>
-                      <span className={styles.publishPill} data-tone={publish.tone}>
-                        <span className={styles.publishDot} aria-hidden="true" />
+                      <StatusBadge tone={publish.tone === 'live' ? 'success' : publish.tone === 'changes' ? 'warning' : 'neutral'}>
                         {publish.label}
-                      </span>
+                      </StatusBadge>
                     </Td>
                     {!narrow && (
                       <Td>
@@ -1249,10 +1219,8 @@ export default function TemplatesListV8() {
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
   const pagerSummary = `${formatNumber(filteredTemplates.length)} 件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)} 件`
-  const listPager = !showPager ? null : pageCount > 1 ? (
+  const listPager = !showPager ? null : (
     <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
-  ) : (
-    <p className={styles.pagerSolo}>{pagerSummary}</p>
   )
 
   const isTemplateSection = activeSection === 'message' || activeSection === 'question' || activeSection === 'rich_video'
@@ -1686,7 +1654,7 @@ export default function TemplatesListV8() {
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content"
       skeleton
       boardId={narrow ? 'L7zA7C' : 'v19Ivv'}
       headingSize="regular"
@@ -1708,9 +1676,9 @@ export default function TemplatesListV8() {
           ))}
         </KpiBand>
       }
-      folderNav={narrow ? undefined : { rows: folderRows, activeId: selectedCategory, onSelect: selectCategory, createAction: createButton(false) }}
+      folderNav={{ rows: folderRows, activeId: selectedCategory, onSelect: selectCategory, createAction: createButton(false) }}
       folders={folderPanel}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+      toolbar={wideToolbar}
       pagination={listPager}
       overlays={overlays}
     >

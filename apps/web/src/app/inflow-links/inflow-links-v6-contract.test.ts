@@ -70,8 +70,9 @@ describe('V6 流入経路一覧の契約', () => {
 
   it('検索・並び順・表示件数を共通部品にし、動く並び替えだけを載せる', () => {
     // 板 xbHxg：検索は共通 SearchField をそのまま置く。素の input 検索に戻さない。
-    expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
-    expect(PAGE).toContain('<SearchField')
+    expect(PAGE).toContain("from '@/components/shared/list-toolbar'")
+    expect(PAGE).toContain('<ListToolbar')
+    expect(PAGE).toContain('search={{ placeholder: searchLabel')
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
     expect(PAGE).toContain("import PageSizeSelect from '@/components/shared/page-size-select'")
     expect(PAGE).toContain('const [sort, setSort] = useListUrlValue<RouteSort>')

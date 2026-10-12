@@ -1,4 +1,11 @@
 'use client'
+import Card from '@/components/shared/card'
+
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("ルール名を入力してください"),
+}
+
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
@@ -139,7 +146,7 @@ export default function EarningRuleCreateV8() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const fieldErrors: Record<string, string> = {}
-  if (!name.trim()) fieldErrors['er-name'] = 'ルール名を入力してください'
+  if ((b244Requirements.name.check(name) !== null)) fieldErrors['er-name'] = 'ルール名を入力してください'
   if (!validAmount) fieldErrors['er-amount'] = '付与マイルは1以上の整数で入力してください'
   if (validFrom && validUntil && validFrom > validUntil) fieldErrors['er-until'] = '終了日は開始日より後にしてください'
   if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
@@ -269,7 +276,7 @@ export default function EarningRuleCreateV8() {
   const trialValue = (filled: string) => (trialBusy ? '数えています…' : trial ? filled : emptyValue('unknown'))
   const preview = (
     <div className={styles.side}>
-      <section className={styles.sideCard} aria-labelledby="er-new-trial">
+      <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-labelledby="er-new-trial">
         <div className={styles.sideHead}>
           <h2 className={styles.sideTitle} id="er-new-trial">この設定だとこう貯まります</h2>
           <button type="button" className={styles.trialButton} onClick={() => void runTrial()} disabled={trialBusy}>
@@ -298,15 +305,15 @@ export default function EarningRuleCreateV8() {
             <dd>{`${validAmount ? miles(value) : emptyValue('unknown')}${dailyCap ? `（1日${dailyCap}回まで）` : ''}`}</dd>
           </div>
         </dl>
-      </section>
-      <section className={styles.sideCard} aria-labelledby="er-new-caution">
+      </Card>
+      <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-labelledby="er-new-caution">
         <h2 className={styles.sideTitle} id="er-new-caution">気をつけること</h2>
         <p className={styles.caution}>
           ・付けたマイルはあとから消せません（減らすで取り消しの明細を足します）
           <br />
           ・確定待ちは、確定の日まで残高に入りません
         </p>
-      </section>
+      </Card>
     </div>
   )
 
@@ -317,6 +324,7 @@ export default function EarningRuleCreateV8() {
       help="どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。"
       notice={conflictBand}
       preview={preview}
+      hidePreviewWhenNarrow
       footerActions={(
         <>
           <Button href={LIST_HREF}>キャンセル</Button>
@@ -331,12 +339,12 @@ export default function EarningRuleCreateV8() {
     >
       {saveError ? <Notice tone="danger" message={saveError} onClose={() => setSaveError('')} /> : null}
 
-      <section className={styles.card} aria-labelledby="er-new-rule">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="er-new-rule">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="er-new-rule">どのルールか</h2>
           <p className={styles.cardNote}>きっかけになる行動を選びます</p>
         </div>
-        <Field label="名前" htmlFor="er-name" error={errorOf('er-name')}>
+        <Field label="名前" htmlFor="er-name" error={errorOf('er-name')} requirement={b244Requirements.name}>
           <SaveErrorField names={["name"]}><TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
         <div className={styles.fieldRow}>
@@ -376,9 +384,9 @@ export default function EarningRuleCreateV8() {
             <p className={styles.cardNote}>条件を付けない場合は全員が対象です。</p>
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="er-new-amount">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="er-new-amount">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="er-new-amount">何マイル付けるか</h2>
         </div>
@@ -400,9 +408,9 @@ export default function EarningRuleCreateV8() {
             />
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="er-new-who">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="er-new-who">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="er-new-who">受け取る人・使えるまで</h2>
         </div>
@@ -418,9 +426,9 @@ export default function EarningRuleCreateV8() {
           <RadioCard name="initial-status" value="pending" checked={initialStatus === 'pending'} onChange={() => setInitialStatus('pending')}
             icon={<Hourglass size={16} />} title="確定待ち" note="確定するまで使えない" />
         </RadioCardGroup></SaveErrorField>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="er-new-limit">
+      <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--space-16)" aria-labelledby="er-new-limit">
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle} id="er-new-limit">付けすぎを防ぐ</h2>
         </div>
@@ -493,7 +501,7 @@ export default function EarningRuleCreateV8() {
             </Checkbox></SaveErrorField>
           </div>
         </Disclosure>
-      </section>
+      </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した決めごと" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage></SaveErrorScope>

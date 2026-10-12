@@ -3,6 +3,7 @@
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import React from 'react'
 import { useTableActionWidth } from './use-table-action-width'
+import { useListRowDensity } from './use-list-row-density'
 import { useListUrlState } from './list-url-state'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import TruncatedText from './truncated-text'
@@ -132,7 +133,7 @@ export function DataTable({
   className?: string
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
-  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery'
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
@@ -140,15 +141,16 @@ export function DataTable({
   label?: string
   'aria-label'?: string
   /** フレックスで並ぶ一覧。既定の表の余白は変えず、指定した表だけに使う。 */
-  columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string }
+  columnLayout?: { headHeight: string; rowHeight: string; gap: string; padding: string; numberInset?: string; nameInset?: string; headPadding?: string; headRadius?: string; rowGap?: string; headTextSize?: string; bodyTextSize?: string; collapseScope?: 'page' }
   /** 列の寸法が板ごとに決まる設定一覧（LINE通知）。セル・線・枠は共通部品が持つ。 */
   grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
+  useListRowDensity(actionWidthRef)
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div ref={actionWidthRef} data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <div ref={actionWidthRef} data-shared-part="list-table" className={[shell.frame, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -243,6 +245,11 @@ export function RowNameLink({ onOpen, onClick, ...props }: React.ComponentProps<
   }} />
 }
 
+/** 名前から既存の詳細を開く操作。行き先の切り替え方は画面が保つ。 */
+export function RowNameButton({ className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <button type="button" {...props} className={[styles.rowNameLink, className].filter(Boolean).join(' ')} />
+}
+
 export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'children' | 'className'> & {
   children?: ReactNode
   align?: 'left' | 'right' | 'center'
@@ -262,15 +269,22 @@ export function Td({ children, align = 'left', className, collapseAt, grow, ...c
   return <td className={classes} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
 }
 
+/** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */
+export function DateCell({ children, ...cellProps }: Omit<TdProps, 'className'>) {
+  return <Td {...cellProps} className={styles.dateCell}>{children}</Td>
+}
+
 /** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, folder, className }: {
+export function NameCell({ name, folder, annotation, className }: {
   name: ReactNode
+  /** 名前の横の状態札。名前やリンクの中には入れない。 */
+  annotation?: ReactNode
   folder?: FolderDotFolder | null
   className?: string
 }) {
   return (
     <td data-list-name-cell="" className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
-      <div className={shell.name}><FolderDotName folder={folder}>{name}</FolderDotName></div>
+      <div className={shell.name}><FolderDotName folder={folder} annotation={annotation}>{name}</FolderDotName></div>
     </td>
   )
 }

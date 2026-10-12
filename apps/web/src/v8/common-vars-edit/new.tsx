@@ -30,6 +30,8 @@ import { withPermissionFailure } from '@/components/shared/api-error-message';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Card from '@/components/shared/card'
 
 /*
  * ★V8 共通情報を作る（板 `p82v9`）。
@@ -459,12 +461,12 @@ export default function NewCommonVarV8() {
         <Notice tone="warn" message="共通情報を登録するLINEアカウントを選択してください。" />
       )}
 
-      <section className={styles.card} aria-labelledby="cv-new-name-heading">
+      <Card variant="form" gap="normal" aria-labelledby="cv-new-name-heading">
         <div className={styles.cardHead}>
           <h2 id="cv-new-name-heading" className={styles.cardTitle}>名前と差し込み名</h2>
         </div>
         <div className={styles.nameRow}>
-          <div className={styles.field}><Field label="共通情報名（友だちには見えません）" htmlFor="cv-name"><SaveErrorField names={["name"]}><input
+          <div className={styles.field}><Field density="input" label="共通情報名（友だちには見えません）" htmlFor="cv-name"><SaveErrorField names={["name"]}><input
               id="cv-name"
               type="text"
               maxLength={NAME_MAX}
@@ -482,7 +484,7 @@ export default function NewCommonVarV8() {
               title={`${name.length}/${NAME_MAX}文字`}
             /></SaveErrorField>
 <VarFieldError message={nameFieldError} /></Field></div>
-          <div className={`${styles.field} ${styles.folderField}`}><Field label="フォルダ" htmlFor="cv-folder"><div className={styles.selectBox}>
+          <div className={`${styles.field} ${styles.folderField}`}><Field density="input" label="フォルダ" htmlFor="cv-folder"><div className={styles.selectBox}>
               <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 aria-label="フォルダ"
                 id="cv-folder"
@@ -503,7 +505,7 @@ export default function NewCommonVarV8() {
               </div>
             ) : null}</Field></div>
         </div>
-        <div className={styles.field}><Field note={<>
+        <div className={styles.field}><Field density="input" note={<>
             半角の英小文字で始め、英小文字・数字・下線だけ・32文字まで。変えるとテンプレートの差し込みが空になるため、あとから変えられません。
           </>} label="差し込み名（あとから変えられません）" htmlFor="cv-key"><div className={styles.keyRow}>
             <span className={styles.keyBox}>
@@ -529,39 +531,37 @@ export default function NewCommonVarV8() {
           </div>
 <VarFieldError message={keyFieldError} />
 </Field></div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="cv-new-type-heading">
+      <Card variant="form" gap="normal" aria-labelledby="cv-new-type-heading">
         <div className={styles.cardHead}>
           <h2 id="cv-new-type-heading" className={styles.cardTitle}>種別と中身</h2>
           <p className={styles.cardNote}>種別は作ったあと変えられません</p>
         </div>
-        <div className={styles.typeGrid} role="radiogroup" aria-label="種別">
+        <RadioCardGroup legend="種別" className={styles.typeGrid}>
           {TYPES.map((entry) => {
             const Icon = entry.icon
             const checked = type === entry.key
             return (
-              <button
+              <RadioCard
                 key={entry.key}
-                type="button"
-                role="radio"
-                aria-checked={checked}
-                onClick={() => {
+                variant="card"
+                name="common-var-type"
+                value={entry.key}
+                checked={checked}
+                title={entry.label}
+                note={entry.desc}
+                icon={<Icon size={14} aria-hidden="true" />}
+                onChange={() => {
                   setType(entry.key)
                   setValue('')
                 }}
-                className={styles.typeCard}
-              >
-                <span className={styles.typeTop}>
-                  <Icon size={14} aria-hidden="true" />
-                  <span className={styles.typeLabel}>{entry.label}</span>
-                </span>
-                <span className={styles.typeDesc} title={entry.desc}>{entry.desc}</span>
-              </button>
+                onClick={() => setValue('')}
+              />
             )
           })}
-        </div>
-        <div className={styles.field}><Field label="中身" htmlFor="cv-value" required={COMMON_VAR_VALUE_REQUIRED.has(type)}>{type === 'boolean' ? (
+        </RadioCardGroup>
+        <div className={styles.field}><Field density="input" label="中身" htmlFor="cv-value" required={COMMON_VAR_VALUE_REQUIRED.has(type)}>{type === 'boolean' ? (
             <SaveErrorField names={["value"]}><Select size="full" aria-label="中身" id="cv-value" error={valueFieldError || undefined} value={value} onChange={(next) => { setValue(next); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
           ) : type === 'long_text' ? (
             <SaveErrorField names={["value"]}><textarea
@@ -607,24 +607,24 @@ export default function NewCommonVarV8() {
             /></SaveErrorField>
           )}
 <VarFieldError message={valueFieldError} /></Field></div>
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="cv-new-period-heading">
+      <Card variant="form" gap="normal" aria-labelledby="cv-new-period-heading">
         <div className={styles.cardHead}>
           <h2 id="cv-new-period-heading" className={styles.cardTitle}>使える期間</h2>
           <p className={styles.cardNote}>空なら期間を決めません。予約した配信は、送り始める時刻で判断します</p>
         </div>
         <div className={styles.periodGrid}>
 
-          <Field label="始まり" htmlFor="cv-valid-from"><SaveErrorField names={["validFrom","valid_from"]}><DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
-          <Field label="終わり" htmlFor="cv-valid-until"><SaveErrorField names={["validUntil","valid_until"]}><DateTimeField id="cv-valid-until" value={validUntil} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
+          <Field density="input" label="始まり" htmlFor="cv-valid-from"><SaveErrorField names={["validFrom","valid_from"]}><DateTimeField id="cv-valid-from" value={validFrom} onChange={(next) => { setValidFrom(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
+          <Field density="input" label="終わり" htmlFor="cv-valid-until"><SaveErrorField names={["validUntil","valid_until"]}><DateTimeField id="cv-valid-until" value={validUntil} onChange={(next) => { setValidUntil(next); setPeriodFieldError('') }} invalid={Boolean(periodFieldError)} /></SaveErrorField></Field>
           <div className={styles.selectBox}>
-            <Field label="期間の外では" htmlFor="cv-expiry-behavior"><SaveErrorField names={["expiryBehavior","expiry_behavior"]}><Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} /></SaveErrorField></Field>
+            <Field density="input" label="期間の外では" htmlFor="cv-expiry-behavior"><SaveErrorField names={["expiryBehavior","expiry_behavior"]}><Select size="full" aria-label="期間の外では" id="cv-expiry-behavior" value={expiryBehavior} onChange={(next) => setExpiryBehavior(next as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} /></SaveErrorField></Field>
           </div>
         </div>
         <VarFieldError message={periodFieldError} />
         {expiryBehavior === 'fallback' && (
-          <div className={styles.field}><Field label="代替値" htmlFor="cv-fallback-value">{type === 'boolean' ? (
+          <div className={styles.field}><Field density="input" label="代替値" htmlFor="cv-fallback-value">{type === 'boolean' ? (
               <SaveErrorField names={["fallbackValue","fallback_value"]}><Select size="full" aria-label="代替値" id="cv-fallback-value" error={fallbackFieldError || undefined} value={fallbackValue} onChange={(next) => setFallbackValue(next)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
             ) : type === 'date' ? (
               <SaveErrorField names={["fallbackValue","fallback_value"]}><DateField id="cv-fallback-value" invalid={Boolean(fallbackFieldError)} value={fallbackValue} onChange={setFallbackValue} /></SaveErrorField>
@@ -642,9 +642,9 @@ export default function NewCommonVarV8() {
             )}
 <VarFieldError message={fallbackFieldError} /></Field></div>
         )}
-      </section>
+      </Card>
 
-      <div className={styles.field}><Field label="社内メモ" htmlFor="cv-memo"><SaveErrorField names={["memo"]}><input
+      <div className={styles.field}><Field density="input" label="社内メモ" htmlFor="cv-memo"><SaveErrorField names={["memo"]}><input
           id="cv-memo"
           type="text"
           maxLength={MEMO_MAX}

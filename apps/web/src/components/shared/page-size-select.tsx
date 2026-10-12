@@ -36,7 +36,7 @@ export default function PageSizeSelect({
   // だけ使っているが、公開Propsの型は変えず、id/name/disabled だけ中へ渡す。
   const { disabled, id, name } = rest
   return (
-    <label className={['flex min-w-0 items-center gap-2', className].filter(Boolean).join(' ')}>
+    <label data-page-size className={['flex min-w-0 items-center gap-2', className].filter(Boolean).join(' ')}>
       {label ? <span className="text-ink-faint text-xs whitespace-nowrap">{label}</span> : null}
       <Select
         size="page-size"

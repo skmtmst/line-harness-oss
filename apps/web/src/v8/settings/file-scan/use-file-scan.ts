@@ -52,16 +52,16 @@ export function useFileScan() {
   const [stopError, setStopError] = useState('')
   const configFields = useFormErrors()
   const hasExternalInput = Boolean(provider.trim() || endpoint.trim() || secretRef.trim())
-  configFields.define('externalProvider', '提供元', () => hasExternalInput && !provider.trim() ? '提供元を入力してください' : null)
+  configFields.define('externalProvider', '提供元', () => hasExternalInput && !provider.trim() ? '提供元を入力してください' : null, { required: hasExternalInput })
   configFields.define('externalEndpointUrl', '送り先（https）', () => {
     if (!hasExternalInput) return null
     if (!endpoint.trim()) return '送り先を入力してください'
     try {
       return new URL(endpoint.trim()).protocol === 'https:' ? null : 'https:// で始まる送り先を入力してください'
     } catch { return '送り先の URL を確かめてください（https:// から）' }
-  })
+  }, { required: hasExternalInput })
   configFields.define('externalSecretRef', '鍵の名前', () => !hasExternalInput || (/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(secretRef.trim()) && secretRef.trim().length <= 120)
-    ? null : '鍵の名前は FILE_SCAN_SECRET_ で始まる大文字・数字・下線の120文字以内で指定してください')
+    ? null : '鍵の名前は FILE_SCAN_SECRET_ で始まる大文字・数字・下線の120文字以内で指定してください', { required: hasExternalInput })
 
   // 外の検査の設定が保存前なら離脱の番兵を出す。
   const configDirty = configOpen && (

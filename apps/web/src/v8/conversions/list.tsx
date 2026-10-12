@@ -1,7 +1,7 @@
 'use client'
 
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
 import TruncatedText from '@/components/shared/truncated-text'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -18,7 +18,8 @@ import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
-import { ListPage, ListPagePagination } from '@/components/templates';
+import { ListPage } from '@/components/templates';
+import { ListPager } from '@/components/templates/list-page';
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -30,7 +31,7 @@ import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
-import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell } from '@/components/shared/table';
+import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '@/components/shared/table';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
@@ -42,6 +43,7 @@ import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -69,7 +71,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
  * 状態の見本帳 `E2l8cw`）。
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「成果地点を作る」）・
- * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「使う場所を足す」と「…」。
+ * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「…」（使う場所を足す操作も中に残す）。
  * 行はURLに残る右の詳細パネル、「止める」は3択と理由を持つ確認画面。
  *
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
@@ -192,8 +194,8 @@ function StatePill({ point }: { point: ConversionDefinitionListItem }) {
 function TableHead({ selection }: { selection?: ReactNode } = {}) {
   return (
     <thead>
-      <TableHeadRow className={styles.headRow} data-table-layout="columns">
-        <Th className={styles.colName}>{selection}成果地点</Th>
+      <TableHeadRow data-table-layout="columns">
+        <Th grow>{selection}成果地点</Th>
         <Th className={styles.colState}>状態</Th>
             <Th className={styles.colTrigger} collapseAt="narrow">何が起きたら数えるか</Th>
         <Th className={styles.colCount} align="right">この30日</Th>
@@ -212,16 +214,16 @@ function ListSkeleton() {
       <DelayedSkeleton
         loading
         skeleton={
-          <DataTable className={styles.table}>
+          <DataTable columnLayout={{ headHeight: 'var(--tpl-cn-head-h)', rowHeight: 'var(--tpl-cn-row-h)', gap: 'var(--tpl-cn-col-gap)', padding: '0 var(--tpl-list-inset)', numberInset: 'var(--tpl-cn-num-pad-end)', bodyTextSize: 'var(--polish-text-body)', collapseScope: 'page' }}>
             <TableHead />
             <tbody aria-hidden="true">
               {[0, 1, 2, 3, 4].map((index) => (
-                <Tr key={index} className={styles.row} data-table-layout="columns">
-                  <Td className={styles.colName}><Skeleton className={styles.skeletonName} /></Td>
+                <Tr key={index} data-table-layout="columns">
+                  <Td grow><Skeleton className={styles.skeletonName} /></Td>
                   <Td className={styles.colState}><Skeleton className={styles.skeletonName} /></Td>
                     <Td className={styles.colTrigger} collapseAt="narrow"><Skeleton className={styles.skeletonName} /></Td>
-                  <Td className={styles.colCount}><Skeleton className={styles.skeletonNum} /></Td>
-                  <Td className={styles.colValue}><Skeleton className={styles.skeletonNum} /></Td>
+                  <Td className={styles.colCount} align="right"><Skeleton className={styles.skeletonNum} /></Td>
+                  <Td className={styles.colValue} align="right"><Skeleton className={styles.skeletonNum} /></Td>
                   <Td className={styles.colUsage} collapseAt="narrow"><Skeleton className={styles.skeletonName} /></Td>
                   <ActionCell className={styles.colOps}><Skeleton className={styles.skeletonNum} /></ActionCell>
                 </Tr>
@@ -804,7 +806,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   })
 
   const rowMenuItems = (point: ConversionDefinitionListItem): ActionMenuItem[] => [
-    { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
+    { id: 'detail', label: "成果地点の詳細を見る", onSelect: () => setDetailTarget(point) },
     { id: 'usage', label: '使う場所を見る', onSelect: () => setPanelId(point.id) },
     ...(canEdit ? [
       { id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(point) },
@@ -879,37 +881,20 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div className={styles.noticeRow}>
-      <Notice tone="info">成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。</Notice>
-    </div>
+    null
   )
   const searchBox = (
     <SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="成果地点の名前で探す" aria-label="成果地点の名前で探す" />
   )
   /* 1152 の板（BygrU）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {notice}
-      <ListToolbarRow>
-        {createInRow}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>{searchBox}</ListToolbarSearchSlot>
-      </ListToolbarRow>
-      <ListToolbarRow>
-        <div className={styles.narrowChips}>{filterChips}</div>
-        <span className={styles.spacer} aria-hidden="true" />
-        <ListToolbarOptional compact label="保存した絞り込み">{savedBox}</ListToolbarOptional>
-        {perPageBox}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
   const wideToolbar = (
-    <div className={`${styles.wideTools} ${role !== null && !canEdit ? styles.viewerTools : ''}`}>
-      {notice}
+    <div className={styles.wideTools} data-viewer={role !== null && !canEdit || undefined}>
+
       <ListToolbar
-        search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 240, value: query, onChange: setQuery }}
+        search={{ placeholder: '成果地点の名前で探す', label: '成果地点の名前で探す', width: 160, value: query, onChange: setQuery }}
         filters={filterChips}
-        trailing={<>{savedBox}{canEdit ? sortBox : null}{perPageBox}</>}
+        secondary={<ListToolbarEnd>{savedBox}{canEdit ? sortBox : null}{perPageBox}</ListToolbarEnd>}
       />
     </div>
   )
@@ -931,7 +916,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
             disabled: ingestBusy !== '', onSelect: () => void toggleIngest(panelPoint),
           }] : []),
-          { id: 'events', label: '中身を見る', onSelect: () => setDetailTarget(panelPoint) },
+          { id: 'events', label: "成果地点の詳細を見る", onSelect: () => setDetailTarget(panelPoint) },
           { id: 'close', label: '閉じる', onSelect: () => setPanelId(null) },
         ]} />
       </div>
@@ -989,6 +974,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             ? `${formatNumber(stopImpact.stopImpact.affectedUsageCount)}か所で使われています。どうしますか。`
             : '利用先と影響を読み込めませんでした。'}
       </p>
+      <p>止めると、使っている配信・流入リンク・アフィリエイトでも、この成果地点では数えなくなります。</p>
       <SaveErrorField names={["conversion-v8-stop-action","stopAction"]}><RadioCardGroup legend="どうしますか？">
         <RadioCard
           variant="row"
@@ -1085,8 +1071,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             <Notice tone="warn">一覧は先頭5000個までを表示しています。これより後ろの成果地点は検索や絞り込みで範囲を分けて確認してください。</Notice>
           </div>
         ) : null}
-        <div className={`${styles.tableWrap} ${narrow ? styles.tableWrapNarrow : role !== null && !canEdit ? styles.tableWrapViewer : ''}`}>
-          <DataTable className={styles.table}>
+        <div className={styles.tableWrap}>
+          <DataTable columnLayout={{ headHeight: 'var(--tpl-cn-head-h)', rowHeight: 'var(--tpl-cn-row-h)', gap: 'var(--tpl-cn-col-gap)', padding: '0 var(--tpl-list-inset)', numberInset: 'var(--tpl-cn-num-pad-end)', bodyTextSize: 'var(--polish-text-body)', collapseScope: 'page' }}>
             <TableHead selection={folderMove.pageCheckbox} />
             <tbody>
               {current.map((point) => {
@@ -1098,24 +1084,21 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                     key={point.id}
                     interactive
                     selected={panelId === point.id || highlighted}
-                    className={styles.row}
                     data-table-layout="columns"
                     data-row-id={point.id}
                     detailKey="point" onOpen={() => setPanelId((currentId) => (currentId === point.id ? null : point.id))}
                   >
-                    <Td className={styles.colName}>
+                    <Td grow>
                       {/* 名前の前に左の列と同じフォルダの色の丸（未分類は色の無い輪）。札は名前の頭にそろえる。 */}
                       <FolderDotName folder={folderDotFor(folders, point.folderId)} dot={!narrow}>{folderMove.checkbox(point)}
-                      <button
-                        type="button"
-                        className={styles.nameButton}
+                      <RowNameButton
                         title={point.name}
                         aria-expanded={panelId === point.id}
                         aria-label={`「${point.name}」の詳細を見る`}
                         onClick={(event) => { event.stopPropagation(); setPanelId((currentId) => (currentId === point.id ? null : point.id)) }}
                       >
                         {point.name}
-                      </button>
+                      </RowNameButton>
                       </FolderDotName>
 
                     </Td>
@@ -1124,8 +1107,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                       <span className={styles.cellMain} title={sourceTriggerLabel(point)}>{shortTrigger(point)}</span>
                       <span className={styles.cellSub} title={rowSub(point)}>{rowSub(point)}</span>
                     </Td>
-                    <Td className={styles.colCount}><span className={styles.num}>{`${formatNumber(point.metrics.netCount)} 件`}</span></Td>
-                    <Td className={styles.colValue}>
+                    <Td className={styles.colCount} align="right"><span className={styles.num}>{`${formatNumber(point.metrics.netCount)} 件`}</span></Td>
+                    <Td className={styles.colValue} align="right">
                       <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUsage} collapseAt="narrow">
@@ -1134,9 +1117,6 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                     </Td>
                     <ActionCell className={styles.colOps}>
                       <div className={styles.opsBox}>
-                        {canEdit
-                          ? <Button href={addUsageHref(point)}>使う場所を足す</Button>
-                          : <span className={styles.opsSpace} aria-hidden="true" />}
                         <RowMenu
                           label={menuLabel}
                           open={openMenuId === point.id}
@@ -1156,13 +1136,11 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
     )
   }
 
-  const pager = !loading && !loadFailed && pageCount > 1 ? (
-    <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {`${(currentPage - 1) * pageSize + 1}〜${(currentPage - 1) * pageSize + current.length} / ${formatNumber(shown.length)} 件`}
-      </span>
+  const pager = !loading && !loadFailed && shown.length > 0 ? (
+    <ListPager>
+      <ListRange total={shown.length} first={(currentPage - 1) * pageSize + 1} last={(currentPage - 1) * pageSize + current.length} />
       <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="成果地点の一覧のページ送り" />
-    </ListPagePagination>
+    </ListPager>
   ) : null
 
   const listUnavailable = loading || loadFailed
@@ -1205,6 +1183,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       help={canEdit
             ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
             : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
+      explanation="成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。"
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"
@@ -1266,9 +1245,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           />
         </KpiBand>
       </>}
-      folders={<>
-        {createButton}
-        <ManagedFolderPanel
+      folders={<ManagedFolderPanel
+          createAction={createButton}
           kind="conversion"
           accountId={accountId}
           folders={folders}
@@ -1282,10 +1260,9 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           allCount={total}
           unfiledCount={folderState.unfiledCount}
           error={folderState.error}
-        />
-      </>}
-      collapsedFolders={narrow ? undefined : <>{createInRow}{folderSelect}</>}
-      toolbar={narrow ? narrowToolbar : wideToolbar}
+        />}
+      collapsedFolders={<>{createInRow}{folderSelect}</>}
+      toolbar={wideToolbar}
       pagination={pager}
       overlays={<>
         {folderMove.overlays}

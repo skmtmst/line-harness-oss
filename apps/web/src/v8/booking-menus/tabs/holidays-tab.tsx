@@ -11,6 +11,7 @@ import { ApiError, bookingApi, type BookingException, type BookingSettings } fro
 import { AccountIcon, StateCard, SkeletonRows, WEEKDAY_JP, addDaysStr, useV8TabEdit, type LoadStatus } from './shared'
 import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
+import { requiredText, optionalText } from '@/lib/form-requirement'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
@@ -40,6 +41,12 @@ function jpDate(date: string): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEKDAY_JP[d.getUTCDay()]}）`
 }
 
+const holidayRequirements = {
+  from: requiredText('開始日を入れてください。'),
+  to: requiredText('終了日を入れてください。'),
+  reason: optionalText,
+}
+
 export function HolidaysTabV8({ accountId, settings, status, error, exceptions, closedWeekdays, bookingCountOnClosed, canEdit, onSaved, onReload }: {
   accountId: string
   settings: BookingSettings | null
@@ -60,6 +67,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   const [editFrom, setEditFrom] = useState('')
   const [editTo, setEditTo] = useState('')
   const [editReason, setEditReason] = useState('')
+  const [dateErrors, setDateErrors] = useState<{ from?: string; to?: string }>({})
   const [editError, setEditError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<BookingException | null>(null)
@@ -92,6 +100,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
     setEditTo(date ?? '')
     setEditReason('')
     setEditError(null)
+    setDateErrors({})
   }
   function openEdit(item: BookingException) {
     setEditing(item)
@@ -99,14 +108,15 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
     setEditTo(item.dateTo || item.date || '')
     setEditReason(item.reason ?? item.note ?? '')
     setEditError(null)
+    setDateErrors({})
   }
 
   async function save() {
     if (inFlightRef.current) return
-    if (!editFrom || !editTo || editFrom > editTo) {
-      setEditError('開始日と終了日を正しく入れてください。')
-      return
-    }
+    const from = holidayRequirements.from.check(editFrom) ?? undefined
+    const to = holidayRequirements.to.check(editTo) ?? (editFrom && editTo < editFrom ? '終了日は開始日以降にしてください。' : undefined)
+    setDateErrors({ from, to })
+    if (from || to) return
     inFlightRef.current = true
     setBusy(true)
     setEditError(null)
@@ -298,9 +308,9 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         busy={busy}
       >
         <div className="grid gap-3">
-          <Field label="開始日"><SaveErrorField names={["editFrom","dateFrom","edit_from"]}><DateField aria-label="休業の開始日" value={editFrom} onChange={setEditFrom} disabled={busy} className="mt-1" /></SaveErrorField></Field>
-          <Field label="終了日"><SaveErrorField names={["editTo","dateTo","edit_to"]}><DateField aria-label="休業の終了日" value={editTo} onChange={setEditTo} disabled={busy} className="mt-1" /></SaveErrorField></Field>
-          <Field label="理由"><SaveErrorField names={["editReason","reason","edit_reason"]}><input aria-label="休業の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={busy} placeholder="例：お盆・店舗の改装" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
+          <Field label="開始日" requirement={holidayRequirements.from} error={dateErrors.from}><SaveErrorField names={["editFrom","dateFrom","edit_from"]}><DateField aria-label="休業の開始日" value={editFrom} onChange={(value) => { setEditFrom(value); setDateErrors(current => ({ ...current, from: undefined })) }} disabled={busy} className="mt-1" /></SaveErrorField></Field>
+          <Field label="終了日" requirement={holidayRequirements.to} error={dateErrors.to}><SaveErrorField names={["editTo","dateTo","edit_to"]}><DateField aria-label="休業の終了日" value={editTo} onChange={(value) => { setEditTo(value); setDateErrors(current => ({ ...current, to: undefined })) }} disabled={busy} className="mt-1" /></SaveErrorField></Field>
+          <Field label="理由" requirement={holidayRequirements.reason}><SaveErrorField names={["editReason","reason","edit_reason"]}><input aria-label="休業の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={busy} placeholder="例：お盆・店舗の改装" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
           {editError ? <Notice tone="danger" >{editError}</Notice> : null}
           <div className="flex justify-end gap-2">
             <Button onClick={() => { if (!busy) setEditing(null) }} disabled={busy}>キャンセル</Button>

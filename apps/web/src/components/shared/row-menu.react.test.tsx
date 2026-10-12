@@ -26,12 +26,12 @@ const openMenu = async () => {
 }
 
 describe('RowMenu：行の右端の「…」', () => {
-  it('size="row" は 28角の印（印14）、省略時は 36角のまま（板ごとに絵の大きさ）', () => {
-    const { unmount } = render(<RowMenu label="春のセールの操作" items={items()} size="row" />)
+  it('枠付きの指定では size="row" は 28角の印（印14）、省略時は 36角（板ごとの大きさ）', () => {
+    const { unmount } = render(<RowMenu label="春のセールの操作" items={items()} appearance="box" size="row" />)
     expect(trigger().getAttribute('data-size')).toBe('row')
     expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('14')
     unmount()
-    render(<RowMenu label="春のセールの操作" items={items()} />)
+    render(<RowMenu label="春のセールの操作" items={items()} appearance="box" />)
     expect(trigger().getAttribute('data-size')).toBeNull()
     expect(trigger().querySelector('svg')?.getAttribute('width')).toBe('16')
   })
@@ -71,8 +71,8 @@ describe('RowMenu：行の右端の「…」', () => {
   it('危ない操作は赤字で、区切りの下・最後に回す', async () => {
     render(<RowMenu label="春のセールの操作" items={items()} />)
     await openMenu()
-    expect(menuItems().map((item) => item.textContent)).toEqual(['複製する', '止める', '削除する'])
-    const last = menuItems()[2]
+    expect(menuItems().map((item) => item.textContent)).toEqual(['複製する', '削除する', '止める'])
+    const last = menuItems()[1]
     expect(last.className).toMatch(/danger/)
     expect(last.parentElement?.querySelector('hr')).toBeTruthy()
     expect(menuItems()[0].parentElement?.querySelector('hr')).toBeNull()

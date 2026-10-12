@@ -353,13 +353,13 @@ export default function QrDialog({
     <div
       data-design="QR"
       className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={direct?.title ?? resource?.title ??'友だち追加のQRコード'}
       onClick={onClose}
     >
       <div
         ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={direct?.title ?? resource?.title ??'友だち追加のQRコード'}
         className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-8 shadow-float"
         style={{ maxWidth: 820 }}
         onClick={(e) => e.stopPropagation()}
@@ -388,7 +388,7 @@ export default function QrDialog({
               QRの枠は横幅に応じて縮める（DASH-13）。320pxでは280px固定だと
               パネルの内側に収まらず横にはみ出していた。正方形は保つ。
             */}
-            <div className="bg-canvas-sunken rounded-panel flex aspect-square w-full max-w-[280px] items-center justify-center">
+            <div className={`bg-canvas-sunken rounded-panel flex w-full max-w-[280px] items-center justify-center ${blocked ? 'py-4' : 'aspect-square'}`}>
               {direct?.qrContent ? direct.qrContent : (routeStopped || resource?.stopped) ? (
                 <p className="text-ink-secondary px-4 text-center text-xs leading-relaxed" role="alert">
                   この経路は停止しています。QRコードは表示しません。

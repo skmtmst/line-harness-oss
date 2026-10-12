@@ -19,6 +19,7 @@ import { Field } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -485,7 +486,7 @@ export default function SavedSearchEditV8() {
   const [nameError, setNameError] = useState('')
   const [conditionsError, setConditionsError] = useState('')
   const nameRef = useRef<HTMLInputElement>(null)
-  const conditionsRef = useRef<HTMLElement>(null)
+  const conditionsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!conditionsError) return
     const first = conditionsRef.current?.querySelector<HTMLElement>('[aria-invalid="true"], input, [role="combobox"], button')
@@ -903,7 +904,7 @@ export default function SavedSearchEditV8() {
         )} dirty={false}
       >
         {error ? <Notice tone="danger" message={error} /> : null}
-        <section className={styles.card} aria-label="名前と共有">
+        <Card variant="form" gap="normal" aria-label="名前と共有">
           <h2 className={styles.cardTitle}>名前と共有</h2>
           <Field label="条件名"><Field error={nameError}><SaveErrorField names={["name"]}><TextField ref={nameRef} value={name} maxLength={80} onChange={(event) => { setName(event.target.value); setNameError('') }} aria-label="条件名" /></SaveErrorField></Field>
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" /></Field>
@@ -919,9 +920,9 @@ export default function SavedSearchEditV8() {
               <button type="button" role="radio" aria-checked={!isShared} className={!isShared ? styles.segOn : styles.segBtn} onClick={() => setIsShared(false)}>自分だけ</button>
             </div>
           </div>
-        </section>
+        </Card>
 
-        <section ref={conditionsRef} className={styles.card} aria-label="条件">
+        <div ref={conditionsRef}><Card variant="form" gap="normal" aria-label="条件">
           <div className={styles.cardTitles}>
             <h2 className={styles.cardTitle}>条件</h2>
             <p className={styles.cardNote}>「かつ」はすべて満たす人、「または」はどれかを満たす人に当てはまります。</p>
@@ -965,9 +966,9 @@ export default function SavedSearchEditV8() {
             <button type="button" className={styles.ghostButton} onClick={() => patchConditions({ ...conditions, all: [...allConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />かつの条件を足す</button>
             <button type="button" className={styles.ghostButton} onClick={() => patchConditions({ ...conditions, any: [...anyConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />またはの条件を足す</button>
           </div>
-        </section>
+        </Card></div>
 
-        <section className={styles.card} aria-label="友だち一覧での見せ方">
+        <Card variant="form" gap="normal" aria-label="友だち一覧での見せ方">
           <h2 className={styles.cardTitle}>友だち一覧での見せ方</h2>
           <div className={styles.listRow}>
             <div className={styles.field}>
@@ -981,7 +982,7 @@ export default function SavedSearchEditV8() {
             </div>
           </div>
           <p className={styles.hint}>{`表示列：${conditions.list?.columns?.join('・') || '名前・タグ・担当者'}`}</p>
-        </section>
+        </Card>
         {/* IDEA-04：印ならタグ・値なら情報欄・条件の保存は保存した検索、という違いを編集の場所でも確かめられる。 */}
         <AttributeKindGuide current="search" />
       </CreatePage>

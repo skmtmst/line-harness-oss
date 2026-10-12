@@ -14,7 +14,7 @@
 :root .select:focus-visible,
 :root .add:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 :root .select {
-  padding: var(--folder-row-pad-block, 7px) 10px; gap: 8px; border-radius: var(--polish-radius-control);
+  padding: var(--folder-row-pad-block, var(--tpl-toolbar-gap)) var(--tpl-folder-pad-side); gap: 8px; border-radius: var(--polish-radius-control);
   font-size: 13px; font-weight: 500; line-height: normal; color: var(--color-ink-secondary);
 }
 :root .row[data-active] { border-radius: var(--polish-radius-control); background: var(--color-shell); }
@@ -36,7 +36,7 @@
 :root .row[data-active] .label { font-weight: 600; }
 
 :root .panel { max-width: 100%; min-width: 0; }
-:root .row { padding: var(--folder-row-pad-block, 7px) 10px; gap: 8px; border-radius: var(--polish-radius-control); }
+:root .row { padding: var(--folder-row-pad-block, var(--tpl-toolbar-gap)) var(--tpl-folder-pad-side); gap: 8px; border-radius: var(--polish-radius-control); }
 :root .row .select { padding: 0; }
 :root .menu { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
 /*

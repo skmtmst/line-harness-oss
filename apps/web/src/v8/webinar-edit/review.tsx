@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Check, Globe, Play, Send } from 'lucide-react'
@@ -169,7 +170,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         {ctx.analytics ? <p className={form.previewNote}>{`申込 ${formatNumber(ctx.analytics.summary.reservations)} 人`}</p> : null}
       </>}
     >
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-review-title" data-wc-pane="review">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-review-title" data-wc-pane="review">
         <div className={form.cardHeadRow}><h2 id="webinar-review-title" className={form.cardTitle}>{state === 'ready' ? `公開前の確認 ${passed}/${checks.length}` : '公開前の確認'}</h2></div>
         <p className={styles.desc}>{state === 'ready' ? `${checks.length}つ全部が通ると公開できます。` : '公開に要るものを確かめます。'}</p>
         {state === 'error' ? <Notice tone="info" action={<Button onClick={load}>もう一度読み込む</Button>}>公開前の確認を読み込めませんでした。このままでは公開できません。</Notice> : null}
@@ -192,9 +193,9 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         )}
         {notice ? <p className={form.cardNote} role="status">{notice}</p> : null}
         {publishError ? <Notice tone="danger" className={form.fieldErrorNoticePlacement} >{publishError}</Notice> : null}
-      </section>
+      </Card>
 
-      <section className={form.card} aria-labelledby="webinar-summary-title">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-summary-title">
         <div className={form.cardHead}><h2 id="webinar-summary-title" className={form.cardTitle}>設定のまとめ</h2></div>
         <dl className={styles.summary}>
           {summary.map(([label, value]) => (
@@ -204,7 +205,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
             </div>
           ))}
         </dl>
-      </section>
+      </Card>
 
       <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} onConfirm={() => testNotify()} />
     </CreatePage></SaveErrorScope>

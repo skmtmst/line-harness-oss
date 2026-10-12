@@ -126,6 +126,7 @@ export default function PetsV8({
       headingSize="regular"
       title="マイペット"
       help="お客さまがマイページで登録したペットです。体重と主食から、1日のごはんの目安を出します。"
+      explanation="体重が90日更新されていないペットは、マイページで更新をお願いできます（行の「…」→マイページで更新を促す）。"
       actions={accountId ? (
         <Button type="button" onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
           <Download size={15} aria-hidden="true" />CSVで書き出す

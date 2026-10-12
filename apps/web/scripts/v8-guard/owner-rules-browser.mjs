@@ -52,9 +52,12 @@ export default function scanOwnerRules() {
       if (width < 56 && !/^[…·]+$/.test(fullText)) add('short',trunc,{deficit:Math.ceil(56-width)},fullText)
     }
     if (['rgb(37, 99, 235)','rgb(29, 78, 216)'].includes(c.color)) {
+      // B-245：題の横の共通説明ボタンは青。手書きの青い操作へ広げない。
+      const explanation = el.closest('button[type="button"][data-shared-part="page-explanation-toggle"][aria-controls][aria-expanded]')
+      const sharedExplanation = explanation && [...explanation.classList].some(name => /^page-explanation_toggle(?:__|$)/.test(name)) && explanation.closest('[data-template-region="heading"]')
       let pill = false
       for (let p = el, i = 0; p && i < 4; p = p.parentElement,i++) if (tinted(css(p))) { pill = true; break }
-      if (!pill) add('blue',el,{count:1},text)
+      if (!pill && !sharedExplanation) add('blue',el,{count:1},text)
     }
   }
   // 同じ列の主操作・メニュー・状態。幅とxを別々に見張る。
@@ -95,7 +98,13 @@ export default function scanOwnerRules() {
     const r = row.getBoundingClientRect(), leaves = textLeaves(row)
     if (r.height >= 40 && leaves.length) {
       const used = Math.max(...leaves.map(d=>d.getBoundingClientRect().bottom))-Math.min(...leaves.map(d=>d.getBoundingClientRect().top))
-      if (used > 0 && r.height-used > 48) add('tallrow',row,{excess:Math.ceil(r.height-used-48)})
+      // 固定したWQmepの受信表は72px。共通の指定を使い、その実寸以内なら
+      // 1行の名前でも高さを詰めない。指定を越えた行と、通常の表は引き続き検出する。
+      const frame = row.closest('[data-column-layout]')
+      const inboxDensity = frame?.style.getPropertyValue('--table-row-height') === 'var(--tpl-db-inbox-row-h)'
+        && parseFloat(css(row).getPropertyValue('--tpl-db-inbox-row-h')) === 72
+        && r.height <= 73
+      if (!inboxDensity && used > 0 && r.height-used > 48) add('tallrow',row,{excess:Math.ceil(r.height-used-48)})
     }
     const table = row.closest(tableSelector)
     if (tinted(css(row)) && table) {
@@ -172,7 +181,9 @@ export default function scanOwnerRules() {
   for (const bar of [...root.querySelectorAll('[data-shared-part="sticky-bar"],[data-pencil-name*="下の帯"]')].filter(visible)) {
     const b=bar.getBoundingClientRect(), parent=bar.parentElement
     if (!parent || b.height<40 || root.closest('[data-liff]')) continue
-    const ends=textLeaves(parent).filter(d=>!bar.contains(d)).map(d=>d.getBoundingClientRect().bottom).filter(bottom=>bottom<=b.top+1)
+    // アイコンを子に持つボタンや、値を持つ入力も本文の終端。文字だけでは実際の空白を測れない。
+    const controls=[...parent.querySelectorAll('button,a,input,select,textarea,[role="button"]')].filter(visible)
+    const ends=[...textLeaves(parent),...controls].filter(d=>!bar.contains(d)).map(d=>d.getBoundingClientRect().bottom).filter(bottom=>bottom<=b.top+1)
     if (ends.length) { const gap=b.top-Math.max(...ends); if(gap>=96) add('footgap',bar,{excess:Math.ceil(gap-95)}) }
   }
   for (const table of [...root.querySelectorAll('[data-shared-part="list-table"]')].filter(visible)) {
@@ -183,6 +194,13 @@ export default function scanOwnerRules() {
       const q=sib.getBoundingClientRect(), left=q.left-r.left, right=r.right-q.right
       if (left>4 || right>4) add('inset',table,{left:Math.max(0,Math.ceil(left)),right:Math.max(0,Math.ceil(right))},'',sib)
     }
+  }
+  // B-243：画面側で共通の幅を上書きしても実寸で止める。
+  for (const panel of document.querySelectorAll('[data-design-part="drawer"]')) {
+    if (!visible(panel) || innerWidth < 540) continue
+    const width = panel.getBoundingClientRect().width
+    const allowed = panel.getAttribute('data-width') === 'composer' ? [Math.min(1160, innerWidth)] : [480, 540]
+    if (!allowed.some(value => Math.abs(width - value) <= 1)) add('drawerwidth', panel, { width, expected: allowed.join('/') })
   }
   return findings
 }

@@ -39,7 +39,7 @@ import InlineEdit from '@/components/shared/inline-edit'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { withViewTransition } from '@/components/shared/view-transition';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -149,7 +149,7 @@ function toContextItems(items: ActionMenuItem[]): ContextMenuItem[] {
 
 function StatusPill({ webinar }: { webinar: WebinarListItem }) {
   return (
-    <SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'info' : 'neutral'}>{statusLabel(webinar)}</SharedStatusPill>
+    <SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'neutral' : 'neutral'}>{statusLabel(webinar)}</SharedStatusPill>
   )
 }
 
@@ -796,9 +796,7 @@ function WebinarList() {
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
-    <div className={styles.noticeRow}>
-      <Notice tone="info">公開すると、申込ページとLINEの案内が使えるようになります。申込から相談までの流れは、各ウェビナーの「分析」で見られます。</Notice>
-    </div>
+    null
   )
   const searchBox = (
     <SearchField
@@ -810,26 +808,10 @@ function WebinarList() {
     />
   )
   /* 1152 の板（uBMuB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … 並び・よく使う絞り込み・件数」。 */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      {notice}
-      <ListToolbarRow>
-        {createButton}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>{searchBox}</ListToolbarSearchSlot>
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        <span className={styles.spacer} aria-hidden="true" />
-        {sortBox}
-        {savedBox}
-        {perPageBox}
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
   const wideToolbar = (
     <>
-      {notice}
+
       <ListToolbar
         search={{ placeholder: 'ウェビナー名で探す', label: 'ウェビナー名で探す', width: 240, value: query, onChange: setQuery }}
         filters={filterChips}
@@ -940,12 +922,10 @@ function WebinarList() {
     )
   }
 
-  const pager = hasListData && pageCount > 1 ? (
+  const pager = hasListData ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(currentPage - 1) * pageSize + 1}〜{(currentPage - 1) * pageSize + visibleItems.length} / {formatNumber(visibleTotal)} 件
-      </span>
-      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" />
+      <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り"
+        summary={paginationSummary(visibleTotal, (currentPage - 1) * pageSize + 1, (currentPage - 1) * pageSize + visibleItems.length)} />
     </ListPagePagination>
   ) : null
 
@@ -953,8 +933,11 @@ function WebinarList() {
 
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
+      heightMode="content"
       skeleton
-      help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}</>}
+      help={<>{"録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。"}{"行の「…」から 参加者・分析・コメント演出・アーカイブ。行を押すと右に詳細が出ます（↑↓で次の行へ）。"}{kpis.map((kpi) => kpi.help).join(" ")}</>}
+      noticeSpacing="section"
+      explanation="公開すると、申込ページとLINEの案内が使えるようになります。申込から相談までの流れは、各ウェビナーの「分析」で見られます。"
       boardId="UyUMw"
       headingSize="regular"
       title="ウェビナー"
@@ -987,7 +970,6 @@ function WebinarList() {
               presentation="band"
               title={kpi.title}
               icon={<kpi.icon size={13} aria-hidden="true" />}
-              help={kpi.help}
               value={kpi.value}
               unit={kpi.value === null ? '' : kpi.unit}
               detail={kpi.detail}
@@ -1008,8 +990,8 @@ function WebinarList() {
           <FolderPanelNote>フォルダを消しても、中のウェビナーは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       </>}
-      collapsedFolders={narrow ? undefined : foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}</>}
-      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{narrow ? narrowToolbar : wideToolbar}</>}
+      collapsedFolders={foldersLoadError?<ListState kind="error" title="フォルダを読み込めませんでした" onRetry={()=>void refreshFolders()}/>:<>{createButton}{folderSelect}</>}
+      toolbar={<>{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}{wideToolbar}</>}
       pagination={pager}
       overlays={<>
         {archiveTarget ? (

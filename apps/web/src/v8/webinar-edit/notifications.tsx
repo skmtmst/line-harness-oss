@@ -1,4 +1,5 @@
 'use client'
+import Card from '@/components/shared/card'
 
 import { api, type CommonActionResources } from '@/lib/api';
 import Toggle from '@/components/shared/toggle';
@@ -357,16 +358,16 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
       </>}
     >
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-notify-title" data-wc-pane="notifications">
         <div className={form.cardHeadRow}>
           <h2 id="webinar-notify-title" className={form.cardTitle}>通知とリマインド</h2>
           <HelpTip label="送った数と通知の対象">{`予定 ${countWithUnit(overview?.pending)}・取消 ${countWithUnit(overview?.cancelled)}・合計 ${countWithUnit(overview?.total)}。通知の対象：${audienceText(overview?.audience)}`}<br /><NotificationStateBadge state={notificationRowState(settings ? SETTINGS_KEYS.filter(key => key.endsWith("Enabled")).some(key => Boolean(settings[key])) : undefined, loadState !== 'loading', loadState === 'error')} /><br />{deliveryTimingSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{missedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}<br />{completedNoticeSummary(settings, loadState !== 'loading', loadState === 'error')}</HelpTip>
         </div>
         <p className={styles.desc}>LINE で送るお知らせです。テストは全部をまとめて自分に送ります。</p>
         {notificationBody}
-      </section>
+      </Card>
 
-      <section className={form.card} data-gap="tight" aria-labelledby="webinar-after-title">
+      <Card variant="form" gap="normal" aria-labelledby="webinar-after-title">
         <h2 id="webinar-after-title" className={form.cardTitle}>視聴後にすること</h2>
         <p className={styles.desc}>見たかどうかで、タグを付けたりシナリオを始めたりします。</p>
         {actionError ? (
@@ -405,7 +406,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
               ? <ReadValue label="視聴結果を取得できない場合">{policy === 'escalate' ? '要対応へ追加' : '翌日に取り直す'}</ReadValue>
               : <SaveErrorField names={["policy","missingResultPolicy"]}><Select id="webinar-missing-policy" aria-label="視聴結果を取得できない場合" size="full" value={policy} disabled={saving} onChange={(value) => setPolicy(value as typeof policy)} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に取り直す' }]} /></SaveErrorField>}
           </div></div>
-      </section>
+      </Card>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 

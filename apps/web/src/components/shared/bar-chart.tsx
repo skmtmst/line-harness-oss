@@ -42,6 +42,7 @@ export function toBarChartItems(
   options?: {
     campaigns?: Array<{ date: string; name: string }>
     formatTitle?: (date: string) => string
+    formatAxisLabel?: (date: string) => string
   },
 ): BarChartItem[] {
   const formatTitle = options?.formatTitle ?? defaultTitle
@@ -52,7 +53,7 @@ export function toBarChartItems(
       .join('、')
     return {
       key: day.date,
-      axisLabel: `${Number(day.date.slice(5, 7))}/${Number(day.date.slice(8, 10))}`,
+      axisLabel: options?.formatAxisLabel?.(day.date) ?? `${Number(day.date.slice(5, 7))}/${Number(day.date.slice(8, 10))}`,
       tooltipTitle: formatTitle(day.date),
       added: day.added,
       removed: day.removed,
@@ -65,9 +66,12 @@ const STEPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
 
 /** 目盛りは4本まで。上端が最大値を包むきりの良い段にする。 */
 export function barChartTicks(maxValue: number): number[] {
-  const max = Math.max(0, maxValue)
-  const step = STEPS.find((candidate) => max / candidate <= 3) ?? STEPS[STEPS.length - 1]
+  const max = Math.max(0, Number.isFinite(maxValue) ? maxValue : 0)
+  const magnitude = 10 ** Math.floor(Math.log10(Math.max(1, max / 3)))
+  const largeStep = [1, 2, 5, 10].map(value => value * magnitude).find(candidate => max / candidate <= 3)!
+  const step = STEPS.find((candidate) => max / candidate <= 3) ?? largeStep
   const top = Math.max(step, Math.ceil(max / step) * step)
+  if (!Number.isFinite(top)) return [0, max]
   const ticks: number[] = []
   for (let value = 0; value <= top; value += step) ticks.push(value)
   return ticks
@@ -76,6 +80,22 @@ export function barChartTicks(maxValue: number): number[] {
 function labelStep(count: number): number {
   if (count <= 16) return 2
   return Math.ceil(count / 8)
+}
+
+export type BarChartLegendItem = { label: string; tone: 'added' | 'removed' }
+const DEFAULT_LEGEND: BarChartLegendItem[] = [
+  { label: '増えた', tone: 'added' },
+  { label: '減った', tone: 'removed' },
+]
+
+/** 凡例を切り替えの隣へ置く板でも、色と文字は同じ部品を使う。 */
+export function BarChartLegend({ items = DEFAULT_LEGEND, layout }: { items?: BarChartLegendItem[]; layout?: 'dashboard' }) {
+  return <ul className={styles.legend} data-layout={layout} aria-label="凡例">
+    {items.map((entry) => <li key={entry.label} className={styles.legendItem}>
+      <span aria-hidden="true" className={[styles.swatch, entry.tone === 'added' ? styles.swatchAdded : styles.swatchRemoved].join(' ')} />
+      {entry.label}
+    </li>)}
+  </ul>
 }
 
 /**
@@ -88,10 +108,9 @@ export function BarChart({
   selectedKey,
   onSelect,
   label = '日ごとの増減',
-  legend = [
-    { label: '増えた', tone: 'added' },
-    { label: '減った', tone: 'removed' },
-  ],
+  legend = DEFAULT_LEGEND,
+  layout,
+  showLegend = true,
 }: {
   items: BarChartItem[]
   selectedKey?: string
@@ -101,27 +120,20 @@ export function BarChart({
    * 凡例の文言（d8X09：登録／ブロック）。渡さないときは今までどおり
    * 増えた／減った。画面側で手書きしない。
    */
-  legend?: { label: string; tone: 'added' | 'removed' }[]
+  legend?: BarChartLegendItem[]
+  /** 短い日別グラフ。凡例を別の段へ出しても数・吹き出し・読み上げ表を保つ。 */
+  layout?: 'dashboard'
+  showLegend?: boolean
 }) {
   const addedLabel = legend.find(item=>item.tone==='added')?.label ?? '増えた'
   const removedLabel = legend.find(item=>item.tone==='removed')?.label ?? '減った'
   const max = Math.max(1, ...items.flatMap((item) => [item.added, item.removed]))
   const ticks = barChartTicks(max)
   const top = ticks[ticks.length - 1] || 1
-  const step = labelStep(items.length)
+  const step = layout === 'dashboard' && items.length <= 8 ? 1 : labelStep(items.length)
   return (
-    <div className={styles.chart}>
-      <ul className={styles.legend} aria-label="凡例">
-        {legend.map((entry) => (
-          <li key={entry.label} className={styles.legendItem}>
-            <span
-              aria-hidden="true"
-              className={[styles.swatch, entry.tone === 'added' ? styles.swatchAdded : styles.swatchRemoved].join(' ')}
-            />
-            {entry.label}
-          </li>
-        ))}
-      </ul>
+    <div className={styles.chart} data-layout={layout}>
+      {showLegend ? <BarChartLegend items={legend} layout={layout} /> : null}
       <div className={styles.plot} role="group" aria-label={label} data-blank-ok="棒の高さを共通の縦目盛りと比べるための描画領域">
         {ticks.map((tick) => (
           <div
@@ -140,7 +152,7 @@ export function BarChart({
               `${item.tooltipTitle} ${addedLabel}${item.added}人・${removedLabel}${item.removed}人` +
               (item.note ? `・${item.note}` : '')
             return (
-              <div key={item.key} className={styles.column}>
+              <div key={item.key} className={styles.column} data-latest={layout === 'dashboard' && index === items.length - 1 ? true : undefined}>
                 <button
                   type="button"
                   className={styles.dayButton}
@@ -155,7 +167,7 @@ export function BarChart({
                       style={{ height: `${(item.added / top) * 100}%` }}
                     />
                     <span
-                      className={[styles.bar, styles.removedBar].join(' ')}
+                      className={[styles.bar, styles.removedBar, layout === 'dashboard' ? styles.dashboardRemovedBar : ''].filter(Boolean).join(' ')}
                       style={{ height: `${(item.removed / top) * 100}%` }}
                     />
                   </span>

@@ -66,7 +66,7 @@ export default function LinePreview({
           <span>{title}</span>
           {note ? <HelpTip label="LINEでの見え方の説明">{note}</HelpTip> : null}
         </p> : null}
-        <div className={styles.phone}>
+        <div className={styles.phone} data-line-preview-part="device-frame">
           <div className={styles.screen}>
             <div className={styles.statusBar}>
               <span className={styles.clock}>9:41</span>

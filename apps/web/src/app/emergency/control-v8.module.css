@@ -18,92 +18,6 @@
 
 /* 閲覧のみの帯。数の帯の上。 */
 
-/* 数の帯：4つのマスを区切り線で並べる。 */
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--tpl-rest3-em-kpi-gap);
-}
-
-.kpi {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-rest3-em-kpi-inner-gap);
-  min-width: 0;
-  padding: var(--tpl-rest3-em-kpi-pad);
-  border-radius: var(--tpl-rest3-em-radius);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-
-
-.kpiHead {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rest3-em-kpi-inner-gap);
-  min-width: 0;
-}
-
-.kpiTile {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-rest3-em-tile);
-  height: var(--tpl-rest3-em-tile);
-  border-radius: var(--tpl-rest3-em-tile-radius);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-}
-
-.kpiLabel {
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--tpl-rest3-em-small);
-  font-weight: 600;
-  line-height: var(--tpl-rest3-em-small-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kpiValue {
-  display: flex;
-  align-items: baseline;
-  height: var(--tpl-rest3-em-num-lh);
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-rest3-em-num);
-  font-weight: 600;
-  line-height: var(--tpl-rest3-em-num-lh);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.kpiValueDanger {
-  color: var(--color-danger);
-}
-
-.kpiUnit {
-  margin-left: var(--tpl-rest3-em-unit-gap);
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-rest3-em-small);
-  font-weight: 400;
-}
-
-.kpiDetail {
-  margin: 0;
-  overflow: hidden;
-  color: var(--color-ink-faint);
-  font-size: var(--tpl-rest3-em-small);
-  line-height: var(--tpl-rest3-em-small-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .card {
   padding: var(--tpl-rest3-em-card-pad);
   outline: 1px solid var(--card-edge);
@@ -439,10 +353,6 @@
 
 /* 板が狭いとき（1152 など）は数の帯を2列に、説明の2枚を1列に。表は列の幅を中身に任せて横に送る。 */
 @container (max-width: 760px) {
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .infoGrid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -452,11 +362,6 @@
   }
 }
 
-@container (max-width: 560px) {
-  .kpis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 
 .targetItem {
   display: inline-flex;

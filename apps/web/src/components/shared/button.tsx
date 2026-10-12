@@ -30,7 +30,7 @@ type CommonProps = {
    * `delivery-bulk` は★V8 デリバリー受注の「まとめて」の帯の中の操作（絵 h7OeT）だけ。
    * 高さ28・左右10・角丸8・字12は `delivery-row` と同じで、印13角・印と字の間5が違う。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'booking' | 'delivery-row' | 'delivery-bulk' | 'delivery-head'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'inbox-tool' | 'booking' | 'delivery-row' | 'delivery-bulk' | 'delivery-head'
   fullWidth?: boolean
   align?: 'start'
   /**
@@ -158,7 +158,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     href: _href,
     type = 'button',
     busy,
-    busyLabel = '保存中…',
+    busyLabel = '保存しています…',
     done,
     doneLabel = '保存しました',
     widthReserve = 'states',

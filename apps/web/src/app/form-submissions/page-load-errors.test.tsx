@@ -193,8 +193,8 @@ describe('R603: フォルダだけ失敗しても一覧と件数を残す', () =
     // 取得済みのフォームは残る。
     expect(host.textContent).toContain('箱フォーム')
     expect(host.textContent).toContain('未分類フォーム')
-    // 件数も残る（全面エラー・0件にしない）。1ページに収まるときは「N件」だけ（BEHAVIOR.md）。
-    expect(host.textContent).toMatch(/(^|[^0-9])2 件(?!中)/)
+    // 件数も残る（全面エラー・0件にしない）。1ページでも範囲とページ送りを出す（B-231）。
+    expect(host.textContent).toContain('2件中 1〜2件')
     expect(host.querySelector('[data-list-state="error"]')).toBeNull()
     // フォルダ欄だけ失敗と再試行。
     expect(host.textContent).toContain('フォルダを読み込めませんでした。')
@@ -229,7 +229,7 @@ describe('正常・空は従来どおり', () => {
   it('一覧が出る', async () => {
     await mount()
     expect(host.textContent).toContain('箱フォーム')
-    expect(host.textContent).toMatch(/(^|[^0-9])2 件(?!中)/)
+    expect(host.textContent).toContain('2件中 1〜2件')
   })
 
   it('空は作成導線の空状態', async () => {

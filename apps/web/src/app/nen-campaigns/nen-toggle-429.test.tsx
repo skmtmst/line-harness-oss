@@ -177,6 +177,10 @@ describe('M501 停止・再開の混雑時の案内', () => {
       stop!.click()
     })
     await flush()
+    const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(button => button.textContent === '止める')
+    expect(confirm).toBeTruthy()
+    await act(async () => { confirm!.click() })
+    await flush()
 
     // 待って再試行する案内。汎用の「切り替えられませんでした」だけではない。
     expect(container.textContent).toContain('少し待ってから')
@@ -199,6 +203,10 @@ describe('M501 停止・再開の混雑時の案内', () => {
     await act(async () => {
       stop!.click()
     })
+    await flush()
+    const confirm = [...document.body.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(button => button.textContent === '止める')
+    expect(confirm).toBeTruthy()
+    await act(async () => { confirm!.click() })
     await flush()
 
     expect(container.textContent).toContain('切り替え')

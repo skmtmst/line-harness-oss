@@ -122,7 +122,8 @@
 :root .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
 
 /* B-152・仕上げ1：ラベルと欄 */
-:root .labelRow { margin-bottom: var(--polish-space-row); }
+:root .field { gap: var(--polish-space-row); }
+:root .labelRow { margin-bottom: 0; }
 
 /* B-152・仕上げ2 */
 :root .field .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
@@ -146,6 +147,9 @@
   font-weight: var(--tpl-field-label-weight);
 }
 
+/* B-152：ふつうの欄は親の間とラベルの下の余白を二重に足さない。 */
+html:root .field:not([data-density]):not([data-spacing]) { gap: var(--polish-space-row); }
+html:root .field:not([data-density]):not([data-spacing]) > .labelRow { margin-bottom: 0; }
 /*
  * 題と中身の間（Field の contentGap）。
  * 共通の間は「題の行の下 8（--polish-space-row）＋段の間 6」で 14。絵の間が
@@ -160,3 +164,27 @@
 :root .field[data-field-content-gap] .labelRow {
   margin-bottom: 0;
 }
+
+/* 固定絵のラベル行18。B-244の11px札も行の高さを押し広げない。 */
+html:root .field .label { line-height: var(--tpl-field-label-lh); }
+/* input の密度は20のラベル行を持つ。ふつうの18の行で押しつぶさない。 */
+html:root .field[data-density='input'] { gap: var(--polish-space-row); }
+html:root .field[data-density='input'] .label { line-height: var(--tpl-rt-label-lh); }
+html:root :is(.required, .optional) {
+  font-size: var(--polish-text-note);
+  line-height: var(--tpl-field-badge-lh);
+}
+
+/* B-191：欄の名前は1行で省略し、全文は label の title と読み上げ名に残す。 */
+html:root .labelRow { min-width: 0; }
+html:root .labelRow > .label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html:root .labelRow > :not(.label) { flex-shrink: 0; }
+:root .field [aria-invalid='true']:is(input, textarea, select) { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
+
+/* 認証の欄は取り込み前の間を保持する。指定なしのinput密度は変えない。 */
+html:root .field[data-density='input'][data-field-content-gap] { gap: var(--field-content-gap); }

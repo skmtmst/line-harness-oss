@@ -68,7 +68,6 @@ export default function MembersListV8({
   const topTwoKeys = useMemo(() => sorted.slice(0, 2).map((item) => item.key), [sorted])
   /* load の依存には配列ではなく、内容で比べられる結合文字を使う（取得ループを防ぐ）。 */
   const topTwoKeyQuery = topTwoKeys.join(',')
-  const rankOrder = useMemo(() => [...rankSource].sort((a, b) => a.annualThresholdYen - b.annualThresholdYen).map((item) => item.key), [rankSource])
 
   const load = useCallback(async () => {
     const request = ++requestRef.current
@@ -207,7 +206,7 @@ export default function MembersListV8({
               </div>
               <div role="rowgroup">
                 {data.items.map((member) => (
-                  <MemberRow key={member.friendId} member={member} rankOrder={rankOrder} onOpen={(href) => router.push(href)} />
+                  <MemberRow key={member.friendId} member={member} onOpen={(href) => router.push(href)} />
                 ))}
               </div>
             </GridTable>
@@ -231,11 +230,9 @@ export default function MembersListV8({
 
 function MemberRow({
   member,
-  rankOrder,
   onOpen,
 }: {
   member: NenMemberRow
-  rankOrder: string[]
   onOpen: (href: string) => void
 }) {
   const friendDetail = `/friends/detail?id=${encodeURIComponent(member.friendId)}`
@@ -243,7 +240,7 @@ function MemberRow({
     <GridRow className={styles.mRow} data-row-id={member.friendId}>
       <GridNameCell name={
         <span className={styles.memberName} title={`${member.name || '（名前なし）'} ／ ${member.customerId ? `EC会員 ${member.customerId}` : 'EC未連携'}`}>{member.name || '（名前なし）'}</span>}/>
-      <span role="cell"><RankChip rankKey={member.rankKey} name={member.rankName} rankOrder={rankOrder} /></span>
+      <span role="cell"><RankChip name={member.rankName} /></span>
       <span role="cell"><span className={styles.numStrong}>{yen(member.annualMilesYen)}</span></span>
       <span role="cell"><span className={styles.numSoft}>{yen(member.lifetimeMilesYen)}</span></span>
       <span role="cell"><span className={styles.numPlain}>{formatNumber(member.mileBalance)}</span></span>

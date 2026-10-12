@@ -5,6 +5,7 @@ export default function scanPendec2Rules() {
   const visible = el => {
     if (!el || el.closest('svg,script,style,[inert],[data-line-preview-part="talk"],[data-template-region="folders"]')) return false
     for (let p = el; p; p = p.parentElement) {
+      // 一般の崩れ検査と同じ。閉じた詳細設定の本文は描かれていない。
       if (p !== el && p.matches('details:not([open])') && !p.querySelector(':scope > summary')?.contains(el)) return false
       const c = css(p); if (c.display === 'none' || c.visibility === 'hidden' || +c.opacity === 0) return false
     }
@@ -19,7 +20,7 @@ export default function scanPendec2Rules() {
     }
     return parts.join(' > ')
   }
-  const add = (kind, el, measure, other) => findings.push({ kind, target: sel(el), text: (el.innerText || el.textContent || '').replace(/\s+/g,' ').slice(0,120), measure, ...(other ? {other:sel(other)} : {}) })
+  const add = (kind, el, measure, other) => findings.push({ kind, target: sel(el), text: ((kind === 'canvasbottom' ? el.querySelector('h1,h2')?.textContent : null) || el.innerText || el.textContent || '').replace(/\s+/g,' ').slice(0,120), measure, ...(other ? {other:sel(other)} : {}) })
   const all = selector => [...root.querySelectorAll(selector)].filter(visible)
   const framed = el => { const c=css(el); return c.outlineStyle !== 'none' && parseFloat(c.outlineWidth)>0 || ['Top','Right','Bottom','Left'].every(x => c['border'+x+'Style']!=='none' && parseFloat(c['border'+x+'Width'])>0) || c.boxShadow!=='none' }
   const choiceSelector = '[data-choice-card],label[class*="radio-card_card"]:not([data-variant="row"]),label[class*="layout-picker_tile"]'

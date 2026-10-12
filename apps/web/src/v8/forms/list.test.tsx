@@ -223,9 +223,10 @@ describe('V8 回答フォーム一覧', () => {
     expect(screen.getByText('友だち情報 3')).toBeTruthy()
   })
 
-  it('1ページに収まるときは件数だけ（N件）', async () => {
+  it('1ページでも件数の範囲と現在のページを出す', async () => {
     await mount()
-    expect(screen.getByText('1 件')).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: '回答フォームのページ送り' }).textContent).toContain('1件中 1〜1件')
+    expect(screen.getByRole('button', { name: '1ページ目へ' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('一覧の口へ件数 20・最新の回答順で頼む', async () => {

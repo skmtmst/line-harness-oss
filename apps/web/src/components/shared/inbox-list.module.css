@@ -1,0 +1,13 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.header { position: relative; display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-8); row-gap: var(--tpl-inbox-head-gap); padding: var(--tpl-inbox-head-pad-top) var(--tpl-inbox-head-pad-x) 0; }
+.headline { display: flex; width: 100%; min-width: 0; align-items: center; gap: var(--tpl-inbox-head-tools-gap); }
+.headline > h2 { flex: 1; min-width: 0; padding-left: var(--tpl-inbox-title-inset); }
+.search { padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0; }
+.filters { display: flex; flex-wrap: wrap; gap: var(--space-8); margin-top: var(--tpl-inbox-head-gap); }
+}
+
+/* 従来の続きの操作の寸法。画面は見た目を上書きしない。 */
+html:root .loadMore { width: 100%; padding: var(--polish-space-field) var(--polish-space-card); font-size: var(--text-body); color: var(--color-success); border-bottom: 1px solid var(--color-hairline); }
+html:root .loadMore:hover { background: var(--color-accent-soft); }
+html:root .olderMessages { padding: var(--space-4) var(--polish-space-field); background: color-mix(in srgb, var(--color-canvas) 90%, transparent); border-radius: var(--radius-pill); color: var(--color-action); font-size: var(--text-caption); font-weight: 600; box-shadow: var(--card-shadow); }

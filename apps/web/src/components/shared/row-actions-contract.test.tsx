@@ -57,7 +57,7 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     const src = read('row-actions.tsx')
     expect(src).toContain("'use client'")
     expect(src).toContain("import Button from './button'")
-    expect(src).toContain("import ActionMenu, { type ActionMenuItem } from './action-menu'")
+    expect(src).toContain("import ActionMenu, { orderActionMenuItems, type ActionMenuItem } from './action-menu'")
     // 「⋯」は既存の MoreAction トリガーを使い回す。
     expect(src).toContain('<MoreAction')
     // 機能ごとの裸の button 装飾や文字リンクを新たに作らない。

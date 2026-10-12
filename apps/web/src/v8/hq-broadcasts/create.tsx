@@ -488,12 +488,12 @@ export default function HqBroadcastCreate() {
    * メッセージの段を開いて1つ目の吹き出しへ移る。配信名・送り先・日時は段の帯（［〇〇へ移動］つき）のまま。
    */
   const fields = useFormErrors()
-  fields.define('title', '配信名', () => !title.trim() ? '配信名を入れてください' : title.trim().length > TITLE_MAX ? `配信名は${TITLE_MAX}文字までです` : null, { reveal: () => changeStep('basic') })
-  fields.define('accountIds', '送るアカウント', () => chosen.length ? null : '送るアカウントを選んでください', { reveal: () => changeStep('audience') })
+  fields.define('title', '配信名', () => !title.trim() ? '配信名を入れてください' : title.trim().length > TITLE_MAX ? `配信名は${TITLE_MAX}文字までです` : null, { ...({ reveal: () => changeStep('basic') }), required: true })
+  fields.define('accountIds', '送るアカウント', () => chosen.length ? null : '送るアカウントを選んでください', { ...({ reveal: () => changeStep('audience') }), required: true })
   fields.define('candidates', '配信対象の候補', () => chosen.length && tagStatus !== 'ready' ? '配信対象の候補を読み直してください' : null, { reveal: () => changeStep('audience') })
-  fields.define('tagName', '送る相手のタグ', () => audience === 'tag' && !tagName ? '送る相手のタグを選んでください' : null, { reveal: () => changeStep('audience') })
-  fields.define('target', '配信対象', () => audience === 'advanced' && !pruneCondition(condition) && !savedName ? '詳細条件を入力するか、保存した条件を選んでください' : null, { reveal: () => changeStep('audience') })
-  fields.define('scheduledAt', '送る日時', () => when === 'later' && !scheduledAt ? '送る日時を選んでください' : scheduledAt && Date.parse(scheduledAt) <= Date.now() ? '予約日時は今より後にしてください' : null, { reveal: () => changeStep('schedule') })
+  fields.define('tagName', '送る相手のタグ', () => audience === 'tag' && !tagName ? '送る相手のタグを選んでください' : null, { ...({ reveal: () => changeStep('audience') }), required: audience === 'tag' })
+  fields.define('target', '配信対象', () => audience === 'advanced' && !pruneCondition(condition) && !savedName ? '詳細条件を入力するか、保存した条件を選んでください' : null, { ...({ reveal: () => changeStep('audience') }), required: audience === 'advanced' })
+  fields.define('scheduledAt', '送る日時', () => when === 'later' && !scheduledAt ? '送る日時を選んでください' : scheduledAt && Date.parse(scheduledAt) <= Date.now() ? '予約日時は今より後にしてください' : null, { ...({ reveal: () => changeStep('schedule') }), required: when === 'later' })
   bubbles.forEach((item, index) => {
     fields.define(`bubble-${index}`, `${index + 1} 通目`, () => hqBubbleProblem(item) || null, {
       reveal: () => { if (step !== 'message') changeStep('message'); setOpenBubble(index) },
@@ -824,8 +824,8 @@ export default function HqBroadcastCreate() {
   return (
     <SaveErrorScope errors={saveErrors}><SaveErrorScope errors={fields}><>
       <MessageComposerPage active={step === 'message'}><div className={formStyles.root} data-step={step} data-hq-broadcast-create="">
-        <PageHeading title={<>一括配信を作る</>}
-        crumbs={<><p aria-live="polite">{draftLabel}</p></>}
+        <PageHeading title={<>一括配信を作る</>} headingSize="compact"
+        subtitle={<span aria-live="polite">{draftLabel}</span>}
         steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} /></>}
         actions={<>{/* 手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。 */}<Button aria-expanded={previewOpen} aria-controls="hq-broadcast-line-preview" className={formStyles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button></>} />
         {error ? (
@@ -869,7 +869,7 @@ export default function HqBroadcastCreate() {
                 {method === 'duplicate' ? copiedRun ? (
                   <SourcePickerSelection buttonRef={basicPickerTrigger} item={broadcastPickerItem(copiedRun)} folders={hqFolders} onChange={() => setBasicPicker('duplicate')} />
                 ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選ぶ</Button> : null}
-                <Field label="配信名" required count={{ value: title.trim().length, max: TITLE_MAX }}><SaveErrorField names={["title"]}><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} /></SaveErrorField>
+                <Field label="配信名" requirement={fields.requirement('title')} count={{ value: title.trim().length, max: TITLE_MAX }}><SaveErrorField names={["title"]}><input {...fields.bind('title')} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} /></SaveErrorField>
 <small>友だちには表示されません。一覧で見分けるための名前です</small></Field>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}
                 <div className={formStyles.basicFields}>
@@ -896,7 +896,7 @@ export default function HqBroadcastCreate() {
             {shows('audience') ? (
               <section id="broadcast-step-audience" className={formStyles.section}>
                 <div className={styles.accounts} data-design-node="J5DH6o">
-                  <h3>送るアカウント</h3>
+                  <h3>送るアカウント{fields.requirement('accountIds').required ? <RequiredBadge /> : null}</h3>
                   {loadError && !stores ? <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => window.location.reload()} /> : !stores ? <ListState permissionScope="hq" kind="loading" /> : (
                     <div className={styles.accountSelection} aria-live="polite">
                       <SaveErrorField names={["accountIds"]}><EntityPickerSummary id="hq-send-accounts" label="送るアカウント" noun="送るアカウント" icon={Building2} name={chosen.length ? `${formatNumber(chosen.length)} アカウント` : ''} meta={accountSummary}
@@ -942,9 +942,9 @@ export default function HqBroadcastCreate() {
                 ) : null}
                 {audience === 'tag' ? (
                   <div className="border-hairline border-t pt-4">
-                    <p className="text-ink-secondary mb-1 block text-xs font-semibold">含めるタグ</p>
+                    <Field label="含めるタグ" requirement={fields.requirement('tagName')}>
                     <SaveErrorField names={["tagName","tag_name"]}><EntityPickerField label="含めるタグ" noun="タグ" icon={TagIcon} items={byName(tagOptions)} value={tagName} onChange={setTagName}
-                      disabled={tagStatus !== 'ready' || chosen.length === 0} /></SaveErrorField>
+                      disabled={tagStatus !== 'ready' || chosen.length === 0} /></SaveErrorField></Field>
                     {tagStatus === 'ready' && chosen.length > 0 && (tagOptions ?? []).length === 0 ? <p className="mt-1 text-xs text-ink-faint">選んだアカウントにタグがありません。</p> : null}
                     {tagName && (tagOptions ?? []).some((t) => t.name === tagName && t.accounts < chosen.length) ? (
                       <p className="mt-1 text-xs text-warning">このタグが無いアカウントには送りません（最終確認で外します）。</p>
@@ -955,7 +955,7 @@ export default function HqBroadcastCreate() {
                   <div className="border-hairline border-t pt-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-bold text-ink">配信対象の条件</p>
+                        <p className="text-sm font-bold text-ink">配信対象の条件{fields.requirement('target').required ? <RequiredBadge /> : null}</p>
                         <p className="mt-1 text-xs text-ink-faint">{pruneCondition(condition) ? '設定した詳細条件で絞り込みます。' : savedName ? '保存した条件で絞り込みます。' : '条件を1つ以上設定するか、保存した条件を選んでください。'}</p>
                       </div>
                       <Button type="button" onClick={() => { setConditionDraft(condition); setConditionOpen(true) }}>条件を編集</Button>
@@ -1024,8 +1024,8 @@ export default function HqBroadcastCreate() {
                 </RadioCardGroup></SaveErrorField>
                 {when === 'later' ? (
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div><Field label="送る日" htmlFor="hq-bc-date"><SaveErrorField names={["date", "scheduledAt"]}><DateField id="hq-bc-date" value={date} onChange={setDate} aria-label="送る日" /></SaveErrorField></Field></div>
-                    <div><Field label="時刻（日本時間）" htmlFor="hq-bc-time"><SaveErrorField names={["time", "scheduledAt"]}><TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" /></SaveErrorField></Field></div>
+                    <div><Field label="送る日" htmlFor="hq-bc-date" requirement={fields.requirement('scheduledAt')}><SaveErrorField names={["date", "scheduledAt"]}><DateField id="hq-bc-date" value={date} onChange={setDate} aria-label="送る日" /></SaveErrorField></Field></div>
+                    <div><Field label="時刻（日本時間）" htmlFor="hq-bc-time" requirement={fields.requirement('scheduledAt')}><SaveErrorField names={["time", "scheduledAt"]}><TimeField id="hq-bc-time" size="field" value={time} onChange={setTime} aria-label="時刻（日本時間）" /></SaveErrorField></Field></div>
                   </div>
                 ) : null}
                 <div className={formStyles.quota}>

@@ -1,5 +1,7 @@
 'use client'
 
+
+import Card from '@/components/shared/card'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -171,11 +173,11 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
   /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
   const fields = useFormErrors()
-  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'))
-  fields.define('text', '質問文', () => (question.text.trim() ? null : '質問文を入力してください。'))
+  fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'), { required: true })
+  fields.define('text', '質問文', () => (question.text.trim() ? null : '質問文を入力してください。'), { required: true })
   question.choices.forEach((choice, index) => {
     fields.define(`extras-${index}`, `選択肢 ${index + 1} の追加処理`, () => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))
-    fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (choice.label.trim() ? null : 'ボタンの文字を入力してください。'))
+    fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (choice.label.trim() ? null : 'ボタンの文字を入力してください。'), { required: true })
   })
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
 
@@ -286,10 +288,10 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         {error ? <Notice tone="danger" message={error} /> : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
-        <section className={styles.card} aria-labelledby="q-name">
+        <Card variant="form" gap="normal" aria-labelledby="q-name">
           <h2 className={styles.cardTitle} id="q-name">名前とフォルダ</h2>
           <div className={styles.row}>
-            <Field label="テンプレート名"><SaveErrorField names={["name"]}><input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
+            <Field label="テンプレート名" requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><input {...fields.bind('name')} className={styles.input} value={name} maxLength={120} placeholder="例：継続の意思をうかがう" aria-invalid={fields.invalid('name') || undefined} aria-describedby={fields.invalid('name') ? 'q-name-error' : undefined} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
             <FieldError id="q-name-error">{fields.error('name')}</FieldError>
             <div className={`${styles.field} ${styles.folder}`}>
               <span className={styles.pickLabel}>フォルダ</span>
@@ -313,12 +315,12 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               /></SaveErrorField>
             </div>
           </div>
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="q-question">
+        <Card variant="form" gap="normal" aria-labelledby="q-question">
           <h2 className={styles.cardTitle} id="q-question">質問</h2>
           <Field label="前文（空なら送らない）"><SaveErrorField names={["intro","question.intro"]}><input className={styles.input} value={question.intro ?? ''} maxLength={4500} placeholder="いつもありがとうございます。" onChange={(event) => setQuestion((current) => ({ ...current, intro: event.target.value }))} /></SaveErrorField></Field>
-          <Field label="質問文（160文字まで）"><SaveErrorField names={["text","question.text"]}><input {...fields.bind('text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></SaveErrorField></Field>
+          <Field label="質問文（160文字まで）" requirement={fields.requirement('text')}><SaveErrorField names={["text","question.text"]}><input {...fields.bind('text')} className={styles.input} value={question.text} maxLength={160} placeholder="来月も定期便を続けますか？" aria-invalid={fields.invalid('text') || undefined} aria-describedby={fields.invalid('text') ? 'q-text-error' : undefined} onChange={(event) => setQuestion((current) => ({ ...current, text: event.target.value }))} /></SaveErrorField></Field>
           <FieldError id="q-text-error">{fields.error('text')}</FieldError>
           <div className={styles.inline}>
             <span className={styles.pickLabel} id="q-mode">答え方</span>
@@ -328,9 +330,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               ))}
             </span>
           </div>
-        </section>
+        </Card>
 
-        <section className={styles.card} aria-labelledby="q-choices">
+        <Card variant="form" gap="normal" aria-labelledby="q-choices">
           <div className={styles.cardHead}>
             <h2 className={styles.cardTitle} id="q-choices">選択肢</h2>
             <p className={styles.note}>答えをどこに残すかを、選択肢ごとに決めます</p>
@@ -342,7 +344,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
                   <Button type="button" variant="text" disabled={question.choices.length <= 1} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を消す`}><Trash2 size={14} aria-hidden="true" />消す</Button>
                 </div>
-                <Field label="ボタンの文字（20文字まで）"><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
+                <Field label="ボタンの文字（20文字まで）" requirement={fields.requirement(`choice-${index}`)}><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><input {...fields.bind(`choice-${index}`)} className={styles.input} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>
                 {host ? null : <QuestionEditor value={question} onChange={setQuestion} choiceOnly={index} choiceColumns/>}
                 <div {...fields.bind(`extras-${index}`)}><TapExtrasField error={fields.error(`extras-${index}`)} name={`選択肢${index + 1}`} unavailable={choice.behavior === 'tel' || choice.behavior === 'mail' ? '電話・メールを開く動きではタグ・加点を使えません。' : undefined} value={{ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }} tags={tags} accountId={host ? null : selectedAccountId} onChange={extra => setChoice(index, { addTagIds: extra.tagIds, scoreChange: extra.scoreChange })} /></div>
@@ -355,7 +357,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               <Plus size={15} aria-hidden="true" />{`選択肢を足す（最大 ${MAX_CHOICES} つ）`}
             </Button>
           </span>
-        </section>
+        </Card>
       </TemplateEditFrame>
 
       {/* 押したときの動きは今の部品で決める（全部の選択肢をまとめて直せる）。 */}

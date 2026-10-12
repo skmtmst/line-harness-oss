@@ -17,7 +17,8 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
+import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ListPagePagination } from '@/components/templates'
 import {
   approvalReviewReasons,
@@ -34,7 +35,7 @@ import {
 } from './display'
 import AttributionSection from './attribution-view'
 import BulkOpWizard from './bulk-op'
-import { AffiliateFrame, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import {
   AffiliateToolbar,
   PerPageSelect,
@@ -417,9 +418,9 @@ export default function ApprovalsTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={`${styles.table} ${styles.tableApprovals}`}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
+          <TableHeadRow data-table-layout="columns">
             <Th className={styles.colCheck}>
               {canSelect ? (
                 <SaveErrorField names={["allSafeSelected","selected","all_safe_selected"]}><Checkbox
@@ -436,11 +437,11 @@ export default function ApprovalsTab() {
                 /></SaveErrorField>
               ) : null}
             </Th>
-            <Th className={styles.colName}>友だちと、成果が出た時刻</Th>
+            <Th grow>友だち</Th>
             <Th className={styles.colApAffiliate}>紹介した人</Th>
-            <Th className={styles.colApAccount}>アカウント</Th>
+            <Th collapseAt="narrow" className={styles.colApAccount}>アカウント</Th>
             <Th className={styles.colApOffer}>案件と成果地点</Th>
-            <Th className={`${styles.colApReward} ${styles.num}`}>報酬</Th>
+            <Th align="right" className={styles.colApReward}>報酬</Th>
             <Th className={styles.colApCheck}>確認</Th>
             <Th className={styles.colApOps}>決める</Th>
           </TableHeadRow>
@@ -451,7 +452,7 @@ export default function ApprovalsTab() {
             const needsReview = reasons.length > 0
             const pending = item.approvalStatus === 'pending'
             return (
-              <Tr key={item.eventId} className={styles.row} data-table-layout="columns" onOpen={() => setDetailItem(item)}>
+              <Tr key={item.eventId} data-table-layout="columns" onOpen={() => setDetailItem(item)}>
                 <Td className={styles.colCheck}>
                   {canSelect ? (
                     <SaveErrorField names={[`pagedItems.${saveFieldIndex}.eventId`,`pagedItems.${saveFieldIndex}.event_id`,"eventId","item.eventId","selected","event_id","id","item.event_id"]}><Checkbox
@@ -468,21 +469,21 @@ export default function ApprovalsTab() {
                     /></SaveErrorField>
                   ) : null}
                 </Td>
-                <Td className={styles.colName}><FolderDotName>
+                <Td grow><FolderDotName>
                   <span className={styles.stack}>
-                    <button type="button" className={styles.rowName} title={personName(item.friendName)} onClick={() => setDetailItem(item)}>{personName(item.friendName)}</button>
+                    <RowNameButton title={personName(item.friendName)} onClick={() => setDetailItem(item)}>{personName(item.friendName)}</RowNameButton>
 
                   </span>
                 </FolderDotName></Td>
                 <Td className={styles.colApAffiliate}><span className={styles.cellNum} title={item.affiliateName ?? undefined}>{item.affiliateName ?? '名前を読み込めませんでした'}</span></Td>
-                <Td className={styles.colApAccount}><span className={styles.cellNum} title={item.lineAccountName ?? undefined}>{item.lineAccountName ?? 'アカウント未設定'}</span></Td>
+                <Td collapseAt="narrow" className={styles.colApAccount}><span className={styles.cellNum} title={item.lineAccountName ?? undefined}>{item.lineAccountName ?? 'アカウント未設定'}</span></Td>
                 <Td className={styles.colApOffer}>
                   <span className={styles.stack}>
                     <span className={styles.cellNum} title={item.offerName ?? undefined}>{item.offerName ?? '案件は未設定'}</span>
-                    <span className={styles.rowWrap}>{`${item.conversionPointName ?? '成果地点は未設定'}・成果額 ${formatYenNullable(item.value)}`}</span>
+                    <span className={styles.rowWrap}><TruncatedText value={`${item.conversionPointName ?? '成果地点は未設定'}・成果額 ${formatYenNullable(item.value)}`} /></span>
                   </span>
                 </Td>
-                <Td className={`${styles.colApReward} ${styles.num}`}>
+                <Td align="right" className={styles.colApReward}>
                   <span className={styles.cellNum}>{item.rewardAmount != null ? formatYen(item.rewardAmount) : '未確定'}</span>
                 </Td>
                 <Td className={styles.colApCheck}>

@@ -1,5 +1,11 @@
 'use client'
 
+import { requiredText } from '@/lib/form-requirement'
+const b244Requirements = {
+  name: requiredText("共通アクション名を入力してください"),
+}
+
+
 import { CommonActionConfig, commonActionChoices } from '@/components/automations/common-action-editor';
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -161,7 +167,7 @@ export function CommonActionNew() {
     if (saving) return
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     setError('')
-    if (!name.trim()) return setInputError({ target: 'ca-name', message: '共通アクション名を入力してください' })
+    if ((b244Requirements.name.check(name) !== null)) return setInputError({ target: 'ca-name', message: '共通アクション名を入力してください' })
     if (actions.length === 0) return setInputError({ target: 'ca-add-step', message: '処理を1つ以上追加してください' })
     setInputError(null)
     setSaving(true)
@@ -270,7 +276,7 @@ export function CommonActionNew() {
 
       <section className={styles.card} aria-labelledby="ca-what">
         <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ca-what">どんなアクションか</h2></div>
-        <Field label="名前" htmlFor="ca-name" error={inputError?.target === 'ca-name' ? inputError.message : undefined}>
+        <Field label="名前" htmlFor="ca-name" error={inputError?.target === 'ca-name' ? inputError.message : undefined} requirement={b244Requirements.name}>
           <SaveErrorField names={["name"]}><TextField id="ca-name" value={name} maxLength={120} placeholder="例：購入のお礼" onChange={(event) => { setName(event.target.value); if (inputError?.target === 'ca-name') setInputError(null) }} /></SaveErrorField>
         </Field>
         <Field label="説明"><SaveErrorField names={["description"]}><TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} /></SaveErrorField></Field>

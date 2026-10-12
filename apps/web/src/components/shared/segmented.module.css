@@ -84,11 +84,11 @@
 :root .item { font-size: var(--text-body); line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 
 /*
- * 小型（d8X09 グラフ／表）。器 r8・項目 3/10・文 12/18・
+ * 小型のグラフ／表。器 r8・項目 3/12・文 12/18・
  * つまみ r6。箱型（dtJVi）の合格は変えない。v8 だけ。
  */
 :root .root[data-size='small'] { border-radius: var(--radius-segment); }
-:root .root[data-size='small'] .item { padding: 3px 10px; font-size: var(--text-caption); line-height: 18px; }
+:root .root[data-size='small'] .item { min-height: 0; padding: 3px var(--polish-space-field); font-size: var(--text-caption); line-height: 18px; }
 :root .root[data-size='small'] .thumb { border-radius: var(--radius-mini); }
 
 /* 詰めた形（ベルの小窓 mV28V の分類）。器・つまみの角丸は既定のまま。v8 だけ。 */
@@ -145,8 +145,9 @@
 :root .root[data-size='sticker'] { height: var(--seg-timing-h); max-width: 100%; gap: 0; }
 :root .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-body); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }
 
-/* B-152②：役割ごとの文字の段。 */
-:root .item, :root .selected, html:root .root[data-size] .item, html:root .root[data-appearance] .selected { font-weight: var(--polish-weight-body); }
+/* B-211：通常500・選択600。大きさを変えても選択の太さを保つ。 */
+:root .item { font-weight: var(--polish-weight-label); }
+:root .selected, :root .root[data-size] .selected { font-weight: 600; }
 
 /* B-152⑨：切り替える各ボタンの角丸。 */
 html:root .root .item, html:root .root .thumb, html:root .root[data-size] .thumb { border-radius: var(--polish-radius-control); }
@@ -159,6 +160,6 @@ html:root .root .item, html:root .root .thumb, html:root .root[data-size] .thumb
 @layer components { html:root .root[data-appearance='reservation'] .item{padding:6px 13px;min-height:36px;border-radius:var(--radius-pill);} html:root .root[data-appearance='reservation'] .selected{outline-color:var(--color-accent);font-weight:600;} }
 
 /* B-203・B-207・B-211：10-10 に採用した共通の形。 */
-html:root .thumb { background: var(--color-selection-bg); box-shadow: var(--choice-selected-shadow); }
-html:root .selected, html:root .root[data-appearance] .selected { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
+:root .thumb { background: var(--color-selection-bg); box-shadow: var(--choice-selected-shadow); }
+:root .selected, :root .root[data-appearance] .selected { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
 html:root .item { white-space: nowrap; flex-shrink: 0; }

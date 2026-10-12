@@ -38,7 +38,7 @@ describe('一覧の行の決まり（B-190/193/194/195/198）', () => {
     expect(document.querySelector('[data-kpi-number]')?.textContent).toBe('—')
     expect(document.querySelector('[data-design-node="xRvDB"]')?.textContent).toBe(text)
   })
-  it.each(['0', '1,234 人', '¥29,800', '12.4%', '1時間24分', '+3 件', '—'])('数字の書式「%s」を保つ', (text) => {
+  it.each(['0', '1,234 人', '¥29,800', '12.4%', '1時間24分', '+3 件', '3.2 GB', '800 KB', '—'])('数字の書式「%s」を保つ', (text) => {
     expect(isKpiNumberText(text)).toBe(true)
     render(<KpiCard title="数字" value={null} valueText={text} unit="" detail={null} />)
     expect(document.querySelector('[data-kpi-number]')?.textContent).toBe(text)
@@ -68,6 +68,10 @@ describe('一覧の行の決まり（B-190/193/194/195/198）', () => {
     for (const rule of ['B-190', 'B-193', 'B-194']) expect(failures.some((failure: string) => failure.includes(rule))).toBe(true)
     expect(auditListSource('<FolderDotName><FolderDotName>名前</FolderDotName></FolderDotName>')[0]).toContain('名前の丸の重複')
     expect(auditListSource('<Tr><Td><RowMenu items={[{ label: "編集する" }]} /></Td></Tr>')).toEqual([])
+  })
+  it('名前の横の未完の注記を名前の状態と混同しない', () => {
+    expect(auditListSource('<Tr><NameCell name="フォーム" annotation={<StatusBadge tone="danger">後処理の未完 2</StatusBadge>} /></Tr>')).toEqual([])
+    expect(auditListSource('<Tr><NameCell name={<StatusBadge>公開中</StatusBadge>} /></Tr>')).toHaveLength(1)
   })
   it('全画面のソースに違反がない', () => {
     expect(auditListSources(resolve(process.cwd(), 'src'))).toEqual([])

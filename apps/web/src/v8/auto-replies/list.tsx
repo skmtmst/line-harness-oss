@@ -56,7 +56,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import { withViewTransition } from '@/components/shared/view-transition';
-import Pagination from '@/components/shared/pagination'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { compareEvaluationOrder, movePriorityUpdates } from './order';
 import QuickCreateV8 from './quick-create'
@@ -944,6 +944,12 @@ export default function AutoRepliesListV8() {
 
   const folderPanel = (
     <ManagedFolderPanel
+      createAction={canEdit ? <CreateRuleButton
+        full
+        disabled={false}
+        menuOpen={createMenuOpen}
+        onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
+      /> : undefined}
       kind="auto_reply"
       folders={folders}
       onChanged={loadFolders}
@@ -1201,7 +1207,7 @@ export default function AutoRepliesListV8() {
                     >
                       {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
                       <div className={styles.countMain}>{r.hits?.period ?? emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>累計 {r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回</div>
+                      <div className={styles.countSub}>{`累計 ${r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回`}</div>
                     </Td>
                   )}
                   <Td>
@@ -1217,7 +1223,7 @@ export default function AutoRepliesListV8() {
                             setPage(1)
                           }}
                         >
-                          <span>重なり {conflicts}</span>
+                          <span>{`重なり ${conflicts}`}</span>
                         </button>
                       )}
                     {!r.isActive && r.stopReason && (
@@ -1364,12 +1370,10 @@ export default function AutoRepliesListV8() {
   )
 
   /* ページ送りは型の pagination 枠へ（余白は型）。 */
-  const listPager = pageCount > 1 ? (
+  const listPager = ready ? (
     <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {(safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, sortedItems.length)} / {formatNumber(sortedItems.length)} 件
-      </span>
-      <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
+      <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage}
+        summary={paginationSummary(sortedItems.length, (safePage - 1) * pageSize + 1, Math.min(safePage * pageSize, sortedItems.length))} />
     </ListPagePagination>
   ) : null
 
@@ -1485,49 +1489,15 @@ export default function AutoRepliesListV8() {
    * 1152 の板（WPrd5）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
-  const narrowToolbar = (
-    <ListToolbarFrame>
-      <Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice>
-      <ListToolbarRow>
-        {canEdit && <CreateRuleButton
-          compact
-          disabled={false}
-          menuOpen={createMenuOpen}
-          onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
-        />}
-        <div className={styles.narrowFolder}>{folderSelect}</div>
-        <ListToolbarSearchSlot>
-          <SearchField
-            placeholder="ルール名・言葉で探す"
-            aria-label="ルール名・言葉で探す"
-            value={query}
-            onChange={(value) => {
-              setQuery(clampSearchQuery(value))
-              setPage(1)
-            }}
-            onClear={() => {
-              setQuery('')
-              setPage(1)
-            }}
-          />
-        </ListToolbarSearchSlot>
-        <span className={styles.narrowSpacer} aria-hidden="true" />
-        {perPageBox}
-      </ListToolbarRow>
-      <ListToolbarRow>
-        {filterChips}
-        {sortBox}
-        <ListToolbarOptional compact label="よく使う絞り込み">{savedBox}</ListToolbarOptional>
-      </ListToolbarRow>
-    </ListToolbarFrame>
-  )
+
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" skeleton boardId={narrow ? 'WPrd5' : 'uE9gf'} headingSize="regular" title={<>
         自動応答
       </>} help={<>{<>
         届いたメッセージに、決めた言葉・曜日・時間帯で自動で返します。上のルールから順に、最初に当たった1つだけが動きます。
-      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}</>}
+      </>}{"□ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集。「…」に 停止・複製・実行結果・削除。「重なり」の札は、同じ受信に先に当たるルールがあるという印（押すと重なりのあるルールだけを表示します）。"}{kpis.map((kpi) => kpi.help).filter(Boolean).join(" ")}</>}
+      explanation="上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。"
       stats={<>
         {/* 見るだけの人への帯（`Q5lOCc`）。数の帯の上。 */}
         {!canEdit && (
@@ -1536,7 +1506,7 @@ export default function AutoRepliesListV8() {
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} help={kpi.help} helpLabel={kpi.helpLabel} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? () => { setConflictOnly(true); setPage(1) } : undefined} retryLabel="重なりを見る →" />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? () => { setConflictOnly(true); setPage(1) } : undefined} retryLabel="重なりを見る →" />
           ))}
         </KpiBand>
       </>}
@@ -1711,14 +1681,6 @@ export default function AutoRepliesListV8() {
       </>}
 
       folders={<>
-          {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
-          {!canEdit && <span className={styles.viewerCreateSpace} aria-hidden="true" />}
-          {canEdit && <CreateRuleButton
-            full
-            disabled={false}
-            menuOpen={createMenuOpen}
-            onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
-          />}
           <ActionMenu
             open={createMenuOpen}
             onClose={() => setCreateMenuOpen(false)}
@@ -1731,15 +1693,15 @@ export default function AutoRepliesListV8() {
           />
           {folderPanel}
         </>}
-        collapsedFolders={narrow ? undefined : <>{createButton}{folderSelect}</>}
-        toolbar={narrow ? narrowToolbar : <>
+        collapsedFolders={<>{createButton}{folderSelect}</>}
+        toolbar={<>
           {/* 案内の帯は表の上の主列に置く（板 uE9gf）。左のフォルダの列を押し下げないよう toolbar 枠の先頭に置き、一行を取る。 */}
-          <div style={{ flexBasis: '100%' }}><Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice></div>
+
           {/* 道具の段は型の toolbar 枠に渡す（中身だけ渡す）。 */}
           <ListToolbar
             search={{
               placeholder: 'ルール名・言葉で探す',
-              width: 200,
+              width: 160,
               value: query,
               onChange: (value) => {
                 setQuery(clampSearchQuery(value))

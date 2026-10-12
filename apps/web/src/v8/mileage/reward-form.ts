@@ -1,6 +1,7 @@
 /* app/mileage/rewards/edit/reward-form.ts から写した（src/v8 は @/app を import できない）。古い側を直したら、ここも同じ判断を入れる。 */
 import type { MileageRewardFailurePolicy, MileageRewardKind } from '@/lib/api'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import { requiredText, type FormRequirement } from '@/lib/form-requirement'
 
 /**
  * 使い道の入力の中身（設計 `p9CcEB` 17-1-G）。
@@ -49,21 +50,28 @@ export const LIMIT_FIELD_ERRORS = {
   benefitExpiresDays: '交換後に使える日数は1以上の整数で入力してください',
 } as const
 
+export const rewardNameRequirement = requiredText('使い道の名前を入力してください')
+export const rewardMilesRequirement: FormRequirement = {
+  required: true,
+  check: value => value.trim() && Number.isInteger(Number(value)) && Number(value) > 0 ? null : '必要マイルは1以上の整数で入力してください',
+}
+export function rewardActionRequirement(kind: MileageRewardKind): FormRequirement {
+  return { required: kind !== 'coupon', check: value => kind === 'coupon' || value.trim() ? null : '交換後に渡すものを選んでください' }
+}
+
 /**
  * 送る前の確かめ。**Worker の検査を置き換えない。**
  * 押してから断られるより、打っている最中に気づけるだけ。
  */
 export function validateReward(form: FormState): string[] {
   const errors: string[] = []
-  if (!form.name.trim()) errors.push('使い道の名前を入力してください')
-  const miles = Number(form.requiredMiles)
-  if (!form.requiredMiles.trim() || !Number.isInteger(miles) || miles <= 0) {
-    errors.push('必要マイルは1以上の整数で入力してください')
-  }
+  const nameError = rewardNameRequirement.check(form.name)
+  const milesError = rewardMilesRequirement.check(form.requiredMiles)
+  if (nameError) errors.push(nameError)
+  if (milesError) errors.push(milesError)
   /* **クーポン以外は渡すものが要る**（Worker の `action_required` と同じ）。 */
-  if (form.rewardKind !== 'coupon' && !form.commonActionVersionId.trim()) {
-    errors.push('交換後に渡すものを選んでください')
-  }
+  const actionError = rewardActionRequirement(form.rewardKind).check(form.commonActionVersionId)
+  if (actionError) errors.push(actionError)
   /*
    * R298/R299: 在庫は 0（品切れ）を許し、それ以外の上限・日数は 1 以上。
    * Worker の保存検証と同じ境界にする。

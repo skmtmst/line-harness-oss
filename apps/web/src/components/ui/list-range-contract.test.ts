@@ -69,12 +69,14 @@ describe('ListRange 統一（監査6 #667）', () => {
         expect(source).toContain('title={`${total}件中')
         expect(source).toContain('(page - 1) * PAGE + 1')
         expect(source).toContain('Math.min(page * PAGE, total)')
-        expect(source).toContain('pageCount > 1')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../app/rich-menus/page.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + 1')
         expect(source).toContain('Math.min(currentPage * pageSize, groupTotal)')
         expect(source).toContain('formatNumber(groupTotal)')
-        expect(source).toContain('pageCount > 1')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../v8/webhooks/interactions.tsx') {
         expect(source).toContain('`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`')
         expect(source).toContain('data.total === 0 ? 0 : (data.page - 1) * data.limit + 1')
@@ -82,18 +84,19 @@ describe('ListRange 統一（監査6 #667）', () => {
         expect(source).toContain('data.pagination.offset + 1')
         expect(source).toContain('data.pagination.offset + data.items.length')
         expect(source).toContain('formatNumber(total)')
-        expect(source).toContain('pageCount > 1')
+        expect(source).toContain('<Pagination')
       } else if (path === '../../v8/conversions/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + current.length')
-        expect(source).toContain('formatNumber(shown.length)')
-        expect(source).toContain('pageCount > 1')
+        expect(source).toContain('<ListRange total={shown.length}')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
       } else if (path === '../../v8/webinars/list.tsx') {
         expect(source).toContain('(currentPage - 1) * pageSize + visibleItems.length')
-        expect(source).toContain('formatNumber(visibleTotal)')
-        expect(source).toContain('hasListData && pageCount > 1')
+        expect(source).toContain('paginationSummary(visibleTotal,')
+        expect(source).toContain('const pager = hasListData ?')
       } else if (path === '../../v8/nen-campaigns/list.tsx') {
         expect(source).toContain('`\u0024{formatNumber(total)} 件中 \u0024{(page - 1) * size + 1}〜\u0024{Math.min(total, page * size)} 件`')
-        expect(source).toContain('pageCount > 1')
+        expect(source).toContain('<Pagination')
       } else expect(source, `${path} に ListRange がない`).toContain('ListRange')
     },
   )
@@ -117,10 +120,10 @@ describe('ListRange 統一（監査6 #667）', () => {
     expect(source).toContain('(cursorPage - 1) * perPage + items.length')
   })
 
-  it('ページ送りは1ページしかないとき隠す（友だち追加時の配信）', () => {
+  it('B-231：単一ページもカーソル式の共通ページ送りを使う', () => {
     const source = read('../../v8/friend-add/list.tsx')
-    // 以前は1ページでも「前へ 1 次へ」が常に出ていた。
-    expect(source).toContain('canPrev || data.nextCursor')
+    expect(source).toContain('<CursorPagination')
+    expect(source).toContain('hasNext={Boolean(data.nextCursor)}')
     expect(source).not.toContain('aria-current="page">{cursorPage}')
   })
 })

@@ -23,6 +23,7 @@ const net = vi.hoisted(() => ({
   calls: [] as string[],
   stamp: 'STAMP-1',
   putStatus: 200 as number,
+  malformedEmails: false,
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
@@ -54,6 +55,12 @@ function installFetch() {
         ? { success: true, data: { id: 'friend-a', updatedAt: 'STAMP-2' } }
         : { success: false, code: 'METADATA_CONFLICT', error: 'ほかの変更が先に保存されました' }
       return new Response(JSON.stringify(body), { status: net.putStatus, headers: { 'Content-Type': 'application/json' } })
+    }
+    if (path.startsWith('/api/support/inbox')) {
+      return new Response(JSON.stringify({ success: true, data: net.malformedEmails ? null : { items: [], summary: { total: 0 } } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    if (url.pathname === '/api/friends/friend-a/fields') {
+      return new Response(JSON.stringify({ success: true, data: { items: [], hiddenPersonalCount: 0 } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (path.startsWith('/api/friends/friend-a')) {
       return new Response(JSON.stringify({ success: true, data: {
@@ -114,6 +121,7 @@ beforeEach(() => {
   net.calls.length = 0
   net.stamp = 'STAMP-1'
   net.putStatus = 200
+  net.malformedEmails = false
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => {}, removeItem: () => {} })
   installFetch()
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -171,4 +179,13 @@ describe('注目切替の競合(N-040 #808)', () => {
     expect(host.textContent).toContain('ほかの変更が先に保存されました')
     expect(starButton()?.getAttribute('aria-label')).toBe('注目にする')
   })
+  it('メールの成功応答に一覧が無いときも、LINEの会話と失敗の案内を保つ', async () => {
+    net.malformedEmails = true
+    await render()
+    await flush()
+    expect(host.textContent).toContain('メールの読み込みに失敗しました。')
+    expect(starButton()?.getAttribute('aria-label')).toBe('注目にする')
+    expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull()
+  })
+
 })

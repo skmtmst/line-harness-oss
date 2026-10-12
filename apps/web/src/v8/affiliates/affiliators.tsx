@@ -12,6 +12,7 @@ import { Banknote, CircleDot, CircleHelp, Download, Plus, Trophy, Users } from '
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
 import EmptyList from '@/components/shared/empty-list'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
@@ -27,6 +28,7 @@ import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 import { ListPagePagination } from '@/components/templates'
+import { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import {
   calculateAffiliateReward,
   currentSettlementPeriod,
@@ -47,7 +49,7 @@ import {
 import { AffiliateArchiveDialog } from './dialogs'
 import AffiliateDrawer from './drawer'
 import MonthlyFlow from './monthly-flow'
-import { AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
 import {
   AffiliateToolbar,
   PerPageSelect,
@@ -55,7 +57,6 @@ import {
   RowMenu,
   SavedSelect,
   StateCard,
-  StatusPill,
   ToolbarNotices,
 } from './parts'
 import styles from './affiliates.module.css'
@@ -430,6 +431,8 @@ export default function AffiliatorsTab() {
       folders={[]}
       onChanged={() => undefined}
       canManage={!readonly}
+      createAction={createButton(true)}
+      reserveCreateSpace={false}
       itemLabel="アフィリエイター"
       activeId="all"
       onSelect={() => undefined}
@@ -500,7 +503,7 @@ export default function AffiliatorsTab() {
       narrow={narrow}
       notices={notices}
       search={{ placeholder: '名前・紹介コードで探す', value: query, onChange: (value) => resetPage(() => setQuery(value)) }}
-      chips={narrow ? chips : <>{folderSelect}{chips}</>}
+      chips={<><ListToolbarOptional compact label="報酬の決め方">{folderSelect}</ListToolbarOptional>{chips}</>}
       trailing={trailing}
       narrowLead={<>{createButton(false)}{folderSelect}</>}
     />
@@ -518,9 +521,9 @@ export default function AffiliatorsTab() {
 
   const table = (
     <div className={styles.tableWrap}>
-      <DataTable className={styles.table}>
+      <DataTable columnLayout={AFFILIATE_TABLE_LAYOUT}>
         <thead>
-          <TableHeadRow className={styles.headRow} data-table-layout="columns">
+          <TableHeadRow data-table-layout="columns">
             <Th className={styles.colCheck}>
               {readonly ? null : (
                 <SaveErrorField names={["allChecked","checked","all_checked"]}><Checkbox
@@ -530,18 +533,18 @@ export default function AffiliatorsTab() {
                 /></SaveErrorField>
               )}
             </Th>
-            <Th className={styles.colName}>アフィリエイター</Th>
-            <Th>状態</Th>
-            <Th className={`${styles.colLinks} ${styles.num}`}>紹介リンク</Th>
-            <Th className={`${styles.colFriends} ${styles.num}`}>友だち追加</Th>
-            <Th className={`${styles.colConv} ${styles.num}`}>成果</Th>
-            <Th className={`${styles.colReward} ${styles.num}`}>報酬</Th>
+            <Th grow>アフィリエイター</Th>
+            <Th className={styles.colState}>状態</Th>
+            <Th align="right" className={styles.colLinks}>紹介リンク</Th>
+            <Th collapseAt="narrow" align="right" className={styles.colFriends}>友だち追加</Th>
+            <Th align="right" className={styles.colConv}>成果</Th>
+            <Th align="right" className={styles.colReward}>報酬</Th>
             <Th className={styles.colOps}>操作</Th>
           </TableHeadRow>
         </thead>
         <tbody>
           {pagedRows.map((row, saveFieldIndex) => (
-            <Tr key={row.id} className={styles.row} data-table-layout="columns" data-row-id={row.id} detailKey="affiliate" onOpen={() => { setDrawerId(current => current === row.id ? null : row.id); setDrawerEdit(false) }}>
+            <Tr key={row.id} data-table-layout="columns" data-row-id={row.id} detailKey="affiliate" onOpen={() => { setDrawerId(current => current === row.id ? null : row.id); setDrawerEdit(false) }}>
               <Td className={styles.colCheck}>
                 {readonly ? null : (
                   <SaveErrorField names={[`pagedRows.${saveFieldIndex}.id`,"id","row.id","checked"]}><Checkbox
@@ -551,7 +554,7 @@ export default function AffiliatorsTab() {
                   /></SaveErrorField>
                 )}
               </Td>
-              <Td className={styles.colName}>
+              <Td grow>
                 <span className={narrow ? styles.stack : `${styles.stack} ${styles.dotStack}`}>
                   <FolderDotName folder={null}>
                     {nameButton(row)}
@@ -559,11 +562,11 @@ export default function AffiliatorsTab() {
 
                 </span>
               </Td>
-              <Td><StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill></Td>
-              <Td className={`${styles.colLinks} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.linkCount)}本`}</span></Td>
-              <Td className={`${styles.colFriends} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)} 人`}</span></Td>
-              <Td className={`${styles.colConv} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)} 件`}</span></Td>
-              <Td className={`${styles.colReward} ${styles.num}`}><span className={styles.cellNum}>{formatYen(row.rewardAmount)}</span></Td>
+              <Td className={styles.colState}><StatusBadge tone={row.isActive ? 'success' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusBadge></Td>
+              <Td align="right" className={styles.colLinks}><span className={styles.cellNum}>{`${formatNumber(row.linkCount)}本`}</span></Td>
+              <Td collapseAt="narrow" align="right" className={styles.colFriends}><span className={styles.cellNum}>{`${formatNumber(row.friendAdds)} 人`}</span></Td>
+              <Td align="right" className={styles.colConv}><span className={styles.cellNum}>{`${formatNumber(row.totalConversions)} 件`}</span></Td>
+              <Td align="right" className={styles.colReward}><span className={styles.cellNum}>{formatYen(row.rewardAmount)}</span></Td>
               <Td className={styles.colOps}>
                 <span className={styles.rowActions}>
                   <Button type="button" onClick={() => openDrawer(row.id, false)}>成果を見る</Button>
@@ -640,7 +643,7 @@ export default function AffiliatorsTab() {
 
   function nameButton(row: { id: string; name: string }) {
     return (
-      <RowNameLink onOpen={() => openDrawer(row.id, false)} href={itemHref('affiliate', row.id)} className={styles.rowName} title={row.name}>
+      <RowNameLink onOpen={() => openDrawer(row.id, false)} href={itemHref('affiliate', row.id)} title={row.name}>
         {row.name}
       </RowNameLink>
     )
@@ -659,7 +662,7 @@ export default function AffiliatorsTab() {
       }
       stats={stats}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
-      folders={narrow ? undefined : <>{createButton(true)}{folderPanel}</>}
+      folders={folderPanel}
       toolbar={toolbar}
       pagination={pager}
       overlays={<>

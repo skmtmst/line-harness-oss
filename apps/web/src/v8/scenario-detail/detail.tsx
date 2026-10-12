@@ -2587,6 +2587,7 @@ export default function ScenarioDetailV8({
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
                             <RowMenu
                               appearance="plain"
+                              size="row"
                               label={`${step.stepOrder} 通目のその他操作`}
                               menuLabel={`${step.stepOrder} 通目の操作`}
                               open={stepMenuId === step.id}

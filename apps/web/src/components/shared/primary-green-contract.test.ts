@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -22,8 +23,8 @@ function code(src: string): string {
     .replace(/^\s*\/\/.*$/gm, '')
 }
 
-const FILES = sources(SRC).map((p) => ({ p: path.relative(SRC, p), s: code(fs.readFileSync(p, 'utf8')) }))
-const CSS = fs.readFileSync(path.join(SRC, 'app', 'globals.css'), 'utf8')
+const FILES = sources(SRC).map((p) => ({ p: path.relative(SRC, p), s: code(readUiSource(p, 'utf8')) }))
+const CSS = readUiSource(path.join(SRC, 'app', 'globals.css'), 'utf8')
 
 /**
  * 白文字を載せる緑は `--color-accent-deep`（**#087a3e・5.44:1**）。
@@ -99,7 +100,7 @@ describe('白文字を載せる緑', () => {
     const dir = path.join(SRC, 'components', 'shared')
     const hits: string[] = []
     for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.css'))) {
-      const css = fs.readFileSync(path.join(dir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+      const css = readUiSource(path.join(dir, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
       // 宣言のかたまりごとに、地と文字色を突き合わせる
       for (const block of css.split('}')) {
         if (!/color:\s*var\(--color-on-accent\)/.test(block)) continue

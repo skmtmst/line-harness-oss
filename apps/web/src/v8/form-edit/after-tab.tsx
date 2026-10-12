@@ -1,5 +1,7 @@
 'use client'
 
+
+import Card from '@/components/shared/card'
 import { useState } from 'react'
 import { FileText, IdCard, MessageSquare, Bell, Tag, Workflow } from 'lucide-react'
 import type { FormAction, FormOptions } from '@line-crm/shared'
@@ -45,19 +47,19 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
     if(onSubmitTagId) onChangeSubmitTag('') }
 
   if (readOnly) return <>
-    <section className={styles.card}>
+    <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)">
       <h2 className={styles.cardTitle}>答え終わったときの画面</h2>
       <p>お礼の文：{options.thanksText || 'ご回答ありがとうございました。'}</p>
       <p>終わったあと：{options.thanksUrl || 'お礼を出す'}</p>
-    </section>
-    <section className={styles.card}>
+    </Card>
+    <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)">
       <h2 className={styles.cardTitle}>答え終わったら行うこと</h2> <ActionEditor value={actions} refs={refs} onChange={setActions} readOnly/>
-    </section>
+    </Card>
   </>
 
   return (
     <>
-      <section className={styles.card} aria-labelledby="fe-thanks-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-thanks-title">
         <h2 id="fe-thanks-title" className={styles.cardTitle}>答え終わったときの画面</h2>
         <div className={styles.field}><Field label="お礼の文" htmlFor="fe-thanks-text"><SaveErrorField names={["thanksText","options.thanksText","thanks_text","options.thanks_text"]}><TextField id="fe-thanks-text" value={options.thanksText ?? ''} placeholder="ご回答ありがとうございました。" onChange={(e) => onChangeOptions({ thanksText: e.target.value })} /></SaveErrorField></Field></div>
         <div className={styles.endingRow}>
@@ -84,14 +86,14 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
               }}
             /></SaveErrorField></Field></div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.card} aria-labelledby="fe-actions-title">
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-actions-title">
         <div className={styles.cardHeadText}>
           <h2 id="fe-actions-title" className={styles.cardTitle}>答え終わったら行うこと</h2>
           <p className={styles.cardNote}>上から順に行います。行を押すと中身を変えられます</p>
         </div> <ActionEditor value={actions} refs={refs} onChange={setActions} />
-      </section>
+      </Card>
     </>
   )
 }

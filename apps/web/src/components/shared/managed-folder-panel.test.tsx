@@ -87,15 +87,17 @@ describe('一覧の左のフォルダの列（共通）', () => {
     const text = host.textContent ?? ''
     expect(text.indexOf('シナリオを作る')).toBeLessThan(text.indexOf('すべて'))
     expect(text).toContain('フォルダを追加')
-    expect(text).toContain('フォルダを消しても、中のシナリオは未分類に残ります')
+    // B-245：削除の影響は操作直前の確認窓へ。下の削除試験で説明とAPIを守る。
+    expect(text).not.toContain('フォルダを消しても、中のシナリオは未分類に残ります')
     // 未分類の数はサーバーの同じ母集団の数
     expect(host.querySelector('button[title="未分類"]')?.textContent).toContain('4')
   })
 
-  it('色の無いフォルダも名前から選んだ色の丸で出す（灰色の丸にしない）', async () => {
+  it('色の無いフォルダも名前から選んだ色のフォルダで出す', async () => {
     await act(async () => { root.render(<Screen kind="scenario" canManage />) })
-    const dot = host.querySelector('button[title="会員"] [data-folder-dot="filed"]') as HTMLElement
-    expect(dot.style.backgroundColor).not.toBe('')
+    const icon = host.querySelector('button[title="会員"] svg.lucide-folder') as SVGElement
+    expect(icon.style.color).not.toBe('')
+    expect(icon.getAttribute('fill')).toBe('currentColor')
   })
 
   it('「…」は 名前を変える・色を変える・並べ替える・消す。消すと DELETE を送り、選んでいたら「すべて」へ戻して読み直す', async () => {

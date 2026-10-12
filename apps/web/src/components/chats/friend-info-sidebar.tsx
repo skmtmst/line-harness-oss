@@ -8,6 +8,7 @@ import TagOverflow from '@/components/shared/tag-overflow'
 import { DragHandle } from '@/components/shared/row-actions'
 import Link from 'next/link'
 import CustomerInfoPanel from '@/components/shared/customer-info-panel'
+import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
 import StatusPill, { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Avatar from '@/components/shared/avatar'
 import { Children, cloneElement, isValidElement, useCallback, useState, useEffect, useRef } from 'react'
@@ -29,7 +30,7 @@ import { runOptimisticWithUndo } from '@/lib/undoable'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import { canEditFeature } from '@/lib/staff-capability'
 import { X } from 'lucide-react'
-import { formatRelative, formatNumber } from '@/lib/format'
+import { formatDateTime, formatRelative, formatNumber } from '@/lib/format'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
@@ -259,6 +260,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const effectiveStatus = localStatus !== undefined ? localStatus : chatStatus?.status
   const effectiveOperatorId = localOperatorId !== undefined ? localOperatorId : operatorId
   const effectiveNotes = localNotes !== undefined ? localNotes : chatStatus?.notes
+  const [editingSupport, setEditingSupport] = useState(false)
+  const [editingMemo, setEditingMemo] = useState(false)
   const [tagToRemove, setTagToRemove] = useState<{ id: string; name: string; friendId: string } | null>(null)
   const effectiveTags = localTags ?? friend?.tags
   // 友だち・会話が切り替わったら持ち直しを捨てる。
@@ -268,6 +271,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setLocalNotes(undefined)
     setLocalTags(undefined)
     setTagToRemove(null)
+    setEditingSupport(false)
+    setEditingMemo(false)
   }, [friendId, chatId, accountId])
 
   const [showSettings, setShowSettings] = useState(false)
@@ -846,10 +851,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         }
       } else if (key === 'm' && canEditChat) {
         event.preventDefault()
-        memoAreaRef.current?.focus()
+        setEditingMemo(true)
+        requestAnimationFrame(() => memoAreaRef.current?.focus())
       } else if (key === 's' && canEditChat) {
         event.preventDefault()
-        statusButtonRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+        setEditingSupport(true)
+        requestAnimationFrame(() => statusButtonRef.current?.querySelector<HTMLButtonElement>('button')?.focus())
       }
     }
     document.addEventListener('keydown', onKey)
@@ -1048,7 +1055,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 色と文字サイズは生のTailwindではなくトークンで書く
                 （raw-colors / design-debt の基準を増やさない）。
               */}
-              <div className="space-y-1.5 border-t border-hairline pt-2">
+              <div data-customer-upcoming className="space-y-1.5 border-t border-hairline pt-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-ink-faint text-micro shrink-0">次回予約</span>
                   {upcoming.kind === 'loading' ? (
@@ -1672,11 +1679,21 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   canEdit={canEditFeature('attribute.personal_info.edit', staffRole)}
                   hiddenPersonalCount={friendFields.kind === 'data' ? friendFields.hiddenPersonalCount : 0}
                   sections={[
-                    { key: 'support', label: '対応', content: <>{sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']))}<dl><div><dt>最後の連絡</dt><dd>{lastContactAt ? formatRelative(lastContactAt) : '—'}</dd></div></dl></> },
-                    { key: 'tags', label: 'タグ', content: sectionBody(renderTags(friend)) },
+                    { key: 'support', label: '対応', action: canEditChat ? <Button variant="text" size="inline" aria-label="対応を編集" aria-expanded={editingSupport} onClick={() => setEditingSupport(value => !value)}>{editingSupport ? '閉じる' : '編集'}</Button> : null, content: <>
+                      {editingSupport ? sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) : <>
+                        <CustomerInfoRows rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }]} />
+                        {sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-upcoming'?: boolean }>(child) && child.props['data-customer-upcoming'])}
+                      </>}
+                      <CustomerInfoRows rows={[{ label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }]} />
+                    </> },
+                    { key: 'tags', label: 'タグ', action: canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen(value => !value)}>{tagPickerOpen ? '閉じる' : '編集'}</Button> : null, content: <>
+                      <TagOverflow maxVisible={2}>{(effectiveTags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} size="xs" onRemove={canEditFriend && tagPickerOpen && friendId ? () => setTagToRemove({ id: tag.id, name: tag.name, friendId }) : undefined} />)}</TagOverflow>
+                      {(effectiveTags ?? []).length === 0 ? 'タグなし' : null}
+                      {sectionBody(renderTags(friend)).filter(child => isValidElement<{ id?: string }>(child) && child.props.id === 'inbox-panel-tag-picker')}
+                    </> },
                     { key: 'mileage', label: 'マイル', content: sectionBody(renderMileage(friend)) },
                     { key: 'richMenu', label: 'リッチメニュー', action: canEditFeature('/rich-menus', staffRole) ? <Link href="/rich-menus">編集</Link> : null, content: sectionBody(renderRichMenu(friend)) },
-                    { key: 'memo', label: 'メモ', content: sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) },
+                    { key: 'memo', label: 'メモ', action: canEditChat ? <Button variant="text" size="inline" aria-label="メモを編集" aria-expanded={editingMemo} onClick={() => setEditingMemo(value => !value)}>{editingMemo ? '閉じる' : '編集'}</Button> : null, content: editingMemo ? sectionBody(renderSupport(friend)).filter(child => isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo']) : effectiveNotes || 'まだありません' },
                   ]}
                   extraSections={Children.toArray(renderDetailSections(friend).props.children).flatMap(child => {
                     if (!isValidElement<{ 'data-customer-section'?: string; children?: React.ReactNode }>(child)) return []

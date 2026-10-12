@@ -23,8 +23,8 @@ describe('共通情報一覧のはみ出し（#973 U026）', () => {
   })
 
   it('狭い幅ではフォルダを縦パネルではなく1行の選択欄にする', () => {
-    expect(PAGE).toContain('narrow ? narrowToolbar : wideToolbar')
-    expect(PAGE).toContain('options={folderOptions}')
+    expect(PAGE).toContain('folderNav={{ rows: folderRows')
+    expect(TEMPLATE).toContain('options={rows.map(')
     expect(TEMPLATE).toContain('folderNav')
     expect(FRAME).toContain('1100px')
   })

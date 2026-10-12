@@ -179,12 +179,12 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
 
   it('行の「…」に中身・申込者・プレビュー・削除がそろう', async () => {
     await renderList()
-    const menuButton = document.querySelector<HTMLElement>('button[aria-label$="の操作"]')
+    const menuButton = document.querySelector<HTMLElement>('tbody button[aria-label$="の操作"]')
     expect(menuButton, '行末の「…」がある').toBeTruthy()
     await act(async () => { menuButton!.click() })
     await flush()
     const labels = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((m) => m.textContent)
-    expect(labels.some((t) => t?.includes('中身を見る')), '中身を見る').toBe(true)
+    expect(labels.some((t) => t?.includes('イベントの設定を見る')), 'イベントの設定を見る').toBe(true)
     expect(labels.some((t) => t?.includes('申込者を見る')), '申込者を見る').toBe(true)
     expect(labels.some((t) => t?.includes('プレビュー')), 'プレビュー').toBe(true)
     expect(labels.some((t) => t?.includes('削除する')), '削除する').toBe(true)
