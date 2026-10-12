@@ -163,6 +163,7 @@ export function TagEditForm({
   }, [tag.id, accountId, values.rewardMiles, values.referralRewardMiles, retroactiveReference, host])
 
   const requestSave = () => {
+    if (readOnly) return
     const problem = tagNameProblem(name)
     if (problem) { setNameError(problem); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
