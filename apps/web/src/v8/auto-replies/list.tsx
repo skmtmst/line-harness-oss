@@ -1490,7 +1490,7 @@ export default function AutoRepliesListV8() {
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
   const narrowToolbar = (
-    <ListToolbarFrame>
+    <ListToolbarFrame layout="stacked">
       <Notice tone="info">上のルールから順に見て、最初に当たった1つだけが動きます。順番は行の左のつまみで入れ替えます。</Notice>
       <ListToolbarRow>
         {canEdit && <CreateRuleButton
