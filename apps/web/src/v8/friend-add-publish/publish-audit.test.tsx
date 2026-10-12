@@ -43,3 +43,10 @@ for (const role of [null, 'viewer']) it(`権限${role}では有効化・テス�
  expect(net.conflicts).not.toHaveBeenCalled()
  expect(screen.getByText('有効にする前の確認は、編集できる人が行います。')).toBeTruthy()
 })
+
+it('確認行のテストするは編集へ移らず、同じ条件で実際のテストを呼ぶ',async()=>{
+ net.query='id=r';net.test.mockResolvedValue({success:true,data:{matched:true}})
+ render(<Page/>);await act(async()=>{})
+ await act(async()=>screen.getByRole('button',{name:'テストする',exact:true}).click())
+ expect(net.test).toHaveBeenCalledWith('a','r',{routeId:null,expectedAt:null,friendId:null})
+})

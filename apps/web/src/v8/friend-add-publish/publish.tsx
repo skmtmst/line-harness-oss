@@ -316,7 +316,7 @@ function FriendAddPublish() {
       title: 'テストで判定を確かめた',
       desc: testOk ? 'テストで判定が通りました' : 'テストで判定が通るまで、有効にはできません',
       href: null,
-      action: '直す',
+      action: 'テストする',
     },
     {
       ok: slack !== false,
