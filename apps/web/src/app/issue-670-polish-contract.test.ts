@@ -100,7 +100,7 @@ describe('#670 17 予約一覧の押せない保存した条件を置かない',
 describe('#670 02 担当の二重ラベルと並び順の見出し', () => {
   it('受信箱の担当はプルダウンの自称だけにする', () => {
     expect(CHATS).not.toContain('<span className="shrink-0">担当者</span>')
-    expect(CHATS).toContain('label="担当"')
+    expect(read('..', 'components', 'shared', 'inbox-head-menus.tsx')).toContain('label="担当"')
   })
 })
 
