@@ -62,6 +62,19 @@ afterEach(() => {
 const buttons = () => [...document.querySelectorAll('button')]
 
 describe('統括のひな形の一覧（店と同じ形）', () => {
+  it.each(['template', 'form', 'tag', 'rich_menu'] as const)('フォルダの説明は共通の?へ渡し、%sの固有説明と機能を保つ', async type => {
+    await render({ type, kind: type === 'template' ? 'message' : undefined })
+    const panel = host.querySelector('aside[aria-label="フォルダ"]')!
+    expect(panel.textContent).not.toContain('フォルダを消しても')
+    const help = panel.querySelector<HTMLButtonElement>('button[aria-label="フォルダの説明"]')!
+    expect(help).toBeTruthy()
+    await act(async () => { help.click() })
+    const explanation = document.getElementById(help.getAttribute('aria-describedby')!)!
+    expect(explanation.textContent).toContain('フォルダを消しても、中の項目は未分類に残ります。')
+    if (type === 'template') expect(explanation.textContent).toContain('種類のタブをまたいで')
+    expect(panel.textContent).toContain('フォルダを追加')
+    expect(host.querySelector('tbody tr')).toBeTruthy()
+  })
   it('メッセージのタブでも保存した形の札を出し、古い応答からテキストを推測しない', async () => {
     await render({ rows: [
       { ...row('text', '文字の案内', 0), message_type: 'text' },

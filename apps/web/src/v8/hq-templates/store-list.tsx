@@ -17,7 +17,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import EmptyList from '@/components/shared/empty-list'
 import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel'
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot'
 import { deleteFolderDescription } from '@/components/shared/folder-row-actions'
 import KpiBand from '@/components/shared/kpi-band'
@@ -273,9 +273,9 @@ export default function HqStoreList(props: HqStoreListProps) {
       addFolderLabel="フォルダを追加"
       rows={folderLoadFailed ? [] : folderRows}
     >
-      {folderLoadFailed ? <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement}>フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice> : <p className={storeStyles.folderNote}>
-        {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります' : `フォルダを消しても、中の${words.item}は未分類に残ります`}
-      </p>}
+      {folderLoadFailed ? <Notice tone="danger" className={storeStyles.folderNoteNoticePlacement}>フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice> : <FolderPanelNote itemLabel={words.item}>
+        {type === 'template' ? 'フォルダは種類のタブをまたいで使えます。' : undefined}
+      </FolderPanelNote>}
     </FolderPanel>
   )
 
