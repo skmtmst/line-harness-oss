@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { couponDate, couponPayloadError } from '@line-crm/shared'
 import { api, type BroadcastMessageAsset } from '@/lib/api'
+import { CardHeader } from '@/components/shared/card'
 import { Field } from '@/components/shared/form-controls'
 import Toggle from '@/components/shared/toggle'
 import Select from '@/components/shared/select'
@@ -47,8 +48,7 @@ export default function CouponSettings({ accountId, value, onChange, onOptionsLo
   return <>
     <div className={styles.fieldRow}>
       <div className={styles.field}>
-        <h2 className={styles.cardTitle}>読み取った人にクーポンを渡す</h2>
-        <p className={styles.cardNote}>オンにすると、友だち追加のあとトークにクーポンが届きます（1人1回）</p>
+        <CardHeader size="stacked" title="読み取った人にクーポンを渡す" meta="オンにすると、友だち追加のあとトークにクーポンが届きます（1人1回）" />
       </div>
       <Toggle checked={value.couponEnabled} disabled={disabled} label="クーポンを渡す"
         onChange={(couponEnabled) => onChange({ ...value, couponEnabled })} />

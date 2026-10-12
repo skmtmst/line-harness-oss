@@ -56,7 +56,7 @@ export default function FolderColorButton({ value, onChange, colors = FOLDER_SEL
     close()
   }
   const palette = (
-    <div ref={paletteRef} id={paletteId} className={[styles.palette, appearance === 'palette' && styles.paletteFlat].filter(Boolean).join(' ')} role="radiogroup" aria-label={label} onKeyDown={escape}>
+    <div ref={paletteRef} id={paletteId} className={appearance === 'palette' ? `${styles.palette} ${styles.paletteFlat}` : styles.palette} role="radiogroup" aria-label={label} onKeyDown={escape}>
       {choices.map((item, index) => (
         <button key={item.value} type="button" role="radio"
           aria-label={item.name} title={item.name} aria-checked={selected(item)}
