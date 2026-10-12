@@ -11,7 +11,7 @@ describe('外部連携の一覧は現在のV8の型と数の帯を使う', () =>
     expect(view).toContain('<WebhookBand')
   })
   it('数の帯の題は共通の文字と色を使う', () => {
-    expect(kpi).toMatch(/:root \.label \{[^}]*font-size: 13px/s)
+    expect(kpi).toMatch(/:root \.label \{[^}]*font-size: var\(--text-caption\)/s)
     expect(kpi).toContain('var(--color-ink)')
     expect(read('../../v8/webhooks/shell.tsx')).toContain('presentation="band"')
   })

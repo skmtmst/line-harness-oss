@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { readUiSource } from '../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -9,7 +10,7 @@ import { describe, expect, it } from 'vitest'
  * いた崩れの戻し検知。直しを戻すと赤くなる。
  */
 function read(rel: string): string {
-  return fs.readFileSync(path.join(__dirname, rel), 'utf8')
+  return readUiSource(path.join(__dirname, rel), 'utf8')
 }
 
 describe('m22c 札・ボタンの折り返し', () => {

@@ -97,11 +97,10 @@ async function renderPanel(notes: string | null = '前のメモ', friendId = 'fr
     expect(host.querySelector('[data-customer-info-panel] section[aria-label="対応"]')).toBeTruthy()
   })
   // ふだんは値を読む形。以前からの保存・失敗・競合の検証は編集を開いて行う。
-  if (document.documentElement.dataset.theme === 'v8') {
+  {
     await act(async () => {
       host.querySelector<HTMLButtonElement>('button[aria-label="対応を編集"]')?.click()
       host.querySelector<HTMLButtonElement>('button[aria-label="メモを編集"]')?.click()
-      host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')?.click()
     })
   }
 }
@@ -137,10 +136,10 @@ describe('B-26 右の欄でその場で直す', () => {
     await renderPanel()
     const picker = () => document.getElementById('inbox-panel-tag-picker')!
     expect(picker().hidden).toBe(true)
-    await act(async () => { button('＋ 追加')!.click() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     expect(picker().hidden).toBe(false)
     expect(document.querySelector('[aria-label="タグを探して付ける"]')).toBeTruthy()
-    await act(async () => { button('＋ 追加')!.click() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     expect(picker().hidden).toBe(true)
     document.activeElement instanceof HTMLElement && document.activeElement.blur()
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true })) })
@@ -185,7 +184,7 @@ describe('B-26 右の欄でその場で直す', () => {
     mocks.removeTag.mockResolvedValue({ success: true, data: null })
     mocks.addTag.mockResolvedValue({ success: true, data: null })
     await renderPanel()
-    await eventually(() => { expect(document.querySelector('button[aria-label="未契約を外す"]')).toBeTruthy() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
     expect(mocks.removeTag).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('『未契約』を外しますか？')
@@ -199,6 +198,7 @@ describe('B-26 右の欄でその場で直す', () => {
 
   it('タグを外す確認をキャンセルすると、タグも保存先も変えない', async () => {
     await renderPanel()
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
     await act(async () => { button('キャンセル')!.click() })
     expect(mocks.removeTag).not.toHaveBeenCalled()
@@ -208,6 +208,7 @@ describe('B-26 右の欄でその場で直す', () => {
 
   it('確認中に友だちを切り替えたら確認を閉じ、別の友だちから外さない', async () => {
     await renderPanel()
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
     await act(async () => { root.render(<FriendInfoSidebar friendId="friend-1" chatId="chat-1" />) })
     expect(document.body.textContent).not.toContain('『未契約』を外しますか？')
@@ -219,6 +220,7 @@ describe('B-26 右の欄でその場で直す', () => {
     mocks.removeTag.mockResolvedValue({ success: true, data: null })
     await renderPanel()
     expect(document.querySelector('[role="group"][aria-label="タグ「未契約」"]')).toBeTruthy()
+    await act(async () => { host.querySelector<HTMLButtonElement>('section[aria-label="タグ"] button[aria-controls="inbox-panel-tag-picker"]')!.click() })
     await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="未契約を外す"]')!.click() })
     expect(mocks.removeTag).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('『未契約』を外しますか？')

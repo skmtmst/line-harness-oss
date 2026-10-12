@@ -55,7 +55,7 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
     expect(body).toContain('<Th className={styles.colOfferOps}>操作</Th>')
     expect(body).toContain('<Td className={styles.colOfferOps}>')
     expect(body).toContain('className={styles.rowActions}')
-    expect(css).toContain('.colOfferOps { width: var(--tpl-af-col-offer-ops); }')
+    expect(css).toMatch(/\.colOfferOps\s*\{[^}]*width:\s*var\(--tpl-icon-btn-row-hit\)/s)
     expect(css).toMatch(/\.rowActions\s*\{[^}]*display: flex;[^}]*align-items: center;/)
   })
 

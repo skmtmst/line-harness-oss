@@ -201,6 +201,7 @@ describe('画面', () => {
     await act(async () => { root.render(<OpsSupportPage />) })
     await flush()
     const text = host.textContent ?? ''
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="お問い合わせの説明"]')!.click() })
     const information = Array.from(host.querySelectorAll('[title]')).map(node => node.getAttribute('title')).join('\n')
     expect(text).toContain('すべて')
     const stages = host.querySelector<HTMLButtonElement>('button[aria-label="状態で絞る"]')!

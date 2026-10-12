@@ -218,7 +218,7 @@ describe('R275 計測サイトの停止と再開', () => {
     await settle()
 
     // 「…」を開いて止めるを選ぶ（絵どおりの操作）
-    await act(async () => { (host.querySelector('button[aria-controls="site-script-row-actions"]') as HTMLElement).click() })
+    await act(async () => { (host.querySelector('button[aria-label="「公式ショップ」の操作"]') as HTMLElement).click() })
     await settle()
     const stop = button('止める')
     expect(stop).toBeTruthy()
@@ -244,10 +244,10 @@ describe('R275 計測サイトの停止と再開', () => {
     expect(host.querySelector('[title="理由: サイトを閉じたため"]')).not.toBeNull()
     expect(text()).not.toContain('data-site="site-1"')
     // 「…」の中に再開だけあり、止めるは無い
-    await act(async () => { (host.querySelector('button[aria-controls="site-script-row-actions"]') as HTMLElement).click() })
+    await act(async () => { (host.querySelector('button[aria-label="「公式ショップ」の操作"]') as HTMLElement).click() })
     await settle()
     expect(button('再開する')).toBeTruthy()
-    expect(button('止める')?.hasAttribute('disabled')).toBe(true)
+    expect(button('止める')).toBeUndefined()
   })
 
   it('staffには止める・再開する入口を出さない', async () => {

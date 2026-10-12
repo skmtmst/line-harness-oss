@@ -45,10 +45,12 @@ describe('表の外側の余白の洗い出し', () => {
   it('/affiliates：外側はV8の板の余白、操作列は中身の幅で固定', () => {
     const body = code(read('v8', 'affiliates', 'affiliators.tsx'))
     const css = read('v8', 'affiliates', 'affiliates.module.css')
-    expect(body).toContain('<Th className={styles.colName}>アフィリエイター</Th>')
+    expect(body).toContain('<Th grow>アフィリエイター</Th>')
     expect(body).toContain('<Th className={styles.colOps}>操作</Th>')
-    expect(css).toContain('padding: var(--tpl-af-head-pad)')
-    expect(css).toContain('padding: var(--tpl-af-row-pad)')
+    expect(body).toContain('columnLayout={AFFILIATE_TABLE_LAYOUT}')
+    const frame = read('v8', 'affiliates', 'frame.tsx')
+    expect(frame).toContain("padding: '0 var(--tpl-list-inset)'")
+    expect(frame).toContain("rowHeight: 'var(--tpl-af-row-h)'")
     expect(css).toContain('.colOps { width: var(--tpl-af-col-ops); }')
   })
 

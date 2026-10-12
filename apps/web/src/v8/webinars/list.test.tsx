@@ -104,8 +104,8 @@ describe('V8 ウェビナー一覧', () => {
       return originalFetch(input, init)
     })
     await render()
-    const help = buttonByLabel('視聴の説明')!
-    expect(help.closest('[data-kpi-presentation]')?.textContent).toContain('—')
+    const help = buttonByLabel('ウェビナーの説明')!
+    expect([...host.querySelectorAll('[data-kpi-number]')].map(node => node.textContent)).toContain('—')
     await act(async () => help.click())
     const note = host.querySelector('[role="note"]')!
     expect(note.textContent?.match(/視聴区間の記録をまだ集計できないため/g)).toHaveLength(1)

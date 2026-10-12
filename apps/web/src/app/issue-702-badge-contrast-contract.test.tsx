@@ -99,7 +99,7 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
     const page = read('webinars/page.tsx')
     const css = read('../components/shared/status-pill.module.css')
     const globals = read('globals.css')
-    expect(page).toContain("<SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'info' : 'neutral'}")
+    expect(page).toContain("<SharedStatusPill tone={statusTone(webinar) === 'active' ? 'success' : statusTone(webinar) === 'scheduled' ? 'neutral' : 'neutral'}")
     for (const tone of ['success', 'info', 'neutral']) {
       const ink = globals.match(new RegExp(`--polish-status-${tone}-ink:\\s*(#[0-9a-fA-F]{6})`))?.[1]
       const bg = globals.match(new RegExp(`--polish-status-${tone}-bg:\\s*#([0-9a-fA-F]{8})`))?.[1]

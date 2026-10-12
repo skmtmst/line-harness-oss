@@ -34,8 +34,8 @@ describe('V6 機能18の画面契約', () => {
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {
     expect(SITE).toContain('boardId="XjOte"')
     expect(ADS).toContain('boardId="qSTVR"')
-    expect(ADS).toContain('data-design-node="FDBsG"')
-    expect(ADS).toContain('data-design-node="p0kA3"')
+    expect(ADS).toContain('boardId="FDBsG"')
+    expect(ADS).toContain('boardId="p0kA3"')
     expect(CREATE).toContain('boardId="KMaMk"')
     expect(DETAIL).toContain('boardId="Q5le3"')
     expect(ADS).toContain('成果地点と、広告に返す名前の対応')

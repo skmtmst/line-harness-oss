@@ -488,7 +488,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     // Aへ送信を開始し、応答は保留のまま。(ダイレクト送信パネルにも
     // 「送信」ボタンがあるので、トーク画面の中に限定する)
     const pane = document.querySelector('[data-inbox-v4="talk-pane"]')
-    const sendButton = [...(pane?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '送信')
+    const sendButton = [...(pane?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '送信する')
     await click(sendButton ?? null)
     await flush()
     expect(net.posts.some((p) => p.path === '/api/chats/friend-a/send')).toBe(true)

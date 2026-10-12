@@ -74,7 +74,7 @@ describe('#670 25/09 オートメーションの状態と行高・ページ送�
 
 describe('#670 16/22 アフィリエイトの操作セルと緑文字', () => {
   it('計測中・停止中は状態の札で出し、操作セルに置かない', () => {
-    expect(AFFILIATES).toContain("<StatusPill tone={row.isActive ? 'active' : 'neutral'}>")
+    expect(AFFILIATES).toContain("<StatusBadge tone={row.isActive ? 'success' : 'neutral'}>")
     const operationAt = AFFILIATES.indexOf('<Td className={styles.colOps}>')
     const operationEnd = AFFILIATES.indexOf('</Td>', operationAt)
     expect(operationAt).toBeGreaterThan(-1)

@@ -272,7 +272,7 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     const button = (label: string) => Array.from(document.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)!
 
     expect(host.textContent).toContain('手で入れた費用')
-    await act(async () => { (host.querySelector('button[aria-controls="ads-entry-actions"]') as HTMLButtonElement).click() })
+    await act(async () => { (host.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement).click() })
     await act(async () => { button('取り消す').click() })
     // 窓の確定ボタンは一覧の同名ボタンと分ける（窓は最後に描かれる）。
     const confirmButton = Array.from(document.querySelectorAll('button'))
