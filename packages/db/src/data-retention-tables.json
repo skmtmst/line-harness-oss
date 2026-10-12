@@ -4123,6 +4123,32 @@
       "parentColumn": "id"
     }
   },
+  "rt_delivery_uber_oauth_states": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "rt_delivery_uber_connections": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "rt_delivery_uber_store_candidates": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_delivery_uber_app_tokens": {
+    "category": "global"
+  },
   "visit_stamp_pin_attempts": {
     "category": "purge",
     "scope": {

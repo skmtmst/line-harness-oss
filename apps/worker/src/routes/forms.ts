@@ -2,7 +2,7 @@ import { callFormWebhook } from '../services/form-webhook.js';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, validatedInputBody } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 import { hydrateDocumentAnswers, validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
 import { formAvailability } from '../services/form-availability.js';
@@ -2436,11 +2436,22 @@ forms.post('/api/forms/:id/submit', inputJsonBoundary(), async (c) => {
     if (!FORM_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
       return inputError(c, { success: false, error: 'Idempotency-Key must be a UUID' }, 400, []);
     }
+    // 本文は手前の inputJsonBoundary が読んでオブジェクトだと確かめている。
+    // ここで読み直すと同じ本文を二度読むことになるので、検査済みをそのまま使う。
+    // この口を通らない組み合わせのときだけ、従来どおり読んで形を確かめる。
     let body: { data?: unknown; trackedLinkId?: unknown; testToken?: unknown };
-    try {
-      body = await c.req.json();
-    } catch {
-      return inputError(c, { success: false, error: 'リクエストの形式が正しくありません' }, 400, []);
+    const validated = validatedInputBody(c);
+    if (validated) {
+      body = validated;
+    } else {
+      try {
+        body = await c.req.json();
+      } catch {
+        return inputError(c, { success: false, error: 'リクエストの形式が正しくありません' }, 400, []);
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return inputError(c, { success: false, error: 'リクエストの形式が正しくありません' }, 400, []);
+      }
     }
     // P（試し回答）：試し合言葉はヘッダ・クエリ・本文のどこからでも読む。
     // 正しければ下書きを読む（公開版が無くても・受付停止でも試せる）。
