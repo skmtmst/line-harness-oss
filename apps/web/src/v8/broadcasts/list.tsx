@@ -3,7 +3,7 @@
 import ListDateTime from '@/components/shared/list-date-time'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional } from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -930,10 +930,7 @@ export default function BroadcastListV8() {
     <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         {searchBox}
-        {dateBox}
-        {saveCurrentButton}
-        <span className={styles.spacer} aria-hidden="true" />
-        {savedSearchBox}
+        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}{saveCurrentButton}{savedSearchBox}</ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
         {statusChips}

@@ -7,6 +7,7 @@ import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
 import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth } from '../../src/components/shared/list-toolbar-fit.mjs'
 import { fitSelectContent } from '../../src/components/shared/select-content-size.mjs'
+import scanFixPatterns from './fix-patterns-browser.mjs'
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
@@ -316,5 +317,24 @@ test('F1/F6: stacked state badges keep their text and the 60px row with common s
     assert.equal(await page.locator('.badge').nth(1).innerText(), '後処理の未完 2')
     await page.locator('.statusCell').evaluate(el => el.style.paddingBlock='12px')
     assert.ok(await page.locator('tr').evaluate(el => el.getBoundingClientRect().height) > 60)
+  } finally { await browser.close() }
+})
+
+test('F10: stacked callers share two narrow rows; a separate leading row fails and named overflow keeps tools usable', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({viewport:{width:1152,height:900}})
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button,input{height:36px;flex:none}.wideCreate{width:100%}</style><section data-page-template="list" data-list-skeleton style="width:852px;container-type:inline-size;container-name:v8-page"><div class="slots" data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout="slots-stacked"><span class="leading" data-toolbar-leading><a class="wideCreate">送り先を作る</a><button style="width:150px">フォルダ：すべて</button></span><span class="rowBreak"></span><div class="slotsRow" data-toolbar-row><span class="slotTool" data-toolbar-role="search"><div class="searchSlot" data-toolbar-search><input type="search" placeholder="名前で探す"></div></span><span class="slotTool" data-toolbar-role="filter"><details class="optional" data-toolbar-optional data-collapsed><summary>配信日・検索条件</summary><div data-toolbar-optional-content><input aria-label="配信日" type="date"><button>条件を保存する</button></div></details></span></div><div class="slotsRow" data-toolbar-row><span class="slotTool" data-toolbar-role="filter"><button>状態：すべて</button></span><span class="slotTool" data-toolbar-role="count"><span data-list-page-size><button>20件表示</button></span></span></div></div></section></html>`)
+    await page.locator('.slots').evaluate(el => el.style.setProperty('--toolbar-leading-width',`${el.querySelector('[data-toolbar-leading]').getBoundingClientRect().width}px`))
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F10,0)
+    const heights = await page.locator('[data-toolbar-leading]').evaluate(el=>[...el.children].map(c=>c.getBoundingClientRect().y))
+    assert.equal(heights[0],heights[1])
+    await page.locator('summary').click()
+    await page.locator('input[type="date"]').fill('2026-10-12')
+    assert.equal(await page.locator('input[type="date"]').inputValue(),'2026-10-12')
+    assert.equal((await page.evaluate(scanFixPatterns)).counts.F10,0,'popover fields do not create a third toolbar row')
+    await page.locator('summary').click()
+    await page.addStyleTag({content:'.slots{flex-direction:column!important}.slots>.slotsRow{display:flex!important;width:100%}'})
+    assert.ok((await page.evaluate(scanFixPatterns)).counts.F10>0)
   } finally { await browser.close() }
 })

@@ -9,14 +9,23 @@ export default function scanFixPatterns() {
     counts[pattern]++
     findings.push({ pattern, reason, text: el.textContent?.trim().slice(0, 90) ?? '', label: el.getAttribute('aria-label') })
   }
-  const lines = el => {
-    const ys = [], walker = document.createTreeWalker(el, 4)
+  const textRects = el => {
+    const rects = [], walker = document.createTreeWalker(el, 4)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (!node.textContent.trim() || !visible(node.parentElement) || node.parentElement.closest('svg')) continue
       const range = document.createRange(); range.selectNodeContents(node)
-      for (const r of range.getClientRects()) if (r.width && r.height && !ys.some(y => Math.abs(y - r.y) < 2)) ys.push(r.y)
+      for (const r of range.getClientRects()) if (r.width && r.height) rects.push(r)
     }
-    return ys.length
+    return rects
+  }
+  const lines = el => {
+    const bands = []
+    for (const rect of textRects(el)) {
+      const band = bands.find(b => Math.min(b.bottom, rect.bottom) > Math.max(b.top, rect.top))
+      if (band) { band.top = Math.max(band.top, rect.top); band.bottom = Math.min(band.bottom, rect.bottom) }
+      else bands.push({top:rect.top,bottom:rect.bottom})
+    }
+    return bands.length
   }
   const canvas = document.createElement('canvas').getContext('2d')
   const roots = [...document.querySelectorAll('[data-page-template="list"]')].filter(visible)
@@ -40,8 +49,10 @@ export default function scanFixPatterns() {
       if (el.closest('[data-kpi-number]')) continue
       const css = getComputedStyle(el)
       if (!el.textContent.trim() || css.display === 'contents') continue
-      const range = document.createRange(); range.selectNodeContents(el)
-      if (range.getBoundingClientRect().width > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
+      const rects = textRects(el)
+      if (!rects.length) continue
+      const paintedWidth = Math.max(...rects.map(r=>r.right)) - Math.min(...rects.map(r=>r.left))
+      if (paintedWidth > (el.clientWidth || el.getBoundingClientRect().width) - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0) + 1
         || el.scrollHeight > el.clientHeight + 1) add('F1', el, 'short text does not fit')
     }
     for (const el of all('input[type="search"]')) {
@@ -69,6 +80,20 @@ export default function scanFixPatterns() {
     for (const el of all('[data-row-menu]')) if (el.closest('[data-kpi-strip]')) add('F9', el, 'row menu in KPI band')
     for (const el of all('[data-list-name-cell] [data-design-node="xRvDB"]')) add('F9', el, 'state is in name column')
     if (root.getBoundingClientRect().width < 1100) {
+      for (const toolbar of all('[data-shared-part="list-toolbar"]')) {
+        if (toolbar.parentElement.closest('[data-shared-part="list-toolbar"]')) continue
+        const controls = [...toolbar.querySelectorAll('button,input,summary')].filter(el => visible(el)
+          && !el.closest('[data-toolbar-optional][data-collapsed] [data-toolbar-optional-content]')
+          && !el.closest('[data-design-part="notice"],[data-shared-part="notice"],[role="status"],[role="alert"]'))
+        const rows = []
+        for (const el of controls) {
+          const rect = el.getBoundingClientRect(), row = rows.find(r => Math.min(r.bottom,rect.bottom)>Math.max(r.top,rect.top))
+          if (row) { row.top=Math.max(row.top,rect.top);row.bottom=Math.min(row.bottom,rect.bottom) }
+          else rows.push({top:rect.top,bottom:rect.bottom})
+        }
+        if (toolbar.querySelector('[data-list-page-size]') && rows.length !== 2) add('F10', toolbar, `narrow list has ${rows.length} tool rows instead of two`)
+      }
+
       for (const folder of all('[data-template-region="folders"]')) add('F10', folder, 'folder column remains in narrow list')
       for (const count of all('[data-list-page-size]')) {
         const toolbar = count.closest('[data-template-region="toolbar"]')

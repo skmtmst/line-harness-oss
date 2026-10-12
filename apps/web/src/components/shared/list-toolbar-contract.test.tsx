@@ -147,7 +147,7 @@ describe('B-178 共通の道具の段の操作', () => {
     const css = read('list-toolbar.module.css')
     expect(css).toMatch(/:root\s*\.toolbar:not\(:has\(\.optional\)\)\s*{[^}]*flex-wrap:\s*wrap/s)
     // B-244：名前の無い「…」へ畳まず、狭い白い板で2段にする。
-    expect(css).not.toContain('.optional[data-collapsed] > summary')
+    expect(read('list-toolbar.tsx')).not.toMatch(/<summary[^>]*>…<\/summary>/)
     expect(css).toContain('@container v8-page (max-width: 1099px)')
     expect(css).toContain(".toolbar[data-toolbar-layout='stacked']")
   })

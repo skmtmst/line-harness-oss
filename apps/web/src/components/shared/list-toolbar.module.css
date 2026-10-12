@@ -261,7 +261,29 @@ html:root :is(.slots, .toolbar) [data-toolbar-row][data-toolbar-fit='single'] { 
 html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) {
   width: max-content; min-width: max-content; max-width: none; flex: none;
 }
-/* 2段の型では、各段が道具の幅を持つ。display:contentsで段の外へ出さない。 */
+/* Narrow list frames own the two rows, including a formerly stacked caller. */
 @container v8-page (max-width: 1099px) {
-:root .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; flex-wrap: wrap; width: 100%; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] { flex-direction: row; flex-wrap: wrap; }
+  html:root .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: contents; }
+  html:root .slots:has([data-toolbar-role='search']) > .rowBreak { display: none; }
+  html:root .slots .slotTool[data-toolbar-role='search'] { flex-basis: calc(100% - var(--toolbar-leading-width, 0px) - var(--tpl-toolbar-gap)); }
+  html:root .leading { flex: none; flex-wrap: nowrap; }
+  html:root .leading > :is(button, a),
+  html:root .leading :global(.v8-folder-create) { width: max-content; flex: none; }
 }
+/* A named overflow group preserves the original controls and handlers. */
+.optional > summary { display: none; }
+.optional[data-collapsed] { position: relative; min-width: 0; }
+.optional[data-collapsed] > summary {
+  display: inline-flex; align-items: center; height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap);
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-control); cursor: pointer;
+  gap: var(--tpl-toolbar-gap); font: inherit; font-weight: 500; white-space: nowrap; box-shadow: var(--control-shadow);
+}
+.optional > summary::-webkit-details-marker { display: none; }
+.optional > summary:focus-visible { outline: 2px solid var(--color-focus-ring); }
+.optional[data-collapsed] > [data-toolbar-optional-content] {
+  position: absolute; top: 100%; left: 0; z-index: 50; width: max-content;
+  padding: var(--tpl-toolbar-gap); background: var(--color-canvas);
+  border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
+}
+.optional[data-collapsed]:not([open]) > [data-toolbar-optional-content] { display: none; }

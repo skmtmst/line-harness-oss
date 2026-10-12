@@ -1,5 +1,6 @@
 'use client'
 import type React from 'react'
+import { ChevronDown } from 'lucide-react'
 
 import { useRef, useState, useLayoutEffect, Fragment, Children, isValidElement, cloneElement, createContext, useContext, type ReactNode, type HTMLAttributes } from 'react'
 import Select, { type SelectProps } from './select'
@@ -15,6 +16,8 @@ function useToolbarFit() {
     const toolbar = ref.current
     if (!toolbar || !window.ResizeObserver) return
     const measure = () => {
+      const leading = toolbar.querySelector<HTMLElement>('[data-toolbar-leading]')
+      toolbar.style.setProperty('--toolbar-leading-width', `${Math.ceil(leading?.getBoundingClientRect().width ?? 0)}px`)
       if (toolbar.dataset.toolbarLayout?.includes('stacked')) {
         for (const row of toolbar.querySelectorAll<HTMLElement>('[data-toolbar-row]')) fitToolbarWrap(row)
       } else fitToolbarWrap(toolbar)
@@ -191,8 +194,11 @@ function orderedTrailingTools(nodes: ReactNode): ReactNode[] {
   return flatten(nodes).sort((a, b) => rank(a) - rank(b))
 }
 
-/** B-244：省略記号へ畳まず、操作名を持つ元の道具を表示する。 */
-export function ListToolbarOptional({ children }: { children: ReactNode; label?: string; compact?: boolean }) {
+/** B-244/266: retain named tools; an overflow group keeps its explicit name. */
+export function ListToolbarOptional({ children, label = 'ほかの絞り込み', collapse }: { children: ReactNode; label?: string; compact?: boolean; collapse?: 'overflow' }) {
+  return collapse === 'overflow' ? <OverflowTools label={label}>{children}</OverflowTools> : <InlineOptional>{children}</InlineOptional>
+}
+function InlineOptional({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const item = ref.current
@@ -205,6 +211,34 @@ export function ListToolbarOptional({ children }: { children: ReactNode; label?:
     return () => observer.disconnect()
   }, [children])
   return <span ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional><span data-toolbar-optional-content>{children}</span></span>
+}
+
+function OverflowTools({ children, label }: { children: ReactNode; label: string }) {
+  const ref = useRef<HTMLDetailsElement>(null), expandedWidth = useRef(0)
+  const [collapsed, setCollapsed] = useState(false)
+  useLayoutEffect(() => {
+    const item = ref.current
+    const owner = item?.closest<HTMLElement>('[data-toolbar-layout="band"], [data-toolbar-layout="slots"], [data-toolbar-layout="stacked"], [data-toolbar-layout="slots-stacked"]')
+    const row = item?.closest<HTMLElement>('[data-toolbar-row]')
+    const flat = row && getComputedStyle(row).display === 'contents'
+    const toolbar = flat ? owner : row ?? owner
+    if (!item || !toolbar || !window.ResizeObserver) return
+    const measure = () => {
+      if (!item.hasAttribute('data-collapsed')) expandedWidth.current = fitToolbarOptionalWidth(item)
+      setCollapsed(!toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && owner?.closest('[data-page-template]')?.getBoundingClientRect().width! < 1100)).fits)
+    }
+    let frame = 0
+    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    const observer = new ResizeObserver(queue)
+    observer.observe(toolbar)
+    for (const tool of toolbar.querySelectorAll('button,input')) observer.observe(tool)
+    measure(); void document.fonts?.ready.then(measure)
+    return () => { cancelAnimationFrame(frame); observer.disconnect() }
+  }, [children])
+  return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
+    onKeyDown={event => { if (event.key === 'Escape' && collapsed) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}>
+    <summary aria-label={label}>{label}<ChevronDown size={14} aria-hidden="true" /></summary><div data-toolbar-optional-content role="group" aria-label={label}>{children}</div>
+  </details>
 }
 
 export type ListToolbarSortProps = Omit<SelectProps, 'aria-label' | 'label'> & { label?: string; 'aria-label'?: string }
@@ -238,13 +272,15 @@ export function ResponsiveFilterChips({ children, label = '状態' }: { children
   useLayoutEffect(() => {
     const choices = ref.current
     const owner = choices?.closest<HTMLElement>('[data-toolbar-layout="band"], [data-toolbar-layout="slots"], [data-toolbar-layout="stacked"], [data-toolbar-layout="slots-stacked"]')
-    const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') ? choices?.closest<HTMLElement>('[data-toolbar-row]') ?? owner : owner
+    const row = choices?.closest<HTMLElement>('[data-toolbar-row]')
+    const flat = row && getComputedStyle(row).display === 'contents'
+    const toolbar = owner?.dataset.toolbarLayout?.includes('stacked') && !flat ? row ?? owner : owner
     if (!choices || !toolbar || !window.ResizeObserver) return
     const measure = () => {
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
       choices.dataset.filterWidth = String(unfoldedWidth.current)
-      setCollapsed(!toolbarContentFit(toolbar).fits)
+      setCollapsed(!toolbarContentFit(toolbar, null, 0, true, Boolean(flat && owner?.closest('[data-page-template]')?.getBoundingClientRect().width! < 1100)).fits)
     }
     let frame = 0
     const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }

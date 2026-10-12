@@ -3,14 +3,16 @@
  * @param {HTMLElement | null} [expandedItem]
  * @param {number} [expandedWidth]
  * @param {boolean} [includeExpanded]
+ * @param {boolean} [secondary]
  */
-export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 0, includeExpanded = true) {
+export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 0, includeExpanded = true, secondary = false) {
   const flatten = element => getComputedStyle(element).display === 'contents'
     ? [...element.children].flatMap(flatten) : [element]
   const tools = [...toolbar.children].flatMap(flatten).filter(tool => {
     const css = getComputedStyle(tool)
     const spacer = css.flexGrow !== '0' && !tool.textContent.trim() && !tool.querySelector('button,input')
     return css.display !== 'none' && !spacer
+      && !(secondary && tool.matches('[data-toolbar-leading], [data-toolbar-role="search"]'))
       && !tool.matches('[data-toolbar-secondary], [data-design-part="notice"], :has(> [data-design-part="notice"])')
   })
   const css = getComputedStyle(toolbar), gap = parseFloat(css.columnGap) || 0
