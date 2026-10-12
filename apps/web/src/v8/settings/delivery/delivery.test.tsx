@@ -106,8 +106,11 @@ describe('設定 › デリバリー連携', () => {
 
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続エラー')).toBeTruthy()
-    const note = uberCard.getByText('注文を受け取れませんでした。musubo が確認しています。')
-    expect(note.getAttribute('data-tone')).toBe('danger')
+    // 状態の注記は共通の帯（Notice）で出す。危険の帯は role="alert" で、
+    // 色は共通の `.danger` が持つ（自作の data-tone は持たない／B-172 status-badge）。
+    const notice = uberCard.getByText('注文を受け取れませんでした。musubo が確認しています。').closest('[data-design-part="notice"]')
+    expect(notice).toBeTruthy()
+    expect(notice?.getAttribute('role')).toBe('alert')
   })
 
   it('DL-2：申し込み受付中は申し込んだ日と取り消しの口を出す', () => {
@@ -154,7 +157,8 @@ describe('設定 › デリバリー連携', () => {
     expect(screen.getByText('つなぐお店を選んでください')).toBeTruthy()
     expect(button('このお店につなぐ').disabled).toBe(true)
 
-    const stores = within(screen.getByRole('radiogroup', { name: 'つなぐお店' }))
+    // 共通の RadioCardGroup は fieldset ＋ legend で描くので、役割は group。
+    const stores = within(screen.getByRole('group', { name: 'つなぐお店' }))
     expect(stores.getByText('新宿店')).toBeTruthy()
     fireEvent.click(stores.getByText('渋谷店'))
     expect(button('このお店につなぐ').disabled).toBe(false)

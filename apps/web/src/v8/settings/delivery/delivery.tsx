@@ -6,7 +6,8 @@ import { PageFrame, PageHeading, PageFooter } from '@/components/templates/page-
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
-import Radio from '@/components/shared/radio'
+import Notice from '@/components/shared/notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { usePageTitle, usePageCrumbs, useHideSettingsNav } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -193,18 +194,19 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   return (
     <>
       <PageFrame kind="settings" boardId="dF4Ov" hasFooter={canManage}>
+        {/* 板の頭は型の PageHeading だけ。頭の下に説明の行を置かず、説明は題の横の「？」へ入れる
+            （docs/v8-design-rules.md:66・§6.12-2／B-158・B-172 page-head）。承認案 v03 の説明文は
+            つながっている会社があるかどうかで書き分け、そのまま「？」の中身にする。 */}
         <PageHeading
           headingSize="compact"
           title="デリバリー連携"
-          help="Uber Eats・出前館・ロケットナウに入った注文を、musubo の「デリバリー受注」画面にまとめて取り込みます。お店での入力はありません。"
+          help={`Uber Eats・出前館・ロケットナウに入った注文を、musubo の「デリバリー受注」画面にまとめて取り込みます。${
+            anyConnected
+              ? 'つながっているサービスの状態をここに出します。お店での入力はありません。うまくいっていない時は musubo が原因を確認し、必要な手続きを行います。'
+              : 'お店での入力はありません。Uber Eats は「ログインしてつなぐ」を押して Uber Eats の画面で許可するだけ、出前館とロケットナウは「連携を申し込む」を押すだけです。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'
+          }`}
         />
         <div className={styles.body}>
-          <p className={styles.lead}>
-            {anyConnected
-              ? 'つながっているサービスの状態です。ここでも入力はありません。うまくいっていない時は musubo が原因を確認し、必要な手続きを行います。'
-              : 'お店での入力はありません。Uber Eats は「ログインしてつなぐ」を押して Uber Eats の画面で許可するだけ、出前館とロケットナウは「連携を申し込む」を押すだけです。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'}
-          </p>
-
           {services.map((service) => {
             const state = STATUS[service.status]
             const usable = service.ready && canManage
@@ -222,10 +224,12 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                   <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>
                 </div>
 
+                {/* 状態の注記は自作の色分け（`.note[data-tone]`）をやめ、共通の帯（Notice）に任せる
+                    （B-172 status-badge）。つなぐ手順の案内は色の意味を持たないので真珠色の囲みのまま。 */}
                 {service.status === 'disconnected' ? (
                   <p className={styles.note}>{service.guide}</p>
                 ) : service.stateNote ? (
-                  <p className={styles.note} data-tone={service.status === 'error' ? 'danger' : 'warn'}>{service.stateNote}</p>
+                  <Notice tone={service.status === 'error' ? 'danger' : 'warn'} appearance="soft">{service.stateNote}</Notice>
                 ) : null}
 
                 {service.status === 'applying' ? (
@@ -329,23 +333,23 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         onConfirm={pickStore}
         onCancel={() => { setPicking(null); setPickedStoreId('') }}
       >
-        <div className={styles.stores} role="radiogroup" aria-label="つなぐお店">
+        {/* 1つだけ選ぶ群は共通の RadioCardGroup／RadioCard に任せる（§6.12-14・B-172 toggle）。
+            群の役割も選んだときの色も共通の部品が持ち、この画面では自作しない。
+            窓の中の小さい箱なので variant="form"。 */}
+        <RadioCardGroup legend="つなぐお店" className={styles.stores}>
           {picking?.stores.map((store) => (
-            <Radio
+            <RadioCard
               key={store.id}
-              fill
+              variant="form"
               name="delivery-store"
-              className={`${styles.store}${pickedStoreId === store.id ? ` ${styles.storeSelected}` : ''}`}
+              value={store.id}
               checked={pickedStoreId === store.id}
-              onChange={() => setPickedStoreId(store.id)}
-            >
-              <span className={styles.storeText}>
-                <span className={styles.storeName}>{store.name}</span>
-                <span className={styles.storeAddress}>{store.address}</span>
-              </span>
-            </Radio>
+              onChange={setPickedStoreId}
+              title={store.name}
+              note={store.address}
+            />
           ))}
-        </div>
+        </RadioCardGroup>
         <p className={styles.note}>
           選んだお店の注文が「デリバリー受注」に届きます。あとから変えるときは、この画面で一度解除してからもう一度ログインしてください。
         </p>
