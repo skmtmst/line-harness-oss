@@ -45,6 +45,15 @@ test('list columns give spare width to the name and remeasure changed data', asy
       assert.ok(grown > small, `new content must grow back within its original budget (columns=${columns}, ${small}→${grown})`)
       assert.equal(await page.locator('button').evaluate(el => el.getBoundingClientRect().width), 36)
       assert.equal(await page.locator('td[data-cell-grow]').innerText(), 'Google広告 夏キャンペーン')
+      await page.locator('tbody td').nth(1).evaluate(el => { el.innerHTML = '<span data-design-node="xRvDB" class="badge"><span style="display:block;overflow:hidden;text-overflow:ellipsis">計測済</span></span>' })
+      await page.addStyleTag({ content: '.badge{display:inline-flex;padding:2px 8px;gap:8px;max-width:100%}.badge::before{content:"";width:6px;height:6px;flex:none}' })
+      await page.locator('.frame').evaluate(fitListColumns)
+      const badge = await page.locator('.badge > span').evaluate(el => ({ available: el.clientWidth, required: el.scrollWidth }))
+      assert.ok(badge.available >= badge.required, 'the pseudo-element dot and its gap must not consume the label width')
+      await page.locator('tbody td').nth(2).evaluate(el => { el.innerHTML = '<div style="display:flex;gap:8px"><button style="width:84px;height:32px;flex:none">登録する</button><button style="width:36px;height:36px;flex:none">…</button></div>' })
+      await page.locator('.frame').evaluate(fitListColumns)
+      const ops = await page.locator('tbody td').nth(2).evaluate(el => ({ available: el.clientWidth, required: el.scrollWidth }))
+      assert.ok(ops.available >= ops.required, 'primary action and menu both keep their hit areas')
     }
   } finally { await browser.close() }
 })

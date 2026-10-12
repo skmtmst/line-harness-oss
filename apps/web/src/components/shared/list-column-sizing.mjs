@@ -30,7 +30,12 @@ export function fitListColumns(frame) {
     const css = getComputedStyle(node)
     if (css.display === 'none' || css.visibility === 'hidden' || node.matches('.sr-only, [hidden], [role="menu"], [role="tooltip"]')) return 0
     if (node.matches('button, input, svg, img, video, [role="button"]')) return node.getBoundingClientRect().width
-    const sizes = [...node.childNodes].map(intrinsic).filter(size => size > 0)
+    const pseudo = position => {
+      const style = getComputedStyle(node, position)
+      return style.content === 'none' || style.content === 'normal' || style.display === 'none' ? 0 : number(style.width)
+    }
+    const sizes = [pseudo('::before'), ...[...node.childNodes].map(intrinsic), pseudo('::after')].filter(size => size > 0)
+    if (!sizes.length && !node.textContent.trim()) return node.getBoundingClientRect().width
     const inline = css.display === 'inline' || css.display === 'inline-flex' || (css.display === 'flex' && css.flexDirection === 'row')
     const content = inline ? sizes.reduce((sum, size) => sum + size, 0) + number(css.columnGap) * Math.max(0, sizes.length - 1) : Math.max(0, ...sizes)
     return content + number(css.paddingLeft) + number(css.paddingRight) + number(css.borderLeftWidth) + number(css.borderRightWidth)
@@ -39,7 +44,9 @@ export function fitListColumns(frame) {
     if (index === nameIndex || !cell.getBoundingClientRect().width) return null
     const cells = rows.map(row => row.children[index]).filter(Boolean).filter(cell => cell.getBoundingClientRect().width)
     // A genuinely long secondary value keeps its existing truncation budget.
-    return Math.ceil(Math.min(frame.listColumnCeilings[index], Math.max(0, ...cells.map(intrinsic))))
+    const required = Math.max(0, ...cells.map(intrinsic))
+    const controls = cells.some(cell => cell.querySelector('button, input, [data-design-node="xRvDB"]'))
+    return Math.ceil(controls ? required : Math.min(frame.listColumnCeilings[index], required))
   })
   for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
     cell.toggleAttribute('data-content-name-column', index === nameIndex)
