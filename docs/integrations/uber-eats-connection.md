@@ -119,6 +119,9 @@ https://developer.uber.com/docs/eats/api/webhooks
   `rt_delivery_uber_store_candidates`（つなぐ店舗の候補）／`rt_delivery_uber_app_tokens`
   （アプリ単位のトークンの控え）。更新用トークンの欄は作りません（公式仕様どおり返らないため）。
   時刻はミリ秒の整数、トークンは `v1.…` の暗号化した形式だけを保存します。
+  4表の退会後の扱いは `packages/db/src/data-retention-tables.json` に登録済みです。
+  一時状態と接続はその統括のものとして消し（`account_id` で紐づけ）、店舗の候補は店舗の子として
+  店舗より先に消します。アプリ単位のトークンだけは統括に紐づかないので消す対象に入れません。
 - 認可の入口と戻り先の受け口（**追加済み**）：`apps/worker/src/routes/restaurant-delivery.ts`。
 
   | 道 | 役割 |
