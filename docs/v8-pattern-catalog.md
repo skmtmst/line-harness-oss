@@ -910,6 +910,7 @@
 
 - **役目**：本文枠の内側の下端で、差し込む項目と文字数を同じ形で見せる。
 - **持ち主（コード）**：`apps/web/src/components/shared/message-insert-row.tsx`・`message-insert-row.module.css`（`MessageBody`・`MessageInsertRow`・`MessageInsertButton`）。本文中の札は `insert-text-field.tsx`・`insert-tokens.ts`、統括の種類の受け渡しは `hq-message-inserts.tsx`。
+- **入力の大きさ（2026-10-12 F3）**：`InsertTextField.editorSize=message|code`。本文88／コード264の既存の高さと、共通の内側10/12を部品が持つ。保存する文字・札・カーソルの口と、既定／compactは変えない。
 - **持ち主（Pen）**：リマインダの採用形（B-221）。共通の部品IDは司令塔の確定待ち。V6xAo・U5rxyH・Bb8xi・pIHp3 等は画面の板のIDで、部品IDと混同しない。
 - **決まり**：[§6.34](v8-design-rules.md)・B-221・B-238。「差し込む」11px＋印付き文字ボタン＋右端の文字数。狭い時はその他にまとめ文字数は枠下。統括の項目は店名／電話／予約ページ／名前＋固定8つ。
 - **見つけ方**：枠外の「＋ 名前」の札・「差し込み：」・古い編集部品・同じ役目の自前行を探す。本文中の札と保存する {{…}} は違反ではない。
