@@ -22,6 +22,7 @@ export default function scanFixPatterns() {
   const roots = [...document.querySelectorAll('[data-page-template="list"]')].filter(visible)
   for (const root of roots) {
     const all = selector => [...root.querySelectorAll(selector)].filter(visible)
+    if (!root.hasAttribute('data-list-skeleton') && !root.querySelector('[data-list-skeleton]')) add('F4', root, 'list template is missing its shared standard and audit scope')
     const heading = root.querySelector('[data-template-region="heading"],[data-template-region="header"]')
     inventory.push({
       board: root.dataset.designNode, frame: root.dataset.heightMode,
@@ -35,7 +36,7 @@ export default function scanFixPatterns() {
       pageSizes: all('[data-list-page-size]').length,
     })
     for (const el of all('[data-select-value],[data-design-node="xRvDB"] > span,[data-kpi-detail] [role="note"],th,button:not(:has([data-list-name]))')) {
-      if (el.closest('[data-list-name-cell],tbody td') && !el.matches('[data-select-value]')) continue
+      if (el.closest('[data-list-name-cell]') || el.closest('tbody td') && !el.matches('[data-select-value]') && !el.closest('[data-design-node="xRvDB"]')) continue
       if (el.closest('[data-kpi-number]')) continue
       const css = getComputedStyle(el)
       if (!el.textContent.trim() || css.display === 'contents') continue
@@ -60,6 +61,10 @@ export default function scanFixPatterns() {
     for (const el of all('[data-list-sort]')) {
       const value = el.querySelector('[data-select-value]')
       if (!visible(value) || !/^並び[：:].+/.test(value.textContent.trim())) add('F8', el, 'sort has no visible current value')
+    }
+    for (const el of all('[data-template-region="toolbar"] button:disabled,[data-template-region="toolbar"] input:disabled')) {
+      const explained = el.title || (el.getAttribute('aria-describedby') || '').split(/\s+/).some(id => document.getElementById(id)?.textContent.trim())
+      if (!explained && !el.closest('[aria-busy="true"]') && !/読み込|保存中|送信中|処理中/.test(el.textContent)) add('F8', el, 'disabled tool has no reason')
     }
     for (const el of all('[data-row-menu]')) if (el.closest('[data-kpi-strip]')) add('F9', el, 'row menu in KPI band')
     for (const el of all('[data-list-name-cell] [data-design-node="xRvDB"]')) add('F9', el, 'state is in name column')

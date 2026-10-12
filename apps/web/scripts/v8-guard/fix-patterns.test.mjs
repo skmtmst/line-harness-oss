@@ -13,10 +13,11 @@ test('F1/F2/F3/F7/F9/F10 count defects, preserve presence and ignore truncated n
       <table><tbody><tr><td data-list-name-cell><span data-list-name style="display:block;width:50px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">省略してよい長い名前</span></td><td><span data-list-date-time style="display:block;width:55px">09/30 14:12</span></td><td><span data-unknown-value>種類を確認できません</span></td><td><button>直す</button></td></tr></tbody></table>
       <aside data-template-region="folders">フォルダ</aside><div data-kpi-strip><button data-row-menu>…</button></div></section>`)
     const before = await page.evaluate(scanFixPatterns)
-    for (const pattern of ['F1','F2','F3','F7','F8','F9','F10']) assert.ok(before.counts[pattern] > 0, pattern)
+    for (const pattern of ['F1','F2','F3','F4','F7','F8','F9','F10']) assert.ok(before.counts[pattern] > 0, pattern)
     assert.equal(before.inventory[0].help[0], '一覧の説明')
-    assert.ok(!before.findings.some(f => f.text.includes('省略してよい')))
+    assert.ok(!before.findings.some(f => ['F1','F2'].includes(f.pattern) && f.text.includes('省略してよい')))
     await page.evaluate(() => {
+      document.querySelector('[data-page-template]').setAttribute('data-list-skeleton','templates')
       document.querySelector('[data-select-value]').style.width='200px'
       document.querySelector('input').style.width='240px'
       document.querySelector('[data-list-date-time]').style.width='120px'

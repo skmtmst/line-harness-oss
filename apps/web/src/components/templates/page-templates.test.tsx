@@ -7,6 +7,12 @@ import { PageFrame } from './page-frame'
 
 afterEach(cleanup)
 describe('V8 の型へ渡す操作', () => {
+  it('一覧型は画面の任意指定によらず標準の一覧寸法と検査を持つ', () => {
+    const { container, rerender } = render(<ListPage title="一覧">表</ListPage>)
+    expect(container.querySelector('[data-page-template="list"]')?.getAttribute('data-list-skeleton')).toBe('templates')
+    rerender(<PageFrame kind="create">入力</PageFrame>)
+    expect(container.querySelector('[data-page-template="create"]')?.hasAttribute('data-list-skeleton')).toBe(false)
+  })
   it('一覧の高さは本文で決まり、単独の板と明示した画面高さを保つ', () => {
     const { container, rerender } = render(<ListPage title="一覧">少ない行</ListPage>)
     const frame = () => container.querySelector('[data-page-template]')!
