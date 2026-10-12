@@ -25,7 +25,11 @@ export default function FolderColorButton({ value, onChange, colors = FOLDER_SEL
   const paletteRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLSpanElement>(null)
   const paletteId = useId()
-  const choices = allowClear ? [{ value: '', name: '色なし' }, ...colors] : colors
+  // 保存済みの色が既定の候補に無い場合も、今の選択を見失わない。
+  const paletteColors = appearance === 'palette' && value && !colors.some(item => item.value.toLowerCase() === value.toLowerCase())
+    ? [...colors, { value, name: `現在の色（${value}）` }]
+    : colors
+  const choices = allowClear ? [{ value: '', name: '色なし' }, ...paletteColors] : paletteColors
   const current = value ?? ''
   const selected = (item: FolderColorOption) => item.value.toLowerCase() === current.toLowerCase()
   const colorName = choices.find(selected)?.name ?? (value || '色なし')

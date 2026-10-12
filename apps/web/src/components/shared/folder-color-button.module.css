@@ -23,4 +23,7 @@
 .swatch:focus-visible, .button:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .button:disabled, .swatch:disabled { cursor: not-allowed; opacity: 0.5; }
 .paletteFlat { border: 0; padding: 0; background: transparent; box-shadow: none; }
+/* KVkPg：その場で選ぶ丸は24。メニューの18pxの見本点とは別の用途。 */
+.paletteFlat .swatch { width: 24px; height: 24px; }
+.paletteFlat .swatch[data-selected] { outline-color: var(--color-ink); outline-offset: 2px; }
 }
