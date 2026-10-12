@@ -26,6 +26,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    fetchApi: vi.fn(async () => ({ data: { identityRetentionDays: 90 } })),
     api: {
       ...actual.api,
       staff: {
