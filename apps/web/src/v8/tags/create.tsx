@@ -234,7 +234,7 @@ function TagCreate() {
         {error || copyError ? <Notice tone="danger" message={error || copyError} /> : null}
 
         <Card variant="form" gap="normal" aria-labelledby="tag-new-basic">
-          <CardHeader layout="stacked" title="基本" titleId="tag-new-basic" />
+          <CardHeader size="stacked" title="基本" titleId="tag-new-basic" />
           <Field label="タグ名" required><SaveErrorField names={["name"]}><TextField
               ref={nameRef}
               aria-label="タグ名"
@@ -269,7 +269,7 @@ function TagCreate() {
         </Card>
 
         <Card variant="form" gap="normal" aria-labelledby="tag-new-ways">
-          <CardHeader layout="stacked" title="付け方（どこで付けるか）" titleId="tag-new-ways" meta="作ったあとに、回答フォーム・オートメーション・タグ連動からこのタグを付けられます" />
+          <CardHeader size="stacked" title="付け方（どこで付けるか）" titleId="tag-new-ways" meta="作ったあとに、回答フォーム・オートメーション・タグ連動からこのタグを付けられます" />
           <div className={styles.waysRow}>
             <Link href="/form-submissions"><Card surface="muted" padding="compact" layout="vertical" gap="tight">
               <ClipboardList className={styles.wayIcon} aria-hidden="true" />
