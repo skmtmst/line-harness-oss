@@ -1243,7 +1243,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             help="この30日に数えた成果の件数です（取り消しを引いた数）。"
             value={reportUnavailable ? null : kpi.currentCount}
             unit="件"
-            detail={delta === null || reportUnavailable ? emptyValue('unknown') : `その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}
+            detail={delta === null || reportUnavailable ? emptyValue('unknown') : <span title={`前の30日 ${formatNumber(kpi.previousCount ?? 0)}件`}>{`その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}</span>}
           />
           <KpiCard
             presentation="band"
@@ -1253,7 +1253,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             value={reportUnavailable ? null : kpi.currentValue}
             valueText={reportUnavailable ? undefined : `¥${formatNumber(kpi.currentValue)}`}
             unit=""
-            detail={listTruncated ? '直近5000件までの合計です' : '注文の金額で数えるもの'}
+            detail={<span title={listUnavailable ? '金額の内訳を読み込めませんでした' : `${formatNumber(points.filter(point => point.value != null).length)}個の成果地点で金額を記録`}>{listTruncated ? '直近5000件までの合計です' : '注文の金額で数えるもの'}</span>}
           />
           <KpiCard
             presentation="band"

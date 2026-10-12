@@ -1,4 +1,3 @@
-/* ★V8 ログインユーザー：app/staff/staff-actions.ts の写し（src/v8 は @/app を読めない）。直すときは両方を直す。 */
 import type { StaffMember } from '@line-crm/shared'
 
 export type StaffActionPolicy = {

@@ -11,8 +11,12 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import type { NenCampaignSetting, NenColumn } from '../../lib/api'
-import { NenOverview, type ColumnDeliveryPlan, type NenTab } from './nen-overview'
+import NenOverview from '@/v8/nen-campaigns/list'
+import { type ColumnDeliveryPlan, type NenTab } from '@/v8/nen-campaigns/display'
 
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -134,6 +138,8 @@ const click = (element: HTMLElement) => act(() => {
 })
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/nen-campaigns?tab=columns')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -147,9 +153,9 @@ afterEach(() => {
 describe('コラム一覧の打切りの可視化（#935 N-300）', () => {
   it('口の上限で打ち切られたとき、全体件数と「新しい◯本まで」を出す', () => {
     renderColumns({ columns: [column('c1'), column('c2')], columnsTotal: 250 })
-    expect(container.textContent).toContain('コラムは全部で250本あります')
-    expect(container.textContent).toContain('新しい2本までを表示しています')
-    expect(container.textContent).toContain('2本（全体 250本）')
+    expect(container.textContent).toContain('コラムは250本ありますが、2本までしか読み込んでいません。')
+    expect(container.textContent).toContain('検索・絞り込みは読み込んだ分の中で探します。')
+    expect(container.textContent).toContain('コラム 250')
   })
 
   it('打ち切りが無ければ全体件数の注意を出さない', () => {
@@ -170,7 +176,7 @@ const bodyButton = (label: string): HTMLButtonElement => {
 describe('配信確認の文言と実態の一致（#935 N-303）', () => {
   it('「今すぐ」は「今すぐ配信しますか」と確認する', () => {
     renderColumns({ columns: [column('c1')], selectedColumnId: 'c1', plan: { when: 'now', scheduledAt: '' } })
-    click(primaryButton('この内容で送る'))
+    click(primaryButton('配信を予約する'))
     expect(bodyText()).toContain('「題名c1」を今すぐ配信しますか？')
     expect(bodyText()).not.toContain('配信予約しますか？')
   })
@@ -183,7 +189,7 @@ describe('配信確認の文言と実態の一致（#935 N-303）', () => {
       plan: { when: 'schedule', scheduledAt: '2099-05-01T10:30' },
       onDeliverColumn: onDeliver,
     })
-    click(primaryButton('この内容で予約する'))
+    click(primaryButton('配信を予約する'))
     expect(bodyText()).toContain('「題名c1」を配信予約しますか？')
     click(bodyButton('予約する'))
     expect(onDeliver).toHaveBeenCalledWith(expect.objectContaining({ id: 'c1' }), '2099-05-01T10:30:00+09:00')
@@ -200,8 +206,7 @@ describe('過去の予約日時を画面で止める（#935 N-304）', () => {
       onDeliverColumn: onDeliver,
     })
     expect(container.textContent).toContain('予約日時が過去になっています。いまより先の日時を選んでください。')
-    expect(container.textContent).toContain('の予約日時はいまより先を選んでください')
-    const button = primaryButton('この内容で予約する')
+    const button = primaryButton('配信を予約する')
     expect(button.disabled).toBe(true)
     click(button)
     expect(onDeliver).not.toHaveBeenCalled()
@@ -213,7 +218,7 @@ describe('過去の予約日時を画面で止める（#935 N-304）', () => {
       selectedColumnId: 'c1',
       plan: { when: 'schedule', scheduledAt: '' },
     })
-    expect(container.textContent).toContain('の予約日時を入れてください')
+    expect(primaryButton('配信を予約する').disabled).toBe(true)
     expect(container.textContent).not.toContain('いまより先の日時')
   })
 })

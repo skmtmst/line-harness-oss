@@ -71,14 +71,14 @@ describe('ダイアログの桃箱', () => {
   })
 
   it('桃箱は v8 だけで桃色（v7 は変えない）', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.calloutDanger\s*\{[^}]*background:\s*var\(--color-danger-bg\)/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.calloutDanger \.description\s*\{[^}]*color:\s*var\(--color-danger\)/s)
+    expect(css).toMatch(/:root \.calloutDanger\s*\{[^}]*background:\s*var\(--color-danger-bg\)/s)
+    expect(css).toMatch(/:root \.calloutDanger \.description\s*\{[^}]*color:\s*var\(--color-danger\)/s)
   })
 
   it('桃箱は板どおり角丸 8・内側 10/12・文 11px/17px（YZ57z）', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.calloutDanger\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.calloutDanger\s*\{[^}]*padding:\s*10px 12px/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.calloutDanger \.description\s*\{[^}]*font-size:\s*11px/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.calloutDanger \.description\s*\{[^}]*line-height:\s*17px/s)
+    expect(css).toMatch(/:root \.calloutDanger\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s)
+    expect(css).toMatch(/:root \.calloutDanger\s*\{[^}]*padding:\s*10px 12px/s)
+    expect(css).toMatch(/:root \.calloutDanger \.description\s*\{[^}]*font-size:\s*11px/s)
+    expect(css).toMatch(/:root \.calloutDanger \.description\s*\{[^}]*line-height:\s*17px/s)
   })
 })

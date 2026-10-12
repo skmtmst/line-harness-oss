@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 印のタイル（Pencil ★V8 `C9CaMS`・`E7USZ9`・`A2mryd`）。
@@ -16,36 +16,32 @@
   justify-content: center;
   flex-shrink: 0;
   background: var(--color-canvas);
-  border: 1px solid var(--color-hairline);
   color: var(--color-ink-secondary);
 }
 
 .sm {
   width: 24px;
   height: 24px;
-  border-radius: var(--radius-tile-sm);
 }
 
 .md {
   width: 24px;
   height: 24px;
-  border-radius: var(--radius-tile);
 }
 
 .lg {
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-tile);
 }
 
-[data-theme='v8'] .root {
+:root .root {
   gap: 0;
   border: 0;
   outline: 1px solid var(--color-hairline);
   outline-offset: -0.5px;
 }
-[data-theme='v8'] .sm { border-radius: var(--radius-tile-sm); }
-[data-theme='v8'] .md, [data-theme='v8'] .lg { border-radius: var(--radius-tile); }
-[data-theme='v8'] .root svg { flex-shrink: 0; }
+:root .sm { border-radius: var(--radius-tile-sm); }
+:root .md, :root .lg { border-radius: var(--radius-tile); }
+:root .root svg { flex-shrink: 0; }
 
 }

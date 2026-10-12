@@ -1,6 +1,6 @@
 'use client'
 
-import { createPageReturnHref } from '@/components/shared/create-page'
+import { createPageErrorMessage, createPageReturnHref } from '@/components/shared/create-page'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
@@ -303,7 +303,7 @@ function WebhooksCreateV8Inner() {
       { if (!fieldFailure)
 
 
-      setError(cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。') }
+      setError(createPageErrorMessage(cause)) }
       setSaving(false)
     }
   }

@@ -23,7 +23,14 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import CommentsV8 from './comments-v8'
+import CommentsPane from '@/v8/webinar-edit/comments'
+import { webinarDetailChrome, webinarEditContext } from '@/test-utils/webinar-edit'
+import type { Webinar, WebinarEditor } from '@/lib/api'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+const dirty = vi.fn()
+const register = vi.fn()
 
 let mounted: Root[] = []
 
@@ -33,13 +40,14 @@ function render(): HTMLElement {
   const root: Root = createRoot(host)
   mounted.push(root)
   act(() => {
-    root.render(<CommentsV8 webinarId="webinar-1" />)
+    root.render(<><CommentsPane ctx={webinarEditContext({ id: 'webinar-1' } as Webinar, {} as WebinarEditor)} chrome={webinarDetailChrome} onDirtyChange={dirty} registerSave={register} /><ToastHost /></>)
   })
   return host
 }
 
 describe('コメント演出のV8（Omqd4）', () => {
   beforeEach(() => {
+    clearToastsForTest()
     apiMocks.comments.mockResolvedValue({
       data: [{ atSeconds: 10, authorName: '田中', body: 'こんばんは' }],
     })
@@ -59,7 +67,7 @@ describe('コメント演出のV8（Omqd4）', () => {
     expect(host.querySelector('[data-design-node="Omqd4"]')).not.toBeNull()
     expect(host.textContent).toContain('コメント演出')
     // 名前と本文は入力欄の値として描かれる（textContent には出ない）。
-    const nameInput = host.querySelector('input[aria-label="1行目の名前"]') as HTMLInputElement | null
+    const nameInput = host.querySelector('input[aria-label="1 行目の名前"]') as HTMLInputElement | null
     expect(nameInput?.value).toBe('田中')
     expect(host.textContent).toContain('保存する')
   })
@@ -67,7 +75,7 @@ describe('コメント演出のV8（Omqd4）', () => {
   it('空の名前・本文の追加行は送信せず、入力を残して直せる', async () => {
     const host = render()
     await act(async () => undefined)
-    const add = [...host.querySelectorAll('button')].find((el) => el.textContent === '＋ 追加')
+    const add = [...host.querySelectorAll('button')].find((el) => el.textContent === '＋ コメントを足す')
     await act(async () => {
       add!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
@@ -76,8 +84,8 @@ describe('コメント演出のV8（Omqd4）', () => {
       save!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(apiMocks.saveComments).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('2行目を確認してください')
-    expect(host.querySelector('input[aria-label="2行目の名前"]')).not.toBeNull()
+    expect(host.textContent).toContain('2 行目を確認してください')
+    expect(host.querySelector('input[aria-label="2 行目の名前"]')).not.toBeNull()
   })
 
   it('読み込み失敗は空や保存可能にせず、読み直して復帰する', async () => {
@@ -89,7 +97,7 @@ describe('コメント演出のV8（Omqd4）', () => {
     expect((buttons().find((element) => element.textContent === '保存する') as HTMLButtonElement).disabled).toBe(true)
     expect(host.textContent).not.toContain('まだコメントがありません')
     await act(async () => { buttons().find((element) => element.textContent === 'もう一度読み込む')!.click() })
-    expect((host.querySelector('input[aria-label="1行目の名前"]') as HTMLInputElement).value).toBe('田中')
+    expect((host.querySelector('input[aria-label="1 行目の名前"]') as HTMLInputElement).value).toBe('田中')
   })
 
   it('保存失敗は入力を残し、二重クリックを一回にしてやり直せる', async () => {
@@ -102,7 +110,7 @@ describe('コメント演出のV8（Omqd4）', () => {
     expect(apiMocks.saveComments).toHaveBeenCalledTimes(1)
     await act(async () => { reject(new Error('通信切れ')) })
     expect(host.textContent).toContain('入力を残しました')
-    expect((host.querySelector('input[aria-label="1行目のコメント"]') as HTMLInputElement).value).toBe('こんばんは')
+    expect((host.querySelector('input[aria-label="1 行目の本文"]') as HTMLInputElement).value).toBe('こんばんは')
     await act(async () => { save().click() })
     expect(apiMocks.saveComments).toHaveBeenCalledTimes(2)
     expect(apiMocks.saveComments.mock.calls[1][1]).toEqual([{ atSeconds: 10, authorName: '田中', body: 'こんばんは' }])

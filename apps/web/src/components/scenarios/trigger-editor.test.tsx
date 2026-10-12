@@ -28,6 +28,8 @@ const fetchTags = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', () => ({
   api: {
+    tags: { list: fetchTags },
+    tagGroups: { list: vi.fn(async () => ({ success: true, data: [] })) },
     scenarios: {
       triggers: { list: listTriggers, add: addTrigger, remove: removeTrigger },
       simulate,

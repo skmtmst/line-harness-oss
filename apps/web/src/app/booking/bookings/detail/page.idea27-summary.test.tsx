@@ -19,18 +19,19 @@ const m = vi.hoisted(() => ({
   getAuditLogs: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: m.account }),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams({ id: m.id }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async () => ({
   ApiError: class extends Error {},
   api: { staff: { me: async () => ({ success: true, data: { role: 'owner' } }) } },
   bookingApi: {
+    ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
     getBooking: m.get,
     decideRequest: vi.fn(async () => ({ status: 'confirmed' })),
     listMenus: vi.fn(async () => ({ menus: [] })),

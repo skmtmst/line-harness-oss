@@ -19,7 +19,7 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import styles from '@/components/shared/entity-picker.module.css'
-import Notice from '@/components/shared/notice'
+import { InsertText } from '@/components/shared/insert-text-field'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
 
@@ -50,6 +50,7 @@ export type TemplatePickerViewProps = {
   remaining: number
   loadingMore: boolean
   onLoadMore: () => void
+  resolvedPreview: { id: string; content: string } | null
   unresolved: string[] | null
   onConfirm: () => void
   confirmDisabled: boolean
@@ -138,7 +139,9 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                           ) : null}
                           <span className={styles.tpCardText}>
                             <span className={styles.tpCardName} title={template.name}>{template.name}</span>
-                            <span className={styles.tpCardBody}>{template.content}</span>
+                            <span className={styles.tpCardBody}>{props.resolvedPreview?.id === template.id
+                              ? <InsertText value={template.content} resolvedValue={props.resolvedPreview.content} />
+                              : template.content}</span>
                           </span>
                         </button>
                       </li>

@@ -3,11 +3,11 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = import.meta.dirname
-const PAGE = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
-const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
-const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
-const DETAIL = readFileSync(join(ROOT, 'detail', 'page.tsx'), 'utf8')
-const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
+const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
+const ADS = ['ads.tsx', 'ad-connections.tsx', 'ad-history.tsx', 'ad-shared.ts'].map(file => readFileSync(join(ROOT, '../../v8/inflow-links', file), 'utf8')).join('\n')
+const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
+const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
+const SITE = readFileSync(join(ROOT, '../../v8/inflow-links/site-script.tsx'), 'utf8')
 const API = readFileSync(join(ROOT, '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
@@ -18,32 +18,32 @@ describe('V6 機能18の画面契約', () => {
     expect(PAGE).not.toContain("label: '流入経路 24'")
     expect(PAGE).not.toContain("label: '広告連携 3'")
     expect(PAGE).not.toContain("label: '広告とのつなぎ 5'")
-    // 「流入経路」は一覧が数える accountFilteredRows（FolderPanel の
+    // 「流入経路」は一覧が数える accountRows（FolderPanel の
     // 「すべて」と同じ集合）を、読み込めたときだけホストへ渡す。
-    expect(PAGE).toContain('onRouteCountChange?.(routeCountAvailable ? accountFilteredRows.length : null)')
+    expect(PAGE).toContain('onRouteCountChange?.(routeCountAvailable ? accountRows.length : null)')
     // 「広告連携」「広告とのつなぎ」は、広告タブが一覧に使う platforms
     // と同じ集計（総数・動いている数）をホストへ渡す。
-    expect(ADS).toContain('onPlatformCountsChange?.(')
-    expect(ADS).toContain('total: platforms.length')
-    expect(ADS).toContain('platforms.filter((platform) => platform.isActive).length')
+    expect(PAGE).toContain('const connected = res.data.filter((platform) => platform.isActive)')
+    expect(PAGE).toContain('total: connected.length')
+    expect(PAGE).toContain('value={adConnected ? adConnected.total : null}')
     // 取得前・失敗時は数字を出さない（null で件数を付けない）。
-    expect(PAGE).toContain('linksCount !== null')
-    expect(PAGE).toContain('adCounts !== null')
+    expect(HOST).toContain('linksCount !== null')
+    expect(PAGE).toContain('routeCountAvailable ? accountRouteCount : null')
   })
 
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {
-    expect(SITE).toContain('data-design-node="XjOte"')
-    expect(ADS).toContain('data-design-node="qSTVR"')
-    expect(ADS).toContain('data-design-node="BuVDB"')
-    expect(ADS).toContain('data-design-node="Im2b1"')
-    expect(CREATE).toContain('data-design-node="KMaMk"')
-    expect(DETAIL).toContain('data-design-node="Q5le3"')
+    expect(SITE).toContain('boardId="XjOte"')
+    expect(ADS).toContain('boardId="qSTVR"')
+    expect(ADS).toContain('data-design-node="FDBsG"')
+    expect(ADS).toContain('data-design-node="p0kA3"')
+    expect(CREATE).toContain('boardId="KMaMk"')
+    expect(DETAIL).toContain('boardId="Q5le3"')
     expect(ADS).toContain('成果地点と、広告に返す名前の対応')
     // #514-14: 口はパスだけ返すため、死んでいる「知らないドメイン」判定と
     // 直書きの警告は出さない。届いたパスをそのまま出す。
     expect(SITE).not.toContain('知らないドメインが1つあります')
     expect(SITE).not.toContain("includes('unknown-')")
-    expect(SITE).toContain('いま届いているページ')
+    expect(SITE).toContain('aria-label="ページごとの表示"')
   })
 
   it('押せない準備中UIを機能18から除く', () => {
@@ -52,16 +52,16 @@ describe('V6 機能18の画面契約', () => {
     }
   })
 
-  it('作成後は発行済みURLを使える詳細へ進む', () => {
-    // V8 KMaMk は CreatePage の包みを使わず、自前の板に直接書く。
-    expect(CREATE).toContain('発行してURLを受け取る')
-    expect(CREATE).toContain('`/inflow-links/detail?id=${res.data.id}`')
+  it('作成後は発行した一覧の行へ戻る', () => {
+    // 現役V8はCreatePageと共通の戻り先を使う。
+    expect(CREATE).toContain('発行して URL を受け取る')
+    expect(CREATE).toContain("router.push(createPageReturnHref('/inflow-links', res.data.id))")
     expect(CREATE).toContain('見分けるための文字')
     expect(CREATE).toContain('お客さまはこの順に進みます')
   })
 
   it('詳細にはこの経路から来た友だちと本人確認の導線がある', () => {
-    expect(DETAIL).toContain('/api/analytics/ref/${encodeURIComponent(r.value.data.refCode)}')
+    expect(DETAIL).toContain('/api/analytics/ref/${encodeURIComponent(routeRefCode)}')
     expect(DETAIL).toContain('この経路から来た友だち')
     expect(DETAIL).toContain('/friends/detail?id=${encodeURIComponent(friend.id)}')
   })
@@ -86,7 +86,7 @@ describe('V6 機能18の計測鍵の契約(#514-2)', () => {
 
   it('取得前・失敗時はコードを出さず案内を出す', () => {
     expect(SITE).toContain('あなたのアカウントのコードを取得しています')
-    expect(SITE).toContain('計測コードを取得できませんでした')
+    expect(SITE).toContain('計測コードを読み込めませんでした')
     expect(SITE).toContain('コードをもう一度取得する')
   })
 
@@ -95,3 +95,5 @@ describe('V6 機能18の計測鍵の契約(#514-2)', () => {
     expect(MOCK).toContain('trackingKey')
   })
 })
+
+const HOST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')

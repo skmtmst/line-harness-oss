@@ -6,7 +6,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadImageFile } from '@/components/shared/media-library-upload'
 import Link from '@/components/shared/list-navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import KpiBand from '@/components/shared/kpi-band'
 import Toggle from '@/components/shared/toggle'
@@ -683,7 +683,7 @@ function CustomerNotificationEditor({
   </div>
 }
 
-function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: (lineAccountId: string | null) => ReactNode } = {}) {
+function LineNotificationsPage() {
   const saveErrors = useSaveFormErrors()
 
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -1004,7 +1004,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
       value={typeof kpi.value === 'number' || kpi.value === null ? kpi.value : null}
       valueText={kpi.valueText ?? (typeof kpi.value === 'string' ? kpi.value : undefined)}
       unit=""
-      detail={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
+      detail={kpi.note === '取得失敗' ? '取得失敗' : kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
       help={kpi.note || undefined}
       valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}
@@ -1223,9 +1223,7 @@ function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: 
     {!canManage && expandedSetting === null ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
     {tab === 'failures' ? <RunsTab lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <RunsTab lineAccountId={selectedAccountId} mode="history" /> : null}
-    {tab === 'operator' ? (renderOperatorRules
-      ? renderOperatorRules(selectedAccountId)
-      : <OperatorTab lineAccountId={selectedAccountId} canManage={canManage} exportOpen={operatorExportOpen} onExportClose={() => setOperatorExportOpen(false)} />) : null}
+    {tab === 'operator' ? <OperatorTab lineAccountId={selectedAccountId} canManage={canManage} exportOpen={operatorExportOpen} onExportClose={() => setOperatorExportOpen(false)} /> : null}
     {tab === 'customer' && expandedSetting ? <>
       <CustomerNotificationEditor
         setting={expandedSetting}

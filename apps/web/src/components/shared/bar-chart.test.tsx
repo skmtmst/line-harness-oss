@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 // @vitest-environment happy-dom
 /*
  * ★V7 グラフ（ノード `h99Gb`）。
@@ -15,7 +16,7 @@ import { BarChart, BarChartEmpty, barChartTicks, toBarChartItems } from './bar-c
 const DIR = dirname(fileURLToPath(import.meta.url))
 const tsx = readFileSync(join(DIR, 'bar-chart.tsx'), 'utf8')
 const css = readFileSync(join(DIR, 'bar-chart.module.css'), 'utf8')
-const analyticsPage = readFileSync(join(DIR, '..', '..', 'app', 'analytics', 'page.tsx'), 'utf8')
+const analyticsPage = readUiSource(join(DIR, '..', '..', 'app', 'analytics', 'page.tsx'), 'utf8')
 
 afterEach(() => cleanup())
 
@@ -147,10 +148,10 @@ describe('まだ数えられないとき', () => {
 })
 
 describe('分析画面の配線（見た目と数字の一致）', () => {
-  it('日ごとの増減の枠が BarChart を使う', () => {
-    expect(analyticsPage).toContain("from '@/components/shared/bar-chart'")
-    expect(analyticsPage).toContain('<BarChart')
-    expect(analyticsPage).toContain('toBarChartItems(overview.days')
+  it('日ごとの増減の枠がV8のグラフへ実際の増減を渡す', () => {
+    expect(analyticsPage).toContain("from '@/components/shared/charts'")
+    expect(analyticsPage).toContain('<DailyBars')
+    expect(analyticsPage).toContain('days={overview.days}')
   })
 
   it('減った棒に赤を使わない', () => {
@@ -160,7 +161,7 @@ describe('分析画面の配線（見た目と数字の一致）', () => {
   it('日ごとの数は overview.days の増減をそのまま渡す', () => {
     expect(analyticsPage).toContain('overview.campaigns')
     // 選択日の1行は BarChart の外で今までどおり出す。
-    expect(analyticsPage).toContain('増加 {selectedDay.added}人・減少 {selectedDay.removed}人')
+    expect(analyticsPage).toContain('増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人')
   })
 })
 

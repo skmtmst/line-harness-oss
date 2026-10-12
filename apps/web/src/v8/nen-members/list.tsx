@@ -51,6 +51,7 @@ export default function MembersListV8({
   /** よく使う札：○○以上（上位2ランク）・ペットあり・EC未連携。 */
   const [chipTopRanks, setChipTopRanks] = useListUrlValue('chipTopRanks', false)
   const [chipPet, setChipPet] = useListUrlValue('chipPet', false)
+  const [petSelection, setPetSelection] = useListUrlValue<'with' | 'without'>('petSelection', 'with')
   const [chipUnlinked, setChipUnlinked] = useListUrlValue('chipUnlinked', false)
   const [rank, setRank] = useListUrlValue('rank', '')
   const [sort, setSort] = useListUrlValue<NenMemberSort>('sort', 'annual_desc')
@@ -78,7 +79,7 @@ export default function MembersListV8({
         rank,
         ranks: chipTopRanks && topTwoKeyQuery ? topTwoKeyQuery.split(',') : undefined,
         link: chipUnlinked ? 'unlinked' : undefined,
-        pet: chipPet ? 'with' : 'any',
+        pet: chipPet ? petSelection : 'any',
         sort,
         page,
         pageSize,
@@ -91,7 +92,7 @@ export default function MembersListV8({
       if (request !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, query, rank, chipTopRanks, chipPet, chipUnlinked, page, pageSize, sort, topTwoKeyQuery])
+  }, [accountId, query, rank, chipTopRanks, chipPet, petSelection, chipUnlinked, page, pageSize, sort, topTwoKeyQuery])
 
   useEffect(() => {
     void load()
@@ -107,6 +108,7 @@ export default function MembersListV8({
     setQuery('')
     setChipTopRanks(false)
     setChipPet(false)
+    setPetSelection('with')
     setChipUnlinked(false)
     setRank('')
     setPage(1)
@@ -136,9 +138,10 @@ export default function MembersListV8({
         >
           {topTwoLabel}
         </FilterChip>
-        <FilterChip selected={chipPet} count={kpis?.petMembers} onChange={(next) => { setChipPet(next); setPage(1) }}>
-          ペットあり
+        <FilterChip selected={chipPet} count={petSelection === 'with' ? kpis?.petMembers : undefined} onChange={(next) => { setChipPet(next); setPage(1) }}>
+          {petSelection === 'without' && chipPet ? 'ペット未登録' : 'ペットあり'}
         </FilterChip>
+        {chipPet ? <Select aria-label="ペットの有無で絞り込む" value={petSelection} onChange={(value) => { setPetSelection(value === 'without' ? 'without' : 'with'); setPage(1) }} options={[{ value: 'with', label: 'ペット：登録あり' }, { value: 'without', label: 'ペット：未登録' }]} /> : null}
         <FilterChip selected={chipUnlinked} count={unlinkedCount} onChange={(next) => { setChipUnlinked(next); setPage(1) }}>
           EC未連携
         </FilterChip>

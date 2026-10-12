@@ -47,7 +47,7 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
   })
 
   it('比べて決めるの A/B の並びに p15At（1152）を付ける', () => {
-    const candidates = read('../friends/identity-candidates/identity-candidates-v8.tsx')
+    const candidates = read('../friends/identity-candidates/page.tsx')
     expect(candidates, '比べて決める1152 の板が無い').toMatch(/boardId="fcg2D"/)
   })
 })

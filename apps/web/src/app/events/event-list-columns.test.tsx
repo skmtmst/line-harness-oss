@@ -11,6 +11,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EventListItem } from '@/lib/api'
+import truncatedStyles from '@/components/shared/truncated-text.module.css'
 
 const listEvents = vi.hoisted(() => vi.fn())
 
@@ -18,6 +19,16 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    fetchApi: (path: string) => {
+      const params = new URL(path, 'http://worker.test').searchParams
+      return params.get('filter') === 'pending' && params.get('limit') === '1'
+        ? Promise.resolve({ items: [], total: 0 }) : listEvents(path)
+    },
+    api: {
+      ...actual.api,
+      staff: { ...actual.api.staff, me: vi.fn().mockResolvedValue({ success: true, data: { id: 'me', role: 'owner', isActive: true } }) },
+      folders: { ...actual.api.folders, list: vi.fn().mockResolvedValue({ success: true, data: [] }) },
+    },
     eventsApi: { ...actual.eventsApi, listEvents },
   }
 })
@@ -28,11 +39,13 @@ vi.mock('next/link', () => ({
   ),
 }))
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -76,6 +89,8 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  history.replaceState({}, '', '/events')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -134,21 +149,18 @@ describe('m19d 一覧の状態ますに申込条件を畳む', () => {
     // 状態のますは後ろから2番目（最後は操作）。
     const stateOf = (row: Element) => row.querySelectorAll('td')[4]
     expect(stateOf(rows[0]).textContent).toContain('公開中')
-    expect(stateOf(rows[0]).textContent).toContain('全員')
+    expect(stateOf(rows[0]).querySelector('[role="group"]')).toBeNull()
     expect(stateOf(rows[1]).textContent).toContain('終了')
     expect(stateOf(rows[1]).textContent).toContain('定期便の契約がある人だけの長いタグ名')
   })
 
-  it('条件の文字は折れず、タグ名は title で全文を確認できる', async () => {
+  it('タグ名は共通の1行省略と全文の読み上げで確認できる', async () => {
     await renderPage()
     const rows = [...document.querySelectorAll('tbody tr')]
     const stateOf = (row: Element) => row.querySelectorAll('td')[4]
-    for (const row of rows) {
-      const condition = stateOf(row).querySelectorAll('span')[1]
-      // truncate（折らずに1行で省略）が無いと、狭い器で1文字ずつ縦に折れる。
-      expect(condition.className).toContain('truncate')
-    }
-    const tag = stateOf(rows[1]).querySelector('[title]')
-    expect(tag?.getAttribute('title')).toBe('定期便の契約がある人だけの長いタグ名')
+    const tag = stateOf(rows[1]).querySelector('[role="group"] [data-truncated-text]')
+    expect(tag?.classList.contains(truncatedStyles.text)).toBe(true)
+    expect(tag?.textContent).toBe('定期便の契約がある人だけの長いタグ名')
+    expect(tag?.closest('[role="group"]')?.getAttribute('aria-label')).toBe('タグ「定期便の契約がある人だけの長いタグ名」')
   })
 })

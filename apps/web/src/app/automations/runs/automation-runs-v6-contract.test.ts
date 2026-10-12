@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 // @ts-expect-error 画面確認用のスクリプトは素のJS。型定義は持たない。
 import { AUTOMATION_RUNS } from '../../../../../../scripts/visual-qa/fixtures.mjs'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/automations/runs.tsx', import.meta.url), 'utf8')
 /**
  * 実口のソース。**画面と同じ形を返しているか**を突き合わせるために読む(#735)。
  *
@@ -33,9 +33,9 @@ function keysOfBlock(source: string, opener: string): string[] {
   return [...flat.matchAll(/^\s*'?\"?([\w.]+)'?\"?\s*:/gm)].map((m) => m[1])
 }
 
-describe('V6 オートメーションが動いた記録（DkPY0）', () => {
+describe('V8 オートメーションが動いた記録', () => {
   it('実ノードと既存の実行記録APIを結ぶ', () => {
-    expect(PAGE).toContain('data-design-node="DkPY0"')
+    expect(PAGE).toContain('boardId="g98F9"')
     expect(PAGE).toContain('/api/automation-runs?')
     expect(PAGE).toContain("params.set('lineAccountId', selectedAccountId)")
     expect(PAGE).toContain("params.set('search', query.trim())")
@@ -53,7 +53,7 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
   it('詳細を開き、失敗した処理だけを安全な再実行口へ接続する', () => {
     expect(PAGE).toContain('もう一度やる')
     expect(PAGE).toContain('/api/automation-runs/${encodeURIComponent(run.id)}/retry')
-    expect(PAGE).toContain('失敗した処理だけを再実行します')
+    expect(PAGE).toContain('失敗した処理だけを、成功済みの処理と重ならないようにもう一度実行できます。')
     expect(PAGE).toContain('失敗した処理をもう一度やる')
     expect(PAGE).toContain('setSelectedRun(run)')
     expect(PAGE).toContain('実行記録の中身')
@@ -72,9 +72,9 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
 
   it('見るだけの権限では操作を出さず、テスト実行の切替と版の区別を持つ (#1043)', () => {
     // 権限不足 view: 再試行・取り消し・CSVを出さない（V6 §9）。
-    expect(PAGE).toContain('useAutomationRunPermissions')
-    expect(PAGE).toContain('runPermissions?.canOperate')
-    expect(PAGE).toContain('runPermissions?.canExport')
+    expect(PAGE).toContain('useAutomationRunManage')
+    expect(PAGE).toContain('permissions.canOperate')
+    expect(PAGE).toContain('permissions.canExport')
     // 既定は本番だけ、切替でテスト実行を含める。
     expect(PAGE).toContain("params.set('include_test', '1')")
     expect(PAGE).toContain('テスト実行も見る')
@@ -107,7 +107,7 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
   })
 
   it('変えられない表示条件は選択肢に見せない (#580)', () => {
-    expect(PAGE).toContain('この30日・20件表示')
+    expect(PAGE).toContain('<PageSizeSelect value={pageSize} onChange={setPageSize}')
     expect(PAGE).not.toContain('onChange={() => undefined}')
   })
 })
@@ -137,8 +137,7 @@ describe('#735 実行記録の形が、画面・実口・見本で揃ってい�
   })
 
   it('画面が知っている状態だけを実口が返す', () => {
-    const screenStatuses = [...PAGE.matchAll(/type RunStatus = ([^\n]+)/g)][0][1]
-      .split('|').map((s) => s.trim().replace(/'/g, ''))
+    const screenStatuses = keysOfBlock(PAGE, 'const STATUS_LABEL: Record<RunStatus, string>')
     const routeCommon = keysOfBlock(ROUTE, 'const COMMON_STATUS_TO_DOMAIN')
     const routeToCommonValues = [...ROUTE.slice(ROUTE.indexOf('const DOMAIN_STATUS_TO_COMMON'))
       .slice(0, ROUTE.slice(ROUTE.indexOf('const DOMAIN_STATUS_TO_COMMON')).indexOf('};'))
@@ -180,7 +179,7 @@ describe('#735 実行記録の形が、画面・実口・見本で揃ってい�
   })
 
   it('見本の実行記録が、画面の型どおりの形を持つ', () => {
-    const screenRun = keysOfBlock(PAGE, 'type AutomationRun = {')
+    const screenRun = keysOfBlock(PAGE, 'type AutomationRunRow = {')
     const fixtureRun = Object.keys((AUTOMATION_RUNS as { items: Record<string, unknown>[] }).items[0])
     expect(screenRun.length).toBeGreaterThan(0)
     // 画面が読むキーは、見本にすべて入っていること(見本が足りないと空欄で撮れてしまう)。

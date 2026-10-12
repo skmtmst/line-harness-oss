@@ -1,10 +1,10 @@
 # 統括のバナー生成の動き（BEHAVIOR.md）
 
 対象：`list.tsx`（一覧 `B9ZAr`・画像ライブラリ `W5Wxr`）と `project.tsx`（プロジェクトの中 `iMnph`・生成中 `p03ImY`・上限 `zOpMG`）。
-写し元：`app/hq/banners/page.tsx`・`app/hq/banners/project/page.tsx`・`components/hq/banners/*`（v7。消さない）。
+入口は現役V8に固定。旧一覧・画像詳細・プロジェクトカードの写しは撤去済み。生成パネルと参照画像選択は現役の共通部品を使う。
 
 ## 入口
-- `app/hq/banners/page.tsx`・`app/hq/banners/project/page.tsx`：`theme === 'v8'` のときだけこの画面を出す。v7 側は今のまま。
+- `app/hq/banners/page.tsx`・`app/hq/banners/project/page.tsx`：常にこの現役画面を出す。
 
 ## 受け付ける URL と指定（v7 と同じ）
 - `/hq/banners`：プロジェクト一覧。`?tab=library` で画像ライブラリ。タブは `router.replace` で切り替え、履歴を積まない。
@@ -14,7 +14,7 @@
 ## 読み込み（API は v7 と同じ）
 - 一覧：`hqBanners.presets`（用途と利用量）・`hqBanners.stats`（数）・`lineAccounts.list`（渡す先）。形の違う応答は置かず「—」。
 - プロジェクト一覧：`projects.list({archived})` と `images.list({limit:100})`（カードの上の3枚）。
-- 画像ライブラリ：`images.list({favorite, delivered, shape, q, withCounts, limit:12, before})`。数（すべて・お気に入り・渡し済み・未使用）はサーバの `counts`。
+- 画像ライブラリ：`images.list({favorite, delivered, shape, q, withCounts, limit, before})`。既定は12枚。件数表示から10・12・20・50枚を選べ、変更時は最初のページへ戻る。遅い古い応答を混ぜず、同じ画像を重複させない。数（すべて・お気に入り・渡し済み・未使用）はサーバの `counts`。
   - **変えた所**：v7 は「さらに N 枚を表示」で足していく形だった。V8 は絵どおり 12 枚ずつのページ（「1–12 件 / 23 件」「次の 12 件」「前の 12 件」）。続きは v7 と同じ `before`（日時のカーソル）で読む。
 - プロジェクトの中：`projects.get(id)`・`presets`。生成は `createGeneration` → `generations.run` を1枚ずつ繰り返す（v7 と同じ。戻ったら続きから動く・止めるは `generations.cancel`）。
 
@@ -36,7 +36,7 @@
 - 上限・一時停止・課金の停止は帯（一覧）と生成パネルの中（プロジェクトの中）に出す。言葉は v7 と同じ判定。
 
 ## 見た目の決めごと
-- 窓の枠は `frame.tsx`（共通の `useOverlayFocus` でフォーカス・Esc・背景で閉じる・処理中は閉じない）。共通の窓は見出しの行の余白と説明の文字が絵と違い、説明が8上・2行に折れるため使っていない。
+- 窓の枠は `frame.tsx` から共通Dialogを使う。フォーカス・Esc・背景で閉じる・処理中は閉じない動きと、長い本文だけのスクロールを共通部品で守る。
 - 生成パネルと参照画像を選ぶ窓は、共通の `components/hq/banners/generation-panel`・`reference-picker-dialog` をそのまま使う（2026-10-05〜06 にオーナーが ★BG-B・★BG-C で決めた形。絵 `iMnph`・`UcBQ5` は決定前の古い形）。
 - プロジェクトの中の下の帯は、承認済み ★BG-B `qIp42` の `X2oLn`「下部追従バー」どおり **左=残り枚数（`M118zK`）／中=書き出す大きさの札（`WDJak`）／右=条件をクリア（`wCvLN`）＋生成する（`abZle`）**。生成中は `An26R`「帯（生成中）」で、右が「生成をやめる」（`CzXI2`）＋押せない「生成中…」（`q9hrn`）。共通の `components/shared/sticky-bar` を使い、札は `components/hq/banners/export-size-chip`。
   - **変えた所**：生成ボタンをパネルの中の全幅ボタン、大きさと「条件をクリア」をその下の行に置いていたが、絵と配置が違っていた（2026-10-07 の差し戻し2件）。v7（`app/hq/banners/project/page.tsx`）と同じ並びにそろえた。止める操作は帯だけに置き、作っている最中の注記（`k7sbSR`）からボタンを外した（同じ操作が2か所に出ていた）。閲覧のみの人には押せないボタンを置かないので帯ごと出さない。

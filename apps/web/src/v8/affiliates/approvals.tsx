@@ -88,7 +88,13 @@ export default function ApprovalsTab() {
   const { readonly, narrow, setCount, focusAffiliateId, accountId } = useAffiliateShell()
 
   const [status, setStatus] = useState<ApprovalStatus>('pending')
-  const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', focusAffiliateId)
+  const [affiliateFilter, setAffiliateFilter] = useListUrlValue<string | null>('affiliateFilter', null)
+  const appliedFocus = useRef<string | null>(null)
+  useEffect(() => {
+    if (!focusAffiliateId || appliedFocus.current === focusAffiliateId) return
+    appliedFocus.current = focusAffiliateId
+    setAffiliateFilter(focusAffiliateId)
+  }, [focusAffiliateId, setAffiliateFilter])
   const [items, setItems] = useState<ConversionApprovalItem[]>([])
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [holdDays, setHoldDays] = useState<number | null>(null)
@@ -216,7 +222,9 @@ export default function ApprovalsTab() {
     }
   }, [loadItems])
 
-  const scoped = useMemo(() => (affiliateFilter ? items.filter((item) => item.affiliateId === affiliateFilter) : items), [affiliateFilter, items])
+  const scoped = useMemo(() => items
+    .filter((item) => !accountId || item.lineAccountId === accountId)
+    .filter((item) => !affiliateFilter || item.affiliateId === affiliateFilter), [accountId, affiliateFilter, items])
   const affiliateFilterName = affiliateFilter ? (items.find((item) => item.affiliateId === affiliateFilter)?.affiliateName ?? null) : null
 
   const retryBulkLeftovers = useCallback(() => {

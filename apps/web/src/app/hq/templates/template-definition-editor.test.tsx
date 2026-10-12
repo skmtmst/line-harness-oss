@@ -19,7 +19,7 @@ describe('TemplateDefinitionEditor', () => {
 
     render(<TemplateDefinitionEditor type="template" value={value} disabled={false} onChange={onChange} />)
 
-    expect(screen.getByText('LINEプレビュー')).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'LINEでの見え方' })).toBeTruthy()
     expect(screen.getByText('本文に入れたURLの扱い')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '名前' }))
 
@@ -57,7 +57,7 @@ describe('TemplateDefinitionEditor', () => {
     }
     const onChange = vi.fn()
     render(<TemplateDefinitionEditor type="rich_menu" value={value} disabled={false} tenantId="tenant-a" onChange={onChange} />)
-    expect(screen.getByRole('list', { name: 'リッチメニュー作成の進み方' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '形と画像' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '変更後' } })
     expect(onChange).toHaveBeenCalledWith({
       ...value,

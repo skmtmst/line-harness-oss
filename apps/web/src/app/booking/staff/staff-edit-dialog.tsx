@@ -14,7 +14,6 @@ import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type BookingStaff } from '@/lib/api'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -40,9 +39,8 @@ export function StaffEditModal({
 }) {
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
-  /* V8 のときだけボタンの内側の保存中表示へ。v7 は従来の文字のまま。 */
-  const adminTheme = useAdminTheme()
-  const busySave = adminTheme === 'v8' ? saving : undefined
+  /* 保存中は共通ボタンの内側に進捗を表示する。 */
+  const busySave = saving
   const [err, setErr] = useState<string | null>(null)
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
   const panelRef = useOverlayFocus(true, onClose, saving)

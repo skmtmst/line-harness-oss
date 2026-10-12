@@ -9,7 +9,7 @@
  * 動きは BEHAVIOR.md。
  */
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactNode, type ReactElement } from 'react'
 import { ArrowRight, BookOpen, CircleCheck } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
@@ -48,11 +48,14 @@ function Field({ label, required, help, error, children }: { label: string; requ
   const inputId = `${baseId}-input`
   const helpId = `${baseId}-help`
   const errorId = `${baseId}-error`
-  const describedBy = [help ? helpId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
-  const field = isValidElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean; 'aria-required'?: boolean }>(children)
-    ? cloneElement(children, { id: inputId, 'aria-describedby': describedBy, 'aria-required': required || undefined, ...(error ? { 'aria-invalid': true as const } : null) })
-    : children
-  return <SharedField label={label} htmlFor={inputId} required={required} help={help}>{field}{error ? <p id={errorId} role="alert" className={styles.error}>{error}</p> : null}</SharedField>
+  const describedBy = error ? `${helpId} ${errorId}` : helpId
+  // SaveErrorField wraps the input. Attach the explanation to the input itself.
+  const controlProps = { id: inputId, 'aria-describedby': describedBy, 'aria-required': required || undefined, ...(error ? { 'aria-invalid': true as const } : null) }
+  const wrapped = isValidElement<{ children?: ReactNode }>(children) ? children.props.children : null
+  const field = isValidElement(wrapped) && isValidElement<{ children?: ReactNode }>(children)
+    ? cloneElement(children, { children: cloneElement(wrapped as ReactElement<Record<string, unknown>>, controlProps) })
+    : isValidElement(children) ? cloneElement(children as ReactElement<Record<string, unknown>>, controlProps) : children
+  return <SharedField label={label} htmlFor={inputId} required={required} help={help}>{field}<span id={helpId} className="sr-only">{help || '空欄なら店舗名を使います'}</span>{error ? <p id={errorId} role="alert" className={styles.error}>{error}</p> : null}</SharedField>
 }
 
 /** マニュアルへの道。URL が決まるまで（空文字）は押せない形で出す（今の画面は出さなかった）。 */

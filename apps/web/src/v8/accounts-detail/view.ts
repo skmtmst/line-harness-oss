@@ -60,6 +60,12 @@ export function friendsLine(account: AccountDetailView): string {
   return `${count}（上限 ${formatNumber(cap)} 人）`
 }
 
+/** 上限と警告の補足。未設定を0と表示しない。 */
+export function capacityDetails(account: AccountDetailView): string {
+  if (account.friendCapacity == null) return '上限は未設定'
+  return `上限 ${formatNumber(account.friendCapacity)}／${account.capacityWarnAt == null ? '警告なし' : `警告 ${formatNumber(account.capacityWarnAt)}`}`
+}
+
 /** 状態の札。 */
 export function stateBadge(account: AccountDetailView): { label: string; tone: 'success' | 'warning' | 'neutral' } {
   if (account.archivedAt) return { label: 'アーカイブ', tone: 'neutral' }

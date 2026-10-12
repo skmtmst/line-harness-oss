@@ -1,50 +1,63 @@
 // @vitest-environment happy-dom
-import React from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import React, { useState } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ActionDrawer } from './tag-editor-v4'
+import LinkedActionList from './linked-action-list'
+import type { LinkedAction } from './tag-editor-v4'
 
 afterEach(cleanup)
 
-function openDrawer() {
-  const onAdd = vi.fn()
-  render(<ActionDrawer accountId={null} suppliedResources={null} onClose={() => {}} onAdd={onAdd} />)
-  return onAdd
+const second: LinkedAction = { id: 'action-b', type: 'テキスト送信', label: '二通目', timing: 'すぐに', definition: { id: 'action-b', type: 'send_message', params: { content: '二通目', delayMinutes: 0, cancelIfTagRemoved: true }, onFailure: 'stop' } }
+
+function openList(initial: LinkedAction[] = []) {
+  const onChange = vi.fn()
+  function Harness() {
+    const [value, setValue] = useState(initial)
+    return <LinkedActionList value={value} onChange={next => { setValue(next); onChange(next) }} accountId={null} />
+  }
+  render(<Harness />)
+  return onChange
 }
 
-describe('連動アクションの実行タイミング', () => {
-  it('即時実行では待ち時間の欄を出さず、遅延0で追加する', () => {
-    const onAdd = openDrawer()
-    expect(screen.queryByLabelText('実行までの待ち時間')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'このアクションを追加する' }))
-    expect(onAdd.mock.calls[0][0]).toMatchObject({ timing: 'すぐに', definition: { params: { delayMinutes: 0, cancelIfTagRemoved: true } } })
+function addText(buttonName = '行うことを足す') {
+  fireEvent.click(screen.getByRole('button', { name: buttonName, exact: true }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'テキスト送信' }))
+}
+
+describe('現役V8の連動アクションの実行タイミング', () => {
+  it('即時実行を遅延0とタグ解除時の中止で追加する', () => {
+    const onChange = openList()
+    addText()
+    expect(onChange.mock.lastCall?.[0][0]).toMatchObject({ timing: 'すぐに', definition: { params: { delayMinutes: 0, cancelIfTagRemoved: true } } })
+    expect((screen.getByLabelText('実行までの分数') as HTMLInputElement).value).toBe('0')
   })
 
-  it('切り替えと矢印キーで待ち時間を選び、入力した時間を保存する', () => {
-    const onAdd = openDrawer()
-    const timing = screen.getByRole('group', { name: '実行するタイミング' })
-    fireEvent.keyDown(within(timing).getByRole('button', { name: 'すぐに実行' }), { key: 'ArrowRight' })
-    expect(within(timing).getByRole('button', { name: '時間をあけて実行' }).getAttribute('aria-pressed')).toBe('true')
-    fireEvent.change(screen.getByLabelText('実行までの待ち時間'), { target: { value: '5' } })
-    fireEvent.click(screen.getByRole('button', { name: 'このアクションを追加する' }))
-    expect(onAdd.mock.calls[0][0]).toMatchObject({ timing: '5分後', definition: { params: { delayMinutes: 5, cancelIfTagRemoved: true } } })
-    fireEvent.click(within(timing).getByRole('button', { name: 'すぐに実行' }))
-    expect(screen.queryByLabelText('実行までの待ち時間')).toBeNull()
+  it('行内で待ち時間を編集して保存し、0分へ戻すと即時実行になる', () => {
+    const onChange = openList()
+    addText()
+    fireEvent.change(screen.getByLabelText('実行までの分数'), { target: { value: '5' } })
+    expect(onChange.mock.lastCall?.[0][0]).toMatchObject({ timing: '5分後', definition: { params: { delayMinutes: 5, cancelIfTagRemoved: true } } })
+    fireEvent.change(screen.getByLabelText('実行までの分数'), { target: { value: '0' } })
+    expect(onChange.mock.lastCall?.[0][0]).toMatchObject({ timing: 'すぐに', definition: { params: { delayMinutes: 0, cancelIfTagRemoved: true } } })
   })
 
   it('待機中にタグが外れた場合の説明は「？」を開くと読める', () => {
-    openDrawer()
+    openList()
+    addText()
     expect(screen.queryByRole('note')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '実行するタイミングの説明' }))
     expect(screen.getByRole('note').textContent).toContain('待機中にタグが外れた場合は実行されません。')
   })
 })
 
-it('前へ追加するときは選択対象IDを呼び出し元へ返す（WEB276）', () => {
-  const onAdd=vi.fn()
-  render(<ActionDrawer accountId={null} suppliedResources={null} onClose={()=>{}} onAdd={onAdd} selectedAction={{ id:'action-b',label:'二通目' }} />)
-  fireEvent.click(screen.getByRole('button',{ name:'追加する位置' }))
-  fireEvent.click(screen.getByRole('button',{ name:'選択中のアクションの前' }))
-  fireEvent.click(screen.getByRole('button',{ name:'このアクションを追加する' }))
-  expect(onAdd).toHaveBeenCalledWith(expect.any(Object),'action-b')
+it('選択した行の前へ追加し、元の行とその保存内容を保つ（WEB276）', () => {
+  const onChange = openList([second])
+  fireEvent.click(screen.getByRole('button', { name: '二通目', exact: true }))
+  addText('この行の前に行うことを足す')
+  const next = onChange.mock.lastCall?.[0] as LinkedAction[]
+  expect(next).toHaveLength(2)
+  expect(next[0].definition?.type).toBe('send_message')
+  expect(next[0].id).not.toBe('action-b')
+  expect(next[1]).toEqual(second)
+  expect(screen.getAllByRole('button', { name: /つ目の行うことを並べ替える/ })).toHaveLength(2)
 })

@@ -1,8 +1,8 @@
-import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+import { readUiSource, readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const TABS = readFileSync(new URL('../affiliates/tabs.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
+const TABS = readFileSync(new URL('../../v8/affiliates/affiliators.tsx', import.meta.url), 'utf8')
 const LEGACY_PAGE = readFileSync(new URL('../affiliates/page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
@@ -19,9 +19,9 @@ describe('V6 成果・アフィリエイトの契約', () => {
   })
 
   it('紹介者一覧の空・読込・失敗を言い分ける', () => {
-    expect(TABS).toContain('kind="error"')
+    expect(TABS).toContain('tone="error"')
     expect(TABS).toContain('kind="loading"')
-    expect(TABS).toContain('kind="empty"')
+    expect(TABS).toContain('<EmptyList')
   })
 
   it('紹介者を物理削除するクライアントAPIを持たない', () => {
@@ -30,7 +30,7 @@ describe('V6 成果・アフィリエイトの契約', () => {
 
   it('一覧の報酬は案件別の確定額を受け取り、割合だけの参考値に固定しない', () => {
     expect(TABS).toContain('confirmedFixedReward: rep?.confirmedReward ?? 0')
-    expect(TABS).toContain('<Th align="right">報酬</Th>')
+    expect(TABS).toContain('monthReward')
     expect(TABS).not.toContain('<Th align="right">参考報酬</Th>')
   })
 })

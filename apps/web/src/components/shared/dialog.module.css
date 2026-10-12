@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .overlay {
   position: fixed;
@@ -26,7 +26,6 @@
 
 .panel {
   display: flex;
-  width: min(844px, 100%);
   /*
    * R283: 縦に長い窓でも見出し・閉じる・保存/取消に到達できる。
    * 面の高さを画面内に収め、中身だけを送る。見出し行と操作は
@@ -34,13 +33,8 @@
    */
   max-height: calc(100dvh - 32px);
   flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--card-edge);
-  border-radius: var(--radius-panel);
   background: var(--color-canvas);
   /* ★V7 の影は3段。画面の真ん中に開く窓は最前面（段3）。 */
-  box-shadow: var(--shadow-float);
-  padding: 18px;
   color: var(--color-ink);
 }
 
@@ -52,14 +46,6 @@
 .confirmationPanel {
   gap: 16px;
   padding: 24px;
-}
-
-.compactConfirmation {
-  width: min(600px, 100%);
-}
-
-.destructiveConfirmation {
-  width: min(720px, 100%);
 }
 
 .confirmationPanel .title {
@@ -91,7 +77,6 @@
   /* R283: 中身が長くても見出し行は縮めない（上に固定）。 */
   flex: 0 0 auto;
   align-items: flex-start;
-  gap: 8px;
 }
 
 .headerContent {
@@ -99,7 +84,6 @@
   flex: 1;
   min-width: 0;
   flex-direction: column;
-  gap: 12px;
 }
 
 .confirmationPanel .headerContent {
@@ -112,8 +96,6 @@
 
 .title {
   margin: 0;
-  font-weight: 600;
-  line-height: 1.5;
 }
 
 .standardTitle {
@@ -152,9 +134,6 @@
 
 .description {
   margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-body);
-  line-height: 1.5;
 }
 
 .callout {
@@ -178,19 +157,19 @@
  * とほぼ同じ。--color-warning-bg #faf0dc は濃すぎるため使わない）。
  * 板どおり角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
  */
-[data-theme='v8'] .calloutWarning {
+:root .calloutWarning {
   border-color: var(--color-status-warn-soft);
   border-radius: var(--radius-segment);
   background: var(--color-status-warn-soft);
   padding: 10px 12px;
 }
 
-[data-theme='v8'] .calloutWarning .title,
-[data-theme='v8'] .calloutWarning .description {
+:root .calloutWarning .title,
+:root .calloutWarning .description {
   color: var(--color-warning);
 }
 
-[data-theme='v8'] .calloutWarning .description {
+:root .calloutWarning .description {
   font-size: 11px;
   line-height: 17px;
 }
@@ -201,14 +180,14 @@
  * （#b3261e）・角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
  * v7 は変えない。VsSyu 式（箱なし）の既定の破壊的トーンはそのまま。
  */
-[data-theme='v8'] .calloutDanger {
+:root .calloutDanger {
   border-color: var(--color-danger-bg);
   border-radius: var(--radius-segment);
   background: var(--color-danger-bg);
   padding: 10px 12px;
 }
 
-[data-theme='v8'] .calloutDanger .description {
+:root .calloutDanger .description {
   color: var(--color-danger);
   font-size: 11px;
   line-height: 17px;
@@ -240,7 +219,6 @@
   flex: 0 0 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
 }
 
 /*
@@ -256,7 +234,6 @@
 }
 
 .designButton {
-  min-width: 112px;
   width: auto;
   white-space: nowrap;
 }
@@ -280,13 +257,13 @@
  * ★V8「ダイアログ」（q3DPdz）：大きさは 800 / 560 の2段にそろえ、
  * 余白は 24。角丸は --radius-panel が v8 で 16 になるのでそのまま。
  */
-[data-theme='v8'] .panel {
+:root .panel {
   width: min(var(--tpl-dialog-large-width), 100%);
   padding: 24px;
 }
 
-[data-theme='v8'] .compactConfirmation,
-[data-theme='v8'] .destructiveConfirmation {
+:root .compactConfirmation,
+:root .destructiveConfirmation {
   width: min(560px, 100%);
 }
 
@@ -303,75 +280,73 @@
  * 出始めの形は @starting-style が持つ。動きを減らす設定では動かさない。
  */
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme='v8'] .overlay {
+  :root .overlay {
     transition: opacity var(--motion-base) var(--motion-ease-out);
   }
 
-  [data-theme='v8'] .panel {
+  :root .panel {
     transition:
       opacity var(--motion-base) var(--motion-ease-out),
       transform var(--motion-base) var(--motion-ease-out);
   }
 
   @starting-style {
-    [data-theme='v8'] .overlay {
+    :root .overlay {
       opacity: 0;
     }
 
-    [data-theme='v8'] .panel {
+    :root .panel {
       opacity: 0;
       transform: translateY(4px) scale(0.98);
     }
   }
 
-  [data-theme='v8'] .overlay[data-closing],
-  [data-theme='v8'] .panel[data-closing] {
+  :root .overlay[data-closing],
+  :root .panel[data-closing] {
     transition-duration: var(--motion-exit);
   }
 }
 
-[data-theme='v8'] .overlay[data-closing] {
+:root .overlay[data-closing] {
   opacity: 0;
   /* 消えていく間は下の画面を押せるようにする（薄い膜が押下を食べない）。 */
   pointer-events: none;
 }
 
-[data-theme='v8'] .panel[data-closing] {
+:root .panel[data-closing] {
   opacity: 0;
   transform: translateY(4px) scale(0.98);
 }
 
 /* ★V8（夕13）：重なる物の外縁は border-soft（TOKENS-20261001）。 */
-[data-theme="v8"] .panel {
+:root .panel {
   border-color: var(--color-border-soft);
 }
 }
-
-.footer { display: contents; }
 /* 正本 q3DPdz：枠560、頭・手順・中身・下を独立した段にする。 */
-[data-theme='v8'] .panel {
+:root .panel {
   width: min(var(--tpl-dialog-width), 100%); padding: 0; gap: 0; overflow: hidden;
   border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--card-edge); outline-offset: -0.5px;
   box-shadow: var(--shadow-controls-pop);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
-[data-theme='v8'] .panel[data-size='large'] { width: min(var(--tpl-dialog-large-width), 100%); }
+:root .panel[data-size='large'] { width: min(var(--tpl-dialog-large-width), 100%); }
 /* 絵の窓の幅・上からの位置を画面が渡したとき（designWidth・designTop）。狭い画面では画面の幅まで。
    層（@layer components）の中に置くと、この層の外の「幅 560」に負けて効かない。必ずこの後ろに置く。 */
-[data-theme='v8'] .panel[data-design-width] { width: min(var(--dialog-design-width), 100%); }
-[data-theme='v8'] .overlay[data-design-top] { align-items: flex-start; padding-top: var(--dialog-design-top); }
-[data-theme='v8'] .headerRow { width: 100%; padding: 20px 24px 8px; gap: 12px; }
+:root .panel[data-design-width] { width: min(var(--dialog-design-width), 100%); }
+:root .overlay[data-design-top] { align-items: flex-start; padding-top: var(--dialog-design-top); }
+:root .headerRow { width: 100%; padding: 20px 24px 8px; gap: 12px; }
 /* 絵の頭の余白・高さを画面が渡したとき（designHeaderPadding・designHeaderHeight）。上の共通の値の後ろに置く。 */
-[data-theme='v8'] .panel[data-design-header-padding] > .headerRow { padding: var(--dialog-design-header-padding); }
-[data-theme='v8'] .panel[data-design-header-height] > .headerRow { height: var(--dialog-design-header-height); min-height: 0; box-sizing: border-box; }
-[data-theme='v8'] .headerContent { gap: 2px; }
-[data-theme='v8'] .title { font-size: var(--tpl-dialog-title-size); font-weight: var(--tpl-dialog-title-weight); line-height: 24px; }
+:root .panel[data-design-header-padding] > .headerRow { padding: var(--dialog-design-header-padding); }
+:root .panel[data-design-header-height] > .headerRow { height: var(--dialog-design-header-height); min-height: 0; box-sizing: border-box; }
+:root .headerContent { gap: 2px; }
+:root .title { font-size: var(--tpl-dialog-title-size); font-weight: var(--tpl-dialog-title-weight); line-height: 24px; }
 /*
  * 題の下の補足（絵 hjdqV「12:02 受信・受け取り希望 12:15」）。
  * 絵は題 y120-147・補足 y151-169 で間4。共通の題は行の高さ24で y120-144 なので、
  * 段の間2＋ここの5＝7 を足して補足の上端を y151 にそろえる。
  */
-[data-theme='v8'] .titleNote {
+:root .titleNote {
   margin-top: 5px;
   font-size: var(--text-caption);
   line-height: 18px;
@@ -383,36 +358,36 @@
  * 絵（dgeTy・XCVGd）は左の丸い印と題が縦の中央でそろい、間は12（左24＋印36＋間12＝題72）。
  * 題は 18/700。渡さない窓は上の既定（上そろえ・間8・太さ600）のまま。
  */
-[data-theme='v8'] .panel[data-design-title-row='mark'] .titleRow {
+:root .panel[data-design-title-row='mark'] .titleRow {
   align-items: center;
   gap: 12px;
 }
 
-[data-theme='v8'] .panel[data-design-title-row='mark'] .titleIcon {
+:root .panel[data-design-title-row='mark'] .titleIcon {
   padding-top: 0;
 }
 
-[data-theme='v8'] .panel[data-design-title-row='mark'] .title {
+:root .panel[data-design-title-row='mark'] .title {
   font-size: var(--text-lead);
   font-weight: 700;
 }
 
-[data-theme='v8'] .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
-[data-theme='v8'] .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
-[data-theme='v8'] .close svg { width: 16px; height: 16px; }
-[data-theme='v8'] .content { width: 100%; padding: 24px; }
-[data-theme='v8'] .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
-[data-theme='v8'] .footer { display: block; width: 100%; flex-shrink: 0; }
-[data-theme='v8'] .footer:empty { display: none; }
-[data-theme='v8'] .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
+:root .description { font-size: 13px; line-height: 20px; font-weight: 400; color: var(--color-ink-secondary); }
+:root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
+:root .close svg { width: 16px; height: 16px; }
+:root .content { width: 100%; padding: 24px; }
+:root .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
+:root .footer { display: block; width: 100%; flex-shrink: 0; }
+:root .footer:empty { display: none; }
+:root .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
 /* 下のボタンを中央に置く口（footerAlign="center"）。既定の右寄せは変えない。 */
-[data-theme='v8'] .panel[data-footer-align='center'] .actions { justify-content: center; }
-[data-theme='v8'] .footerLead { flex: 1; font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
-[data-theme='v8'] .designButton { min-width: 0; font-family: inherit; line-height: 20px; }
-[data-theme='v8'] .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
-[data-theme='v8'] .designButton[data-dialog-action='primary'] { border: 0; }
-[data-theme='v8'] .buttonIcon svg { width: 15px; height: 15px; }
-[data-theme='v8'] .steps { width: 100%; flex-shrink: 0; padding: 10px 24px; border-block: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
+:root .panel[data-footer-align='center'] .actions { justify-content: center; }
+:root .footerLead { flex: 1; font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
+:root .designButton { min-width: 0; font-family: inherit; line-height: 20px; }
+:root .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
+:root .designButton[data-dialog-action='primary'] { border: 0; }
+:root .buttonIcon svg { width: 15px; height: 15px; }
+:root .steps { width: 100%; flex-shrink: 0; padding: 10px 24px; border-block: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
 .stepItems { display: flex; align-items: center; gap: 10px; }
 .stepItem { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; min-height: 0; font-family: inherit; color: var(--color-ink); font-size: 13px; font-weight: 600; line-height: 20px; }
 .stepItem:disabled { opacity: 1; }
@@ -421,51 +396,51 @@
 .stepDone { background: var(--color-accent-deep); color: var(--color-canvas); }
 .stepCurrent { background: var(--color-ink); color: var(--color-canvas); }
 .stepLine { width: 28px; height: 1.5px; background: var(--color-accent-deep); }
-[data-theme='v8'] .error { margin: 0 24px 12px; }
-[data-theme='v8'] .panel[style*='--dialog-design-footer-padding'] .actions { padding: var(--dialog-design-footer-padding); }
-[data-theme='v8'] .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
-[data-theme='v8'] .panel[data-footer-divider='none'] .actions { border-top: 0; }
-[data-theme='v8'] .panel[data-footer-lead='fixed'] .footerLead { flex: none; margin-right: var(--tpl-sb-group-gap); }
+:root .error { margin: 0 24px 12px; }
+:root .panel[style*='--dialog-design-footer-padding'] .actions { padding: var(--dialog-design-footer-padding); }
+:root .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
+:root .panel[data-footer-divider='none'] .actions { border-top: 0; }
+:root .panel[data-footer-lead='fixed'] .footerLead { flex: none; margin-right: var(--tpl-sb-group-gap); }
 
-[data-theme='v8'] .headerContent { align-items: flex-start; }
-[data-theme='v8'] .steps { display: flex; align-items: center; gap: 10px; }
-[data-theme='v8'] .content { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
-[data-theme='v8'] .content > * { flex-shrink: 0; }
-[data-theme='v8'] .designButton[data-dialog-action='primary'] { box-shadow: var(--v8-parts-primary-shadow); }
+:root .headerContent { align-items: flex-start; }
+:root .steps { display: flex; align-items: center; gap: 10px; }
+:root .content { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+:root .content > * { flex-shrink: 0; }
+:root .designButton[data-dialog-action='primary'] { box-shadow: var(--v8-parts-primary-shadow); }
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
-[data-theme='v8'] .panel { -webkit-font-smoothing: auto; }
+:root .panel { -webkit-font-smoothing: auto; }
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
-[data-theme='v8'] .panel[data-design-layout='stacked'] { padding: 24px; gap: 14px; }
-[data-theme='v8'] .panel[data-design-layout='stacked'] > .headerRow { padding: 0; align-items: center; }
-[data-theme='v8'] .panel[data-design-layout='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
-[data-theme='v8'] .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
-[data-theme='v8'] .panel[data-design-layout='stacked'] > .content { padding: 0; align-items: stretch; }
-[data-theme='v8'] .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
-[data-theme='v8'] .panel[data-confirm-first] .actions > button:last-child { order: -1; }
+:root .panel[data-design-layout='stacked'] { padding: 24px; gap: 14px; }
+:root .panel[data-design-layout='stacked'] > .headerRow { padding: 0; align-items: center; }
+:root .panel[data-design-layout='stacked'] .title { font-size: 17px; line-height: 26px; font-weight: 700; }
+:root .panel[data-design-layout='stacked'] > .description { margin: 0; width: 100%; line-height: 22px; }
+:root .panel[data-design-layout='stacked'] > .content { padding: 0; align-items: stretch; }
+:root .panel[data-design-layout='stacked'] .actions { padding: 0; border: 0; }
+:root .panel[data-confirm-first] .actions > button:last-child { order: -1; }
 
-[data-theme='v8'] .panel[data-design-layout='stacked'] .close { width: 28px; height: 28px; min-height: 0; padding: 0; }
+:root .panel[data-design-layout='stacked'] .close { width: 28px; height: 28px; min-height: 0; padding: 0; }
 
-[data-theme='v8'] .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
-[data-theme='v8'] .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }
+:root .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
+:root .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }
 /* hadfk の続いた窓。呼び出し側が選んだときだけ、既定の段の帯を外す。 */
-[data-theme='v8'] .panel[data-layout='continuous'] { padding: 22px 24px; gap: 14px; }
-[data-theme='v8'] .panel[data-layout='continuous'] > .headerRow { padding: 0; align-items: center; }
-[data-theme='v8'] .panel[data-layout='continuous'] .title { font-size: 16px; font-weight: 700; line-height: 23px; }
-[data-theme='v8'] .panel[data-layout='continuous'] .description { font-size: 12px; line-height: 17px; }
-[data-theme='v8'] .panel[data-layout='continuous'] > .steps { padding: 0; border: 0; background: transparent; }
-[data-theme='v8'] .panel[data-layout='continuous'] > .content { padding: 0; }
-[data-theme='v8'] .panel[data-layout='continuous'] .actions { padding: 6px 0 0; border: 0; }
+:root .panel[data-layout='continuous'] { padding: 22px 24px; gap: 14px; }
+:root .panel[data-layout='continuous'] > .headerRow { padding: 0; align-items: center; }
+:root .panel[data-layout='continuous'] .title { font-size: 16px; font-weight: 700; line-height: 23px; }
+:root .panel[data-layout='continuous'] .description { font-size: 12px; line-height: 17px; }
+:root .panel[data-layout='continuous'] > .steps { padding: 0; border: 0; background: transparent; }
+:root .panel[data-layout='continuous'] > .content { padding: 0; }
+:root .panel[data-layout='continuous'] .actions { padding: 6px 0 0; border: 0; }
 
 /* アカウントの窓は頭・本文・操作を同じ余白で続ける。既定の窓は変えない。 */
-[data-theme='v8'] .panel[data-layout='account-inset'] { padding: var(--tpl-acd-dlg-pad); gap: var(--tpl-acd-dlg-gap); }
-[data-theme='v8'] .panel[data-layout='account-inset'] > .headerRow,
-[data-theme='v8'] .panel[data-layout='account-inset'] > .content { padding: 0; }
-[data-theme='v8'] .panel[data-layout='account-inset'] .title { font-size: var(--tpl-acd-dlg-title-size); line-height: var(--tpl-acd-dlg-title-lh); }
-[data-theme='v8'] .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }
+:root .panel[data-layout='account-inset'] { padding: var(--tpl-acd-dlg-pad); gap: var(--tpl-acd-dlg-gap); }
+:root .panel[data-layout='account-inset'] > .headerRow,
+:root .panel[data-layout='account-inset'] > .content { padding: 0; }
+:root .panel[data-layout='account-inset'] .title { font-size: var(--tpl-acd-dlg-title-size); line-height: var(--tpl-acd-dlg-title-lh); }
+:root .panel[data-layout='account-inset'] .insetActions { display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-acd-actions-gap); padding: var(--tpl-acd-dlg-foot-pad); box-shadow: var(--tpl-acd-line-top); }
 
-html[data-theme='v8'] .stepCurrent { background: var(--color-selection-border); color: var(--color-canvas); }
+html:root .stepCurrent { background: var(--color-selection-border); color: var(--color-canvas); }
 
 /* 入力を含む確認窓は、欄を本文幅にそろえる。 */
-html[data-theme='v8'] .content[data-content-layout='form'] { align-items: stretch; }
+html:root .content[data-content-layout='form'] { align-items: stretch; }

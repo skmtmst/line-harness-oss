@@ -26,18 +26,19 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 
-import NewRichMenuPage from './page'
+import NewRichMenuPage from './create-v8'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
 let root: Root
 const fetchUrls: string[] = []
+const writes: string[] = []
 
 const TEMPLATES_BY_ACCOUNT: Record<string, Array<{ id: string; name: string }>> = {
   'acc-1': [{ id: 'tpl-a1', name: 'お知らせ' }],
@@ -46,10 +47,15 @@ const TEMPLATES_BY_ACCOUNT: Record<string, Array<{ id: string; name: string }>> 
 
 function stubFetch() {
   fetchUrls.length = 0
-  vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
+  writes.length = 0
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (init?.method === 'PATCH') writes.push(String(url))
     const text = String(url)
     fetchUrls.push(text)
     const parsed = new URL(text, 'http://localhost')
+    if (parsed.pathname === '/api/rich-menu-groups') return { ok: true, status: 200, json: async () => ({ success: true, data: { items: [], total: 0, page: 1, limit: 200 } }) }
+    if (parsed.pathname === '/api/staff/me') return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } }) }
+    if (parsed.pathname === '/api/rich-menu-groups/scope-draft') return { ok: true, status: 200, json: async () => ({ success: true, data: {"id":"scope-draft","accountId":"acc-1","name":"scope-test","chatBarText":"メニュー","size":"large","isDefaultForAll":true,"status":"draft","targetingPriority":0,"targetingEnabled":false,"targetingCondition":null,"folderId":null,"defaultOpen":true,"version":1,"defaultPageId":"p-1","pages":[{"id":"p-1","orderIndex":0,"name":"トップ","aliasId":"","lineRichmenuId":null,"imageR2Key":null,"imageContentType":null,"areas":[{"id":"area-1","boundsX":0,"boundsY":0,"boundsWidth":2500,"boundsHeight":1686,"actionType":"message","actionData":{"text":"hello"},"intent":"text","label":"ボタン","tagIds":[],"scoreChange":null,"templateId":null,"formId":null,"trackedLinkId":null}]}]} }) }
     if (parsed.pathname === '/api/templates') {
       const accountId = parsed.searchParams.get('account_id')
       return { ok: true, status: 200, json: async () => ({ success: true, data: accountId ? (TEMPLATES_BY_ACCOUNT[accountId] ?? []) : [] }) }
@@ -80,6 +86,8 @@ function clickOption(label: string) {
 describe('m18r 作成画面のテンプレート候補は選択accountで絞る', () => {
   beforeEach(() => {
     accountState.id = 'acc-1'
+    document.documentElement.dataset.theme = 'v8'
+    window.history.replaceState({}, '', '/rich-menus/new?id=scope-draft&step=buttons')
     stubFetch()
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -92,6 +100,7 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     })
     host.remove()
     vi.unstubAllGlobals()
+    delete document.documentElement.dataset.theme
   })
 
   it('テンプレート一覧の取得に選択accountが付く', async () => {
@@ -110,13 +119,8 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
       root.render(<NewRichMenuPage />)
     })
     await settle(100)
-    // 1面目の動きを開き、動きを「テンプレートを送る」に変える
-    const setup = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '設定する')
-    expect(setup).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(setup!)
-    })
-    await settle(50)
+    // V8 keeps the active area editor open after resuming the draft.
+
     const intentTrigger = host.querySelector('button[aria-label="押したときの動き"]')
     expect(intentTrigger).toBeTruthy()
     await act(async () => {
@@ -145,12 +149,6 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
       fireEvent.click(confirm!)
     })
     await settle(50)
-    const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存する')
-    expect(save).toBeTruthy()
-    await act(async () => {
-      fireEvent.click(save!)
-    })
-    await settle(50)
     // acc-2（テンプレート「予約確認」だけ）へ切り替える
     accountState.id = 'acc-2'
     await act(async () => {
@@ -159,5 +157,10 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     await settle(150)
     expect(templateUrls().some((url) => url.includes('account_id=acc-2'))).toBe(true)
     expect(host.textContent).toContain('1件は、今のアカウントにないため外しました')
+    const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '下書きを保存')!
+    expect(save).toBeTruthy()
+    await act(async () => fireEvent.click(save))
+    await settle(50)
+    expect(writes).toHaveLength(0)
   })
 })

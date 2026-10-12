@@ -71,7 +71,7 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
       'components/friends/single-friend-actions.tsx',
       'components/friends/advanced-search-dialog.tsx',
       'components/dashboard/side-cards.tsx',
-      'components/dashboard/dashboard-editor.tsx',
+      'v8/dashboard/dashboard-editor.tsx',
     ]
     for (const rel of FIXED_STATE) {
       const f = FILES.find((x) => x.p === rel)
@@ -100,38 +100,18 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
   it('30日の窓は「過去30日」と書く', () => {
     /* 直す途中（2026-10-09 時点で「この30日」「直近30日」が画面に残るファイル）。 */
     const migrating = new Set([
-    'app/automations/list-v8.tsx',
-    'app/automations/page.tsx',
-    'app/automations/runs-v8.tsx',
-    'app/automations/runs/page.tsx',
-    'app/automations/templates-v8.tsx',
     'app/booking/menus/page.tsx',
     'app/common-actions/versions/page.tsx',
-    'app/conversions/_components/conversion-dialogs.tsx',
-    'app/conversions/conversion-points-v8.tsx',
-    'app/conversions/new/page.tsx',
-    'app/conversions/page.tsx',
-    'app/ec-commerce/connector-panel.tsx',
     'app/emergency/page.tsx',
-    'app/inflow-links/ad-integration-v8.tsx',
-    'app/inflow-links/ad-integration.tsx',
-    'app/line-notifications/customer-kpis.ts',
+
+
     'app/line-notifications/page.tsx',
-    'app/mileage/earning-rules/new/v8-earning-rule-new.tsx',
     'app/mileage/page.tsx',
-    'app/mileage/v8-balances-tab.tsx',
-    'app/mileage/v8-earning-rules-tab.tsx',
-    'app/nen-campaigns/nen-campaigns-v8.tsx',
-    'app/nen-campaigns/nen-overview.tsx',
+    'v8/nen-campaigns/list.tsx',
     'app/nen-members/photo-review-v8.tsx',
-    'app/restaurant-test/v8/google.tsx',
+    'v8/restaurant/google/reviews.tsx',
     'app/visual-qa/v8-parts/page.tsx',
-    'app/webhooks/outgoing-v8.tsx',
-    'app/webhooks/webhook-interactions.tsx',
-    'app/webhooks/webhook-overviews.tsx',
     'components/broadcasts/segment-preset-controls.tsx',
-    'components/inflow-links/site-script-v8.tsx',
-    'components/inflow-links/site-script.tsx',
     'components/staff/login-audit.tsx',
     'v8/auto-replies/runs.tsx',
     'v8/automations/list.tsx',

@@ -2,7 +2,7 @@
 
 /*
  * 「プレビューを開く →」：お客さまの申込ページの見本を窓で見せる（絵 d4adD4 の右の列）。
- * 口は今の作り（components/events/event-application-preview.tsx）と同じ applicationPreview。
+ * 口は既存の applicationPreview。APIが見本として返した情報を表示する。
  * 見本を作るだけで、申し込みや公開はしない。
  */
 import { useRef, useState } from 'react'
@@ -10,6 +10,7 @@ import type { EventApplicationPreview } from '@line-crm/shared'
 import { eventsApi, type EventDetail } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import Button from '@/components/shared/button'
+import TextLink from '@/components/shared/text-link'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { jstToUtcIso } from './shared'
@@ -63,7 +64,9 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
           <div className={styles.previewBody}>
             <p className={styles.phoneName}>{data.name}</p>
             <p>{formatDateTime(data.startsAt)}〜{formatDateTime(data.endsAt)}</p>
-            {data.venueName ? <p>{data.venueName}</p> : null}
+            {data.venueName || data.venueUrl ? <p>{data.venueUrl
+              ? <TextLink href={data.venueUrl} external>{data.venueName || '会場の案内'}</TextLink>
+              : data.venueName}</p> : null}
             {data.venueAddress ? <p>{data.venueAddress}</p> : null}
             {data.description ? <p className={styles.previewText}>{data.description}</p> : null}
             <p>残り {data.capacity} 席</p>

@@ -6,13 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OpsAnnouncementsPage from './page'
 import OpsAnnouncementsV8 from '@/v8/ops/announcements'
 import { previewLabel, toLocalInput, toPublishAt } from './format'
+import { pickDateTime } from '@/test-utils/rich-menu-editor'
+import { notifySaved } from '@/components/shared/toast'
+import { screen, fireEvent } from '@testing-library/react'
+
+vi.mock('@/components/shared/toast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/shared/toast')>()), notifySaved: vi.fn(),
+}))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/ops/announcements',
   useRouter: () => ({ push: navigation.push, replace: vi.fn(), back: vi.fn() }),
 }))
@@ -53,6 +60,8 @@ let announcements: unknown[] = []
 let putOverride: { status: number; payload: unknown } | null = null
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  vi.mocked(notifySaved).mockClear()
   calls = []
   lineConfigured = true
   announcements = [sent, draft]
@@ -91,6 +100,7 @@ afterEach(() => {
   act(() => root.unmount())
   host.remove()
   vi.unstubAllGlobals()
+  delete document.documentElement.dataset.theme
 })
 
 async function flush() {
@@ -125,11 +135,12 @@ describe('画面', () => {
     expect(host.querySelector('button[aria-label="契約者専用LINEの登録状況"]')).not.toBeNull()
     expect(text).toContain('9月20日 深夜のメンテナンスのお知らせ')
     expect(text).toContain('送信済み')
-    expect(text).toContain('21 / 24')
-    expect(text).toContain('5 / 24')
+    expect(text).toContain('21/24')
+    expect(text).toContain('5/24')
     expect(text).toContain('下書き')
     expect(host.querySelector('button[aria-label="宛先の見込み"]')).not.toBeNull()
-    expect(Array.from(document.querySelectorAll('button')).filter((b) => b.textContent === '直す')).toHaveLength(1)
+    expect(host.querySelector('button[aria-label="「料金改定のご案内（下書き）」を直す"]')).not.toBeNull()
+    expect(host.querySelector('button[aria-label="「9月20日 深夜のメンテナンスのお知らせ」を元に新しく作る"]')).not.toBeNull()
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/preview') && c.method === 'POST')).toBe(true)
     expect(document.querySelector('[data-design-node="tQ2MJ"]')).not.toBeNull()
   })
@@ -140,6 +151,8 @@ describe('画面', () => {
     const subject = document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!
     const body = document.querySelector<HTMLTextAreaElement>('textarea')!
     await act(async () => { setValue(subject, 'メンテナンスのお知らせ'); setValue(body, '本文です') })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'メール', exact: true }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '契約者専用LINE', exact: true }))
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
     // 板 `TJUUl`「送る前の確認」：宛先・届く方法・日時と件名・本文を見てから送る。
@@ -153,8 +166,8 @@ describe('画面', () => {
     await act(async () => { (sendInDialog as HTMLButtonElement).click() })
     await flush()
     const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
-    expect(post.body).toMatchObject({ subject: 'メンテナンスのお知らせ', body: '本文です', audienceKind: 'all', channels: ['line', 'screen'], mode: 'send', publishAt: null })
-    expect(host.textContent).toContain('送りました（24人。LINE 21・メール 24）')
+    expect(post.body).toMatchObject({ subject: 'メンテナンスのお知らせ', body: '本文です', audienceKind: 'all', channels: ['screen', 'line'], mode: 'send', publishAt: null })
+    expect(notifySaved).toHaveBeenCalledWith('送りました（24人。LINE 21・メール 24）')
   })
 
   it('公開日時を入れると主ボタンが「配信を予約する」になり、mode=schedule で送る', async () => {
@@ -164,34 +177,14 @@ describe('画面', () => {
       setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '予約のお知らせ')
       setValue(document.querySelector<HTMLTextAreaElement>('textarea')!, '本文')
     })
-    // 公開日時の選択（★V7）で今月の押せる日の 02:00 を選ぶ。値は今までどおり日本時間の文字列。
-    // 固定の日付で指定すると、その日が今月の格子に出ない月の切り替わりで
-    // 落ちる（月初境界で発生）。格子の中の押せる日をその都度選ぶ。
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('button[aria-label="公開日時（日本時間）"]')!.click()
-    })
-    const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-    await act(async () => {
-      picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
-    })
-    let picked = ''
-    await act(async () => {
-      const day = Array.from(document.querySelectorAll<HTMLButtonElement>('button[aria-label]')).find((b) => {
-        const label = b.getAttribute('aria-label') ?? ''
-        return /^(\d{4})年(\d{1,2})月(\d{1,2})日（.）/.test(label) && b.getAttribute('aria-disabled') !== 'true' && !b.hasAttribute('data-outside')
-      })!
-      const match = day.getAttribute('aria-label')!.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日/)!
-      const pad2 = (n: string) => n.padStart(2, '0')
-      picked = `${match[1]}-${pad2(match[2])}-${pad2(match[3])}`
-      day.click()
-    })
-    await act(async () => {
-      const hour = picker.querySelector<HTMLSelectElement>('select[aria-label="時"]')!
-      hour.value = '02'
-      hour.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+    const picked = new Date(Date.now() + 86400_000).toISOString().slice(0, 10)
+    await pickDateTime('公開日時（日本時間）', `${picked}T02:00`)
     expect(button('今すぐ送る')).toBeUndefined()
     await act(async () => { button('配信を予約する')!.click() })
+    await flush()
+    const confirmation = document.body.querySelector('[data-design-node="TJUUl"]')!
+    const send = [...confirmation.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent?.includes('02:00') && item.textContent.includes('に送る'))!
+    await act(async () => { send.click() })
     await flush()
     const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
     expect(post.body).toMatchObject({ mode: 'schedule', publishAt: `${picked}T02:00:00+09:00` })
@@ -201,7 +194,8 @@ describe('画面', () => {
     lineConfigured = false
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
-    expect(host.textContent).toContain('契約者専用LINEのアカウントが未設定です')
+    expect(host.textContent?.replace(/\s/g, '')).toContain('契約者専用LINEのアカウントが未設定です')
+    fireEvent.click(screen.getByRole('checkbox', { name: '契約者専用LINE', exact: true }))
     await act(async () => {
       setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, 'x')
       setValue(document.querySelector<HTMLTextAreaElement>('textarea')!, 'y')
@@ -224,7 +218,8 @@ describe('画面', () => {
     // 件名も本文も空のまま「下書きとして保存」→ 入力の検証エラー
     await act(async () => { button('下書きを保存する')!.click() })
     await flush()
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('件名を入力してください')
+    expect(document.querySelector('#ann-subject-error')?.textContent).toBe('件名を入力してください')
+    expect(document.querySelector('#ann-subject')?.getAttribute('aria-invalid')).toBe('true')
     // 一覧は「読み込み失敗」に変わらず、空の案内のまま保つ
     expect(host.textContent).toContain('まだお知らせはありません')
     expect(host.textContent).not.toContain('お知らせを表示できませんでした')
@@ -290,7 +285,7 @@ describe('二重押しと同時保存（M512/M513）', () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     // 下書きの「編集」を押して編集に入る。
-    await act(async () => { button('直す')!.click() })
+    await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="「料金改定のご案内（下書き）」を直す"]')!.click() })
     await flush()
     expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toContain('料金改定のご案内')
     await act(async () => {
@@ -310,7 +305,7 @@ describe('二重押しと同時保存（M512/M513）', () => {
     await flush()
     const put = calls.find((c) => c.url.includes('/api/ops/announcements/a2') && c.method === 'PUT')!
     expect(put.body).toMatchObject({ subject: '料金改定のご案内（修正）', expectedUpdatedAt: '2026-09-17T10:00:00.000+09:00' })
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('ほかの人が先に保存しました')
+    expect(document.body.textContent).toContain('ほかの人が先にお知らせを保存しました')
     // 入力は消えない。
     expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toBe('料金改定のご案内（修正）')
     // 一覧を読み直す（GET がもう一度呼ばれる）。

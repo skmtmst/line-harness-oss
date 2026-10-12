@@ -9,7 +9,7 @@
   min-width: 0;
   margin-bottom: var(--tpl-nc-tab-pull);
 }
-:global([data-theme='v8']) .tabs [role='tab'] {
+:global(:root) .tabs [role='tab'] {
   box-sizing: border-box;
   height: var(--tpl-nc-tab-h);
   min-height: 0;
@@ -49,7 +49,7 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   display: flex;
   align-items: center;
   gap: var(--tpl-nc-col-gap);
@@ -59,7 +59,7 @@
   background: var(--color-table-head);
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-nc-col-gap);
   box-sizing: border-box;
   height: var(--tpl-nc-row-h);
@@ -67,8 +67,8 @@
   border-bottom: 0;
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   flex-shrink: 0;
   height: auto;
   padding: 0;
@@ -76,19 +76,19 @@
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+:global(:root) .table .headRow[data-table-layout='columns'] > th {
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
   font-weight: 600;
   white-space: nowrap;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colName,
+:global(:root) .table .row[data-table-layout='columns'] > td.colName {
   flex: 1 1 0;
   min-width: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > :is(th.colSent, th.colOrders, th.colViews),
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > :is(td.colSent, td.colOrders, td.colViews) {
+:global(:root) .table .headRow[data-table-layout='columns'] > :is(th.colSent, th.colOrders, th.colViews),
+:global(:root) .table .row[data-table-layout='columns'] > :is(td.colSent, td.colOrders, td.colViews) {
   padding-right: var(--tpl-nc-num-pad-end);
   text-align: right;
 }
@@ -253,18 +253,18 @@
 }
 
 /* 引き出し（中身・クーポンの決めごと）。絵 oqSJP の幅は 520（共通の引き出しは 660）。 */
-:global([data-theme='v8'] [data-design-part='drawer']):has(.couponForm) {
+:global(:root [data-design-part='drawer']):has(.couponForm) {
   width: min(var(--tpl-nc-drawer-w), 100%);
 }
 /* 絵 oqSJP の引き出しは頭・中・足に線を引かず、全体を余白24・間16で並べる。 */
-:global([data-theme='v8'] [data-design-part='drawer']):has(.couponForm) > :global(header) {
+:global(:root [data-design-part='drawer']):has(.couponForm) > :global(header) {
   padding: var(--tpl-nc-drawer-head-pad);
   border-bottom: 0;
 }
-:global([data-theme='v8'] [data-design-part='drawer']):has(.couponForm) > :global(div) {
+:global(:root [data-design-part='drawer']):has(.couponForm) > :global(div) {
   padding: var(--tpl-nc-drawer-body-pad);
 }
-:global([data-theme='v8'] [data-design-part='drawer']):has(.couponForm) > :global(footer) {
+:global(:root [data-design-part='drawer']):has(.couponForm) > :global(footer) {
   padding: var(--tpl-nc-drawer-foot-pad);
   border-top: 0;
 }

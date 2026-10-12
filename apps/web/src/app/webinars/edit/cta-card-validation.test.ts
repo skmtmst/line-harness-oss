@@ -3,16 +3,9 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 import type { WebinarCtaCard } from '@/lib/api'
-import { ctaCardProblems } from './cta-card-validation'
+import { cardFieldProblems, parseMinSec } from '@/v8/webinar-edit/cta-validation'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'cta-v8.tsx'), 'utf8')
-
-function parseMinSec(v: string): number | null {
-  const m = /^(\d+):([0-5]?\d)$/.exec(v.trim())
-  if (m) return Number(m[1]) * 60 + Number(m[2])
-  const n = Number(v.trim())
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
-}
+const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/cta.tsx'), 'utf8')
 
 const card = (over: Partial<WebinarCtaCard> = {}): WebinarCtaCard => ({
   atSeconds: 0,
@@ -28,52 +21,38 @@ const card = (over: Partial<WebinarCtaCard> = {}): WebinarCtaCard => ({
 
 describe('CTAカードの保存前チェック (N-119)', () => {
   it('不足の無いカードはそのまま通る', () => {
-    expect(ctaCardProblems([card()], ['10:00'], 3600, parseMinSec)).toEqual([])
-    expect(ctaCardProblems([card({ kind: 'form', formId: 'f1', url: null })], ['600'], 3600, parseMinSec)).toEqual([])
+    expect(cardFieldProblems(card(), '10:00', 3600)).toEqual({ time: null, title: null, button: null, link: null })
+    expect(cardFieldProblems(card({ kind: 'form', formId: 'f1', url: null }), '600', 3600)).toEqual({ time: null, title: null, button: null, link: null })
+    expect(parseMinSec('600')).toBe(600)
   })
 
   it('URLカードの未入力とhttpをそれぞれ直し方つきで示す', () => {
-    expect(ctaCardProblems([card({ url: '' })], ['10:00'], 3600, parseMinSec)).toEqual([
-      '1枚目: URLが未入力です。https:// から始まるURLを入れてください',
-    ])
-    expect(ctaCardProblems([card({ url: 'http://example.com' })], ['10:00'], 3600, parseMinSec)).toEqual([
-      '1枚目: URLは https:// で始めてください（httpは使えません）',
-    ])
+    expect(cardFieldProblems(card({ url: '' }), '10:00', 3600).link).toBe('https:// から始まる URL を入れてください')
+    expect(cardFieldProblems(card({ url: 'http://example.com' }), '10:00', 3600).link).toBe('URL は https:// で始めてください（http は使えません）')
   })
 
   it('フォームカードの未選択を示す', () => {
-    expect(ctaCardProblems([card({ kind: 'form', formId: null })], ['10:00'], 3600, parseMinSec)).toEqual([
-      '1枚目: フォームが選ばれていません。公開中のフォームを選ぶか、種類をURLへ変えてください',
-    ])
+    expect(cardFieldProblems(card({ kind: 'form', formId: null }), '10:00', 3600).link).toBe('公開中のフォームを選ぶか、種類を URL へ変えてください')
   })
 
   it('表示時間の不正と動画超過を示す', () => {
-    expect(ctaCardProblems([card()], ['abc'], 3600, parseMinSec)).toEqual([
-      '1枚目: 表示時間が不正です（例: 45:00 または秒数）',
-    ])
-    expect(ctaCardProblems([card()], ['90:00'], 3600, parseMinSec)).toEqual([
-      '1枚目: 表示時間が動画の長さ（60分）を超えています。動画の中の時刻に直してください',
-    ])
+    expect(cardFieldProblems(card(), 'abc', 3600).time).toBe('出す時刻は 分:秒 で入れてください（例：45:00）')
+    expect(cardFieldProblems(card(), '90:00', 3600).time).toBe('出す時刻が動画の長さ（60分）を超えています。動画の中の時刻に直してください')
   })
 
   it('タイトル・ボタン文言の空も示し、複数カードの不足をまとめて返す', () => {
-    const problems = ctaCardProblems(
-      [card({ title: ' ' }), card({ buttonLabel: '' }), card({ url: '' })],
-      ['10:00', '20:00', '30:00'],
-      7200,
-      parseMinSec,
-    )
-    expect(problems).toEqual([
-      '1枚目: タイトルが空です。カードの見出しを入れてください',
-      '2枚目: ボタンの文言が空です。ボタンに出す文字を入れてください',
-      '3枚目: URLが未入力です。https:// から始まるURLを入れてください',
-    ])
+    const problems = [card({ title: ' ' }), card({ buttonLabel: '' }), card({ url: '' })].map((item, i) => cardFieldProblems(item, `${i + 1}0:00`, 7200))
+    expect(problems[0].title).toBe('カードの見出しを入れてください')
+    expect(problems[1].button).toBe('ボタンに出す文字を入れてください')
+    expect(problems[2].link).toBe('https:// から始まる URL を入れてください')
+    expect(problems.every((item) => Object.values(item).some(Boolean))).toBe(true)
   })
 
   it('編集タブの保存はこのチェックを通してからAPIを呼ぶ', () => {
     // 関数だけ直して配線を忘れると、不足のまま保存されて公開前検証で初めて止まる。
-    expect(PAGE).toContain('ctaCardProblems(ctas, times, durationSeconds, parseMinSec)')
-    expect(PAGE.indexOf('ctaCardProblems(ctas, times, durationSeconds, parseMinSec)'))
+    expect(PAGE).toContain('cardFieldProblems(card, times[i]')
+    expect(PAGE).toContain('fields.define(`cta-${i}-link`')
+    expect(PAGE.indexOf('if (fields.submit().length > 0)'))
       .toBeLessThan(PAGE.indexOf('webinarApi.saveCtas(webinarId, next)'))
   })
 })

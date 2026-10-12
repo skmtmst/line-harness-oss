@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * 監査 R586: 月次集計用の一覧 GET だけが 503 でも、版の詳細
  * （版・利用先・版履歴）は読めること。月次件数だけ未取得と明示し、
@@ -71,7 +72,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams('id=ca-1'),
   usePathname: () => '/common-actions/versions',
@@ -87,7 +88,7 @@ vi.mock('@/components/automations/use-common-action-permission', () => ({
   useCanManageCommonActions: () => true,
 }))
 vi.mock('@/lib/use-manual-href', () => ({ useManualHref: () => null }))
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
   usePageChrome: () => ({ title: null }),
 }))
@@ -113,6 +114,7 @@ function retryMonthlyButton(): HTMLButtonElement | undefined {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   net.listMode = 'failing'
   net.listCount = 0
   net.getCount = 0
@@ -141,7 +143,7 @@ describe('月次集計だけ失敗しても版詳細は読める（監査 R586�
     expect(container.textContent).toContain('テストアクション')
     expect(container.textContent).toContain('どこから呼ばれているか')
     expect(container.textContent).toContain('版の履歴')
-    expect(container.querySelector('[data-list-name]')?.textContent).not.toContain('申込フォーム')
+    expect(container.querySelector('tbody')?.textContent ?? container.textContent).toContain('申込フォーム')
   })
 
   it('月次件数だけ未取得と明示し、そこだけ再試行できる', async () => {

@@ -32,6 +32,7 @@ import { CATEGORY_MAX, EMPTY_DRAFT, EXCERPT_MAX, TITLE_MAX, TITLE_NOTICE_LENGTH,
 import styles from './form.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { ColumnPreviewCard } from './preview'
 
 /*
  * ★V8-B コラムを書く（`yRDwW`）。
@@ -152,9 +153,9 @@ export default function ColumnNew() {
   const preview = (
     <div className={styles.side}>
       <LinePreview accountName={accountName} caption={draft.scheduledAt ? draft.scheduledAt.replace('T', ' ').replaceAll('-', '/') : '配信日時は未設定'}>
-        <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0, 1)} time="10:00">
+        {hasImage || draft.category.trim() ? <ColumnPreviewCard column={{ title, category: draft.category.trim() || null, excerpt, imageUrl: draft.imageUrl.trim() || null, articleUrl: draft.articleUrl.trim() }} buttonLabel="コラムを読む" /> : <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0, 1)} time="10:00">
           <span className={styles.bubbleText}>{`【コラム】${title}\n${excerpt}\n▶ コラムを読む`}</span>
-        </LinePreviewMessage>
+        </LinePreviewMessage>}
       </LinePreview>
       <Card role="region" layout="vertical" padding="compact" surface="standard" spacing="tight" aria-labelledby="nen-col-tips">
         <h2 className={styles.sideTitle} id="nen-col-tips">読まれるコラムの書きかた</h2>

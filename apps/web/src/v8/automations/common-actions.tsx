@@ -61,7 +61,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * ★V8 オートメーションの共通アクション（Pencil `LnGNw`）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
- * （app/common-actions/common-actions-v8.tsx）と同じ（一覧・検索・状態の絞り込み・複製・保管・CSV）。
+ * （共通アクションの既存API）と同じ（一覧・検索・状態の絞り込み・複製・保管・CSV）。
  * 違いは見せ方だけ——型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「共通アクションを作る」）・
  * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「中身を見る」と「…」。
  */
@@ -109,10 +109,10 @@ export default function CommonActionsV8() {
   const viewerOnly = canManage === false
   const runPermissions = useAutomationRunManage()
   const canExportCsv = runPermissions === null || runPermissions.canExport
-  const tabCounts = useAutomationTabCounts()
 
   const [items, setItems] = useState<CommonActionSummary[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
+  const tabCounts = useAutomationTabCounts(undefined, summary?.total ?? null)
   const [filter, setFilter] = useListUrlValue<Filter>('filter', 'all')
   const [query, setQuery] = useListUrlValue('q', '')
   const deferredQuery = useDeferredValue(query)

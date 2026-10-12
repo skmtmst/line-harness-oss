@@ -2,7 +2,7 @@
 /*
  * 共有の行の窓（VirtualRows・M10・V8のみ）。
  * - 見える分＋前後の予備だけ描き、上下に詰め物で高さを保つ
- * - v7・行数が少ないときは今までどおり全部描く（聞き口なし）
+ * - 行数が少ないときは今までどおり全部描く（聞き口なし）
  * - 指が当たっている行は窓から外さない
  * - 選んだ行の印は描いた分だけ今までどおり（選び自体は外の Set）
  */
@@ -39,7 +39,7 @@ describe('VirtualRows（描く分）', () => {
     const { container } = render(<VirtualRows count={3} rowHeight={78} renderRow={renderRow} />)
     expect(screen.getByText('行0')).toBeTruthy()
     expect(screen.getByText('行2')).toBeTruthy()
-    // v7（試験の既定）では窓にしない。
+    // 少ない行は窓にしない。
     expect(container.querySelector('[data-virtual-index]')).toBeNull()
   })
 

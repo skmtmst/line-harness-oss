@@ -8,7 +8,6 @@ const DETAIL = readFileSync(join(__dirname, 'detail', 'page.tsx'), 'utf8')
 const TABLE = readFileSync(join(__dirname, '..', '..', 'components', 'friends', 'friend-list-table.tsx'), 'utf8')
 const DUPLICATES = readFileSync(join(__dirname, '..', 'duplicates', 'page.tsx'), 'utf8')
 const USERS = readFileSync(join(__dirname, '..', 'users', 'page.tsx'), 'utf8')
-const USER_FILTERS = readFileSync(join(__dirname, '..', '..', 'components', 'users', 'users-filters.tsx'), 'utf8')
 
 describe('友だち画面のオーナー指摘契約', () => {
   it('一覧を行数に合わせ、表の下に固定の空白を残さない', () => {
@@ -28,16 +27,14 @@ describe('友だち画面のオーナー指摘契約', () => {
   })
 
   it('統合ユーザーの操作行を一重の枠と同じ高さにそろえる', () => {
-    expect(USERS).toContain('data-users-actions="true"')
-    expect(USERS).toContain('items-center gap-2')
-    expect(USERS).toContain('<Button\n          type="button"\n          onClick={() => setPendingForceRefresh(true)}')
-    expect(USER_FILTERS).toContain('flex min-w-0 flex-1 flex-nowrap items-center gap-2')
-    // #748: 検索欄は共有SearchField（内側が40px）へ移行。素のinputに直書きしない。
-    expect(USER_FILTERS).toContain('<SearchField')
-    expect(USER_FILTERS).toContain('min-w-0 flex-1')
-    expect(USER_FILTERS).not.toContain('rounded-[14px] border')
-    // 高さは部品側が持つ（SearchField・Select ともに40px。寸法の契約試験が守る）。
-    // ここでは操作行がその3部品でそろっていることだけ見る。
-    expect(USER_FILTERS.match(/<Select/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(USERS).toContain('className={styles.headAction}')
+    expect(USERS).toContain('onClick={() => u.setPendingForceRefresh(true)}')
+    expect(USERS).toContain('className={styles.toolbar}')
+    expect(USERS).toContain('<SearchField')
+    expect(USERS).toContain('<Select')
+    expect(USERS).toContain('<EntitySelect')
+    expect(USERS).toContain('u.setAccount')
+    expect(USERS).toContain('u.setUid')
+
   })
 })

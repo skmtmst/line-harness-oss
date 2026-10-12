@@ -54,12 +54,12 @@ describe('登録メディアの認証付きダウンロード', () => {
  */
 describe('登録メディア画面の直接参照の排除', () => {
   it('page と詳細窓に item.url / preview.url の直接表示が残っていない', async () => {
-    const { readFileSync } = await import('node:fs')
+    const { readUiSource: readFileSync } = await import('../../../scripts/test-ui-source.mjs')
     const { dirname, join } = await import('node:path')
     const { fileURLToPath } = await import('node:url')
     const dir = dirname(fileURLToPath(import.meta.url))
     const directRefs: string[] = []
-    for (const file of ['page.tsx', 'media-detail-dialog.tsx']) {
+    for (const file of ['page.tsx', '../../v8/contents/media-detail-dialog.tsx']) {
       const source = readFileSync(join(dir, file), 'utf8')
       for (const [index, line] of source.split('\n').entries()) {
         if (/^\s*\/\//.test(line) || /^\s*\*/.test(line)) continue

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -26,8 +27,8 @@ const net = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: ({ children }: { children?: unknown }) => children }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/analytics',
+  useSearchParams: () => new URLSearchParams({ tab: fixture.tab }),
 }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => null,
@@ -164,6 +165,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-09-09T00:00:00.000Z'))
   fixture.accountId = 'account-a'
@@ -247,7 +249,7 @@ describe('クロス分析の「数えるもの」選択(N-276)', () => {
     // イベント種類の選択は「イベントの回数」を選ぶまで出さない。
     expect(host.querySelector('#cross-measure-event')).toBeNull()
 
-    await click('この30日を集計')
+    await click('集計する')
     expect(lastBody('/api/analytics/cross/query').measure).toEqual({ kind: 'unique_friends' })
   })
 
@@ -273,7 +275,7 @@ describe('クロス分析の「数えるもの」選択(N-276)', () => {
     expect(values).not.toContain('url_clicked')
 
     await select('cross-measure-event', 'postback_received')
-    await click('この30日を集計')
+    await click('集計する')
     expect(lastBody('/api/analytics/cross/query').measure).toEqual({ kind: 'events', eventType: 'postback_received' })
   })
 })
@@ -324,7 +326,7 @@ describe('エラー面の読み直し(N-287)', () => {
 
     expect(callsTo('/api/friend-fields')).toHaveLength(2)
     expect(host.querySelector('#cross-field')).not.toBeNull()
-    expect(host.textContent).toContain('この30日を集計')
+    expect(host.textContent).toContain('集計する')
   })
 
   it('ファネル一覧の取得失敗も、その場で読み直せる', async () => {
@@ -415,7 +417,7 @@ describe('棒グラフと期間切替の読み上げ(N-288)', () => {
 
     await act(async () => { dayBar?.click(); await Promise.resolve() })
     expect(dayBar?.getAttribute('aria-pressed')).toBe('true')
-    expect(host.textContent).toContain('増加 5人・減少 2人')
+    expect(host.textContent).toContain('増加 5 人・減少 2 人')
   })
 
   it('時間帯の棒は1本ごとに時間と回数の名前を持つ', async () => {
@@ -426,8 +428,8 @@ describe('棒グラフと期間切替の読み上げ(N-288)', () => {
     fixture.tab = 'reactions'
     await render()
 
-    expect(host.querySelector('[role="img"][aria-label="9時台 4回"]')).not.toBeNull()
-    expect(host.querySelector('[role="img"][aria-label="0時台 0回"]')).not.toBeNull()
+    expect(host.querySelector('button[aria-label^="9時台 4回"]')).not.toBeNull()
+    expect(host.querySelector('button[aria-label="0時台 0回"]')).not.toBeNull()
   })
 
   it('ファネルの段の棒は、人数・通過率の行と紐づいている', async () => {
@@ -440,11 +442,10 @@ describe('棒グラフと期間切替の読み上げ(N-288)', () => {
     await render()
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
 
-    const bar = host.querySelector('button[aria-label="案内の段"]') as HTMLButtonElement | null
+    const bar = host.querySelector('button[aria-label="案内 10人"]') as HTMLButtonElement | null
     expect(bar).not.toBeNull()
-    const describedBy = bar?.getAttribute('aria-describedby')
-    expect(describedBy).toBe('funnel-step-1-value')
-    const value = host.querySelector(`#${describedBy}`)
-    expect(value?.textContent).toContain('10 人')
+    expect(bar?.getAttribute('aria-label')).toBe('案内 10人')
+    expect(bar?.textContent).toContain('10人')
+    expect(bar?.getAttribute('aria-pressed')).toBe('true')
   })
 })

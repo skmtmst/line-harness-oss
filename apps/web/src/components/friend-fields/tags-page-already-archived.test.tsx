@@ -24,7 +24,7 @@ const fixture = vi.hoisted(() => ({
   archive: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -63,6 +63,7 @@ vi.mock('@/lib/api', () => {
         update: async () => ({ success: true, data: null }),
         delete: async () => ({ success: true, data: null }),
       },
+      listStats: { get: async () => ({ success: false, error: 'unused' }) },
       featureSettings: {
         visibility: async () => ({
           success: true,
@@ -73,7 +74,9 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-import TagsPageV4 from './tags-page-v4'
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+
+import TagsList from '@/v8/tags/list'
 
 const TAGS = [
   {
@@ -133,11 +136,11 @@ afterEach(() => {
 async function openDeleteDialog() {
   // 整理の結果は Toast（右下・4秒）で出す。置き場所も一緒に描く。
   clearToastsForTest()
-  render(<><TagsPageV4 accountId="account-a" /><ToastHost /></>)
+  render(<><TagsList accountId="account-a" /><ToastHost /></>)
   // 表と狭幅カードの両方に同じ操作が出るため、見えている側として先頭を取る。
   // ★V7 `Xn1Mz`：削除は「…」メニューの中の危ない操作へ。赤いゴミ箱だけの
   // ボタンは行に直に置かない。確認窓の動き（#708）はそのまま守る。
-  const moreButton = (await screen.findAllByRole('button', { name: '旧キャンペーンのその他操作' }))[0]
+  const moreButton = (await screen.findAllByRole('button', { name: 'タグ「旧キャンペーン」の操作' }))[0]
   await act(async () => { fireEvent.click(moreButton) })
   const deleteItem = await screen.findByRole('menuitem', { name: '保管する' })
   await act(async () => { fireEvent.click(deleteItem) })
@@ -194,12 +197,13 @@ describe('R190 保管済みの行に同じ確認を繰り返さない', () => {
       success: true,
       data: [{ ...TAGS[0], status: 'archived' }],
     }))
-    render(<><TagsPageV4 accountId="account-a" /><ToastHost /></>)
+    render(<><TagsList accountId="account-a" /><ToastHost /></>)
+    fireEvent.click(await screen.findByRole('button', { name: '保管' }))
     expect((await screen.findAllByText('旧キャンペーン')).length).toBeGreaterThan(0)
     // 保管済みでも編集は「…」に残し、保管を繰り返す口は出さない。
-    fireEvent.click(screen.getAllByRole('button', { name: '旧キャンペーンのその他操作' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: 'タグ「旧キャンペーン」の操作' })[0])
     expect(screen.queryByRole('menuitem', { name: '保管する' })).toBeNull()
     // 編集への道は残す。保管済みでも名前・説明の訂正はできる（#710）。
-    expect(screen.getByRole('menuitem', { name: '編集する' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '編集' })).toBeTruthy()
   })
 })

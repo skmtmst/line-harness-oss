@@ -36,7 +36,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * 型（CreatePage）の左に段「基本」（マーク名・色）と段「自動で変えるきまり」、右の列に「出す場所と数」と案内の帯。
  * 下の帯は「保管する」が左端、キャンセル・保存が真ん中。
  * 読み込み・保存・版の衝突（R513）・冪等キー（R512）・権限（R511）・保管の影響確認は
- * 今の部品（app/tags/mark-editor-v8.tsx）から写した。
+ * 今の部品（src/v8/tags/mark-editor.tsx）から写した。
  * 絵に無い「新しい友だちに最初から付ける」は右の列の下の空きに置く。並び順は一覧で並べ替える（ここでは今の値を保つ）。
  * きまりの中身を変える・作るは、今の自動変更ルールの部品（SupportMarkRulesPanel）を窓で開く。
  */

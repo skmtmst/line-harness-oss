@@ -1,7 +1,7 @@
 /*
- * 7ページを 1152・1440 で撮る（時計を固定・動きを止める）。v7-pixel-diff の材料。
+ * V8のページを1152・1440で撮る（時計を固定・動きを止める）。
  *
- *   node apps/web/scripts/v8-guard/shots.mjs <baseUrl> <outDir> [v7|v8|both]
+ *   node apps/web/scripts/v8-guard/shots.mjs <baseUrl> <outDir> [v8]
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -26,10 +26,11 @@ async function collectDiag(page, { theme, width, name, route }) {
   }
 }
 
-const [baseUrl, dir, themeArg = 'v7'] = process.argv.slice(2)
-if (!baseUrl || !dir) throw new Error('使い方: shots.mjs <baseUrl> <outDir> [v7|v8|both]')
+const [baseUrl, dir, themeArg = 'v8'] = process.argv.slice(2)
+if (!baseUrl || !dir) throw new Error('使い方: shots.mjs <baseUrl> <outDir> [v8]')
 mkdirSync(dir, { recursive: true })
-const themes = themeArg === 'both' ? ['v7', 'v8'] : [themeArg]
+if (themeArg !== 'v8') throw new Error('Only V8 screens are supported')
+const themes = ['v8']
 const browser = await chromium.launch()
 let n = 0
 for (const theme of themes) {

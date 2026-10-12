@@ -13,9 +13,11 @@ let t:SqliteD1,env:Env['Bindings'];
 const sender=vi.fn(async()=>{});
 const store='s',scenario='restaurant-followup:s';
 function iso(offset:number){return new Date(Date.now()+offset*60000).toISOString();}
-function reservation(id='r',starts=iso(3000),source='phone') {
+function reservation(id='r',starts=iso(3000),source='phone',occurredAt?:string) {
  t.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status)
  VALUES(?,'s',?,'友だち','UID',2,?,?,'confirmed')`).run(id,source,starts,new Date(Date.parse(reservationInstant(starts))+120*60000).toISOString());
+ // SQLiteのstrftime('now')はJavaScriptの偽時計と別。固定時刻の試験ではイベントも同じ時刻で作る。
+ if(occurredAt !== undefined) t.raw.prepare('UPDATE rt_reservation_events SET occurred_at=? WHERE reservation_id=?').run(occurredAt,id);
  return t.raw.prepare('SELECT * FROM rt_reservation_events WHERE reservation_id=? ORDER BY reservation_version DESC LIMIT 1').get(id) as RestaurantEvent;
 }
 async function activate() {
@@ -204,7 +206,7 @@ describe('飲食3・承認した共通版と予約ごとの送り方',()=>{
  it.each(boundaries)('旧SQLiteのUTC時刻を端末の時間帯でずらさない（$jst JST）',async({now,next})=>{
   vi.setSystemTime(new Date(now));await activate();
   const starts=iso(1440).replace('T',' ').slice(0,19);
-  const e=reservation('r',starts);await scheduleRestaurantFollowup(t.db,e);
+  const e=reservation('r',starts,'phone',new Date(now).toISOString());await scheduleRestaurantFollowup(t.db,e);
   const due=t.raw.prepare("SELECT scheduled_at FROM scenario_source_jobs j JOIN scenario_versions v ON v.id=j.scenario_version_id JOIN json_each(v.steps_snapshot) st ON json_extract(st.value,'$.version_step_id')=j.step_id WHERE json_extract(st.value,'$.live_step_id') LIKE '%:reservation_24h'").get() as {scheduled_at:string};
   expect(due.scheduled_at).toBe(new Date(now).toISOString());
   expect(await processScenarioSourceJobs(env,sender)).toBe(2);
@@ -213,7 +215,7 @@ describe('飲食3・承認した共通版と予約ごとの送り方',()=>{
  it.each(boundaries)('$jst JSTでも予約時刻の24時間前・本文の今日を日本時間で扱う',async({now})=>{
   vi.setSystemTime(new Date(now));await activate();
   t.raw.exec("UPDATE scenario_steps SET message_content='{{date}}・{{var.reservation_datetime}}' WHERE scenario_id='restaurant-followup:s' AND step_order=0");await activate();
-  const starts=iso(1440);await scheduleRestaurantFollowup(t.db,reservation('r',starts));
+  const starts=iso(1440);await scheduleRestaurantFollowup(t.db,reservation('r',starts,'phone',new Date().toISOString()));
   const before=t.raw.prepare("SELECT j.scheduled_at FROM scenario_source_jobs j JOIN scenario_versions v ON v.id=j.scenario_version_id JOIN json_each(v.steps_snapshot) st ON json_extract(st.value,'$.version_step_id')=j.step_id WHERE json_extract(st.value,'$.live_step_id') LIKE '%:reservation_24h'").get() as {scheduled_at:string};
   expect(Date.parse(starts)-Date.parse(before.scheduled_at)).toBe(24*60*60000);
   expect(before.scheduled_at).toBe(new Date(now).toISOString());

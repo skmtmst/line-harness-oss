@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 
-import BulkOpWizard from './bulk-op-wizard'
+import BulkOpWizard from '@/v8/affiliates/bulk-op'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -25,8 +25,8 @@ describe('まとめて操作の手順窓 V8', () => {
     )
     expect(document.querySelector('[data-design-node="hadfk"]')).toBeTruthy()
     expect(screen.getByText('成果をまとめて操作')).toBeTruthy()
-    expect(screen.getByText(/選択した成果2件/)).toBeTruthy()
-    expect(screen.getByText(/報酬¥3,280/)).toBeTruthy()
+    expect(screen.getByText(/選択した成果\s*2\s*件/)).toBeTruthy()
+    expect(screen.getByText(/報酬\s*¥3,280/)).toBeTruthy()
     expect(screen.getByRole('radio', { name: /認める/ })).toBeTruthy()
     expect(screen.getByRole('radio', { name: /認めない/ })).toBeTruthy()
   })

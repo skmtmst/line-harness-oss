@@ -92,8 +92,8 @@ test('v8 では SAUCs の見本カードがタブ名とそろって出る', asyn
   expect(board?.textContent).not.toContain('見本に書いたことだけを送ります')
 })
 
-test('v7 では従来の見本タブが出て SAUCs は出ない', async () => {
+test('旧テーマ属性でも現役の見本タブが出て SAUCs が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="SAUCs"]')).toBeNull()
-  expect(host.textContent).toContain('受け取る見本')
+  expect(host.querySelector('[data-design-node="SAUCs"]')).not.toBeNull()
+  expect(host.textContent).toContain('こちらで受け取る')
 })

@@ -3,7 +3,11 @@ import React from 'react'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { NenOverview, type NenCoupon, type NenTab } from './nen-overview'
+
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+import NenOverview from '@/v8/nen-campaigns/list'
+import { type NenCoupon, type NenTab } from '@/v8/nen-campaigns/display'
 
 /*
  * 419: 誕生日クーポン設定の「2月29日生まれの子」3択が

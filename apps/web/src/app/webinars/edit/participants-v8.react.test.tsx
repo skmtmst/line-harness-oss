@@ -6,6 +6,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { webinarEditContext, webinarDetailChrome } from '@/test-utils/webinar-edit'
+import type { Webinar, WebinarEditor } from '@/lib/api'
 
 const apiMocks = vi.hoisted(() => ({
   participants: vi.fn(),
@@ -25,13 +27,15 @@ vi.mock('@/lib/api', async (importOriginal) => {
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/webinars/edit',
   useRouter: () => ({ push: vi.fn() }),
 }))
 
-import ParticipantsV8 from './participants-v8'
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+
+import ParticipantsPane from '@/v8/webinar-edit/participants'
 
 const ANALYTICS = {
   summary: {
@@ -89,12 +93,9 @@ function render(): HTMLElement {
   roots.push(root)
   act(() => {
     root.render(
-      <ParticipantsV8
-        webinarId="webinar-1"
-        durationSeconds={900}
-        analytics={ANALYTICS}
-        analyticsState="ready"
-        onRetry={() => undefined}
+      <ParticipantsPane
+        ctx={webinarEditContext({ id: 'webinar-1', title: 'ウェビナー', durationSeconds: 900 } as Webinar, { version: 2 } as WebinarEditor, { analytics: ANALYTICS, analyticsState: 'ready' })}
+        chrome={webinarDetailChrome}
       />,
     )
   })
@@ -103,6 +104,8 @@ function render(): HTMLElement {
 
 describe('参加者管理のV8（uNsEy）', () => {
   beforeEach(() => {
+    window.history.replaceState(null, '', '/webinars/edit?id=webinar-1')
+    window.dispatchEvent(new PopStateEvent('popstate'))
     apiMocks.participants.mockResolvedValue({
       data: { items: ITEMS, nextCursor: null, rule: null, measurement: { state: 'available', reason: null } },
     })

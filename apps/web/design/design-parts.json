@@ -3882,14 +3882,6 @@
       "pencilUsage": 0,
       "lastCheckedAt": "2026-08-24"
     },
-    "emergency-summary-card": {
-      "name": "運用状態のローカル SummaryCard",
-      "reviewStatus": "investigating",
-      "reason": "src/app/emergency/page.tsx にローカル定義があり、値が文字列（\"通常運用\"）。XywGr は22pxの数字が前提の設計に見えるため、共通部品で受けてよいか未確定。名前も共通部品と衝突している。",
-      "code": "src/app/emergency/page.tsx",
-      "pencilUsage": 0,
-      "lastCheckedAt": "2026-08-24"
-    },
     "tPTMp-contrast": {
       "name": "共通 表見出しセルのコントラスト",
       "reviewStatus": "investigating",

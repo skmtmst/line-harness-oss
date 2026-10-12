@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/automations/list.tsx'), 'utf8')
 
 /** 注意書きの中の `confirm(` に当てないため、コメントを外す。 */
 function code(src: string): string {
@@ -42,33 +42,33 @@ describe('オートメーションの確認窓', () => {
   })
 
   it('実行の本体が二度押しを止め、返事を確かめ、finally で戻す', () => {
-    const guarded = slice(PAGE, 'async function performAutomationAction', '\nfunction AutomationRowActions')
-    const body = slice(PAGE, 'const runPending = async', '\n  return (')
-    expect(guarded, '同期ロックを取らず処理中でも受け付けてしまう').toContain('!lock.tryAcquire()')
+    const body = slice(PAGE, 'const confirmPending = async', '\n  const runSingleTest')
+    expect(body, '同期ロックを取らず処理中でも受け付けてしまう').toContain('pendingLockRef.current')
+    expect(body).toContain('pendingLockRef.current = lock')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を握りつぶしている').toContain('setActionError(')
     expect(body, '生のAPIエラーをそのまま出している').not.toContain('setActionError(res.error)')
-    expect(guarded, 'finally で同期ロックを戻していない').toMatch(/finally \{[\s\S]*lock\.release\(\)[\s\S]*onFinish\(\)/)
+    expect(body, 'finally で同期ロックを戻していない').toMatch(/finally \{[\s\S]*pendingLockRef\.current === lock[\s\S]*pendingLockRef\.current = null[\s\S]*setWorking\(false\)/)
+    expect(body).toContain('await load()')
   })
 
   it('押した時点のアカウントを窓に固定する', () => {
     expect(PAGE, 'アカウントを窓に持っていない').toContain(
-      "setPending({ kind: 'archive', automation: target, accountId: selectedAccountId })",
+      "setPending({ kind: 'archive', item, accountId: selectedAccountId })",
     )
     expect(PAGE, '切り替わりを見ていない').toContain(
-      'const accountChanged = pending !== null && pending.accountId !== selectedAccountId',
+      'pending.accountId !== selectedAccountIdRef.current',
     )
-    const dialog = dialogWith(PAGE, 'open={pending !== null}')
+    const dialog = dialogWith(PAGE, 'open={pending !== null && pending.accountId === selectedAccountId}')
     expect(dialog, '切り替わっても実行できてしまう').toContain(
-      'onConfirm={accountChanged ? undefined : () => void runPending()}',
+      'onConfirm={pending?.accountId === selectedAccountId ? () => confirmPending() : undefined}',
     )
-    expect(dialog, '切り替わったことを窓の中で伝えていない').toContain(
-      '押したあとにLINEアカウントが切り替わりました。',
-    )
+    expect(dialog, '前の店の処理のロックを持つ窓を使い回している').toContain('key={selectedAccountId}')
+    expect(PAGE).toContain('setPending(null)')
   })
 
-  it('取り消せない保管だけを赤にする', () => {
-    const dialog = dialogWith(PAGE, 'open={pending !== null}')
+  it('保管だけを赤にし、稼働の切替は通常の確認にする', () => {
+    const dialog = dialogWith(PAGE, 'open={pending !== null && pending.accountId === selectedAccountId}')
     expect(dialog, '戻せる稼働の切り替えまで赤になっている').toContain(
       "destructive={pending?.kind === 'archive'}",
     )
@@ -77,11 +77,10 @@ describe('オートメーションの確認窓', () => {
   })
 
   it('何が消え・何が残るかを本文で読ませる', () => {
-    const dialog = dialogWith(PAGE, 'open={pending !== null}')
-    expect(dialog).toContain('一覧から隠します。動いた記録と設定は残りますが、この画面からは元に戻せません。')
-    expect(dialog).toContain('ルールの設定は残るので、あとから動かし直せます。')
-    // 実行の記録を持っていない。0回と書かずに、数えていないことを断る。
-    expect(dialog).toContain('このルールが何回動いたかは記録していないため、ここには出せません。')
+    const dialog = dialogWith(PAGE, 'open={pending !== null && pending.accountId === selectedAccountId}')
+    expect(dialog).toContain('通常の一覧から外します。動いた記録と設定は残り、保管の札から戻せます。')
+    expect(dialog).toContain('切り替えても、動いた記録は残ります。')
+    expect(dialog).toContain('稼働は再開しません。')
     // 注意書きの中の「0回」を拾わないよう、コメントを外してから見る。
     expect(code(dialog), '取れない数を0回として作っている').not.toContain('0回')
   })

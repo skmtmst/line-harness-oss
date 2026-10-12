@@ -41,7 +41,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-import { FileScanV8 } from './file-scan-v8'
+import FileScanV8 from '@/v8/settings/file-scan/screen'
 
 afterEach(() => cleanup())
 

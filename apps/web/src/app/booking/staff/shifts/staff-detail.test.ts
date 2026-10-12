@@ -2,22 +2,20 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const DETAIL = readFileSync(join(__dirname, 'staff-detail.tsx'), 'utf8')
+const DETAIL = readFileSync(join(__dirname, '../../../../v8/booking-staff/shifts.tsx'), 'utf8')
 const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
 const ROOT = join(__dirname, '..', '..', '..', '..', '..', '..', '..')
 const MOCK = readFileSync(join(ROOT, 'scripts/visual-qa/mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(ROOT, 'scripts/visual-qa/fixtures.mjs'), 'utf8')
 
 describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
-  it('?staff_id= のときだけ担当者ビューを開き、ないときは従来の受付枠のまま', () => {
+  it('?staff_id= は現役V8の担当勤務、管理者の指定なしは店舗の受付枠へ進む', () => {
     expect(PAGE).toContain("useSearchParams().get('staff_id')")
-    expect(PAGE).toContain('<StaffDetail staffId={staffId} />')
-    expect(PAGE).toContain('<StoreShiftsView />')
-    expect(DETAIL).toContain('data-design-node="tksPcStaff"')
-    expect(DETAIL).not.toContain('<Header')
-    // 新節に data-design は付けない(設計に無い節を設計対応と偽らない。構造検査の対象外)。
-    expect(DETAIL).not.toContain('data-design="Staff')
-    for (const heading of ['いつもの勤務時間', '休憩', '日ごとのシフト', '外の予定', 'の予約枠（14日分）', 'つながる先']) {
+    expect(PAGE).toContain('<StaffShiftsV8 staffId={staffId} />')
+    expect(DETAIL).toContain("router.replace('/booking/menus?tab=hours')")
+    expect(DETAIL).toContain('<StaffShiftsDetail staffId={staffId}')
+    expect(DETAIL).toContain('<PageHeading')
+    for (const heading of ['いつもの勤務時間', '休憩', 'この日だけ', '何週分かのシフト', 'Google カレンダー', 'の予約枠（14日分）']) {
       expect(DETAIL).toContain(heading)
     }
     expect(DETAIL).not.toContain('準備中')
@@ -40,7 +38,7 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
       'bookingApi.putAvailabilityRules(selectedAccountId, staffId, payload)',
       'bookingApi.putBreaks(',
       'bookingApi.putShifts(selectedAccountId, staffId, [',
-      'bookingApi.deleteShift(selectedAccountId, staffId, removeTarget.id)',
+      'bookingApi.deleteShift(selectedAccountId, staffId, removeTarget.item.id)',
       'bookingApi.generateShifts(selectedAccountId, staffId, {',
       'bookingApi.putGoogleCalendar(selectedAccountId, staffId, trimmed)',
       'bookingApi.deleteGoogleCalendar(selectedAccountId, staffId)',
@@ -59,50 +57,36 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     expect(DETAIL).not.toContain('availability.ts')
   })
 
-  /*
-    曜日指定と日付指定の休憩は「同じ理由で同じく予約枠から除く」。
-    片方にだけ注記があると、運用者は注記の無いほうを「除かない」と読む。
-    見出しの直後の説明文だけを切り出して見るので、別の節に同じ文が
-    あっても通らない。文言は2つの節で一字一句そろえる。
-  */
-  const noteUnderHeading = (heading: string): string => {
-    const at = DETAIL.indexOf(heading)
-    expect(at, `見出し「${heading}」が無い`).toBeGreaterThan(-1)
-    const open = DETAIL.indexOf('<p', at)
-    const close = DETAIL.indexOf('</p>', open)
-    expect(open, `「${heading}」の直後に説明文が無い`).toBeGreaterThan(-1)
-    expect(close).toBeGreaterThan(open)
-    return DETAIL.slice(DETAIL.indexOf('>', open) + 1, close)
-  }
-
-  it('休憩は曜日指定も日付指定も、枠から除くことを同じ文言で言う', () => {
-    const EXCLUDED = '休憩の時間は予約枠から除きます。'
-    const weekly = noteUnderHeading('>休憩</h2>')
-    const byDate = noteUnderHeading('>この日だけの休憩</h3>')
-    expect(weekly).toContain(EXCLUDED)
-    expect(byDate).toContain(EXCLUDED)
-    // 「別の話かもしれない」と読まれないよう、言い換えを許さない。
-    expect(weekly.slice(weekly.indexOf('休憩の時間は')))
-      .toBe(byDate.slice(byDate.indexOf('休憩の時間は')))
+  it('休憩は曜日指定も日付指定も、予約枠の読み直しへ反映する', () => {
+    expect(DETAIL).toContain('休憩の時間は予約枠から除きます。')
+    expect(DETAIL).toContain('bookingApi.putBreaks(')
+    expect(DETAIL).toContain('bookingApi.putBreakDates(')
+    expect(DETAIL).toContain('await loadAvailability(')
+    expect(DETAIL).toContain("kind: 'break'")
   })
 
-  it('休憩は版付きで保存し、重なったら最新へ描き直す', () => {
+  it('休憩は版付きで保存し、409では入力を保持して本人が最新を読む', () => {
     expect(DETAIL).toContain('breaksVersion,')
     expect(DETAIL).toContain('breakDatesVersion,')
     expect(DETAIL).toContain('error.status === 409')
     expect(DETAIL).toContain('ほかの変更と重なりました')
-    expect(DETAIL).toContain('asBreakConflict(error.data)')
+    expect(DETAIL).toContain('breakSaveConflict.mark()')
+    expect(DETAIL).toContain('dateSaveConflict.mark()')
+    expect(DETAIL).toContain('入力はそのまま残しています')
+    expect(DETAIL).toContain('breakSaveConflict.reloadLatest()')
+    expect(DETAIL).toContain('dateSaveConflict.reloadLatest()')
+    expect(DETAIL).not.toContain('asBreakConflict(error.data)')
   })
 
   it('この日だけの休憩は日付ごとに持てる', () => {
     expect(DETAIL).toContain('bookingApi.getBreakDates(selectedAccountId, staffId)')
     expect(DETAIL).toContain('bookingApi.putBreakDates(')
     expect(DETAIL).toContain('この日だけの休憩')
-    expect(DETAIL).toContain('setDateError(staffErrorMessage(error,')
+    expect(DETAIL).toContain('setShiftError(staffErrorMessage(error,')
   })
 
   it('保存が効いたあとは保存した口と予約枠を読み直す(2回目の保存が残る)', () => {
-    const refreshes = DETAIL.match(/await refreshAfterSave\(\)/g) ?? []
+    const refreshes = DETAIL.match(/await refreshAfterSave\('(rules|days)'\)/g) ?? []
     expect(refreshes.length).toBeGreaterThanOrEqual(4)
     expect(DETAIL).toContain('bookingApi.getAvailabilityRules(selectedAccountId, staffId)')
     expect(DETAIL).toContain('bookingApi.getAvailability(')
@@ -111,10 +95,10 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
 
   it('権限なし・見つからない・失敗をはっきり出し、保存失敗で入力を消さない', () => {
     expect(DETAIL).toContain('error.status === 403')
-    expect(DETAIL).toContain('担当者の設定を${action}する権限がありません')
+    expect(DETAIL).toContain("permissionDeniedMessage('store')")
     expect(DETAIL).toContain('error.status === 404')
     expect(DETAIL).toContain('担当者が見つかりませんでした')
-    expect(DETAIL).toContain('保存済みの内容は消えていません')
+    expect(DETAIL).toContain('setRuleError(staffErrorMessage(error,')
     expect(DETAIL).toContain('入力はそのまま残しています')
     expect(DETAIL).toContain('setRuleError(staffErrorMessage(error,')
     expect(DETAIL).toContain('setShiftError(staffErrorMessage(error,')
@@ -122,7 +106,7 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
   })
 
   it('日付・時刻は文字列のまま送り、曜日と今日だけUTC計算する(DST安全)', () => {
-    expect(DETAIL).toContain('work_date: newDate')
+    expect(DETAIL).toContain('work_date: dayAddDate')
     expect(DETAIL).toContain('T00:00:00Z')
     expect(DETAIL).toContain("timeZone,")
     expect(DETAIL).not.toContain('getTimezoneOffset')
@@ -130,20 +114,19 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     expect(DETAIL).not.toContain('new Date(shift.work_date)')
   })
 
-  it('14日の予約枠は初日の曜日ぶん空けて月曜始まりの列へ置く(R163)', () => {
-    // 列見出しは月〜日で固定。今日から14日を余白なしで並べると、
-    // 日曜に開いたときに日付と曜日の列がずれる。
-    expect(DETAIL).toContain('previewLeadBlanks')
-    expect(DETAIL).toContain('(weekdayOf(previewDates[0]) + 6) % 7')
-    expect(DETAIL).toContain('aria-hidden="true"')
-    // 月またぎの位置が分かるよう、月の初めと先頭は「月/日」で出す。
-    expect(DETAIL).toContain('formatDay(item.date)')
+  it('14日の予約枠は店の今日を起点に日付順で持ち、曜日は各日のtitleで示す', () => {
+    // 現役V8は曜日見出しの月曜始まりの表ではなく、日付と印の札を並べる。
+    expect(DETAIL).toContain('const from = todayKey(timeZone)')
+    expect(DETAIL).toContain('Array.from({ length: 14 }')
+    expect(DETAIL).toContain('addDays(from, index)')
+    expect(DETAIL).toContain('title={shortDay(item.date)}')
+    expect(DETAIL).toContain('key={item.date}')
   })
 
   it('日別シフトがある日は優先、ない日はいつもの時間、外の予定は枠を閉じる', () => {
-    expect(DETAIL).toContain('ある日は、いつもの勤務時間よりこちらが優先されます')
+    expect(DETAIL).toContain('日ごとのシフトがある日はそちらが優先')
     expect(DETAIL).toContain('外の予定は枠を閉じます')
-    expect(DETAIL).toContain('すでにある日は残します')
+    expect(DETAIL).toContain('すでにある日は残す')
   })
 
   it('撮影用の固定データと口が本番と同じ器でそろう', () => {
@@ -155,7 +138,7 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     }
   })
 
-  it('キーボードで操作でき、日付と時刻は★V7の部品を使う', () => {
+  it('キーボードで操作でき、日付と時刻は現在の共通部品を使う', () => {
     expect(DETAIL).toContain('DateField')
     expect(DETAIL).toContain('TimeField')
     expect(DETAIL).toContain('date-field')

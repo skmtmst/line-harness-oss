@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./line-followup.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../../v8/restaurant/line-followup/line-followup.tsx', import.meta.url), 'utf8')
 
 /* 板 `xLpnS`：LINE来店フォローは V8 だけで出す。v7 console は使わない。 */
 describe('LINE来店フォロー V8（板 xLpnS）', () => {
@@ -15,7 +15,7 @@ describe('LINE来店フォロー V8（板 xLpnS）', () => {
   })
 
   it('本送信は押せないまま置く（プレビューのみ）', () => {
-    expect(PAGE).toContain("label=\"本送信\"")
+    expect(PAGE).toContain("title=\"本送信\"")
     expect(PAGE).toContain('プレビューのみ')
   })
 })

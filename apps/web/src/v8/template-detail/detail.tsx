@@ -31,6 +31,7 @@ import { DetailLoading } from '@/components/templates/detail-page';
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
+import { ListEmptyMessage } from '@/components/shared/list-state'
 
 /*
  * ★V8 テンプレートの詳細（一から書いた画面・2026-10-07）。
@@ -327,7 +328,7 @@ export default function TemplateDetailV8() {
       <span className={styles.usageKind}>{row.kind}</span>
       {row.href
         ? <Link href={row.href} className={styles.usageName} ><TruncatedText value={String(row.name ?? '')} /></Link>
-        : <span className={styles.usageNameQuiet} ><TruncatedText value={String(row.name ?? '')} /></span>}
+        : <span className={styles.usageNameQuiet} title="旧形式・開ける画面がありません"><TruncatedText value={String(row.name ?? '')} /></span>}
       <span className={row.fixed ? styles.usageVersionFixed : styles.usageVersion} title={row.version}>{row.version}</span>
       <span className={styles.usageState}>{row.status ?? emptyValue('unknown')}</span>
       {row.href
@@ -463,7 +464,7 @@ export default function TemplateDetailV8() {
                 </div>
               ) : null}
             </>
-          ) : <p className={styles.empty}>まだ使われていません</p>}
+          ) : <ListEmptyMessage>まだ使われていません</ListEmptyMessage>}
         </section>
 
         <section className={styles.card} aria-label="版の履歴">
@@ -514,6 +515,7 @@ export default function TemplateDetailV8() {
                   ) : null}
                 </div>
               ))}
+              {versions?.length === 0 ? <ListEmptyMessage>版はまだありません。</ListEmptyMessage> : null}
               {typeof compareTarget === 'number' ? compareBox : null}
             </>
           )}

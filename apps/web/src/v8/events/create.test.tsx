@@ -12,7 +12,6 @@ vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: React.Props
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/lib/use-unsaved-guard', () => ({ useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: vi.fn(), cancelLeave: vi.fn() }) }))
 vi.mock('./application-preview', () => ({ default: () => null }))
 import EventsCreate from './create'

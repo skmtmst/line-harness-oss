@@ -17,6 +17,11 @@ import { TextField } from './text-field'
 import HelpTip from './help-tip'
 import { joinDescribedBy, useFieldContext } from './field-context'
 
+/** 公開前にも同じ上限を示す。確認欄が独自の上限文を持たない。 */
+export function MediaLimitNote({ kind = '画像', maxMb }: { kind?: string; maxMb: number }) {
+  return <p>{kind}は{maxMb}MBまで。超えると登録できません</p>
+}
+
 /**
  * 画像・動画・ファイルを入れる所。Pencil ★V8 の採用案 Z7vd2（B-128「画像を追加する所」）。
  *

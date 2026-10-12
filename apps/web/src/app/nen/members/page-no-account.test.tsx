@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({ accountId: null as string | null }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -17,13 +17,13 @@ vi.mock('@/lib/api', () => ({ ApiError: class extends Error { status?: number } 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: state.accountId }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
 vi.mock('@/components/shared/page-header', () => ({ default: () => null }))
 vi.mock('@/components/layout/scrollable-tabs', () => ({ default: () => null }))
 vi.mock('@/lib/nen-ranks-api', () => ({ nenRanksApi: { settings: vi.fn() } }))
-vi.mock('./rank-settings-tab', () => ({ default: () => <div data-testid="rank-tab" /> }))
-vi.mock('./lifetime-tab', () => ({ default: () => <div data-testid="lifetime-tab" /> }))
-vi.mock('./members-tab', () => ({ default: () => <div data-testid="members-tab" /> }))
+vi.mock('@/v8/nen-members/ranks', () => ({ default: () => <div data-testid="rank-tab" /> }))
+vi.mock('@/v8/nen-members/lifetime', () => ({ default: () => <div data-testid="lifetime-tab" /> }))
+vi.mock('@/v8/nen-members/list', () => ({ default: () => <div data-testid="members-tab" /> }))
 
 import Page from './page'
 

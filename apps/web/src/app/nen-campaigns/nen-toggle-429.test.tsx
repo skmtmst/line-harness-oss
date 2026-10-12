@@ -12,6 +12,10 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/lib/staff-role', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner',
+}))
+
 const net = vi.hoisted(() => ({
   /** 停止・再開の結果。'rateLimited' は429。 */
   toggleResult: 'rateLimited' as 'rateLimited' | 'serverError',
@@ -137,7 +141,7 @@ function findButtonByLabel(label: string): HTMLButtonElement | undefined {
 
 function openRowMenu(): HTMLButtonElement {
   const menu = [...container.querySelectorAll('button')]
-    .find((node) => (node.getAttribute('aria-label') ?? '').endsWith('のその他操作')) as HTMLButtonElement | undefined
+    .find((node) => (node.getAttribute('aria-label') ?? '') === '「お誕生日配信」の操作') as HTMLButtonElement | undefined
   expect(menu, `行の「…」操作がある（描画内容: ${(container.textContent ?? '').slice(0, 200)}）`).toBeTruthy()
   return menu!
 }

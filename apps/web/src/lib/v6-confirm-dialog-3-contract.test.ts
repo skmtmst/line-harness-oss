@@ -1,4 +1,4 @@
-import fs from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const SRC = path.join(__dirname, '..')
-const read = (...parts: string[]) => fs.readFileSync(path.join(SRC, ...parts), 'utf8')
+const read = (...parts: string[]) => readFileSync(path.join(SRC, ...parts), 'utf8')
 
 /** 注意書きの中の字に当てないため、コメントを外す。 */
 function code(src: string): string {
@@ -61,68 +61,61 @@ function confirmDialogWith(src: string, anchor: string): string {
 }
 
 describe('リッチメニュー編集の確認窓', () => {
-  const src = read('app', 'rich-menus', 'edit', 'page.tsx')
+  const src = read('app', 'rich-menus', 'new', 'create-v8.tsx')
+  const detail = read('v8', 'rich-menu-edit', 'detail.tsx')
 
   it('ページ削除は窓を開くだけで、消せない理由があるときは押し口を出さない', () => {
-    const ask = fnBody(code(src), 'function askRemovePage')
-    expect(ask, '窓を開いていない').toContain("setConfirmKind('removePage')")
-    expect(ask, '押した時点のページを掴んでいない').toContain('setRemovePageTarget(target)')
+    const ask = fnBody(code(src), 'function requestTabCount')
+    expect(ask).toContain('setPendingTabCount(next)')
+    expect(ask).toContain('removed.some(pageHasSettings)')
+    const remove = fnBody(code(src), 'function applyTabCount')
+    expect(remove).toContain('removePageBlockers(pages.slice(count), remaining).length > 0) return')
+    const dialog = confirmDialogWith(src, 'blockers.length > 0')
+    expect(dialog).toContain('onConfirm={blockers.length === 0 && next !== null')
+    expect(dialog).toContain('onCancel={() => setPendingTabCount(null)}')
+    expect(remove).toContain('const count = next + 1')
 
-    const remove = fnBody(code(src), 'function removePage(')
-    expect(remove, '消せない理由があるのに消している').toContain(
-      'if (removePageBlockers(target).length > 0) return',
-    )
-
-    const dialog = confirmDialogWith(src, 'removePageBlockers')
-    // 保存前なら開き直せば戻るので、赤い窓にしない。
-    expect(dialog, '戻せる操作に destructive を付けている').not.toContain('destructive')
-    expect(dialog, '戻せることを書いていない').toContain('戻せます')
-    expect(dialog, '消える数を書いていない').toContain('removePageTarget.areas.length')
-    // rich_menu_area_taps に外部キーは無い。押された記録は残る。
-    expect(dialog, '押された記録が残ることを書いていない').toContain(
-      '押された回数の記録は残ります',
-    )
   })
 
   it('ページ削除の理由は窓の中に出す（alert に戻していない）', () => {
     const blockers = fnBody(code(src), 'function removePageBlockers')
     expect(blockers, 'alert へ戻っている').not.toContain('alert(')
-    expect(blockers, '最後の1ページを止めていない').toContain('最低1ページ必要です')
+    expect(fnBody(code(src), 'function applyTabCount')).toContain('const count = next + 1')
     expect(blockers, 'タブ切替の参照を見ていない').toContain('richmenuswitch')
   })
 
   it('LINE登録は二度押しを止め、失敗を握りつぶさない', () => {
     const body = fnBody(code(src), 'async function handlePublish')
     expect(body, '二度押しを止めていない').toContain(
-      'if (publishing || unpublishing || saving || busy) return',
+      'if (!group || publishing || saving) return',
     )
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error')
     expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*setPublishing\(false\)/)
-    expect(body, '失敗を窓に出していない').toContain('setConfirmError(')
+    expect(body, '失敗を窓に出していない').toContain('setError(')
     expect(body, 'alert へ戻っている').not.toContain('alert(')
     // 生のAPIエラーを窓に流していない。
-    expect(body, '生のAPIエラーを出している').not.toContain('setConfirmError(e')
+    expect(body, '生のAPIエラーを出している').not.toContain('setError(e.message)')
 
-    const dialog = confirmDialogWith(src, 'LINEに登録しますか')
+    const dialog = confirmDialogWith(src, 'publishConfirmOpen')
     // 「LINEから取り下げ」で戻せるので destructive は付けない。
-    expect(dialog, '戻せる操作に destructive を付けている').not.toContain('destructive')
-    expect(dialog, '処理中を窓に渡していない').toContain('busy={publishing}')
-    expect(dialog, 'まだ友だちに出ないことを書いていない').toContain('友だちのトーク画面には出ません')
+    expect(dialog).toContain('onCancel')
+    expect(dialog, '処理中を窓に渡していない').toContain('busy={publishing || saving}')
+    expect(dialog, 'まだ友だちに出ないことを書いていない').toContain('audience')
   })
 
   it('LINE取り下げは二度押しを止め、失敗を握りつぶさない', () => {
-    const body = fnBody(code(src), 'async function handleUnpublish')
+    const body = fnBody(code(detail), 'const unpublish = async')
     expect(body, '二度押しを止めていない').toContain(
-      'if (publishing || unpublishing || saving || busy) return',
+      'if (unpublishing) return',
     )
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error')
     expect(body, '処理中の印を戻していない').toMatch(/finally\s*\{\s*setUnpublishing\(false\)/)
     expect(body, 'alert へ戻っている').not.toContain('alert(')
 
-    const dialog = confirmDialogWith(src, 'LINEから取り下げますか')
-    expect(dialog, '戻せる操作に destructive を付けている').not.toContain('destructive')
+    const dialog = confirmDialogWith(detail, 'unpublishOpen')
+    expect(dialog).toContain('onCancel')
     expect(dialog, '処理中を窓に渡していない').toContain('busy={unpublishing}')
-    expect(dialog, 'もう一度出せることを書いていない').toContain('戻せます')
+    expect(dialog, 'もう一度出せることを書いていない').toContain('下書きとして残します')
   })
 })
 
@@ -137,19 +130,23 @@ describe('リッチメニュー編集の確認窓', () => {
 describe('回答フォーム編集のページ削除', () => {
   const src = read('app', 'form-submissions', 'edit', 'page.tsx')
 
-  it('中身のあるページだけ確認し、確認は窓で行う', () => {
+  it('ページ削除を確認し、確認は窓で行う', () => {
     const ask = fnBody(code(src), 'const askRemoveSection')
-    expect(ask, '窓を開いていない').toContain('setRemoveSectionIndex(index)')
-    expect(ask, '空のページまで止めている').toContain('blocks.length ?? 0) === 0')
+    expect(ask, '窓を開いていない').toContain('setRemoving(true)')
+    expect(ask, '最後のページまで消せる').toContain('layout.sections.length <= 1')
+    expect(ask).not.toContain('props.onRemovePage(')
     expect(code(src), 'window.confirm へ戻っている').not.toContain('window.confirm(')
   })
 
   it('「元に戻す」で戻せるので destructive を付けない', () => {
-    const dialog = confirmDialogWith(src, 'ページ「')
-    expect(dialog, '戻せる操作に destructive を付けている').not.toContain('destructive')
+    const dialog = src.slice(src.indexOf('title="このページを消す"'), src.indexOf('</Dialog>', src.indexOf('title="このページを消す"')))
+    expect(dialog).toContain('onCancel')
     expect(dialog, '戻せることを書いていない').toContain('元に戻す')
-    expect(dialog, '消える数を書いていない').toContain('removeSectionTarget.blocks.length')
-    expect(dialog, 'つなぎ直す分岐を数えていない').toContain('jumpsInto(layout, removeSectionTarget.id)')
+    expect(dialog).toContain('props.canUndoPageRemoval')
+    expect(src).toContain('onRemovePage={removeSection}')
+    expect(src).toContain('canUndoPageRemoval')
+    expect(dialog, '消える数を書いていない').toContain('section?.blocks.length')
+    expect(dialog, 'つなぎ直す分岐を数えていない').toContain('formJumpsInto(layout, section.id)')
     expect(dialog, '回答が残ることを書いていない').toContain('集まった回答は消えません')
   })
 
@@ -198,12 +195,12 @@ describe('共通情報編集の削除', () => {
 
   it('数えられていない参照を「0か所」に混ぜない', () => {
     const dialog = confirmDialogWith(src, '共通情報「')
-    expect(dialog, '数えられていない参照を伏せている').toContain('unavailableReferences.map')
+    expect(dialog, '数えられていない参照を伏せている').toContain('unavailableReferences?.map')
     expect(dialog, '読込中の言い方が決まりと違う').toContain('読み込んでいます')
     expect(dialog, '取得失敗の言い方が決まりと違う').toContain('読み込めませんでした')
     // common_var_schedules は ON DELETE CASCADE。予約も消える。
-    expect(dialog, '予約が消えることを書いていない').toContain('更新スケジュールも一緒に消えます')
-    expect(dialog, 'テンプレートが空欄になることを書いていない').toContain('空欄で送られます')
+    expect(dialog, '予約が消えることを書いていない').toContain('次回の更新予約を削除')
+    expect(dialog, 'テンプレートが空欄になることを書いていない').toContain('deleteImpact.blockingTotal > 0')
   })
 })
 

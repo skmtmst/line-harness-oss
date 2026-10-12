@@ -1,17 +1,18 @@
 import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 
 /** 共通情報の削除確認（設計 `yPkWe` 14-1-A）。 */
 describe('共通情報の削除確認', () => {
   it('ブラウザ標準の確認ではなく共通ダイアログを使う', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
     expect(PAGE).not.toContain('confirm(')
-    expect(PAGE).toContain('data-qa-open="yPkWe"')
+    expect(PAGE).toContain('designNode="xxKtW"')
   })
 
   it('使用先を確認できた未使用の共通情報だけを確認画面へ進める', () => {
@@ -22,7 +23,7 @@ describe('共通情報の削除確認', () => {
 
   it('削除する名前と件数を題で確認できる', () => {
     expect(PAGE).toContain('「${deleteTargets[0]?.name ?? \'\'}」を削除しますか？')
-    expect(PAGE).toContain('ほか${deleteTargets.length - 1}件を削除しますか？')
+    expect(PAGE).toContain('ほか${deleteTargets.length - 1} 件を削除しますか？')
   })
 
   it('消えるもの・残るもの・元に戻せないことを伝える', () => {
@@ -44,19 +45,19 @@ describe('共通情報の削除確認', () => {
   it('失敗しても窓を閉じず、削除できなかったものだけを残す', () => {
     expect(PAGE).toContain('setDeleteTargets(failed)')
     expect(PAGE).toContain('削除できなかったものだけを残しています。')
-    expect(PAGE).toContain('error={deleteError}')
+    expect(PAGE).toContain('error={deleteBatchError || undefined}')
   })
 
   it('LINEアカウントを切り替えたら前の確認と選択を捨てる', () => {
-    expect(PAGE).toContain('deleteRequestRef.current = {')
+    expect(PAGE).toContain('batchRequestRef.current = {')
     expect(PAGE).toContain('setSelected(new Set())')
     expect(PAGE).toContain('setDeleteTargets([])')
     expect(PAGE).toContain('}, [selectedAccountId])')
   })
 
   it('確認と削除の遅い返事をアカウントと世代の両方で照合する', () => {
-    expect(PAGE).toContain('deleteRequestRef.current.accountId === request.accountId')
-    expect(PAGE).toContain('deleteRequestRef.current.generation === request.generation')
+    expect(PAGE).toContain('batchRequestRef.current.accountId === request.accountId')
+    expect(PAGE).toContain('batchRequestRef.current.generation === request.generation')
     expect(PAGE).toContain('api.commonVars.deleteImpact(id, request.accountId)')
     expect(PAGE).toContain('api.commonVars.delete(target.id, request.accountId, batchReason.trim())')
   })

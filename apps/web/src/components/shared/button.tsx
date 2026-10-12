@@ -9,7 +9,6 @@ import type {
   ReactNode,
 } from 'react'
 import styles from './button.module.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 type CommonProps = {
   /**
@@ -191,7 +190,6 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   }, [done, busy])
 
   const elementRef = useRef<HTMLButtonElement | null>(null)
-  const v8 = useAdminTheme() === 'v8'
   const idleWidthRef = useRef(0)
   const measuredLabelRef = useRef<string | null>(null)
   useLayoutEffect(() => {
@@ -202,12 +200,11 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       return
     }
     // 親の再描画でラベルが変わらなければ、複製・挿入・幅取得を繰り返さない。
-    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, v8, presentation, buttonProps.style, buttonProps.hidden])
+    const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, presentation, buttonProps.style, buttonProps.hidden])
     if (measuredLabelRef.current === measurementKey) return
     measuredLabelRef.current = measurementKey
     el.style.minWidth = ''
     idleWidthRef.current = el.offsetWidth
-    if (!v8) return
     if (widthReserve === 'idle') {
       /*
        * 絵が幅を決めている並び。結果の文字の分を控えず、平常時の文字で幅を決める。

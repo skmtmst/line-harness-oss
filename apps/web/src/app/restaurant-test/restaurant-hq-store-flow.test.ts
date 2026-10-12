@@ -2,14 +2,14 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 // 旧一覧の転送の部品（stores/store-list.tsx）はどこからも読まれないので 2026-10-07 に消した。転送は stores/page.tsx の redirect が担う。
-const wizard = readFileSync(new URL('./stores/new/page.tsx', import.meta.url), 'utf8')
-const terms = readFileSync(new URL('./terms/page.tsx', import.meta.url), 'utf8')
-const banner = readFileSync(new URL('./stores/store-context-banner.tsx', import.meta.url), 'utf8')
+const wizard = readFileSync(new URL('../../v8/restaurant/store-new/store-new.tsx', import.meta.url), 'utf8')
+const terms = readFileSync(new URL('../../v8/restaurant/terms/terms.tsx', import.meta.url), 'utf8')
+const menu = readFileSync(new URL('../../components/hq/account-menu.tsx', import.meta.url), 'utf8')
 const index = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const storesPage = readFileSync(new URL('./stores/page.tsx', import.meta.url), 'utf8')
 const accountsPage = readFileSync(new URL('../accounts/page.tsx', import.meta.url), 'utf8')
 const accountsNewPage = readFileSync(new URL('../accounts/new/page.tsx', import.meta.url), 'utf8')
-const consolePage = readFileSync(new URL('./restaurant-console.tsx', import.meta.url), 'utf8')
+const consolePage = readFileSync(new URL('../../v8/restaurant/booking-kit/shell.tsx', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../lib/restaurant-test-api.ts', import.meta.url), 'utf8')
 const manualLinks = readFileSync(new URL('../../lib/manual-links.ts', import.meta.url), 'utf8')
 
@@ -39,10 +39,10 @@ describe('飲食店向けHQと店舗追加動線', () => {
   it('URLへ店舗識別子を付けず、サーバーセッションAPIで切り替える', () => {
     expect(api).toContain('selectStore:')
     expect(api).toContain('clearStoreSelection:')
-    expect(banner).toContain('を表示しています')
-    expect(banner).toContain('統括に戻る')
-    expect(banner).toContain("router.push('/hq')")
-    expect(banner).not.toContain('?store=')
+    expect(menu).toContain('統括に戻る')
+    expect(menu).toContain('restaurantTestApi.clearStoreSelection(selectedAccountId)')
+    expect(menu).toContain("router.push('/hq')")
+    expect(menu).not.toContain('?store=')
   })
 
   it('規約同意を先頭にした5ステップで、資格情報は2項目だけ入力する', () => {
@@ -50,13 +50,13 @@ describe('飲食店向けHQと店舗追加動線', () => {
       '利用規約への同意',
       '店舗の基本情報',
       'LINE公式アカウントを作る',
-      'Messaging APIを有効にして接続する',
+      'Messaging APIで接続',
       '接続の確認',
       'まずはLINE公式アカウントの登録を行いましょう。',
       'アカウントセットアップ実行',
       'よくある質問',
     ]) expect(wizard).toContain(label)
-    expect(wizard).toContain('ステップ {step} / 5')
+    expect(wizard).toContain('ステップ ${step} / 5')
     expect(wizard).toContain('チャネルID')
     expect(wizard).toContain('チャネルシークレット')
     expect(wizard).not.toContain('チャネルアクセストークン（長期）')
@@ -67,8 +67,8 @@ describe('飲食店向けHQと店舗追加動線', () => {
   it('店舗追加と利用規約の画面名はトップバーだけに置き、戻る導線は本文に残す', () => {
     expect(wizard).toContain("usePageTitle('店舗を追加')")
     expect(terms).toContain("usePageTitle('利用規約')")
-    expect(wizard).toContain('統括へ戻る')
-    expect(terms).toContain('店舗追加へ戻る')
+    expect(wizard).toContain("<Button href=\"/hq\">キャンセル</Button>")
+    expect(terms).toContain("label: '店舗を追加', href: '/restaurant-test/stores/new'")
     expect(wizard).not.toContain("@/components/layout/header")
     expect(terms).not.toContain("@/components/layout/header")
     expect(wizard).not.toContain('<Header')
@@ -85,7 +85,8 @@ describe('飲食店向けHQと店舗追加動線', () => {
 
   it('マニュアルURLをJSXへ直書きせず、空の間は押し口を出さない', () => {
     expect(wizard).toContain('MANUAL_LINKS')
-    expect(wizard).toContain('if (!href) return null')
+    expect(wizard).toContain('return href')
+    expect(wizard).toContain('<Button disabled title=')
     expect(manualLinks).toContain("createOfficialAccount: ''")
     expect(manualLinks).toContain("enableMessagingApi: ''")
     expect(manualLinks).toContain("findChannelCredentials: ''")

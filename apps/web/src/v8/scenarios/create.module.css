@@ -22,7 +22,7 @@
   gap: var(--tpl-section-gap);
   min-width: 0;
 }
-:global([data-theme='v8']) .card {
+:global(:root) .card {
   padding: var(--tpl-sc2-card-pad);
 }
 .cardHead {

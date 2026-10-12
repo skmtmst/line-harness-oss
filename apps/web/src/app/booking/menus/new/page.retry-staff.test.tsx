@@ -24,12 +24,12 @@ const m = vi.hoisted(() => ({
   push: vi.fn(),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
 vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => true }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: m.account }),
 }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: m.push }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: m.push }) }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -40,6 +40,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
       mileage: { rules: async () => ({ success: true, data: [] }) },
     },
     bookingApi: {
+      listMenus: async () => ({ menus: [] }),
+      listResources: async () => ({ data: { resources: [] } }),
+      listStaffMenusBulk: async () => ({ staff: [] }),
+
       createMenu: m.create,
       listStaff: m.staff,
       getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
@@ -72,7 +76,7 @@ beforeEach(() => {
 
 async function fillName() {
   await flush()
-  fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), {
+  fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), {
     target: { value: '検証メニュー' },
   })
 }
@@ -82,21 +86,21 @@ describe('DEEP-16: 担当設定だけが失敗したあとの再実行', () => {
     m.getMatrix.mockRejectedValueOnce(new Error('network'))
     render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByLabelText('担当A'))
+    fireEvent.click(screen.getByRole('button', { name: '担当A' }))
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
 
     // 部分成功を明示する: メニューは作成済み、作成ボタンは再開用に変わる。
-    expect(screen.getByText(/メニューは作成済みですが/)).toBeTruthy()
-    expect(screen.getByText(/新しいメニューは増えません/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'つくって出す' })).toBeNull()
+    expect(screen.getByText(/メニューは保存されましたが/)).toBeTruthy()
+    expect(m.create).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: '保存して公開' })).toBeNull()
     // 部分成功の間は「保存して続けて作る」も出さない（新規作成の再利用をしない）。
     expect(screen.queryByRole('button', { name: '保存して続けて作る' })).toBeNull()
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '担当の設定をやり直す' }))
+      fireEvent.click(screen.getByRole('button', { name: '残りの設定をやり直す' }))
     })
 
     // 作成は1回だけ。再実行は担当設定（get→put）だけをやり直す。
@@ -125,17 +129,17 @@ describe('DEEP-16: 担当設定だけが失敗したあとの再実行', () => {
     })
     render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByLabelText('担当1'))
-    fireEvent.click(screen.getByLabelText('担当2'))
+    fireEvent.click(screen.getByRole('button', { name: '担当1' }))
+    fireEvent.click(screen.getByRole('button', { name: '担当2' }))
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
     expect(m.create).toHaveBeenCalledTimes(1)
 
     m.putMatrix.mockResolvedValue({ ok: true })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '担当の設定をやり直す' }))
+      fireEvent.click(screen.getByRole('button', { name: '残りの設定をやり直す' }))
     })
 
     // 成功した担当1へは再度 put しない。失敗した担当2だけをやり直す。
@@ -150,27 +154,27 @@ describe('DEEP-17: アカウント切替で前の担当を持ち込まない', (
   it('切替後に前アカウントの担当へ割当を送らない', async () => {
     const v = render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByLabelText('担当A'))
+    fireEvent.click(screen.getByRole('button', { name: '担当A' }))
 
     m.account = 'B'
     await act(async () => { v.rerender(<Page />) })
     await flush()
 
     // 前アカウントの担当は候補にも選択にも残らない。
-    expect(screen.queryByLabelText('担当A')).toBeNull()
-    expect((screen.getByLabelText('担当B') as HTMLInputElement).checked).toBe(false)
+    expect(screen.queryByRole('button', { name: '担当A' })).toBeNull()
+    expect(screen.getByRole('button', { name: '担当B' }).getAttribute('aria-pressed')).toBe('false')
 
     // 未選択のまま押しても作らない（0人のメニューを出さない）。
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
     expect(screen.getByText(/担当できる人を1人以上選んでください/)).toBeTruthy()
     expect(m.create).not.toHaveBeenCalled()
 
     // 切替先の担当を選んでから作る。割当は B の担当にだけ行く。
-    fireEvent.click(screen.getByLabelText('担当B'))
+    fireEvent.click(screen.getByRole('button', { name: '担当B' }))
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
     expect(m.create).toHaveBeenCalledWith('B', expect.anything(), expect.any(String))
     expect(m.create).toHaveBeenCalledTimes(1)
@@ -182,11 +186,11 @@ describe('DEEP-17: アカウント切替で前の担当を持ち込まない', (
   it('担当候補の取得が終わるまで作成させない', async () => {
     m.staff.mockImplementation(() => new Promise(() => {}))
     render(<Page />)
-    fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), {
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), {
       target: { value: '検証メニュー' },
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
     expect(screen.getByText(/担当スタッフを読み込んでいます/)).toBeTruthy()
     expect(m.create).not.toHaveBeenCalled()
@@ -196,11 +200,11 @@ describe('DEEP-17: アカウント切替で前の担当を持ち込まない', (
     m.staff.mockRejectedValue(new Error('network'))
     render(<Page />)
     await flush()
-    fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), {
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), {
       target: { value: '検証メニュー' },
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
     expect(screen.getByText(/担当スタッフを読み込めませんでした/)).toBeTruthy()
     expect(m.create).not.toHaveBeenCalled()
@@ -213,16 +217,16 @@ describe('R535: 応答消失後の再送は同じキーで送る', () => {
     m.create.mockRejectedValueOnce(new Error('network'))
     render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByLabelText('担当A'))
+    fireEvent.click(screen.getByRole('button', { name: '担当A' }))
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
     expect(m.create).toHaveBeenCalledTimes(1)
 
     // 失敗しても入力は残り、同じボタンで再送できる。
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
 
     expect(m.create).toHaveBeenCalledTimes(2)
@@ -237,9 +241,9 @@ describe('R535: 応答消失後の再送は同じキーで送る', () => {
   it('アカウントを切り替えるとキーは替わる', async () => {
     const v = render(<Page />)
     await fillName()
-    fireEvent.click(screen.getByLabelText('担当A'))
+    fireEvent.click(screen.getByRole('button', { name: '担当A' }))
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
     const keyA = m.create.mock.calls[0][2]
     expect(typeof keyA).toBe('string')
@@ -247,9 +251,9 @@ describe('R535: 応答消失後の再送は同じキーで送る', () => {
     m.account = 'B'
     await act(async () => { v.rerender(<Page />) })
     await flush()
-    fireEvent.click(screen.getByLabelText('担当B'))
+    fireEvent.click(screen.getByRole('button', { name: '担当B' }))
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'つくって出す' }))
+      fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     })
 
     // 別アカウントは別の作成試行。前のキーを使い回さない。
@@ -270,7 +274,7 @@ describe('R536: 担当候補の取得失敗は画面内で取り直せる', () =
     expect(screen.queryByText(/まだスタッフが登録されていません/)).toBeNull()
     const retry = screen.getByRole('button', { name: '担当をもう一度読み込む' })
 
-    fireEvent.change(screen.getByPlaceholderText('例: トリミング（小型犬）'), {
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), {
       target: { value: '検証メニュー' },
     })
     await act(async () => {
@@ -278,9 +282,9 @@ describe('R536: 担当候補の取得失敗は画面内で取り直せる', () =
     })
 
     // 取り直せたので候補が出る。入力は保たれている。
-    expect(screen.getByLabelText('担当A')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '担当A' })).toBeTruthy()
     expect(
-      (screen.getByPlaceholderText('例: トリミング（小型犬）') as HTMLInputElement).value,
+      (screen.getByPlaceholderText('例：トリミング（小型犬）') as HTMLInputElement).value,
     ).toBe('検証メニュー')
   })
 
@@ -289,7 +293,7 @@ describe('R536: 担当候補の取得失敗は画面内で取り直せる', () =
     render(<Page />)
     await flush()
 
-    expect(screen.getByText(/見る権限がありません/)).toBeTruthy()
+    expect(screen.getByText(/権限がありません/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: '担当をもう一度読み込む' })).toBeNull()
   })
 })

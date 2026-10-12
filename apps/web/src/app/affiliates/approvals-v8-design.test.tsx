@@ -5,6 +5,7 @@
  * - 道具：4つの札＋よく使う絞り込み（1段）
  * - 表頭：決める
  */
+import { AffiliateShell } from '@/v8/affiliates/frame'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
@@ -37,9 +38,13 @@ const ITEMS = [
   },
 ]
 
-vi.mock('@/lib/api', () => ({ api: {} }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
-vi.mock('./tabs', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/api')>(), api: {} }))
+
+vi.mock('@/v8/affiliates/display', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/v8/affiliates/display')>(),
   listAllConversionApprovals: async (status: string) => ({
     items: ITEMS.filter((item) => item.approvalStatus === status),
     truncated: false,
@@ -48,18 +53,11 @@ vi.mock('./tabs', () => ({
   formatYenNullable: (n: number | null) => (n == null ? '—' : `¥${n}`),
 }))
 
-vi.mock('./affiliate-display', () => ({
-  APPROVAL_ORDER_STATUS_TEXT: {},
-  ORDER_DUPLICATE_TITLE: '',
-  REWARD_ENTRY_STATUS_TEXT: {},
-  approvalReviewReasons: () => [],
-  personNameText: (name: string | null) => name ?? '名前なし',
-}))
 
-vi.mock('./attribution-view', () => ({ default: () => null }))
-vi.mock('./bulk-op-wizard', () => ({ default: () => null }))
+vi.mock('@/v8/affiliates/attribution-view', () => ({ default: () => null }))
+vi.mock('@/v8/affiliates/bulk-op', () => ({ default: () => null }))
 
-const { default: ApprovalsTabV8 } = await import('./v8-approvals-tab')
+const { default: ApprovalsTabV8 } = await import('@/v8/affiliates/approvals')
 
 afterEach(() => {
   cleanup()
@@ -67,7 +65,7 @@ afterEach(() => {
 
 describe('OylSV 成果承認タブの絵合わせ', () => {
   test('数の帯が絵どおり', async () => {
-    render(<ApprovalsTabV8 canEdit registerHeaderActions={() => {}} />)
+    render(<AffiliateShell.Provider value={{ tab: 'approvals', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><ApprovalsTabV8 /></AffiliateShell.Provider>)
     await waitFor(() => {
       expect(screen.getAllByText('承認待ち').length).toBeGreaterThan(0)
     })
@@ -78,7 +76,7 @@ describe('OylSV 成果承認タブの絵合わせ', () => {
   })
 
   test('道具が1段で札と絞り込みがそろう', async () => {
-    render(<ApprovalsTabV8 canEdit registerHeaderActions={() => {}} />)
+    render(<AffiliateShell.Provider value={{ tab: 'approvals', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><ApprovalsTabV8 /></AffiliateShell.Provider>)
     await waitFor(() => {
       expect(screen.getByLabelText('よく使う絞り込み')).toBeTruthy()
     })
@@ -90,7 +88,7 @@ describe('OylSV 成果承認タブの絵合わせ', () => {
   })
 
   test('表頭が決める', async () => {
-    render(<ApprovalsTabV8 canEdit registerHeaderActions={() => {}} />)
+    render(<AffiliateShell.Provider value={{ tab: 'approvals', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><ApprovalsTabV8 /></AffiliateShell.Provider>)
     await waitFor(() => {
       expect(screen.getByText('決める')).toBeTruthy()
     })

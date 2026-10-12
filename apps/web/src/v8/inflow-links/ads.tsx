@@ -105,6 +105,21 @@ function platformLabel(platform: Pick<AdPlatform, 'name' | 'displayName'>): stri
   return PROVIDERS.find((provider) => provider.key === platform.name)?.label ?? platform.displayName ?? platform.name
 }
 
+/** 以前の設定の金額は、費用の記録と混ぜず媒体の同じ補足で確認できる。 */
+function legacyMonthlyCost(platform: AdPlatform | undefined, rows: AdCostRow[]): string | null {
+  if (!platform || rows.some((row) => row.adPlatformId === platform.id)) return null
+  const amount = platform.config.monthly_cost
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return null
+  const rawCurrency = platform.config.currency
+  const currency = typeof rawCurrency === 'string' ? rawCurrency.trim().toUpperCase() : ''
+  if (!/^[A-Z]{3}$/.test(currency)) return '以前の設定：通貨を確認（通貨は未設定）'
+  try {
+    return `以前の設定：${new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(amount)}（費用の記録とは別）`
+  } catch {
+    return '以前の設定：通貨を確認（通貨は未設定）'
+  }
+}
+
 export default function AdsV8() {
   const saveErrors = useSaveFormErrors()
   usePageTitle('広告連携')
@@ -384,6 +399,7 @@ export default function AdsV8() {
               const active = platform?.isActive === true
               const status = platform ? costPlatforms.find((item) => item.id === platform.id) : undefined
               const synced = shortJst(status?.lastSuccessAt) ?? shortJst(platform?.config.synced_at)
+              const legacyCost = legacyMonthlyCost(platform, costRows)
               const Icon = provider.icon
               return (
                 <div key={provider.key} className={styles.provider} role="listitem">
@@ -394,8 +410,8 @@ export default function AdsV8() {
                       ? <StatusBadge tone="success" size="compact">つないでいる</StatusBadge>
                       : <StatusBadge tone="neutral" size="compact">未接続</StatusBadge>}
                   </div>
-                  <p className={styles.providerSub} title={status?.lastRunStatus === 'failed' && status.lastError ? `直近は取り込めませんでした（${status.lastError}）` : undefined}>
-                    {active ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動` : 'つなぐと費用とクリックを毎日取り込みます'}
+                  <p className={styles.providerSub} title={status?.lastRunStatus === 'failed' && status.lastError ? `直近は取り込めませんでした（${status.lastError}）` : legacyCost ?? undefined}>
+                    {legacyCost ?? (active ? `最後の取り込み ${synced ?? emptyValue('unknown')}・毎日自動` : 'つなぐと費用とクリックを毎日取り込みます')}
                   </p>
                   {manage ? (
                     <span>

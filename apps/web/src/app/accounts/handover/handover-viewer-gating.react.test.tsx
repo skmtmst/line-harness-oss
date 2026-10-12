@@ -35,11 +35,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams('id=account-1'),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -90,6 +90,7 @@ beforeEach(() => {
     success: true,
     data: [account, { id: 'account-2', name: '支店', channelId: 'ch-2' }],
   }))
+  document.documentElement.dataset.theme='v8'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -97,7 +98,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
-  host.remove()
+  host.remove(); delete document.documentElement.dataset.theme
 })
 
 async function flush() {
@@ -149,13 +150,13 @@ describe('R522 引き継ぎの出し分け（役割×操作）', () => {
 
     const labels = buttons()
     expect(labels).not.toContain('事前確認をやり直す')
-    expect(labels).not.toContain('本実行へ進む')
-    expect(labels).not.toContain('引き継ぎを取り消す')
+    expect(labels).not.toContain('本実行する（あと 1 人）')
+    expect(labels).not.toContain('引き継ぎをやめる')
     expect(labels).not.toContain('判断を保存する')
     // 要確認の行は決めた内容だけ見せ、書き換えの選択肢は出さない。
     // 判断の選択肢は共通 Select（button＋listbox）で描く。
     expect(host.textContent).toContain('同じ人')
-    expect(host.querySelector('button[aria-label="この人の判断"]')).toBeNull()
+    expect(host.querySelector('button[aria-label="山田の判断"]')).toBeNull()
     expect(host.textContent).toContain('引き継ぎの変更はオーナーと管理者だけができます')
   })
 
@@ -168,10 +169,13 @@ describe('R522 引き継ぎの出し分け（役割×操作）', () => {
     })
     await flush()
 
+    await act(async () => { [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === '申告の数を入れる')!.click() })
     const labels = buttons()
     expect(labels).toContain('事前確認をやり直す')
-    expect(labels).toContain('本実行へ進む')
-    expect(labels).toContain('引き継ぎを取り消す')
-    expect(host.querySelector('button[aria-label="この人の判断"]')).not.toBeNull()
+    expect(labels).toContain('本実行する（あと 1 人）')
+    expect(labels).toContain('引き継ぎをやめる')
+    expect(host.querySelector('button[aria-label="山田の判断"]')).not.toBeNull()
   })
 })
+
+vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId:'account-1',selectedAccount:{id:'account-1',name:'Fixture'},accounts:[],loading:false})}))

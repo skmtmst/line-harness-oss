@@ -27,7 +27,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-import FileScanStoppedBanner from './file-scan-stopped-banner'
+import FileScanStoppedBanner from '@/v8/contents/file-scan-stopped-banner'
 
 afterEach(() => cleanup())
 

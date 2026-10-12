@@ -2,7 +2,7 @@
 /*
  * 友だち一覧の窓（M10・V8のみ）。
  * - 机・2,000行：窓の内側だけ描く（全部描かない）
- * - v7：今までどおり全部描く
+ * - 旧テーマの属性が残っていてもV8の窓で描く
  * - 選んだ行：窓の中は印付き・選び自体は外の Set（崩さない）
  */
 import { cleanup, render, screen } from '@testing-library/react'
@@ -75,11 +75,18 @@ describe('友だち一覧の窓', () => {
     }
   })
 
-  it('v7は今までどおり全部描く', () => {
-    const list = friends(70)
-    const { container } = render(<FriendListTable {...tableProps(list)} />)
-    expect(container.querySelector('[data-virtual-index]')).toBeNull()
-    expect(container.querySelectorAll('.contents').length).toBe(70)
+  it('旧テーマ属性を置いても机の多い行はV8の窓で描く', () => {
+    document.documentElement.dataset.theme = 'v7'
+    desktop()
+    try {
+      const list = friends(70)
+      const { container } = render(<FriendListTable {...tableProps(list)} />)
+      const windows = container.querySelectorAll('[data-virtual-index]')
+      expect(windows.length).toBeGreaterThan(0)
+      expect(windows.length).toBeLessThan(70)
+    } finally {
+      delete document.documentElement.dataset.theme
+    }
   })
 
   it('選んだ行の印は窓の中でも付く', () => {

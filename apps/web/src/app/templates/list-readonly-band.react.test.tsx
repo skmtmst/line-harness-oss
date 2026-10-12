@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
  * V8 一覧の閲覧のみの帯（`hEDTK`）。staff（変えられない人）には
- * 見出しの下に青い帯「閲覧のみで見ています。変える操作は管理者に頼んでください。」
+ * 見出しの下に青い帯「閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。」
  * が出る。owner/admin には出ない。
  */
 
@@ -42,11 +42,11 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-import TemplatesListV8 from './list-v8'
+import TemplatesListV8 from '@/v8/templates/list'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const BAND = '閲覧のみで見ています。変える操作は管理者に頼んでください。'
+const BAND = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'

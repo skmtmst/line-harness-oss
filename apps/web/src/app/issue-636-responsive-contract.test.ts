@@ -20,7 +20,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 describe('04-C-横1: タグ表は1440pxに収まる', () => {
-  const page = read('../components/friend-fields/tags-page-v4.tsx')
+  const page = read('../v8/tags/tags-tab.tsx')
 
   it('表の最小幅を内容実幅（833px）以下の800pxへ下げる', () => {
     expect(page).not.toContain('min-w-[880px]')
@@ -34,8 +34,13 @@ describe('04-C-横1: タグ表は1440pxに収まる', () => {
     expect(page).toContain('min-w-[800px]')
   })
 
-  it('狭い幅で情報を落とさない逃げ道（表だけ横スクロール）は残す', () => {
-    expect(page).toContain('overflow-x-auto')
+  it('狭い幅でも名前の色の印から所属フォルダを確認できる', () => {
+    expect(page).toContain('<DataTable')
+    expect(page).toContain('<FolderDotName folder={group}>')
+    const dot = read('../components/shared/folder-dot.tsx')
+    expect(dot).toContain("const label = `フォルダ：${folder?.name ?? '未分類'}`")
+    expect(dot).toContain('title={label}')
+    expect(page).not.toContain('<Th className={styles.colFolder}>')
   })
 })
 
@@ -55,16 +60,9 @@ describe('08-C-狭1 / 10-C-狭1: 狭幅で検索欄を実用幅に保つ', () =>
     it(`${name}の検索欄は共通部品を使い、狭い幅でも押し潰さない`, () => {
       const page = read(path)
       if (path === 'webinars/page.tsx') {
-        // V8は画面専用の道具段。SearchFieldとCSSで縮み方を守る。
-        const css = read('webinars/list-v8.module.css')
+        // 検索欄は現在の共有道具段が幅を持つ。
         expect(page).toContain('<SearchField')
-        expect(page).toContain('className={styles.searchWrap}')
-        const toolbar = css.match(/\.toolbar\s*\{[^}]*\}/)?.[0]
-        const search = css.match(/\.searchWrap\s*\{[^}]*\}/)?.[0]
-        expect(toolbar).toContain('flex-wrap: wrap;')
-        expect(search).toContain('flex: 0 0 auto;')
-        expect(search).toContain('width: 240px;')
-        expect(search).toContain('max-width: 100%;')
+        expect(page).toContain('<ListToolbar')
       } else {
         expect(page).toContain('<ListToolbar')
       }

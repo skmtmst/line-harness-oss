@@ -19,6 +19,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useBookingEdit } from './lib/edit-permission'
 import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
@@ -37,6 +38,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import { isSaveConflict } from '@/components/shared/api-error-message'
 
 /**
  * ★V8「予約メニューを作る」（板 QqER7・競合時 v5L19Z）。
@@ -52,6 +54,10 @@ import Notice from '@/components/shared/notice'
  * 409 は板 v5L19Z の帯を出し、「違いを比べる」「最新を読み込んで続ける」
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
+
+function resourceSignature(ids: Iterable<string>, quantities: Record<string, string>) {
+  return JSON.stringify([...ids].sort().map((id) => [id, quantities[id] ?? '1']))
+}
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -131,6 +137,7 @@ export default function MenuFormV8() {
     : null
 
   const canEdit = useBookingEdit('/booking/menus')
+  const canManageResources = usePermissionAccess('booking.settings')
 
   /* ---- 読み込むデータ ---- */
   const [menus, setMenus] = useState<BookingMenu[]>([])
@@ -170,6 +177,10 @@ export default function MenuFormV8() {
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [autoTagId, setAutoTagId] = useState<string | null>(null)
   const [resourceIds, setResourceIds] = useState<Set<string>>(new Set())
+  const [resourceQuantities, setResourceQuantities] = useState<Record<string, string>>({})
+  const [resourceSaving, setResourceSaving] = useState(false)
+  const [resourceMessage, setResourceMessage] = useState<string | null>(null)
+  const resourceSubmitRef = useRef<number | null>(null)
 
   /* ---- 保存・競合 ---- */
   const [saving, setSaving] = useState<null | 'draft' | 'publish' | 'conflict'>(null)
@@ -220,6 +231,7 @@ export default function MenuFormV8() {
     setIntakeQuestion(menu.intake_question ?? '')
     setAutoTagId(menu.auto_tag_id)
     setResourceIds(new Set((menu.assigned_resources ?? []).map((item) => item.resourceId)))
+    setResourceQuantities(Object.fromEntries((menu.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)])))
     const ids = new Set<string>()
     for (const [staffId, matrix] of Object.entries(matrices)) {
       if (matrix.some((row) => row.menu_id === menu.id && row.is_offered)) ids.add(staffId)
@@ -236,7 +248,7 @@ export default function MenuFormV8() {
       menu.cutoff_hours_before != null ? String(menu.cutoff_hours_before) : '',
       menu.cancel_deadline_hours_before != null ? String(menu.cancel_deadline_hours_before) : '',
       Boolean(menu.intake_question), menu.intake_question ?? '', menu.auto_tag_id,
-      [...ids].sort().join(','), [...(menu.assigned_resources ?? []).map((item) => item.resourceId)].sort().join(','),
+      [...ids].sort().join(','), resourceSignature((menu.assigned_resources ?? []).map((item) => item.resourceId), Object.fromEntries((menu.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)]))),
       optionalHit,
     ])
   }, [])
@@ -316,6 +328,7 @@ export default function MenuFormV8() {
 
   useEffect(() => {
     void loadAll()
+    return () => { generationRef.current += 1 }
   }, [loadAll])
 
   /* タグ候補（このアカウントの有効なものだけ）。失敗してもタグなし保存は止めない。 */
@@ -362,6 +375,9 @@ export default function MenuFormV8() {
     setComparing(false)
     setAssigned(new Set())
     setResourceIds(new Set())
+    setResourceQuantities({})
+    setResourceSaving(false)
+    setResourceMessage(null)
     setAutoTagId(null)
     setNoAssign(false)
   }, [selectedAccountId])
@@ -381,9 +397,14 @@ export default function MenuFormV8() {
   const tagCandidates = tags.filter(
     (tag) => (tag.lineAccountId == null || tag.lineAccountId === selectedAccountId) && tag.status !== 'archived',
   )
+  const unavailableTag = tagStatus === 'ready' && autoTagId !== null && !tagCandidates.some((tag) => tag.id === autoTagId)
+  const unavailableTagName = tags.find((tag) => tag.id === autoTagId)?.name ?? '設定されていたタグ'
 
   const assignedIds = [...assigned].filter((id) => staff.some((person) => person.id === id))
-  const activeResources = resources.filter((item) => item.isActive)
+  const activeResources = resources.filter((item) => item.isActive || resourceIds.has(item.id))
+  const resourceChoices = [...activeResources, ...(editTarget?.assigned_resources ?? [])
+    .filter((item) => !resources.some((candidate) => candidate.id === item.resourceId))
+    .map((item) => ({ id: item.resourceId, name: item.name, isActive: false }))]
 
   const effectiveCategory = categoryPicking ? categoryNew.trim() : categoryLabel.trim()
   const draftMenu: DraftMenu = {
@@ -407,7 +428,7 @@ export default function MenuFormV8() {
     name, effectiveCategory, description, durationMinutes, basePrice, concurrentCapacity,
     bufferAfterMinutes, ownRules, windowDays, cutoffHours, cancelDeadlineHours,
     askQuestion, intakeQuestion, autoTagId,
-    [...assigned].sort().join(','), [...resourceIds].sort().join(','), noAssign,
+    [...assigned].sort().join(','), resourceSignature(resourceIds, resourceQuantities), noAssign,
   ])
   const dirty = baselineRef.current !== '' && baselineRef.current !== currentSignature ||
     (baselineRef.current === '' && Boolean(
@@ -453,6 +474,9 @@ export default function MenuFormV8() {
   }
 
   function toggleResource(id: string) {
+    if (editTarget && (!canManageResources || resourceSaving || saving)) return
+    setResourceMessage(null)
+    if (!resourceIds.has(id)) setResourceQuantities((current) => ({ ...current, [id]: '1' }))
     setResourceIds((current) => {
       const next = new Set(current)
       if (next.has(id)) next.delete(id)
@@ -465,6 +489,7 @@ export default function MenuFormV8() {
     if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
     if (staffStatus === 'loading') return '担当スタッフを読み込んでいます。読み込みが終わってから保存してください'
     if (staffStatus === 'error') return '担当スタッフを読み込めませんでした。読み直してから保存してください'
+    if ([...resourceIds].some((id) => !Number.isInteger(Number(resourceQuantities[id] ?? '1')) || Number(resourceQuantities[id] ?? '1') < 1 || Number(resourceQuantities[id] ?? '1') > 1000)) return '必要数は1〜1000の整数で入力してください。'
     return bookingMenuError({
       name,
       durationMinutes,
@@ -549,18 +574,66 @@ export default function MenuFormV8() {
   }
 
   async function writeResources(menuId: string, expectedVersion: number): Promise<number> {
-    const selected = [...resourceIds].map((resourceId) => ({ resourceId, quantity: 1 }))
-    const before = (editTarget?.assigned_resources ?? [])
-      .map((item) => item.resourceId)
-      .sort()
-      .join(',')
-    const after = [...resourceIds].sort().join(',')
+    const selected = [...resourceIds].map((resourceId) => ({ resourceId, quantity: Number(resourceQuantities[resourceId] ?? '1') }))
+    const before = resourceSignature((editTarget?.assigned_resources ?? []).map((item) => item.resourceId), Object.fromEntries((editTarget?.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)])))
+    const after = resourceSignature(resourceIds, resourceQuantities)
     if (before === after && editTarget) return expectedVersion
     const response = await bookingApi.saveMenuResources(selectedAccountId!, menuId, {
       expectedVersion,
       resources: selected,
     })
     return response.data.version
+  }
+
+  // 旧編集窓の設備だけの保存を維持する。他の入力・担当は保存しない。
+  async function submitResources() {
+    const generation = generationRef.current
+    if (resourceSubmitRef.current === generation || saving || !canManageResources || !selectedAccountId || !editTarget) return
+    const expectedVersion = editTarget.version
+    if (!Number.isInteger(expectedVersion) || Number(expectedVersion) < 1) {
+      setResourceMessage('最新のメニュー情報を読み直してから、もう一度お試しください。')
+      return
+    }
+    const selected = [...resourceIds].map((resourceId) => ({ resourceId, quantity: Number(resourceQuantities[resourceId] ?? '1') }))
+    if (selected.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000)) {
+      setResourceMessage('必要数は1〜1000の整数で入力してください。')
+      return
+    }
+    const signature = resourceSignature(resourceIds, resourceQuantities)
+    resourceSubmitRef.current = generation
+    setResourceSaving(true)
+    setResourceMessage(null)
+    try {
+      const response = await bookingApi.saveMenuResources(selectedAccountId, editTarget.id, { expectedVersion: Number(expectedVersion), resources: selected })
+      if (generationRef.current !== generation) return
+      const assignedResources = selected.map((item) => {
+        const candidate = resources.find((resource) => resource.id === item.resourceId)
+          ?? editTarget.assigned_resources?.find((resource) => resource.resourceId === item.resourceId)
+        return {
+          menuId: editTarget.id, resourceId: item.resourceId, name: candidate?.name ?? '不明な設備',
+          type: candidate?.type ?? '', capacity: candidate?.capacity ?? item.quantity, quantity: item.quantity,
+          isActive: candidate?.isActive ?? false,
+          warning: candidate?.isActive ? null : 'resource_inactive' as const,
+        }
+      })
+      setEditTarget((current) => current && ({ ...current, version: response.data.version, assigned_resources: assignedResources }))
+      // 設備だけを保存しても、名前などの未保存の変更は残す。
+      if (baselineRef.current) {
+        const baseline = JSON.parse(baselineRef.current) as unknown[]
+        baseline[15] = signature
+        baselineRef.current = JSON.stringify(baseline)
+      }
+      setResourceMessage('設備の割当を保存しました。新しい予約枠から反映されます。')
+    } catch (error) {
+      if (generationRef.current !== generation) return
+      const fieldFailure = saveErrors.capture(error)
+      if (!fieldFailure) setResourceMessage(isSaveConflict(error)
+        ? 'ほかの担当者が先に保存しました。最新の内容を読み直してください。'
+        : '設備の割当を保存できませんでした。入力は残っています。もう一度お試しください。')
+    } finally {
+      if (resourceSubmitRef.current === generation) resourceSubmitRef.current = null
+      if (generationRef.current === generation) setResourceSaving(false)
+    }
   }
 
   function menuBody(publish: boolean): Partial<BookingMenu> {
@@ -608,7 +681,7 @@ export default function MenuFormV8() {
   }
 
   async function save(publish: boolean, overwrite = false) {
-    if (!selectedAccountId || saving) return
+    if (!selectedAccountId || saving || resourceSubmitRef.current === generationRef.current) return
     setSaveError(null)
     const validationError = validate()
     if (validationError) {
@@ -682,7 +755,7 @@ export default function MenuFormV8() {
       /* 設備（選んだときだけ）。 */
       // WEB063：設備は「選んだときだけ」ではなく、前と変わったときに保存する（全部外したときも）。
       const resourcesChanged = editTarget
-        ? [...(editTarget.assigned_resources ?? []).map((item) => item.resourceId)].sort().join(',') !== [...resourceIds].sort().join(',')
+        ? resourceSignature((editTarget.assigned_resources ?? []).map((item) => item.resourceId), Object.fromEntries((editTarget.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)]))) !== resourceSignature(resourceIds, resourceQuantities)
         : resourceIds.size > 0
       let resourcesPending = createdMenuNeedingFollowUp?.resourcesPending ?? resourcesChanged
       if (resourcesPending && version >= 1) {
@@ -891,7 +964,7 @@ export default function MenuFormV8() {
             <div className={styles.grid3}>
               <span className={styles.labelSmall}>かかる時間</span>
               <span className={styles.labelSmall}>金額（空なら「お問い合わせ」）</span>
-              <span className={styles.labelSmall}>予約したときのマイル</span>
+              <span className={styles.labelSmall}>予約したときのマイル <TextLink external href="/mileage?tab=earning-rules">設定を見る</TextLink></span>
               <span className={styles.unitField}>
                 <SaveErrorField names={["durationMinutes","duration_minutes"]}><NumberInput unit="分"
                   type="number"
@@ -1102,6 +1175,8 @@ export default function MenuFormV8() {
 
             <div className={styles.subSection}>
               <h2 className={styles.subTitle}>予約を受けたときにすること</h2>
+              <p className="text-ink-faint text-sm">予約を受け付けたことを知らせる：日時・メニュー・場所を書いた案内をLINEへ送ります。</p>
+              <p className="text-ink-faint text-sm">前日・開始前に思い出してもらう：確定した予約は、前日と設定時間前のリマインダへ登録されます。</p>
               {tagStatus === 'loading' ? (
                 <span className="inline-block w-full" aria-busy="true">
                   <span className="sr-only">タグを読み込んでいます</span>
@@ -1109,7 +1184,7 @@ export default function MenuFormV8() {
                 </span>
               ) : tagStatus === 'error' ? (
                 <p className="text-ink-faint text-sm">タグを読み込めませんでした。タグなしで保存できます。</p>
-              ) : tagCandidates.length === 0 ? (
+              ) : tagCandidates.length === 0 && autoTagId === null ? (
                 <p className="text-ink-faint text-sm">このアカウントに使えるタグがありません。タグなしで保存できます。</p>
               ) : (
                 /* 打って絞り込める1つ選び（タグが多いアカウントでも探せる）。 */
@@ -1119,9 +1194,13 @@ export default function MenuFormV8() {
                   onChange={(value) => setAutoTagId(value === '' ? null : value)}
                   placeholder="付けるタグ：なし"
                   /* 「なし」は候補に入れず、空のときの見出し（placeholder）と × で表す。 */
-                  options={tagCandidates.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `付けるタグ：${tag.name}` }))}
+                  options={[
+                    ...tagCandidates.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: `付けるタグ：${tag.name}` })),
+                    ...(unavailableTag ? [{ value: autoTagId!, label: `付けるタグ：${unavailableTagName}（今は使えません）`, disabled: true }] : []),
+                  ]}
                 /></SaveErrorField>
               )}
+              {unavailableTag && <Notice tone="warn" role="alert">設定されていたタグは整理済みか、このアカウントのタグではありません。選び直すか「なし」にしてください。</Notice>}
               <div className={styles.toggleLineLead}>
                 <SaveErrorField names={["askQuestion","ask_question"]}><SettingCheckbox
                   label="予約するときに質問を出す"
@@ -1151,27 +1230,43 @@ export default function MenuFormV8() {
                 </span>
               ) : resourcesStatus === 'error' ? (
                 <p className="text-ink-faint text-sm">設備を読み込めませんでした。選ばずに保存できます。</p>
-              ) : activeResources.length === 0 ? (
+              ) : resourceChoices.length === 0 ? (
                 <p className="text-ink-faint text-sm">使える設備はまだありません。受付枠の設備から登録できます。</p>
               ) : (
                 <div className={styles.checkRow}>
-                  {activeResources.map((item) => {
+                  {resourceChoices.map((item) => {
                     const on = resourceIds.has(item.id)
                     return (
                       <button
                         key={item.id}
                         type="button"
                         aria-pressed={on}
+                        disabled={Boolean(editTarget && (!canManageResources || resourceSaving || saving || !item.isActive && !on))}
                         className={`${styles.check} ${on ? styles.checkOn : ''}`}
                         onClick={() => toggleResource(item.id)}
                       >
                         <span className={styles.checkBox} aria-hidden="true">{checkMark}</span>
-                        {item.name}
+                        {item.name}{!item.isActive ? '（停止中）' : ''}
                       </button>
                     )
                   })}
                 </div>
               )}
+              {editTarget && resourceChoices.filter((item) => resourceIds.has(item.id)).map((item) => (
+                <Field key={item.id} label={`${item.name}の必要数`}>
+                  <SaveErrorField names={[`resources.${[...resourceIds].indexOf(item.id)}.quantity`]}><NumberInput unit="個" type="number" min={1} max={1000} step={1}
+                    aria-label={`${item.name}の必要数`} value={resourceQuantities[item.id] ?? '1'}
+                    disabled={!canManageResources || resourceSaving || saving !== null || !item.isActive}
+                    onChange={(event) => {
+                      setResourceMessage(null)
+                      setResourceQuantities((current) => ({ ...current, [item.id]: event.target.value }))
+                    }} /></SaveErrorField>
+                </Field>
+              ))}
+              {editTarget && (canManageResources ? (
+                <Button variant="secondary" size="compact" busy={resourceSaving} disabled={resourceSaving || saving !== null || resourcesStatus !== 'ready'} onClick={() => void submitResources()}>設備の割当を保存する</Button>
+              ) : <p className="text-ink-faint text-sm">設備の割当は閲覧のみです。変更は管理者へ依頼してください。</p>)}
+              {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
             </div>
 
             <div className={styles.payHead}>
@@ -1231,7 +1326,7 @@ export default function MenuFormV8() {
               <Button onClick={() => guarded(() => router.push('/booking/menus'))}>キャンセル</Button>
               {!editTarget && (
                 <Button
-                  disabled={saving !== null}
+                  disabled={saving !== null || resourceSaving}
                   busy={saving === 'draft'}
                   onClick={() => void save(false)}
                 >
@@ -1240,7 +1335,7 @@ export default function MenuFormV8() {
               )}
               <Button
                 variant="primary"
-                disabled={saving !== null}
+                disabled={saving !== null || resourceSaving}
                 busy={saving !== null}
                 onClick={() => void save(true, Boolean(conflict))}
               >

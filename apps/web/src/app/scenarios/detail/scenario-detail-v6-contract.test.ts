@@ -1,4 +1,6 @@
-import fs from 'node:fs'
+import nodeFs from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
+const fs = { ...nodeFs, readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -18,7 +20,7 @@ const DIALOGS = fs.readFileSync(
 describe('V6 シナリオ編集の契約', () => {
   it('上部の一括テスト送信を既存の全通テスト送信へ接続する', () => {
     expect(PAGE).toContain(
-      "onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}",
+      "onClick={() => setTestSend({ stepId: null, label: 'すべての通' })}",
     )
     expect(PAGE).not.toContain('一括テスト送信は準備中です')
     expect(PAGE).toContain('lineAccountId={scenario?.lineAccountId ?? null}')
@@ -46,10 +48,10 @@ describe('V6 シナリオ編集の契約', () => {
     // 候補に無い保存値は消さず「名前を確認できません」として残し、理由を示す。
     expect(PAGE).toContain('editFolderMissing')
     expect(PAGE).toContain('名前を確認できません')
-    expect(PAGE).toContain('このアカウントの候補にありません')
+    expect(PAGE).toContain('いま入っているフォルダが見つかりません')
     // 候補を取り直せないあいだは変更を止める（別範囲の値を黙って保存しない）。
     expect(PAGE).toContain("disabled={folderState !== 'ready'}")
-    expect(PAGE).toContain('フォルダを確認できないため、いまは変更できません。')
+    expect(PAGE).toContain('フォルダ一覧を読み込めませんでした。')
   })
 
   it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {

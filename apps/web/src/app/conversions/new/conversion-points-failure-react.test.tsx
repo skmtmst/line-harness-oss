@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
 import NewConversionPage from './page'
 
 /*
@@ -17,7 +17,8 @@ const st = vi.hoisted(() => ({
   points: [] as Array<{ name: string; lineAccountId: string | null }>,
 }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     selectedAccountId: st.accountId,
@@ -129,11 +130,11 @@ describe('R597 同名確認の取得失敗は明示して再試行を付ける',
     st.pointsMode = 'error'
     await render()
     await typeName('商品を買った')
-    expect(host.textContent).not.toContain('同じ名前の「商品を買った」があります')
+    expect(host.textContent).not.toContain('同じ名前の「商品を買った」がすでにあります')
     st.pointsMode = 'ok'
     st.points = [{ name: '商品を買った', lineAccountId: 'account-a' }]
     await clickRetry()
-    expect(host.textContent).toContain('同じ名前の「商品を買った」があります')
+    expect(host.textContent).toContain('同じ名前の「商品を買った」がすでにあります')
     expect(host.textContent).not.toContain('同じ名前があるか確認できませんでした')
   })
 
@@ -141,7 +142,7 @@ describe('R597 同名確認の取得失敗は明示して再試行を付ける',
     st.points = [{ name: '商品を買った', lineAccountId: 'account-a' }]
     await render()
     await typeName('商品を買った')
-    expect(host.textContent).toContain('同じ名前の「商品を買った」があります')
+    expect(host.textContent).toContain('同じ名前の「商品を買った」がすでにあります')
     expect(host.textContent).not.toContain('同じ名前があるか確認できませんでした')
   })
 })

@@ -20,7 +20,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 /*
  * ★V8「友だち情報欄を編集」（Pencil `w9zY5` の編集の形）の入口。
  *
- * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/edit-field-page-v8.tsx）と同じ。
+ * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/src/v8/tags/field-edit.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/edit?id=<項目>`。
  */
 

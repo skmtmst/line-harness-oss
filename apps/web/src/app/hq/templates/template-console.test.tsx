@@ -3,7 +3,7 @@ import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import TemplateConsole, { resolvedItems } from './template-console'
+import TemplateConsole, { resolvedItems } from '@/test-utils/hq-template-console'
 import type { Preflight, TemplateDefinition, TemplateType } from '@/lib/hq-templates-api'
 
 const calls = vi.hoisted(() => Object.fromEntries(['uploadImage','deleteImage','context','list','accounts','get','create','update','remove','preflight','distribute','result'].map(key => [key, vi.fn()])))
@@ -409,5 +409,3 @@ vi.mock('@/v8/hq-templates/tag-editor', () => ({ default: function TagEditor({ d
   const next = { ...definition, tag: { ...definition.tag, name } }
   return <>{notice ? <p role="status">{notice}</p> : null}<label>ひな形の名前<input value={name} disabled={saving} onChange={e => setName(e.target.value)} /></label><label>説明<textarea disabled={saving} /></label>{error ? <p role="alert">{error}</p> : null}{conflict ? <button onClick={onReloadLatest}>最新の内容を読み込む</button> : null}<button disabled={saving} onClick={onCancel}>キャンセル</button><button disabled={saving || !name.trim()} onClick={() => onSaveDraft(next)}>下書きを保存</button><button disabled={saving || !name.trim()} onClick={() => onSave(next)}>保存する</button></>
 } }))
-
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))

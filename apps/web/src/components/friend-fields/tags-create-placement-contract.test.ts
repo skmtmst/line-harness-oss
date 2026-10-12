@@ -1,31 +1,20 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const SRC = readFileSync(join(HERE, 'tags-page-v4.tsx'), 'utf8')
+const read = (path: string) => readFileSync(resolve(process.cwd(), 'src', path), 'utf8')
+const body = read('v8/tags/tags-tab.tsx')
+const root = read('v8/tags/list.tsx')
 
-/*
- * 作るボタンの置き場所の決まり：普段使う作る操作は、一覧のすぐ上の
- * 左の操作の並びにまとめる。見出しの行の右端には置かない。
- * タグ画面では「フォルダを追加」（副）の横に「＋ タグを作る」（主）を
- * 並べ、タブ行の右端にはたまにしか使わない CSV だけを残す。
- */
-describe('タグ画面の作る操作の置き場所', () => {
-  it('「フォルダを追加」と「＋ タグを作る」が同じ並びに隣り合う', () => {
-    const at = SRC.indexOf('href="/tags/folders/new">フォルダを追加')
-    expect(at).toBeGreaterThan(-1)
-    const row = SRC.slice(at, at + 400)
-    // 注記ではなく押せるボタンの実体が隣にあること。
-    expect(row).toContain('<Button href="/tags/new" variant="primary">＋ タグを作る</Button>')
+describe('V8タグ画面の作る操作の置き場所', () => {
+  it('作る操作はフォルダ欄にまとめ、畳まれた幅にも入口を出す', () => {
+    expect(body).toContain('createAction={createButton(true)}')
+    expect(body).toContain('{createButton(false)}')
+    expect(body).toContain('addFolderLabel="フォルダを追加"')
+    expect(body).toContain('<Button href="/tags/new" variant="primary"')
   })
-
-  it('タブ行の右端には CSV で一括登録だけが残る', () => {
-    const actions = SRC.slice(
-      SRC.indexOf('actions={currentTabBlocked'),
-      SRC.indexOf("tab === 'marks'"),
-    )
+  it('見出しの右にはCSVで一括登録を置く', () => {
+    const actions = root.slice(root.indexOf('const actions ='), root.indexOf("tab === 'marks' ? (", root.indexOf('const actions =')))
     expect(actions).toContain('CSVで一括登録')
     expect(actions).not.toContain('/tags/new')
   })

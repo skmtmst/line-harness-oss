@@ -1,6 +1,6 @@
 # 流入と計測の一覧（V8）の動き
 
-入口：`app/inflow-links/page.tsx`（V8 で「流入経路」のとき＝`?tab` なし／`?tab=links` だけ `src/v8/inflow-links/list.tsx`。それ以外は今のまま）。
+入口：`app/inflow-links/page.tsx`（`?tab` なし／`?tab=links` は `src/v8/inflow-links/list.tsx`。全経路をV8に固定）。
 絵：一覧 `xbHxg`・1152 `y1ztx`・閲覧のみ `EMUl9`・QR コードの小窓 `GtI4Y`。
 
 ## 受け付ける URL と指定
@@ -37,7 +37,7 @@
 
 # 流入と計測の詳細（V8・detail.tsx・板 Q5le3）
 
-入口：`app/inflow-links/detail/page.tsx`（V8 のときだけ `src/v8/inflow-links/detail.tsx`。v7 は同じファイルのまま）。写し元：同じ page.tsx（import はしない）。
+入口：`app/inflow-links/detail/page.tsx`（`src/v8/inflow-links/detail.tsx` に固定）。
 
 ## 受け付ける URL
 - `/inflow-links/detail?id=<経路ID>`。`id` が無ければ `?ref=<refCode>` を一覧から引いて決める。どちらも無ければ「見る流入経路が指定されていません」。404 は「見つかりません」、それ以外の失敗は「読み込めませんでした」＋もう一度。

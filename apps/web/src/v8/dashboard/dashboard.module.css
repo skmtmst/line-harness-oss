@@ -11,9 +11,9 @@
 .notices { display: flex; flex-direction: column; gap: var(--tpl-db-row-gap); }
 
 /* ── 数の帯（ダッシュボードは大きい帯：数28・上下16） ── */
-:global([data-theme='v8']) .todayBand.todayBand > * { padding: var(--tpl-db-cell-pad); gap: var(--tpl-db-cell-gap); }
-:global([data-theme='v8']) .todayBand.todayBand [data-kpi-number] { font-size: var(--tpl-db-num-size); line-height: var(--tpl-db-num-lh); font-variant-numeric: normal; }
-:global([data-theme='v8']) .todayBand.todayBand [data-kpi-number] + span { font-size: var(--tpl-db-unit-size); line-height: var(--tpl-db-unit-lh); }
+:global(:root) .todayBand.todayBand > * { padding: var(--tpl-db-cell-pad); gap: var(--tpl-db-cell-gap); }
+:global(:root) .todayBand.todayBand [data-kpi-number] { font-size: var(--tpl-db-num-size); line-height: var(--tpl-db-num-lh); font-variant-numeric: normal; }
+:global(:root) .todayBand.todayBand [data-kpi-number] + span { font-size: var(--tpl-db-unit-size); line-height: var(--tpl-db-unit-lh); }
 .cellMenu.cellMenu { width: var(--tpl-db-menu); height: var(--tpl-db-menu); flex-basis: var(--tpl-db-menu); min-width: 0; min-height: 0; box-shadow: none; outline: 0; padding: 0; border: 0; background: transparent; color: var(--color-ink-faint); }
 .cellDetail {
   display: flex; flex-wrap: wrap; gap: var(--tpl-db-row-gap) var(--tpl-db-fig-gap);

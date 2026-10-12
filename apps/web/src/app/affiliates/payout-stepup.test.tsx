@@ -19,7 +19,7 @@ vi.mock('@/lib/session-snapshot', () => ({
   readSessionSnapshot: () => ({ stepUpMethod: 'totp' }),
 }))
 
-const { PayoutStepUpDialog } = await import('./payment-tab')
+const { PayoutStepUpDialog } = await import('@/v8/affiliates/payment-dialogs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -47,6 +47,6 @@ describe('銀行用CSVの本人確認 V8', () => {
     )
     /* 窓は別所（ポータル）に描かれるため、文書全体から探す。 */
     expect(document.querySelector('[data-design-node="CVz5d"]')).toBeTruthy()
-    expect(await screen.findByText('書き出す中身：38件・¥70,400')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '確認して書き出す' }).getAttribute('title')).toBe('書き出す中身：38 件・¥70,400')
   })
 })

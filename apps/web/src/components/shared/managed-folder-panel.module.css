@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* フォルダの列の下の注（テンプレート一覧と同じ小さな薄い字）。字の途中で折ってよい（狭い列で3行にしない）。 */
 .note {

@@ -16,17 +16,14 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
  */
 
 const account = vi.hoisted(() => ({ id: 'account-1' }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   usePathname: () => '/automations/runs',
   useSearchParams: () => new URLSearchParams(),
 }))
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id, loading: false }) }))
-vi.mock('@/components/automations/use-can-manage', () => ({
-  useAutomationRunPermissions: () => ({ canOperate: true, canExport: true }),
-}))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
 vi.mock('@/components/layout/merged-tabs', () => ({ default: () => null }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -37,8 +34,12 @@ vi.mock('@/lib/api', async (importOriginal) => {
     downloadApiFile: vi.fn(),
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: vi.fn(async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } })) },
+      commonActions: { ...actual.api.commonActions, list: vi.fn(async () => ({ success: true, data: [] })) },
       automations: {
         ...actual.api.automations,
+        list: vi.fn(async () => ({ success: true, data: [] })),
+        templates: vi.fn(async () => ({ success: true, data: [] })),
         getRun: vi.fn(),
         cancelRun: vi.fn(),
       },
@@ -47,7 +48,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { api, ApiError, downloadApiFile, fetchApi } from '@/lib/api'
-import AutomationRunsPage from './page'
+import AutomationRunsPage from '@/v8/automations/runs'
 
 const mockFetch = fetchApi as unknown as ReturnType<typeof vi.fn>
 const mockDownload = downloadApiFile as unknown as ReturnType<typeof vi.fn>
@@ -102,6 +103,9 @@ let root: Root | null = null
 beforeEach(() => {
   // 一覧の読み込みは400ms遅れる。待ちは偽の時計で進める（本物の時間を待たない）。
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState({}, '', '/automations/runs')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   account.id = 'account-1'
   mockFetch.mockReset()
   mockDownload.mockReset()
@@ -122,6 +126,7 @@ afterEach(async () => {
   root = null
   container = null
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
   vi.clearAllMocks()
   vi.useRealTimers()
 })
@@ -143,11 +148,11 @@ async function mountPage(): Promise<HTMLDivElement> {
 }
 
 async function openDetail(el: HTMLDivElement): Promise<void> {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '中身を見る')
+  const button = Array.from(document.querySelectorAll('button')).find((node) => node.textContent === '中身を見る')
   if (!button) throw new Error('「中身を見る」ボタンが見つかりません')
   await act(async () => { (button as HTMLButtonElement).click() })
   await act(async () => { await drainMicrotasks() })
-  if (!el.textContent?.includes('実行記録の中身')) throw new Error('詳細が出ませんでした')
+  if (!document.querySelector('[data-design-part="detail-panel"]')) throw new Error('詳細が出ませんでした')
 }
 
 describe('R492: 店を替えたら前の店の詳細・確認を残さない', () => {
@@ -155,17 +160,17 @@ describe('R492: 店を替えたら前の店の詳細・確認を残さない', (
     const el = await mountPage()
     await openDetail(el)
     // 取消の確認まで開く。
-    const cancel = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'この実行を取りやめる')
+    const cancel = Array.from(document.querySelectorAll('button')).find((node) => node.textContent === 'この実行を取りやめる')
     await act(async () => { (cancel as HTMLButtonElement).click() })
-    expect(el.textContent).toContain('取りやめますか')
+    expect(document.body.textContent).toContain('取りやめますか')
     // B店へ。A店の詳細・確認は残らない。
     account.id = 'account-2'
     await act(async () => { root!.render(<AutomationRunsPage />) })
     await act(async () => { await vi.advanceTimersByTimeAsync(450) })
     await act(async () => { await drainMicrotasks() })
-    expect(el.textContent).not.toContain('実行記録の中身')
-    expect(el.textContent).not.toContain('取りやめますか')
-    expect(el.textContent).toContain('佐藤さん')
+    expect(document.querySelector('[data-design-part="detail-panel"]')).toBeNull()
+    expect(document.body.textContent).not.toContain('取りやめますか')
+    expect(document.body.textContent).toContain('佐藤さん')
   })
 
   it('取消の応答が店切替後に返っても、替えた先へ書かない', async () => {
@@ -173,9 +178,9 @@ describe('R492: 店を替えたら前の店の詳細・確認を残さない', (
     await openDetail(el)
     let releaseCancel!: (value: unknown) => void
     mockCancelRun.mockReturnValueOnce(new Promise((resolve) => { releaseCancel = resolve as (value: unknown) => void }))
-    const cancel = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'この実行を取りやめる')
+    const cancel = Array.from(document.querySelectorAll('button')).find((node) => node.textContent === 'この実行を取りやめる')
     await act(async () => { (cancel as HTMLButtonElement).click() })
-    const confirm = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '取りやめる')
+    const confirm = Array.from(document.querySelectorAll('button')).find((node) => node.textContent === '取りやめる')
     await act(async () => { (confirm as HTMLButtonElement).click() })
     // 応答待ちの間にB店へ。
     account.id = 'account-2'
@@ -184,8 +189,8 @@ describe('R492: 店を替えたら前の店の詳細・確認を残さない', (
     await act(async () => { await vi.advanceTimersByTimeAsync(450) })
     await act(async () => { await drainMicrotasks() })
     // B店の画面にA店の取消結果は書かない。
-    expect(el.textContent).not.toContain('実行を取りやめました')
-    expect(el.textContent).not.toContain('実行記録の中身')
+    expect(document.body.textContent).not.toContain('実行を取りやめました')
+    expect(document.querySelector('[data-design-part="detail-panel"]')).toBeNull()
   })
 })
 
@@ -194,11 +199,11 @@ describe('R493: 詳細の失敗は「記録なし」と別に、権限不足も�
     mockGetRun.mockRejectedValueOnce(new ApiError(503, '読み込めませんでした'))
     const el = await mountPage()
     await openDetail(el)
-    expect(el.textContent).toContain('詳細を読み込めませんでした')
-    expect(el.textContent).toContain('もう一度読む')
-    expect(el.textContent).not.toContain('処理の記録はありません')
+    expect(document.body.textContent).toContain('詳細を読み込めませんでした')
+    expect(document.body.textContent).toContain('もう一度読み込む')
+    expect(document.body.textContent).not.toContain('処理の記録はありません')
     await act(async () => {
-      (Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'もう一度読む') as HTMLButtonElement).click()
+      (Array.from(document.querySelectorAll('button')).find((node) => node.textContent === 'もう一度読み込む') as HTMLButtonElement).click()
     })
     await act(async () => { await drainMicrotasks() })
     expect(mockGetRun).toHaveBeenCalledTimes(2)
@@ -208,15 +213,15 @@ describe('R493: 詳細の失敗は「記録なし」と別に、権限不足も�
     mockGetRun.mockRejectedValueOnce(new ApiError(403, '権限がありません'))
     const el = await mountPage()
     await openDetail(el)
-    expect(el.textContent).toContain('この実行を見る権限がありません')
-    expect(el.textContent).not.toContain('もう一度読む')
-    expect(el.textContent).not.toContain('処理の記録はありません')
+    expect(document.body.textContent).toContain('この実行を見る権限がありません')
+    expect(document.body.textContent).not.toContain('もう一度読み込む')
+    expect(document.body.textContent).not.toContain('処理の記録はありません')
   })
 
   it('0件のときだけ「処理の記録はありません」と出す', async () => {
     const el = await mountPage()
     await openDetail(el)
-    expect(el.textContent).toContain('処理の記録はありません')
+    expect(document.body.textContent).toContain('処理の記録はありません')
   })
 })
 
@@ -236,14 +241,14 @@ describe('R494・R495: 再試行の応答消失とCSVの上限', () => {
     mockGetRun.mockResolvedValue(ok({ ...detailA, id: 'run-f', status: 'waiting', canRetry: false, canCancel: true }))
     const el = await mountPage()
     await openDetail(el)
-    const retry = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'もう一度やる')
+    const retry = Array.from(document.querySelectorAll('button')).find((node) => node.textContent === '失敗した処理をもう一度やる')
     await act(async () => { (retry as HTMLButtonElement).click() })
     await act(async () => { await vi.advanceTimersByTimeAsync(450) })
     await act(async () => { await drainMicrotasks() })
     // 古い失敗のままにせず、受付済みを出す。古い再試行ボタンは残さない。
-    expect(el.textContent).toContain('再試行を受け付けています')
-    expect(el.querySelectorAll('button')).toSatisfy(
-      (buttons) => !Array.from(buttons as unknown as HTMLButtonElement[]).some((node) => node.textContent === 'もう一度やる'),
+    expect(document.body.textContent).toContain('再試行を受け付けています')
+    expect(document.querySelectorAll('button')).toSatisfy(
+      (buttons) => !Array.from(buttons as unknown as HTMLButtonElement[]).some((node) => node.textContent === '失敗した処理をもう一度やる'),
     )
   })
 
@@ -252,18 +257,19 @@ describe('R494・R495: 再試行の応答消失とCSVの上限', () => {
     mockDownload.mockResolvedValue({ totalCount: 5001, returnedCount: 5000, truncated: true })
     const el = await mountPage()
     // 書き出す前から上限の案内が出る。
-    expect(el.textContent).toContain('5,000件までしか出ません')
-    const csv = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'CSVで書き出す')
+    expect(document.body.textContent).toContain('5,000件までしか出ません')
+    const csv = Array.from(document.querySelectorAll('button')).find((node) => node.textContent === 'CSVで書き出す')
     await act(async () => { (csv as HTMLButtonElement).click() })
     await act(async () => { await drainMicrotasks() })
-    expect(el.textContent).toContain('残り1件')
-    expect(el.textContent).toContain('分けて出してください')
+    expect(document.body.textContent).toContain('残り1 件')
+    expect(document.body.textContent).toContain('分けて出してください')
   })
 })
 
 describe('R493直リンク: ?runの詳細取得失敗も見せて再試行できる', () => {
   it('503でも一覧は残し、詳細の失敗と「もう一度読む」を出す', async () => {
     window.history.replaceState({}, '', '/automations/runs?run=run-1')
+    window.dispatchEvent(new PopStateEvent('popstate'))
     try {
       mockFetch.mockImplementation(async () => listResponse([rowA], 1))
       mockGetRun.mockReset()
@@ -271,16 +277,16 @@ describe('R493直リンク: ?runの詳細取得失敗も見せて再試行でき
       mockGetRun.mockResolvedValue(ok({ ...detailA, id: 'run-1' }))
       const el = await mountPage()
       // 合成正常の一覧は使えるまま。
-      expect(el.textContent).toContain('田中さん')
+      expect(document.body.textContent).toContain('田中さん')
       // 直リンクの失敗が見える。
-      expect(el.textContent).toContain('詳細を読み込めませんでした')
-      const retry = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'もう一度読む')
+      expect(document.body.textContent).toContain('詳細を読み込めませんでした')
+      const retry = Array.from(document.querySelectorAll('button')).find((node) => node.textContent === 'もう一度読み込む')
       expect(retry).toBeTruthy()
       await act(async () => { (retry as HTMLButtonElement).click() })
       await act(async () => { await drainMicrotasks() })
       expect(mockGetRun.mock.calls.length).toBeGreaterThanOrEqual(2)
       // 再試行で詳細が開く。
-      expect(el.textContent).toContain('実行記録の中身')
+      expect(document.querySelector('[data-design-part="detail-panel"]')).not.toBeNull()
     } finally {
       window.history.replaceState({}, '', '/automations/runs')
     }

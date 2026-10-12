@@ -2,7 +2,6 @@
 
 import TagOverflow from './tag-overflow'
 import { useEffect, useState } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { TagToggle } from './tag-pill'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -373,7 +372,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
         </div>
       ))}
 
-      <Button variant="secondary" className="text-ink-secondary rounded-card v7:h-10 w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
+      <Button variant="secondary" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
           update({
             ...condition,
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],

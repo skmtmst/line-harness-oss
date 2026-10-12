@@ -49,7 +49,7 @@
 .content { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-fdt-content-gap); padding: var(--tpl-fdt-content-pad); }
 .kpis { width: 100%; }
 /* 絵の数の帯は角丸の枠で囲む（一覧の帯は上下の線だけ）。この画面の帯にだけ効かせる。 */
-:global([data-theme='v8']) .kpis.kpis[data-kpi-presentation='band'] { border: 1px solid var(--card-edge); border-radius: var(--tpl-fdt-row-radius); overflow: hidden; box-shadow: var(--card-shadow); }
+:global(:root) .kpis.kpis[data-kpi-presentation='band'] { border: 1px solid var(--card-edge); border-radius: var(--tpl-fdt-row-radius); overflow: hidden; box-shadow: var(--card-shadow); }
 /* 補足が空のマスは3段目を出さない（絵は数まで）。失敗・再試行の文は出す。 */
 .kpis p:has(> span:empty:only-child) { display: none; }
 .section { display: flex; flex-direction: column; gap: var(--tpl-fdt-sec-gap); min-width: 0; }

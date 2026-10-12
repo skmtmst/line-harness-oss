@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 一覧の行に置くアイコン操作。Pencil V5 の
@@ -170,7 +170,7 @@
 }
 }
 
-[data-theme='v8'] .action[data-size='small'] { min-height: 0; width: var(--tpl-icon-btn-sm); height: var(--tpl-icon-btn-sm); }
+:root .action[data-size='small'] { min-height: 0; width: var(--tpl-icon-btn-sm); height: var(--tpl-icon-btn-sm); }
 
 /* B-199：同じ列の主操作は最長の文字に合わせた同じ幅。 */
-html[data-theme='v8'] .rowButton, html[data-theme='v8'] .quickAction { width: var(--row-action-width, max-content); min-width: max-content; justify-content: center; }
+html:root .rowButton, html:root .quickAction { width: var(--row-action-width, max-content); min-width: max-content; justify-content: center; }

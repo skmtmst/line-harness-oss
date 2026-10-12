@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PANEL = readFileSync(new URL('./google-sheets-panel.tsx', import.meta.url), 'utf8')
+const PANEL = readFileSync(new URL('../../v8/webhooks/sheets.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 /*
@@ -17,11 +17,12 @@ describe('R151 Google Sheets 連携の読み込みは期限付き', () => {
   })
 
   it('打ち切り・失敗・不正応答のどれでも読み込み状態を終えて再試行できる', () => {
-    // 失敗系はすでに loadError → 再試行ボタンの経路がある。期限はその経路へ
+    // 失敗系はすでに error 状態 → 再試行ボタンの経路がある。期限はその経路へ
     // 乗せるので、新しい分岐ではなく fetch の signal として渡す。
-    expect(PANEL).toContain('api.webhooks.googleSheets.connection(requestAccountId, { signal })')
+    expect(PANEL).toContain('api.webhooks.googleSheets.connection(accountId, { signal })')
     // 履歴の取得は loadRuns に切り出し、そこへ同じ期限を渡す
     expect(PANEL).toContain('api.webhooks.googleSheets.runs(accountId, { signal })')
-    expect(PANEL).toContain('loadError')
+    expect(PANEL).toContain("setStatus('error')")
+    expect(PANEL).toContain('onRetry={() => void load()}')
   })
 })

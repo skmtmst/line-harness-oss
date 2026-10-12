@@ -10,7 +10,7 @@ import {
   toCreateInput,
   validateDraft,
   visibleAccountTags,
-} from './column-form'
+} from '@/v8/nen-campaigns/column-form'
 
 const draft = (over: Partial<typeof EMPTY_DRAFT> = {}) => ({
   ...EMPTY_DRAFT,

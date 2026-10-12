@@ -37,7 +37,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams('id=acc-1'),
 }))
 
@@ -51,14 +51,14 @@ vi.mock('@/components/step-up-prompt', () => ({
   useStepUpGate: () => ({ gate: async () => 'token', prompt: null }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
-import HandoverV8 from './handover-v8'
+import HandoverV8 from '@/v8/accounts-detail/handover'
 
-const v8css = readFileSync(join(process.cwd(), 'src/app/accounts/handover/handover-v8.module.css'), 'utf8')
-const v8tsx = readFileSync(join(process.cwd(), 'src/app/accounts/handover/handover-v8.tsx'), 'utf8')
+const v8css = readFileSync(join(process.cwd(), 'src/v8/accounts-detail/handover.module.css'), 'utf8')
+const v8tsx = readFileSync(join(process.cwd(), 'src/v8/accounts-detail/handover.tsx'), 'utf8')
 
 function handoverDetail(over: Record<string, unknown> = {}) {
   return {
@@ -108,6 +108,7 @@ let root: Root
 
 beforeEach(() => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  document.documentElement.dataset.theme='v8'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -127,7 +128,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(async () => { root.unmount() })
-  host.remove()
+  host.remove(); delete document.documentElement.dataset.theme
   document.body.innerHTML = ''
 })
 
@@ -151,20 +152,20 @@ describe('V8-B 乗り換え（x2dSNv）', () => {
     const execute = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('本実行する')) as HTMLButtonElement
     expect(execute, '本実行の口がある').toBeTruthy()
     expect(execute.disabled, '未判断2人の間は押せない').toBe(true)
-    expect(document.body.textContent).toContain('未判断が 2人残っています')
+    expect(document.body.textContent).toContain('未判断が 2 人残っています')
   })
 
   it('判断を変えて保存すると保存の口を叩く', async () => {
     handoversSaveDecisions.mockResolvedValue({ success: true, data: {} })
     await renderV8()
     // 1行目の判断を「新しく作る」に変える（共有 Select は小さな窓で選ぶ形）
-    const selects = document.querySelectorAll('button[aria-label="この人の判断"]')
+    const selects = document.querySelectorAll('button[aria-label$="の判断"]')
     await act(async () => { (selects[0] as HTMLButtonElement).click() })
     await flush()
     const option = [...document.querySelectorAll('[role="option"] button')].find((o) => o.textContent === '新しく作る') as HTMLElement
     await act(async () => { option!.click() })
     await flush()
-    expect(document.body.textContent).toContain('1件の書き換えをまだ保存していません')
+    expect(document.body.textContent).toContain('1 件の書き換えをまだ保存していません')
     const save = [...document.querySelectorAll('button')].find((b) => b.textContent === '判断を保存する')
     await act(async () => { save!.click() })
     await flush()
@@ -172,7 +173,9 @@ describe('V8-B 乗り換え（x2dSNv）', () => {
   })
 
   it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', () => {
-    expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')
+    expect(v8tsx).toContain('<SettingsPage layout="account-handover"')
+    expect(v8tsx).toContain('<DataTable presentation="account-handover"')
+    expect(v8tsx).toContain('<StickyBar presentation="account-handover"')
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     // 影は共通のカードの影だけ（2026-10-09 オーナー採用 B-137）。ほかの影は直書きしない。
     expect(v8css.replace(/box-shadow:\s*var\(--card-shadow\)/g, '')).not.toMatch(/box-shadow\s*:/)
@@ -180,3 +183,5 @@ describe('V8-B 乗り換え（x2dSNv）', () => {
     expect(v8tsx).not.toContain('準備中')
   })
 })
+
+vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId:'acc-1',selectedAccount:{id:'acc-1',name:'Fixture'},accounts:[],loading:false})}))

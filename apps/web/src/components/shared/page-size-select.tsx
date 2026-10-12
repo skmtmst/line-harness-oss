@@ -2,8 +2,9 @@
 
 import type { SelectHTMLAttributes } from 'react'
 import Select from '@/components/shared/select'
+import { PAGE_SIZES } from './page-size-options'
+export { PAGE_SIZES, DEFAULT_PAGE_SIZE, EXTENDED_PAGE_SIZES } from './page-size-options'
 
-export const PAGE_SIZES: readonly number[] = [10, 20, 50]
 export const PAGE_SIZE_SELECT_OPTIONS = PAGE_SIZES.map((size) => ({ value: String(size), label: `${size} 件表示` }))
 
 /**

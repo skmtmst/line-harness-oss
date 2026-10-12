@@ -23,17 +23,17 @@ describe('V8 の枠：1152px でも絵どおり', () => {
 
   it('開いた左メニューを狭い幅で 216px に詰めない', () => {
     const css = read('sidebar.module.css')
-    expect(css).not.toMatch(/\[data-theme="v8"\] \.desktop:not\(\[data-collapsed\]\)\s*\{[^}]*216px/)
+    expect(css).not.toMatch(/:root \.desktop:not\(\[data-collapsed\]\)\s*\{[^}]*216px/)
   })
 
   it('上の帯の LINE アカウントの札を 1439px 以下でも潰さない', () => {
     const css = read('..', 'shared', 'top-bar.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.accountField > \.accountPill \{[^}]*position: relative;[^}]*width: auto;/)
+    expect(css).toMatch(/:root \.accountField > \.accountPill \{[^}]*position: relative;[^}]*width: auto;/)
   })
 
   it('行の「…」のメニューの項目は絵の高さ（変数）', () => {
     const css = read('..', 'shared', 'action-menu.module.css')
-    expect(css).toMatch(/\[data-theme="v8"\] \.item:not\(\.itemTall\) \{[^}]*height: var\(--tpl-menu-item-h\);/)
+    expect(css).toMatch(/:root \.item:not\(\.itemTall\) \{[^}]*height: var\(--tpl-menu-item-h\);/)
     const globals = read('..', '..', 'app', 'globals.css')
     expect(globals).toMatch(/--tpl-menu-item-h: 34px;/)
   })

@@ -2,12 +2,14 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { fireEvent, getByRole } from '@testing-library/react'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import { AccountArchiveDialog, AccountRestoreDialog, AccountSettingsDialog } from './account-settings-dialogs'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+import { AccountArchiveDialogV8 as AccountArchiveDialog, AccountRestoreDialogV8 as AccountRestoreDialog, AccountSettingsDialogV8 as AccountSettingsDialog } from '@/v8/hq/account-dialogs'
 import type { AccountWithStats } from '@/contexts/account-context'
 
 /*
@@ -111,22 +113,19 @@ test('保存の窓は板 D6ljr・理由と6桁で保存の口へ送る', async (
   await settle()
   expect(document.body.querySelector('[data-design-node="D6ljr"]')).toBeTruthy()
   await fillCode('123456')
-  const confirm = Array.from(document.body.querySelectorAll('button'))
-    .find((button) => (button.textContent ?? '').includes('本人確認してアーカイブする'))
-  expect(confirm).toBeTruthy()
-  await act(async () => { confirm!.click() })
+  // 現役の6桁入力は最後の桁で本人確認する。
   await settle()
   expect(calls.some((call) => call.url === '/api/auth/step-up')).toBe(true)
   expect(calls.some((call) => call.url === '/api/line-accounts/account-a/archive')).toBe(true)
   expect(done).toBe(true)
 })
 
-test('設定の窓はタグを付けて保存すると付け替え口へ送る（板 HMpVx）', async () => {
+test('設定の窓はフォルダを選んで保存すると付け替え口へ送る（板 HMpVx・API-17）', async () => {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
     calls.push({ url: url.pathname, method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? init.body : '' })
-    if (url.pathname === '/api/line-account-tags' && (init?.method ?? 'GET') === 'GET') {
-      return response({ success: true, data: [{ id: 'tag-area', name: '渋谷エリア', color: null, displayOrder: 0 }] })
+    if (url.pathname === '/api/line-account-folders' && (init?.method ?? 'GET') === 'GET') {
+      return response({ success: true, data: { folders: [{ id: 'folder-area', name: '渋谷エリア', color: null, displayOrder: 0 }], unfiledCount: 0 } })
     }
     return response({ success: true, data: { id: 'account-a' } })
   }))
@@ -145,18 +144,17 @@ test('設定の窓はタグを付けて保存すると付け替え口へ送る�
   ))
   await settle()
   await settle()
-  const chip = Array.from(document.body.querySelectorAll('button'))
-    .find((button) => (button.textContent ?? '') === '渋谷エリア')
-  expect(chip?.getAttribute('aria-pressed')).toBe('false')
-  await act(async () => { chip!.click() })
-  expect(chip?.getAttribute('aria-pressed')).toBe('true')
+  await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: 'フォルダ' })) })
+  const folder = getByRole(document.body, 'option', { name: '渋谷エリア' })
+  await act(async () => { fireEvent.click(folder.querySelector('button') ?? folder) })
+  expect(getByRole(document.body, 'button', { name: 'フォルダ' }).textContent).toContain('渋谷エリア')
   const save = Array.from(document.body.querySelectorAll('button'))
     .find((button) => (button.textContent ?? '') === '保存')
   expect(save).toBeTruthy()
   await act(async () => { save!.click() })
   await settle()
-  const put = calls.find((call) => call.url === '/api/line-accounts/account-a/tags' && call.method === 'PUT')
-  expect(put?.body).toContain('tag-area')
+  const put = calls.find((call) => call.url === '/api/line-accounts/account-a/folder' && call.method === 'PUT')
+  expect(put && JSON.parse(put.body)).toEqual({ folderId: 'folder-area' })
   expect(saved).toBe(true)
 })
 
@@ -168,10 +166,7 @@ test('戻す窓は板 HFsO9・6桁で復帰の口へ送る', async () => {
   await settle()
   expect(document.body.querySelector('[data-design-node="HFsO9"]')).toBeTruthy()
   await fillCode('654321')
-  const confirm = Array.from(document.body.querySelectorAll('button'))
-    .find((button) => (button.textContent ?? '').includes('本人確認して戻す'))
-  expect(confirm).toBeTruthy()
-  await act(async () => { confirm!.click() })
+  // 現役の6桁入力は最後の桁で本人確認する。
   await settle()
   expect(calls.some((call) => call.url === '/api/line-accounts/account-a/restore')).toBe(true)
   expect(done).toBe(true)

@@ -8,7 +8,7 @@ import { mount, settle, stubFetchNotFound, type Mounted } from '@/test-utils/rac
 
 const fixture = vi.hoisted(() => ({ id: 'rule-a', pending: [] as Array<{ resolve: (v: unknown) => void }> }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(`id=${fixture.id}`),
   useRouter: () => ({ push: vi.fn() }),
   usePathname: () => '/mileage/earning-rules/edit',

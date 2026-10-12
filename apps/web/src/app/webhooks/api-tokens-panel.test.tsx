@@ -16,12 +16,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 
-import ApiTokensPanel from './api-tokens-panel'
+import ApiTokensPanel from '@/v8/webhooks/api-tokens'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -44,7 +44,7 @@ function token(id: string, name: string, scopes: string[]) {
 }
 
 function text(): string {
-  return host.textContent ?? ''
+  return document.body.textContent ?? ''
 }
 /** ConfirmDialog は body 直下の portal に描くので、ページ本文とは別に見る。 */
 function dialogButton(label: string): HTMLButtonElement | undefined {
@@ -53,7 +53,7 @@ function dialogButton(label: string): HTMLButtonElement | undefined {
     .find((el) => el.textContent?.includes(label))
 }
 function button(label: string): HTMLButtonElement | undefined {
-  return Array.from(host.querySelectorAll('button')).find((el) => el.textContent?.includes(label))
+  return Array.from(document.body.querySelectorAll('button')).find((el) => el.textContent?.includes(label))
 }
 async function settle() {
   await act(async () => {
@@ -115,8 +115,8 @@ describe('R434 API接続パネル', () => {
       return { status: 500, body: { success: false, error: 'unhandled' } }
     }
     await render()
-    expect(text()).toContain('まだ接続がありません')
-    expect(button('接続を作る')).toBeTruthy()
+    expect(text()).toContain('まだ API 接続の鍵がありません')
+    expect(button('最初の鍵を発行する')).toBeTruthy()
   })
 
   it('失敗：読み込めなかった旨と再試行', async () => {
@@ -136,7 +136,7 @@ describe('R434 API接続パネル', () => {
     expect(retry).toBeTruthy()
     await act(async () => { retry!.click() })
     await settle()
-    expect(text()).toContain('まだ接続がありません')
+    expect(text()).toContain('まだ API 接続の鍵がありません')
   })
 
   it('停止中：外部連携オフの旨。鍵の操作は出さない', async () => {
@@ -151,7 +151,7 @@ describe('R434 API接続パネル', () => {
     }
     await render()
     expect(text()).toContain('外部連携が止まっています')
-    expect(button('接続を作る')).toBeFalsy()
+    expect(button('最初の鍵を発行する')).toBeFalsy()
   })
 
   it('発行：一度だけ平文が出る。閉じたら一覧に戻る', async () => {
@@ -169,9 +169,9 @@ describe('R434 API接続パネル', () => {
       return { status: 500, body: { success: false, error: 'unhandled' } }
     }
     await render()
-    await act(async () => { button('接続を作る')!.click() })
+    await act(async () => { button('最初の鍵を発行する')!.click() })
     await settle()
-    const nameInput = host.querySelector('#api-token-name') as HTMLInputElement
+    const nameInput = document.querySelector('#wh-token-name') as HTMLInputElement
     expect(nameInput).toBeTruthy()
     await act(async () => {
       nameInput.focus()
@@ -181,7 +181,7 @@ describe('R434 API接続パネル', () => {
       nameInput.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await settle()
-    await act(async () => { button('発行する')!.click() })
+    await act(async () => { dialogButton('発行する')!.click() })
     await settle()
     // 平文はこの1回だけ。
     expect(text()).toContain('lhp_issued_once')
@@ -218,6 +218,8 @@ describe('R434 API接続パネル', () => {
     expect(text()).toContain('lhp_rotated_once')
     await act(async () => { button('閉じる')!.click() })
     await settle()
+    await act(async () => { (host.querySelector('button[aria-label="「予約連携」の操作"]') as HTMLButtonElement).click() })
+    await settle()
     await act(async () => { button('止める')!.click() })
     await settle()
     await act(async () => { dialogButton('止める')!.click() })
@@ -225,3 +227,7 @@ describe('R434 API接続パネル', () => {
     expect(calls.some((c) => c.path.includes('/revoke') && c.method === 'POST')).toBe(true)
   })
 })
+
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))

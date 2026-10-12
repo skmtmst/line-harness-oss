@@ -9,16 +9,16 @@ const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
 /*
  * V8-B オートメーション3板（`LWQXd` 一覧・`J1VA8` 下書きを仕上げる・
  * `c7dxp` 見本12件）。F-14〜F-16 の口が入ったので、絵どおりに作り直した
- * V8 の枝の外枠に `data-design-node` を付ける。v7 は変えない。
+ * 現役V8の外枠と操作を確認する。
  */
 describe('V8 オートメーション3板の印', () => {
   it('一覧の外枠に LWQXd を付ける', () => {
-    const list = read('list-v8.tsx')
+    const list = read('../../v8/automations/list.tsx')
     expect(list, '一覧の板が無い').toMatch(/narrow \? 'En14p' : viewerOnly \? 'nH9L8' : 'LWQXd'/)
   })
 
   it('一覧の行の操作に「1人で試す」を置く（F-14 担当へ知らせるの動作確認口）', () => {
-    const list = read('list-v8.tsx')
+    const list = read('../../v8/automations/list.tsx')
     expect(list, '1人で試すが無い').toContain('1人で試す')
   })
 
@@ -33,12 +33,12 @@ describe('V8 オートメーション3板の印', () => {
   })
 
   it('見本の外枠に c7dxp を付ける', () => {
-    const templates = read('templates-v8.tsx')
+    const templates = read('../../v8/automations/templates.tsx')
     expect(templates, '見本の板が無い').toMatch(/(?:data-design-node|boardId)="c7dxp"/)
   })
 
   it('見本は口の実データから12件出す（F-16）。絵の数は書かない', () => {
-    const templates = read('templates-v8.tsx')
+    const templates = read('../../v8/automations/templates.tsx')
     expect(templates, '再読み込みが無い').toContain('見本を再読み込み')
     expect(templates, '絞り込みが無い').toContain('きっかけ')
   })

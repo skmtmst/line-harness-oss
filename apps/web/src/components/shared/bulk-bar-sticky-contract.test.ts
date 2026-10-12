@@ -13,7 +13,7 @@ const FILES: Array<[string, string]> = [
   ['v8/scenarios/list.module.css', '.bulkRow'],
   ['v8/auto-replies/list.module.css', '.bulkRow'],
   ['app/reminders/list-v8.module.css', '.bulkRow'],
-  ['app/templates/list-v8.module.css', '.bulkRow'],
+  ['v8/templates/list.tsx', 'BulkBar'],
 ]
 
 function block(css: string, selector: string): string {
@@ -23,7 +23,12 @@ function block(css: string, selector: string): string {
 
 describe('一括バーは長い一覧でも画面の下に付いてくる', () => {
   it.each(FILES)('%s の %s は position: sticky・bottom を持つ', (file, selector) => {
-    const body = block(readFileSync(join(SRC, file), 'utf8'), selector)
+    const source = readFileSync(join(SRC, file), 'utf8')
+    if (file.endsWith('.tsx')) {
+      expect(source).toContain('<BulkBar count={selectedCount}')
+      expect(source).toContain("from '@/components/shared/bulk-bar'")
+    }
+    const body = block(file.endsWith('.tsx') ? readFileSync(join(SRC, 'components/shared/bulk-bar.module.css'), 'utf8') : source, file.endsWith('.tsx') ? '.bar' : selector)
     expect(body).toMatch(/position:\s*sticky/)
     expect(body).toMatch(/bottom:/)
   })

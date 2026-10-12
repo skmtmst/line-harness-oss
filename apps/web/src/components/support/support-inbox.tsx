@@ -6,7 +6,7 @@ import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import ListState from '@/components/shared/list-state'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -127,7 +127,7 @@ function isUnknownChannel(item: Pick<InboxItem, 'channel'>): boolean {
 }
 
 export default function SupportInbox({ channel = 'email' }: { channel?: Channel }) {
-  const isV8 = useAdminTheme() === 'v8'
+
   const sendKeysRef = useRef(new IdempotencyKeyStore())
   const [status, setStatus] = useState<'open' | ThreadStatus | 'all'>('open')
   const [query, setQuery] = useState('')
@@ -246,7 +246,6 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
     return () => poll.stop()
   }, [loadDetail, loadInbox, status, inboxRetryKey])
 
-
   const choose = (item: InboxItem) => {
     setSelected(item)
     setError('')
@@ -362,15 +361,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   </div>
                   <div className="shrink-0 text-right">
                     <p className={`text-micro font-semibold ${isStaleUnresolved(item) ? 'text-status-warn-deep' : 'text-ink-faint'}`}>{elapsed(item.lastIncomingAt)}</p>
-                    {isV8 ? <div className="mt-1"><StatusPill tone={SUPPORT_STATUS_TONES[item.status]}>{statusLabel[item.status]}</StatusPill></div> : (
-                    <StatusBadge
-                      tone={item.status === 'resolved' ? 'success' : 'neutral'}
-                      size="compact"
-                      className="mt-1"
-                    >
-                      {statusLabel[item.status]}
-                    </StatusBadge>
-                    )}
+                    {<div className="mt-1"><StatusPill tone={SUPPORT_STATUS_TONES[item.status]}>{statusLabel[item.status]}</StatusPill></div>}
                   </div>
                 </div>
               </button>
@@ -456,6 +447,5 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
     </div>
   )
 }
-
 
 /* 一覧の顔は共通 Avatar（名前から頭文字）。青丸＋✉の自前描画は使わない。 */

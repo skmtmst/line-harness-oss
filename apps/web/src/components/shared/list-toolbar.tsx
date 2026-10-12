@@ -119,7 +119,6 @@ export function ListToolbarOptional({ children, label = 'ほかの絞り込み',
     const item = ref.current, toolbar = item?.closest<HTMLElement>('[data-list-toolbar]')
     if (!item || !toolbar || !window.ResizeObserver || compact) return
     const measure = () => {
-      if (document.documentElement.dataset.theme !== 'v8') return
       const content = item.querySelector<HTMLElement>('[data-toolbar-optional-content]')!
       if (!item.hasAttribute('data-collapsed')) expandedWidthRef.current = content.getBoundingClientRect().width
       const tools = [...toolbar.querySelectorAll<HTMLElement>('[data-toolbar-tools]')].flatMap((group) => [...group.children] as HTMLElement[])

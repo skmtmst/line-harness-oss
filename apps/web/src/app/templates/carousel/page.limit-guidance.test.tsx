@@ -6,8 +6,7 @@ import type { StaffMember } from '@line-crm/shared'
  *
  * 決まり（送信境界・Worker の carousel-validation と同じ）は変えない。
  * タイトルか画像があるパネルは60文字、両方なければ120文字。
- * この試験は、その決まりが画面の3か所（欄の注記・文字数カウンタ・
- * 「気をつけること」）で食い違わずに出ることを、実際に組み立てて確かめる。
+ * 現役の欄の上限・超過した文字数・補足が食い違わないことを実マウントで確かめる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -22,7 +21,7 @@ const routing = vi.hoisted(() => ({
   pushed: [] as string[],
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({
     push: (href: string) => routing.pushed.push(href),
     replace: (href: string) => routing.pushed.push(href),
@@ -111,19 +110,14 @@ function typeInto(input: HTMLInputElement | HTMLTextAreaElement, value: string) 
 
 /** 「気をつけること」の中のパネル本文の行。 */
 function bodyCaution(): HTMLElement | null {
-  return (
-    Array.from(container.querySelectorAll('li')).find((element) =>
-      element.textContent?.includes('パネル本文は'),
-    ) ?? null
-  )
+  return container.querySelector('[title*="本文はタイトルか画像があると"]')
 }
 
-const titleInput = () => document.getElementById('cr-panel-0-title') as HTMLInputElement | null
-const bodyInput = () => document.getElementById('cr-panel-0-text') as HTMLTextAreaElement | null
-/** 本文カウンタ（「0 / 120」の形）。 */
+const titleInput = () => document.getElementById('cr-title') as HTMLInputElement | null
+const bodyInput = () => document.getElementById('cr-text') as HTMLInputElement | null
+/** 現役は超過したときに文字数と減らす案内を出す。 */
 function bodyCounter(): HTMLElement | null {
-  const area = bodyInput()
-  return (area?.parentElement?.querySelector('p.tabular-nums') as HTMLElement | null) ?? null
+  return Array.from(container.querySelectorAll<HTMLElement>('p[role="alert"]')).find(element => element.textContent?.includes('多すぎる分を減らしてください')) ?? null
 }
 
 beforeEach(() => {
@@ -149,10 +143,10 @@ describe('R621: 本文の上限案内は画像・タイトルの有無と食い�
   it('両方なければ120文字で案内し、注意文も120文字をうたう', async () => {
     await mountNew()
     // 欄のそばの注記とカウンタは120文字。
-    expect(bodyCounter()?.textContent).toBe('0 / 120')
+    expect(bodyCounter()).toBeNull()
     expect(container.textContent).toContain('120文字まで')
     // 「気をつけること」は一律60文字ではなく、両方の条件を書く。
-    const caution = bodyCaution()?.textContent ?? ''
+    const caution = bodyCaution()?.getAttribute('title') ?? ''
     expect(caution).toContain('60文字')
     expect(caution).toContain('120文字')
   })
@@ -160,20 +154,20 @@ describe('R621: 本文の上限案内は画像・タイトルの有無と食い�
   it('タイトルを入れると60文字に切り替わる', async () => {
     await mountNew()
     await act(async () => { typeInto(titleInput()!, '夏の定番セット') })
-    expect(bodyCounter()?.textContent).toBe('0 / 60')
-    expect(container.textContent).toContain('タイトルか画像があるため60文字までです')
+    expect(bodyCounter()).toBeNull()
+    expect(container.textContent).toContain('本文（タイトルか画像があると60文字まで）')
   })
 
   it('送信境界はそのまま：タイトルあり61文字は超過、なし120文字は収まる', async () => {
     await mountNew()
     // 両方なしで120文字ちょうどは赤くならない。
     await act(async () => { typeInto(bodyInput()!, 'あ'.repeat(120)) })
-    expect(bodyCounter()?.textContent).toBe('120 / 120')
-    expect(bodyCounter()?.className).not.toContain('text-danger')
+    expect(bodyInput()?.value).toHaveLength(120)
+    expect(bodyCounter()).toBeNull()
     // タイトルを足すと上限が60に下がり、同じ本文が超過になる。
     await act(async () => { typeInto(titleInput()!, '見出し') })
-    expect(bodyCounter()?.textContent).toBe('120 / 60')
-    expect(bodyCounter()?.className).toContain('text-danger')
+    expect(bodyCounter()?.textContent).toContain('本文 120 / 60 文字')
+    expect(bodyCounter()?.textContent).toContain('多すぎる分を減らしてください')
   })
 })
 

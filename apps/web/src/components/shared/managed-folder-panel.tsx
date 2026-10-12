@@ -19,6 +19,7 @@ import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import FolderAddDialog from './folder-add-dialog'
+import Dialog from './dialog'
 import { useFolderRowActions } from './folder-row-actions'
 import styles from './managed-folder-panel.module.css'
 
@@ -83,6 +84,22 @@ export interface ManagedFolderControl {
   startAdd: () => void
   startEdit: (folder: Folder) => void
   startDelete: (folder: Folder) => void
+}
+
+/** 畳んだフォルダ列を開く窓。既存の保存先と行の操作をそのまま受け取る。 */
+export function FolderManagementDialog({ open, rows, activeId, onSelect, onAdd, onClose, children }: {
+  open: boolean
+  rows: FolderPanelRow[]
+  activeId: string
+  onSelect: (id: string) => void
+  onAdd?: () => void
+  onClose: () => void
+  children?: ReactNode
+}) {
+  return <Dialog open={open} title="フォルダを管理" onCancel={onClose} footer={null}>
+    <FolderPanel rows={rows} activeId={activeId} onSelect={id => { onSelect(id); onClose() }}
+      onAddFolder={onAdd ? () => { onClose(); onAdd() } : undefined} addFolderLabel="フォルダを追加">{children}</FolderPanel>
+  </Dialog>
 }
 
 export interface ManagedFolderPanelProps {

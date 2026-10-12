@@ -24,7 +24,7 @@ describe('#976 デザイン統一', () => {
   it('U080: 書体の正本は --font-sans で、body は inline style ではなく font-sans を読む', () => {
     // ★V7「見た目の物差し」§3: 「Inter, Noto Sans JP」の順。英字と数字は
     // Inter（next/font が --font-inter を出す）、かなと漢字は Noto Sans JP。
-    expect(globals).toMatch(/--font-sans:\s*var\(--font-inter\),\s*var\(--font-noto-sans-jp\),\s*"Hiragino Sans",\s*"Yu Gothic",\s*system-ui,\s*sans-serif;/)
+    expect(globals).toMatch(/--font-sans:\s*var\(--font-noto-sans-jp\),\s*"Noto Sans JP",\s*var\(--font-inter\),\s*Inter,\s*sans-serif;/)
     expect(layout).toContain('font-sans')
     expect(layout).not.toContain('fontFamily')
     expect(layout).toContain("from 'next/font/google'")

@@ -16,7 +16,6 @@ import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)))
 const EXCEPTIONS = new Set([
-  'app/scenarios/mode-v8.tsx',
   /*
    * リマインダV8の選ぶカード（ChoiceCardV8）は共通 RadioCard が持たない
    * 「アイコン左上・丸右上」の形。丸は本物の input[type=radio] で、
@@ -28,7 +27,6 @@ const EXCEPTIONS = new Set([
    * カード型で表のセルに入らず、共通 Checkbox は複数選択の意味になる。
    * 本物の input[type=radio]（name 群・aria-label 付き）で意味を保つ。
    */
-  'app/events/change-review/change-review-v8.tsx',
 ])
 
 function walk(dir: string, out: string[] = []): string[] {

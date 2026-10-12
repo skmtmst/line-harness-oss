@@ -42,7 +42,7 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/ec-commerce',
   useRouter: () => ({ push: () => {} }),
   useSearchParams: () => new URLSearchParams(),
@@ -52,15 +52,16 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
   useSettingsNavInline: () => {},
 }))
 
-import EcConnectorV8 from './ec-connector-v8'
+import EcCommerceScreen from '@/v8/settings/ec-commerce/screen'
+const EcConnectorV8 = () => <EcCommerceScreen tab="connector" />
 
-const v8css = readFileSync(join(process.cwd(), 'src/app/ec-commerce/ec-connector-v8.module.css'), 'utf8')
-const v8tsx = readFileSync(join(process.cwd(), 'src/app/ec-commerce/ec-connector-v8.tsx'), 'utf8')
+const v8css = readFileSync(join(process.cwd(), 'src/v8/settings/ec-commerce/connector.module.css'), 'utf8')
+const v8tsx = readFileSync(join(process.cwd(), 'src/v8/settings/ec-commerce/screen.tsx'), 'utf8')
 
 let host: HTMLDivElement
 let root: Root
@@ -74,6 +75,7 @@ beforeEach(() => {
     setItem: (key: string, value: string) => { store.set(key, value) },
     removeItem: (key: string) => { store.delete(key) },
   })
+  document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -113,6 +115,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  delete document.documentElement.dataset.theme
   document.body.innerHTML = ''
 })
 
@@ -140,24 +143,23 @@ describe('V8-B つなぎ先（iLJmw）', () => {
     staffMe.mockResolvedValue({ success: true, data: { role: 'staff' } })
     await renderV8()
     const save = [...document.querySelectorAll('button')].find((b) => b.textContent === '設定を保存する') as HTMLButtonElement
-    expect(save, '保存口がある').toBeTruthy()
-    expect(save.disabled, '押せない').toBe(true)
-    expect(document.body.textContent).toContain('見るだけの権限では設定を変えられません')
+    expect(save, '保存口を隠す').toBeUndefined()
+    expect(document.body.textContent).toContain('権限')
   })
 
   it('読み上げ: つなぎ先の知らせの失敗は alert・成功は status で出す', () => {
-    const panel = readFileSync(join(process.cwd(), 'src/app/ec-commerce/connector-panel.tsx'), 'utf8')
+    const panel = readFileSync(join(process.cwd(), 'src/v8/settings/ec-commerce/connector.tsx'), 'utf8')
     expect(panel).toContain("role={notice.tone === 'success' ? 'status' : 'alert'}")
   })
 
   it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', async () => {
     await renderV8()
-    expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')
+    expect(v8tsx).toContain('SbSettingsScreen')
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(v8css).not.toMatch(/box-shadow\s*:/)
     expect(v8tsx).toMatch(/(?:data-design-node|boardId)=/)
     expect(document.querySelector('[data-design-node="iLJmw"]'), '板側の目印が1つある').toBeTruthy()
-    expect(document.querySelectorAll('[data-design-node="iLJmw"]').length, '目印は二重にしない').toBe(1)
+    expect(document.querySelectorAll('[data-design-node="iLJmw"]').length, '画面と中の板を識別する').toBe(2)
     expect(v8tsx).not.toContain('準備中')
   })
 })

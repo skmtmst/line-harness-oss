@@ -17,7 +17,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
  */
 
 const account = vi.hoisted(() => ({ id: 'account-1' }))
-vi.mock('next/navigation', () => ({
+const notice = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shared/toast', () => ({ notifyToast: notice, notifySaved: notice }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -51,6 +54,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
+      tagGroups: { ...actual.api.tagGroups, list: vi.fn().mockResolvedValue({ success: true, data: [] }) },
       // 条件部品が選択肢を読みに行く口。本物へ飛ばさない。
       tags: { ...actual.api.tags, list: vi.fn() },
       scenarios: { ...actual.api.scenarios, list: vi.fn() },
@@ -73,7 +77,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 import { api } from '@/lib/api'
-import NewAutomationPage from './page'
+import { NewAutomationV8 as NewAutomationPage } from '@/v8/automations/create/create'
+import { pickAutomationTag, replaceFirstAutomationAction, openFirstAutomationAction } from '@/test-utils/automation-v8-interactions'
 
 const mockList = api.automations.list as unknown as ReturnType<typeof vi.fn>
 const mockResources = api.automations.draftResources as unknown as ReturnType<typeof vi.fn>
@@ -95,6 +100,8 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  notice.mockReset()
   account.id = 'account-1'
   window.sessionStorage.clear()
   window.history.replaceState(null, '', '/automations/new')
@@ -134,6 +141,8 @@ afterEach(async () => {
   root = null
   container = null
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
+  vi.unstubAllGlobals()
   vi.clearAllMocks()
 })
 
@@ -151,15 +160,6 @@ async function mountPage(): Promise<HTMLDivElement> {
   return container
 }
 
-/** ネイティブselectへ値を入れる。 */
-async function chooseOption(select: HTMLSelectElement, value: string): Promise<void> {
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')?.set
-    setter?.call(select, value)
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-  })
-}
-
 async function typeText(input: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
@@ -169,13 +169,13 @@ async function typeText(input: HTMLInputElement, value: string): Promise<void> {
 }
 
 async function clickButton(el: HTMLElement, text: string): Promise<void> {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === text)
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   await act(async () => { (button as HTMLButtonElement).click() })
 }
 
 function findButton(el: HTMLElement, text: string): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === text)
+  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   return button as HTMLButtonElement
 }
@@ -186,12 +186,11 @@ describe('AUDIT automation draft identity and data', () => {
     const el = await mountPage()
     // 素のURLでは前の下書きを読みに行かない（再開は ?draft= だけ）。
     expect(mockGet).not.toHaveBeenCalled()
-    const name = el.querySelector('input[id="au-name"]') as HTMLInputElement
+    const name = el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement
     expect(name.value).toBe('')
     await typeText(name, '別の新しいルール')
-    const tag = el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement
-    await chooseOption(tag, 'tag-1')
-    await clickButton(el, '下書きを保存する')
+    await pickAutomationTag('予約')
+    await clickButton(el, '下書きを保存')
     // 前の下書きを上書きせず、新しい下書きを作ってそこへ保存する。
     // DETAIL-13: 作成操作ごとの冪等鍵を渡す（この操作専用の鍵）。
     expect(mockCreate).toHaveBeenCalledWith(
@@ -203,20 +202,22 @@ describe('AUDIT automation draft identity and data', () => {
 
   it('D13b: ?draft= を付けた再開は番号・中身・版を一緒に読み、同じ下書きを更新する', async () => {
     sessionStorage.setItem('lh-automation-new-draft-v1', JSON.stringify({ 'account-1': { id: 'previous-draft', draftVersionId: 'saved-v1' } }))
-    mockGet.mockResolvedValue(ok({
+    const resumed = {
       id: 'previous-draft', draftVersionId: 'v7', name: '途中のルール', description: null,
       eventType: 'message_received', triggerConfig: { keyword: '予約' }, conditions: {},
       actions: [{ id: 'step-1', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' }],
-    }))
+    }
+    mockGet.mockImplementation(async () => ok({ ...resumed, draftVersionId: mockUpdate.mock.calls.length ? 'v2' : 'v7' }))
     window.history.pushState(null, '', '/automations/new?draft=previous-draft')
     const el = await mountPage()
     expect(mockGet).toHaveBeenCalledWith('previous-draft', 'account-1')
     // 名前と中身がフォームへ戻る。
-    expect((el.querySelector('input[id="au-name"]') as HTMLInputElement).value).toBe('途中のルール')
-    await clickButton(el, '下書きを保存する')
+    expect((el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement).value).toBe('途中のルール')
+    await clickButton(el, '下書きを保存')
     // 新しい下書きは作らず、読んだ版を条件に同じ下書きを更新する。
     expect(mockCreate).not.toHaveBeenCalled()
     expect(mockUpdate).toHaveBeenCalledWith('previous-draft', 'account-1', expect.objectContaining({ expectedDraftVersionId: 'v7' }))
+    expect(el.textContent).toContain('下書きに保存しました')
   })
 
   it('D13c: 再開の読み込みが終わるまで保存ボタンは押せない', async () => {
@@ -225,7 +226,7 @@ describe('AUDIT automation draft identity and data', () => {
     window.history.pushState(null, '', '/automations/new?draft=previous-draft')
     const el = await mountPage()
     expect(mockGet).toHaveBeenCalledWith('previous-draft', 'account-1')
-    const saveButton = findButton(el, '下書きを保存する')
+    const saveButton = findButton(el, '下書きを保存')
     expect(saveButton.disabled).toBe(true)
     expect(el.textContent).toContain('下書きを読み込んでいます')
     expect(mockUpdate).not.toHaveBeenCalled()
@@ -241,12 +242,12 @@ describe('AUDIT automation draft identity and data', () => {
       .mockRejectedValueOnce(new Error('network down'))
       .mockResolvedValue(ok({ id: 'draft-9', draftVersionId: 'v1' }))
     const el = await mountPage()
-    await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, 'やり直すルール')
-    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きを保存する')
+    await typeText(el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement, 'やり直すルール')
+    await pickAutomationTag('予約')
+    await clickButton(el, '下書きを保存')
     await act(async () => { await drainMicrotasks() })
     expect(mockCreate).toHaveBeenCalledTimes(1)
-    await clickButton(el, '下書きを保存する')
+    await clickButton(el, '下書きを保存')
     await act(async () => { await drainMicrotasks() })
     expect(mockCreate).toHaveBeenCalledTimes(2)
     const firstKey = mockCreate.mock.calls[0]?.[2]
@@ -263,12 +264,12 @@ describe('AUDIT automation draft identity and data', () => {
       .mockRejectedValueOnce(new Error('update failed'))
       .mockResolvedValue(ok({ draftVersionId: 'v2' }))
     const el = await mountPage()
-    await typeText(el.querySelector('input[id="au-name"]') as HTMLInputElement, 'やり直すルール')
-    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きを保存する')
+    await typeText(el.querySelector('input[id="v8-rule-name"]') as HTMLInputElement, 'やり直すルール')
+    await pickAutomationTag('予約')
+    await clickButton(el, '下書きを保存')
     await act(async () => { await drainMicrotasks() })
     expect(mockCreate).toHaveBeenCalledTimes(1)
-    await clickButton(el, '下書きを保存する')
+    await clickButton(el, '下書きを保存')
     await act(async () => { await drainMicrotasks() })
     expect(mockCreate).toHaveBeenCalledTimes(2)
     expect(mockCreate.mock.calls[1]?.[2]).toBe(mockCreate.mock.calls[0]?.[2])
@@ -280,9 +281,8 @@ describe('AUDIT automation draft identity and data', () => {
 
   it('D14: 店を切り替えると入力はその店の控えへ。別店の文面は残らず、戻れば復元する', async () => {
     const el = await mountPage()
-    await typeText(el.querySelector('#au-name') as HTMLInputElement, 'A店専用ルール')
-    const action = el.querySelector('select[id^="au-action"]') as HTMLSelectElement
-    await chooseOption(action, 'send_message')
+    await typeText(el.querySelector('#v8-rule-name') as HTMLInputElement, 'A店専用ルール')
+    await replaceFirstAutomationAction('メッセージを送る')
     const message = el.querySelector('textarea')!
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!
@@ -292,12 +292,12 @@ describe('AUDIT automation draft identity and data', () => {
     // A店 → B店。A店の文面がB店の画面へ残らない。
     account.id = 'account-2'
     await act(async () => { root!.render(<NewAutomationPage />) })
-    expect((el.querySelector('#au-name') as HTMLInputElement).value).toBe('')
-    expect(el.textContent).toContain('そのアカウントを選び直すと戻ります')
+    expect((el.querySelector('#v8-rule-name') as HTMLInputElement).value).toBe('')
+    expect(notice).toHaveBeenCalledWith(expect.stringContaining('そのアカウントを選び直すと戻ります'))
     // B店でB店の内容を入れて保存すると、B店の下書きとして作られる。
-    await typeText(el.querySelector('#au-name') as HTMLInputElement, 'B店のルール')
-    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きを保存する')
+    await typeText(el.querySelector('#v8-rule-name') as HTMLInputElement, 'B店のルール')
+    await pickAutomationTag('予約')
+    await clickButton(el, '下書きを保存')
     expect(mockCreate).toHaveBeenCalledWith(
       'received-message-tag', 'account-2', expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
     )
@@ -305,19 +305,20 @@ describe('AUDIT automation draft identity and data', () => {
     // B店 → A店。A店の入力がそのまま戻る。
     account.id = 'account-1'
     await act(async () => { root!.render(<NewAutomationPage />) })
-    expect((el.querySelector('#au-name') as HTMLInputElement).value).toBe('A店専用ルール')
+    expect((el.querySelector('#v8-rule-name') as HTMLInputElement).value).toBe('A店専用ルール')
+    if (!el.querySelector('textarea')) await openFirstAutomationAction()
     expect(el.querySelector('textarea')!.value).toBe('A店限定のお知らせ')
   })
 
   it('D15: 保存できたあとに「まだ保存していません」は残らない', async () => {
     const el = await mountPage()
-    await typeText(el.querySelector('#au-name') as HTMLInputElement, '保存済みルール')
-    await chooseOption(el.querySelector('select[aria-label="自動化で付けるタグ"]') as HTMLSelectElement, 'tag-1')
-    await clickButton(el, '下書きを保存する')
+    await typeText(el.querySelector('#v8-rule-name') as HTMLInputElement, '保存済みルール')
+    await pickAutomationTag('予約')
+    await clickButton(el, '下書きを保存')
     expect(el.textContent).toContain('下書きに保存しました')
     expect(el.textContent).not.toContain('まだ保存していません')
     // 保存のあとで直すと、ふたたび未保存側へ戻る。
-    await typeText(el.querySelector('#au-name') as HTMLInputElement, '保存済みルール・改')
+    await typeText(el.querySelector('#v8-rule-name') as HTMLInputElement, '保存済みルール・改')
     expect(el.textContent).toContain('保存したあとに内容を変更しています')
   })
 })

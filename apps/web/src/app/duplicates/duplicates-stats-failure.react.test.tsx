@@ -16,7 +16,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -151,7 +151,7 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
 
     // 候補一覧は残り、一覧の総数は見える。
     expect(host.textContent).toContain('田中太郎')
-    expect(host.textContent).toContain('18組中')
+    expect(host.textContent).toContain('18組')
     // 件数矛盾：未取得のカードを「0組」と誤案内しない。
     expect(host.textContent).not.toContain('0組')
     // 総数が確実な重複候補は一覧の total、内訳不明は「—」+理由。
@@ -182,7 +182,7 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
     }
 
     expect(host.textContent).toContain('然 本店')
-    expect(host.textContent).toContain('アカウント別ブレイクダウン')
+    expect(host.textContent).toContain('アカウントごとの重なり')
     expect(host.textContent).not.toContain('候補一覧は取得済みの内容を表示しています')
   })
 
@@ -193,7 +193,7 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
 
     expect(host.textContent).toContain('田中太郎')
     expect(host.textContent).toContain('1配信あたりの無駄')
-    expect(host.textContent).toContain('アカウント別ブレイクダウン')
+    expect(host.textContent).toContain('アカウントごとの重なり')
     expect(host.textContent).not.toContain('候補一覧は取得済みの内容を表示しています')
   })
 
@@ -202,7 +202,7 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
     fixture.list.mockResolvedValue({ success: true, data: listData([]) })
     await renderPage()
 
-    expect(host.textContent).toContain('条件に合う重複候補はありません')
+    expect(host.textContent).toContain('重複の候補はありません')
     expect(host.textContent).toContain('0組')
     expect(host.textContent).not.toContain('候補一覧を読み込めませんでした')
   })
@@ -212,13 +212,11 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
     fixture.list.mockRejectedValue(new ApiError(503))
     await renderPage()
 
-    expect(host.textContent).toContain('登録した内容は消えていません')
+    expect(host.textContent).toContain('重複の候補を読み込めませんでした')
 
     fixture.stats.mockResolvedValue({ success: true, data: statsData() })
     fixture.list.mockResolvedValue({ success: true, data: listData([candidate()]) })
-    const buttons = Array.from(host.querySelectorAll('button'))
-    expect(buttons.length).toBeGreaterThan(0)
-    await act(async () => { buttons[0].click() })
+    await act(async () => { retryButton('もう一度試す').click() })
     for (let i = 0; i < 5; i += 1) {
       await act(async () => {})
     }
@@ -227,3 +225,5 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
     expect(host.textContent).not.toContain('登録した内容は消えていません')
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())

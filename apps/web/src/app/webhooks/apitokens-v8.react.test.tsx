@@ -106,9 +106,9 @@ test('v8 では ralAc の鍵の表（札・入れ替える）が出る', async (
   expect(board?.textContent).toContain('鍵を発行する')
 })
 
-test('v7 では従来の鍵タブが出て ralAc は出ない', async () => {
+test('旧テーマ属性でも現役の鍵タブが出て ralAc が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="ralAc"]')).toBeNull()
+  expect(host.querySelector('[data-design-node="ralAc"]')).not.toBeNull()
 })
 
 test('v8 で行を右クリックすると「…」と同じ止めるが出る', async () => {

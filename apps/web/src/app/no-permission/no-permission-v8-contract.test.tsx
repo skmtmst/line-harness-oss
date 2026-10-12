@@ -8,10 +8,10 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import NoPermissionV8 from './no-permission-v8'
+import NoPermissionV8 from '@/v8/no-permission/no-permission'
 
 // happy-dom では import.meta.url が file 形にならないため、作業場所からの相対で読む。
-const BOARD = readFileSync('src/app/no-permission/no-permission-v8.tsx', 'utf8')
+const BOARD = readFileSync('src/v8/no-permission/no-permission.tsx', 'utf8')
 const VARS_V8 = readFileSync('src/app/contents/vars/list-v8.tsx', 'utf8')
 
 /*

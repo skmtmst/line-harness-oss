@@ -57,7 +57,8 @@ describe('V8の数の帯とメンバー一覧', () => {
 
   it('LINE通知の数の帯は小さい幅で1列、640px以上で2列にする', () => {
     const page = read('app/line-notifications/page.tsx')
-    expect(page).toContain('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4')
+    expect(page).toContain('<KpiBand presentation="band"')
+    expect(read('components/shared/kpi-card.module.css')).toMatch(/@media \(max-width: 639px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/)
     expect(page).toContain('kpisWithSendCountsState.map(renderKpiCard)')
   })
 
@@ -74,24 +75,24 @@ describe('V8の数の帯とメンバー一覧', () => {
 /** 旧来の折りたたみ部品を引き続き使う画面。 */
 describe('KPI折りたたみの適用（#975 U060）', () => {
   const targets: Array<[string, string]> = [
-    ['app/conversions/page.tsx', 'KpiCollapse'],
-    ['app/automations/page.tsx', 'KpiCollapse'],
-    ['app/automations/runs/page.tsx', 'KpiCollapse'],
+    ['v8/conversions/list.tsx', 'KpiBand'],
+    ['v8/automations/shell.tsx', 'KpiBand'],
+    ['app/automations/runs/page.tsx', 'KpiBand'],
     // app/hq/page.tsx は V8 のホーム（v8/hq/home.tsx・絵どおりの数の帯）を出すだけになったので外した（2026-10-09 V7 削除）。
-    ['app/nen-campaigns/nen-overview.tsx', 'KpiCollapse'],
-    ['app/ec-commerce/page.tsx', 'KpiCollapse'],
-    ['app/emergency/page.tsx', 'KpiCollapse'],
-    ['app/nen/members/members-tab.tsx', 'KpiCollapse'],
-    ['app/nen/members/lifetime-tab.tsx', 'KpiCollapse'],
-    ['app/nen/pets/pets-tab.tsx', 'KpiCollapse'],
-    ['app/nen/health/health-tab.tsx', 'KpiCollapse'],
-    ['components/hq/banners/banner-shell.tsx', 'KpiCollapse'],
+    ['v8/nen-campaigns/list.tsx', 'KpiBand'],
+    ['v8/settings/ec-commerce/screen.tsx', 'KpiBand'],
+    ['v8/settings/emergency/history-details.tsx', 'KpiBand'],
+    ['v8/nen-members/members.tsx', 'KpiBand'],
+    ['v8/nen-members/members.tsx', 'KpiBand'],
+    ['v8/nen-pets/pets.tsx', 'KpiBand'],
+    ['v8/nen-health/health.tsx', 'KpiBand'],
+    ['v8/hq-banners/list.tsx', 'KpiBand'],
   ]
 
   for (const [path, marker] of targets) {
     it(`${path} が KpiCollapse を使う`, () => {
       const source = readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')
-      expect(source).toContain(`from '@/components/ui/kpi-collapse'`)
+      expect(source).toContain(marker === 'KpiBand' ? `from '@/components/shared/kpi-band'` : `from '@/components/ui/kpi-collapse'`)
       expect(source).toContain(`<${marker}`)
     })
   }

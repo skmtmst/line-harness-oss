@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { photoReviewEntryFrom, photoReviewStatusFrom } from './photo-review-query'
+import { photoReviewEntryFrom, photoReviewStatusFrom } from '@/v8/nen-posts/query'
 
 /*
  * #666 N-004: 深掘りのURLの読み方。実画面での効き目は

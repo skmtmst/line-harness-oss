@@ -17,35 +17,38 @@ const m = vi.hoisted(() => ({ summary: vi.fn() }))
 type DrawerProps = { open: boolean; status: string; summary: { pet: { name: string } } | null; onClose: () => void }
 
 vi.mock('@/components/shared/page-header', () => ({ default: ({ actions }: { actions?: React.ReactNode }) => <div>{actions}</div> }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/lib/nen-pets-api', () => ({ nenPetsApi: { healthSummary: m.summary } }))
-vi.mock('./health-tab', () => ({
-  default: ({ onOpenSummary }: { onOpenSummary: (petId: string) => void }) => (
-    <>
-      <button onClick={() => onOpenSummary('pet-A')}>開くA</button>
-      <button onClick={() => onOpenSummary('pet-B')}>開くB</button>
-    </>
-  ),
-}))
-vi.mock('./items-tab', () => ({ default: () => null }))
-vi.mock('./summary-drawer', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/lib/nen-pets-api', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/nen-pets-api')>(), nenPetsApi: { healthSummary: m.summary, health: async () => ({ success: true, data: LIST }) } }))
+vi.mock('@/v8/nen-health/summary', () => ({
   default: ({ open, status, summary, onClose }: DrawerProps) =>
-    open ? (
+    (
       <div>
         <span data-testid="drawer-body">{status === 'loading' ? '読み込み中' : summary?.pet.name}</span>
         <button onClick={onClose}>閉じる</button>
       </div>
-    ) : null,
+    ),
   SummarySheet: ({ summary }: { summary: { pet: { name: string } } }) => <div data-testid="print-sheet">{summary.pet.name}</div>,
 }))
 
 import Page from './page'
 
+const ROW = {
+ pet:{id:'pet-A',name:'PetA',callName:'PetA',animalType:'dog',breed:'',ageLabel:'1',imageUrl:null},
+ owner:{friendId:'f1',name:'Owner',customerId:null},lastLoggedOn:null,lastLoggedLabel:'',daysSinceLast:null,count30d:0,totalRecords:0,
+ weightSeries:[null,null,null,null,null,null,null,null],latestWeightKg:null,weightChangePercent:null,latestStool:null,latestAppetite:null,changes:[],concerning:false,
+}
+const LIST={items:[ROW,{...ROW,pet:{...ROW.pet,id:'pet-B',name:'PetB'}}],total:2,page:1,pageSize:20,kpis:{recordsThisWeek:0,petsWithRecords:2,petsTotal:2,concerning:0,silent30:2}}
+function openPet(name:string) {
+ fireEvent.click(screen.getByRole('button',{name:'\u300c'+name+'\u300d\u306e\u64cd\u4f5c'}))
+ fireEvent.click(screen.getByRole('menuitem',{name:'30\u65e5\u306e\u307e\u3068\u3081'}))
+}
+
+
 const summaryOf = (name: string) => ({ success: true, data: { pet: { name } } })
 const flush = () => act(async () => { await Promise.resolve() })
-const printButton = () => screen.getByRole('button', { name: '獣医師向けPDFを書き出す' }) as HTMLButtonElement
+const printButton = () => screen.getByRole('button', { name: '獣医師向け PDF を書き出す' }) as HTMLButtonElement
 
 afterEach(cleanup)
 beforeEach(() => {
@@ -60,10 +63,10 @@ describe('DEEP-23 30日のまとめ', () => {
       .mockImplementationOnce(() => new Promise((resolve) => { resolveA = resolve }))
       .mockResolvedValueOnce(summaryOf('ペットB'))
     render(<Page />)
-    fireEvent.click(screen.getByText('開くA'))
+    await screen.findByText('PetA'); openPet('PetA')
     await flush()
     fireEvent.click(screen.getByText('閉じる'))
-    fireEvent.click(screen.getByText('開くB'))
+    openPet('PetB')
     await flush()
 
     expect(screen.getByTestId('print-sheet').textContent).toBe('ペットB')
@@ -80,11 +83,11 @@ describe('DEEP-23 30日のまとめ', () => {
       .mockResolvedValueOnce(summaryOf('ペットA'))
       .mockImplementationOnce(() => new Promise(() => {}))
     render(<Page />)
-    fireEvent.click(screen.getByText('開くA'))
+    await screen.findByText('PetA'); openPet('PetA')
     await flush()
     expect(screen.getByTestId('print-sheet').textContent).toBe('ペットA')
 
-    fireEvent.click(screen.getByText('開くB'))
+    openPet('PetB')
     await flush()
     // Bの取得中はAの面を印刷対象にしない
     expect(screen.queryByTestId('print-sheet')).toBeNull()
@@ -95,7 +98,7 @@ describe('DEEP-23 30日のまとめ', () => {
   it('アカウントを切り替えると開いているまとめは閉じ、印刷も出せなくなる', async () => {
     m.summary.mockResolvedValueOnce(summaryOf('ペットA'))
     const v = render(<Page />)
-    fireEvent.click(screen.getByText('開くA'))
+    await screen.findByText('PetA'); openPet('PetA')
     await flush()
     expect(screen.getByTestId('print-sheet').textContent).toBe('ペットA')
 

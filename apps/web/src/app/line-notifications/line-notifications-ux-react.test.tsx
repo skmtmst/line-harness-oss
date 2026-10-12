@@ -32,8 +32,8 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => null,
   useMergedTab: () => 'customer',
 }))
-vi.mock('@/components/line-notifications/notification-run-list', () => ({ default: () => null }))
-vi.mock('./operator-notification-rules', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({ default: () => null }))
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({ default: () => null }))
 
 vi.mock('@/lib/api', () => {
   class ApiError extends Error {

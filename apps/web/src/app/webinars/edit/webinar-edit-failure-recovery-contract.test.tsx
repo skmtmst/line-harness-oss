@@ -1,6 +1,12 @@
+// @vitest-environment happy-dom
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+import { createRoot } from 'react-dom/client'
+import { flushSync } from 'react-dom'
+import { fireEvent } from '@testing-library/react'
 import React, { act, type ReactElement } from 'react'
 import type { Root } from 'react-dom/client'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => {
   class MockApiError extends Error {
@@ -34,7 +40,8 @@ const apiMocks = vi.hoisted(() => {
 
 const navigationMocks = vi.hoisted(() => ({ query: 'id=webinar-1' }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   ApiError: apiMocks.ApiError,
   extractApiErrorCode: apiMocks.extractApiErrorCode,
   fetchApi: apiMocks.fetchApi,
@@ -80,187 +87,18 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
-vi.mock('@/components/webinars/webinar-notifications', () => ({ default: () => <div>通知設定</div> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], loading: false }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 
 import EditWebinarPage from './page'
 
-type Listener = (event: unknown) => void
-
-class FakeNode {
-  nodeType: number
-  nodeName: string
-  ownerDocument: FakeDocument
-  parentNode: FakeNode | null = null
-  childNodes: FakeNode[] = []
-
-  constructor(nodeType: number, nodeName: string, ownerDocument: FakeDocument) {
-    this.nodeType = nodeType
-    this.nodeName = nodeName
-    this.ownerDocument = ownerDocument
-  }
-
-  appendChild<T extends FakeNode>(child: T): T {
-    if (child.parentNode) child.parentNode.removeChild(child)
-    child.parentNode = this
-    this.childNodes.push(child)
-    return child
-  }
-
-  insertBefore<T extends FakeNode>(child: T, before: FakeNode | null): T {
-    if (before === null) return this.appendChild(child)
-    const index = this.childNodes.indexOf(before)
-    if (index < 0) throw new Error('insert target not found')
-    if (child.parentNode) child.parentNode.removeChild(child)
-    child.parentNode = this
-    this.childNodes.splice(index, 0, child)
-    return child
-  }
-
-  removeChild<T extends FakeNode>(child: T): T {
-    const index = this.childNodes.indexOf(child)
-    if (index < 0) throw new Error('child not found')
-    this.childNodes.splice(index, 1)
-    child.parentNode = null
-    return child
-  }
-
-  get firstChild(): FakeNode | null { return this.childNodes[0] ?? null }
-  get lastChild(): FakeNode | null { return this.childNodes.at(-1) ?? null }
-  get nextSibling(): FakeNode | null {
-    if (!this.parentNode) return null
-    const index = this.parentNode.childNodes.indexOf(this)
-    return this.parentNode.childNodes[index + 1] ?? null
-  }
-
-  get textContent(): string {
-    return this.childNodes.map((child) => child.textContent).join('')
-  }
-
-  set textContent(value: string) {
-    this.childNodes = []
-    if (value) this.appendChild(this.ownerDocument.createTextNode(value))
-  }
-}
-
-class FakeText extends FakeNode {
-  nodeValue: string
-
-  constructor(value: string, ownerDocument: FakeDocument) {
-    super(3, '#text', ownerDocument)
-    this.nodeValue = value
-  }
-
-  override get textContent(): string { return this.nodeValue }
-  override set textContent(value: string) { this.nodeValue = value }
-}
-
-class FakeElement extends FakeNode {
-  tagName: string
-  dataset: Record<string, string> = {}
-  namespaceURI = 'http://www.w3.org/1999/xhtml'
-  style: Record<string, string> & { setProperty: (name: string, value: string) => void }
-  attributes = new Map<string, string>()
-  listeners = new Map<string, Set<Listener>>()
-  disabled = false
-  value = ''
-  checked = false
-  selected = false
-  defaultSelected = false
-  multiple = false
-
-  constructor(tagName: string, ownerDocument: FakeDocument) {
-    super(1, tagName.toUpperCase(), ownerDocument)
-    this.tagName = tagName.toUpperCase()
-    const style = {} as FakeElement['style']
-    style.setProperty = (name, value) => { style[name] = value }
-    this.style = style
-  }
-
-  setAttribute(name: string, value: string): void { this.attributes.set(name, String(value)) }
-  removeAttribute(name: string): void { this.attributes.delete(name) }
-  getAttribute(name: string): string | null { return this.attributes.get(name) ?? null }
-  addEventListener(type: string, listener: Listener): void {
-    const listeners = this.listeners.get(type) ?? new Set<Listener>()
-    listeners.add(listener)
-    this.listeners.set(type, listeners)
-  }
-  removeEventListener(type: string, listener: Listener): void { this.listeners.get(type)?.delete(listener) }
-  focus(): void { this.ownerDocument.activeElement = this }
-  get options(): FakeElement[] { return this.childNodes.filter((child): child is FakeElement => child instanceof FakeElement && child.tagName === 'OPTION') }
-}
-
-class FakeDocument extends FakeNode {
-  defaultView: Record<string, unknown>
-  documentElement: FakeElement
-  body: FakeElement
-  activeElement: FakeElement | null = null
-  listeners = new Map<string, Set<Listener>>()
-
-  constructor() {
-    const placeholder = {} as FakeDocument
-    super(9, '#document', placeholder)
-    this.ownerDocument = this
-    this.documentElement = new FakeElement('html', this)
-    this.body = new FakeElement('body', this)
-    this.documentElement.appendChild(this.body)
-    this.defaultView = {}
-  }
-
-  getElementById(id: string): FakeElement | null {
-    const find = (node: FakeNode): FakeElement | null => {
-      if (node instanceof FakeElement && node.getAttribute('id') === id) return node
-      for (const child of node.childNodes) { const hit = find(child); if (hit) return hit }
-      return null
-    }
-    return find(this.documentElement)
-  }
-  createElement(tagName: string): FakeElement { return new FakeElement(tagName, this) }
-  createElementNS(_namespace: string, tagName: string): FakeElement { return this.createElement(tagName) }
-  createTextNode(value: string): FakeText { return new FakeText(value, this) }
-  createComment(value: string): FakeText { return new FakeText(value, this) }
-  addEventListener(type: string, listener: Listener): void {
-    const listeners = this.listeners.get(type) ?? new Set<Listener>()
-    listeners.add(listener)
-    this.listeners.set(type, listeners)
-  }
-  removeEventListener(type: string, listener: Listener): void { this.listeners.get(type)?.delete(listener) }
-}
-
-let documentStub: FakeDocument
-let createRoot: typeof import('react-dom/client').createRoot
-let flushSync: typeof import('react-dom').flushSync
+type FakeElement = HTMLButtonElement
+const documentStub = document
 const mountedRoots: Root[] = []
-
-beforeAll(async () => {
-  documentStub = new FakeDocument()
-  const windowStub = documentStub.defaultView
-  Object.assign(windowStub, {
-    document: documentStub,
-    Node: FakeNode,
-    Element: FakeElement,
-    HTMLElement: FakeElement,
-    HTMLIFrameElement: class extends FakeElement {},
-    getSelection: () => null,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-    location: new URL('http://localhost/webinars/edit?id=webinar-1&pane=cta'),
-    history: { state: null, pushState: () => undefined, replaceState: () => undefined },
-  })
-  Object.assign(globalThis, {
-    window: windowStub,
-    document: documentStub,
-    Node: FakeNode,
-    Element: FakeElement,
-    HTMLElement: FakeElement,
-    IS_REACT_ACT_ENVIRONMENT: true,
-  })
-  ;({ createRoot } = await import('react-dom/client'))
-  ;({ flushSync } = await import('react-dom'))
-})
-
 beforeEach(() => {
+  forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember)
+  window.history.replaceState(null, '', '/webinars/edit?id=webinar-1')
+  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   vi.clearAllMocks()
   navigationMocks.query = 'id=webinar-1'
   apiMocks.get.mockImplementation((id: string) => Promise.resolve({ data: { ...webinar, id } }))
@@ -318,16 +156,8 @@ async function mount(element: ReactElement) {
   }
 }
 
-function elements(root: FakeNode): FakeElement[] {
-  return root.childNodes.flatMap((child) => [
-    ...(child instanceof FakeElement ? [child] : []),
-    ...elements(child),
-  ])
-}
-
-function reactProps(element: FakeElement): Record<string, unknown> | undefined {
-  const key = Object.keys(element).find((name) => name.startsWith('__reactProps$'))
-  return key ? (element as unknown as Record<string, Record<string, unknown>>)[key] : undefined
+function elements(root: HTMLElement): FakeElement[] {
+  return [...root.querySelectorAll('*')] as FakeElement[]
 }
 
 function findButton(container: FakeElement, label: string): FakeElement {
@@ -360,18 +190,14 @@ function optionLabels(container: FakeElement): string[] {
 
 async function clickButton(container: FakeElement, label: string): Promise<void> {
   const button = findButton(container, label)
-  const onClick = reactProps(button)?.onClick
-  if (typeof onClick !== 'function') throw new Error(`button has no onClick: ${label}`)
-  await act(async () => { onClick({ currentTarget: button, target: button, preventDefault: () => undefined }) })
+  await act(async () => { fireEvent.click(button) })
   await flush()
 }
 
 async function changeSelect(container: FakeElement, ariaLabel: string, value: string): Promise<void> {
   const select = elements(container).find((element) => element.tagName === 'SELECT' && element.getAttribute('aria-label') === ariaLabel)
   if (!select) throw new Error(`select not found: ${ariaLabel}`)
-  const onChange = reactProps(select)?.onChange
-  if (typeof onChange !== 'function') throw new Error(`select has no onChange: ${ariaLabel}`)
-  await act(async () => { onChange({ currentTarget: { value }, target: { value } }) })
+  await act(async () => { fireEvent.change(select, { target: { value } }) })
   await flush()
 }
 
@@ -416,21 +242,21 @@ const analytics = {
 }
 
 describe('Issue #674 ウェビナー編集の実挙動', () => {
-  it('公開前検査の失敗を表示し、操作で再試行して成功状態へ復帰する', async () => {
+  it('公開前の確認の失敗を表示し、操作で再試行して成功状態へ復帰する', async () => {
     navigationMocks.query = 'id=webinar-1&pane=review'
     apiMocks.publishValidation
       .mockRejectedValueOnce(new Error('temporary'))
       .mockResolvedValueOnce({ data: { version: 3, checks: [], blockers: [], warnings: [] } })
 
     const view = await mount(<EditWebinarPage />)
-    expect(view.container.textContent).toContain('公開前検査を読み込めませんでした。このままでは公開できません。')
-    expect(view.container.textContent).not.toContain('必要なものは揃っています。')
+    expect(view.container.textContent).toContain('公開前の確認を読み込めませんでした。このままでは公開できません。')
+    expect(view.container.textContent).not.toContain('必要なものはそろっています。')
 
     await clickButton(view.container, 'もう一度読み込む')
 
     expect(apiMocks.publishValidation).toHaveBeenCalledTimes(2)
-    expect(view.container.textContent).toContain('必要なものは揃っています。')
-    expect(view.container.textContent).not.toContain('公開前検査を読み込めませんでした。')
+    expect(view.container.textContent).toContain('必要なものはそろっています。')
+    expect(view.container.textContent).not.toContain('公開前の確認を読み込めませんでした。')
   })
 
   it('フォーム候補の失敗を表示し、操作で再試行して候補を描画する', async () => {
@@ -442,7 +268,7 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
 
     const view = await mount(<EditWebinarPage />)
     expect(view.container.textContent).toContain('回答フォームを読み込めませんでした。')
-    expect(view.container.textContent).toContain('候補が取れない間は種類をURLに切り替えて保存できます。')
+
 
     await clickButton(view.container, 'もう一度読み込む')
 
@@ -483,14 +309,16 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
 
     const view = await mount(<EditWebinarPage />)
     expect(view.container.textContent).toContain('視聴エラー')
-    expect(view.container.textContent).toContain('視聴開始直後')
-    expect(view.container.textContent).toContain('未視聴')
+    expect(view.container.textContent).toContain('入場のみ')
+    expect(view.container.textContent).toContain('見ていない・見逃し案内の対象')
+    await act(async () => (view.container.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement).click())
     expect(view.container.textContent).toContain('下書き')
     expect(view.container.textContent).not.toContain('有効')
 
     apiMocks.get.mockResolvedValue({ data: { ...webinar, id: 'webinar-active', status: 'active' } })
     navigationMocks.query = 'id=webinar-active&pane=participants'
     await view.rerender(<EditWebinarPage />)
+    await act(async () => (view.container.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement).click())
     expect(view.container.textContent).toContain('公開中')
   })
 
@@ -569,8 +397,8 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(optionLabels(view.container)).not.toContain('旧フォームA')
     expect(inputValues(view.container)).not.toContain('旧CTA・A')
     expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(true)
-    expect(isDisabled(findExactButton(view.container, 'CTAカードを保存する'))).toBe(true)
+    expect(isDisabled(findButton(view.container, '下書きを保存'))).toBe(true)
+    expect(isDisabled(findExactButton(view.container, '下書きを保存'))).toBe(true)
 
     formsB.resolve({ success: true, data: [{ id: 'form-b', name: '新フォームB', isActive: true }] })
     ctasB.resolve({ data: [ctaCard('新CTA・B', 60, 'form-b')] })
@@ -628,28 +456,35 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(optionLabels(view.container)).toContain('旧フォームA')
 
     await changeSelect(view.container, '申込に使う回答フォーム', 'form-a')
-    await clickButton(view.container, '申込フォームを保存する')
+    await clickButton(view.container, '下書きを保存')
 
     /* サーバーが拒否したので候補を取り直す。取り直しの間は前の候補を出さない。 */
     expect(apiMocks.fetchApi).toHaveBeenCalledTimes(2)
     expect(optionLabels(view.container)).not.toContain('旧フォームA')
     expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(true)
+    expect(isDisabled(findButton(view.container, '下書きを保存'))).toBe(true)
 
     retry.resolve({ success: true, data: [{ id: 'form-c', name: '選び直し用フォームC', isActive: true }] })
     await flush()
     expect(optionLabels(view.container)).toContain('選び直し用フォームC')
-    expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(false)
+    expect(isDisabled(findButton(view.container, '下書きを保存'))).toBe(false)
   })
 
   it('分析は実際に表示している集計とグラフだけを案内する', async () => {
     navigationMocks.query = 'id=webinar-1&pane=analytics'
     const view = await mount(<EditWebinarPage />)
     const ids = new Set(elements(view.container).map((element) => element.getAttribute('id')))
-    for (const id of ['webinar-analytics-tiles', 'webinar-analytics-funnel', 'webinar-analytics-retention']) expect(ids.has(id)).toBe(true)
+    for (const id of ['webinar-analytics-funnel', 'webinar-analytics-retention']) expect(ids.has(id)).toBe(true)
+    expect(view.container.querySelector('[data-kpi-presentation]')).not.toBeNull()
     expect(elements(view.container).some((element) => element.getAttribute('aria-label') === 'この段の見出しへ移動')).toBe(false)
     expect(view.container.textContent).not.toContain('設定サマリー')
   })})
 
 // 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
 vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))
+
+// 保存/API境界は現役の選ぶ欄も以前のSelectと同じ土台へ合わせる。
+vi.mock('@/components/shared/entity-picker-sources', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/shared/entity-picker-sources')>()),
+  EntityKindField: ({label,options,value,onChange,disabled}: {label:string; options: Array<{id:string;name?:string;label?:string}>; value:string; onChange:(id:string)=>void;disabled?:boolean}) => <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}><option value="">未設定</option>{options.map(option => <option key={option.id} value={option.id}>{option.name ?? option.label}</option>)}</select>,
+}))

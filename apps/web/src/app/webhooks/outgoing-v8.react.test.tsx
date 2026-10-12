@@ -201,9 +201,9 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタ�
   expect(clickable.some((element) => element.textContent?.includes('中身を見る'))).toBe(true)
 })
 
-test('v7 では従来の一覧が出て ZSbFY は出ない', async () => {
+test('旧テーマ属性でも現役の一覧が出て ZSbFY が出る', async () => {
   await renderPage()
-  expect(host.querySelector('[data-design-node="ZSbFY"]')).toBeNull()
+  expect(host.querySelector('[data-design-node="ZSbFY"]')).not.toBeNull()
 })
 
 test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗したら戻る', async () => {

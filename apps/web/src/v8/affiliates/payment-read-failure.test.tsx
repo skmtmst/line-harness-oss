@@ -10,6 +10,15 @@ vi.mock('@/lib/api',async original=>{const actual=await original<typeof import('
 import PaymentTab from './payment'
 beforeEach(()=>{f.summaries.mockReset().mockResolvedValue({success:true,data:[]});f.current.mockReset().mockResolvedValue({success:true,data:null})})
 afterEach(cleanup)
+it('支払い一覧の壊れた返事を空の一覧にせず、読み直す',async()=>{
+ f.summaries.mockResolvedValueOnce({success:true,data:null})
+ render(<PaymentTab/>)
+ await screen.findByText('支払いの集計を読み込めませんでした')
+ expect(screen.queryByText('今回締められる報酬はありません')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:/もう一度/}))
+ await screen.findByText('今回締められる報酬はありません')
+ expect(f.summaries).toHaveBeenCalledTimes(2)
+})
 it.each(['summaries','current'] as const)('B-241：支払いの%s拒否を未処理なし・未締めとして扱わず読み直す',async(key)=>{
  f[key].mockRejectedValueOnce(new Error('fixture failure'))
  render(<PaymentTab/>)

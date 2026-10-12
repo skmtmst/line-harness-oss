@@ -24,6 +24,7 @@ import { ReadValue } from './parts'
 import type { EditContext, PaneSaveProps, WizardChrome } from './types'
 import form from './form.module.css'
 import styles from './video.module.css'
+import VideoMetadata from './video-metadata'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -34,7 +35,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
  * 動画（差し替える・準備の段）→ 公開期間（オンデマンド）／開催回（日時指定）→ 配信枠 → 視聴の数え方。
  * 右は公開ページでの見え方。
- * 口・保存の決まりは app/webinars/edit/video-v8.tsx・video-stages.tsx・scheduled-session-row.tsx と同じ（BEHAVIOR.md）。
+ * 口・保存の決まりは BEHAVIOR.md に記録。
  */
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
@@ -241,7 +242,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
     return () => registerSave(null)
   }, [registerSave, readOnly])
 
-  const fileName = webinar.videoPrefix ? (webinar.videoPrefix.split('/').pop() ?? webinar.videoPrefix) : null
+
   const showStages = asset !== undefined && asset !== null && asset.stage !== 'ready'
   const stageIndex = asset ? STAGE_ORDER.indexOf(asset.stage) : -1
   const firstOnce = webinar.schedule.find((rule) => rule.type === 'once' && rule.at)
@@ -265,7 +266,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
   )
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
       boardId={scheduled ? 'LPOe7' : 'VWNaA'}
       title={chrome.title}
       actions={chrome.actions}
@@ -273,16 +274,16 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
       steps={chrome.steps}
       help={scheduled
         ? '日時指定配信：開催回ごとに日時と定員を決めます。動画は準備（変換など）が済んでから公開できます。'
-        : '動画と、見られる期間を決めます。見終わったかどうかの決め方もここで決めます。'}
+        : `動画と、見られる期間を決めます。見終わったかどうかの決め方もここで決めます。${hasVideo ? '動画を再生すると、視聴状況が友だちごとに記録されます。' : ''}`}
       footerActions={chrome.footerActions}
       status={chrome.status}
       preview={<>
         <h2 className={form.previewTitle}>公開ページでの見え方</h2>
         <div className={styles.pageCard}>
           <p className={styles.pageTitle} title={webinar.title}>{webinar.title}</p>
-          <span className={styles.player} aria-hidden="true"><Play size={32} /></span>
+          {hasVideo ? <span className={styles.player} aria-hidden="true"><Play size={32} /></span> : null}
           <p className={styles.pageNote}>
-            {scheduled && firstOnce?.at
+            {!hasVideo ? '動画を設定すると、友だちの画面での見え方がここに出ます。' : scheduled && firstOnce?.at
               ? `${shortJst(firstOnce.at)} から・${fmtJaDuration(webinar.durationSeconds)}`
               : `${webinar.publicationEndsAt ? '期間内だけ見られます' : 'いつでも見られます'}・${fmtJaDuration(webinar.durationSeconds)}`}
           </p>
@@ -300,8 +301,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
         <div className={styles.videoRow}>
           <span className={styles.thumb} aria-hidden="true"><Play size={18} /></span>
           <span className={styles.videoText}>
-            <span className={styles.videoName} title={fileName ?? undefined}>{fileName ?? '動画がまだ選ばれていません'}</span>
-            <span className={styles.videoMeta}>{hasVideo ? `${fmtJaDuration(webinar.durationSeconds)}・16:9・自動再生なし` : '差し替えるから登録メディアの動画を選びます'}</span>
+            <VideoMetadata webinar={webinar} />
           </span>
           {readOnly ? null : <Button onClick={() => setReplaceOpen(true)}><Upload size={15} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</Button>}
         </div>

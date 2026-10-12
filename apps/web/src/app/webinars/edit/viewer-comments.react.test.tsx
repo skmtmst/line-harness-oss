@@ -4,9 +4,11 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const userComments = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), webinarApi: { userComments } }))
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), webinarApi: { userComments, participants: async () => ({ data: { items: [] } }) } }))
 import { ApiError } from '@/lib/api'
-import ViewerComments from './viewer-comments'
+import { WebinarAnalyticsPane } from '@/test-utils/webinar-analytics'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 const COMMENT = { id: 'comment-1', friendId: 'friend 1', friendName: '参加者', pictureUrl: null, sessionStartAt: 1, atSeconds: -30, body: '質問があります\nありがとうございます', createdAt: '' }
 let root: Root
@@ -14,7 +16,7 @@ let host: HTMLDivElement
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 async function render(id = 'webinar-1') {
-  await act(async () => root.render(<ViewerComments webinarId={id} />))
+  await act(async () => root.render(<WebinarAnalyticsPane id={id} />))
 }
 
 describe('分析の視聴者コメント', () => {
@@ -34,8 +36,8 @@ describe('分析の視聴者コメント', () => {
     await render()
     expect(userComments).toHaveBeenCalledWith('webinar-1')
     expect(host.textContent).toContain(COMMENT.body)
-    expect(host.textContent).toContain('-0:30')
-    expect(host.querySelector('a')?.getAttribute('href')).toBe('/chats?friend=friend%201')
+    expect(host.textContent).toContain('−0:30')
+    expect(host.querySelector('a[href="/chats?friend=friend%201"]')).not.toBeNull()
     expect(host.textContent).toContain('1件')
   })
 

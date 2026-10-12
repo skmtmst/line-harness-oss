@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatPhotoReceivedAt } from './photo-review-time'
+import { formatPhotoReceivedAt } from '@/v8/nen-posts/time'
 
 describe('写真審査の受信日時', () => {
   it('UTCの日時を日本時間で表示する', () => {

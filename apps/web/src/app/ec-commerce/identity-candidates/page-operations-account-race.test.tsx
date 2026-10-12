@@ -37,7 +37,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn() }),
   usePathname: () => '/ec-commerce/identity-candidates',
   useSearchParams: () => new URLSearchParams(),
@@ -144,13 +144,14 @@ function tabsResponse(accountId: string) {
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme='v8'; window.history.replaceState({}, '', '/ec-commerce/identity-candidates'); window.dispatchEvent(new Event('popstate'))
   vi.clearAllMocks()
   mocks.accountId = 'acc-1'
   mockOperationsTabsPassthrough()
   mocks.list.mockResolvedValue(REVIEW_OK)
 })
 
-afterEach(() => { cleanup() })
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
 describe('アカウント切替でも今のアカウントの集計を保つ（R600残件）', () => {
   test('遅れて届いたAの成功がBの集計を上書きしない', async () => {
@@ -256,3 +257,6 @@ describe('アカウント切替でも今のアカウントの集計を保つ（R
     expect(screen.queryByText('読み込めませんでした')).toBeNull()
   })
 })
+
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/staff-role', async (importOriginal) => ({...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole: () => 'owner'}))

@@ -16,10 +16,9 @@ const PAGE = readFileSync('src/app/contents/page.tsx', 'utf8')
 
 /*
  * ★V8 登録メディア一覧（板 `O7hUt7`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
+ * テーマの古い属性が残っていてもV8一覧に固定し、
  * 数の帯・フォルダの列・道具の段・札の格子・表示範囲とページ送りが出ること、
  * staff では閲覧のみの帯が出て管理操作が押せない形になることを実DOMで固定する。
- * v7 では従来の一覧（`g89Tc`）が出ることも固定する。
  * 帯の数は API の実値だけ（見本の数を直書きしない）。
  */
 vi.mock('@/contexts/account-context', () => ({
@@ -217,18 +216,19 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     expect(dots[1].getAttribute('data-folder-dot')).toBe('unfiled')
   })
 
-  test('v7 では従来の一覧が出て、新しい一覧は出ない', async () => {
+  test('旧テーマ属性が残っていてもV8一覧を出す', async () => {
     document.documentElement.dataset.theme = 'v7'
     await renderPage()
-    expect(host?.querySelector('[data-design-node="g89Tc"]')).not.toBeNull()
-    expect(host?.querySelector('[data-design-node="O7hUt7"]')).toBeNull()
+    expect(host?.querySelector('[data-design-node="g89Tc"]')).toBeNull()
+    expect(host?.querySelector('[data-design-node="O7hUt7"]')).not.toBeNull()
   })
 })
 
 describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
-  test('v8 のときだけ新しい形を出す分岐を持つ', () => {
-    expect(PAGE).toContain("theme === 'v8' ? <MediaLibraryListV8 /> : <MediaLibraryInner />")
-    expect(PAGE).toContain('data-design-node="g89Tc"')
+  test('V8に固定し旧テーマの分岐を持たない', () => {
+    expect(PAGE).toContain('<MediaLibraryListV8 />')
+    expect(PAGE).not.toContain('useAdminTheme')
+    expect(PAGE).not.toContain('data-design-node="g89Tc"')
   })
 
   test('数の帯・道具の段・表示範囲とページ送りを持つ', () => {

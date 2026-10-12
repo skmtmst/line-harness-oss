@@ -3,14 +3,15 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
-  DIFFERENT_PROVIDER_NOTE,
-  HANDOVER_STEPS,
+  DIFFERENT_PROVIDER_DETAIL,
+  HANDOVER_PILLS,
+  countsLine,
   MATCH_BUCKETS,
   totalsMatch,
-} from './handover-view'
+} from '@/v8/accounts-detail/handover-view'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../../v8/accounts-detail/handover.tsx'), 'utf8')
 
 /**
  * LINEアカウントの乗り換え・引き継ぎ（設計 ★V6 33-4 `nx3XW`）。
@@ -19,18 +20,14 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  */
 describe('V6 33-4 乗り換え・引き継ぎ', () => {
   it('設計の5段を持つ', () => {
-    expect(HANDOVER_STEPS.map((s) => s.label)).toEqual([
-      '引き継ぎコードを出す',
-      '受け取り先で読む',
-      '事前確認',
-      '競合の判断',
-      '本実行と照合',
+    expect(HANDOVER_PILLS).toEqual([
+      '引き継ぎコード', '事前確認', '要確認を決める', '本実行',
     ])
   })
 
   it('事前確認の4区分を、設計の言葉で持つ', () => {
     expect(MATCH_BUCKETS.map((b) => b.label)).toEqual([
-      '自動で一致', '要確認', '一致しない', '別人の可能性',
+      '自動で同じ人', '要確認', '一致しない', '別人の可能性',
     ])
     // 「要確認」は人が決める。**決めるまで本実行できない**ことを書く。
     expect(PAGE).toContain('「要確認」を全部決めるまで本実行できません')
@@ -52,18 +49,19 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
     expect(PAGE).toContain('api.accountHandovers.listForAccount(id)')
     expect(PAGE).toContain('api.accountHandovers.get(current.id)')
     expect(PAGE).toContain('totalsMatch(handover.counts, handover.counts.sourceTotal)')
-    expect(PAGE).toContain("countsAreComplete ? `${formatNumber(handover.counts?.[bucket.key])}人` : '—'")
+    expect(PAGE).toContain("countsAreComplete && handover.counts ? countsLine(handover.counts)")
+    expect(countsLine({sourceTotal:2,auto:1,review:1,unmatched:0,lookalike:0})).toBe('元の友だち 2 人：自動で同じ人 1・要確認 1')
   })
 
   it('事前確認では元のアカウントが変わらないと書く', () => {
     // 押す前に、戻れるかどうかを読ませる。
-    expect(PAGE).toContain('ここで止めても、元のアカウントは何も変わりません')
+    expect(PAGE).toContain('元のアカウントの友だち・履歴・配信は消しません')
   })
 
   it('事前確認をやり直す操作を実APIへつなぐ', () => {
     expect(PAGE).toContain('api.accountHandovers.preview(handover.id')
     expect(PAGE).toContain('事前確認をやり直す')
-    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0')
+    expect(PAGE).toContain('const executeDisabled = unresolved > 0')
   })
 
   it('プロバイダーが違うときの断りを持つ', () => {
@@ -71,8 +69,8 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
       **同じ人でも別のIDになる。** これを書かずに進めると、事前確認で
       「一致しない」が大量に出た理由が分からない。
     */
-    expect(DIFFERENT_PROVIDER_NOTE).toContain('同じ人でも別のIDになります')
-    expect(DIFFERENT_PROVIDER_NOTE).toContain('対応表を取り込むか')
+    expect(DIFFERENT_PROVIDER_DETAIL).toContain('同じ人でも別のIDになる')
+    expect(DIFFERENT_PROVIDER_DETAIL).toContain('対応表を取り込むか')
   })
 
   it('?id= なしで開いたとき、無限ローディングにせず一覧へ戻す', () => {
@@ -115,14 +113,15 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
         `${label} が canManage で守られていません`,
       ).toContain('canManage')
     }
-    gated('busy={issuing} busyLabel="発行中…">引き継ぎコードを出す', '引き継ぎコードを出す')
-    gated('busy={linking} busyLabel="確認中…">コードを読む', 'コードを読む')
-    gated('busy={refreshing} busyLabel="確認中…">事前確認をやり直す', '事前確認をやり直す')
-    gated('busy={savingDecisions}>判断を保存する', '判断を保存する')
-    gated('busy={executing} busyLabel="実行中…">本実行へ進む', '本実行へ進む')
-    gated('setCancelOpen(true)}>\n                  引き継ぎを取り消す', '引き継ぎを取り消す')
-    gated('setRollbackOpen(true) }}>\n                切り戻す', '切り戻す')
+    gated('onClick={() => { setExecuteError(\'\'); void issueCode() }}', '引き継ぎコードを出す')
+    gated('onClick={() => void submitLinkCode()}', 'コードを読む')
+    gated('onClick={() => void rerunPreview()}', '事前確認をやり直す')
+    gated('onClick={() => void saveDecisions()}', '判断を保存する')
+    gated('disabled={executeDisabled}', '本実行する')
+    gated('onClick={() => setCancelOpen(true)}', '引き継ぎをやめる')
+    gated('onClick={() => { setRollbackError(\'\'); setRollbackOpen(true) }}', '切り戻す')
     expect(PAGE).toContain('引き継ぎの変更はオーナーと管理者だけができます')
-    expect(PAGE).toContain('bg-info-bg text-ink-secondary')
+    expect(PAGE).toContain('<ReadOnlyNotice')
+
   })
 })

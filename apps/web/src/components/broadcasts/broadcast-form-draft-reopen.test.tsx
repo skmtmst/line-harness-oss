@@ -141,7 +141,7 @@ describe('下書きの開き直しと再編集（BROADCAST-17）', () => {
       expect(getApi).toHaveBeenCalledWith('draft-1')
       // 保存していた題と本文が画面へ入っている（＝書き直せる）。
       expect(titleInput()?.value).toBe('秋のキャンペーン告知')
-      const body = container.querySelector('textarea[placeholder="テキストを入力"]') as HTMLTextAreaElement | null
+      const body = container.querySelector('[role="textbox"][placeholder="テキストを入力"]') as HTMLTextAreaElement | null
       expect(body?.value).toBe('保存していた本文')
 
       await act(async () => {

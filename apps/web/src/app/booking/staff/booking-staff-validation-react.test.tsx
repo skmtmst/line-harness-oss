@@ -1,4 +1,4 @@
-import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
+import { pickEntity, pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -36,8 +36,8 @@ function switchAccount(id: string | null): void {
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: useControllableAccount() }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
-vi.mock('next/navigation', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.routerPush }),
 }))
 vi.mock('@/components/shared/image-uploader', () => ({
@@ -200,7 +200,7 @@ describe('予約スタッフ保存前検証（実React）', () => {
   test('専用の新規登録画面も空白名を同じ理由で止める', async () => {
     render(<NewBookingStaffPage />)
     fireEvent.change(screen.getByLabelText(/スタッフ名/), { target: { value: '   ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
     expect(await screen.findByText('スタッフ名を入力してください')).toBeTruthy()
     expect(fixture.createStaff).not.toHaveBeenCalled()
   })
@@ -216,12 +216,12 @@ describe('予約スタッフ保存前検証（実React）', () => {
     }] })
     render(<NewBookingStaffPage />)
     fireEvent.change(screen.getByLabelText(/スタッフ名/), { target: { value: '  田中  ' } })
-    fireEvent.change(screen.getByLabelText(/お客様向けの表示名/), { target: { value: '  たなか  ' } })
+    fireEvent.change(screen.getByLabelText(/お客さま向けの表示名/), { target: { value: '  たなか  ' } })
     fireEvent.change(screen.getByLabelText(/肩書き/), { target: { value: '  店長  ' } })
-    fireEvent.change(screen.getByRole('textbox', {name:'顔写真'}), { target: { value: '  https://example.test/tanaka.png  ' } })
+    fireEvent.change(screen.getByRole('textbox', {name:/顔写真.*URL/}), { target: { value: '  https://example.test/tanaka.png  ' } })
     fireEvent.change(screen.getByLabelText(/紹介文/), { target: { value: '  丁寧に対応します。  ' } })
-    fireEvent.click(await screen.findByRole('checkbox', { name: /カット/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
+    await pickEntities('予約を受けられるメニュー', ['カット'])
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
 
     await waitFor(() => expect(fixture.createStaff).toHaveBeenCalledWith('account-a', expect.objectContaining({
       name: '田中', display_name: 'たなか', role: '店長',

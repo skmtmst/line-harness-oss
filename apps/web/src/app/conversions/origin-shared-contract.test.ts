@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
-const LIST_PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const NEW_PAGE = readUiSource(new URL('./new/page.tsx', import.meta.url), 'utf8')
+const LIST_PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 /* 詳細・編集の窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
-const DIALOGS = readFileSync(new URL('./_components/conversion-dialogs.tsx', import.meta.url), 'utf8')
+const DIALOGS = readFileSync(new URL('../../v8/conversions/dialogs.tsx', import.meta.url), 'utf8')
 
 /**
  * R41: 起点の説明は対応表(origin-labels)が正本。作成・一覧・詳細・編集の
@@ -13,7 +14,7 @@ const DIALOGS = readFileSync(new URL('./_components/conversion-dialogs.tsx', imp
  */
 describe('起点の説明の共通化(R41)', () => {
   it('作成と一覧は対応表から引く', () => {
-    expect(NEW_PAGE).toContain("from '../origin-labels'")
+    expect(NEW_PAGE).toContain("from './origin-labels'")
     expect(NEW_PAGE).toContain('originInfoOf(eventType)')
     expect(LIST_PAGE).toContain("from './origin-labels'")
     expect(LIST_PAGE).toContain('originInfoOf(')
@@ -49,7 +50,7 @@ describe('数えない条件の共通化(R40)', () => {
   })
 
   it('自由文のメモ欄は条件の部品とは別にある', () => {
-    expect(NEW_PAGE).toContain('cv-exclusion-memo')
+    expect(NEW_PAGE).toContain('cv-memo')
     expect(NEW_PAGE).not.toContain('cv-excluded-condition')
   })
 })
