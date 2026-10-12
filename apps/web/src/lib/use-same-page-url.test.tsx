@@ -7,7 +7,7 @@
  * 違いで画面を丸ごと読み直す。別の住所へ行くときだけルーターを使う。
  */
 import React, { act } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const replace = vi.hoisted(() => vi.fn())
@@ -23,14 +23,20 @@ function Probe() { api = useSamePageUrl(); return null }
 
 describe('useSamePageUrl', () => {
   let host: HTMLDivElement
+  let root: Root
   beforeEach(async () => {
     window.history.replaceState(null, '', '/hq/broadcasts/new')
     host = document.createElement('div')
     document.body.appendChild(host)
-    const root = createRoot(host)
+    root = createRoot(host)
     await act(async () => { root.render(<Probe />) })
   })
-  afterEach(() => { host.remove(); vi.clearAllMocks(); api = null })
+  afterEach(async () => {
+    await act(async () => { root.unmount() })
+    host.remove()
+    vi.clearAllMocks()
+    api = null
+  })
 
   it('同じ住所の ?step= の切り替えはルーターを通さず、履歴を積まずに書き換える', () => {
     const before = window.history.length

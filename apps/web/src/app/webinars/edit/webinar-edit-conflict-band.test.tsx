@@ -2,11 +2,16 @@
 /*
  * 同時編集の帯（板 `pvimJ`）。409 の見分けと帯の表示だけを確かめる。
  */
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { isConflict } from '@/v8/webinar-edit/cta'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 const latestEditor = { version: 3 } as never
 

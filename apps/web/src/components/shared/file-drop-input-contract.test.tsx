@@ -8,9 +8,14 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, cleanup, render } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import FileDropzone from './file-drop'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const styles = readFileSync(join(DIR, 'file-drop.module.css'), 'utf8')

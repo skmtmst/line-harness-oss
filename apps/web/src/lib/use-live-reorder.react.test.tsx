@@ -3,9 +3,14 @@
  * 並べ替えの付いてくる動き（フルード ②）：引きずっている間、通った行の位置へ入れ替えて見せる。
  * 自分の上を通っても戻らない（行がずれて往復しない）。離す先は見せていた位置の行。
  */
-import { act, renderHook } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { cleanup, act, renderHook } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { useLiveReorder } from './use-live-reorder'
+
+// globals: false のため Testing Library の自動 cleanup は登録されない。
+afterEach(async () => {
+  await act(async () => cleanup())
+})
 
 const rows = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]
 
