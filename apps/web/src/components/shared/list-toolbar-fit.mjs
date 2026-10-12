@@ -45,7 +45,10 @@ export function fitToolbarWrap(toolbar) {
 export function fitToolbarOptionalWidth(item) {
   const content = item.querySelector('[data-toolbar-optional-content]')
   if (!content || item.hasAttribute('data-collapsed')) return 0
-  const width = Math.ceil(Math.max(content.getBoundingClientRect().width, content.scrollWidth))
+  const children = [...content.children].filter(el => getComputedStyle(el).display !== 'none')
+  const intrinsic = children.reduce((sum, el) => sum + Math.max(el.getBoundingClientRect().width, el.scrollWidth), 0)
+    + (parseFloat(getComputedStyle(content).columnGap) || 0) * Math.max(0, children.length - 1)
+  const width = Math.ceil(item.hasAttribute('data-toolbar-overflow-group') ? intrinsic : Math.max(content.getBoundingClientRect().width, content.scrollWidth))
   item.style.setProperty('--toolbar-optional-width', `${width}px`)
   return width
 }

@@ -338,3 +338,18 @@ test('F10: stacked callers share two narrow rows; a separate leading row fails a
     assert.ok((await page.evaluate(scanFixPatterns)).counts.F10>0)
   } finally { await browser.close() }
 })
+
+test('named overflow measures its tools, not free space reserved for the rightmost action', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}button{height:36px;flex:none}</style><div class="toolbar" style="width:800px"><button style="width:200px">検索</button><details class="optional" data-toolbar-optional data-toolbar-overflow-group open><summary>条件</summary><div data-toolbar-optional-content><button style="width:160px">配信日</button><button style="width:140px">保存する</button><span class="slotsEnd"><button style="width:120px">保存した検索</button></span></div></details></div>`)
+    assert.equal(await page.locator('details').evaluate(fitToolbarOptionalWidth),436)
+    assert.equal((await page.locator('.toolbar').evaluate(toolbarContentFit)).fits,true)
+    await page.locator('.toolbar').evaluate(el=>el.style.width='740px')
+    assert.equal(await page.locator('details').evaluate(fitToolbarOptionalWidth),436)
+    assert.equal((await page.locator('.toolbar').evaluate(toolbarContentFit)).fits,true)
+    await page.locator('.toolbar').evaluate(el=>el.style.width='500px')
+    assert.equal((await page.locator('.toolbar').evaluate(toolbarContentFit)).fits,false)
+  } finally { await browser.close() }
+})

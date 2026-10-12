@@ -273,6 +273,8 @@ html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) 
 }
 /* A named overflow group preserves the original controls and handlers. */
 .optional > summary { display: none; }
+.optional[data-toolbar-overflow-group]:not([data-collapsed]) { flex: 1; }
+.optional[data-toolbar-overflow-group]:not([data-collapsed]) > [data-toolbar-optional-content] { width: 100%; }
 .optional[data-collapsed] { position: relative; min-width: 0; }
 .optional[data-collapsed] > summary {
   display: inline-flex; align-items: center; height: var(--tpl-chip-h); padding: 0 var(--tpl-toolbar-gap);

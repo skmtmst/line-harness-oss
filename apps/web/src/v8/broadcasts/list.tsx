@@ -930,7 +930,7 @@ export default function BroadcastListV8() {
     <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
         {searchBox}
-        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}{saveCurrentButton}{savedSearchBox}</ListToolbarOptional>
+        <ListToolbarOptional collapse="overflow" label="配信日・検索条件">{dateBox}{saveCurrentButton}<ListToolbarEnd>{savedSearchBox}</ListToolbarEnd></ListToolbarOptional>
       </ListToolbarRow>
       <ListToolbarRow>
         {statusChips}
