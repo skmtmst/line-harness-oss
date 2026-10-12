@@ -255,7 +255,8 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
       boardId={BOARD[tab]}
       headingSize="regular"
       title="NEN配信"
-      explanation={<>{"ネットショップの注文や誕生日に合わせて、決まったメッセージやコラムを自動で送ります。"}<div>{"自動配信は、注文・発送・誕生日などのきっかけで送ります。止めると、そのあとのきっかけでは送りません。"}</div><div>{"コラムは外部サイトの記事へつなぐカードです。書いたあと、一覧の「この内容で予約する」で LINE に配信します。"}</div><div>{"いつ・だれに・何を送ったかの記録です。届かなかったものも、ここで理由が分かります。"}</div></>}
+      help="ネットショップの注文や誕生日に合わせて、決まったメッセージやコラムを自動で送ります。"
+      explanation={tab === 'columns' ? "コラムは外部サイトの記事へつなぐカードです。書いたあと、一覧の「この内容で予約する」で LINE に配信します。" : tab === 'history' ? "いつ・だれに・何を送ったかの記録です。届かなかったものも、ここで理由が分かります。" : "自動配信は、注文・発送・誕生日などのきっかけで送ります。止めると、そのあとのきっかけでは送りません。"}
       actions={actions}
       tabs={tabs}
       stats={stats}

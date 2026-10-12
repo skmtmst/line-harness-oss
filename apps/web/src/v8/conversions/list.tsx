@@ -1180,9 +1180,10 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       skeleton
-      explanation={<>{canEdit
+      help={canEdit
             ? '行の「…」から 編集・使う場所を見る・使う場所を足す・止める・複製。止めると、使っている配信や流入リンクでも数えなくなります。'
-            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}<div>成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。</div></>}
+            : '行の「…」から 中身と使う場所を見られます。止めると、使っている配信や流入リンクでも数えなくなります。'}
+      explanation="成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。"
       boardId="r6dJFy"
       headingSize="regular"
       title="コンバージョン"

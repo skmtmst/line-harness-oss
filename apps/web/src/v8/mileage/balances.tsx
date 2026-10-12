@@ -535,7 +535,8 @@ export default function BalancesTab() {
 
   return (
     <MileageFrame
-      explanation={<>{"行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"}<div>残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。</div></>}
+      help="行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。"
+      explanation="残高は数分ごとに計算し直します。「残高を再読み込み」で今すぐ計算し直せます。"
       actions={<div className={styles.headActions}>
         <Button onClick={() => void reloadAll()} disabled={loading}>
           <RefreshCw size={15} aria-hidden="true" /> 残高を再読み込み

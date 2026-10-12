@@ -909,7 +909,8 @@ export default function EarningRulesTab() {
 
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
-      explanation={<>{"行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"}<div>決めごとを変えると、変えたあとの行動から新しい数で付きます。前に付いたマイルは変わりません。</div></>}
+      help="行の「…」から 編集・止める・複製・この決めごとの履歴を見る。"
+      explanation="決めごとを変えると、変えたあとの行動から新しい数で付きます。前に付いたマイルは変わりません。"
       actions={
         <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す

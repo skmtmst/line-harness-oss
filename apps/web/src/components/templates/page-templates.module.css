@@ -44,6 +44,7 @@
 :global(:root) .main { min-width: 0; flex: 1; }
 /* B-149：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
 :global(:root) .folders + .main { border-left: 0; }
+:global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar[data-toolbar-spacing='section'] { padding-block: var(--polish-space-card); }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }

@@ -45,12 +45,12 @@ function useExplanation() {
 export function PageExplanationToggle() {
   const { open, toggle, bodyId, toggleId } = useExplanation()
   const Chevron = open ? ChevronUp : ChevronDown
-  return <button type="button" id={toggleId} className={styles.toggle} data-shared-part="page-explanation-toggle" aria-expanded={open} aria-controls={bodyId} onClick={toggle}>
+  return <button type="button" id={toggleId} className={styles.toggle} data-shared-part="page-explanation-toggle" data-screen-explanation-toggle aria-expanded={open} aria-controls={bodyId} onClick={toggle}>
     この画面の説明<Chevron size={16} aria-hidden="true" />
   </button>
 }
 
-export function PageExplanationBody({ children }: { children: ReactNode }) {
+export function PageExplanationBody({ children, keepMounted = false }: { children: ReactNode; keepMounted?: boolean }) {
   const { open, bodyId, toggleId } = useExplanation()
-  return open ? <div className={styles.body} id={bodyId} role="region" aria-labelledby={toggleId}>{children}</div> : null
+  return open || keepMounted ? <div hidden={!open} data-screen-explanation className={styles.body} id={bodyId} role="region" aria-labelledby={toggleId}>{children}</div> : null
 }

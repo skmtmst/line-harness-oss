@@ -585,11 +585,12 @@ export default function AutomationListV8() {
   return (
     <SaveErrorScope errors={saveErrors}><ListPage
       skeleton
-      explanation={<>{<>{AUTOMATIONS_DESCRIPTION}{canEdit
+      help={<>{AUTOMATIONS_DESCRIPTION}{canEdit
             ? '行の「…」から 編集・複製・1人で試す・止める・動いた記録を見る・削除。'
             : '行の「…」から 動いた記録を見る。'}{estimatedHoursSaved === null
               ? '削減時間はまだ数えられていません。'
-              : `およそ${formatNumber(estimatedHoursSaved)}時間の削減（この30日の実行1回30秒として計算しています）。`}</>}<div>ルールは1人で試してから動かすと、まちがいを防げます。動いた結果は「動いた記録」で見られます。</div></>}
+              : `およそ${formatNumber(estimatedHoursSaved)}時間の削減（この30日の実行1回30秒として計算しています）。`}</>}
+      explanation="ルールは1人で試してから動かすと、まちがいを防げます。動いた結果は「動いた記録」で見られます。"
       boardId={narrow ? 'En14p' : viewerOnly ? 'nH9L8' : 'LWQXd'}
       headingSize="regular"
       title="オートメーション"

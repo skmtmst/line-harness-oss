@@ -839,7 +839,8 @@ function FriendAddList() {
       skeleton
       heightMode="content"
       toolbarSpacing="section"
-      explanation={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}{kpis.map(kpi => kpi.help ? <p key={kpi.key}>{kpi.title}：{kpi.help}</p> : null)}<div>{ROUTE_NOTICE}</div></>}
+      help={<>{"友だち追加されたときに、来た経路（流入リンク）ごとに初回の案内を送り、タグ付けやシナリオを始めます。"}{ORDER_NOTE}{kpis.map(kpi => kpi.help ? <p key={kpi.key}>{kpi.title}：{kpi.help}</p> : null)}</>}
+      explanation="経路が分かるのは「流入リンク」から来た人だけです。素のQR・検索から来た人には、いちばん下の「経路が分からなかった人」が動きます。"
       boardId={canEdit ? 'MRhef' : 'LEwkJ'}
       headingSize="regular"
       title="友だち追加時の配信"

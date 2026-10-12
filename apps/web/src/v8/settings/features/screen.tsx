@@ -386,7 +386,8 @@ export default function FeatureSettingsScreen() {
     <SbSettingsScreen
       boardId="ywFJT"
       title={TITLE}
-      explanation={<>{DESCRIPTION}<div>公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。</div></>}
+      help={DESCRIPTION}
+      explanation="公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。"
       saveActions={ready && canManage ? (
         <>
           <Button

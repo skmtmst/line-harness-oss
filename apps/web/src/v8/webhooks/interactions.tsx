@@ -450,7 +450,8 @@ export default function WebhooksInteractionsV8() {
 
   return (
     <ListPage
-      explanation={<>{<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}<div>失敗したものは「もう一度送る」でやり直せます。相手が止まっていたときは、自動で3回までやり直します。</div></>}
+      help={<>{WEBHOOKS_DESCRIPTION}{"行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。"}</>}
+      explanation="失敗したものは「もう一度送る」でやり直せます。相手が止まっていたときは、自動で3回までやり直します。"
       boardId="Uv9AA"
       headingSize="regular"
       title="外部連携"

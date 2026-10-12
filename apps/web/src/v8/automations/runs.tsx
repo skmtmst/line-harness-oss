@@ -586,7 +586,8 @@ export default function AutomationRunsV8() {
 
   return (
     <ListPage
-      explanation={<>{<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}<div>「もう一度やる」は、やり直せる失敗（一時的な送信の失敗など）だけに出ます。ブロック中など原因を直す必要があるものには出ません。条件に外れたものは、ルールの「だれに」に当てはまらなかった人です。</div></>}
+      help={<>{AUTOMATIONS_DESCRIPTION}{"行の「…」から 中身を見る・もう一度やる（失敗のとき）・ルールを開く・トークを開く。"}</>}
+      explanation="「もう一度やる」は、やり直せる失敗（一時的な送信の失敗など）だけに出ます。ブロック中など原因を直す必要があるものには出ません。条件に外れたものは、ルールの「だれに」に当てはまらなかった人です。"
       boardId="g98F9"
       headingSize="regular"
       title="オートメーション"

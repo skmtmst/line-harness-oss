@@ -457,7 +457,8 @@ export default function BookingMediaPage() {
         <PageHeading
           headingSize="compact"
           title="予約サイト・グルメ媒体"
-          explanation="店ごとに、予約サイト・グルメ媒体の店舗ページと管理画面（ログイン）の URL を持ちます。管理画面の URL は「今日のお店」と「枠を閉じる知らせ」の［管理画面を開く］に使います。他の予約サイトの空き枠は自動で変更しません。LINE や電話で予約が入ったら、他のサイトの同じ時刻の枠を閉じる知らせを出します。"
+          help="店ごとに、予約サイト・グルメ媒体の店舗ページと管理画面（ログイン）の URL を持ちます。管理画面の URL は「今日のお店」と「枠を閉じる知らせ」の［管理画面を開く］に使います。"
+      explanation="他の予約サイトの空き枠は自動で変更しません。LINE や電話で予約が入ったら、他のサイトの同じ時刻の枠を閉じる知らせを出します。"
           actions={(
             <span className={styles.headActions}>
               {stores.length > 1 ? (

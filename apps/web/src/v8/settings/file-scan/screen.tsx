@@ -219,7 +219,8 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} explanation={<>{DESCRIPTION}<div>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</div></>}>
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
+      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -249,7 +250,8 @@ export default function FileScanScreen() {
   const externalOn = Boolean(config?.externalProvider && config?.externalEndpointUrl)
 
   return (
-    <SbSettingsScreen boardId="PfA4o" title={TITLE} explanation={<>{DESCRIPTION}<div>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</div></>}>
+    <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION}
+      explanation="確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。">
 
 
       {actionError && !configServerError ? <Notice tone="danger" message={actionError} /> : null}

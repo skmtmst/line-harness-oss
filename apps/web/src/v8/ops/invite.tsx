@@ -110,7 +110,7 @@ export default function OpsInviteV8() {
         </span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-invite-title">
-        <PageHeading inset="none" title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" help={<>
+        <PageHeading inset="none" title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" subtitleSize="body" subtitle={<>
           {check && !check.needsPassword
             ? '運営コンソールに招待されました（有効期限は24時間）。続けると 2要素認証の設定に進みます。'
             : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に2要素認証を設定します。'}

@@ -1277,9 +1277,8 @@ export default function RichMenusListV8() {
       boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}
       headingSize="regular"
       title="リッチメニュー"
-      explanation={<>{"トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"}<div>
-      {PRIORITY_NOTE}
-    </div></>}
+      help="トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。"
+      explanation="上のメニューが優先されます。同じ友だちが複数の条件に当てはまるときは、いちばん上の1つだけが出ます。順番は行の左のつまみで入れ替えます。"
       actions={
         <Button
           type="button"

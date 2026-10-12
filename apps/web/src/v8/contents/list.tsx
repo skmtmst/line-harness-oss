@@ -1160,7 +1160,8 @@ export default function MediaLibraryListV8() {
       toolbarRowGap="card"
       headingSize="regular"
       title="登録メディア一覧"
-      explanation={<>{"配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"}<div>使っているメディアは消せません。いらなくなったら「アーカイブ」にすると一覧と新規選択から外れます（使っている場所や過去の配信はそのまま動きます）。</div></>}
+      help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
+      explanation="使っているメディアは消せません。いらなくなったら「アーカイブ」にすると一覧と新規選択から外れます（使っている場所や過去の配信はそのまま動きます）。"
       tabs={!canManageMedia ? (
         <div className={styles.roBand}><ReadOnlyNotice role="note">{`閲覧のみで見ています。${managementPermissionReason}。`}</ReadOnlyNotice></div>
       ) : undefined}
