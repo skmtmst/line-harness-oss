@@ -11,6 +11,7 @@ import { Check, Pause, Pencil, Plus, Trash2, Zap } from 'lucide-react';
 import { api, ApiError, describeSaveFailure, type SaveSupportMarkAutomationRule, type SupportMarkArchiveImpact, type SupportMarkAutomationEvent, type SupportMarkAutomationRule, type SupportMarkListItem } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls';
@@ -464,9 +465,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         identity={back}
         preview={aside}
         destructive={editing && selected && !hideForm ? (
-          <Button type="button" variant="danger" onClick={() => openArchive()} busyLabel="処理中…" disabled={archiveBlockReason !== null} title={archiveBlockReason ?? undefined}>
-            <Pause size={15} aria-hidden="true" />保管する
-          </Button>
+          <StickyBarAction label="保管する" icon={Pause} onClick={() => openArchive()} disabledReason={archiveBlockReason} />
         ) : undefined}
         footerActions={hideForm ? <></> : <>
           <Button type="button" onClick={() => guarded(() => router.push('/tags?tab=marks'))}>キャンセル</Button>

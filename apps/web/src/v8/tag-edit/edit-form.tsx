@@ -1,5 +1,5 @@
 'use client'
-import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Trash2, ArrowLeft, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert , Trash2 } from 'lucide-react';
 import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -9,6 +9,7 @@ import Link from '@/components/shared/list-navigation'
 import type { Tag, TagGroup } from '@line-crm/shared';
 import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api';
 import { formatDay } from '@/lib/format';
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -235,7 +236,7 @@ export function TagEditForm({
         identity={host ? undefined : <></>}
         help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
         preview={host ? host.preview(values) : side}
-        destructive={host || readOnly ? undefined : <Button variant="danger" type="button" onClick={onDelete}>タグを削除する</Button>}
+        destructive={host || readOnly ? undefined : <StickyBarAction label="タグを削除する" icon={Trash2} onClick={onDelete} />}
         footerActions={(
           <>
             <Button onClick={onCancel}>キャンセル</Button>

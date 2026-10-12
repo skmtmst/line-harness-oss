@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X , Trash2 } from 'lucide-react'
 import { isSavedSearchOpAllowed, isSavedSearchValueOptionalOp } from '@line-crm/shared'
 import type { FriendField, SavedSearch, SavedSearchCondition, SavedSearchConditionKind, SavedSearchConditions, Scenario, SupportMark, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -893,7 +894,7 @@ export default function SavedSearchEditV8() {
         ].join('・')}
         preview={side}
         destructive={(
-          <Button variant="danger" type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={deleteReason}>削除する</Button>
+          <StickyBarAction label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => setDeleteOpen(true)} />
         )}
         status={dirty ? '変更内容を確かめて保存してください' : undefined}
         footerActions={(
