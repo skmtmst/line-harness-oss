@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
+  role: 'owner' as string | null,
   account: 'account-1',
   foldersList: vi.fn(),
   friendFieldsList: vi.fn(),
@@ -41,6 +42,8 @@ vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
 }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => fixture.role }))
+
 vi.mock('@/lib/api', () => ({
   api: {
     folders: { list: fixture.foldersList },
@@ -64,6 +67,7 @@ function fieldsOf(accountId: string) {
 }
 
 beforeEach(() => {
+  fixture.role = 'owner'
   // V8 の作る画面を見る。本番は v7 のままなので分岐は残す。
   document.documentElement.dataset.theme = 'v8'
   fixture.account = 'account-1'
@@ -491,3 +495,12 @@ describe('未保存の入力保護', () => {
 
 // 選ぶ物の欄も、保存/API境界の試験では以前のSelectと同じ差し替えにする。
 vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))
+
+for (const role of [null, 'viewer']) it(`役割${role}には作成と保存を出さず、一覧へ戻れる`, async () => {
+  fixture.role = role
+  render(<NewReminderPage />)
+  expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
+  expect(screen.queryByLabelText('リマインダ名（60文字まで）')).toBeNull()
+  expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
+  expect(fixture.createDraft).not.toHaveBeenCalled()
+})
