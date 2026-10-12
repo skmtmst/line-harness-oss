@@ -256,6 +256,8 @@ export type Env = {
     BUILD_GIT_COMMIT?: string;
     BUILD_VERSION?: string;
     BUILD_RELEASED_AT?: string;
+    /** 外部ファイル検査の許可組（host=FILE_SCAN_SECRET_X、カンマ区切り）。未設定なら内蔵検査のみ。 */
+    FILE_SCAN_ALLOWED_PAIRS?: string;
     IMAGES: R2Bucket;
     /** 飲食店向けの受信メール原本。本番 wrangler.toml には束縛が無いので任意 */
     RAW_MAIL?: R2Bucket;
