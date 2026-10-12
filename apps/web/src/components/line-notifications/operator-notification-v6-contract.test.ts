@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
-const list = readFileSync(new URL('../../app/line-notifications/operator-notification-rules.tsx', import.meta.url), 'utf8')
+const list = readFileSync(new URL('../../v8/settings/line-notifications/operator-tab.tsx', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../../app/line-notifications/page.tsx', import.meta.url), 'utf8')
 // 2026-10-07：作る・なおす画面は src/v8/line-notifications/operator-edit に一から書いた（板 gjUz3・hiBO8）。
 const create = readFileSync(new URL('../../v8/line-notifications/operator-edit.tsx', import.meta.url), 'utf8')
@@ -12,15 +12,15 @@ const dispatch = readFileSync(new URL('../../../../worker/src/services/operator-
 describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の接続', () => {
   it('4タブの2番目に運用者向けを置き、顧客向けと混ぜない', () => {
     expect(page).toMatch(/customer[\s\S]*operator[\s\S]*failures[\s\S]*history/)
-    expect(page).toContain('<OperatorNotificationRules lineAccountId={selectedAccountId}')
+    expect(page).toContain('<OperatorTab lineAccountId={selectedAccountId}')
   })
 
   it('一覧はアカウント別の実行記録APIを読み、未取得を0件にしない', () => {
     // N-342 (#943): 運用者通知の正本APIは /api/line-notifications 配下。
     expect(list).toContain('api.lineNotifications.operatorRules.list(lineAccountId)')
-    expect(list).toContain("state === 'ready' ? summary?.published ?? null : null")
+    expect(list).toContain("ready ? summary?.published ?? null : null")
     // 板 u8xibp：受け取る人の実数。未取得のとき0件にしない。
-    expect(list).toContain("state === 'ready' ? summary?.recipients ?? null : null")
+    expect(list).toContain("ready ? summary?.recipients ?? null : null")
     expect(list).toContain('kind="error"')
     expect(list).toContain('kind="forbidden"')
     expect(list).toContain('data-list-state={listState}')

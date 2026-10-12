@@ -1,14 +1,8 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import EmergencyPage from './page'
-
-const {
-  EmergencyControlFeedback,
-  emergencySafetyTransition,
-  isEmergencyMutationLocked,
-  runCurrentRequest,
-} = EmergencyPage.__test
+import { EmergencyControlFeedback } from './control-feedback-v8'
+import { emergencySafetyTransition, isEmergencyMutationLocked, runCurrentRequest } from './control-state'
 
 function deferred<T>() {
   let resolve!: (value: T) => void

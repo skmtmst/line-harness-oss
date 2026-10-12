@@ -23,6 +23,12 @@ const EVENT_WORD: Record<string, string> = {
   'friend.added': '友だちになった',
   'form.submitted': 'フォームが送られた',
   'booking.created': '予約が入った',
+  'friend.tag_added': 'タグが追加されたとき',
+  'message.received': 'メッセージを受け取ったとき',
+  'conversion.created': '成果が認められたとき',
+  'order.created': '注文が確定したとき',
+  'inventory.low': '在庫が少なくなったとき',
+  'shipment.completed': '発送が完了したとき',
   '*': 'すべての出来事',
 }
 

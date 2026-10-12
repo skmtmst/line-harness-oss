@@ -9,7 +9,7 @@ import TwoFactorLoginPage from '@/app/login/two-factor/page'
 
 /*
  * ★V8-B 運営 ログイン 2段目（tOPeY）。入口の分け方を見張る：
- * V8 かつ運営から来たとき（?next=ops）だけ「6桁の確認」。管理画面の2段目と v7 は今のまま。
+ * 運営も管理画面もV8の6桁入力に固定し、運営の戻り先と権限確認は区別する。
  */
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a>,
@@ -55,15 +55,15 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
     expect(login?.hasAttribute('disabled')).toBe(false)
   })
 
-  it('V8 でも管理画面の2段目（next なし）は今のまま', async () => {
+  it('管理画面の2段目もV8で出し、LINEでのログイン方法を保つ', async () => {
     await open('/login/two-factor#lh_2fa=challenge-1', 'v8')
-    expect(host.textContent).not.toContain('6桁の確認')
-    expect(host.textContent).toContain('二段階認証')
+    expect(host.textContent).toContain('6桁の確認')
+    expect(host.textContent).toContain('LINEログイン')
   })
 
-  it('v7 では運営から来ても今のまま', async () => {
+  it('旧テーマ属性が残っても運営はV8で出す', async () => {
     await open('/login/two-factor?next=ops#lh_2fa=challenge-1', 'v7')
-    expect(host.textContent).not.toContain('6桁の確認')
-    expect(host.textContent).toContain('二段階認証')
+    expect(host.textContent).toContain('6桁の確認')
+    expect(host.querySelector('[data-design-node="tOPeY"]')).not.toBeNull()
   })
 })

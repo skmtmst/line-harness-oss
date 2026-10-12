@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
@@ -14,14 +14,13 @@ describe('担当割り当ての保存状態（#975 U075）', () => {
   })
 
   it('差分がないときは保存の押し口を出さず中立の札にする', () => {
-    expect(PAGE).toContain('|| !dirty')
-    expect(PAGE).toContain('変更なし')
-    expect(PAGE).toContain('tone="neutral"')
+    expect(PAGE).toContain('if (!dirty)')
+    expect(PAGE).toContain("notifyToast('変更はありません。')")
   })
 
   it('状態を文字で出す（未保存・変更なし・失敗）', () => {
     expect(PAGE).toContain('未保存の変更があります')
     expect(PAGE).toContain('変更はありません')
-    expect(PAGE).toContain('保存できませんでした')
+    expect(PAGE).toContain('describeSaveFailure(e)')
   })
 })

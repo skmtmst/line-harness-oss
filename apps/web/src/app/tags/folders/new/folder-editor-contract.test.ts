@@ -67,14 +67,15 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
 
 describe('タグの一覧（設計 hqrOv）', () => {
   it('指標カード4枚を、取得失敗でも見出しごと残す', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx')
     // 「タグ数」は一覧の件数（1–20 / N件）と同じ数の重ね書きだったため
     // 「未使用」へ置き換えた（総数は一覧の上の1か所だけに出す決まり）。
-    expect(source).toContain("titles={['未使用', '付与済み友だち', '今月の付与', '整理候補']}")
+    for (const title of ['未使用', '付けている友だち', '今月付けた回数', '整理の候補']) expect(source).toContain(`title: '${title}'`)
+    expect(source).toContain('title={kpi.title}')
   })
 
   it('画面名を本文へ戻さない', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
+    const source = read('v8/tags/tags-tab.tsx')
     // `/tags` の画面名は共通トップバーが menu.ts から出す。
     expect(source).not.toContain("import Header from '@/components/layout/header'")
     expect(source).not.toContain('<h1')

@@ -3,11 +3,11 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/list.tsx'), 'utf8')
 
 /** 数の帯ぶんだけを切り出す。ファイル全体を見ると別の数に当たって素通りする。 */
 function band(): string {
-  const at = PAGE.indexOf('aria-label="流入と計測の概要"')
+  const at = PAGE.indexOf('<KpiBand>')
   if (at < 0) return ''
   return PAGE.slice(at, at + 4500)
 }
@@ -26,7 +26,7 @@ describe('流入と計測の帯は、読めていない数を0件と書かない
     // ここは「読めていないときに数を出さない」ことだけを見る。
     // **何を数えるか**は別の主題なので `inflow-kpi-scope-contract.test.ts` が見る。
     expect(tiles, '読めていなくても件数を出している').toContain(
-      "routeCountAvailable ? formatNumber(accountRouteCount) : '—'",
+      "routeCountAvailable ? accountRouteCount : null",
     )
   })
 

@@ -35,11 +35,11 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams('id=account-1'),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => {},
 }))
 
@@ -93,6 +93,7 @@ beforeEach(() => {
   accountsGet.mockImplementation(async () => ({ success: true, data: account }))
   handoversForAccount.mockImplementation(async () => ({ success: true, data: [{ id: 'h-1' }] }))
   handoverGet.mockImplementation(async () => ({ success: true, data: detail }))
+  document.documentElement.dataset.theme='v8'
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -100,7 +101,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
-  host.remove()
+  host.remove(); delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
 
@@ -129,7 +130,7 @@ describe('R521 補助の一覧だけ失敗しても本体は隠さない', () =>
     expect(host.textContent).toContain('受け取り先の一覧だけ読み込めませんでした')
     expect(findButton('一覧だけ読み直す')).not.toBeNull()
     // 受け取り先の名前はまだ取れていない。
-    expect(host.textContent).toContain('未取得')
+    expect(host.textContent).toContain('—')
   })
 
   it('一覧が例外（503相当）でも引継ぎの内容が出る', async () => {
@@ -177,3 +178,5 @@ describe('R521 補助の一覧だけ失敗しても本体は隠さない', () =>
     expect(host.textContent).toContain('乗り換えの情報を読み込めませんでした')
   })
 })
+
+vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId:'account-1',selectedAccount:{id:'account-1',name:'Fixture'},accounts:[],loading:false})}))

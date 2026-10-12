@@ -29,10 +29,10 @@ describe('行内ラジオの小さい字（★BG-B z14gEG）', () => {
 
   it('小さい字は v8 だけで文 12/17', () => {
     expect(CSS).toMatch(
-      /\[data-theme='v8'\]\s*\.root\[data-size='small'\]\s*\.label\s*\{[^}]*font-size:\s*var\(--text-caption\)/s,
+      /:root\s*\.root\[data-size='small'\]\s*\.label\s*\{[^}]*font-size:\s*var\(--text-caption\)/s,
     )
     expect(CSS).toMatch(
-      /\[data-theme='v8'\]\s*\.root\[data-size='small'\]\s*\.label\s*\{[^}]*line-height:\s*17px/s,
+      /:root\s*\.root\[data-size='small'\]\s*\.label\s*\{[^}]*line-height:\s*17px/s,
     )
   })
 

@@ -7,6 +7,7 @@
  * - M002：読み込み403で権限不足と分かり、再試行は出ない。
  * - M003：応答消失後の再送は保存済みとして扱い、他人の変更とは区別する。
  */
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -95,7 +96,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 const navigation = vi.hoisted(() => ({ query: 'id=form-1&tab=basic' }))
-vi.mock('next/navigation', () => ({
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(navigation.query),
 }))
@@ -106,7 +108,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', selectedAccount: { name: 'テスト店' }, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
 
 const { default: EditFormPage } = await import('./page')
 
@@ -130,12 +132,13 @@ function findButton(text: string): HTMLButtonElement | undefined {
 
 async function renderPage() {
   await act(async () => {
-    root.render(<EditFormPage />)
+    root.render(<><EditFormPage /><ToastHost /></>)
   })
   await flush()
 }
 
 beforeEach(() => {
+  clearToastsForTest()
   net.putCount = 0
   net.getCount = 0
   net.updateBehavior = 'ok'
@@ -159,7 +162,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'forbidden'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     expect(container.textContent).toContain('権限')
@@ -170,7 +173,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'serverError'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     expect(container.textContent).toContain('時間をおいて')
@@ -181,7 +184,7 @@ describe('M001 保存の失敗は日本語の理由と立て直し方で出す',
     net.updateBehavior = 'offline'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     expect(container.textContent).not.toContain('Failed to fetch')
@@ -207,7 +210,7 @@ describe('M003 応答消失後の再送は保存済みとして扱う', () => {
     net.reconcileContent = 'same'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     await flush()
@@ -216,7 +219,7 @@ describe('M003 応答消失後の再送は保存済みとして扱う', () => {
     expect(net.getCount).toBeGreaterThan(1)
     expect(container.textContent).toContain('下書きを保存しました')
     expect(container.textContent).not.toContain('ほかの人が')
-    expect(container.querySelector('[data-qa="form-edit-conflict-reload"]')).toBeNull()
+    expect(findButton('最新を読み込んで続ける')).toBeUndefined()
   })
 
   it('違う中身ならほかの人の編集として読み直し導線を出す', async () => {
@@ -224,11 +227,11 @@ describe('M003 応答消失後の再送は保存済みとして扱う', () => {
     net.reconcileContent = 'other'
     await renderPage()
     await act(async () => {
-      findButton('下書きを保存する')!.click()
+      findButton('下書きを保存')!.click()
     })
     await flush()
     await flush()
     expect(container.textContent).toContain('ほかの人が')
-    expect(container.querySelector('[data-qa="form-edit-conflict-reload"]')).toBeTruthy()
+    expect(findButton('最新を読み込んで続ける')).toBeTruthy()
   })
 })

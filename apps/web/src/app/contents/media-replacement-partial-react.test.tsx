@@ -122,7 +122,7 @@ vi.mock('@/lib/api', () => {
   }
 })
 
-const { default: MediaReplacementDialog } = await import('./media-replacement-dialog')
+const { default: MediaReplacementDialog } = await import('@/v8/contents/media-replacement-dialog')
 
 let host: HTMLDivElement
 let root: Root

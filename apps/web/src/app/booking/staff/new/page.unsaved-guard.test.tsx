@@ -21,14 +21,14 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: fixture.push }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -37,6 +37,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ...actual,
     api: { staff: { list: async () => ({ success: true, data: [] }) } },
     bookingApi: {
+      listStaff: async () => ({ staff: [] }),
       listMenus: fixture.listMenus,
       createStaff: fixture.createStaff,
       putStaffMenus: fixture.putStaffMenus,

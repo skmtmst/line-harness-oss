@@ -8,10 +8,11 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/contexts/account-context'
-import V8RewardsTab from './v8-rewards-tab'
+import { MileageShell } from '@/v8/mileage/frame'
+import V8RewardsTab from '@/v8/mileage/rewards'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=rewards'),
   usePathname: () => '/mileage',
@@ -61,6 +62,7 @@ function rewardFixture(id: string, name: string, status: 'published' | 'draft') 
 
 const createdRewards: Array<unknown> = []
 const testedRewards: string[] = []
+let reportSummary: { publishedCount: number; redeemedMilesThisMonth: number; neverRedeemedFriendCount: number | null; mostRedeemedRewardName: string | null; mostRedeemedRewardCount: number | null } | undefined
 
 function stubFetch() {
   globalThis.fetch = (async (input: unknown, init?: { method?: string; body?: string }) => {
@@ -81,6 +83,7 @@ function stubFetch() {
       return new Response(JSON.stringify({
         success: true,
         data: {
+          summary: reportSummary,
           rewards: [
             rewardFixture('reward-1', '送料無料クーポン', 'published'),
             rewardFixture('reward-2', '冬の限定ギフト', 'draft'),
@@ -109,7 +112,6 @@ function stubFetch() {
 
 let container: HTMLDivElement
 let root: Root
-let headerNode: React.ReactNode
 const originalFetch = globalThis.fetch
 
 function installWebStorage(): void {
@@ -140,7 +142,7 @@ beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   createdRewards.length = 0
   testedRewards.length = 0
-  headerNode = null
+  reportSummary = undefined
   stubFetch()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -159,11 +161,7 @@ async function renderTab() {
   await act(async () => {
     root.render(
       <AccountProvider>
-        <V8RewardsTab
-          readonly={false}
-          registerHeaderActions={(node) => { headerNode = node }}
-          registerTabCount={() => {}}
-        />
+        <MileageShell.Provider value={{ tab: 'rewards', readonly: false, narrow: false, counts: {}, setCount: () => {} }}><V8RewardsTab /></MileageShell.Provider>
       </AccountProvider>,
     )
   })
@@ -179,7 +177,7 @@ async function waitForRows(): Promise<void> {
 
 function openRowMenu(name: string): void {
   const button = [...container.querySelectorAll('button')].find(
-    (element) => element.getAttribute('aria-label') === `${name}のその他操作`,
+    (element) => element.getAttribute('aria-label') === `${name}の操作`,
   )
   if (!(button instanceof HTMLButtonElement)) throw new Error('その他操作のボタンがありません')
   button.click()
@@ -200,14 +198,28 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     expect(body).toContain('残り 制限なし')
     expect(body).toContain('10/31 まで')
     expect(body).not.toContain('残り制限なし')
+    expect(container.querySelector('[title="1回も使っていない人の数は未取得"]')).not.toBeNull()
+    expect(body).toContain('交換の回数は未取得')
   })
 
-  it('フォルダの注意書きと行の脚注が絵どおり', async () => {
+  it('0人と0回は未取得と区別し、0回の使い道を人気として名指ししない', async () => {
+    reportSummary = { publishedCount: 1, redeemedMilesThisMonth: 0, neverRedeemedFriendCount: 0, mostRedeemedRewardName: '交換されていない使い道', mostRedeemedRewardCount: 0 }
+    await renderTab()
+    await waitForRows()
+    expect(container.querySelector('[title="1回も使っていない人 0 人"]')).not.toBeNull()
+    expect(container.textContent).toContain('まだ交換されていません')
+    expect(container.textContent).not.toContain('交換の回数は未取得')
+    expect(container.textContent).not.toContain('交換されていない使い道')
+  })
+
+  it('現役のフォルダはすべてだけを出し、行の操作を説明する', async () => {
     await renderTab()
     await waitForRows()
     const body = container.textContent ?? ''
-    expect(body).toContain('フォルダを消しても、中の経路は未分類に残ります')
-    expect(body).toContain('行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。')
+    expect(body).toContain('すべて')
+    expect(container.querySelector('button[aria-label="フォルダを追加"]')).toBeNull()
+    await act(async () => { (container.querySelector('button[aria-label="マイルの説明"]') as HTMLButtonElement).click() })
+    expect(container.textContent ?? '').toContain('行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。')
   })
 
   it('行の「…」に4つの操作が並ぶ', async () => {
@@ -238,7 +250,6 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
   it('頭に CSVで書き出すが出て、表の中身が入る', async () => {
     await renderTab()
     await waitForRows()
-    expect(headerNode).not.toBeNull()
     const blobs: Blob[] = []
     const restoreObjectUrl = globalThis.URL.createObjectURL
     globalThis.URL.createObjectURL = ((blob: Blob) => {
@@ -247,11 +258,7 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
     }) as typeof globalThis.URL.createObjectURL
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     try {
-      const host = document.createElement('div')
-      document.body.appendChild(host)
-      const headerRoot = createRoot(host)
-      await act(async () => { headerRoot.render(<>{headerNode}</>) })
-      const button = [...host.querySelectorAll('button')].find(
+      const button = [...container.querySelectorAll('button')].find(
         (element) => (element.textContent ?? '').includes('CSVで書き出す'),
       )
       if (!(button instanceof HTMLButtonElement)) throw new Error('CSV のボタンがありません')
@@ -262,8 +269,6 @@ describe('使い道の絵合わせ（板 `S35pO`）', () => {
       expect(text).toContain('"使い道","必要なマイル"')
       expect(text).toContain('送料無料クーポン')
       expect(click).toHaveBeenCalled()
-      await act(async () => { headerRoot.unmount() })
-      host.remove()
     } finally {
       globalThis.URL.createObjectURL = restoreObjectUrl
       click.mockRestore()

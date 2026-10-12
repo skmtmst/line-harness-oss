@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /* 案A（JeINq・EFV8l）：寸法は部品が持ち、呼ぶ画面から上書きしない。 */
 .list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -13,6 +13,6 @@
 }
 
 /* リッチメッセージの6面を1段に置く。右上のラジオの下へ見本を置き、重ねない（B-203/229）。 */
-html[data-theme='v8'] .list[data-preview='message'] .tile {
+html:root .list[data-preview='message'] .tile {
   width: 104px;
 }

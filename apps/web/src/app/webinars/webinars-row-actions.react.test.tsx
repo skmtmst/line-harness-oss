@@ -29,7 +29,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -100,9 +100,9 @@ describe('#641 ウェビナー一覧の行操作', () => {
     // 行に箱アイコンだけのボタンは置かない。
     expect(host.querySelector('button[aria-label="旧機能説明会をアーカイブ"]'), '箱アイコンの直置きが残っています').toBeNull()
 
-    const more = host.querySelector('button[aria-label="旧機能説明会のその他操作"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="ウェビナー「旧機能説明会」の操作"]') as HTMLButtonElement
     expect(more, '「…」の撮影口が消えています').toBeTruthy()
-    expect(more.getAttribute('aria-label')).toBe('旧機能説明会のその他操作')
+    expect(more.getAttribute('aria-label')).toBe('ウェビナー「旧機能説明会」の操作')
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const menu = document.querySelector('[role="menu"]')
@@ -115,7 +115,7 @@ describe('#641 ウェビナー一覧の行操作', () => {
     await act(async () => { root.render(<WebinarsPage />) })
     await flush()
 
-    const more = host.querySelector('button[aria-label="旧機能説明会のその他操作"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="ウェビナー「旧機能説明会」の操作"]') as HTMLButtonElement
     expect(more, '「…」の撮影口が消えています').toBeTruthy()
     act(() => { more.click() })
     const menu = document.querySelector('[role="menu"]')

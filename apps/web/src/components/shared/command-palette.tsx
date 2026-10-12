@@ -15,10 +15,6 @@ export type PaletteItem = {
   section?: string
 }
 
-function isV8(): boolean {
-  return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'v8'
-}
-
 /** 左メニューに出ている行き先を拾う（見えている機能だけ出す）。 */
 function collectVisibleItems(): PaletteItem[] {
   if (typeof document === 'undefined') return []
@@ -65,7 +61,6 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !event.altKey && !event.shiftKey && !isImeComposing(event)) {
-        if (!isV8()) return
         event.preventDefault()
         if (!openRef.current) {
           const active = document.activeElement

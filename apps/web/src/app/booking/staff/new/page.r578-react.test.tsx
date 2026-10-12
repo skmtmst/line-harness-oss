@@ -19,7 +19,7 @@ const fixture = vi.hoisted(() => ({
   push: null as null | ((...args: unknown[]) => void),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: (...args: unknown[]) => fixture.push!(...args), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -28,7 +28,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a' }),
 }))
 
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 
@@ -62,6 +62,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     ApiError,
     api: { staff: { list: async () => ({ success: true, data: [] }) } },
     bookingApi: {
+      listStaff: async () => ({ staff: [] }),
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       createStaff: (...args: unknown[]) => fixture.createStaff!(...args),
       putStaffMenus: (...args: unknown[]) => fixture.putStaffMenus!(...args),
@@ -139,14 +140,15 @@ describe('R578 メニューの取得失敗と未登録を言い分ける', () =>
     await renderNew()
     await screen.findByText('メニューを読み込めませんでした')
 
-    const name = screen.getByPlaceholderText('例: 田中 美咲') as HTMLInputElement
+    const name = screen.getByPlaceholderText('田中 美咲') as HTMLInputElement
     fireEvent.change(name, { target: { value: '田中' } })
 
     fail = false
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
+    fireEvent.click(await screen.findByRole('button', { name: '予約を受けられるメニュー' }))
     await screen.findByRole('checkbox', { name: /カット/ })
     expect(screen.queryByText('メニューを読み込めませんでした')).toBeNull()
-    expect((screen.getByPlaceholderText('例: 田中 美咲') as HTMLInputElement).value).toBe('田中')
+    expect((screen.getByPlaceholderText('田中 美咲') as HTMLInputElement).value).toBe('田中')
   })
 })

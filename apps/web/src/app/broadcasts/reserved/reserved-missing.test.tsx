@@ -105,7 +105,7 @@ describe('broadcasts/reserved の対象なし案内（R582）', () => {
   it('503では同画面の再試行だけを出す', async () => {
     apiMocks.get.mockRejectedValue(new ApiError(503))
     render(<Page />)
-    expect(await screen.findByText('予約結果を表示できませんでした')).toBeTruthy()
+    expect(await screen.findByText('予約結果を読み込めませんでした')).toBeTruthy()
     expect(screen.getByText('通信が切れたか、サーバーが応えませんでした。しばらくしてから、もう一度読み込んでください。')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     // 一覧へ逃がす口は出さない。同画面で続けられる。
@@ -117,7 +117,7 @@ describe('broadcasts/reserved の対象なし案内（R582）', () => {
       .mockRejectedValueOnce(new ApiError(503))
       .mockResolvedValueOnce({ success: true, data: broadcast })
     render(<Page />)
-    await screen.findByText('予約結果を表示できませんでした')
+    await screen.findByText('予約結果を読み込めませんでした')
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await waitFor(() => expect(screen.getAllByText('8月キャンペーンのお知らせ')[0]).toBeTruthy())
     expect(apiMocks.get).toHaveBeenCalledTimes(2)

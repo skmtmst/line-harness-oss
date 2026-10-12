@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { requestUnsavedAction } from './unsaved-action'
 
 /** B-158：ほかの絞り込みとハッシュを残し、タブだけを置き換える。入れ子は親/子。 */
 export function tabHref(href: string, tab: string, parent?: string): string {
@@ -26,11 +27,14 @@ export function useUrlTab<T extends string>(values: readonly T[], fallback: T, p
     return () => { window.removeEventListener('popstate', read); window.removeEventListener('musubo-tab-change', read) }
   }, [key, fallback, parent])
   const select = useCallback((next: T) => {
+    if (next === tab) return
+    requestUnsavedAction(() => {
     setTab(next)
     const href = tabHref(window.location.href, next, parent)
     window.history.replaceState(window.history.state, '', href)
     window.dispatchEvent(new Event('musubo-tab-change'))
     router.replace(href, { scroll: false })
-  }, [router, parent])
+    })
+  }, [router, parent, tab])
   return [tab, select]
 }

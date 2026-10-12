@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { HQ_MENU_SECTIONS } from '@/lib/menu'
 
 const sidebar = readFileSync(new URL('../../components/layout/sidebar.tsx', import.meta.url), 'utf8')
-const sharedTemplatePage = readFileSync(new URL('./hq-template-page.tsx', import.meta.url), 'utf8')
+const sharedTemplatePage = readFileSync(new URL('./form-submissions/page.tsx', import.meta.url), 'utf8')
 const formSubmissions = readFileSync(new URL('./form-submissions/page.tsx', import.meta.url), 'utf8')
 const friendAttributes = readFileSync(new URL('./friend-attributes/page.tsx', import.meta.url), 'utf8')
 const richMenus = readFileSync(new URL('./rich-menus/page.tsx', import.meta.url), 'utf8')
@@ -21,12 +21,10 @@ const UNAVAILABLE_HREFS = [
  * 外す。ページ自体は残し、直接URLでは「アカウントを選ぶ」へ案内する。
  */
 describe('統括の「まだ使えません」画面の整理', () => {
-  it('配布が無効のあいだ4画面をサイドバーに出さない', () => {
-    for (const href of UNAVAILABLE_HREFS) {
-      expect(sidebar).toContain(`'${href}'`)
-    }
-    // フラグが有効になれば再表示する（一時的な除外であり削除ではない）。
-    expect(sidebar).toContain('!HQ_TEMPLATE_DISTRIBUTION_ENABLED')
+  it('現役の配布画面の入口を旧テーマの旗で隠さない', () => {
+    expect(sidebar).toContain('isHq ? HQ_MENU_SECTIONS')
+    expect(sidebar).not.toContain('HQ_TEMPLATE_DISTRIBUTION_ENABLED')
+    expect(sidebar).not.toContain('HQ_UNAVAILABLE_DISTRIBUTION_HREFS')
   })
 
   it('メニューの定義には4項目を残す（有効化で復帰・直接URLは維持）', () => {
@@ -37,7 +35,7 @@ describe('統括の「まだ使えません」画面の整理', () => {
   })
 
   it('直接URLはV8のひな形画面へ通す', () => {
-    expect(sharedTemplatePage).toContain('<TemplateConsole type={type}')
+    expect(sharedTemplatePage).toContain('<HqTemplatesV8 type=\"form\"')
     expect(sharedTemplatePage).not.toContain('TargetMissing')
   })
   it('各入口はV8の機能画面を使う', () => {

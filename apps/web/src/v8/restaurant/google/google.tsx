@@ -1,6 +1,7 @@
 'use client'
 
 import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
@@ -18,6 +19,10 @@ import { ReviewDraft, ReviewsBoard } from './reviews'
 import { PostEditor, PostConfirm, PostsBoard, type MediaUploadHelpers } from './posts'
 import PerformanceBoard from './performance'
 import ProfileBoard from './profile'
+import { ChangeConfirmScreen } from './profile-confirm'
+import { HistoryScreen } from './profile-history'
+import { ProfileEditScreen } from './profile-edit'
+import { HoursEditor } from './profile-hours'
 import SettingsBoard from './settings'
 import styles from './google.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
@@ -30,8 +35,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  *
  * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
  * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
- * 営業時間の変更・変更の確認・変更履歴・プロフィールの編集（?tab=profile&view=hours|confirm|history|edit）は
- * 入口の page.tsx が今の画面へ渡す（V8 の絵がまだ無い）。動きは BEHAVIOR.md。
+ * 営業時間・確認・履歴・編集も共通の V8 部品で出す。動きは BEHAVIOR.md。
  */
 
 export type { MediaUploadHelpers } from './posts'
@@ -141,7 +145,10 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       value={currentStoreId}
       onChange={(value) => {
         const next = stores.find((item) => item.id === value)
-        if (next?.line_account_id && next.line_account_id !== selectedAccountId) setSelectedAccountId(next.line_account_id)
+        if (next?.line_account_id && next.line_account_id !== selectedAccountId) {
+          const nextAccountId = next.line_account_id
+          requestUnsavedAction(() => setSelectedAccountId(nextAccountId))
+        }
       }}
       options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id }))}
     /></SaveErrorField>
@@ -166,7 +173,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
               label: count ? `${TAB_LABELS[key]} ${count}` : TAB_LABELS[key],
               current: tab === key,
               disabled: !connected && key !== 'settings',
-              onClick: () => samePageUrl.replace(`/restaurant-test/google?tab=${key}`),
+              onClick: () => requestUnsavedAction(() => samePageUrl.replace(`/restaurant-test/google?tab=${key}`)),
             }
           })}
         />
@@ -183,6 +190,14 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           <PostsBoard accountId={accountId} go={go} />
         ) : tab === 'performance' ? (
           <PerformanceBoard accountId={accountId} />
+        ) : tab === 'profile' && view === 'confirm' && id ? (
+          <ChangeConfirmScreen key={`${accountId}-${id}`} accountId={accountId} ids={id.split(',').filter(Boolean)} go={go} />
+        ) : tab === 'profile' && view === 'history' ? (
+          <HistoryScreen key={`${accountId}-${searchParams.get('result') ?? ''}`} accountId={accountId} initialResult={(['all', 'applied', 'pending', 'failed'] as const).find((value) => value === searchParams.get('result'))} go={go} />
+        ) : tab === 'profile' && view === 'edit' ? (
+          <ProfileEditScreen key={accountId} accountId={accountId} go={go} />
+        ) : tab === 'profile' && view === 'hours' ? (
+          <HoursEditor key={`${accountId}-${searchParams.get('mode') ?? 'text'}-${searchParams.get('date') ?? ''}`} accountId={accountId} mode={searchParams.get('mode') === 'calendar' ? 'calendar' : searchParams.get('mode') === 'weekly' ? 'weekly' : 'text'} initialDate={searchParams.get('date')} go={go} />
         ) : tab === 'profile' ? (
           <ProfileBoard accountId={accountId} go={go} />
         ) : tab === 'settings' ? (

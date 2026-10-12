@@ -18,6 +18,7 @@ export default function Disclosure({
   size = 'standard',
   className,
   id,
+  onToggle,
   children,
 }: {
   title: ReactNode
@@ -27,11 +28,14 @@ export default function Disclosure({
   size?: 'standard' | 'compact'
   className?: string
   id?: string
+  /** 開いたときにだけ必要な詳細を読み込むための口。 */
+  onToggle?: (open: boolean) => void
   children: ReactNode
 }) {
   return (
     <details
       id={id}
+      onToggle={onToggle ? (event) => onToggle(event.currentTarget.open) : undefined}
       open={defaultOpen || undefined}
       className={[styles.root, size === 'compact' ? styles.compact : '', className].filter(Boolean).join(' ')}
     >

@@ -43,6 +43,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { TextField } from '@/components/shared/text-field'
+import { Field } from '@/components/shared/form-controls'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
@@ -136,6 +138,7 @@ function InflowDetailContent() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [deleteConfirmationName, setDeleteConfirmationName] = useState('')
   const [deleteChoice, setDeleteChoice] = useState<DeleteChoice>('stop')
   const [canPermanentlyDelete, setCanPermanentlyDelete] = useState(false)
   // 「別の流入リンクへ送る」の転送先。先頭を自動採用しない（#514 重大4）。
@@ -270,6 +273,7 @@ function InflowDetailContent() {
 
   async function applyDeleteChoice() {
     if (!route || deleting) return
+    if (deleteChoice === 'delete' && deleteConfirmationName !== route.name) return
     if (deleteChoice === 'delete' && !canPermanentlyDelete) {
       setDeleteChoice('stop')
       setDeleteError('完全削除には管理者権限が必要です。受付停止を選んでください。')
@@ -293,7 +297,7 @@ function InflowDetailContent() {
         const result = deleteChoice === 'delete'
           ? await fetchApi<{ success: boolean; error?: string }>(`/api/entry-routes/${encodeURIComponent(route.id)}`, {
               method: 'DELETE',
-              body: JSON.stringify({ confirmationName: route.name }),
+              body: JSON.stringify({ confirmationName: deleteConfirmationName }),
             })
           : await api.entryRoutes.update(route.id, { isActive: false })
         if (!result.success) throw new Error(result.error)
@@ -364,6 +368,7 @@ function InflowDetailContent() {
   // 削除の窓を開く。「…」と帯の「止める」から、選ぶ内容だけ変える。
   const openDelete = (choice: DeleteChoice) => {
     setDeleteError('')
+    setDeleteConfirmationName('')
     setDeleteChoice(choice)
     setRedirectTargetId('')
     setAfterMenuOpen(false)
@@ -780,6 +785,7 @@ function InflowDetailContent() {
           designNode="UIaM7"
           designWidth={840}
           busy={deleting}
+          confirmDisabled={deleteChoice === 'delete' && deleteConfirmationName !== route.name}
           error={deleteError || undefined}
           confirmLabel={deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除する'}
           onConfirm={() => {
@@ -829,6 +835,13 @@ function InflowDetailContent() {
               </div>
             ) : null}
 
+            {deleteChoice === 'delete' ? (
+              <Field label={`完全削除するには「${route.name}」と入力`}>
+                <TextField id="inflow-delete-confirmation" value={deleteConfirmationName} disabled={deleting}
+                  onChange={(event) => setDeleteConfirmationName(event.target.value)} autoComplete="off" />
+                <p className={styles.note}>空白や大文字・小文字も含め、現在の経路名と同じ入力が必要です。</p>
+              </Field>
+            ) : null}
           </div>
         </Dialog>
       ) : null}

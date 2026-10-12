@@ -139,6 +139,24 @@ describe('GET /api/auto-reply-runs', () => {
     expect(json.data.items[0].inputPreview).toBeNull();
   });
 
+  it.each([
+    ['failed', 'delayed_delivery_unknown', null, '届いたか分からないため要確認'],
+    ['skipped', null, 'partial_failure_requires_retry', '失敗した処理だけを再実行してください'],
+  ])('SEND-S03/S04: %sの不明・部分失敗を通常の見送りに隠さない', async (status, error_code, skip_reason, expected) => {
+    const original = await mocks.listAutoReplyEvaluationRuns();
+    mocks.listAutoReplyEvaluationRuns.mockResolvedValueOnce({ ...original, items: [{
+      ...original.items[0], status, error_code, skip_reason,
+      candidate_result: 'won', candidate_reason_codes: '["keyword_matched"]',
+      has_failed_action_run: error_code ? 1 : 0,
+    }] });
+    const response = await app().request('/api/auto-reply-runs', {}, { DB: db } as Env['Bindings']);
+    const json = await response.json() as { data: {items: Array<{status:string;detail:string;canRetry:boolean;errorCode:string|null}>} };
+    expect(json.data.items[0].status).toBe(status === 'failed' ? 'permanent_failed' : 'skipped');
+    expect(json.data.items[0].errorCode).toBe(error_code);
+    expect(json.data.items[0].detail).toContain(expected);
+    expect(json.data.items[0].canRetry).toBe(false);
+  });
+
   it('受信本文はチャット閲覧権限がある担当者にだけ返す', async () => {
     const response = await app({ ...staff, permissionKeys: ['/chats'] }).request(
       '/api/auto-reply-runs?rule_id=rule-a',

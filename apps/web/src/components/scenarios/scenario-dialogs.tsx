@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
+import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
   findConditionDraftIssue,
@@ -149,10 +150,10 @@ export function ConditionDialog({
       wide
       footer={
         <>
-          <Button variant="secondary" className="text-ink-secondary v7:h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
+          <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="v7:h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
                * 欄の下で知らせて止める。保存済みの条件は維持する。
@@ -486,10 +487,10 @@ export function OnCompleteDialog({
       onClose={onClose}
       footer={
         <>
-          <Button variant="secondary" className="text-ink-secondary v7:h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
+          <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="v7:h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
                * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
@@ -565,7 +566,7 @@ export function OnCompleteDialog({
         <p className="text-ink-secondary mt-0.5 mb-2 text-xs">
           配り終えた人に対して、タグ・友だち情報・対応マークなどを動かします。
         </p>
-        <Button variant="secondary" className="text-ink-secondary v7:h-10 px-4 whitespace-normal" type="button" onClick={onOpenActions}>
+        <Button variant="secondary" className="text-ink-secondary px-4 whitespace-normal" type="button" onClick={onOpenActions}>
           アクション設定{actionCount > 0 ? `（${actionCount} 件）` : ''}
         </Button>
       </div>
@@ -1007,10 +1008,10 @@ export function TestSendDialog({
       // ここに確認中のフッターは要らない。
       footer={
         <>
-        <Button variant="secondary" className="text-ink-secondary v7:h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
+        <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
           キャンセル
         </Button>
-        <Button variant="primary" className="v7:h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
+        <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
           内容を確認
         </Button>
         </>
@@ -1323,7 +1324,7 @@ export function FriendPlanDialog({
             <div className="flex flex-wrap justify-between gap-2">
               <dt className="text-ink-faint">いまの状態</dt>
               <dd className="text-ink">
-                {plan.subscription
+                {plan.subscription?.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : plan.subscription
                   ? FRIEND_PLAN_STATUS[plan.subscription.status] ?? plan.subscription.status
                   : 'まだ開始していません'}
               </dd>
@@ -1338,7 +1339,7 @@ export function FriendPlanDialog({
               <div className="flex flex-wrap justify-between gap-2">
                 <dt className="text-ink-faint">止まっている理由</dt>
                 <dd className="text-ink">
-                  {plan.subscription.pauseReason === 'delivery_failed'
+                  {plan.subscription.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : plan.subscription.pauseReason === 'delivery_failed'
                     ? '配信失敗'
                     : plan.subscription.pauseReason === 'after_send'
                       ? 'この通を送ったあと止める設定'
@@ -1358,6 +1359,7 @@ export function FriendPlanDialog({
             </div>
           </dl>
 
+          {plan.subscription?.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedNotice action={<Button href={`/chats?friend=${encodeURIComponent(plan.friendId)}`}>トークの送信記録を確認</Button>} /> : null}
           {plan.start.state === 'blocked' ? (
             <Notice tone="warn">
               <p className="font-semibold">いまはこの友だちへ配信されません</p>

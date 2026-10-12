@@ -22,7 +22,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 /*
  * ★V8 ウェビナーのコメント演出（Pencil Omqd4）。
  * 左に流すコメントの表（秒数・名前・本文はその場で直せる。行の右端は消す）、右に視聴画面での見え方。
- * 口・件数の上限・JSON の読み込み・保存の決まりは app/webinars/edit/comments-v8.tsx と同じ（BEHAVIOR.md）。
+ * 口・件数の上限・JSON の読み込み・保存の決まりは BEHAVIOR.md。
  */
 
 /** 1行の中身を確かめる。直せないときは理由の文を返す。 */

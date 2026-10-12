@@ -57,8 +57,8 @@ import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size
  *
  * 型（ListPage）に、数の帯（これからの回・申込・あと少しで満席・申し込みが少ない）、
  * 左のフォルダの列（上に「イベントを作る」）、案内の帯と道具の段、表、ページ送りをはめる。
- * データの口（取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ）は今の V8
- * （src/app/events/events-list-v8.tsx）と同じ。行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
+ * データの口は取得・絞り込み・並び・ページ送り・名前の変更・削除・フォルダ。
+ * 行の名前の前にフォルダの色の丸（2026-10-07 オーナー）。
  */
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -666,7 +666,10 @@ export default function EventsListV8() {
       headingSize="regular"
       title="イベント予約"
       layout="event-list"
-      help="教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。"
+      help={<>
+        教室・体験会・相談会など、回ごとに定員のあるイベントの申込を受けます。
+        {dataReady && kpi.nearest_low_starts_at ? <p>申し込みが少ないのは{jstDay(kpi.nearest_low_starts_at)}の回。あと{daysUntilIso(kpi.nearest_low_starts_at) ?? emptyValue('unknown')}日です。</p> : null}
+      </>}
       folderWidth={200}
 
       tabs={!canEdit ? (

@@ -43,6 +43,7 @@ import {
   PANE_KEYS,
   STEPS,
   nextStepOf,
+  nextLabelOf,
   stepStateOf,
   webinarStatusLabel,
   type PaneKey,
@@ -69,15 +70,6 @@ const STEP_TITLE: Record<StepKey, string> = {
   cta: 'CTA・フォーム',
   notifications: '通知と視聴後のこと',
   review: '公開の前に確かめる',
-}
-
-/* 次へ進む押し口の文言。絵どおり行き先の名前。 */
-const NEXT_LABEL: Record<StepKey, string | null> = {
-  basic: '動画の設定へ',
-  video: 'CTA・フォームへ',
-  cta: '通知へ',
-  notifications: '確認へ',
-  review: null,
 }
 
 function normalizePane(value: string | null): PaneKey {
@@ -377,13 +369,18 @@ function EditInner() {
     } catch (cause) { if (!saveErrors.capture(cause)) setDuplicateError('複製できませんでした。保存済みの内容を読み直してお試しください。') }
     finally { setDuplicating(false) }
   }
-  const menuActions = !readOnly ? <><RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false || duplicating }} items={[
-    { id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) },
-    ...(webinar.status === 'active' ? [{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }] : []),
-  ]} />{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}</> : null
+  const menuActions = <><RowMenu label="ウェビナーの操作" triggerProps={{ disabled: pausing || savingForNav !== false || duplicating }} items={[
+    { id: 'participants', label: '参加者を見る', onSelect: () => goStep('participants') },
+    { id: 'analytics', label: '分析を見る', onSelect: () => goStep('analytics') },
+    { id: 'comments', label: 'コメント演出を開く', onSelect: () => goStep('comments') },
+    ...(!readOnly ? [
+      { id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) },
+      ...(webinar.status === 'active' ? [{ id: 'pause', label: '停止', onSelect: () => { setPauseError(''); setPauseVersion(editor.version) } }] : []),
+    ] : []),
+  ]} />{duplicateError ? <Notice tone="danger">{duplicateError}</Notice> : null}</>
 
   const wizardChrome = (key: StepKey, primary?: ReactNode): WizardChrome => {
-    const nextLabel = NEXT_LABEL[key]
+    const nextLabel = nextLabelOf(key)
     const label = nextLabel && unsaved.has(key) && savable.has(key) ? `保存して${nextLabel}` : nextLabel
     const footerWithDraft = (draft: ReactNode) => <>
       <Button href="/webinars">キャンセル</Button>

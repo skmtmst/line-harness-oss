@@ -16,7 +16,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
@@ -136,7 +136,7 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
 
     const card = errorCard()
     expect(card).not.toBeNull()
-    expect(card!.textContent).toContain('表示できませんでした')
+    expect(card!.textContent).toContain('流入リンクを読み込めませんでした')
     expect(card!.querySelector('button')).not.toBeNull()
   })
 })
@@ -189,7 +189,7 @@ describe('R173 検索・絞り込みの0件は未登録と混ぜない', () => {
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 320)) })
     await settle()
 
-    expect(host.textContent).toContain('条件に合う流入経路がありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
     expect(host.textContent).not.toContain('最初のフォルダ')
     expect(host.textContent).not.toContain('まだ流入経路がありません')
   })

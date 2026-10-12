@@ -2,6 +2,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { screen } from '@testing-library/react'
+import RichMenuDetailV8 from '@/v8/rich-menu-edit/detail'
 
 /**
  * K-1 公開の進みセクションの描画試験。
@@ -11,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({
   progressResult: undefined as unknown,
+  publish: vi.fn(),
 }))
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -19,15 +25,20 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } }) },
       richMenuGroups: {
         ...actual.api.richMenuGroups,
         publishProgress: async () => net.progressResult,
+        get: async () => ({ success: true, data: { id: 'g1', name: 'メニュー', accountId: 'account-1', status: 'published', isDefaultForAll: true, targetingEnabled: false } }),
+        publishRuns: async () => ({ success: true, data: { runs: [] } }),
+        previewTargets: async () => ({ success: true, data: null }),
+        tapStats: async () => ({ success: true, data: { byArea: [] } }),
+        reconcile: async () => ({ success: true, data: { diffs: [] } }),
+        publish: net.publish,
       },
     },
   }
 })
-
-const { PublishProgressSection } = await import('./publish-progress-section')
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -42,6 +53,9 @@ async function flush() {
 }
 
 beforeEach(async () => {
+  document.documentElement.dataset.theme = 'v8'
+  net.publish.mockReset()
+  net.publish.mockResolvedValue({ success: true, data: { pages: [] } })
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -52,6 +66,7 @@ afterEach(async () => {
     root.unmount()
   })
   container.remove()
+  delete document.documentElement.dataset.theme
 })
 
 function failedProgress() {
@@ -74,16 +89,16 @@ describe('公開の進み', () => {
   it('読み込み中はその旨だけ出す', async () => {
     net.progressResult = new Promise(() => {})
     await act(async () => {
-      root.render(<PublishProgressSection groupId="g1" onRetry={() => {}} />)
+      root.render(<RichMenuDetailV8 groupId="g1" />)
     })
     await flush()
-    expect(container.textContent).toContain('読み込み中')
+    expect(screen.getByRole('region', { name: '公開の進み' }).querySelector('[aria-busy="true"]')).not.toBeNull()
   })
 
   it('読めないときは飾りの赤を出さず、読み込めなかったとだけ出す', async () => {
     net.progressResult = Promise.reject(new Error('down'))
     await act(async () => {
-      root.render(<PublishProgressSection groupId="g1" onRetry={() => {}} />)
+      root.render(<RichMenuDetailV8 groupId="g1" />)
     })
     await flush()
     expect(container.textContent).toContain('公開の進みを読み込めませんでした。')
@@ -104,7 +119,7 @@ describe('公開の進み', () => {
       },
     }
     await act(async () => {
-      root.render(<PublishProgressSection groupId="g1" onRetry={() => {}} />)
+      root.render(<RichMenuDetailV8 groupId="g1" />)
     })
     await flush()
     expect(container.textContent).toContain('まだ公開していません。')
@@ -113,9 +128,8 @@ describe('公開の進み', () => {
 
   it('失敗した段だけ失敗にし、もう一度公開するボタンで親へつなぐ', async () => {
     net.progressResult = failedProgress()
-    const onRetry = vi.fn()
     await act(async () => {
-      root.render(<PublishProgressSection groupId="g1" onRetry={onRetry} />)
+      root.render(<RichMenuDetailV8 groupId="g1" />)
     })
     await flush()
 
@@ -129,7 +143,8 @@ describe('公開の進み', () => {
     await act(async () => {
       button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(onRetry).toHaveBeenCalledTimes(1)
+    expect(net.publish).toHaveBeenCalledTimes(1)
+    expect(net.publish).toHaveBeenCalledWith('g1', expect.any(String))
   })
 
   it('成功すればボタンを出さない', async () => {
@@ -147,7 +162,7 @@ describe('公開の進み', () => {
       },
     }
     await act(async () => {
-      root.render(<PublishProgressSection groupId="g1" onRetry={() => {}} />)
+      root.render(<RichMenuDetailV8 groupId="g1" />)
     })
     await flush()
     expect(container.textContent).toContain('済み')

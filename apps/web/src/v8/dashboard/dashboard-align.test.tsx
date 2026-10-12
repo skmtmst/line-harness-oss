@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { DashboardColumns, DashboardRow } from '@/components/templates/dashboard-page'
-import DashboardEditor from '@/components/dashboard/dashboard-editor'
+import DashboardEditor from './dashboard-editor'
 import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
@@ -55,10 +55,9 @@ describe('右の列を帯の1マス分にする口', () => {
 })
 
 describe('V8 の既定の表示', () => {
-  it('友だちの状態は V8 では既定で表示（友だち追加リンクの右）。v7 の既定は変えない', () => {
+  it('友だちの状態は既定で表示し、保存済みの非表示は引き継ぐ', () => {
     const v8 = defaultDashboardPreferences(V8_DASHBOARD_DEFAULT_VISIBILITY)
     expect(v8.right.find((item) => item.id === 'friend-status')?.visible).toBe(true)
-    expect(defaultDashboardPreferences().right.find((item) => item.id === 'friend-status')?.visible).toBe(false)
     // 保存済みで隠した人の選択は上書きしない
     const saved = normalizeDashboardPreferences({ right: [{ id: 'friend-status', visible: false }] }, V8_DASHBOARD_DEFAULT_VISIBILITY)
     expect(saved.right.find((item) => item.id === 'friend-status')?.visible).toBe(false)
@@ -134,27 +133,27 @@ describe('ダッシュボード編集の表示の切り替え', () => {
   it('V8 はスイッチ（読み上げ「〇〇を表示」）。押すとオン・オフが変わる', async () => {
     document.documentElement.dataset.theme = 'v8'
     await act(async () => { render(<DashboardEditor {...props()} />) })
-    const toggle = screen.getByRole('switch', { name: '写真審査を表示' })
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    const toggle = screen.getByRole('checkbox', { name: '写真審査を表示' })
+    expect((toggle as HTMLInputElement).checked).toBe(true)
     fireEvent.click(toggle)
-    expect(screen.getByRole('switch', { name: '写真審査を表示' }).getAttribute('aria-checked')).toBe('false')
-    expect(document.querySelector('[role="dialog"] input[type="checkbox"]')).toBeNull()
+    expect((screen.getByRole('checkbox', { name: '写真審査を表示' }) as HTMLInputElement).checked).toBe(false)
   })
 
   it('V8 でも「今日やること」の切り替えは同じ動き（オフ→オンで4枠に戻る）', async () => {
     document.documentElement.dataset.theme = 'v8'
     await act(async () => { render(<DashboardEditor {...props()} />) })
-    fireEvent.click(screen.getByRole('switch', { name: '写真審査を表示' }))
-    fireEvent.click(screen.getByRole('switch', { name: '写真審査を表示' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '写真審査を表示' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '写真審査を表示' }))
     const on = ['対応が必要な受信', '写真審査', '今日の予約', '出荷予定件数']
-      .map((label) => screen.getByRole('switch', { name: `${label}を表示` }).getAttribute('aria-checked'))
-    expect(on.filter((value) => value === 'true')).toHaveLength(4)
+      .map((label) => (screen.getByRole('checkbox', { name: `${label}を表示` }) as HTMLInputElement).checked)
+    expect(on.filter(Boolean)).toHaveLength(4)
   })
 
-  it('v7 はチェックの箱のまま', async () => {
+  it('旧テーマ属性でも現役V8の編集を使う', async () => {
+    document.documentElement.dataset.theme = 'v7'
     await act(async () => { render(<DashboardEditor {...props()} />) })
-    expect(screen.queryByRole('switch', { name: '写真審査を表示' })).toBeNull()
-    expect(document.querySelector('input[aria-label="写真審査を非表示にする"]')).not.toBeNull()
+    expect(screen.getByRole('checkbox', { name: '写真審査を表示' })).toBeTruthy()
+    expect(document.querySelector('input[aria-label="写真審査を非表示にする"]')).toBeNull()
   })
 })
 

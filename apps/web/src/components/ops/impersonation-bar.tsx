@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 import { api, type OpsImpersonation } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
@@ -85,13 +84,13 @@ export default function ImpersonationBar({
 
   const writing = state.mode === 'write'
   const name = state.tenantName ?? '契約先'
-  const theme = useAdminTheme()
+
 
   /*
    * V8-B `VtJQ6`「代理ログイン中（閲覧のみ）」。閲覧のみの帯だけ V8 の形にし、
    * 書き込み中・理由の窓・止め方は今のまま。押す先・API は変えない。
    */
-  const v8ReadBanner = theme === 'v8' && !writing ? (
+  const v8ReadBanner = !writing ? (
     <div data-design-node="VtJQ6" role="status" className={v8.banner}>
       <Eye aria-hidden="true" className={v8.icon} />
       <span className={v8.title}>
@@ -114,14 +113,12 @@ export default function ImpersonationBar({
       <div
         data-design-node="WXp5T"
         role="status"
-        className={writing
-          ? 'flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent'
-          : 'flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent'}
+        className="flex h-12 items-center justify-between gap-3 bg-danger px-5 text-on-accent"
       >
         <span className="flex min-w-0 items-center gap-2.5 text-label font-medium">
-          {writing ? <PencilLine aria-hidden="true" className="h-4.5 w-4.5" /> : <Eye aria-hidden="true" className="h-4.5 w-4.5" />}
+          <PencilLine aria-hidden="true" className="h-4.5 w-4.5" />
           <span className="truncate">
-            {name} として{writing ? '書き込み中' : '閲覧中（書き込みはできません）'}
+            {name} として書き込み中
             {state.piiRevealed ? '・個人情報を表示中' : ''}
           </span>
         </span>
@@ -129,11 +126,7 @@ export default function ImpersonationBar({
           {!state.piiRevealed ? (
             <BarButton onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</BarButton>
           ) : null}
-          {writing ? (
-            <BarButton onClick={() => void toRead()} disabled={busy}>閲覧のみに戻す</BarButton>
-          ) : (
-            <BarButton onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</BarButton>
-          )}
+          <BarButton onClick={() => void toRead()} disabled={busy}>閲覧のみに戻す</BarButton>
           <BarButton onClick={() => void end()} disabled={busy} solid>代理ログインを終える</BarButton>
         </span>
       </div>

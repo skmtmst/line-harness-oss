@@ -180,7 +180,7 @@ function DetailContent() {
               <h3 className={parts.panelTitle}>契約の状況</h3>
               <dl className={styles.kvs}>
                 <Kv k="プラン" v={planLabel(tenant.plan_key)} />
-                <Kv k="請求" v={billing} />
+                <Kv k="請求" v={<span title={`次回の請求日 ${formatDate(tenant.current_period_ends_at)}・トライアル ${tenant.trial_ends_at ? `${formatDate(tenant.trial_ends_at)} まで` : emptyValue('none')}`}>{billing}</span>} />
                 <Kv k="使用量" v={`店舗 ${accounts.filter((a) => !a.archived_at).length}・権限者 ${members.filter((m) => m.is_active).length}・請求の詳細は Stripe`} />
                 <Kv
                   k="飲食店機能"

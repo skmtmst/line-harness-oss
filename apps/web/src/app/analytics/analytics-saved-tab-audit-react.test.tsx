@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,8 +32,8 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
-  useSearchParams: () => new URLSearchParams(),
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/analytics',
+  useSearchParams: () => new URLSearchParams({ tab: 'saved' }),
 }))
 
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -106,6 +107,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   fixture.accountId = 'account-a'
   fixture.role = 'owner'
   net.calls.length = 0
@@ -186,19 +188,17 @@ describe('R463 履歴から固定結果を開ける', () => {
     const state = { snapshotsMode: 'ok' as const, snapshotsFailedOnce: true, recentOneTime: [] }
     net.handler = listHandler(state)
     await render()
-    expect(host.textContent).toContain('この時点の結果を見る')
+    expect(host.textContent).toContain('結果を見る')
     // 開くと固定結果の数値が出る
-    const details = host.querySelector('details') as HTMLDetailsElement
-    expect(details.open).toBe(false)
-    const summary = host.querySelector('details summary') as HTMLElement
-    await act(async () => { summary.click() })
-    expect(details.open).toBe(true)
-    expect(host.textContent).toContain('129,001')
-    expect(host.textContent).toContain('9月21日（月）〜9月27日（日）')
+    const open = host.querySelector('[aria-label="結果の履歴"] button') as HTMLButtonElement
+    await act(async () => { open.click() })
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(document.body.textContent).toContain('129,001')
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('9月21日（月）09:00〜9月27日（日）09:00')
     // 未取得の区別も出る
-    expect(host.textContent).toContain('未取得')
+    expect(document.body.textContent).toContain('未取得')
     // 保存結果のCSVは一覧のCSVと別の入口
-    expect(host.textContent).toContain('この分析の結果をCSVで書き出す')
+    expect(host.querySelector('section[aria-labelledby="saved-history-title"]')?.textContent).toContain('CSVで書き出す')
   })
 })
 

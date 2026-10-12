@@ -462,7 +462,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <Button type="button" onClick={() => setPreviewOpen(true)}>LINEでの見え方を見る</Button>
             </div>
             {sideCard}
-            <h2 className={styles.previewHead}>届き方</h2>
+            <h2 className={styles.previewHead} title="この形式は、いまの画面から自分へのテスト送信ができません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。">届き方</h2>
             <div className={styles.phone}>{phone}</div>
           </>
         )}

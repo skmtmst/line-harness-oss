@@ -1,3 +1,4 @@
+import { globalTokens, resolveValue } from '../../scripts/card-shape-contract.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -6,9 +7,10 @@ import { describe, expect, it } from 'vitest'
 const WEB = path.join(__dirname, '..', '..')
 const CSS = fs.readFileSync(path.join(WEB, 'src', 'app', 'globals.css'), 'utf8')
 
+const CURRENT_TOKENS = globalTokens(CSS)
 function token(name: string): string {
-  const hit = CSS.match(new RegExp(`--${name}:\\s*([^;]+);`))
-  return hit ? hit[1].trim() : '(未定義)'
+  if (!CURRENT_TOKENS.has(`--${name}`)) throw new Error(`Missing CSS token: ${name}`)
+  return resolveValue(`var(--${name})`, CURRENT_TOKENS).trim()
 }
 
 /** V8 §6: 中身のカードは12、窓は16。役割を混ぜない。 */
@@ -31,7 +33,7 @@ describe('カードと窓の角丸は V8 の役割ごとの段に揃う', () => 
 
   it('窓の外枠がカードの角丸を使っていない', () => {
     const dialogs = [
-      'app/mileage/friends/detail/mileage-adjustment-dialog.tsx',
+      'v8/mileage/adjust-dialog.tsx',
       'components/forms/options-dialog.tsx',
       'components/shared/folder-add-dialog.tsx',
       'components/dashboard/qr-dialog.tsx',

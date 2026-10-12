@@ -1,0 +1,77 @@
+[
+  {
+    "filename": "src/app/emergency/control-v8.tsx",
+    "fingerprint": "779d9088fbfcc762",
+    "reason": "空配列は復旧できない追加理由だけ。setFeedback(tone= danger)で復旧失敗を表示し、正常・空として進めない。"
+  },
+  {
+    "filename": "src/v8/affiliates/drawer.tsx",
+    "fingerprint": "86d49a7c1db3235c",
+    "reason": "links.success=falseならsetError(true)。実HTTP拒否もcatchでerrorとなり、引き出しの失敗表示と再取得へ。"
+  },
+  {
+    "filename": "src/v8/auto-replies/list.tsx",
+    "fingerprint": "2a30bb8763703788",
+    "reason": "templateListAvailable=falseを編集部品へ渡してテンプレート未取得を区別。空テンプレートとして候補を確定しない。"
+  },
+  {
+    "filename": "src/v8/booking-menus/menu-form.tsx",
+    "fingerprint": "5d9c55b0e9255d40",
+    "reason": "allSettledの拒否はmenusStatus/staffStatus/editStatus=errorへ。編集時は担当・割当の全成功後だけfillFrom。実初回・409読込の拒否試験も合格。"
+  },
+  {
+    "filename": "src/v8/booking-menus/menu-form.tsx",
+    "fingerprint": "51272aee1b2e2708",
+    "reason": "allSettledの拒否はmenusStatus/staffStatus/editStatus=errorへ。編集時は担当・割当の全成功後だけfillFrom。実初回・409読込の拒否試験も合格。"
+  },
+  {
+    "filename": "src/v8/booking-staff/shifts.tsx",
+    "fingerprint": "234b4c189f12bb57",
+    "reason": "本人は設定閲覧権限なしでも自分の勤務を読める契約。管理者はsettingsRes失敗をthrowしてerrorへ。本人の未取得分をゼロ件の店舗情報として表示しない。"
+  },
+  {
+    "filename": "src/v8/booking-staff/shifts.tsx",
+    "fingerprint": "c2a3c46fd245afd4",
+    "reason": "本人は設定閲覧権限なしでも自分の勤務を読める契約。管理者はsettingsRes失敗をthrowしてerrorへ。本人の未取得分をゼロ件の店舗情報として表示しない。"
+  },
+  {
+    "filename": "src/v8/forms/list.tsx",
+    "fingerprint": "6e747bcd8a6de6f6",
+    "reason": "複製本体の成功後だけの補助検索。候補を得られなければloadFormsの失敗表示付き再取得へ。複製は再送せず作成済みを保持。"
+  },
+  {
+    "filename": "src/v8/inflow-links/edit-route-dialog.tsx",
+    "fingerprint": "94084b258022c39a",
+    "reason": "現行呼出はlist.tsxのみでpoolMemberNamesを必ず渡す。自前取得の枝は現行画面では実行されない。親候補の取得拒否は追加実画面試験5条件で失敗表示を確認済み。"
+  },
+  {
+    "filename": "src/v8/settings/line-notifications/screen.tsx",
+    "fingerprint": "5bd0ee0cb62e144c",
+    "reason": "definitionsFailedを別に保持し、取得失敗を定義なしとして新規作成しない。必要でない機能はそもそも読まない。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "04a568e53cb7d423",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "beb7499f2b4220fa",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "a61b6ddc4bdb9720",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "747b1d50a0da21f8",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  },
+  {
+    "filename": "src/v8/tag-edit/search-edit.tsx",
+    "fingerprint": "b8f5512011d3230e",
+    "reason": "5補助参照はreferenceErrorsを各欄へ渡し、未取得を明示して選択を止める。主要一覧のsuccess:falseとHTTP拒否は全体の失敗へ変更し、再取得へ。"
+  }
+]

@@ -1,50 +1,39 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-
-const EDITOR = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'tag-editor-v4.tsx'),
-  'utf8',
-)
-
-/** タグを作る・編集する（設計 `l25rlp` 4-1-A ／ `ee0sk` 4-1-D）。 */
-describe('タグの編集', () => {
-  it('★の切り替え方が2通りあることを言う', () => {
-    // 「★を付けると…出ます」だけだと、一覧の星からも切り替えられることが伝わらない。
-    expect(EDITOR).toContain('このスイッチ、またはタグ一覧の星をクリックして')
+const read = (file: string) => readFileSync(resolve(process.cwd(), 'src', file), 'utf8')
+const EDITOR = read('v8/tag-edit/edit-form.tsx')
+const MODEL = read('v8/tag-edit/model.ts')
+const SAVE = read('v8/tag-edit/edit.tsx')
+describe('現役V8のタグ編集', () => {
+  it('友だち一覧の表示設定は現在の編集の選ぶ欄から変える', () => {
+    expect(EDITOR).toContain('label="友だち一覧に出す"')
+    expect(EDITOR).toContain('checked={isStarred} onChange={setIsStarred}')
+    expect(EDITOR).not.toContain('タグ一覧の星をクリック')
   })
-
-  it('連動がOFFのとき、ONにすると何ができるかを中身つきで出す', () => {
-    /*
-     * 名前だけを並べていた。倍率が何倍なのか、連動で何を送れるのかが
-     * 読めず、ONにして初めて分かる形だった。
-     */
-    expect(EDITOR).toContain('LINKED_PREVIEW')
-    expect(EDITOR).toContain('このタグが初めて付いた本人に +N mile')
-    expect(EDITOR).toContain('獲得マイルを 1.2／1.5／2.0／3.0倍')
-    expect(EDITOR).toContain('テキスト送信・テンプレート送信・タグ操作・シナリオ開始など')
+  it('連動がOFFでも使える用途とONにしたあとの設定を案内する', () => {
+    expect(EDITOR).toContain('手動付与・配信の絞り込み・シナリオの条件には使えます')
+    expect(EDITOR).toContain('付いたときの動きとマイルを決められます')
+    expect(MODEL).toContain("label: '1.2倍'")
+    expect(EDITOR).toContain('<LinkedActionList')
   })
-
-  it('OFFに戻しても、積んだマイルが戻らないことを言う', () => {
-    // OFFにすれば元通りだと読めてしまう。
+  it('OFFに戻しても積んだマイルは取り消されないことを伝える', () => {
+    expect(EDITOR).toContain('オフに戻すと、これ以降このタグが付いても連動は動きません')
     expect(EDITOR).toContain('すでに積んだマイルは取り消されません')
-    // 新規作成にはまだ積んだものが無いので、編集のときだけ出す。
-    expect(EDITOR).toContain("mode === 'edit' && linked ?")
   })
-
-  it('この設定で起きることの3つ目を、使い道が分かる言い方にする', () => {
-    expect(EDITOR).toContain('配信の絞り込み・シナリオの開始条件・自動応答の付与先として選べます。')
+  it('使い道と使っている所を現在の右欄で確認できる', () => {
+    expect(EDITOR).toContain('使っている所')
+    expect(MODEL).toContain("label: '一斉配信'")
+    expect(MODEL).toContain("label: '回答フォーム'")
+    expect(EDITOR).toContain('row.count > 0 && row.href')
   })
-
-  it('編集からタグを複製できる', () => {
+  it('編集から同じタグを複製して作れる', () => {
     expect(EDITOR).toContain('複製して作る')
+    expect(EDITOR).toContain('href={`/tags/new?copy=${tag.id}`}')
   })
-
-  it('R620: 遡及OFFの編集サマリーは既存への遡及を案内しない', () => {
-    // 連動ON・遡及OFFで「さかのぼって積みます」と「反映されません」が
-    // 同時に出ていた。遡及の案内は連動ONかつ遡及ONのときだけ出す。
-    expect(EDITOR).toContain('linked && applyToExisting')
-    expect(EDITOR).toContain('いま付いている${tag?.friendCount ?? 0}人には反映されません')
+  it('R620: 遡及OFFでは既存へ反映せず、確認した時だけ反映する', () => {
+    expect(EDITOR).toContain('if (applyToExisting && (tag.friendCount ?? 0) > 0')
+    expect(EDITOR).toContain('void onSave(values, false)')
+    expect(SAVE).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
   })
 })

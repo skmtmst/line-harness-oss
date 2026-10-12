@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react'
 import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api,ApiError } from '@/lib/api'
+import ListState from '@/components/shared/list-state'
 import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
 import { FieldError } from '@/components/shared/form-controls'
@@ -87,6 +88,8 @@ export default function QrDialog({
   visualReferenceQr = false,
   routes: routesProp,
   routesPending: routesPendingProp,
+  routesError: routesErrorProp,
+  onRetryRoutes,
   direct,
   resource,
 }: {
@@ -117,10 +120,16 @@ export default function QrDialog({
     アカウント切替直後など、一覧が来る前に「経路が見つからない」と
     断定しないための目印（DASH-09）。
   */
+  routesError?: boolean
+  onRetryRoutes?: () => void
   routesPending?: boolean
 }) {
+  const [fetchedError,setFetchedError]=useState(false)
+  const [readRetry,setReadRetry]=useState(0)
+  const [lookupState,setLookupState]=useState<'idle'|'loading'|'error'|'missing'>('idle')
   const [fetchedRoutes, setFetchedRoutes] = useState<EntryRoute[] | null>(null)
   const routes = routesProp ?? fetchedRoutes ?? []
+  const routesError = Boolean(routesErrorProp || (routesProp===undefined && fetchedError) || lookupState==='error')
   const routesPending = routesProp !== undefined ? (routesPendingProp ?? false) : fetchedRoutes === null
   const [routeId, setRouteId] = useState(initialRouteId)
   /*
@@ -155,18 +164,20 @@ export default function QrDialog({
   useEffect(() => {
     if (!open || routesProp || resource) return
     let cancelled = false
+    setFetchedError(false)
+    setFetchedRoutes(null)
     void api.entryRoutes.list()
       .then((res) => {
-        if (!cancelled) setFetchedRoutes(res.success ? res.data : [])
+        if(!res.success)throw new Error(res.error)
+        if (!cancelled) setFetchedRoutes(res.data)
       })
       .catch(() => {
-        // 経路一覧だけが取れなくても、基本の追加URLのQRは表示できる。
-        if (!cancelled) setFetchedRoutes([])
+        if (!cancelled) setFetchedError(true)
       })
     return () => {
       cancelled = true
     }
-  }, [open, routesProp, resource])
+  }, [open, routesProp, resource,readRetry])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
@@ -178,29 +189,32 @@ export default function QrDialog({
    * 止める（DASH-09 / DASH-28 の方向）。
    */
   useEffect(() => {
-    if (!open || resource || routeId === '' || routesPending) return
+    if (!open || resource || routeId === '' || routesPending || routesErrorProp) {setLookupState('idle');return}
     if (routes.some((r) => r.id === routeId)) {
       setLookedUpRoute(null)
+      setLookupState('idle')
       return
     }
     let cancelled = false
     setLookedUpRoute(null)
+    setLookupState('loading')
     void api.entryRoutes.get(routeId)
       .then((res) => {
-        if (!cancelled && res.success) setLookedUpRoute(res.data)
+        if(!res.success)throw new Error(res.error)
+        if (!cancelled) {setLookedUpRoute(res.data);setLookupState('idle')}
       })
-      .catch(() => {
-        // 取れなければ「見つからない」のまま。ここでは何も出さない。
+      .catch((error:unknown) => {
+        if(!cancelled)setLookupState(error instanceof ApiError && error.status===404?'missing':'error')
       })
     return () => {
       cancelled = true
     }
-  }, [open, routeId, routes, routesPending, resource])
+  }, [open, routeId, routes, routesPending, resource,readRetry,routesErrorProp])
   /* 止めた経路は QR も印刷も出さない（M）。選択肢にも出さない。 */
   const routeStopped = route != null && !route.isActive
-  const routeMissing = routeId !== '' && !route && !routesPending
+  const routeMissing = routeId !== '' && !route && !routesPending && !routesError && lookupState!=='loading'
   const link = resource?.url ?? (route && route.isActive ? `${base}/r/${route.refCode}` : baseLink)
-  const blocked = resource ? Boolean(resource.stopped) : routeMissing || routeStopped
+  const blocked = resource ? Boolean(resource.stopped) : routesError || Boolean(routeId && !route) || routeStopped
 
   useEffect(() => {
     let cancelled = false
@@ -367,6 +381,7 @@ export default function QrDialog({
         </div>
 
         <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
+          {routesError ? <ListState kind="error" title="経路を読み込めませんでした" onRetry={()=>{if(routesErrorProp)onRetryRoutes?.();else setReadRetry(value=>value+1)}}/> : null}
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
           <div className="flex min-w-0 flex-col items-center">
             {/*
@@ -379,7 +394,7 @@ export default function QrDialog({
                   この経路は停止しています。QRコードは表示しません。
                   {stoppedDetail ? <><br />{stoppedDetail}</> : null}
                 </p>
-              ) : routeMissing ? (
+              ) : routesError || lookupState==='loading' ? null : routeMissing ? (
                 <p className="text-ink-faint max-w-[220px] px-4 text-center text-xs leading-relaxed">
                   選んだ経路はこのアカウントでは見つかりません。<br />経路を選び直してください。
                 </p>
@@ -435,7 +450,7 @@ export default function QrDialog({
                   この経路は停止しています。QRコードと印刷は出せません。
                   {stoppedDetail ? ` ${stoppedDetail}` : '別の経路か「基本の追加URL」を選んでください。'}
                 </p>
-              ) : routeMissing ? (
+              ) : routesError || lookupState==='loading' ? null : routeMissing ? (
                 <p className="text-danger mt-1 text-xs" role="alert">
                   選んだ経路はこのアカウントでは使えません。別の経路か「基本の追加URL」を選んでください。
                 </p>
@@ -499,7 +514,7 @@ export default function QrDialog({
                   type="button"
                   onClick={copy}
                   disabled={blocked}
-                  className="v7:min-h-11 shrink-0"
+                  className="shrink-0"
                 >
                   コピー
                 </Button>

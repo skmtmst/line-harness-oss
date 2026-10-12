@@ -5,7 +5,7 @@
  * 共通の窓に絵の幅 860・上からの位置を渡し、中身を絵どおりに組む：
  * 左に画像とダウンロード・お気に入り、右に「アカウントへ配る」（探す・タグの札・アカウントの一覧・渡す）、
  * 下に「生成時の条件」（2列）、いちばん下に 一覧から外す（左）・参照画像にする・同じ設定でもう一度生成（右）。
- * 動き（渡す・外す・お気に入り・もう一度生成）は v7（components/hq/banners/image-detail-modal.tsx）と同じ。
+ * 渡す・外す・お気に入り・もう一度生成は、現役の画面のAPIと動作試験で守る。
  */
 import { Download, ImagePlus, RefreshCw, Send, Star, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'

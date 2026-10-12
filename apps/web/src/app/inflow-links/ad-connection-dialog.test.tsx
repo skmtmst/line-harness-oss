@@ -3,7 +3,7 @@ import { cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react'
 import { afterEach,expect,it,vi } from 'vitest';
 const calls=vi.hoisted(()=>({create:vi.fn(),update:vi.fn(),connect:vi.fn()}));
 vi.mock('@/lib/api',()=>({api:{adPlatforms:calls}}));
-import AdConnectionDialog from './ad-connection-dialog';
+import AdConnectionDialog from '@/v8/inflow-links/ad-connection-dialog';
 afterEach(cleanup);
 it('保存後に疎通確認し、失敗を接続済みとして閉じない',async()=>{
  calls.create.mockResolvedValue({success:true,data:{id:'p'}});calls.connect.mockResolvedValue({success:false});const closed=vi.fn(),saved=vi.fn(async()=>{});

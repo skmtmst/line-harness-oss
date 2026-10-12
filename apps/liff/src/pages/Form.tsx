@@ -1,3 +1,4 @@
+import { useRequestGeneration } from '../lib/use-request-generation.js';
 import SeatBookingBlock from '../components/SeatBookingBlock.js';
 import { restaurantBookingApi } from '../lib/api.js';
 import FormReception, { choiceReceptionLabel } from '../components/FormReception.js';
@@ -134,6 +135,7 @@ export default function Form() {
   const [sectionIndex, setSectionIndex] = useState(0);
   /** 通ってきたページ。「前へ」で分岐を逆にたどるために覚える */
   const [trail, setTrail] = useState<number[]>([]);
+  const request = useRequestGeneration(JSON.stringify([id, testToken, sectionIndex]));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -308,6 +310,8 @@ export default function Form() {
   };
 
   const goBack = () => {
+    request.invalidate();
+    setSending(false);
     setError(null);
     setTrail((prev) => {
       const next = [...prev];
@@ -351,7 +355,7 @@ export default function Form() {
    * 枠の再確認と重なり防止は予約の受け口が担い、埋まっていれば断る。
    * 試し回答では予約を入れない。失敗の文言を返し、空なら全件確保できた。
    */
-  const ensureBookings = async (key: string): Promise<string | null> => {
+  const ensureBookings = async (key: string, generation: number): Promise<string | null> => {
     if (testToken || !layout) return null;
     const targets = collectInputs(layout)
       .map((block) => ({ block, picked: normalizeBookingValue(answers[block.name]) }))
@@ -359,6 +363,7 @@ export default function Form() {
     const made: Array<{ startsAt: string; status: string }> = [];
     setBooked([]);
     for (const { block, picked } of targets) {
+      if (!request.isCurrent(generation)) return null;
       const slot = picked!;
       try {
         const res = slot.kind === 'seats'
@@ -367,6 +372,7 @@ export default function Form() {
           { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt },
           `${key}:booking:${block.id}`,
         );
+        if (!request.isCurrent(generation)) return null;
         made.push({ startsAt: slot.startsAt, status: res?.status ?? 'requested' });
         setBooked([...made]);
       } catch (err) {
@@ -382,28 +388,32 @@ export default function Form() {
   };
 
   const retryBookings = async () => {
+    const generation = request.begin();
     setBookingRetrying(true);
     try {
-      const message = await ensureBookings(idemKey);
-      setBookingError(message);
+      const message = await ensureBookings(idemKey, generation);
+      if (request.isCurrent(generation)) setBookingError(message);
     } finally {
-      setBookingRetrying(false);
+      if (request.isCurrent(generation)) setBookingRetrying(false);
     }
   };
 
-  const sendFlow = async (key: string): Promise<void> => {
+  const sendFlow = async (key: string, generation: number): Promise<void> => {
     // 送り直しの判定は lib/form-submit-flow.ts の判定表に従う。内容違い・
     // 期限切れの自動付け替えはここには書かない(書くと二重回答になる)。
     let current = key;
     for (let i = 0; i < 6; i += 1) {
+      if (!request.isCurrent(generation)) return;
       const attempt = await api.submitForm(id!, {
         data: Object.fromEntries(Object.entries(answers).map(([name, value]) => [name, Array.isArray(value) ? value.map(v => v && typeof v === 'object' && 'fileId' in v ? { fileId: v.fileId } : v) : value])),
         trackedLinkId: search.get('ref') ?? undefined,
       }, current, testToken ?? undefined);
+      if (!request.isCurrent(generation)) return;
       const decision = decideFormSubmitStep(attempt);
       if (decision.action === 'done') {
         // 回答の保存後に予約を確保する。予約だけ失敗しても回答は残す。
-        const bookingMessage = await ensureBookings(current);
+        const bookingMessage = await ensureBookings(current, generation);
+        if (!request.isCurrent(generation)) return;
         setBookingError(bookingMessage);
         const url = !bookingMessage ? layout!.options?.thanksUrl : undefined;
         if (url) {
@@ -447,18 +457,21 @@ export default function Form() {
       return;
     }
 
+    if (sending) return;
+    const generation = request.begin();
     setConfirming(false);
     setSending(true);
     setError(null);
     setConflict(null);
     setBookingError(null);
     try {
-      await sendFlow(keyOverride ?? idemKey);
+      await sendFlow(keyOverride ?? idemKey, generation);
     } catch (err) {
+      if (!request.isCurrent(generation)) return;
       logFailure('form-submit', err);
       setError(submitErrorText(err));
     } finally {
-      setSending(false);
+      if (request.isCurrent(generation)) setSending(false);
     }
   };
 

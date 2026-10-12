@@ -1,82 +1,55 @@
 // @vitest-environment happy-dom
-import React, { act, useState } from 'react'
+// @vitest-environment-options { "url": "http://localhost/rich-menus/edit/" }
+import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-/**
- * 公開予約の「応答が返ってこなかったときの押し直し」を本物のReactで動かす試験(#621)。
- *
- * 押すたびに新しい Idempotency-Key を作っていると、通信が切れて応答が返らない
- * ままもう一度押したときにサーバーには別の操作に見え、同じ予約が2件できる。
- * ここは本物の React(react-dom/client)・本物の DOM 操作(ラジオ・日時入力・
- * 送信ボタン)で、実際に送られた Idempotency-Key だけを見る。
- * 差し替えるのは通信(api)と next のルーティングだけ。
- */
+import RichMenuCreateV8 from '../new/create-v8'
+import { pickDateTime } from '@/test-utils/rich-menu-editor'
+import { SCHEDULE_SAVED_MESSAGE, SCHEDULE_FAILED_MESSAGE } from './schedule-submit'
 
 const net = vi.hoisted(() => ({
-  /** schedule に届いた (キー, 中身) の記録。 */
   scheduleCalls: [] as Array<{ key: string; input: Record<string, unknown> }>,
-  /** 次の schedule 応答。'lost' は応答が返ってこない(通信断)。 */
   scheduleResult: 'ok' as 'ok' | 'lost' | 'conflict',
+  draftWrites: 0,
 }))
-
-vi.mock('next/link', () => ({
-  default: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
+const account = { id: 'account-1', name: 'テスト店' }
+const group = {
+  id: 'menu-1', accountId: 'account-1', name: 'キャンペーン', chatBarText: 'メニュー',
+  size: 'large', defaultPageId: 'p1', isDefaultForAll: false, status: 'draft',
+  targetingCondition: null, targetingPriority: 0, targetingEnabled: false,
+  folderId: null, defaultOpen: true, version: 1,
+  pages: [{ id: 'p1', orderIndex: 0, name: '1枚目', aliasId: '', lineRichmenuId: null, imageR2Key: 'img', imageContentType: 'image/jpeg', areas: [] }],
+}
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccount: account, selectedAccountId: account.id, accounts: [account], loading: false }),
 }))
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(''),
-  useRouter: () => ({ push: () => {}, replace: () => {} }),
-}))
-/*
- * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
- * ここで見たいのは選んだ日時の中身なので、素の <select> に置き換える。
- */
-vi.mock('@/components/shared/select', () => ({
-  default: ({ 'aria-label': label, value, onChange, options }: {
-    'aria-label'?: string
-    value: string
-    onChange: (value: string) => void
-    options: Array<{ value: string; label: string }>
-  }) => (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(e: { target: { value: string } }) => onChange(e.target.value)}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  ),
-}))
-
-vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
-  const actual = await importOriginal()
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } }) },
+      folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
+      tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }) },
+      templates: { ...actual.api.templates, list: async () => ({ success: true, data: [] }) },
+      forms: { ...actual.api.forms, list: async () => ({ success: true, data: [] }) },
+      trackedLinks: { ...actual.api.trackedLinks, list: async () => ({ success: true, data: [] }) },
       richMenuGroups: {
         ...actual.api.richMenuGroups,
+        get: async () => ({ success: true, data: group }),
+        update: async () => { net.draftWrites += 1; return { success: true, data: group } },
         list: async () => ({ success: true, data: [] }),
-        listSchedules: async () => ({ success: true, data: [] }),
-        // 公開の進みも通信の差し替えに含める。冪等キーの試験で実APIを呼ばない。
-        publishProgress: async () => ({ success: true, data: { steps: [], message: null, run: null } }),
-        schedule: async (
-          _groupId: string,
-          input: Record<string, unknown>,
-          idempotencyKey: string,
-        ) => {
-          net.scheduleCalls.push({ key: idempotencyKey, input })
-          if (net.scheduleResult === 'lost') {
-            // 応答が返ってこない。届いたのかどうかも分からない。
-            throw new TypeError('Failed to fetch')
-          }
-          if (net.scheduleResult === 'conflict') {
-            return { success: false, error: '同じ内容の予約がすでにあります' }
-          }
+        previewTargets: async () => ({ success: true, data: null }),
+        prepublishCheck: async () => ({ success: true, data: { selfCheck: { ok: true }, deviceConfirmed: true, deviceConfirmedAt: null, pageCount: 1, maxPages: 10 } }),
+        validatePublish: async () => ({ success: true, data: { checks: [{ key: 'self', ok: true }, { key: 'line', ok: true }] } }),
+        schedule: async (_id: string, input: Record<string, unknown>, key: string) => {
+          net.scheduleCalls.push({ key, input })
+          if (net.scheduleResult === 'lost') throw new TypeError('Failed to fetch')
+          if (net.scheduleResult === 'conflict') return { success: false, error: '同じ内容の予約がすでにあります' }
           return { success: true, data: { id: 'schedule-1', status: 'scheduled' } }
         },
       },
@@ -84,242 +57,93 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-const { default: RichMenuEditPage } = await import('./page')
-const { useScheduleSubmit, SCHEDULE_SAVED_MESSAGE, SCHEDULE_FAILED_MESSAGE } = await import('./schedule-submit')
-
-const { PublishStep } = (RichMenuEditPage as unknown as {
-  __testing: { PublishStep: React.ComponentType<Record<string, unknown>> }
-}).__testing
-
-const group = {
-  id: 'menu-1',
-  accountId: 'account-1',
-  name: 'キャンペーン',
-  chatBarText: 'メニュー',
-  size: 'large' as const,
-  defaultPageId: null,
-  isDefaultForAll: false,
-  status: 'draft' as const,
-  publishingAt: null,
-  targetingCondition: null,
-  targetingPriority: 0,
-  targetingEnabled: false,
-  folderId: null,
-  pages: [],
-}
-
-const pages = [
-  {
-    id: 'p1',
-    orderIndex: 0,
-    name: '1枚目',
-    aliasId: 'lhx-menu-1-0',
-    lineRichmenuId: null,
-    imageR2Key: 'img',
-    imageContentType: 'image/jpeg',
-    areas: [],
-  },
-]
-
-/** 本物の hook と本物の PublishStep を組み合わせた画面。 */
-function Harness() {
-  const [notice, setNotice] = useState('')
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-  // 公開入力は親が持つ（RICHMENU-06）。試験用の親としてここで持つ。
-  const [publish, setPublish] = useState<{
-    mode: 'now' | 'scheduled' | 'period'
-    startsAt: string
-    endsAt: string
-    restoreGroupId: string
-  }>({ mode: 'now', startsAt: '', endsAt: '', restoreGroupId: '' })
-  const submit = useScheduleSubmit({
-    groupId: group.id,
-    persistDraft: async () => {},
-    onSaving: setSaving,
-    onSaved: (message) => {
-      setError('')
-      setNotice(message)
-    },
-    onFailed: (message) => {
-      setNotice('')
-      setError(message)
-    },
-  })
-  return (
-    <div>
-      <p data-testid="notice">{notice}</p>
-      <p data-testid="error">{error}</p>
-      <PublishStep
-        group={group}
-        pages={pages}
-        preview={null}
-        saving={saving}
-        publishing={false}
-        publish={publish}
-        onPublishChange={(patch: Record<string, unknown>) =>
-          setPublish((prev) => ({ ...prev, ...patch }))
-        }
-        onSave={() => {}}
-        onPublishNow={() => {}}
-        onSchedule={submit}
-      />
-    </div>
-  )
-}
-
-// act(...) を使う環境だと React に伝える(伝えないと警告が出続ける)。
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
 let container: HTMLDivElement
 let root: Root
-
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-  })
+class MemoryStorage {
+  private values = new Map<string, string>()
+  get length() { return this.values.size }
+  clear() { this.values.clear() }
+  getItem(key: string) { return this.values.get(key) ?? null }
+  key(index: number) { return [...this.values.keys()][index] ?? null }
+  removeItem(key: string) { this.values.delete(key) }
+  setItem(key: string, value: string) { this.values.set(key, String(value)) }
 }
-
-function findByText<T extends Element>(selector: string, text: string): T {
-  const found = [...container.querySelectorAll(selector)].find((node) =>
-    (node.textContent ?? '').includes(text),
-  )
-  if (!found) throw new Error(`見つかりません: ${selector} / ${text}`)
-  return found as T
+async function flush() { for (let i = 0; i < 6; i += 1) await act(async () => { await Promise.resolve() }) }
+async function openEditor() {
+  window.history.replaceState(null, '', '/rich-menus/edit?id=menu-1&step=publish')
+  await act(async () => { root.render(<RichMenuCreateV8 editGroupId="menu-1" />) })
+  await screen.findByRole('heading', { name: 'いつ公開するか' })
 }
-
-/** 出しはじめを日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm。 */
-async function pickStartsAt(startsAt: string) {
-  const [date, time] = startsAt.split('T')
-  const [hour, minute] = time.split(':')
-  const [y, mo, d] = date.split('-').map(Number)
-  const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
-  await act(async () => {
-    container.querySelector<HTMLElement>('button[aria-label="出しはじめ"]')!.click()
-  })
-  // 日時の選択箱は最上層（MenuPortal→document.body）に出る。器の中にはいない。
-  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
-  })
-  for (let i = 0; i < 24; i += 1) {
-    const grid = document.querySelector('[role="grid"]')
-    if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
-    const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
-    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
-    const nav = [...document.querySelectorAll('button')].find(
-      (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
-    )!
-    await act(async () => {
-      nav.click()
-    })
-  }
-  await act(async () => {
-    [...document.querySelectorAll('button')].find((b) =>
-      (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
-    )!.click()
-  })
-  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
-  await act(async () => {
-    const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
-    hourSelect.value = hour
-    hourSelect.dispatchEvent(new Event('change', { bubbles: true }))
-    const minuteSelect = reopened.querySelector('select[aria-label="分"]') as HTMLSelectElement
-    minuteSelect.value = minute
-    minuteSelect.dispatchEvent(new Event('change', { bubbles: true }))
-  })
-  await act(async () => {
-    [...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!.click()
-  })
-}
-
 async function fillScheduleForm(startsAt: string) {
-  const modeRadio = [...container.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')][1]
-  await act(async () => {
-    modeRadio.click()
-  })
-  await pickStartsAt(startsAt)
-}
-
-async function pressReserve() {
-  const button = findByText<HTMLButtonElement>('button', 'この内容で予約する')
-  await act(async () => {
-    button.click()
-  })
+  fireEvent.click(screen.getByRole('radio', { name: /日時を決めて公開する/ }))
+  await pickDateTime('公開を始める日時', startsAt)
+  fireEvent.click(screen.getAllByRole('button', { name: '見直す' })[1])
   await flush()
 }
-
+async function pressReserve() {
+  const count = net.scheduleCalls.length
+  fireEvent.click(screen.getByRole('button', { name: '予約する' }))
+  await waitFor(() => expect(net.scheduleCalls).toHaveLength(count + 1))
+  await flush()
+}
 beforeEach(async () => {
   net.scheduleCalls.length = 0
   net.scheduleResult = 'ok'
+  net.draftWrites = 0
+  vi.stubGlobal('localStorage', new MemoryStorage())
+  document.documentElement.dataset.theme = 'v8'
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
-  await act(async () => {
-    root.render(<Harness />)
-  })
-  await flush()
+  await openEditor()
 })
-
 afterEach(async () => {
-  await act(async () => {
-    root.unmount()
-  })
+  await act(async () => { root.unmount() })
   container.remove()
+  delete document.documentElement.dataset.theme
+  localStorage.clear()
 })
-
-describe('公開予約の Idempotency-Key（本物のReact）', () => {
+describe('現役の公開予約の再試行と冪等鍵', () => {
   it('応答が返らなかった押し直しは同じキーで送り、予約を2件にしない', async () => {
     await fillScheduleForm('2026-09-20T10:00')
-
     net.scheduleResult = 'lost'
     await pressReserve()
-    expect(net.scheduleCalls).toHaveLength(1)
-    expect(container.querySelector('[data-testid="error"]')?.textContent).toBe(SCHEDULE_FAILED_MESSAGE)
-
-    // 同じ内容のまま押し直す。応答が確定していないのでキーは変えない。
+    expect(screen.getByText(SCHEDULE_FAILED_MESSAGE)).toBeTruthy()
     net.scheduleResult = 'ok'
     await pressReserve()
-    expect(net.scheduleCalls).toHaveLength(2)
     expect(net.scheduleCalls[1].key).toBe(net.scheduleCalls[0].key)
     expect(net.scheduleCalls[1].input).toEqual(net.scheduleCalls[0].input)
-    expect(container.querySelector('[data-testid="notice"]')?.textContent).toBe(SCHEDULE_SAVED_MESSAGE)
-    expect(container.querySelector('[data-testid="error"]')?.textContent).toBe('')
+    expect(net.draftWrites).toBe(2)
+    expect(screen.getByText(SCHEDULE_SAVED_MESSAGE)).toBeTruthy()
+    expect(screen.queryByText(SCHEDULE_FAILED_MESSAGE)).toBeNull()
   })
-
   it('保存できたあとの予約は新しいキーになる（別の操作として通る）', async () => {
     await fillScheduleForm('2026-09-20T10:00')
     await pressReserve()
+    await screen.findByRole('heading', { name: '公開予約を受け付けました' })
+    // 保存した編集を閉じて開き直し、新しい予約を作る。
+    await act(async () => { root.render(null) })
+    await openEditor()
+    await fillScheduleForm('2026-09-20T10:00')
     await pressReserve()
-
-    expect(net.scheduleCalls).toHaveLength(2)
     expect(net.scheduleCalls[1].key).not.toBe(net.scheduleCalls[0].key)
   })
-
   it('サーバーが断ってもキーは変えない（同じ内容の押し直しを2件にしない）', async () => {
     await fillScheduleForm('2026-09-20T10:00')
-
     net.scheduleResult = 'conflict'
     await pressReserve()
     await pressReserve()
-
-    expect(net.scheduleCalls).toHaveLength(2)
     expect(net.scheduleCalls[1].key).toBe(net.scheduleCalls[0].key)
-    expect(container.querySelector('[data-testid="error"]')?.textContent).toBe(SCHEDULE_FAILED_MESSAGE)
+    expect(screen.getByText(SCHEDULE_FAILED_MESSAGE)).toBeTruthy()
   })
-
   it('応答が返らないまま中身を直したら、別の操作として新しいキーになる', async () => {
     await fillScheduleForm('2026-09-20T10:00')
-
     net.scheduleResult = 'lost'
     await pressReserve()
-
     net.scheduleResult = 'ok'
     await fillScheduleForm('2026-09-21T10:00')
     await pressReserve()
-
-    expect(net.scheduleCalls).toHaveLength(2)
     expect(net.scheduleCalls[1].key).not.toBe(net.scheduleCalls[0].key)
     expect(net.scheduleCalls[1].input.startsAt).not.toBe(net.scheduleCalls[0].input.startsAt)
   })

@@ -21,6 +21,8 @@ import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { HealthPanelV8 } from './health'
 import UpdateHistoryV8 from './history'
 import styles from './screen.module.css'
+import { RowActions } from '@/components/shared/row-actions'
+import HistoryDetails, { type HistoryDetail } from './history-details'
 import Notice from '@/components/shared/notice'
 
 /** 板 Y4LkX1 の並び。健全性チェック・更新履歴・緊急コントロール。 */
@@ -45,6 +47,7 @@ export default function EmergencyScreen({
   renderControl?: (accounts: LineAccount[], controlRef: RefObject<EmergencyControlHandle | null>) => ReactNode
 }) {
   const tab = useMergedTab(TABS)
+  const [historyDetail, setHistoryDetail] = useState<HistoryDetail>(null)
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
@@ -84,7 +87,10 @@ export default function EmergencyScreen({
       </Button>
     : tab === 'control' && canManage
       ? <Button variant="danger" type="button" onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
-      : undefined
+      : tab === 'history' ? <RowActions subjectName="履歴" menuItems={[
+        { id: 'incidents', label: '止めた・戻した記録を見る', onSelect: () => setHistoryDetail('incidents') },
+        { id: 'updates', label: '更新内容を見る', onSelect: () => setHistoryDetail('updates') },
+      ]} /> : undefined
   const description = tab === 'health'
     ? `musubo とつながる先が動いているかを、9 つの項目を5分ごとに自動で確かめます。おかしいときはここから止められます。`
     : tab === 'control'
@@ -115,6 +121,7 @@ export default function EmergencyScreen({
       ) : null}
       {tab === 'control' ? renderControl?.(accounts, controlRef) : null}
       {tab === 'history' ? (renderHistory ? renderHistory() : <UpdateHistoryV8 />) : null}
+      <HistoryDetails panel={historyDetail} onClose={() => setHistoryDetail(null)} />
     </SbSettingsScreen>
   )
 }

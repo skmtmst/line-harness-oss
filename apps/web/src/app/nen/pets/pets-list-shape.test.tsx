@@ -21,10 +21,11 @@ vi.mock('@/lib/nen-pets-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/nen-pets-api')>()
   return { ...actual, nenPetsApi: { ...actual.nenPetsApi, pets: (...args: unknown[]) => api.pets(...args) } }
 })
-vi.mock('./pet-editor', () => ({ default: () => null }))
+vi.mock('@/v8/nen-pets/editor', () => ({ default: () => null }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
-import PetsTab from './pets-tab'
-import type { PetsQuery } from './pets-tab'
+import PetsTab from '@/v8/nen-pets/list'
+import type { PetsQuery } from '@/v8/nen-pets/parts'
 
 const query: PetsQuery = { q: '', species: '', product: '', weight: '', sort: 'updated_desc' }
 const flush = () => act(async () => { await Promise.resolve() })
@@ -58,16 +59,16 @@ describe('nen/pets の一覧', () => {
   it('本物の器で行が出て件数も出る', async () => {
     api.pets.mockResolvedValue({ success: true, data: petList })
     const onTotal = vi.fn()
-    render(<PetsTab accountId="account-a" query={query} onQueryChange={() => undefined} onTotal={onTotal} />)
+    render(<PetsTab canEdit accountId="account-a" query={query} onQueryChange={() => undefined} onKpis={onTotal} />)
     await flush()
-    expect((await screen.findAllByText('ももちゃん')).length).toBeGreaterThan(0)
-    expect(onTotal).toHaveBeenCalledWith(1)
+    expect((await screen.findAllByText('もも')).length).toBeGreaterThan(0)
+    expect(onTotal).toHaveBeenCalledWith(expect.objectContaining({total:1}))
     expect(screen.queryByText('ペットを読み込めませんでした')).toBeNull()
   })
 
   it('旧偽APIの器では読み込み失敗になる', async () => {
     api.pets.mockResolvedValue({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
-    render(<PetsTab accountId="account-a" query={query} onQueryChange={() => undefined} onTotal={() => undefined} />)
+    render(<PetsTab canEdit accountId="account-a" query={query} onQueryChange={() => undefined} onKpis={() => undefined} />)
     await flush()
     expect(await screen.findByText('ペットを読み込めませんでした')).toBeTruthy()
   })

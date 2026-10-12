@@ -13,7 +13,7 @@ const FORM = readFileSync(join(HERE, 'menu-form-v8.tsx'), 'utf8')
 describe('予約メニュー作成のタグ検索', () => {
   it('タグの絞り込み欄がある', () => {
     expect(FORM).toMatch(/<EntitySelect\s+[^>]*aria-label="予約後に付けるタグ"/)
-    expect(FORM).toContain('options={tagCandidates.map')
+    expect(FORM).toContain('tagCandidates.map')
     const picker = readFileSync(join(HERE, '../../../../components/shared/entity-picker.tsx'), 'utf8')
     expect(picker).toContain('item.name.toLocaleLowerCase().includes(q)')
   })

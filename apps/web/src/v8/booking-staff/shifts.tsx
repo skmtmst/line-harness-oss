@@ -10,7 +10,7 @@ import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { CalendarPlus, Plus, Smartphone, Trash2, UserX } from 'lucide-react'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ApiError, api, bookingApi, type BookingAvailabilitySlot, type BookingBreakConflict, type BookingException, type BookingMenu, type BookingShift, type BookingStaff } from '@/lib/api'
+import { ApiError, api, bookingApi, type BookingAvailabilitySlot, type BookingException, type BookingMenu, type BookingShift, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -31,6 +31,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import { useSaveConflict } from '@/components/shared/save-conflict'
 
 /*
  * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
@@ -109,16 +110,9 @@ function staffErrorMessage(error: unknown, action: string): string {
   if (error instanceof ApiError) {
     if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '担当者が見つかりませんでした。削除された可能性があります。一覧に戻って選び直してください。'
-    if (error.status === 409) return 'ほかの変更と重なりました。最新の状態を読み直したので、確かめてからもう一度保存してください。'
+    if (error.status === 409) return 'ほかの変更と重なりました。入力はそのまま残しています。最新を読み込むと、編集中の入力を最新の内容に置き換えます。'
   }
   return `担当者の設定を${action}できませんでした。入力はそのまま残しています。通信状態を確認して、もう一度お試しください。`
-}
-
-function asBreakConflict(data: unknown): BookingBreakConflict | null {
-  if (!data || typeof data !== 'object') return null
-  const candidate = data as { version?: unknown; breaks?: unknown }
-  if (typeof candidate.version !== 'string' || !Array.isArray(candidate.breaks)) return null
-  return candidate as BookingBreakConflict
 }
 
 type RuleDraft = { active: boolean; start: string; end: string }
@@ -361,6 +355,17 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [breakGroups, setBreakGroups] = useState<BreakGroup[]>([])
   const [breaksVersion, setBreaksVersion] = useState('')
   const [breakError, setBreakError] = useState<string | null>(null)
+  const conflictContext = JSON.stringify([selectedAccountId, staffId])
+  const breakSaveConflict = useSaveConflict({
+    contextKey: conflictContext,
+    fetchLatest: () => selectedAccountId ? bookingApi.getBreaks(selectedAccountId, staffId) : Promise.resolve(null),
+    reload: () => reloadBreaks('weekly'),
+  })
+  const dateSaveConflict = useSaveConflict({
+    contextKey: conflictContext,
+    fetchLatest: () => selectedAccountId ? bookingApi.getBreakDates(selectedAccountId, staffId) : Promise.resolve(null),
+    reload: () => reloadBreaks('dated'),
+  })
   const [savingBreaks, setSavingBreaks] = useState(false)
   const [breaksSavedAt, setBreaksSavedAt] = useState<string | null>(null)
   const [openDaysFor, setOpenDaysFor] = useState<string | null>(null)
@@ -445,6 +450,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       return
     }
     setLoadStatus('loading')
+    breakSaveConflict.clear()
+    dateSaveConflict.clear()
     setStaffMissing(false)
     setPreviewError(false)
     setRuleError(null)
@@ -659,22 +666,56 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       setBreaksVersion(result.version)
       setBreaksSavedAt(new Date().toISOString())
       setOpenDaysFor(null)
+      breakSaveConflict.clear()
+      if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, saveGeneration)
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
       const fieldFailure = saveErrors.capture(error)
-      // 409 のときだけ最新へ描き直す。それ以外は入力を消さない。
-      const conflict = error instanceof ApiError && error.status === 409 ? asBreakConflict(error.data) : null
-      if (conflict) {
-        setBreakGroups(groupBreaks(conflict.breaks
-          .filter((item) => item.weekday != null)
-          .map((item) => ({ id: item.id, weekday: item.weekday ?? 1, start_time: item.start_time, end_time: item.end_time }))))
-        setBreaksVersion(conflict.version)
-      }
+      if (error instanceof ApiError && error.status === 409) breakSaveConflict.mark()
       { if (!fieldFailure)
       setBreakError(staffErrorMessage(error, '保存')) }
     } finally {
       if (saveGeneration !== requestRef.current) return
       setSavingBreaks(false)
+    }
+  }
+
+  /** 最新への置き換えは、入力を残した帯で本人が選んだときだけ行う。 */
+  async function reloadBreaks(kind: 'weekly' | 'dated') {
+    if (!selectedAccountId) return
+    const generation = requestRef.current
+    const weekly = kind === 'weekly'
+    if (weekly) setSavingBreaks(true)
+    else setSavingShift(true)
+    try {
+      if (weekly) {
+        const latest = await bookingApi.getBreaks(selectedAccountId, staffId)
+        if (generation !== requestRef.current) return
+        setBreakGroups(groupBreaks(latest.breaks))
+        setBreaksVersion(latest.version)
+        setOpenDaysFor(null)
+        breakSaveConflict.clear()
+        setBreakError(null)
+      } else {
+        const latest = await bookingApi.getBreakDates(selectedAccountId, staffId)
+        if (generation !== requestRef.current) return
+        setDateRows(latest.breaks.map((item) => ({ key: item.id, id: item.id, date: item.work_date, start: item.start_time, end: item.end_time })))
+        setBreakDatesVersion(latest.version)
+        setEditingDayRow(null)
+        dateSaveConflict.clear()
+        setShiftError(null)
+      }
+      if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, generation)
+    } catch (error) {
+      if (generation !== requestRef.current) return
+      const message = staffErrorMessage(error, '読み込み')
+      if (weekly) setBreakError(message)
+      else setShiftError(message)
+    } finally {
+      if (generation === requestRef.current) {
+        if (weekly) setSavingBreaks(false)
+        else setSavingShift(false)
+      }
     }
   }
 
@@ -704,18 +745,14 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (saveGeneration !== requestRef.current) return false
       setDateRows(result.breaks.map((item) => ({ key: item.id, id: item.id, date: item.work_date, start: item.start_time, end: item.end_time })))
       setBreakDatesVersion(result.version)
-      return true
+      dateSaveConflict.clear()
+      if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, saveGeneration)
+      return saveGeneration === requestRef.current
     } catch (error) {
       if (saveGeneration !== requestRef.current) return false
       const fieldFailure = saveErrors.capture(error);
 
-      const conflict = error instanceof ApiError && error.status === 409 ? asBreakConflict(error.data) : null
-      if (conflict) {
-        setDateRows(conflict.breaks
-          .filter((item) => item.work_date != null)
-          .map((item) => ({ key: item.id, id: item.id, date: item.work_date ?? '', start: item.start_time, end: item.end_time })))
-        setBreakDatesVersion(conflict.version)
-      }
+      if (error instanceof ApiError && error.status === 409) dateSaveConflict.mark()
       { if (!fieldFailure)
       setShiftError(staffErrorMessage(error, '保存')) }
       return false
@@ -789,6 +826,8 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
       if (saveGeneration !== requestRef.current) return
         if (!res.success) throw new Error('exception_save_failed')
         setStaffExceptions((current) => [...current, res.data])
+        if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, saveGeneration)
+        if (saveGeneration !== requestRef.current) return
       } else if (dayAddKind === 'shift') {
         await bookingApi.putShifts(selectedAccountId, staffId, [{ work_date: dayAddDate, start_time: dayAddStart, end_time: dayAddEnd }])
       if (saveGeneration !== requestRef.current) return
@@ -1154,6 +1193,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 </div>
               ) : null}
               {breaksSavedAt ? <p className={styles.savedNote} role="status">保存しました。</p> : null}
+              {breakSaveConflict.conflict && canEdit ? <Notice tone="warn" role="alert" message="ほかの人の変更と重なりました。入力は残しています。最新を読み込むと、編集中の休憩を最新の内容に置き換えます。" action={<Button onClick={() => void breakSaveConflict.reloadLatest()} disabled={savingBreaks}>最新を読み込んで続ける</Button>} /> : null}
               {breakError ? <p className={layout.fieldError} role="alert">{breakError}</p> : null}
             </fieldset></section>
 
@@ -1252,6 +1292,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                   <Button onClick={() => setDayAddOpen((open) => !open)} aria-expanded={dayAddOpen}><Plus className={styles.btnIcon} aria-hidden="true" />この日を足す</Button>
                 </div>
               ) : null}
+              {dateSaveConflict.conflict && canEdit ? <Notice tone="warn" role="alert" message="ほかの人の変更と重なりました。入力は残しています。最新を読み込むと、編集中の日付付き休憩を最新の内容に置き換えます。" action={<Button onClick={() => void dateSaveConflict.reloadLatest()} disabled={savingShift}>最新を読み込んで続ける</Button>} /> : null}
               {shiftError ? <p className={layout.fieldError} role="alert">{shiftError}</p> : null}
             </fieldset></section>
 

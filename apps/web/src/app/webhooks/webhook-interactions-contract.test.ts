@@ -1,17 +1,18 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(import.meta.dirname, 'webhook-interactions.tsx'), 'utf8')
-const HOST = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(import.meta.dirname, '../../v8/webhooks/interactions.tsx'), 'utf8')
+const HOST = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
 const API = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
-describe('V6 外部連携・やり取りの記録 KNG00', () => {
+describe('V8 外部連携・やり取りの記録 Uv9AA', () => {
   it('実ノードと実ルートを接続する', () => {
-    expect(PAGE).toContain('data-design-node="KNG00"')
+    expect(PAGE).toContain('boardId="Uv9AA"')
     expect(HOST).toContain("{ key: 'interactions', label: 'やり取りの記録' }")
     expect(HOST).toContain("{ key: 'outgoing', label: 'こちらから送る' }")
-    expect(HOST).toContain("tab === 'interactions' && <WebhookInteractions />")
+    expect(HOST).toContain("if (tab === 'interactions') return <InteractionsV8Page />")
     expect(API).toContain('/api/webhooks/interactions?')
   })
 
@@ -25,24 +26,24 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     // 総数を、取れたとき（status==='ready'）だけ付ける。
     expect(HOST).toContain("outgoingStatus === 'ready'")
     expect(HOST).toContain("incomingStatus === 'ready'")
-    expect(HOST).toContain('`${item.label} ${outgoing.length}`')
-    expect(HOST).toContain('`${item.label} ${incoming.length}`')
+    expect(HOST).toContain("label('こちらから送る', outgoingCount)")
+    expect(HOST).toContain("label('こちらで受け取る', incomingCount)")
     // 「見本」は画面に並べる見本データから別集計する。
-    expect(HOST).toContain('`見本 ${SOURCE_PRESETS.length + OUTGOING_SAMPLES.length}`')
+    expect(HOST).toContain('`見本 ${SAMPLE_COUNT}`')
   })
 
   it('読込・空・失敗を分け、未取得を0件と見せない', () => {
-    expect(PAGE).toContain('kind="loading"')
+    expect(PAGE).toContain('aria-busy="true"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('value={data.summary.averageDurationMs == null ? null')
+    expect(PAGE).toContain('value: known ? known.total : null')
     expect(PAGE).toContain('日は未取得')
   })
 
   it('遅れと成功率に対象期間を書く(IDEA-26)', () => {
     // 「いつからの数字か」が分からないと遅い・悪いの判断が付かない。
     // 成功・返事までの時間・未取得の各補足に選択中の期間を入れる。
-    expect(PAGE).toContain('この${periodDays}日で ${formatNumber(successRate)}')
+    expect(PAGE).toContain('この${periodDays}日で ${formatNumber(known.total > 0')
     expect(PAGE).toContain('この${periodDays}日でいちばん遅くて')
     expect(PAGE).toContain('この${periodDays}日は未取得')
     expect(PAGE).toContain('この${periodDays}日の送受信の処理時間')
@@ -55,15 +56,15 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
     expect(PAGE).toContain('確かめたので送り直す')
     expect(PAGE).toContain('void retry(confirmingRetry, true)')
     // まとめて: 結果不明は送らず件数だけ返し、1件ずつの復旧を案内する。
-    expect(PAGE).toContain('response.data.needsReview')
+    expect(PAGE).toContain('d.needsReview')
     expect(PAGE).toContain('確かめてから、一覧で1件ずつやり直してください')
     expect(API).toContain('JSON.stringify({ confirmed: options?.confirmed === true })')
   })
 
   it('やり直せる範囲とやり直し済みのつながりを業務の言葉で示す(IDEA-26)', () => {
-    expect(PAGE).toContain('retryabilityText(selected, canRetry)')
+    expect(PAGE).toContain('retryabilityText(item, canRetry)')
     expect(PAGE).toContain('前の失敗をやり直した記録')
-    expect(PAGE).toContain('送り直せるのは管理者です')
+    expect(PAGE).toContain('送り直せるのは統括と管理者です')
     expect(PAGE).toContain('相手側でもう一度送ってもらってください')
     // d23b R408: 件数は「送り直せる数」と「対象外の数」に分けて出す。
     // 結果不明の件数も引き続き案内へ出す。
@@ -74,17 +75,17 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
 
   it('技術的な記録は必要なときだけ開き、秘密情報はそこにも出さない(IDEA-26)', () => {
     expect(PAGE).toContain('技術的な記録を開く')
-    expect(PAGE).toContain('{selected.eventType}')
-    expect(PAGE).toContain('{selected.responseStatus')
-    expect(PAGE).toContain('{selected.retryOfId')
+    expect(PAGE).toContain('{item.eventType}')
+    expect(PAGE).toContain('item.responseStatus !== null')
+    expect(PAGE).toContain('{item.retryOfId')
     expect(PAGE).not.toContain('request_body_json')
     expect(PAGE).not.toContain('requestBodyJson')
   })
 
-  it('URL・シークレット・本文を画面へ出さず、内部エラーも表示しない', () => {
-    expect(PAGE).toContain('接続先URL、シークレット、本文は安全のため表示しません。')
-    expect(PAGE).toContain('title={item.triggerSummary}>{item.triggerSummary}')
-    expect(PAGE).toContain('安全のため本文と接続情報は一覧に表示しません')
+  it('一覧にURL・秘密値を出さず、詳細は伏せ字の本文だけ読み内部エラーを出さない', () => {
+    expect(PAGE).toContain('接続先 URL、シークレット、本文のうち個人が分かる部分は、安全のため伏せています。')
+    expect(PAGE).toContain('title={item.triggerSummary}>{lines.main}')
+    expect(PAGE).toContain('api.webhooks.interactions.payload(item.id, accountId)')
     expect(PAGE).not.toContain('API error:')
     expect(PAGE).not.toContain('Failed to fetch')
     expect(PAGE).not.toContain('requestBodyJson')
@@ -92,18 +93,18 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
   })
 
   it('送り直しは管理者だけに見せ、単体と一括の両方を持つ', () => {
-    expect(PAGE).toContain("role === 'owner' || role === 'admin'")
+    expect(PAGE).toContain("staffRole === 'owner' || staffRole === 'admin'")
     expect(PAGE).toContain('失敗したものをまとめてやり直す')
-    expect(PAGE).toContain("canRetry && item.canRetry ? <Button")
+    expect(PAGE).toContain('return allowed && item.canRetry &&')
   })
 
   it('アカウント切替後に前の記録や送り直し結果を表示しない', () => {
-    expect(PAGE).toContain('const requestGeneration = ++loadGenerationRef.current')
-    expect(PAGE).toContain('loadGenerationRef.current !== requestGeneration')
-    expect(PAGE).toContain('selectedAccountIdRef.current !== requestAccountId')
-    expect(PAGE).toContain('loadedAccountId !== requestAccountId')
-    expect(PAGE).toContain('if (selectedAccountIdRef.current === requestAccountId) setRetrying(null)')
-    expect(PAGE).toContain('if (selectedAccountIdRef.current === requestAccountId) setBulkRetrying(false)')
+    expect(PAGE).toContain('const generation = ++generationRef.current')
+    expect(PAGE).toContain('generationRef.current !== generation')
+    expect(PAGE).toContain('accountRef.current !== accountId')
+    expect(PAGE).toContain('loadedAccountId !== accountId')
+    expect(PAGE).toContain('if (accountRef.current === accountId) setRetrying(null)')
+    expect(PAGE).toContain('if (accountRef.current === accountId) setBulkRetrying(false)')
   })
 
   it('本文に画面タイトルや説明を重ねない', () => {
@@ -115,7 +116,7 @@ describe('V6 外部連携・やり取りの記録 KNG00', () => {
   // 「届いた記録」「受け取ったとき」の案内を試しには出さない。
   it('受け取りの試しの記録は実処理と別の案内にする(R407)', () => {
     expect(PAGE).toContain("item.eventType === 'incoming_webhook.test'")
-    expect(PAGE).toContain('の受け取りを試したとき')
+    expect(PAGE).toContain('の受け取りを試した')
     expect(PAGE).toContain('受け取りの試しの記録です。実際の受け取りと処理の実行はしていないため')
   })
 })

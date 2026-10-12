@@ -3,7 +3,7 @@
 対象：今までの V8 の健康日記（`app/nen/health/health-v8.tsx`）と v7（`page.tsx` の HealthInner・`health-tab.tsx`・`items-tab.tsx`・`summary-drawer.tsx`）。動きを写して、`health.tsx`（外枠と一覧）・`summary.tsx`（30日のまとめと印刷面）・`items.tsx`（記録の項目）を一から書いた。見た目は型（ListPage）と部品で組み直した。板は 一覧 `mIwA4`・30日のまとめ（引き出し）`BVuYh`・記録の項目 `z2tvtX`。
 
 ## 入口
-- `app/nen/health/page.tsx`：V8 のときだけ `@/v8/nen-health/health` を出す。v7 の画面と `health-v8.tsx` は切り替えの日まで残す。
+- `app/nen/health/page.tsx`：`@/v8/nen-health/health` に固定。対象の照合/印刷の状態は現役本体が持ち、旧の一覧/項目/まとめ/印刷CSS/読まれない写しは除去済み。
 
 ## 受け付ける URL と指定（今までと同じ名前・同じ意味）
 - `?tab=concern`：気になる変化（同じ一覧を「変化：気になる」で絞る）。`?tab=items`：記録の項目。無い・ほかの値は記録のあるペット。

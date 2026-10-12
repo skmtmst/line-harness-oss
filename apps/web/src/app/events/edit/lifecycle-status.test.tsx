@@ -5,12 +5,12 @@
  * - 319：状態を変えたら、上の「申込の状況」の札も読み直す
  */
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ getEvent: vi.fn(), setEventLifecycle: vi.fn() }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? 'ev-1' : null) }),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
@@ -18,8 +18,8 @@ vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
-vi.mock('@/components/events/event-form', () => ({ default: () => <div>フォーム</div> }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock() }))
+vi.mock('@/v8/events/edit-form', () => ({ default: () => <div>フォーム</div> }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -37,10 +37,11 @@ vi.mock('@/lib/api', async (importOriginal) => {
 const { default: EditEventPage } = await import('./page')
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
   net.getEvent.mockReset()
   net.setEventLifecycle.mockReset()
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
 describe('公開の状態（WEB318/319）', () => {
   it('状態が読めなかったら、読み直しを出す', async () => {
@@ -58,12 +59,35 @@ describe('公開の状態（WEB318/319）', () => {
     net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'paused', is_published: 1 })
     await act(async () => { pause.click() })
     const reason = document.body.querySelector('textarea') as HTMLTextAreaElement
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(reason, '台風')
-      reason.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await act(async () => { fireEvent.change(reason, { target: { value: '台風' } }) })
     const confirm = screen.getAllByRole('button', { name: '一時停止する' }).at(-1)!
     await act(async () => { confirm.click() })
-    await waitFor(() => expect(screen.getByText('一時停止')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('停止中')).toBeTruthy())
+    expect(net.setEventLifecycle).toHaveBeenCalledWith('acc-1', 'ev-1', expect.objectContaining({ to: 'paused', reason: '台風' }))
+    expect(net.getEvent).toHaveBeenCalledTimes(3)
+  })
+
+  it('理由なしの中止を止め、二度押しと失敗後の再送でも同じ操作の鍵を使う', async () => {
+    net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'published', is_published: 1 })
+    let fail!: (error: unknown) => void
+    net.setEventLifecycle.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject })).mockResolvedValue({ lifecycle_status: 'cancelled' })
+    render(<EditEventPage />)
+    const cancel = await screen.findByRole('button', { name: '中止する' })
+    await act(async () => { cancel.click() })
+    const dialog = screen.getByRole('alertdialog')
+    let confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '中止する')!
+    expect(confirm.disabled).toBe(true)
+    expect(net.setEventLifecycle).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.change(dialog.querySelector('textarea')!, { target: { value: '荒天のため中止' } }) })
+    confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '中止する')!
+    await act(async () => { confirm.click(); confirm.click() })
+    expect(net.setEventLifecycle).toHaveBeenCalledTimes(1)
+    const key = net.setEventLifecycle.mock.calls[0][2].idempotency_key
+    await act(async () => { fail(new Error('offline')) })
+    await waitFor(() => expect(dialog.textContent).toContain('変えられませんでした'))
+    expect(dialog.querySelector('textarea')?.value).toBe('荒天のため中止')
+    confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '中止する')!
+    await act(async () => { confirm.click() })
+    expect(net.setEventLifecycle).toHaveBeenLastCalledWith('acc-1', 'ev-1', { to: 'cancelled', reason: '荒天のため中止', idempotency_key: key })
   })
 })

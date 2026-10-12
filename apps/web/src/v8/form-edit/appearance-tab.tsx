@@ -1,8 +1,7 @@
 'use client'
 
-
 import Card from '@/components/shared/card'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Sparkles, Link2 } from 'lucide-react'
 import {
   FORM_THEME_DEFAULT, CUSTOMER_DESIGNS, DEFAULT_CUSTOMER_LOOK, resolveCustomerFormTheme, type CustomerLook,
@@ -69,6 +68,7 @@ type Props = {
   ogImageUrl: string
   onChangeOptions: (next: Partial<FormOptions>) => void
   onChangeName: (next: string) => void
+  onBlurName?: () => void
   onChangeDescription: (next: string) => void
   onChangeOgTitle: (next: string) => void
   onChangeOgDescription: (next: string) => void
@@ -88,6 +88,7 @@ export function AppearanceTab(props: Props) {
   const patchBackground = (backgroundImageUrl: string | null) => onChangeOptions({customerDesign:{mode,preset},theme:{...theme,backgroundImageUrl}})
   const deadlineOn = options.deadline?.enabled ?? false
   const ogImageError = ogImageUrlError(props.ogImageUrl)
+  const initialAppearance = useRef({ theme: { ...theme }, ogTitle: props.ogTitle, ogDescription: props.ogDescription, ogImageUrl: props.ogImageUrl })
   const linkSummary = [props.ogTitle.trim() ? '見出し' : null, props.ogDescription.trim() ? '説明' : null, props.ogImageUrl.trim() ? '画像' : null].filter(Boolean).join('・') || '自動で作る'
 
   if (props.readOnly) {
@@ -182,11 +183,11 @@ export function AppearanceTab(props: Props) {
           {props.accountLookError && !props.portable ? <FieldError id="account-look-error">{props.accountLookError}</FieldError> : null}
           {mode === 'fixed' ? <><p className={styles.fieldLabelPlain}>デザインの型</p><CustomerDesignPicker value={preset} onChange={next => onChangeOptions({customerDesign:{mode:'fixed',preset:next}})} /></> : null}
           {mode === 'fixed' && preset === 'custom' ? <>
-          <p className={styles.fieldLabelPlain}>色（5つの役割）</p>
+          <p className={styles.fieldLabelPlain} title="文字と背景の色の差は4.5:1以上にしてください。">色（5つの役割）</p>
           <div id="fe-colors" className={styles.wells}>
             {COLOR_ROLES.map((role) => (
               <span key={role.key} className={styles.well}>
-                <ColorWell value={theme[role.key]} allowAlpha={false} allowClear={false} label={`${role.label}の色`} onChange={(color) => color && patchTheme({ [role.key]: color.slice(0, 7).toLowerCase() })} />
+                <ColorWell value={theme[role.key]} allowAlpha={false} allowClear={false} retainInvalidInput label={`${role.label}の色`} onChange={(color) => color && patchTheme({ [role.key]: color.slice(0, 7).toLowerCase() })} />
                 <span className={styles.wellLabel}>{role.label}</span>
               </span>
             ))}
@@ -258,7 +259,7 @@ export function AppearanceTab(props: Props) {
           <h2 id="fe-about-title" className={styles.cardTitle}>フォームのこと</h2>
           <p className={styles.cardNote}>名前は一覧と題に出ます。覚え書きはお客さまには出ません。</p>
         </div>
-        <div className={styles.field}><Field label="フォーム名" htmlFor="fe-name"><SaveErrorField names={["name","props.name"]}><TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onChange={(e) => props.onChangeName(e.target.value)} /></SaveErrorField>
+        <div className={styles.field}><Field label="フォーム名" htmlFor="fe-name"><SaveErrorField names={["name","props.name"]}><TextField id="fe-name" value={props.name} invalid={Boolean(props.nameError)} onBlur={props.onBlurName} onChange={(e) => props.onChangeName(e.target.value)} /></SaveErrorField>
 {props.nameError ? <p role="alert" className={styles.fieldError}>{props.nameError}</p> : null}</Field></div>
         <div className={styles.field}><Field label="覚え書き" htmlFor="fe-desc"><SaveErrorField names={["description","props.description"]}><TextArea id="fe-desc" rows={2} value={props.description} onChange={(e) => props.onChangeDescription(e.target.value)} /></SaveErrorField></Field></div>
       </Card>
@@ -282,6 +283,16 @@ export function AppearanceTab(props: Props) {
               urlEntry={{ id: 'fe-og-image', value: props.ogImageUrl, onChange: props.onChangeOgImageUrl, label: 'カードの画像URL', placeholder: 'https://', open: Boolean(ogImageError) }}
             /></SaveErrorField>
           </div>
+        </div>
+        <div className={styles.tight}>
+          <Button onClick={() => {
+            const initial = initialAppearance.current
+            onChangeOptions({ theme: { ...initial.theme } })
+            props.onChangeOgTitle(initial.ogTitle)
+            props.onChangeOgDescription(initial.ogDescription)
+            props.onChangeOgImageUrl(initial.ogImageUrl)
+          }}>元に戻す</Button>
+          <Button onClick={() => onChangeOptions({ theme: { ...FORM_THEME_DEFAULT } })} title="色・書体・角の丸み・背景を初期設定に戻します">初期設定に戻す</Button>
         </div>
       </Dialog>
 

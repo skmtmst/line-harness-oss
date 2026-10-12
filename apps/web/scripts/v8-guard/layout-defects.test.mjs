@@ -7,7 +7,7 @@ import { spawnSync, execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
-import { assess, assessAgainstBase, record, measurePage, validateAllowances } from './layout-defects.mjs'
+import { assess, assessAgainstBase, record, measurePage, identifyStableTargets, validateAllowances } from './layout-defects.mjs'
 import scanPanelBlank from './panel-blank-browser.mjs'
 const shell = body => '<style>*{box-sizing:border-box}body{margin:0;font:16px/20px sans-serif}main{width:1000px}</style><main>'+body+'</main>'
 const cases = {
@@ -184,6 +184,30 @@ test('同じ検出器の統合先実測だけを土台にし、新規・件数�
   assert.equal(assessAgainstBase([{...touch,measure:{gap:2}}],[touch],'/friends',1152).failures.length,1)
   const empty = {...f,kind:'empty-blank-ok',measure:{count:1}}
   assert.equal(assessAgainstBase([empty],[empty],'/friends',1152).failures.length,1, '理由なしの除外は既存でも止める')
+})
+
+test('旧の非表示要素の削除は同じ外枠と照合し、増殖・別の子・実寸の悪化は止める', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    const f = {kind:'blank-horizontal',target:'div.app-shell_workspace:nth-of-type(2) > p:nth-of-type(1)',text:'right',measure:{excess:156}}
+    const identify = async (finding, markup) => {
+      await page.setContent(markup)
+      return (await page.evaluate(identifyStableTargets,[finding]))[0]
+    }
+    const base = await identify(f, '<div hidden></div><div class="app-shell_workspace__old"><p>本文</p></div>')
+    const head = await identify({...f,target:f.target.replace('(2)','(1)')}, '<div class="app-shell_workspace__new"><p>本文</p></div>')
+    const allow = record([f],'/fixture',1152,'既存の同じ場所')
+    const assessHead = values => assessAgainstBase(values,[base],'/fixture',1152,allow)
+    assert.equal(assessHead([head]).failures.length,0)
+    assert.equal(assessHead([head,head]).failures.length,1)
+    for (const change of [
+      {...head,measure:{excess:157}}, {...head,text:'別の文字'},
+      await identify({...head,target:head.target.replace('p:nth-of-type(1)','p:nth-of-type(2)')},'<div class="app-shell_workspace__new"><p>本文</p><p>別</p></div>'),
+      await identify(head,'<div class="app-shell_workspace__new"><p>本文</p></div><div class="app-shell_workspace__other"><p>別</p></div>'),
+    ]) assert.equal(assessHead([change]).failures.length,1)
+    assert.equal(assessAgainstBase([head],[f],'/fixture',1152,allow).failures.length,1,'本線の実画面の証拠なしでは照合しない')
+  } finally { await browser.close() }
 })
 
 test('CLIは新しい検出種類をbaseにも当て、既存は通すが新しい黒い箱とbaseの測定失敗は終了1', async () => {

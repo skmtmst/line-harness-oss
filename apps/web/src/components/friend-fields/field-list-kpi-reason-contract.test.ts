@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const LIST = fs.readFileSync(path.join(__dirname, 'field-list.tsx'), 'utf8')
+const LIST = fs.readFileSync(path.join(__dirname, '../../v8/tags/fields-tab.tsx'), 'utf8')
 
 /** 注釈を落とす。「なぜ直したか」を書いた文が、直したはずの字面に当たるのを避ける。 */
 function code(src: string): string {
@@ -17,9 +17,9 @@ const CODE = code(LIST)
 
 /** 帯を組み立てているところだけを切り出す。表の桁の同じ字面に当たらないようにする。 */
 function cardsBlock(): string {
-  const at = CODE.indexOf('const cards = [')
+  const at = CODE.indexOf('const kpis = [')
   if (at < 0) return ''
-  return CODE.slice(at, CODE.indexOf(']', CODE.indexOf("今月の更新", at)))
+  return CODE.slice(at, CODE.indexOf(']', CODE.indexOf("今月の変更", at)))
 }
 
 /**
@@ -67,7 +67,7 @@ describe('友だち情報欄の帯は、数が出せない理由を添える', (
   it('4枚とも理由に差し替わる', () => {
     const block = cardsBlock()
     expect(block, '帯の組み立てが見つからない').not.toBe('')
-    const titles = ['項目数', '登録済み友だち', '今月の更新']
+    const titles = ['項目', '入力済みの友だち', '今月の変更']
     for (const title of titles) {
       const at = block.indexOf(title)
       expect(at, `帯「${title}」が見つからない`).toBeGreaterThan(-1)

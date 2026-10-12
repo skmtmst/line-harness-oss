@@ -11,7 +11,6 @@ import { RefreshCover } from '@/components/shared/refresh-cover'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { VirtualRows } from '@/components/shared/virtual-rows'
 import FriendListRow, { FriendListCard } from './friend-list-row'
 import type { FriendAction } from './single-friend-actions'
@@ -143,27 +142,21 @@ export default function FriendListTable({
    * ★V8：多い行は窓で描く（M10・2,000行対策）。
    * 机（lg）では行の高さが78pxでそろっているので窓に入れる。
    * 手（lg未満）の札は高さがばらばらのため窓にせず、見える側だけ描く。
-   * v7・測る前は今までどおり両方描く（描画の不一致を起こさない）。
+   * 幅を測る前は両方描き、CSSで見える側を選ぶ。
    */
-  const theme = useAdminTheme()
   const [desktop, setDesktop] = useState<boolean | null>(null)
   useEffect(() => {
-    // テーマの状態は初回v7で来るため、地の値は直接読む（中間の全描画を出さない）。
-    if (document.documentElement.dataset?.theme !== 'v8') {
-      setDesktop(null)
-      return
-    }
     const query = window.matchMedia('(min-width: 1024px)')
     const apply = () => setDesktop(query.matches)
     apply()
     query.addEventListener?.('change', apply)
     return () => query.removeEventListener?.('change', apply)
-  }, [theme])
-  const singleBranch = theme === 'v8' && desktop !== null
+  }, [])
+  const singleBranch = desktop !== null
   const windowing = singleBranch && desktop === true && friends.length > 60
   /*
-   * 初回は両テーマとも先頭30行だけ（描画の不一致なし・最初の絵が速い）。
-   * 効果で広げる：v7は全部（settledは今までどおり）・V8は窓か片枝へ。
+   * 初回は先頭30行だけ（描画の不一致なし・最初の絵が速い）。
+   * 効果で広げる：窓か見える側だけを描く。
    */
   const [expanded, setExpanded] = useState(false)
   useEffect(() => {
@@ -322,7 +315,7 @@ export default function FriendListTable({
         ) : firstFriends.map((friend) => (
           /*
             FRIEND-17: lg未満はカード、lg以上はグリッド行。
-            V8では見える側だけ描く（v7・初回は両方描いてCSSで分ける）。
+            見える側だけ描く（初回は両方描いてCSSで分ける）。
             初回は先頭30行だけ（両テーマ同一・描画の不一致なし）。
             列の表示切替（visible）は両側で効く。
           */
@@ -353,15 +346,8 @@ export default function FriendListTable({
         ))}
       </div>
 
-      {/*
-        ★V8（jX2Uw）：ページ送りの帯が「件数＋ボタン」を持つ形。
-        v7 は帯の外に件数を出す（data-pagebar-out が v8 で隠す）、
-        v8 は帯の中の summary に出す。
-      */}
+      {/* ページ送りの帯に件数と操作をまとめる（jX2Uw）。 */}
       <div data-pagebar className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
-        <span data-pagebar-out>
-          <ListRange total={total} first={rangeStart} last={rangeEnd} />
-        </span>
         <Pagination
           className="w-full"
           page={page}

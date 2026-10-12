@@ -545,7 +545,7 @@ describe('V6 event waitlist and applicants', () => {
       .toEqual({ status: 'waiting' });
   });
 
-  test('通知失敗は成立扱いにせず待機へ戻す', async () => {
+  test('通知の応答不明は案内中を保ち、台帳で確認待ちにする', async () => {
     seedBooking();
     seedWaitlist();
     await expect(promoteEventWaitlist(db, {
@@ -555,7 +555,9 @@ describe('V6 event waitlist and applicants', () => {
     })).rejects.toThrow('LINE temporary error');
     expect(sqlite.prepare(
       `SELECT status, offered_at, offer_expires_at, offer_token_hash FROM event_waitlist WHERE id = 'wait-a'`,
-    ).get()).toEqual({ status: 'waiting', offered_at: null, offer_expires_at: null, offer_token_hash: null });
+    ).get()).toEqual({ status: 'offered', offered_at: '2026-09-07T00:00:00.000Z', offer_expires_at: '2026-09-08T00:00:00.000Z', offer_token_hash: expect.any(String) });
+    expect(sqlite.prepare(`SELECT status,retryable,error_code FROM notification_deliveries`).get())
+      .toEqual({status:'failed',retryable:0,error_code:'delivery_unknown'});
   });
 
   test.each(['accepted', 'offered'])('空席確認後に増えた%sの保留人数も確保のSQLで数える', async status => {
@@ -618,7 +620,30 @@ describe('V6 event waitlist and applicants', () => {
     })).rejects.not.toThrow('waitlist_notification_destination_missing');
   });
 
-  test('Cron: 席解放jobを一度だけ処理し、一時失敗は再試行可能に残す', async () => {
+  test('EV-C01: offered保存後・送信前で落ちても次の回に一度だけ案内する', async () => {
+    seedWaitlist();
+    const now = new Date('2026-09-07T00:00:00.000Z');
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    let crash = true;
+    const interrupted = asD1(sqlite, async query => {
+      if (crash && ((query.includes('UPDATE notification_deliveries') && query.includes('attempts'))
+        || (query.includes('UPDATE event_slots') && !query.includes('offer_token_hash')))) {
+        crash = false;
+        throw new Error('injected before send');
+      }
+    });
+    await expect(promoteEventWaitlist(interrupted, {
+      occurrenceId: 'slot-a', lineAccountId: 'account-a', now, sender,
+    })).rejects.toThrow('injected before send');
+    expect(sender).not.toHaveBeenCalled();
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(sqlite.prepare("SELECT notified_at FROM event_waitlist WHERE id='wait-a'").get()).toEqual({ notified_at: now.toISOString() });
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
+  });
+
+  test('Cron: 送信の結果不明は台帳に残し、jobが再開しても二度送らない', async () => {
     seedBooking();
     seedWaitlist();
     sqlite.prepare(`UPDATE event_bookings SET status = 'cancelled' WHERE id = 'booking-a'`).run();
@@ -641,12 +666,62 @@ describe('V6 event waitlist and applicants', () => {
     ).get()).toEqual({ status: 'retryable_failed', attempts: 1, last_error: 'temporary' });
 
     const retryAt = new Date(now.getTime() + 2 * 60_000);
+    const retrySender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
     const second = await processEventWaitlistPromotionJobs(db, {
-      now: retryAt, sender: async () => undefined,
+      now: retryAt, sender: retrySender,
     });
-    expect(second).toEqual({ processed: 1, promoted: 1, retried: 0 });
+    expect(second).toEqual({ processed: 1, promoted: 0, retried: 0 });
+    expect(retrySender).not.toHaveBeenCalled();
+    expect(sqlite.prepare(`SELECT status, retryable, error_code FROM notification_deliveries`).get())
+      .toEqual({ status: 'failed', retryable: 0, error_code: 'delivery_unknown' });
     expect(sqlite.prepare(`SELECT status FROM event_waitlist_promotion_jobs`).get())
       .toEqual({ status: 'completed' });
+  });
+
+  test('EV-C01: 受理後・成功保存前の中断は確認待ちに残し再送しない', async () => {
+    seedWaitlist();
+    const now = new Date('2026-09-07T00:00:00.000Z');
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    const interrupted = asD1(sqlite, async query => {
+      if (query.includes('UPDATE notification_deliveries') && query.includes("status = 'provider_accepted'")) throw new Error('injected accepted ack crash');
+    });
+    await expect(promoteEventWaitlist(interrupted, { occurrenceId: 'slot-a', lineAccountId: 'account-a', now, sender })).rejects.toThrow('injected accepted ack crash');
+    expect(sender).toHaveBeenCalledTimes(1);
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(sqlite.prepare('SELECT status,retryable,error_code FROM notification_deliveries').get())
+      .toEqual({ status:'failed',retryable:0,error_code:'delivery_unknown' });
+  });
+
+  test('EV-C01: 旧版の送信開始不明な案内は自動で送らず運用者に見せる', async () => {
+    await seedOffered('legacy-unknown-token');
+    sqlite.exec("UPDATE event_waitlist SET notified_at=NULL WHERE id='wait-a'");
+    const now = new Date('2026-09-07T00:00:00.000Z');
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).not.toHaveBeenCalled();
+    expect(sqlite.prepare('SELECT status,retryable,error_code FROM notification_deliveries').all())
+      .toEqual([{ status:'failed',retryable:0,error_code:'delivery_unknown' }]);
+  });
+
+  test('EV-C02: expired保存後・次job登録前で落ちても次の回に次の人へ案内する', async () => {
+    await seedOffered('expiry-crash-token', '2026-09-06T00:00:00.000Z');
+    sqlite.exec(`INSERT INTO event_waitlist
+      (id,line_account_id,event_id,slot_id,friend_id,identity_key,status,created_at,updated_at)
+      VALUES ('wait-next','account-a','event-a','slot-a','friend-c','friend-c','waiting','2026-09-02','2026-09-02')`);
+    const now = new Date('2026-09-07T00:00:00.000Z');
+    const sender = vi.fn<EventWaitlistOfferSender>().mockResolvedValue(undefined);
+    const interrupted = asD1(sqlite, async query => {
+      if (query.includes('INSERT OR IGNORE INTO event_waitlist_promotion_jobs')) throw new Error('injected enqueue crash');
+    });
+    await expect(processEventWaitlistPromotionJobs(interrupted, { now, sender })).rejects.toThrow('injected enqueue crash');
+    expect(sender).not.toHaveBeenCalled();
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(sqlite.prepare("SELECT status FROM event_waitlist WHERE id='wait-next'").get()).toEqual({status:'offered'});
+    await processEventWaitlistPromotionJobs(db, { now, sender });
+    expect(sender).toHaveBeenCalledTimes(1);
   });
 
   test('開催後は自動繰り上げしない', async () => {

@@ -114,7 +114,7 @@ async function renderPage(waitForName: string | RegExp = '本文の行') {
   await tableFindText(waitForName)
   return {
     ...rendered,
-    input: screen.getByLabelText("名前・本文・差し込んでいる項目で検索"),
+    input: screen.getByLabelText("テンプレートを検索"),
     TemplatesPage,
   }
 }
@@ -129,7 +129,7 @@ async function search(input: HTMLElement, query: string) {
 describe('テンプレート一覧の検索', () => {
   test("名前・本文・差し込み項目をNFKC・大小文字非依存・空白正規化で検索する", async () => {
     const { input } = await renderPage()
-    expect(input.getAttribute('placeholder')).toBe("テンプレート名で検索（本文・差し込んでいる項目も対象）")
+    expect(input.getAttribute('placeholder')).toMatch(/^名前・本文/)
 
     await search(input, '  welcome vip  ')
     expect(tableText(/ＷＥＬＣＯＭＥ/)).toBeTruthy()
@@ -152,7 +152,7 @@ describe('テンプレート一覧の検索', () => {
     expect(tableText('通常の行')).toBeNull()
 
     await search(input, '存在しない検索語')
-    expect(screen.queryByText('条件に合うテンプレートはありません')).toBeTruthy()
+    expect(screen.queryByText('条件に合うものがありません')).toBeTruthy()
     expect(tableText('長文の行')).toBeNull()
 
     await search(input, ' \n\t ')
@@ -236,7 +236,7 @@ describe('テンプレート一覧の検索', () => {
     })
     expect(tableText('A社テンプレート')).toBeNull()
 
-    const input = screen.getByLabelText("名前・本文・差し込んでいる項目で検索")
+    const input = screen.getByLabelText("テンプレートを検索")
     await search(input, '切替後')
     expect(tableText('B社テンプレート')).toBeTruthy()
     expect(mockState.listCalls).toEqual(['account-a', 'account-b'])
@@ -272,11 +272,14 @@ describe('テンプレート一覧の検索', () => {
     // 767px以下のカードにも同じ文が出るので、表の中だけで見る。
     const table = screen.getByRole('table')
     const row = within(table).getByText('書き換えた行').closest('tr')!
-    expect(within(row).getByText(/書き換え後の新しい本文/)).toBeTruthy()
-    expect(within(row).queryByText(/古い公開版の本文/)).toBeNull()
-    expect(within(row).getByText('編集中')).toBeTruthy()
+    fireEvent.keyDown(row, { key: 'Enter' })
+    const panel = await screen.findByRole('dialog')
+    expect(within(panel).getByText(/書き換え後の新しい本文/)).toBeTruthy()
+    expect(within(panel).queryByText(/古い公開版の本文/)).toBeNull()
+    fireEvent.click(within(panel).getByRole('button', { name: '閉じる' }))
+    expect(within(row).getByText('未公開の変更')).toBeTruthy()
     const unpublishedRow = within(table).getByText('まだ公開していない行').closest('tr')!
-    expect(within(unpublishedRow).getByText('未公開')).toBeTruthy()
+    expect(within(unpublishedRow).getByText('下書きだけ')).toBeTruthy()
 
     // 下書きの本文で検索できる
     await search(input, '書き換え後')
@@ -289,3 +292,6 @@ describe('テンプレート一覧の検索', () => {
     expect(tableText('書き換えた行')).toBeNull()
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

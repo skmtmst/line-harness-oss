@@ -1,6 +1,6 @@
 import type { CommonVarChangeImpact } from '@line-crm/shared'
 import { describe, expect, it } from 'vitest'
-import { impactBreakdown, impactCsv, overLimitCount, urgentImpactCount } from './impact-review'
+import { impactBreakdown, impactCsv, overLimitCount, urgentImpactCount } from '@/v8/common-vars-edit/impact'
 
 const impact = {
   // 状態の語彙は口（commonVarUsageStatus）とそろえる。口が返す呼び名だけを使う。

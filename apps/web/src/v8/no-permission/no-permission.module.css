@@ -1,4 +1,3 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /* ★V8 権限なし（板 O5tUeE）。値は globals.css の --tpl-hb2-* と共通の --tpl-*。 */
 .board {

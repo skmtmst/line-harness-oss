@@ -1,7 +1,7 @@
 /*
  * ★V8-B 健康日記（mIwA4・BVuYh・z2tvtX）。
  * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
- * 数字は app/globals.css の [data-theme="v8"] の --tpl-nph-* に置く（マイペットと同じ物差し）。
+ * 数字は app/globals.css の :root の --tpl-nph-* に置く（マイペットと同じ物差し）。
  */
 
 /* タブ（絵：高さ28・文字の下10）。 */
@@ -9,7 +9,7 @@
   min-width: 0;
   margin-bottom: var(--tpl-nph-tab-pull);
 }
-:global([data-theme='v8']) .tabs [role='tab'] {
+:global(:root) .tabs [role='tab'] {
   box-sizing: border-box;
   height: var(--tpl-nph-tab-h);
   min-height: 0;
@@ -58,7 +58,7 @@
 .table {
   border: 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+:global(:root) .table .headRow[data-table-layout='columns'] {
   display: flex;
   align-items: center;
   gap: var(--tpl-nph-col-gap);
@@ -68,7 +68,7 @@
   background: var(--color-table-head);
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+:global(:root) .table .row[data-table-layout='columns'] {
   gap: var(--tpl-nph-col-gap);
   box-sizing: border-box;
   height: var(--tpl-nph-row-h);
@@ -76,8 +76,8 @@
   border-bottom: 0;
   box-shadow: var(--shadow-row-line);
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+:global(:root) .table .headRow[data-table-layout='columns'] > th,
+:global(:root) .table .row[data-table-layout='columns'] > td {
   flex-shrink: 0;
   min-width: 0;
   height: auto;
@@ -86,18 +86,18 @@
   box-shadow: none;
   line-height: normal;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+:global(:root) .table .headRow[data-table-layout='columns'] > th {
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
   font-weight: 600;
   white-space: nowrap;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colChange,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colChange {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colChange,
+:global(:root) .table .row[data-table-layout='columns'] > td.colChange {
   flex: 1 1 0;
 }
-:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
-:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount {
+:global(:root) .table .headRow[data-table-layout='columns'] > th.colCount,
+:global(:root) .table .row[data-table-layout='columns'] > td.colCount {
   padding-right: var(--tpl-nph-num-pad-end);
   text-align: right;
 }
@@ -111,8 +111,8 @@
 
 /* 狭い板では、気になる変化と詳細にも出る便・食いつきの列を畳む。 */
 @container v8-page (max-width: 1099px) {
-  :global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colStool,
-  :global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colStool {
+  :global(:root) .table .headRow[data-table-layout='columns'] > th.colStool,
+  :global(:root) .table .row[data-table-layout='columns'] > td.colStool {
     display: none;
   }
 }

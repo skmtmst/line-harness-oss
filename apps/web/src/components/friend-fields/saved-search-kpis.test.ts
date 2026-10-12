@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import { savedSearchKpiValues } from './saved-search-kpis'
 
-const LIST = fs.readFileSync(path.join(__dirname, 'saved-search-list.tsx'), 'utf8')
+const LIST = fs.readFileSync(path.join(__dirname, '../../v8/tags/searches-tab.tsx'), 'utf8')
 
 describe('保存した検索の上部指標', () => {
   it('取得できた実値だけをタグ単位で数える', () => {
@@ -41,12 +41,12 @@ describe('保存した検索の上部指標', () => {
     })
   })
 
-  it('V6の4指標を共通カードで出し、呼び出し回数はAPIの実値だけを合計する', () => {
-    expect(LIST).toContain('data-design-node="QKx8Q"')
-    expect(LIST).toContain('title="保存した条件"')
-    expect(LIST).toContain('title="配信で使用中"')
-    expect(LIST).toContain('title="該当者0人"')
-    expect(LIST).toContain('title="今月の呼び出し"')
+  it('V8の4指標を共通カードで出し、呼び出し回数はAPIの実値だけを合計する', () => {
+    expect(LIST).toContain('<KpiBand')
+    expect(LIST).toContain("title: '保存した条件'")
+    expect(LIST).toContain("title: '配信で使っている'")
+    expect(LIST).toContain("title: '該当なし'")
+    expect(LIST).toContain("title: '今月の利用'")
     expect(LIST).toContain('kpis.callsThisMonth')
     expect(LIST).toContain('api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true })')
     expect(LIST).not.toContain('value={84}')

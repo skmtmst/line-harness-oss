@@ -8,6 +8,7 @@ import Notice from '@/components/shared/notice'
 import SeatTile from '@/components/shared/seat-tile'
 import CheckCard from '@/components/shared/check-card'
 import Button from '@/components/shared/button'
+import { RowActions } from '@/components/shared/row-actions'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -107,6 +108,8 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   const [hoursVersion, setHoursVersion] = useState(0)
   const [hoursDraft, setHoursDraft] = useState<Hours | null>(null)
   const [hoursError, setHoursError] = useState('')
+  const [channelsError,setChannelsError]=useState(false)
+  const [channelsRetry,setChannelsRetry]=useState(0)
   const [channels, setChannels] = useState<RestaurantChannel[]>([])
 
   useEffect(() => {
@@ -138,9 +141,9 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
     if (!selectedAccountId || !storeId) return
     void fetchApi<{ success: true; data: RestaurantChannel[] }>(
       `/api/restaurant-test/channels?account_id=${encodeURIComponent(selectedAccountId)}&storeId=${encodeURIComponent(storeId)}`,
-    ).then((res) => { if (current) setChannels(Array.isArray(res.data) ? res.data : []) }).catch(() => { if (current) setChannels([]) })
+    ).then((res) => { if (current) {if(!Array.isArray(res.data))throw new Error('invalid_channels');setChannels(res.data);setChannelsError(false)} }).catch(() => { if (current) setChannelsError(true) })
     return () => { current = false }
-  }, [selectedAccountId, storeId])
+  }, [selectedAccountId, storeId,channelsRetry])
 
   const rows = useMemo(() => (dayRows ?? []).slice().sort((a, b) => a.starts_at.localeCompare(b.starts_at)), [dayRows])
   const reservations = useMemo(
@@ -298,6 +301,11 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
     })
   }
 
+  const generateSlots = () => {
+    if (!selectedAccountId || !store || !canEdit || busy || !hoursVersion || allocInvalid) return
+    void mutate(() => restaurantTestApi.generateInventory(selectedAccountId, { storeId: store.id, date, expectedHoursVersion: hoursVersion, otaCapacity: alloc.ota, lineCapacity: alloc.line, walkInCapacity: alloc.walkin }), '30分ごとの枠を作りました。').then((ok) => { if (ok) setRefresh((n) => n + 1) })
+  }
+
   const saveSlot = () => {
     if (!selectedAccountId || !selected || slotInvalid) return
     const attempt = { ...currentSlotAlloc }
@@ -337,6 +345,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
 
   return (
     <SaveErrorScope errors={saveErrors}><>
+      {channelsError?<ListState kind="error" title="予約媒体を読み込めませんでした" onRetry={()=>setChannelsRetry(n=>n+1)}/>:null}
       {loadError ? (
         <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
       ) : null}
@@ -408,6 +417,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             <div className={styles.sectionHeadRow}>
               <CardHeader size="stacked" titleId="rs-stock-title" title={`時間帯ごとの在庫（${dayLabel(date)}）`} meta="予約台帳の予約から、埋まっている卓と空きを出します。行を押すと右に卓の埋まりぐあいが出ます" />
               <span className={styles.datePicker}><SaveErrorField names={["date"]}><DateField aria-label="在庫の日付" value={date} disabled={busy} onChange={changeDate} /></SaveErrorField></span>
+              {canEdit && slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', onSelect: generateSlots }]} /> : null}
             </div>
             {dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
@@ -421,10 +431,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                     <Button
                       variant="primary"
                       disabled={busy || !hoursVersion || allocInvalid}
-                      onClick={() => {
-                        if (!selectedAccountId || !store) return
-                        void mutate(() => restaurantTestApi.generateInventory(selectedAccountId, { storeId: store.id, date, expectedHoursVersion: hoursVersion, otaCapacity: alloc.ota, lineCapacity: alloc.line, walkInCapacity: alloc.walkin }), '30分ごとの枠を作りました。').then((ok) => { if (ok) setRefresh((n) => n + 1) })
-                      }}
+                      onClick={generateSlots}
                     >この日の枠を作る</Button>
                   ) : undefined}
                 />

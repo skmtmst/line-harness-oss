@@ -44,7 +44,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>,
 }))
 
-const { AffiliatePaymentConfirmDialog } = await import('./action-dialogs')
+const { AffiliatePaymentConfirmDialog } = await import('@/v8/affiliates/dialogs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

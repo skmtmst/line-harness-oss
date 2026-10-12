@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 一括バー。★V7 仕上げ §2 の決まり:
@@ -21,7 +21,6 @@
   border-top: 1px solid var(--card-edge);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
 }
 
 /* 「N件を選択中」。濃い緑の太字、桁は表と同じ tabular-nums。 */
@@ -70,4 +69,4 @@
 }
 
 /* B-161：浮く面の影と薄い縁を共通化。 */
-[data-theme='v8'] .bar { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
+:root .bar { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }

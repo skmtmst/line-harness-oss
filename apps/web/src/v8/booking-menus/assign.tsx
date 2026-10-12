@@ -10,7 +10,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
+import { classifyApiFailure, isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { useBookingEdit } from './lib/edit-permission'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -374,7 +374,7 @@ export default function AssignMatrixV8() {
             <div className={shell.stateCard}>
               <p className={shell.stateTitle}>{loadFailure?.title ?? '読み込めませんでした'}</p>
               <p className={shell.stateDesc}>{loadFailure?.description ?? error}</p>
-              {loadFailure?.retryable ? (
+              {loadFailure?.retryable || classifyApiFailure(loadError) === 'forbidden' ? (
                 <div className={shell.stateActions}>
                   <Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
                 </div>

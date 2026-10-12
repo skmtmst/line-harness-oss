@@ -38,14 +38,16 @@ describe('選んだ札6か所は白＋緑（黒をなくす #4）', () => {
     expectWhiteGreen(selectedRule(css, /\.pageChipOn \{[^}]*\}/s, 'rich-menus'), 'rich-menus')
   })
 
-  it('予約の札', () => {
-    const css = readFileSync(join(APP, 'booking', 'menus', 'settings-v8.module.css'), 'utf8')
-    expectWhiteGreen(selectedRule(css, /\.phoneCatNow \{[^}]*\}/s, 'booking'), 'booking')
+  it('現役V8の予約見本の札は採用済みの墨地・白文字を保つ', () => {
+    const css = readFileSync(join(APP, '../v8/booking-menus/settings.module.css'), 'utf8')
+    const rule = selectedRule(css, /\.phoneCatNow \{[^}]*\}/s, 'booking')
+    expect(rule).toMatch(/background:\s*var\(--color-ink\)/)
+    expect(rule).toMatch(/color:\s*var\(--color-canvas\)/)
   })
 
   it('共通のV8札は10-11固定版とB-211の薄い緑・緑の枠と文字に合わせる', () => {
     const css = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
-    const rule = selectedRule(css, /\[data-theme='v8'\] \.v6-filter-chip\[aria-pressed='true'\] \{[^}]*\}/s, 'shared')
+    const rule = selectedRule(css, /:root \.v6-filter-chip\[aria-pressed='true'\] \{[^}]*\}/s, 'shared')
     expect(rule).toMatch(/background:\s*var\(--color-selection-bg\)/)
     expect(rule).toMatch(/color:\s*var\(--color-selection-border\)/)
     expect(rule).toMatch(/outline-color:\s*var\(--color-selection-border\)/)

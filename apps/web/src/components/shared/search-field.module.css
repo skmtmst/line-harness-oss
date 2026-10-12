@@ -1,18 +1,13 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .search {
   box-sizing: border-box;
   display: flex;
   min-width: 0;
   /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
-  height: 36px;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  border: 1px solid var(--color-field-border);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
-  box-shadow: var(--shadow-field);
 }
 
 .search[hidden] {
@@ -20,10 +15,7 @@
 }
 
 .searchIcon {
-  width: 17px;
-  height: 16px;
   flex: 0 0 17px;
-  color: var(--color-ink-faint);
 }
 
 .input {
@@ -34,9 +26,7 @@
   border: 0;
   background: transparent;
   color: var(--color-ink);
-  font-family: inherit;
   /* #976 U079: 検索欄の文字も入力欄と同じ14px（以前は12pxで最小だった） */
-  font-size: var(--text-body);
 }
 
 .input::placeholder {
@@ -52,7 +42,6 @@
  * 色・太さ・余白は #804 と同じ（2px・action 色・offset 2px）。
  */
 .input:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -92,7 +81,6 @@
 .loadingIcon {
   flex: 0 0 16px;
   color: var(--color-ink-faint);
-  animation: search-spin var(--motion-spin) linear infinite;
 }
 
 @keyframes search-spin {
@@ -122,7 +110,7 @@
  * ★V8「探す欄」（TkVyB）：高さ36・余白 0 12・アイコンとの間 8・
  * 文字は 13px（v7 の40px/14px から小さく引き締める）。
  */
-[data-theme='v8'] .search {
+:root .search {
   height: 36px;
   gap: 8px;
   padding: 0 12px;
@@ -131,13 +119,13 @@
 }
 
 /* 複合欄の焦点は外枠へ。内側の入力の輪郭を重ねない。 */
-[data-theme='v8'] .search:has(:focus-visible) {
+:root .search:has(:focus-visible) {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-[data-theme='v8'] .input:focus-visible { outline: none; }
+:root .input:focus-visible { outline: none; }
 
-[data-theme='v8'] .input {
+:root .input {
   font-size: var(--text-body);
 }
 
@@ -145,11 +133,8 @@
  * 近道の印（例 ⌘K。TSV 実寸 19x17≒12px）。ふだんは隠し、v8 だけで
  * 箱の右端に出す（中の入力が flex:1 で右へ寄せる）。v7 は変えない。
  */
-.shortcut {
-  display: none;
-}
 
-[data-theme='v8'] .shortcut {
+:root .shortcut {
   display: inline-block;
   flex-shrink: 0;
   font-size: var(--text-caption);
@@ -159,20 +144,20 @@
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .search { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
-[data-theme='v8'] .searchIcon { width: 14px; height: 14px; flex-basis: 14px; }
-[data-theme='v8'] .input { padding: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .search { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
+:root .searchIcon { width: 14px; height: 14px; flex-basis: 14px; }
+:root .input { padding: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 
-[data-theme='v8'] .search:has(.input[aria-invalid='true']) { outline-color: var(--color-danger); }
+:root .search:has(.input[aria-invalid='true']) { outline-color: var(--color-danger); }
 }
 /* B-152・仕上げ5 */
-[data-theme='v8'] .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }
+:root .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }
 
 /* B-152・仕上げ7：輪は検索欄の外側だけに出す。 */
-html[data-theme='v8'] .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-html[data-theme='v8'] .search .input:focus-visible { outline: none; }
-html[data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
-html[data-theme='v8'] .disabled .input:disabled { opacity: 1; }
+html:root .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+html:root .search .input:focus-visible { outline: none; }
+html:root .disabled { opacity: var(--polish-disabled-opacity); }
+html:root .disabled .input:disabled { opacity: 1; }
 
 /* B-152・仕上げ8：検索の読み込みは aria-busy で伝え、回る印は保存ボタンだけにする。 */
-[data-theme='v8'] .loadingIcon { display: none; animation: none; }
+:root .loadingIcon { display: none; animation: none; }

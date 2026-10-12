@@ -1,11 +1,12 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { deduplicationLabel } from './dedup'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 /* 詳細・編集の窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
-const DIALOGS = readFileSync(new URL('./_components/conversion-dialogs.tsx', import.meta.url), 'utf8')
-const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
+const DIALOGS = readFileSync(new URL('../../v8/conversions/dialogs.tsx', import.meta.url), 'utf8')
+const NEW_PAGE = readUiSource(new URL('./new/page.tsx', import.meta.url), 'utf8')
 
 describe('数え方の呼び名（CONVERSION-04）', () => {
   it('何回でも・1人1回・日数窓を別の呼び名にする', () => {
@@ -38,7 +39,7 @@ describe('数え方の呼び名（CONVERSION-04）', () => {
   it('作成の選択肢と同じ言葉で出す', () => {
     // 作成カードの呼び名と、一覧・詳細の呼び名がずれると同じものを
     // 別物に読み違える。
-    expect(NEW_PAGE).toContain('title="何回でも数える"')
+    expect(NEW_PAGE).toContain('title="何回でも"')
     expect(NEW_PAGE).toContain('title="1人1回だけ"')
     expect(NEW_PAGE).toContain('title="30日に1回まで"')
     expect(deduplicationLabel('every', null)).toBe('何回でも数える')

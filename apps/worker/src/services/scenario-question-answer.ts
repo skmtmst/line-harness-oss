@@ -1,4 +1,4 @@
-import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
 import { applyTapExtras } from './tap-extras.js'
 /*
  * 質問メッセージの選択肢が押されたときの処理。
@@ -20,7 +20,6 @@ import { applyTapExtras } from './tap-extras.js'
 import {
   validateScenarioActionReferences,
   ensureWorkflowStep, getWorkflowStep, workflowJson,
-  removeTagFromFriend,
   getFriendFieldById,
   getPinnedScenarioStep,
   isResourceInScenarioAccount,
@@ -188,7 +187,7 @@ export async function executeQuestionAnswer(
   })
   for(const id of choice.removeTagIds ?? []) await stage(`tag:remove:${id}`,async owned=>{
     if(!await isResourceInScenarioAccount(db,'tag',id,target.scenarioAccountId)) throw new Error('answer_resource_unavailable')
-    await removeTagFromFriend(owned,friend.id,id)
+    await detachTagAndFireSideEffects(owned,friend.id,id,`${execution.sourceEventId}:remove:${id}`)
   })
   if(choice.field?.fieldId) await stage('field',async owned=>{
     if(!(await validateScenarioActionReferences(db,target.scenarioAccountId,'friend_field',{fieldId:choice.field!.fieldId})).ok) throw new Error('answer_resource_unavailable')

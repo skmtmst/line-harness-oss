@@ -16,10 +16,11 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const FORM = read('event-form.tsx')
-const WIZARD = read('event-wizard.tsx')
-const LIST_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'page.tsx'), 'utf8')
-const BOOKINGS_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'bookings', 'page.tsx'), 'utf8')
+const FORM = read('..', '..', 'v8', 'events', 'edit-form.tsx')
+const CREATE = read('..', '..', 'v8', 'events', 'create.tsx')
+import { EVENT_DEFAULT_DRAFT as CREATE_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS } from '@/v8/events/shared'
+const LIST_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'list.tsx'), 'utf8')
+const BOOKINGS_PAGE = readFileSync(join(HERE, '..', '..', 'v8', 'events', 'bookings.tsx'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'events', 'edit', 'page.tsx'), 'utf8')
 
 /**
@@ -66,7 +67,7 @@ describe('イベント作成・編集の共有契約(#740)', () => {
 
   it('作成・編集の両方で承認期限2/24/72時間と版競合を同じ契約で送る', () => {
     expect(EVENT_DEFAULT_DRAFT.approval_deadline_hours).toBe(24)
-    for (const source of [FORM, WIZARD]) {
+    for (const source of [FORM]) {
       expect(source).toContain('approval_deadline_hours')
       expect(source).toContain("{ value: '2', label: '申込から2時間' }")
       expect(source).toContain("{ value: '24', label: '申込から24時間' }")
@@ -76,26 +77,30 @@ describe('イベント作成・編集の共有契約(#740)', () => {
       expect(source).toContain("e.status === 409 && e.code === 'version_conflict'")
       expect(source).toContain('別の画面でイベントが更新されました。開き直してからもう一度保存してください。')
     }
+    for (const hours of ['2', '24', '72']) expect(CREATE).toContain(`value: '${hours}'`)
+    expect(CREATE).toContain('options={APPROVAL_OPTIONS}')
+    expect(CREATE).toContain('continuingId')
+    expect(CREATE).toContain('router.replace(`/events/edit?id=${encodeURIComponent(continuingId)}`)')
   })
 
   it('両画面が同じ既定値・上限・multi解決を参照する', () => {
-    for (const source of [FORM, WIZARD]) {
+    for (const source of [FORM, CREATE]) {
       expect(source).toContain('EVENT_DEFAULT_DRAFT')
       expect(source).toContain('EVENT_NAME_MAX_LENGTH')
       expect(source).toContain('EVENT_DESCRIPTION_MAX_LENGTH')
     }
     // 既定値の二重定義は無い。片方だけ変えられない形にする。
     expect(FORM).not.toMatch(/const DEFAULT_DRAFT: EventDetail = \{/)
-    expect(WIZARD).not.toMatch(/const DEFAULT_DRAFT: EventDetail = \{/)
+    expect(CREATE).not.toMatch(/const DEFAULT_DRAFT: EventDetail = \{/)
     expect(FORM).toContain('const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT')
-    expect(WIZARD).toContain('const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT')
+    expect(CREATE_DEFAULT_DRAFT).toBe(EVENT_DEFAULT_DRAFT)
     // 作成の送信物は解決器を通る（素の draft を送ると multi で 422 になる）。
-    expect(WIZARD).toContain('resolveEventMultiAccountIds(')
+    expect(CREATE).toContain('resolveEventMultiAccountIds(')
   })
 
   it('KPI の札は1部品に統合され、旧重複定義は残らない', () => {
-    expect(LIST_PAGE).toContain(`from '@/components/events/event-kpi'`)
-    expect(BOOKINGS_PAGE).toContain(`from '@/components/events/event-kpi'`)
+    expect(LIST_PAGE).toContain(`from '@/components/shared/kpi-card'`)
+    expect(BOOKINGS_PAGE).toContain(`from '@/components/shared/kpi-card'`)
     expect(LIST_PAGE).not.toMatch(/function Kpi\(/)
     expect(BOOKINGS_PAGE).not.toMatch(/function EventKpi\(/)
   })
@@ -112,12 +117,13 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
     // 旧作成画面は null を「いつでもキャンセルできる」と表示し、
     // 編集画面の「不可」・API の 403 と逆の意味に見えていた。
     expect(EVENT_CANCEL_DEADLINE_OPTIONS.some((o) => o.value === '0')).toBe(true)
-    for (const source of [FORM, WIZARD]) {
+    for (const source of [FORM]) {
       expect(source).toContain('EVENT_CANCEL_DEADLINE_OPTIONS')
       expect(source).toContain('deadlineOptionsWithSaved(')
     }
     // 旧ラベルの残存は契約違反（null を許可と読ませる表示を残さない）。
-    expect(WIZARD).not.toContain('いつでもキャンセルできる')
+    expect(CREATE).not.toContain('いつでもキャンセルできる')
+    expect(CREATE_DEFAULT_DRAFT.cancel_deadline_hours_before).toBeNull()
     expect(EDIT_PAGE).not.toContain('承認するまで枠は確保されません')
   })
 
@@ -126,9 +132,8 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
     for (const v of ['1', '2', '3', '24', '48', '168']) {
       expect(EVENT_ENTRY_CUTOFF_OPTIONS.some((o) => o.value === v)).toBe(true)
     }
-    for (const source of [FORM, WIZARD]) {
-      expect(source).toContain('EVENT_ENTRY_CUTOFF_OPTIONS')
-    }
+    expect(FORM).toContain('EVENT_ENTRY_CUTOFF_OPTIONS')
+    expect(ENTRY_CUTOFF_OPTIONS.map((option) => option.value)).toEqual(EVENT_ENTRY_CUTOFF_OPTIONS.map((option) => option.value))
   })
 
   it('選択肢に無い保存値は「保存済み」として出し、先頭項目に見せない(EVENT-04)', () => {
@@ -162,15 +167,22 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
   it('編集画面の日時表示は端末の時間帯に依存しない(EVENT-05)', () => {
     expect(FORM).toMatch(/function formatJpDateTime[\s\S]*?formatDateTime\(d\)/)
     // 一覧側は既に JST 固定。両方が同じ固定を持つことだけを見る。
-    expect(LIST_PAGE).toContain('formatDay')
+    expect(LIST_PAGE).toContain("import { jstDay, jstTime } from './shared'")
+    expect(read('..', '..', 'v8', 'events', 'shared.ts')).toContain('time + 9 * 3600_000')
+    expect(read('..', '..', 'v8', 'events', 'shared.ts')).toContain('getUTCDate()')
   })
 
-  it('作成画面は更新した枠を保存後に読み直してから次段階へ進む(EVENT-01)', () => {
+  it('枠の更新は保存後に一覧を読み直す(EVENT-01)', () => {
     // PUT の戻り値は active_count を持たないため、一覧の再取得で残席を合わせる。
-    expect(WIZARD).toMatch(/updateSlot\([\s\S]*?listSlots\([\s\S]*?setSlots\(/)
+    expect(FORM).toMatch(/await updateSlotWithConflictRefresh\(editSlotTarget, next\)[\s\S]*?await refresh\(\)/)
+    expect(FORM).toMatch(/async function refresh\([\s\S]*?listSlots\([\s\S]*?setSlots\(/)
   })
 
   it('公開OFFの保存はボタン名も公開と読ませない(EVENT-02)', () => {
-    expect(WIZARD).toContain("draft.is_published === 1 ? '保存して公開' : '下書きを保存する'")
+    expect(CREATE).toContain('onClick={() => void save(false)}')
+    expect(CREATE).toContain('if (validateInput()) setPublishOpen(true)')
+    expect(CREATE).toContain('onConfirm={() => save(true)}')
+    // 枠だけ失敗した公開済み本体の再試行では、公開状態を下書きへ戻さない。
+    expect(CREATE).toContain('is_published: publish || saved?.is_published === 1 ? 1 : 0')
   })
 })

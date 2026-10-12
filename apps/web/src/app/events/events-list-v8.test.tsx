@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * ★V8-B イベント予約の一覧（板 `e2ekFu`）。
- * v7（`page.tsx` の EventsListPageV7）とは別の部品 `events-list-v8.tsx` が、
- * 同じ口（取得・絞り込み・ページ送り・削除）で V8 の置き場になること。
+ * 現役の src/v8/events/list が、取得・絞り込み・ページ送り・削除を守ること。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -10,9 +9,10 @@ import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mj
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type EventListItem } from '@/lib/api'
+import { fireEvent } from '@testing-library/react'
 
-const v8css = readFileSync(join(process.cwd(), 'src/app/events/events-list-v8.module.css'), 'utf8')
-const v8tsx = readFileSync(join(process.cwd(), 'src/app/events/events-list-v8.tsx'), 'utf8')
+const v8css = readFileSync(join(process.cwd(), 'src/v8/events/list.module.css'), 'utf8')
+const v8tsx = readFileSync(join(process.cwd(), 'src/v8/events/list.tsx'), 'utf8')
 
 const fetchApi = vi.hoisted(() => vi.fn())
 const deleteEvent = vi.hoisted(() => vi.fn())
@@ -42,7 +42,7 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: routerPush }),
 }))
 
@@ -55,7 +55,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageCrumbs: () => {},
 }))
 
-import EventsListV8 from './events-list-v8'
+import EventsListV8 from '@/v8/events/list'
 
 function item(over: Partial<EventListItem>): EventListItem {
   return {
@@ -109,6 +109,9 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  history.replaceState({}, '', '/events')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -135,6 +138,7 @@ afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
   document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
 })
 
 async function flush() {
@@ -184,17 +188,17 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(labels.some((t) => t?.includes('申込者を見る')), '申込者を見る').toBe(true)
     expect(labels.some((t) => t?.includes('プレビュー')), 'プレビュー').toBe(true)
     expect(labels.some((t) => t?.includes('削除する')), '削除する').toBe(true)
-    expect(labels.some((t) => t?.includes('複製')), '複製口は無いので出さない').toBe(false)
+    expect(labels.some((t) => t?.includes('複製する')), '現在は複製口がある').toBe(true)
   })
 
-  it('403 は権限不足の1枚になり、再読み込み口は出ない', async () => {
+  it('403 は権限不足の1枚になり、権限を確認後に再取得できる', async () => {
     fetchApi.mockImplementation(async (url: string) => {
       if (url.includes('filter=pending')) return { items: [], total: 0 }
       throw new ApiError(403, 'forbidden')
     })
     await renderList()
     expect(document.body.textContent).toContain('権限がありません')
-    expect(document.body.textContent).not.toContain('再読み込み')
+    expect([...document.querySelectorAll('button')].some((button) => button.textContent?.includes('もう一度読み込む'))).toBe(true)
   })
 
   it('読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
@@ -214,8 +218,8 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     ).toBeGreaterThanOrEqual(5)
   })
 
-  it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', () => {
-    expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')
+  it('V8 の型・色直書きなし・準備中なしを守る', () => {
+    expect(v8tsx).toContain("import { ListPage } from '@/components/templates'")
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     // 影は共通のカードの影だけ（2026-10-09 オーナー採用 B-137）。ほかの影は直書きしない。
     expect(v8css.replace(/box-shadow:\s*var\(--card-shadow\)/g, '')).not.toMatch(/box-shadow\s*:/)
@@ -229,8 +233,8 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
       return { ...listPayload(), items: [item({ id: 'e1' }), item({ id: 'e2', name: '冬の体験会' }) ], total: 2 }
     })
     await renderList()
-    const first = document.querySelector<HTMLElement>('button[aria-label="「秋のしつけ教室（第1回）」の詳細を見る"]')
-    expect(first, '行名のボタンがある').toBeTruthy()
+    const first = document.querySelector<HTMLElement>('tr[data-row-id="e1"]')
+    expect(first, '開く行がある').toBeTruthy()
     await act(async () => { first!.click() })
     await flush()
     const panel = document.querySelector('[data-design-part="detail-panel"]')
@@ -244,7 +248,7 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
 
   it('行を右クリックすると「…」と同じ操作が出る', async () => {
     await renderList()
-    const first = document.querySelector<HTMLElement>('button[aria-label="「秋のしつけ教室（第1回）」の詳細を見る"]')
+    const first = document.querySelector<HTMLElement>('a[aria-label="「秋のしつけ教室（第1回）」の詳細を見る"]')
     await act(async () => {
       first!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 120 }))
     })
@@ -257,7 +261,7 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
 
   it('詳細パネルの名前をその場で変えると更新口へ届く', async () => {
     await renderList()
-    const first = document.querySelector<HTMLElement>('button[aria-label="「秋のしつけ教室（第1回）」の詳細を見る"]')
+    const first = document.querySelector<HTMLElement>('tr[data-row-id="e1"]')
     await act(async () => { first!.click() })
     await flush()
     const panel = document.querySelector('[data-design-part="detail-panel"]')
@@ -268,9 +272,7 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     const input = document.querySelector<HTMLInputElement>('[data-design-part="detail-panel"] input[aria-label="イベント名"]')
     expect(input, '入力欄が出る').toBeTruthy()
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setter?.call(input!, '改名した教室')
-      input!.dispatchEvent(new Event('input', { bubbles: true }))
+      fireEvent.change(input!, { target: { value: '改名した教室' } })
     })
     await act(async () => {
       input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
@@ -280,15 +282,20 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(document.body.textContent).toContain('改名した教室')
   })
 
-  it('フォルダの追加は真ん中の窓ではなく右のパネルで入れる', async () => {
+  it('フォルダの追加は共通の追加窓で入力できる', async () => {
     await renderList()
-    const add = [...document.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent?.includes('フォルダを追加する'))
+    const add = [...document.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent?.includes('フォルダを追加'))
     expect(add, 'フォルダ追加がある').toBeTruthy()
     await act(async () => { add!.click() })
     await flush()
-    const panel = document.querySelector('[data-design-part="detail-panel"]')
-    expect(panel, '右のパネルが開く').toBeTruthy()
-    expect(panel?.textContent).toContain('フォルダを追加')
-    expect(document.querySelector('.fixed.inset-0.z-50'), '真ん中の窓は出ない').toBeNull()
+    const dialog = document.querySelector('[role="dialog"]')
+    expect(dialog, '共有の窓が開く').toBeTruthy()
+    expect(dialog?.textContent).toContain('フォルダを追加')
+    expect(dialog?.querySelector('input')).toBeTruthy()
+    await act(async () => { fireEvent.change(dialog!.querySelector('input')!, { target: { value: '新しい教室' } }) })
+    const submit = [...dialog!.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === '追加する')!
+    await act(async () => { submit.click() })
+    await flush()
+    expect(foldersCreate).toHaveBeenCalledWith(expect.objectContaining({ kind: 'event', accountId: 'acc-1', name: '新しい教室' }))
   })
 })

@@ -2,23 +2,27 @@
 /*
  * R605: バナープロジェクト一覧の検索0件で件数が「2件中 1〜0件を表示」になる。
  *
- * 本物の React で本物の `ProjectsSection` を mount し、差し替えるのは通信だけ。
+ * 本物の React で本物の `HqBannersListV8` を mount し、差し替えるのは通信だけ。
  * プロジェクト2件の状態で存在しない語を検索し、件数と空状態が一致する（0件）を見る。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/react'
-import ProjectsSection from './projects-section'
+import HqBannersListV8 from '@/v8/hq-banners/list'
+import { flushListUrlState } from '@/components/shared/list-url-state'
 import type { BannerProject } from '@/lib/hq-banners'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}))
+
+const nav = vi.hoisted(() => ({ query: '', push: vi.fn(), replace: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: nav.replace, prefetch: () => {} }), useSearchParams: () => new URLSearchParams(nav.query) }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+
 
 const PROJECTS: BannerProject[] = [
   {
@@ -53,6 +57,9 @@ const originalFetch = globalThis.fetch
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 beforeEach(() => {
+  nav.query = ''
+  window.history.replaceState({}, '', '/hq/banners')
+  flushListUrlState()
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -74,11 +81,11 @@ async function flush(times = 8) {
 }
 
 function open() {
-  root.render(<ProjectsSection usage={null} onChanged={() => undefined} />)
+  root.render(<HqBannersListV8 />)
 }
 
 function searchFor(word: string) {
-  const input = container.querySelector('input[aria-label="プロジェクト名・説明で検索"]')
+  const input = container.querySelector('input[aria-label="プロジェクト名・説明で探す"]')
   expect(input).toBeTruthy()
   fireEvent.change(input!, { target: { value: word } })
 }
@@ -97,7 +104,7 @@ describe('R605 検索0件の件数と空状態（本物のReact）', () => {
     expect(text).not.toContain('1〜0件')
     expect(text).not.toContain('〜0件')
     // 件数は0件。
-    expect(text).toContain('0件')
+    expect(container.querySelectorAll('article[aria-label]')).toHaveLength(0)
     // 空状態は絞り込みの結果が0件の文言で、作る口は出さない。
     expect(text).toContain('条件に合うものがありません')
     expect(text).not.toContain('最初のプロジェクトを作る')
@@ -118,6 +125,6 @@ describe('R605 検索0件の件数と空状態（本物のReact）', () => {
     const text = container.textContent ?? ''
     expect(text).toContain('春のキャンペーン')
     expect(text).toContain('夏のセール')
-    expect(text).toContain('2件中 1〜2件を表示')
+    expect(container.querySelectorAll('article[aria-label]')).toHaveLength(2)
   })
 })

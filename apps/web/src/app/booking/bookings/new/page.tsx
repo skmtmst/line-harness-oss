@@ -767,7 +767,7 @@ export default function NewProxyBookingPage() {
 
   return (
     <div data-design-node={`${NODE_BY_STEP[step]} If9Mh`} className="space-y-4 pb-24">
-      <div className="v8-only"><PageHeading title="電話の予約を入れる" /></div>
+      <div><PageHeading title="電話の予約を入れる" /></div>
       <nav data-design="Crumb" aria-label="現在位置" className="text-ink-faint text-xs">
         <Link href="/booking/bookings" className="text-action underline">予約</Link>
         <span className="mx-2">›</span>

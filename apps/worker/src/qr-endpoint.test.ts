@@ -195,8 +195,6 @@ const read = (relative: string) => readFileSync(path.join(repoRoot, relative), '
  * 頼む絵の大きさが固定であることが効いてくる。
  */
 const QR_CALL_SITES = [
-  { file: 'apps/web/src/app/inflow-links/detail/page.tsx', kind: 'bounded', fixedSize: '320x320' },
-  { file: 'apps/web/src/app/inflow-links/referral-qr-modal.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/web/src/components/dashboard/qr-dialog.tsx', kind: 'bounded', fixedSize: null },
   // V8のQR小窓はDashboardQrDialogへ委譲し、URL生成とサイズ上限を共用する。
   // ★V8 流入と計測の詳細（Q5le3）の「QRを保存」。data は同じく「土台のURL + /r/ + 合言葉」。

@@ -17,7 +17,7 @@ import { AccountProvider } from '@/contexts/account-context'
 import MileagePage from './page'
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams('tab=earning-rules'),
   usePathname: () => '/mileage',
@@ -197,7 +197,7 @@ async function renderPage() {
 async function waitForRowMenuButton(): Promise<HTMLButtonElement> {
   for (let i = 0; i < 40; i += 1) {
     await act(async () => { await Promise.resolve() })
-    const button = container.querySelector('button[aria-label="あいさつでたまるのその他操作"]')
+    const button = container.querySelector('button[aria-label="あいさつでたまるの操作"]')
     if (button) return button as HTMLButtonElement
   }
   throw new Error('その他操作のボタンが出ませんでした')

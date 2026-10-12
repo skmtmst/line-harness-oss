@@ -99,8 +99,6 @@ export type KpiCardProps = {
   badgeTone?: 'accent' | 'neutral' | 'warning' | 'danger'
   action?: { label: string; href: string }
   loading?: boolean
-  /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
-  variant?: 'v5' | 'v6' | 'broadcast'
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
   presentation?: 'card' | 'band' | 'cell' | 'inline'
   density?: 'compact' | 'comfortable'
@@ -116,7 +114,7 @@ export type KpiCardProps = {
 export type SummaryCardProps = KpiCardProps
 
 /**
- * Pencil V5 の `XywGr` を基本に、V6のKPIと配信告知の差を名前付きvariantで固定したカード。
+ * 現在のV8の数のカード。画面ごとの形はpresentationとdensityで指定する。
  *
  * 取れないときの出し方（★V7 `x63W5x`）。**0 とは別物。**
  * - 読み込み中：`loading` を渡す。数値は骨組み、3段目（`detail`）に
@@ -147,7 +145,6 @@ export default function KpiCard({
   badgeTone = 'accent',
   action,
   loading = false,
-  variant = 'v6',
   presentation = 'card',
   density = 'comfortable',
   className,
@@ -156,18 +153,7 @@ export default function KpiCard({
   valueTextWithUnit = false,
   ...cardProps
 }: KpiCardProps) {
-  const variantClass = {
-    v5: undefined,
-    v6: styles.cardV6,
-    broadcast: styles.cardBroadcast,
-  }[variant]
-  const labelVariantClass = {
-    v5: undefined,
-    v6: styles.labelV6,
-    broadcast: styles.labelBroadcast,
-  }[variant]
-  const detailVariantClass = variant === 'broadcast' ? styles.detailNotice : variant === 'v6' ? styles.detailV6 : undefined
-  const classes = [styles.card, variantClass, className].filter(Boolean).join(' ')
+  const classes = [styles.card, className].filter(Boolean).join(' ')
 
   /*
     補足は見出しの「？」（HelpTip）へ。開閉・Esc・外側・1つだけの
@@ -191,7 +177,7 @@ export default function KpiCard({
       data-kpi-presentation={presentation}
       data-kpi-density={density}
       aria-busy={loading || undefined}
-      data-design-version={variant}
+      data-design-version="v8"
       {...cardProps}
     >
       <div className={styles.head}>
@@ -201,11 +187,11 @@ export default function KpiCard({
         */}
         <p
           data-kpi-label
-          className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}
+          className={styles.label}
           title={title || undefined}
         >
           {icon === null ? null : (
-            <span className={`${styles.icon} v8-only`} aria-hidden="true">
+            <span className={styles.icon} aria-hidden="true">
               {icon ?? <ChartNoAxesColumn size={14} />}
             </span>
           )}
@@ -219,13 +205,9 @@ export default function KpiCard({
             </HelpTip>
           ) : null}
         </p>
-        {menu && !menuDescription ? <span className={`${styles.menu} v8-only`}>{menu}</span> : null}
+        {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
         {badge ? (
           <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
-        ) : action ? (
-          <Link href={action.href} className={`${styles.link} v7-only`}>
-            {action.label}
-          </Link>
         ) : null}
       </div>
 
@@ -251,10 +233,10 @@ export default function KpiCard({
       )}
 
       {statusText && !loading ? <StatusBadge>{statusText}</StatusBadge> : null}
-      {delta ? <span className={`${styles.delta} v8-only`}>{delta}</span> : null}
+      {delta ? <span className={styles.delta}>{delta}</span> : null}
       </div>
 
-      <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
+      <p data-kpi-detail data-kpi-detail-present={Boolean(hasDetail(detail) || onRetry || action) || undefined} className={styles.detail}>
         <span className={styles.detailText} title={typeof detail === 'string' ? detail : undefined}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
@@ -262,7 +244,7 @@ export default function KpiCard({
           </button>
         ) : null}
         {action ? (
-          <Link href={action.href} className={`${styles.link} v8-only`}>
+          <Link href={action.href} className={styles.link}>
             <span>{action.label}</span><ArrowRight size={12} aria-hidden="true" />
           </Link>
         ) : null}

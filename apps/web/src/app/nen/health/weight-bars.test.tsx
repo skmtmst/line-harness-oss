@@ -6,7 +6,7 @@
  */
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { WeightBars } from './health-tab'
+import { WeightBars } from '@/v8/nen-health/parts'
 
 describe('体重の推移の棒は丸めない（m22a）', () => {
   it('値のある週の棒に丸みの class が付かない', () => {
@@ -14,7 +14,7 @@ describe('体重の推移の棒は丸めない（m22a）', () => {
       <WeightBars series={[3.0, 3.1, 3.0, 3.4, 3.2, 3.5, 3.1, 3.6]} warn={false} />,
     )
     const bars = [...container.querySelectorAll('span > span')].filter((el) =>
-      el.className.includes('w-2') && !el.className.includes('h-0.5'),
+      el.className.includes('bar') && !el.className.includes('Empty'),
     )
     expect(bars).toHaveLength(8)
     for (const bar of bars) {
@@ -27,6 +27,6 @@ describe('体重の推移の棒は丸めない（m22a）', () => {
     const img = container.firstElementChild as Element
     expect(img.getAttribute('role')).toBe('img')
     expect(img.getAttribute('aria-label')).toMatch(/体重の推移（8週）/)
-    expect(container.querySelectorAll('[class*="h-0.5"]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[class*="Empty"]').length).toBeGreaterThan(0)
   })
 })

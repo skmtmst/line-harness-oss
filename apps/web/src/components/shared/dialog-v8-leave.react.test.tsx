@@ -3,9 +3,12 @@ import React from 'react'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 import Dialog from './dialog'
 import Drawer from './drawer'
+
+beforeEach(() => setTestReducedMotion(false))
 
 afterEach(() => {
   cleanup()
@@ -14,10 +17,11 @@ afterEach(() => {
 
 /*
  * ★V8 仕上げ（M10）：窓・引き出しは閉じるとき逆再生（150ms）してから外す。
- * v7（v8 でない）は今までどおり即時に消える。
+ * 動きを減らす設定では即時に消える。
  */
 describe('V8 窓・引き出しの閉じ方', () => {
-  it('v7は閉じたら即時に消える', () => {
+  it('動きを減らす設定では窓も引き出しも即時に消える', () => {
+    setTestReducedMotion(true)
     const dialog = render(<Dialog open modal={false} title="お知らせ" onCancel={vi.fn()} />)
     expect(screen.getByRole('dialog')).toBeTruthy()
     dialog.rerender(<Dialog open={false} modal={false} title="お知らせ" onCancel={vi.fn()} />)
@@ -116,7 +120,6 @@ describe('V8 窓・引き出しの閉じ方', () => {
     const rules = [...css.matchAll(/(?<=^|[{}])([^{}]*)\{([^}]*)/g)]
       .filter((m) => m[1].includes('[data-design-part="dialog"]') && /animation:\s*lh-surface-in/.test(m[2]))
       .map((m) => m[1].trim())
-    expect(rules.length).toBeGreaterThan(0)
-    for (const selector of rules) expect(selector).toMatch(/:root:not\(\[data-theme="v8"\]\)/)
+    expect(rules).toEqual([])
   })
 })

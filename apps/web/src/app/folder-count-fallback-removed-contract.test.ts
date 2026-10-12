@@ -92,7 +92,9 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(CONTENTS).toContain('folder.itemCount')
     expect(VARS).not.toMatch(/items\.filter\(\(item\) => item\.folderId === folder\.id\)\.length/)
     expect(VARS).not.toMatch(/items\.filter\(\(item\) => item\.folderId === null\)\.length/)
-    expect(VARS).toContain('folder.itemCount')
+    expect(VARS).toContain("managedFolderNavRows('common_var', folders")
+    const panel = VARS.match(/<ManagedFolderPanel[\s\S]*?\/>/)?.[0] ?? ''
+    expect(panel).not.toContain('countOf=')
   })
 
   it('media・common_var・rich_menu: 選択中の1件に閉じた母集団で数えるよう、folders APIへ選択中IDを渡す(#730)', () => {
@@ -100,7 +102,7 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     // 一覧と母集団がずれる。未割当NULL行は一覧に出ないため件数へ入れない。
     expect(CONTENTS).toContain(`api.folders.list('media', accountAtRequest)`)
     expect(VARS).toContain(`api.folders.list('common_var', accountAtRequest)`)
-    expect(RICHMENUS).toContain(`api.folders.list('rich_menu', accountId)`)
+    expect(RICHMENUS).toContain(`api.folders.list('rich_menu', selectedAccount?.id ?? undefined)`)
   })
 
   it('3画面とも「未分類」の件数はAPIから来た値(unfiledCount)を使い、現在ページのフィルタ計算をしていない', () => {

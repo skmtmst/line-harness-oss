@@ -104,7 +104,7 @@ describe('#615 テンプレート画面が React console error を出さない',
     for (let attempt = 0; attempt < 200 && screen.queryAllByText('来店お礼').length === 0; attempt += 1) {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
     }
-    expect(screen.queryByLabelText('名前・本文・差し込んでいる項目で検索')).toBeTruthy()
+    expect(screen.queryByLabelText('テンプレートを検索')).toBeTruthy()
     expect(screen.queryAllByText('来店お礼').length).toBeGreaterThan(0)
 
     expect(consoleErrors).toEqual([])
@@ -123,3 +123,6 @@ describe('#615 テンプレート画面が React console error を出さない',
     expect(PAGE).not.toContain('onChange={() => {}}')
   })
 })
+
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())

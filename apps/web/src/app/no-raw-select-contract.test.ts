@@ -94,15 +94,10 @@ describe('素の <select> を画面に書かない', () => {
   })
 
   it('共通部品は素の <select> を持たない', () => {
-    // 例外は1つだけ。「ブラウザ標準を使う」ことに理由がある。
     const shared = fs.readdirSync(path.join(SRC, 'components', 'shared'))
       .filter((n) => n.endsWith('.tsx') && !n.includes('.test.'))
     const withRaw = shared.filter((n) =>
       count(fs.readFileSync(path.join(SRC, 'components', 'shared', n), 'utf8')) > 0)
-    expect(withRaw.sort(), '共通部品に素の <select> が入った').toEqual([
-      // アカウントの札。印を `select` の中に置けないので札へ重ね、
-      // `select` は透明にして上に敷く。開いた中身はブラウザ任せのまま。
-      'top-bar.tsx',
-    ])
+    expect(withRaw.sort(), '共通部品に素の <select> が入った').toEqual([])
   })
 })

@@ -9,7 +9,7 @@ import {
   createMileageRewardsFetchGuards,
   createRequestGuard,
   createSingleFlightLock,
-} from './redemption-request-guard'
+} from '@/v8/mileage/redemption-request-guard'
 
 /** 世代を取って、しばらくしてから「今の世代なら」採用する。画面の読み方と同じ。 */
 function delayedApply(

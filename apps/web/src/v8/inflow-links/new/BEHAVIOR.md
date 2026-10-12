@@ -1,6 +1,6 @@
 # 流入リンクを作る（V8）の動き
 
-入口：`app/inflow-links/new/page.tsx`（V8 のときだけ `src/v8/inflow-links/new/create.tsx`、それ以外は今の画面）。
+入口：`app/inflow-links/new/page.tsx`（`src/v8/inflow-links/new/create.tsx` に固定）。
 絵：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`。
 
 ## 受け付ける URL と指定
@@ -10,7 +10,7 @@
 ## 呼ぶ口（今の画面と同じ）
 - 候補：`tags.list({ accountId })`・`tagGroups.list(accountId)`・`scenarios.list({ accountId })`・`templates.list(undefined, accountId)`・`entryRouteGenres.list()`・プールは機能が有効なときだけ `pools.list`
 - アカウントを切り替えたら候補を取り直し、今のアカウントに無い選択は外して帯で知らせる
-- 発行：`entryRoutes.create({ name, genre, refCode, tagId, scenarioId, introTemplateId, poolId, redirectUrl, isActive, lineAccountId })` → 詳細 `/inflow-links/detail?id=…` へ
+- 発行：`entryRoutes.create({ name, genre, refCode, tagId, scenarioId, introTemplateId, poolId, redirectUrl, isActive, lineAccountId })` → 一覧 `/inflow-links?highlight=…` の発行した行へ（現役の戻り先）。
 - 409（見分けるための文字が使用中）：`entryRoutes.list(accountId)`、無ければ `entryRoutes.list()` から同じ文字のリンクを探し、見つかれば競合の帯
 - 失敗の言葉は `describeApiFailure`（403 は権限の案内）
 - 入力の途中で離れるときは確認を出す（`useUnsavedGuard`）

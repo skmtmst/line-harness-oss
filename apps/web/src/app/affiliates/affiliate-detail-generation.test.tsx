@@ -5,7 +5,7 @@
  * 応答を返す順で、開いているBの情報が残ることを確かめる。
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 
 const fixture = vi.hoisted(() => ({
@@ -27,7 +27,10 @@ function resolveGate(key: string, value: unknown) {
   for (const resolve of list) resolve(value)
 }
 
-vi.mock('@/lib/api', () => ({
+vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
+
+vi.mock('@/lib/api', async (original) => ({
+  ...await original<typeof import('@/lib/api')>(),
   api: {
     affiliates: {
       list: async () => ({
@@ -60,7 +63,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { AffiliatorsTab } = await import('./tabs')
+const { AffiliatorsTab } = await import('@/test-utils/affiliate-tabs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -138,17 +141,18 @@ afterEach(() => {
 })
 
 async function openRow(name: string) {
-  fireEvent.click(screen.getByRole('button', { name: `${name}の成果を見る` }))
+  fireEvent.click(within(screen.getByRole('row', { name: new RegExp(name) })).getByRole('button', { name: '成果を見る' }))
 }
 
 describe('R289 遅い詳細応答は選んでいる途中の紹介者へ混ぜない', () => {
   test('A→B選択、B→A応答でもBの情報を維持する', async () => {
-    render(<AffiliatorsTab accountId={null} />)
+    render(<AffiliatorsTab accountId="acc-1" />)
     await screen.findByText('候補A')
     await screen.findByText('候補B')
 
     // Aの取得を保留したまま、Bを開く。
     await openRow('候補A')
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '閉じる' }))
     await openRow('候補B')
 
     // Bの応答だけ先に返す。
@@ -157,8 +161,8 @@ describe('R289 遅い詳細応答は選んでいる途中の紹介者へ混ぜ�
       resolveGate('links:aff-b', linksFor('aff-b', 'LINK_B'))
       resolveGate('journeys:aff-b', journeysFor('LINK_B', 'friend-b', 'Friend_B'))
     })
-    // LINK_B はリンク表と動線表の2か所に出る。
-    await waitFor(() => expect(screen.queryAllByText('LINK_B')).toHaveLength(2))
+    await waitFor(() => expect(screen.queryByText('LINK_B')).not.toBeNull())
+    fireEvent.click(screen.getByRole('tab', { name: '友だち' }))
     expect(screen.queryByText('Friend_B')).not.toBeNull()
 
     // 遅れてAの応答が届いても、Bの表示は変わらない。
@@ -169,21 +173,22 @@ describe('R289 遅い詳細応答は選んでいる途中の紹介者へ混ぜ�
     })
     await act(async () => {})
 
-    expect(screen.queryAllByText('LINK_B')).toHaveLength(2)
+    expect(screen.queryByText(/リンク LINK_B/)).not.toBeNull()
     expect(screen.queryByText('Friend_B')).not.toBeNull()
     expect(screen.queryByText('LINK_A')).toBeNull()
     expect(screen.queryByText('Friend_A')).toBeNull()
-    expect(screen.queryByText('222')).not.toBeNull()
-    expect(screen.queryByText('111')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: '内訳' }))
+    expect(screen.queryByText(/クリック 222/)).not.toBeNull()
+    expect(screen.queryByText(/クリック 111/)).toBeNull()
   })
 
   test('閉じた後の応答は捨てる', async () => {
-    render(<AffiliatorsTab accountId={null} />)
+    render(<AffiliatorsTab accountId="acc-1" />)
     await screen.findByText('候補A')
 
     await openRow('候補A')
     // 閉じる。
-    fireEvent.click(screen.getByRole('button', { name: '候補Aの成果を閉じる' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '閉じる' }))
 
     // 閉じた後にAの応答が届いても、何も出ない。
     await act(async () => {

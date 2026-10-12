@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(HERE, 'new', 'page.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
+const NEW_PAGE = readUiSource(join(HERE, 'new', 'page.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const WORKER = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'contents.ts'), 'utf8')
 
@@ -36,22 +37,20 @@ describe('V6共通情報一覧', () => {
     expect(EDIT_PAGE).toContain('setSchedulesError(true)')
   })
 
-  it('一覧は種別を出さず、Qで「状態」列を足した7列を固定する', () => {
+  it('一覧は現役V8の列で名前・差し込み名・状態・中身・使用先を表示する', () => {
     const headings = [...PAGE.matchAll(/<Th[^>]*>([\s\S]*?)<\/Th>/g)]
       .map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
       .slice(1)
     expect(headings).toEqual([
-      '共通情報',
-      '差し込みキー',
-      '状態',
+      '共通情報（差し込み名）',
       '中身',
-      '使われている場所',
-      '更新・次の変更',
-      '操作',
+      '状態',
+      '使っている所',
     ])
     expect(headings).not.toContain('種別')
     expect(PAGE).not.toContain('VAR_TYPE_LABELS[item.type]')
-    expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
+    expect(PAGE).toContain('<TableHeadRow>')
+    expect(PAGE).toContain('<Th ')
     expect(PAGE).toContain('item.usageCount === 0')
     expect(PAGE).toContain('formatListDate(item.updatedAt)')
     // VAR-01: 差し込みキー列は実行時に効く {{var.<varKey>}} を出す。
@@ -63,18 +62,18 @@ describe('V6共通情報一覧', () => {
   })
 
   it('一覧は空・期限つき・未使用の絞り込みとCSVを実際に操作できる', () => {
-    expect(PAGE).toContain("setStateFilter(value)")
+    expect(PAGE).toContain("toggleChip('draftStopped')")
     expect(PAGE).toContain("label: '使われている数が多い順'")
     // N-192: CSVは端末生成から監査台帳つきのサーバ出力へ切り替えた。
     expect(PAGE).toContain('VarsExportPanel')
     expect(API).toContain('createExport')
     expect(API).toContain('/api/common-vars/exports')
-    expect(PAGE).toContain('中身が空のまま使われているものが')
+    expect(PAGE).toContain('差し込んだところが空欄のまま送られます。')
   })
 
   it('初回空と検索0件を言い分ける', () => {
     expect(PAGE).toContain('まだ共通情報がありません')
-    expect(PAGE).toContain('条件に合う共通情報はありません')
+    expect(PAGE).toContain('onClearFilters={clearVarFilters}')
     expect(PAGE).toContain('共通情報を作る')
   })
 
@@ -112,7 +111,7 @@ describe('V6共通情報一覧', () => {
       expect(src, name).toContain('feature="common_vars"')
     }
     // 登録メディア一覧はメディアキーで閉じる（共通情報とは別キー）。
-    const mediaPage = readFileSync(join(HERE, '..', 'page.tsx'), 'utf8')
+    const mediaPage = readUiSource(join(HERE, '..', 'page.tsx'), 'utf8')
     expect(mediaPage).toContain('FeatureGate')
     expect(mediaPage).toContain('feature="media"')
   })

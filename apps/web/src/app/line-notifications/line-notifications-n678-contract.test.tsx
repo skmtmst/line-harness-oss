@@ -80,11 +80,11 @@ vi.mock('@/components/layout/merged-tabs', () => ({
   useMergedTab: () => fixture.activeTab,
 }))
 
-vi.mock('@/components/line-notifications/notification-run-list', () => ({
+vi.mock('@/v8/settings/line-notifications/runs-tab', () => ({
   default: () => <section>送信記録</section>,
 }))
 
-vi.mock('./operator-notification-rules', () => ({
+vi.mock('@/v8/settings/line-notifications/operator-tab', () => ({
   default: () => <section>運用者へのお知らせ設定</section>,
 }))
 
@@ -651,9 +651,9 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
       <LayoutBoundaryProbe />
       <LineNotificationsPage />
     </>)
-    await waitFor(() => expect(screen.getByText('A店の注文受付')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'A店の注文受付の内容を編集' })).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     const introBox = await screen.findByLabelText('ご案内文') as HTMLTextAreaElement
     fireEvent.change(introBox, { target: { value: 'Aで保存を押した時点の本文' } })
     await waitFor(() => expect(screen.getByText('未保存の変更があります')).toBeTruthy())
@@ -745,12 +745,12 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     fixture.testSend.mockReturnValue(heldTestSend.promise)
 
     render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('A店の注文受付')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'A店の注文受付の内容を編集' })).toBeTruthy())
 
     // A で編集を開き、テスト送信の確認を開いて送信する（応答はまだ返さない）。
     // #988 NEXT-05: ボタン名は「テスト受信者に送信」。確認を開いただけでは
     // 送らず、宛先の読み込みが済んでから確認の中の送信ボタンを押す。
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     await screen.findByLabelText('ご案内文')
     fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
     expect(fixture.testSend).not.toHaveBeenCalled()
@@ -1095,13 +1095,16 @@ describe('#678 実Reactで描いた編集画面', () => {
       .not.toContain('未保存の変更があります')
   })
 
-  it('長文を入れても入力欄と見本が最小幅で潰れず、内容をそのまま描く', () => {
+  it('長文を入れても入力欄と見本が最小幅で潰れず、内容をそのまま描く', async () => {
     const longIntro = 'ご注文ありがとうございます。'.repeat(50)
     const html = renderToStaticMarkup(
       <CustomerNotificationEditor {...editorProps} setting={setting({ introText: longIntro })} />,
     )
     expect(html).toContain(longIntro)
-    expect(html).toContain('grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]')
+    expect(html).toMatch(/class="[^"]*editorGrid[^"]*"/)
+    const css = (await import('node:fs')).readFileSync((await import('node:path')).join(__dirname, '../../v8/settings/line-notifications/screen.module.css'), 'utf8')
+    expect(css).toMatch(/\.editorGrid\s*\{[\s\S]*?grid-template-columns: minmax\(0, 1fr\)/)
+    expect(css).toMatch(/@media \(min-width: 1024px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\) var\(--tpl-sb-ln-preview-w\)/)
   })
 
   it('定義がないお知らせには公開ボタンを出さない', () => {
@@ -1167,7 +1170,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
     expect(screen.getByText('運用者へのお知らせ 0')).toBeTruthy()
   })
 
@@ -1203,22 +1206,22 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
     // 板 g3iDs：行は「この30日」だけ（送信履歴の7通）。「今日」の列は置かない。
     // 数カード「この30日」も同じ7通。
     // V8は数字と単位を別要素へ出す。表と数カードの両方の実データを守る。
-    expect(screen.getByText('7通')).toBeTruthy()
+    expect(screen.getByRole('table', { name: '顧客へのお知らせ' }).textContent).toContain('7')
     const number = document.querySelector('[data-kpi-number]')
-    const numbers = [...document.querySelectorAll('[data-kpi-number]')].map((node) => node.parentElement?.textContent)
+    const numbers = [...document.querySelectorAll('[data-kpi-number]')].map((node) => node.textContent)
     expect(number).toBeTruthy()
-    expect(numbers).toContain('7通')
-    expect(numbers).toContain('2通')
-    expect(numbers).not.toContain('5通')
-    expect(numbers).not.toContain('9通')
+    expect(numbers).toContain('7')
+    expect(numbers).toContain('2')
+    expect(numbers).not.toContain('5')
+    expect(numbers).not.toContain('9')
     expect(screen.queryByText('5通')).toBeNull()
     expect(screen.queryByText('9通')).toBeNull()
     // KPIの「今日送った」も送信履歴の合計。
-    expect(screen.getByText('今日送った')).toBeTruthy()
+    expect(screen.getByText('今日 送った')).toBeTruthy()
   })
 
   it('403: 顧客のお知らせは「表示する権限がありません」を出し、権限変更後に読み直せる', async () => {
@@ -1239,7 +1242,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     render(<LineNotificationsPage />)
 
-    await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('顧客へのお知らせを読み込めませんでした')).toBeTruthy())
     expect(fixture.settings).toHaveBeenCalledTimes(1)
 
     // 2回目からは成功する応答へ差し替えてから、実物のボタンを押す。
@@ -1247,9 +1250,9 @@ describe('#678 実DOMへマウントした画面全体', () => {
     fixture.settings.mockResolvedValueOnce({ success: true, data: [setting()] })
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
     expect(fixture.settings).toHaveBeenCalledTimes(2)
-    expect(screen.queryByText('顧客へのお知らせを表示できませんでした')).toBeNull()
+    expect(screen.queryByText('顧客へのお知らせを読み込めませんでした')).toBeNull()
   })
 
   it('運用者だけ403になっても顧客のお知らせは表示を続け、タブは「権限なし」にする', async () => {
@@ -1258,7 +1261,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     fixture.operatorList.mockRejectedValueOnce(new ApiError(403))
 
     const { unmount } = render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
     // M031: 403は「取得失敗」と混ぜない。権限が変わった後も読み直せるようにする。
     expect(screen.getByText('運用者へのお知らせ 権限なし')).toBeTruthy()
     expect(screen.queryByText('運用者へのお知らせ 取得失敗')).toBeNull()
@@ -1273,7 +1276,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     fixture.operatorList.mockRejectedValueOnce(new Error('internal error'))
     render(<LineNotificationsPage />)
     await waitFor(() => expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy())
-    expect(screen.getByText('注文を受け付けました')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy()
   })
 
   it('長文入力: 実物のtextareaへ実物のonChangeで打ち込み、未保存表示・端末控え・保存APIへ渡す中身まで実物のまま追う', async () => {
@@ -1285,9 +1288,9 @@ describe('#678 実DOMへマウントした画面全体', () => {
     fixture.publishDefinition.mockResolvedValue({ success: true, data: definition({ status: 'published', version: 5 }) })
 
     render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     const introBox = await screen.findByLabelText('ご案内文') as HTMLTextAreaElement
 
     fireEvent.change(introBox, { target: { value: longIntro } })
@@ -1346,8 +1349,8 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
     render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     await screen.findByLabelText('ご案内文')
   }
 
@@ -1418,8 +1421,8 @@ describe('#988 条件説明と表示例は実際の意味に合わせる', () =>
     fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
     fixture.operatorList.mockResolvedValue({ success: true, data: { summary: { total: 0 } } })
     render(<LineNotificationsPage />)
-    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: '内容を編集' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /の内容を編集$/ }))
     await screen.findByLabelText('ご案内文')
   }
 

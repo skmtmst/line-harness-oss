@@ -10,22 +10,22 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const api = vi.hoisted(() => ({ list: vi.fn(), conflicts: vi.fn() }))
+const api = vi.hoisted(() => ({ list: vi.fn(), conflicts: vi.fn(), createDraft: vi.fn(async () => ({ success: true, data: { id: 'new-rule', version: 1 } })) }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => '/friend-add-settings/new', useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams('step=basic'),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/components/shared/condition-builder', () => ({ default: () => null }))
 vi.mock('@/components/shared/dialog', () => ({ default: () => null }))
 vi.mock('@/components/shared/icon-button', () => ({ default: () => null }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
 vi.mock('@/components/shared/select', () => ({ default: () => null }))
-vi.mock('@/components/shared/sticky-bar', () => ({ default: () => null }))
 vi.mock('@/components/shared/text-field', () => ({
   TextField: (props: any) => <input {...props} />,
   TextArea: (props: any) => <textarea {...props} />,
@@ -33,9 +33,9 @@ vi.mock('@/components/shared/text-field', () => ({
 vi.mock('@/components/shared/button', () => ({
   default: ({ href, children, ...props }: any) => (href ? <a href={href}>{children}</a> : <button {...props}>{children}</button>),
 }))
-vi.mock('@/lib/api', () => ({ api: { friendAddRules: { list: (...a: unknown[]) => api.list(...a), conflicts: (...a: unknown[]) => api.conflicts(...a) } } }))
+vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), api: { friendAddRules: { list: (...a: unknown[]) => api.list(...a), conflicts: (...a: unknown[]) => api.conflicts(...a), createDraft: api.createDraft } } }))
 
-const { default: Editor } = await import('./friend-add-rule-editor')
+const { default: Editor } = await import('@/v8/friend-add/editor')
 
 let host: HTMLDivElement
 let root: Root
@@ -82,8 +82,15 @@ describe('friend-add 新規の優先順位の初期値', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
       await Promise.resolve()
     })
-    const priorityInput = host.querySelector('input[type="number"]') as HTMLInputElement | null
-    expect(priorityInput?.value).toBe('3')
+    const name = host.querySelector<HTMLInputElement>('#fa-name')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(name, '新しい案内')
+      name.dispatchEvent(new Event('input', { bubbles: true }))
+      name.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('下書きを保存'))!
+    await act(async () => { save.click(); await Promise.resolve() })
+    expect(api.createDraft).toHaveBeenCalledWith(expect.objectContaining({ priority: 3 }), expect.any(String))
     expect(host.textContent).not.toContain('番目')
   })
 })

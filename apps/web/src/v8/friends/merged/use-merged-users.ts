@@ -12,7 +12,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
-import type { UserRowData } from '@/components/users/user-row'
+import type { UserRowData } from '@/components/users/users-types'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 export const USERS_PAGE_SIZE = 50

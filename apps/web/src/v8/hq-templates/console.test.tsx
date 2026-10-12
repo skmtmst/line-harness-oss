@@ -1,4 +1,4 @@
-import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
+import { findPickerDialog, pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * 統括のテンプレート（B-29・B-36）：作るは店のテンプレートの作る画面（メッセージ HfK0O・クーポン C3qMCz）を使い、
@@ -45,6 +45,7 @@ const detail = (definition: unknown = message) => ({ template: { id: 't-1', name
 const listRow = { ...detail().template, kind: 'message', content_summary: '本文', distributed_account_count: 4, distributed_account_names: ['然 -NEN- 本店', '然 -NEN- 渋谷店', '2025年イベント'], distributed_account_more: 1 }
 
 beforeEach(() => {
+  Object.values(calls).forEach((mock) => mock.mockReset())
   window.history.replaceState(null, '', '/hq/templates')
   window.sessionStorage.clear()
   calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
@@ -495,7 +496,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   /** 配る先の欄から共通の窓を開き、アカウントを選んで確定する（dJZ7Q）。 */
   async function pickStores(dialog: HTMLElement, names: string[]) {
     fireEvent.click(within(dialog).getByRole('button', { name: /^配る先：(選ぶ|変える)$/ }))
-    const picker = await screen.findByRole('dialog', { name: '配るアカウントを選ぶ' })
+    const picker = await findPickerDialog('配るアカウントを選ぶ')
     for (const name of names) fireEvent.click(within(picker).getByRole('checkbox', { name }))
     fireEvent.click(within(picker).getByRole('button', { name: `この ${names.length} アカウントにする` }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '配るアカウントを選ぶ' })).toBeNull())
@@ -503,7 +504,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   async function selectFolder() {
     fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「予約」の操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'このフォルダを配る' }))
-    return screen.findByRole('dialog', { name: 'フォルダ「予約」の 2 件を配る' })
+    return findPickerDialog('フォルダ「予約」の 2 件を配る')
   }
   beforeEach(() => {
     document.documentElement.dataset.theme = 'v8'
@@ -518,7 +519,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     render(<HqTemplatesV8 type="template" />)
     const dialog = await selectFolder()
     fireEvent.click(within(dialog).getByRole('button', { name: '配るひな形：変える' }))
-    const picker = screen.getAllByRole('dialog').at(-1)!
+    const picker = await findPickerDialog('ひな形を選ぶ')
     expect((within(picker).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
     expect(within(picker).getByText('本文')).toBeTruthy()
     expect(within(picker).getByText('カルーセル')).toBeTruthy()
@@ -540,7 +541,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     await waitFor(() => expect(calls.preflight).toHaveBeenCalledWith('t-2', ['a-1']))
     expect(calls.distribute).not.toHaveBeenCalled()
     fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
-    const result = await screen.findByRole('dialog', { name: '配った結果：フォルダ「予約」' })
+    const result = await findPickerDialog('配った結果：フォルダ「予約」')
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(result.style.getPropertyValue('--dialog-design-width')).toBe('720px')
     expect(within(result).getByText('1 アカウントへ配りました。成功 2・失敗 0。成功した所はもう使えます。')).toBeTruthy()
@@ -563,7 +564,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '2 件を 1 アカウントへ配る' }))
     fireEvent.click(await screen.findByRole('button', { name: '次のひな形を確かめる（1/2）' }))
     fireEvent.click(await screen.findByRole('button', { name: '2 件を 1 アカウントへ配る' }))
-    const result = await screen.findByRole('dialog', { name: '配った結果：フォルダ「予約」' })
+    const result = await findPickerDialog('配った結果：フォルダ「予約」')
     fireEvent.click(within(result).getByRole('button', { name: '失敗した 1 件をやり直す' }))
     fireEvent.click(await screen.findByRole('button', { name: '1 件を 1 アカウントへ配る' }))
     await waitFor(() => expect(calls.distribute).toHaveBeenCalledTimes(3))
@@ -602,7 +603,7 @@ describe('統括タグの札は詳細から配布結果まで同じ色を保つ'
     fireEvent.click(screen.getByRole('checkbox', { name: '然 -NEN- 本店', exact: true }))
     fireEvent.click(screen.getByRole('button', { name: '1アカウントの重複を確認' }))
     fireEvent.click(await screen.findByRole('button', { name: 'この内容で1アカウントへ配る' }))
-    const result = await screen.findByRole('dialog', { name: '配った結果：VIP' })
+    const result = await findPickerDialog('配った結果：VIP')
     expect(within(result).getByRole('group', { name: 'タグ「VIP」' }).querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain(expectedColor)
     expect(calls.distribute).toHaveBeenCalledOnce()
     expect(within(result).getByText('成功')).toBeTruthy()

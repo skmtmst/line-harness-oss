@@ -963,10 +963,10 @@ export function validateFriendFieldValue(
  * 空文字は行を消す。「空欄にした」と「一度も入れていない」を分けても
  * 画面上は同じ見え方になり、分けた分だけ判定が増えるため。
  */
-export async function setFriendFieldValue(
+export function friendFieldValueStatements(
   db: D1Database,
   input: { friendId: string; fieldId: string; value: string | null; updatedBy: string; field?: FriendFieldValueCheckTarget; sourceType?: string; sourceId?: string },
-): Promise<void> {
+): D1PreparedStatement[] {
   let value = input.value;
   if (input.field) {
     const checked = validateFriendFieldValue(input.field, value);
@@ -981,7 +981,15 @@ export async function setFriendFieldValue(
         DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at,
           source_type = excluded.source_type, source_id = excluded.source_id`)
         .bind(input.friendId,input.fieldId,value,input.updatedBy,now,input.sourceType ?? null,input.sourceId ?? null);
-  await db.batch([statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now)]);
+  return [statement, ...friendFieldReminderTargetStatements(db, [{ friendId: input.friendId, fieldId: input.fieldId, value }], now)];
+}
+
+
+export async function setFriendFieldValue(
+  db: D1Database,
+  input: Parameters<typeof friendFieldValueStatements>[1],
+): Promise<void> {
+  await db.batch(friendFieldValueStatements(db, input));
 }
 
 /**

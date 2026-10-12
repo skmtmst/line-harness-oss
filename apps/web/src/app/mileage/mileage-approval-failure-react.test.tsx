@@ -16,15 +16,15 @@ const apiMocks = vi.hoisted(() => ({
   me: vi.fn(),
 }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a> }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams('tab=balances'),
   usePathname: () => '/mileage',
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: state.accountId, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 vi.mock('@/lib/api', () => ({
   api: {
     mileage: {
@@ -120,7 +120,7 @@ describe('M502 承認待ちの読み込み失敗（本物のReact）', () => {
     await render()
     const text = host.textContent ?? ''
     // 残高は正常に表示される。
-    expect(text).toContain('マイルを持っている友だち')
+    expect(text).toContain('マイルを持っている')
     // 承認待ちの欄に失敗表示と取り直しが出る。
     expect(text).toContain('承認待ちのマイル変更')
     expect(text).toContain('承認待ちを読み込めませんでした')

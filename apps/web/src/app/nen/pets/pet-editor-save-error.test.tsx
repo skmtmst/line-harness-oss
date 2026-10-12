@@ -28,7 +28,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const { default: PetEditor } = await import('./pet-editor')
+const { default: PetEditor } = await import('@/v8/nen-pets/editor')
 // mock済みだが ApiError・describeSaveFailure は本物（…actual 引き継ぎ）。
 const { ApiError } = await import('@/lib/api')
 
@@ -58,9 +58,11 @@ describe('M511フォロー 保存500の案内', () => {
       fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     })
     await waitFor(() => {
-      expect(screen.getByText(/サーバー側で保存できませんでした/)).toBeTruthy()
+      expect(screen.getByRole('alert').textContent).toContain('ペットの保存に失敗しました')
     })
     expect(screen.queryByText(/API error:/)).toBeNull()
+    expect(updatePet).toHaveBeenCalledWith('a1', 'pet-1', expect.objectContaining({ expectedUpdatedAt: 'v1' }))
+    expect(screen.getByLabelText('ペットの名前')).toHaveProperty('value', 'ポチ')
   })
 
   test('409 VERSION_CONFLICT は既存の日本語案内・入力保持のまま（M511保持）', async () => {

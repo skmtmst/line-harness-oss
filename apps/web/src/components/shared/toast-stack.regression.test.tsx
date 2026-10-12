@@ -2,8 +2,10 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import ToastHost, { clearToastsForTest, notifyToast } from './toast'
+import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 afterEach(() => { cleanup(); clearToastsForTest(); vi.restoreAllMocks(); document.documentElement.removeAttribute('data-theme') })
 it('F-3: 通知が消えたら残る通知の位置を200msで詰める', async () => {
+  setTestReducedMotion(false)
   document.documentElement.dataset.theme = 'v8'
   const animate = vi.fn(() => ({ cancel: vi.fn() }))
   Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })

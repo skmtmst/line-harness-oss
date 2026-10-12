@@ -2,6 +2,7 @@
 import Toggle from '@/components/shared/toggle'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePermissionAccess } from '@/lib/use-feature-access'
+import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import ImageUploader from '@/components/shared/image-uploader'
 import { useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -42,6 +43,7 @@ import Notice from '@/components/shared/notice'
 
 export default function StaffNewV8() {
   const saveErrors = useSaveFormErrors()
+  const [mediaOpen, setMediaOpen] = useState(false)
   const { selectedAccountId, selectedAccount } = useAccount()
   const router = useRouter()
   // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
@@ -62,6 +64,9 @@ export default function StaffNewV8() {
   const [members, setMembers] = useState<StaffMember[]>([])
   // 右のスマホの見本に出す、登録済みの担当。
   const [staffList, setStaffList] = useState<BookingStaff[]>([])
+  const [staffPreviewError,setStaffPreviewError]=useState(false)
+  const [staffPreviewLoading,setStaffPreviewLoading]=useState(true)
+  const [staffPreviewRetry,setStaffPreviewRetry]=useState(0)
   /**
    * R310: 登録は済んだが担当メニューの設定が残っているスタッフのID。
    * ここにIDがある間は createStaff を二度と呼ばず、残りの割当だけをやり直す。
@@ -140,22 +145,24 @@ export default function StaffNewV8() {
     }
   }, [membersReloadKey])
 
-  /* 右のスマホの見本用に、登録済みの担当を読む。失敗しても登録はできる。 */
+  /* 見本の取得失敗と空を分ける。登録中の入力は残して読み直す。 */
   useEffect(() => {
     if (!selectedAccountId) return
     let alive = true
+    setStaffPreviewError(false)
+    setStaffPreviewLoading(true)
     bookingApi
       .listStaff(selectedAccountId)
       .then((r) => {
-        if (alive) setStaffList(r.staff)
+        if (alive) {setStaffList(r.staff);setStaffPreviewLoading(false)}
       })
       .catch(() => {
-        if (alive) setStaffList([])
+        if (alive) {setStaffPreviewError(true);setStaffPreviewLoading(false)}
       })
     return () => {
       alive = false
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId,staffPreviewRetry])
 
   // N-411: 予約スタッフ登録は 'booking.settings' の実効 permission 必須。
   const canManageStaff = usePermissionAccess('booking.settings')
@@ -342,7 +349,7 @@ export default function StaffNewV8() {
               <div className={layout.field}><Field label="肩書き" htmlFor="bs-role"><SaveErrorField names={["role"]}><input id="bs-role" type="text" value={role} onChange={(e) => setRole(e.target.value)} maxLength={BOOKING_STAFF_LIMITS.role} placeholder="トリミング担当" className={layout.input} /></SaveErrorField></Field></div>
               <div className={layout.field}>
                 <SaveErrorField names={["imageUrl"]}><ImageUploader
-                  mode="url"
+                  mode="url" onMediaPick={() => setMediaOpen(true)}
                   size="compact"
                   label="顔写真（正方形・1MB まで）"
                   title="顔写真を追加"
@@ -465,18 +472,20 @@ export default function StaffNewV8() {
             </div>
           ) : null}
           <p className={layout.sideTitle}>予約画面での見え方</p>
+          {staffPreviewError ? <ListState kind="error" title="担当の見本を読み込めませんでした" onRetry={()=>setStaffPreviewRetry(value=>value+1)}/> : null}
           <div className={layout.phoneSlot}>
             <PhoneStaffStep
               menu={previewMenu}
               staff={previewStaff}
               designationFree={designationFree}
-              status={menusLoading ? 'loading' : menusError ? 'error' : 'ready'}
+              status={menusLoading || staffPreviewLoading ? 'loading' : menusError || staffPreviewError ? 'error' : 'ready'}
             />
           </div>
           {previewUrl ? null : <p className={layout.cardNote}>このアカウントには予約画面のURLがまだありません</p>}
         </aside>
       </div>
 
+      <MediaPickerDialog open={mediaOpen} accountId={selectedAccountId} kind="image" onClose={() => setMediaOpen(false)} onSelect={(item) => { setImageUrl(item.url); setMediaOpen(false) }} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div></SaveErrorScope>
   )

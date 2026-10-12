@@ -2,7 +2,7 @@
 import type React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import TemplateConsole from './template-console'
+import TemplateConsole from '@/test-utils/hq-template-console'
 import type { TemplateDefinition, TemplateType } from '@/lib/hq-templates-api'
 
 /*

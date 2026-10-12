@@ -311,6 +311,9 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     const publishButton = screen.getByRole('button', { name: '公開する' }) as HTMLButtonElement
     await waitFor(() => expect(publishButton.disabled).toBe(false))
     fireEvent.click(publishButton)
+    const confirm = await screen.findByRole('dialog', { name: '公開の確認' })
+    expect(publishGroup).not.toHaveBeenCalled()
+    fireEvent.click(within(confirm).getByRole('button', { name: '公開する' }))
     await waitFor(() => expect(publishGroup).toHaveBeenCalledTimes(1))
     // 全員宛ての公開は既定メニューになる。
     await screen.findByText('すべての友だちの既定メニューになりました')

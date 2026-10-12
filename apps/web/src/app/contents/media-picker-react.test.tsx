@@ -215,7 +215,7 @@ describe('登録メディア選択窓（N-193 / N-205）', () => {
   it('読込中・0件・失敗を分けて出し、失敗は読み直せる', async () => {
     fixture.listQueue.push(pendingList())
     await renderPicker()
-    expect(dialog().textContent).toContain('メディアを読み込んでいます')
+    expect(dialog().querySelector('[aria-busy="true"][aria-label="メディアを読み込んでいます"]')).toBeTruthy()
 
     // 0件は失敗とは別の案内。
     await act(async () => {

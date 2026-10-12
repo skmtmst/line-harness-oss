@@ -270,6 +270,8 @@ export default function OpsAnnouncementsV8() {
         setConfirmSend(false)
         { if (!fieldFailure)
         setFormError('') }
+        // 入力は残したまま、他の人が変えた一覧の状態を読み直す。
+        await load()
         return
       }
       { if (!fieldFailure)

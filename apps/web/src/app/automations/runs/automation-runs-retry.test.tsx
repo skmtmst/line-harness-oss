@@ -13,16 +13,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchApi = vi.hoisted(() => vi.fn())
 const api = vi.hoisted(() => ({
+  staff: { me: vi.fn(async () => ({ success: true, data: { id: 'staff-1', role: runPermissions.useAutomationRunPermissions().canOperate ? 'owner' : 'viewer' } })) },
+  commonActions: { list: vi.fn(async () => ({ success: true, data: [] })) },
   automations: {
+    list: vi.fn(async () => ({ success: true, data: [] })),
+    templates: vi.fn(async () => ({ success: true, data: [] })),
     // #942 N-353/N-354: 詳細の読み直し・CSV口・取りやめ。
     getRun: vi.fn(async () => ({ success: true as const, data: null })),
     cancelRun: vi.fn(),
     runsCsvUrl: vi.fn(() => 'http://worker.test/api/automation-runs?format=csv'),
   },
 }))
-vi.mock('@/lib/api', () => ({ fetchApi, api }))
+vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), fetchApi, api }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/automations/runs',
   useRouter: () => ({ replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
@@ -39,9 +43,9 @@ vi.mock('@/contexts/account-context', () => ({
 const runPermissions = vi.hoisted(() => ({
   useAutomationRunPermissions: vi.fn(() => ({ canOperate: true, canExport: true })),
 }))
-vi.mock('@/components/automations/use-can-manage', () => runPermissions)
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
-import AutomationRunsPage from './page'
+import AutomationRunsPage from '@/v8/automations/runs'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -97,9 +101,16 @@ async function renderPage() {
     vi.advanceTimersByTime(1000)
   })
   await flush()
+  // 行の実際の「…」から再試行を開く。閲覧のみでは再試行は出ない。
+  const menu = container.querySelector('button[aria-label^="記録"]')
+  if (menu) await act(async () => { (menu as HTMLButtonElement).click() })
+  await flush()
 }
 
 beforeEach(() => {
+  document.documentElement.dataset.theme = 'v8'
+  window.history.replaceState({}, '', '/automations/runs')
+  window.dispatchEvent(new PopStateEvent('popstate'))
   vi.useFakeTimers()
   runPermissions.useAutomationRunPermissions.mockReturnValue({ canOperate: true, canExport: true })
 })
@@ -109,12 +120,14 @@ afterEach(() => {
     root.unmount()
   })
   container.remove()
+  document.body.innerHTML = ''
+  delete document.documentElement.dataset.theme
   vi.clearAllMocks()
   vi.useRealTimers()
 })
 
 function retryButtons(): HTMLButtonElement[] {
-  return Array.from(container.querySelectorAll('button'))
+  return Array.from(document.querySelectorAll('button'))
     .filter((button) => button.textContent === 'もう一度やる')
 }
 
@@ -142,8 +155,8 @@ describe('動いた記録の再実行受け付け(#736)', () => {
     })
     await flush()
 
-    expect(container.textContent).toContain('再実行を受け付けました。結果は実行記録で確認してください')
-    expect(container.textContent).not.toContain('もう一度実行しました')
+    expect(document.body.textContent).toContain('再実行を受け付けました。結果は実行記録で確認してください')
+    expect(document.body.textContent).not.toContain('もう一度実行しました')
     // 一覧の再取得（初回 + 再送後）。ポーリングはしないので3回以上にならない。
     expect(listCalls().length).toBe(2)
   })
@@ -162,8 +175,8 @@ describe('動いた記録の再実行受け付け(#736)', () => {
     })
     await flush()
 
-    expect(container.textContent).toContain('失敗した処理がある実行だけ、もう一度実行できます')
-    expect(container.textContent).not.toContain('受け付けました')
+    expect(document.body.textContent).toContain('失敗した処理がある実行だけ、もう一度実行できます')
+    expect(document.body.textContent).not.toContain('受け付けました')
   })
 
   it('見るだけの権限では再実行・CSVの操作を出さない (#1043)', async () => {
@@ -172,8 +185,8 @@ describe('動いた記録の再実行受け付け(#736)', () => {
     await renderPage()
 
     expect(retryButtons()).toHaveLength(0)
-    expect(container.textContent).not.toContain('CSVで書き出す')
+    expect(document.body.textContent).not.toContain('CSVで書き出す')
     // 記録自体（見る権限の範囲）は表示される。
-    expect(container.textContent).toContain('予約案内')
+    expect(document.body.textContent).toContain('予約案内')
   })
 })

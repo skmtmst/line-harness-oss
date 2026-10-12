@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsTenantsPage from './page'
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/ops/tenants', useRouter: () => ({ push: mockPush }) }))
 const mockPush = vi.fn()
 
@@ -28,6 +28,7 @@ beforeEach(() => {
   postedBody = null
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url.endsWith('/api/ops/tenants') && (!init || !init.method || init.method === 'GET')) {
       return new Response(JSON.stringify({ success: true, data: [], summary }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
@@ -96,7 +97,7 @@ describe('契約先を作る小窓（板 i0FTN）', () => {
     expect((dialog()?.textContent ?? '')).toContain('統括名を入力してください')
   })
 
-  it('統括名を入れると送り、詳細へ進む', async () => {
+  it('統括名を入れると送り、作成した契約先を一覧で示す', async () => {
     await act(async () => { root.render(<OpsTenantsPage />) })
     await flush()
     await act(async () => { openCreateDialog().click() })
@@ -108,6 +109,6 @@ describe('契約先を作る小窓（板 i0FTN）', () => {
     await act(async () => { create?.click() })
     await flush()
     expect(postedBody).toEqual({ name: '検証商事', featurePacks: [] })
-    expect(mockPush).toHaveBeenCalledWith('/ops/tenants/detail?id=t9')
+    expect(mockPush).toHaveBeenCalledWith('/ops/tenants?highlight=t9')
   })
 })

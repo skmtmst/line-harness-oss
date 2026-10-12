@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * 入力欄。Pencil V5 の `ytG7l`「共通 入力欄」（102回）と
@@ -23,7 +23,6 @@
   font-size: var(--text-body);
   font-weight: 400; /* fontWeight: normal */
   font-family: inherit;
-  box-shadow: var(--shadow-field);
 }
 
 .field::placeholder {
@@ -33,7 +32,6 @@
 .field:disabled {
   cursor: not-allowed;
   background: var(--color-canvas-sunken);
-  opacity: 0.6;
 }
 
 .field:focus-visible {
@@ -42,9 +40,7 @@
 }
 
 /* ytG7l 共通 入力欄 */
-.single {
-  height: 36px; /* height: 40 */
-  padding: 0 12px; /* padding: [0, 12] */
+.single { /* height: 40 */ /* padding: [0, 12] */
 }
 
 /* keKe3 共通 入力欄（複数行）／★V8 i5BW8b。最小の高さ120・縦にだけ広げられる（下の層の外の決まり）。 */
@@ -62,9 +58,6 @@
 }
 
 /* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
-.invalid {
-  border-color: var(--color-status-danger);
-}
 
 /*
  * #976 U079/U083: タッチ端末は入力文字16px・欄の高さ44px。
@@ -81,34 +74,34 @@
 }
 
 /* ★V8「枠線の色」：操作する欄の枠は control-border。誤りの赤は変えない。 */
-[data-theme='v8'] .field {
+:root .field {
   border-color: var(--color-control-border);
   box-shadow: var(--control-shadow);
   font-size: var(--polish-text-body);
 }
 
 @media (pointer: coarse) {
-  [data-theme='v8'] .field { font-size: var(--text-lead); }
+  :root .field { font-size: var(--text-lead); }
 }
 
-[data-theme='v8'] .invalid {
+:root .invalid {
   border-color: var(--color-status-danger);
 }
 
 /* V8 正本HTMLの実寸。v7には適用しない。 */
-[data-theme='v8'] .single { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
-[data-theme='v8'] .single[aria-invalid='true'] { outline-color: var(--color-danger); }
-[data-theme='v8'] .single:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+:root .single { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .single[aria-invalid='true'] { outline-color: var(--color-danger); }
+:root .single:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 /* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
-[data-theme='v8'] .single[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
-[data-theme='v8'] .multi[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); border-color: var(--color-danger); }
-[data-theme='v8'] .single { gap: 0; }
+:root .single[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
+:root .multi[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); border-color: var(--color-danger); }
+:root .single { gap: 0; }
 
 /*
  * 打ち直している間（Field の data-field-quiet）は v8 の複数行も普段の枠に戻す。
  * 1行は outline 側で form-controls.module.css が戻す。
  */
-[data-theme='v8'] [data-field-quiet] .multi[aria-invalid='true'] { border-color: var(--color-control-border); }
+:root [data-field-quiet] .multi[aria-invalid='true'] { border-color: var(--color-control-border); }
 }
 
 /*
@@ -127,20 +120,20 @@
 }
 
 /* 2行の説明用。指定した欄だけを小さくする。 */
-[data-theme='v8'] .multiCompact { min-height: var(--tpl-textarea-compact-h); padding: var(--tpl-e78-pair-gap); line-height: var(--tpl-e78-name-lh); }
-[data-theme="v8"] .multi[data-density="compact"] { padding: var(--tpl-rt-gray-note-pad); border: 0; border-radius: var(--tpl-rt-inner-radius); outline: 1px solid var(--color-control-border); outline-offset: -1px; font-size: var(--text-caption); line-height: var(--tpl-rt-draft-lh); }
-[data-theme="v8"] .multi[data-density="compact"][aria-invalid="true"] { outline-color: var(--color-danger); }
-[data-theme="v8"] .multi[data-density="compact"]:focus-visible { outline-width: 2px; outline-offset: 2px; }
-[data-theme='v8'] .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
-[data-theme='v8'] .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
+:root .multiCompact { min-height: var(--tpl-textarea-compact-h); padding: var(--tpl-e78-pair-gap); line-height: var(--tpl-e78-name-lh); }
+:root .multi[data-density="compact"] { padding: var(--tpl-rt-gray-note-pad); border: 0; border-radius: var(--tpl-rt-inner-radius); outline: 1px solid var(--color-control-border); outline-offset: -1px; font-size: var(--text-caption); line-height: var(--tpl-rt-draft-lh); }
+:root .multi[data-density="compact"][aria-invalid="true"] { outline-color: var(--color-danger); }
+:root .multi[data-density="compact"]:focus-visible { outline-width: 2px; outline-offset: 2px; }
+:root .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
+:root .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
 
 /* 見送りの補足2行（ujcar）。指定した欄だけを56pxにする。 */
-[data-theme='v8'] .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
+:root .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
 
 /* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
-[data-theme='v8'] .multiSingleRow { min-height: 36px; height: 36px; border: 0; padding: 7.5px 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: 21px; box-shadow: var(--control-shadow); }
-[data-theme='v8'] .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }
+:root .multiSingleRow { min-height: 36px; height: 36px; border: 0; padding: 7.5px 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: 21px; box-shadow: var(--control-shadow); }
+:root .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }
 
 /* B-152・仕上げ7 */
-[data-theme='v8'] .field:disabled { opacity: var(--polish-disabled-opacity); }
-html[data-theme='v8'] .field:is(.single, .multi)[aria-invalid='true']:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); box-shadow: var(--polish-error-ring); }
+:root .field:disabled { opacity: var(--polish-disabled-opacity); }
+html:root .field:is(.single, .multi)[aria-invalid='true']:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); box-shadow: var(--polish-error-ring); }

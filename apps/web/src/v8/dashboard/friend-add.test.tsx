@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { FriendAddLink } from './friend-add'
 
@@ -20,6 +20,7 @@ it('経路は確定してからURLへ反映し、基本URLへ戻すとQRも基�
   expect(url.value).toBe('https://example.test/auth/line?account=channel-a')
   expect(fixture.routes).toHaveBeenCalledWith('account-a')
   const open = () => fireEvent.click(screen.getByRole('button', { name: '発行中の追加URL' }))
+  await waitFor(() => expect((screen.getByRole('button', { name: '発行中の追加URL' }) as HTMLButtonElement).disabled).toBe(false))
   open()
   let dialog = await screen.findByRole('dialog', { name: '発行中の追加URLを選ぶ' })
   expect((within(dialog).getByRole('radio', { name: '基本の追加URL' }) as HTMLInputElement).checked).toBe(true)

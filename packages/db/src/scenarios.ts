@@ -1733,6 +1733,7 @@ export async function enrollFriendInScenario(
   friendId: string,
   scenarioId: string,
   sourceEnrollmentId?: string,
+  options: { replacingScenarioId?: string | null } = {},
 ): Promise<FriendScenario | null> {
   const id = sourceEnrollmentId ?? crypto.randomUUID();
   if (sourceEnrollmentId) {
@@ -1782,9 +1783,10 @@ export async function enrollFriendInScenario(
       .prepare(
         `SELECT 1 FROM friend_scenarios
           WHERE friend_id = ? AND scenario_id != ? AND status = 'active'
+            AND (? IS NULL OR scenario_id != ?)
           LIMIT 1`,
       )
-      .bind(friendId, scenarioId)
+      .bind(friendId, scenarioId, options.replacingScenarioId ?? null, options.replacingScenarioId ?? null)
       .first<{ 1: number }>();
     if (other) return null;
   }

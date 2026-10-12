@@ -1,7 +1,7 @@
 /*
  * ★V8 シナリオ配信の一覧（Pencil `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態は `BxGhV`）。
  * 枠・見出し・帯・フォルダ列・道具の段の並びは型（ListPage・ListToolbar）が持つ。
- * 値は globals.css の `[data-theme="v8"]` の `--tpl-scn-*` と共通の `--tpl-*` だけを使う。
+ * 値は globals.css の `:root` の `--tpl-scn-*` と共通の `--tpl-*` だけを使う。
  */
 .folderNote {
   margin: 0;

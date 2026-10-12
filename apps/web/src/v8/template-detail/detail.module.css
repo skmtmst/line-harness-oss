@@ -31,7 +31,6 @@
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-eds-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); }
 .bodyBox { padding: var(--tpl-eds-body-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-eds-body-lh); white-space: pre-wrap; overflow-wrap: anywhere; }
-.empty { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); text-align: center; }
 .errorText { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
 .inlineLink { color: var(--color-action); text-decoration: underline; }
 

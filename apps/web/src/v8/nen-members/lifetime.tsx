@@ -1,6 +1,6 @@
 'use client'
 import { notifySaved } from '@/components/shared/toast'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
@@ -61,6 +61,9 @@ export default function LifetimeV8({
   const [notice, setNotice] = useState('')
   /** 編集の窓。index は直す行（新しい行は drafts.length）。 */
   const [editing, setEditing] = useState<{ index: number; threshold: string; title: string; notify: boolean } | null>(null)
+  const [draftAccountId, setDraftAccountId] = useState(accountId)
+  const activeAccount = useRef({ id: accountId })
+  if (activeAccount.current.id !== accountId) activeAccount.current = { id: accountId }
   const fields = useFieldValidation(editing ? [
     ...(!Number.isFinite(parseYen(editing.threshold)) || parseYen(editing.threshold) <= 0
       ? [{ id: 'milestone-threshold', message: '節目の金額は1円以上で入れてください。' }] : []),
@@ -68,6 +71,18 @@ export default function LifetimeV8({
   ] : [])
 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
+
+  if (draftAccountId !== accountId) {
+    const hadUnsaved = dirty || editing !== null
+    setDraftAccountId(accountId)
+    setDrafts([])
+    setDirty(false)
+    setBusy(false)
+    setError('')
+    setEditing(null)
+    cancelLeave()
+    setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+  }
 
   useEffect(() => {
     if (!settings || dirty) return
@@ -107,6 +122,8 @@ export default function LifetimeV8({
   }
 
   const save = async () => {
+    const target = activeAccount.current
+    if (busy || draftAccountId !== accountId) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -114,12 +131,14 @@ export default function LifetimeV8({
       const res = await nenRanksApi.saveMilestones(accountId, drafts.map((row) => ({
         id: row.id, thresholdYen: row.threshold, title: row.title.trim(), notifyOnReach: row.notify,
       })))
+      if (activeAccount.current !== target) return
       if (!res.success) throw new Error(res.error)
       setDirty(false)
       onSaved(accountId, res.data)
       notifySaved(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。')
       if (res.data.sync?.status !== 'synced') setError('ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
     } catch (caught) {
+      if (activeAccount.current !== target) return
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
@@ -128,7 +147,7 @@ export default function LifetimeV8({
         scope: 'store',
       })) }
     } finally {
-      setBusy(false)
+      if (activeAccount.current === target) setBusy(false)
     }
   }
 

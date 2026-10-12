@@ -7,6 +7,7 @@ import { useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { RowMenu } from '@/components/shared/row-actions'
 import styles from './external-import.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 
@@ -46,6 +47,7 @@ export function ExternalImportWorkspace({
   onBack,
   onReload,
   onImport,
+  onDelete,
 }: {
   external: { currentDefault: string | null; lineMenus: LineMenu[] } | null
   loading: boolean
@@ -53,6 +55,7 @@ export function ExternalImportWorkspace({
   onBack: () => void
   onReload: () => void
   onImport: (menu: LineMenu) => void
+  onDelete?: (menu: LineMenu) => void
 }) {
   const unmanaged = external?.lineMenus.filter((menu) => !menu.adminManaged) ?? []
   const [selectedId, setSelectedId] = useState(unmanaged[0]?.richMenuId ?? '')
@@ -144,6 +147,12 @@ export function ExternalImportWorkspace({
                   <p className="text-ink-faint mt-2 text-xs leading-5">LINEから面ごとの動きを読み込めませんでした。読み直してから取り込んでください。</p>
                 )}
                 <Button type="button" variant="primary" className="mt-4" onClick={() => onImport(selected)}>この内容で取り込む</Button>
+                {onDelete ? (
+                  <RowMenu
+                    label={`LINE上の「${selected.name || '名前なし'}」の操作`}
+                    items={[{ id: 'delete', label: 'LINEから削除する', tone: 'danger', onSelect: () => onDelete(selected) }]}
+                  />
+                ) : null}
               </section>
               <Notice tone="warn">
                 <h2 className="mb-1 text-xs font-bold">気をつけること</h2>

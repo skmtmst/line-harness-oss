@@ -944,6 +944,20 @@ export type OperationHealthResult = {
   observedAt: string
 }
 
+/** LINE受信の工程状態。本文・返信の鍵は含めない。 */
+export type LineWebhookRecoveryEvent = {
+  webhookEventId: string;
+  lineAccountId: string | null;
+  eventType: string;
+  status: 'received' | 'processing' | 'succeeded' | 'failed';
+  receivedAt: string;
+  canRetry: boolean;
+  recoveryStatus: 'needs_review' | null;
+  recoveryLabel: string | null;
+  recoveryReasonCode: string | null;
+  recoveryReason: string | null;
+};
+
 export type OperationHealthSnapshot = {
   latestRun: {
     id: string
@@ -13906,6 +13920,10 @@ export const api = {
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
   /** 緊急停止の影響確認、停止・復旧、追記履歴。 */
   operations: {
+    lineReceipts: (accountId: string) => fetchApi<ApiResponse<LineWebhookRecoveryEvent[]>>(`/api/line-webhook-events?status=failed&account_id=${encodeURIComponent(accountId)}`),
+    retryLineReceipt: (id: string) => fetchApi<{ success: boolean; status: 'succeeded' | 'needs_review' | 'busy' | 'failed'; reason?: string }>(
+      `/api/line-webhook-events/${encodeURIComponent(id)}/retry`, { method: 'POST' },
+    ),
     health: (accountId: string) =>
       fetchApi<ApiResponse<OperationHealthSnapshot>>(
         `/api/operations/health?account_id=${encodeURIComponent(accountId)}`,

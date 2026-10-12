@@ -17,16 +17,15 @@ const fixture = vi.hoisted(() => ({
   putBulk: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/booking/menus/staff',
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [] }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(),
   usePageTitle: () => undefined,
 }))
 
@@ -58,7 +57,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import AssignMatrixV8 from './assign-v8'
+import AssignMatrixV8 from '@/v8/booking-menus/assign'
 
 const MENUS = [{
   id: 'menu-1', name: 'カット', category_label: null, description: null,
@@ -124,8 +123,8 @@ describe('担当まとめ（V8）の読み込みと保存', () => {
 
     await act(async () => { gate.resolve({ ok: true }) })
     // 完了（✓：ボタンと知らせ）がでて、知らせに「元に戻す」が付く。
-    await waitFor(() => { expect(screen.getAllByText('保存しました').length).toBeGreaterThanOrEqual(2) })
-    expect(document.querySelector('[data-design="Savebar"]')?.textContent).toContain('保存しました')
+    await waitFor(() => { expect(screen.getByRole('status', { name: '知らせ' }).textContent).toContain('保存しました') })
+    expect(screen.getByRole('button', { name: '保存' })).toBeTruthy()
     const firstCall = (fixture.putBulk as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
     expect(JSON.stringify(firstCall)).toContain('"is_offered":true')
 

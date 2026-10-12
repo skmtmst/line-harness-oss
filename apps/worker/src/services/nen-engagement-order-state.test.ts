@@ -180,3 +180,21 @@ describe('IDEA-21 注文の取り消し・返金と発送後の案内', () => {
     expect(jobRows(raw, 'evt-ship-2').every((row) => row.status === 'pending')).toBe(true);
   });
 });
+
+test('SEND-S06: 中継が記録したNEN配信を呼び出し元で二重に記録しない',async()=>{
+ const f=createTestD1();seed(f.raw);
+ await enqueuePostShippingFollowUps(f.db,shipped('fixture-log','fixture-order') as never,'friend-1','acc-1');
+ const result=await processNenDeliveries(f.db,{
+  proxyBaseUrl:'https://fixture.invalid',defaultAccessToken:'fixture',now:new Date('2026-09-25T12:00:00+09:00'),
+  proxyDispatch:async request=>{
+   const body=await request.json() as {messages:Array<{type:string}>};
+   for(const message of body.messages)f.raw.prepare("INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id) VALUES(?,'friend-1','outgoing',?,?,'acc-1')").run(crypto.randomUUID(),message.type,JSON.stringify(message));
+   return new Response('{}',{status:200});
+  },
+ });
+ expect(result.sent).toBe(3);
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM messages_log').get()).toEqual({n:3});
+ await processNenDeliveries(f.db,{proxyBaseUrl:'https://fixture.invalid',defaultAccessToken:'fixture',now:new Date('2026-09-25T12:00:00+09:00'),proxyDispatch:async()=>{throw new Error('completed jobs must not send')}});
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM messages_log').get()).toEqual({n:3});
+ f.raw.close();
+});

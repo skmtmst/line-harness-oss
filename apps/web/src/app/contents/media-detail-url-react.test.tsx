@@ -144,10 +144,13 @@ async function waitForText(text: string) {
   expect(host.textContent).toContain(text)
 }
 
-function detailButton(filename = MEDIA_A.filename): HTMLButtonElement {
-  const button = host.querySelector<HTMLButtonElement>(`button[aria-label="${filename}の使用箇所"]`)
+async function openDetails(filename = MEDIA_A.filename) {
+  const menu = host.querySelector<HTMLButtonElement>(`button[aria-label="${filename}のその他操作"]`)
+  if (!menu) throw new Error('操作メニューがありません')
+  await act(async () => { menu.click(); await settle() })
+  const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '使用箇所を見る')
   if (!button) throw new Error('詳細ボタンがありません')
-  return button
+  await act(async () => { button.click(); await settle() })
 }
 
 beforeEach(() => {
@@ -180,7 +183,7 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     await renderPage()
     await waitForText(MEDIA_A.filename)
 
-    await act(async () => { detailButton().click(); await settle() })
+    await openDetails()
     expect(window.location.pathname).toBe('/contents')
     expect(new URLSearchParams(window.location.search).get('id')).toBe('media-a')
     await waitForText('ファイルのこと')
@@ -224,7 +227,7 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     window.history.replaceState({}, '', '/contents?id=media-a')
     fixture.pendingDetail = { resolve: () => undefined }
     await renderPage()
-    expect(host.textContent).toContain('メディアの詳細を読み込んでいます')
+    expect(host.querySelector('[aria-busy="true"][aria-label="メディアの詳細を読み込んでいます"]')).toBeTruthy()
 
     const pending = fixture.pendingDetail
     fixture.accountId = 'account-b'

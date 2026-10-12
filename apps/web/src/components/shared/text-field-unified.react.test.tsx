@@ -128,7 +128,7 @@ describe('TextInput・TextArea（form-controls）は正本の包み', () => {
     expect(css).not.toMatch(/\.(control|input|textarea)\s*\{/)
     // v7 の差（読み取り専用の地・押せないときの薄さ・大きさ固定）は v7 に閉じる。
     for (const rule of css.match(/[^{}]*\.legacy(Control|Textarea)[^{]*\{/g) ?? []) {
-      expect(rule).toMatch(/:root:not\(\[data-theme='v8'\]\)/)
+      expect(rule).toMatch(/:root:not\(:root\)/)
     }
   })
 })
@@ -166,6 +166,6 @@ describe('複数行の決まり：縦にだけ広げられる・最小の高さ 
 
   it('画面に直接書いた textarea も v8 では縦だけが既定', () => {
     const globals = withoutComments(read('../../app/globals.css'))
-    expect(globals).toMatch(/\[data-theme='v8'\] textarea\s*\{\s*resize:\s*vertical;\s*\}/)
+    expect(globals).toMatch(/:root textarea\s*\{\s*resize:\s*vertical;\s*\}/)
   })
 })

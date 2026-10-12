@@ -1,8 +1,4 @@
-/*
- * ★V8 ウェビナー一覧で使う決まり（src/app から写したもの）。
- * src/v8 からは @/app を import できないので、読めない理由の言い分けと
- * CSV の作り方はここに持つ。中身は app/webinars の同名の処理と同じ。
- */
+/* ★V8 ウェビナー一覧が使う失敗理由とCSVの決まり。 */
 import { ApiError } from '@/lib/api'
 import type { WebinarListItem, WebinarListParams, WebinarListResponse } from '@/lib/api'
 import type { ListStateKind } from '@/components/shared/list-state'

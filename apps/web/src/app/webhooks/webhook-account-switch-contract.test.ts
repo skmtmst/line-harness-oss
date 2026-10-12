@@ -1,34 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
-
-const source = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-
-describe('Webhook画面のLINEアカウント境界', () => {
-  test('読込結果は要求時のアカウントと世代が現在も一致するときだけ反映する', () => {
-    expect(source).toContain('const requestGeneration = ++loadGenerationRef.current')
-    expect(source).toContain('selectedAccountIdRef.current !== requestAccountId')
-    expect(source).toContain('loadGenerationRef.current !== requestGeneration')
+const read = (name: string) => readFileSync(new URL(`../../v8/webhooks/${name}.tsx`, import.meta.url), 'utf8')
+const shell = read('shell')
+const pages = [read('incoming'), read('outgoing')]
+describe('現役Webhook画面のLINEアカウント境界', () => {
+  test('取得結果はアカウントと世代が同じ時だけ反映する', () => {
+    expect(shell).toContain('const generation = ++generationRef.current')
+    expect(shell).toContain('generationRef.current !== generation || accountRef.current !== accountId')
   })
-
-  test('一覧を取得したアカウントと現在のアカウントが一致しない操作を拒む', () => {
-    expect(source).toContain('loadedAccountId !== requestAccountId')
-    expect(source).toContain('LINEアカウントの一覧を読み直してください')
+  test('一覧の取得元と現在のアカウントが違う操作は拒む', () => {
+    for (const src of pages) { expect(src).toContain('loadedAccountId !== accountId'); expect(src).toContain('LINEアカウントの一覧を読み直してください') }
   })
-
-  test('アカウント切替後は古い書込結果で秘密値や一覧を更新しない', () => {
-    expect(source).toContain('if (selectedAccountIdRef.current !== requestAccountId) return')
-    expect(source).toContain('if (selectedAccountIdRef.current === requestAccountId) await load()')
-    expect(source).toContain('setCreatedSecret(null)')
-    expect(source).toContain("setInForm({ name: '', sourceType: '', secret: '' })")
+  test('切替後は古い書き込みの結果や秘密値を表示しない', () => {
+    for (const src of pages) { expect(src).toContain('if (accountRef.current !== accountId) return'); expect(src).toContain('setDeleteTarget(null)'); expect(src).toContain('setRotateTarget(null)'); expect(src).toContain('accountScopeRef.current === scope') }
   })
-
-  test('更新と削除はAPIの失敗を成功扱いしない', () => {
-    // 有効・無効の切替は失敗時に理由と次の行動を画面の上に出す（受信・送信の2つ）。
-    // N-382対応で文言が変わったが、失敗を成功扱いしない点は同じ。
-    expect(source.match(/message: '切り替えできませんでした。状態は変わっていません。/g)).toHaveLength(2)
-    expect(source).toContain('data-webhook-toggle-error={key}')
-    // 削除はブラウザのconfirmをやめて共通の確認窓へ移したので、
-    // 失敗は窓の中に出す。ここも成功扱いにはしない。
-    expect(source).toContain('if (!res.success) throw new Error(res.error)')
+  test('更新失敗は状態を戻し、削除失敗で窓を閉じない', () => {
+    for (const src of pages) { expect(src).toContain('状態は変わっていません'); expect(src).toContain('if (!res.success)'); expect(src).toContain('if (!res.success) throw new Error(res.error)'); expect(src).toContain('setDeleteError('); expect(src).toContain('setOptimisticActive(') }
   })
 })

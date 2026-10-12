@@ -11,7 +11,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFieldValidation } from '@/lib/use-field-validation'
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -69,6 +69,8 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [dataAccountId, setDataAccountId] = useState(accountId)
   const fields = useFieldValidation(drafts.flatMap((row) => [
     ...(!row.name.trim() ? [{ id: `feeding-name-${row.key}`, message: '商品名を入れるか、行を消してください。' }] : []),
     ...(!Number.isFinite(Number(row.kcal.replace(/[,，]/g, ''))) || Number(row.kcal.replace(/[,，]/g, '')) <= 0
@@ -77,9 +79,26 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
   const generationRef = useRef(0)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
+  if (dataAccountId !== accountId) {
+    const hadUnsaved = dirty
+    generationRef.current += 1
+    setDataAccountId(accountId)
+    setData(null)
+    setDrafts([])
+    setTreatLimit('10')
+    setDirty(false)
+    setBusy(false)
+    setError('')
+    setLoadError(null)
+    setStatus('loading')
+    cancelLeave()
+    setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+  }
+
   const load = useCallback(async () => {
     const generation = ++generationRef.current
     setStatus('loading')
+    setLoadError(null)
     try {
       const res = await nenRanksApi.feeding(accountId)
       if (!res.success) throw new Error(res.error)
@@ -92,6 +111,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
     } catch (caught) {
       if (generationRef.current !== generation) return
       saveErrors.capture(caught);
+      setLoadError(caught)
 
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
@@ -163,6 +183,7 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
         ? `主食を保存し、登録済みのペット ${formatNumber(res.data.refreshedPets)}頭の目安を計算し直しました。`
         : '主食を保存しました。')
     } catch (caught) {
+      if (generationRef.current !== generation) return
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
@@ -171,13 +192,13 @@ export default function FeedingV8({ accountId, canEdit }: { accountId: string; c
         scope: 'store',
       })) }
     } finally {
-      setBusy(false)
+      if (generationRef.current === generation) setBusy(false)
     }
   }
 
   if (status === 'forbidden') return <SaveErrorScope errors={saveErrors}><ListState kind="forbidden" /></SaveErrorScope>
-  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} /></SaveErrorScope>
-  if (!data) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></SaveErrorScope>
+  if (status === 'error') return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="主食のカロリー表を読み込めませんでした" error={loadError ?? undefined} description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の状態を確認して、もう一度お試しください。'} onRetry={() => void load()} /></SaveErrorScope>
+  if (!data) return <SaveErrorScope errors={saveErrors}>{notice ? <Notice tone="success" message={notice} /> : null}<ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></SaveErrorScope>
 
   const tableProps = { fields, drafts, canEdit, busy, onUpdate: update, onDefault: setDefault, onRemove: remove, addDisabled: drafts.length >= MAX_PRODUCTS }
 

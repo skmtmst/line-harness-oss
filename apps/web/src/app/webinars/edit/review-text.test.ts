@@ -3,7 +3,7 @@ import {
   reviewActionSummaryText,
   reviewMonitoringText,
   reviewTestSummaryBody,
-} from './review-text'
+} from '@/v8/webinar-edit/review-summary'
 import type { WebinarPublishValidation } from '@/lib/api'
 
 /*
@@ -23,7 +23,7 @@ function failed(key: string) {
 
 describe('reviewActionSummaryText', () => {
   test('検査が無ければ未取得と出す', () => {
-    expect(reviewActionSummaryText(null)).toBe('—（未取得）')
+    expect(reviewActionSummaryText(null)).toBe('—')
   })
 
   test('視聴後アクションの検査結果をそのまま出す', () => {
@@ -60,7 +60,7 @@ describe('reviewTestSummaryBody', () => {
 
   test('検査の取得前・失敗時はその状態を出す', () => {
     expect(reviewTestSummaryBody(null, 'loading')).toBe('公開前検査を読み込んでいます。')
-    expect(reviewTestSummaryBody(null, 'error')).toContain('公開前検査を取得できませんでした')
+    expect(reviewTestSummaryBody(null, 'error')).toContain('公開前検査を読み込めませんでした')
   })
 })
 

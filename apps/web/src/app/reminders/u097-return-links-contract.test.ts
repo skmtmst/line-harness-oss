@@ -47,7 +47,7 @@ describe('一覧へ戻る操作を置く（#975 U097）', () => {
   })
 
   it('流入リンク詳細は、表示できないとき一覧へ戻れる', () => {
-    expect(INFLOW_DETAIL).toContain('href="/inflow-links"')
+    expect(INFLOW_DETAIL).toContain('backHref="/inflow-links"')
     expect(INFLOW_DETAIL).toContain('流入経路の一覧へ戻る')
   })
 })

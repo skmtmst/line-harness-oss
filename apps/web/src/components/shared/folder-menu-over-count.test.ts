@@ -14,7 +14,7 @@ const tsx = readFileSync(join(dir, 'folder-panel.tsx'), 'utf8')
 
 describe('フォルダの「…」と件数', () => {
   it('V8 では「…」の箱に tailwind の relative を当てない（部品の absolute が負ける）', () => {
-    expect(tsx).toMatch(/className=\{`\$\{styles\.menu\} v7:relative shrink-0`\}/)
+    expect(tsx).toMatch(/className=\{`\$\{styles\.menu\} shrink-0`\}/)
     expect(tsx).not.toMatch(/\$\{styles\.menu\} relative /)
   })
 

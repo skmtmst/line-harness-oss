@@ -51,10 +51,12 @@ describe('Issue #637 h1は1画面に1つ', () => {
   })
 
   it('本文見出しをh1に戻さない（重複が直った画面はh2版を使う）', () => {
-    for (const rel of ['app/nen-campaigns/nen-overview.tsx', 'app/ec-commerce/page.tsx']) {
+    expect(read('v8/nen-campaigns/list.tsx')).toContain('<ListPage')
+    expect(read('components/templates/page-frame.tsx')).toContain("titleAs: HeadingTag = 'h2'")
+    for (const rel of ['v8/settings/ec-commerce/screen.tsx']) {
       const src = read(rel)
       expect(src, rel + ' が共有PageHeader（h1）へ戻っている').toContain(
-        "@/components/layout/page-header-h2",
+        "SbSettingsScreen",
       )
       expect(src, rel + ' が共有PageHeader（h1）へ戻っている').not.toContain(
         "@/components/shared/page-header",
@@ -65,7 +67,7 @@ describe('Issue #637 h1は1画面に1つ', () => {
   it('/nen-members の深い画面（掲載管理・1枚表示）もh1を置かない', () => {
     // トップバーの「投稿」（h1）と並ぶと1画面に h1 が2つになるため h2 へ。
     // 掲載管理の古い photo-publications.tsx はどこからも描かれないので 2026-10-07 に消した。
-    for (const rel of ['app/nen-members/photo-review-detail.tsx']) {
+    for (const rel of ['v8/nen-posts/detail.tsx']) {
       const src = read(rel)
         .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
         .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -101,7 +103,7 @@ describe('Issue #637 画面名とナビ名の一致', () => {
     expect(src).toContain("usePageTitle('コンバージョン')")
     expect(src).toContain('router.replace(target)')
     expect(src).toContain('`/affiliates?${params.toString()}`')
-    const affiliates = read('app/affiliates/affiliates-v8.tsx')
+    const affiliates = read('v8/affiliates/affiliates.tsx')
     expect(affiliates).toContain('usePageTitle(TITLE_BY_TAB[tab])')
     expect(affiliates).toContain("affiliates: '成果とアフィリエイト'")
   })

@@ -1,6 +1,6 @@
 /*
  * ★V8 通知（Pencil `y8QQV`）。枠・見出しは型（ListPage）が持つ。
- * 値は globals.css の `[data-theme="v8"]` の `--tpl-nt-*`。
+ * 値は globals.css の `:root` の `--tpl-nt-*`。
  */
 
 /* 中身 V8：上16・左右24・下24、段の間16。 */

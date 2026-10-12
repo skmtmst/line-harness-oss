@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * チェックのカード（Pencil ★V8 `w6uYMd`・`RRxK5`）。
@@ -14,12 +14,7 @@
 
 .card {
   display: flex;
-  align-items: center;
-  gap: 12px;
   min-height: 68px;
-  padding: 14px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
   background: var(--color-canvas);
   cursor: pointer;
   transition: background-color var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
@@ -47,8 +42,6 @@
   margin: 0;
   width: 18px;
   height: 18px;
-  border: 1.5px solid var(--color-toggle-off);
-  border-radius: var(--radius-icon);
   background: var(--color-canvas);
   cursor: pointer;
   transition: background-color var(--motion-fast) ease-out, border-color var(--motion-fast) ease-out;
@@ -56,12 +49,6 @@
 
 .box:checked {
   background: var(--color-accent-deep);
-  border-color: var(--color-accent-deep);
-}
-
-.box:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
 }
 
 .mark {
@@ -99,103 +86,92 @@
 }
 
 .body {
-  display: grid;
-  gap: 2px;
   min-width: 0;
 }
 
 .title {
-  font-size: var(--text-body);
-  font-weight: 500;
   color: var(--color-ink);
-  line-height: var(--text-lh, 1.4);
-}
-
-.note {
-  font-size: var(--text-caption);
-  color: var(--color-ink-secondary);
-  line-height: 1.5;
 }
 
 /* ★V8「枠線の色」：オフの箱の枠は choice-border。選んだ緑は変えない。 */
-[data-theme='v8'] .box {
+:root .box {
   border-color: var(--color-choice-border);
 }
 
-[data-theme='v8'] .box:checked {
+:root .box:checked {
   border-color: var(--color-accent-deep);
 }
 }
 
 /* 正本 w6uYMd / RRxK5：枠を寸法に足さず、上端にチェックをそろえる。 */
-[data-theme='v8'] .card {
+:root .card {
   align-items: flex-start; border: 0; border-radius: var(--polish-radius-card);
   outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
-[data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { outline-color: var(--color-accent-deep); }
-[data-theme='v8'] .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
-[data-theme='v8'] .box:checked { outline-color: var(--color-accent-deep); }
-[data-theme='v8'] .box:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
-[data-theme='v8'] .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
-[data-theme='v8'] .title { line-height: 20px; }
-[data-theme='v8'] .note { line-height: 18px; font-weight: 400; }
-[data-theme='v8'] .disabled, [data-theme='v8'] .disabled .box { outline-color: var(--color-ink-disabled); }
+:root .checked, :root .checked:hover { outline-color: var(--color-accent-deep); }
+:root .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
+:root .box:checked { outline-color: var(--color-accent-deep); }
+:root .box:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
+:root .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
+:root .title { line-height: 20px; }
+:root .note { line-height: 18px; font-weight: 400; }
+:root .disabled, :root .disabled .box { outline-color: var(--color-ink-disabled); }
 
-[data-theme='v8'] .body { align-items: flex-start; }
-[data-theme='v8'] .note { width: 100%; }
+:root .body { align-items: flex-start; }
+:root .note { width: 100%; }
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
-[data-theme='v8'] .card { -webkit-font-smoothing: auto; }
+:root .card { -webkit-font-smoothing: auto; }
 
 /* 誤りの口を渡した選択欄だけ。フォーカスしても赤い枠を残す。 */
-[data-theme='v8'] .invalid,
-[data-theme='v8'] .invalid:hover { outline-color: var(--color-danger); }
-[data-theme='v8'] .invalid .box,
-[data-theme='v8'] .invalid .box:focus-visible { outline-color: var(--color-danger); }
+:root .invalid,
+:root .invalid:hover { outline-color: var(--color-danger); }
+:root .invalid .box,
+:root .invalid .box:focus-visible { outline-color: var(--color-danger); }
 
 /* ★V8 J5DH6o（統括の一括配信「送るアカウント」）：高さ 56・左右 12・間 10・角丸 10、題 13/600・補足 11、印は真ん中にそろえる。 */
-[data-theme='v8'] .compact { align-items: center; gap: 10px; min-height: 56px; padding: 0 12px; border-radius: var(--radius-control); }
-[data-theme='v8'] .compact .title { font-size: 13px; font-weight: 600; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-[data-theme='v8'] .compact .note { font-size: 11px; line-height: 16px; white-space: nowrap; }
+:root .compact { align-items: center; gap: 10px; min-height: 56px; padding: 0 12px; border-radius: var(--radius-control); }
+:root .compact .title { font-size: 13px; font-weight: 600; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root .compact .note { font-size: 11px; line-height: 16px; white-space: nowrap; }
 
 /* 単独の確認行（Yyw6i）。既定のカード寸法は変えない。 */
-[data-theme='v8'] .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; border-radius: var(--radius-control); }
-[data-theme='v8'] .row .title { font-size: 13px; font-weight: 500; line-height: 20px; }
+:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; border-radius: var(--radius-control); }
+:root .row .title { font-size: 13px; font-weight: 500; line-height: 20px; }
 
 /* B-152①：チェック付きカードも内側16。 */
-[data-theme='v8'] .card { padding: var(--polish-space-card); gap: var(--polish-space-field); }
+:root .card { padding: var(--polish-space-card); gap: var(--polish-space-field); }
 
 /* B-152②：役割ごとの文字の段。 */
-[data-theme='v8'] .title, html[data-theme='v8'] .card:is(.compact, .row) .title { font-size: var(--text-body); font-weight: var(--polish-weight-label); line-height: 20px; }
-[data-theme='v8'] .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); color: var(--color-ink-faint); }
+:root .title, html:root .card:is(.compact, .row) .title { font-size: var(--text-body); font-weight: var(--polish-weight-label); line-height: 20px; }
+:root .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); color: var(--color-ink-faint); }
 
 /* B-152・仕上げ7：誤りのある欄もキーボードの輪は青。 */
-[data-theme='v8'] .box:focus-visible, [data-theme='v8'] .invalid .box:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+:root .box:focus-visible, :root .invalid .box:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 
 /* B-152⑩：説明文は省略せず、必要な行数で読む。 */
-[data-theme='v8'] .note, html[data-theme='v8'] .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+:root .note, html:root .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 
 /* B-152⑦：カード全体の地と濃さをそろえ、箱を二重に薄くしない。 */
-[data-theme='v8'] .card {
+:root .card {
   --polish-overlay-strength: var(--polish-overlay-idle);
   background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
   transition-property: background-color, border-color, outline-color, opacity, --polish-overlay-strength;
   transition-duration: var(--polish-interaction-duration);
 }
-[data-theme='v8'] .card:not(.disabled):hover { --polish-overlay-strength: var(--polish-hover-opacity); }
-[data-theme='v8'] .card:not(.checked):not(.disabled):hover { background-color: var(--color-canvas); }
-[data-theme='v8'] .card:not(.disabled):active { --polish-overlay-strength: var(--polish-active-opacity); }
-[data-theme='v8'] .card:has(.box:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-[data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
-html[data-theme='v8'] .disabled .box:disabled { opacity: var(--polish-enabled-opacity); }
+:root .card:not(.disabled):hover { --polish-overlay-strength: var(--polish-hover-opacity); }
+:root .card:not(.checked):not(.disabled):hover { background-color: var(--color-canvas); }
+:root .card:not(.disabled):active { --polish-overlay-strength: var(--polish-active-opacity); }
+:root .card:has(.box:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+:root .disabled { opacity: var(--polish-disabled-opacity); }
+html:root .disabled .box:disabled { opacity: var(--polish-enabled-opacity); }
 
-[data-theme='v8'] .card { padding: var(--tpl-card-pad); }
+:root .card { padding: var(--tpl-card-pad); }
 
 /* B-203・B-207・B-211：10-10 に採用した共通の形。 */
-[data-theme='v8'] .card { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
-[data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
-html[data-theme='v8'] .boxWrap, html[data-theme='v8'] .box { width: var(--choice-size); height: var(--choice-size); }
-html[data-theme='v8'] .mark { inset: 0; margin: auto; }
-html[data-theme='v8'] .card:has(.box:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
-html[data-theme='v8'] .invalid { outline-color: var(--color-danger); }
+:root .card { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
+:root .checked, :root .checked:hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
+html:root .boxWrap, html:root .box { width: var(--choice-size); height: var(--choice-size); }
+html:root .mark { inset: 0; margin: auto; }
+html:root .card:has(.box:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+html:root .invalid { outline-color: var(--color-danger); }

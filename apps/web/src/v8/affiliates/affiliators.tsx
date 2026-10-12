@@ -48,6 +48,7 @@ import {
 } from './display'
 import { AffiliateArchiveDialog } from './dialogs'
 import AffiliateDrawer from './drawer'
+import MonthlyFlow from './monthly-flow'
 import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
 import {
   AffiliateToolbar,
@@ -139,6 +140,7 @@ export default function AffiliatorsTab() {
   const [drawerId, setDrawerId] = useDetailPanelUrl('affiliate')
   const itemHref = useListItemHref()
   const [drawerEdit, setDrawerEdit] = useState(false)
+  const [monthlyFlowOpen, setMonthlyFlowOpen] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [bulkConfirm, setBulkConfirm] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -651,9 +653,12 @@ export default function AffiliatorsTab() {
   return (
     <SaveErrorScope errors={saveErrors}><AffiliateFrame
       actions={
+        <>
+        <Button type="button" onClick={() => setMonthlyFlowOpen(true)}>今月の流れを確認</Button>
         <Button onClick={exportCsv} disabled={shownRows.length === 0}>
           <Download size={15} aria-hidden="true" /> CSVで書き出す
         </Button>
+        </>
       }
       stats={stats}
       folderNav={{ rows: managedFolderNavRows(null, []), activeId: 'all', onSelect: () => undefined, createAction: readonly ? undefined : createButton(false) }}
@@ -661,6 +666,7 @@ export default function AffiliatorsTab() {
       toolbar={toolbar}
       pagination={pager}
       overlays={<>
+        <MonthlyFlow open={monthlyFlowOpen} accountId={accountId} onClose={() => setMonthlyFlowOpen(false)} />
         <ConfirmDialog open={resumeTarget !== null} title={`「${resumeTarget?.name ?? ''}」の紹介を再開しますか？`} description="紹介リンクからの成果を再び数えます。" confirmLabel="紹介を再開する" busy={resuming} error={resumeError} onConfirm={() => void resumeReferral()} onCancel={() => { if (!resuming) setResumeTarget(null) }} />
         <AffiliateArchiveDialog
           target={archiveTarget}

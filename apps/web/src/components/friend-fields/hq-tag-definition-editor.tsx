@@ -1,15 +1,11 @@
 'use client'
 
-import type { TagGroup } from '@line-crm/shared'
 import type { TagDefinition } from '@/lib/hq-templates-api'
-import TagEditorV4, {
+import {
   definitionsForSave,
   linkedActionFromDefinition,
-  type TagEditorActionLabel,
   type TagEditorValues,
 } from './tag-editor-v4'
-
-const HQ_PORTABLE_ACTIONS: readonly TagEditorActionLabel[] = ['テキスト送信', 'マイル付与']
 
 export function hqTagDefinitionToEditor(definition: TagDefinition): TagEditorValues {
   const tag = definition.tag
@@ -49,41 +45,4 @@ export function hqTagEditorToDefinition(definition: TagDefinition, values: TagEd
     },
     folders: definition.folders,
   }
-}
-
-export default function HqTagDefinitionEditor({ definition, mode = 'create', saving, error, notice, onCancel, onSave }: {
-  definition: TagDefinition
-  mode?: 'create' | 'edit'
-  saving: boolean
-  error?: string
-  notice?: string
-  onCancel: () => void
-  /** R561: 正規編集部品の「保存して続けて作る」の選択を統括の保存へ伝える。 */
-  onSave: (definition: TagDefinition, andAnother?: boolean) => void | Promise<void>
-}) {
-  const now = new Date().toISOString()
-  const groups: TagGroup[] = definition.folders.map((folder, index) => ({
-    id: folder.id,
-    accountId: null,
-    name: folder.name,
-    sortOrder: index,
-    color: folder.color ?? null,
-    createdAt: now,
-    updatedAt: now,
-  }))
-  const initialValues = hqTagDefinitionToEditor(definition)
-  return <TagEditorV4
-    mode={mode}
-    embedded
-    groups={groups}
-    initialLinked={initialValues.linked}
-    initialValues={initialValues}
-    resources={null}
-    allowedActionTypes={HQ_PORTABLE_ACTIONS}
-    saving={saving}
-    error={error}
-    notice={notice}
-    onCancel={onCancel}
-    onSave={async (values, andAnother) => { await onSave(hqTagEditorToDefinition(definition, values), andAnother) }}
-  />
 }

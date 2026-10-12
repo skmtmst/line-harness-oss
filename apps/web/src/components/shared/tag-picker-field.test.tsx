@@ -6,7 +6,6 @@ import TagPickerField from './tag-picker-field'
 import TapExtrasField from './tap-extras-field'
 const mocks = vi.hoisted(() => ({ list: vi.fn(), groups: vi.fn(), create: vi.fn() }))
 vi.mock('@/lib/api', () => ({ api: { tags: { list: mocks.list, create: mocks.create }, tagGroups: { list: mocks.groups } } }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('./use-tap-action-sources', () => ({ useTapActionAccount: () => null }))
 const tags = [{ id: 't1', name: '予約に興味', groupId: 'g1', isStarred: true }, { id: 't2', name: '来店', groupId: null }]
 beforeEach(() => {

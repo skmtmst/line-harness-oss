@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAYMENT = readFileSync(new URL('./payment-tab.tsx', import.meta.url), 'utf8')
-const DIALOGS = readFileSync(new URL('./action-dialogs.tsx', import.meta.url), 'utf8')
+const PAYMENT = readFileSync(new URL('../../v8/affiliates/payment.tsx', import.meta.url), 'utf8')
+const PAYMENT_DIALOGS = readFileSync(new URL('../../v8/affiliates/payment-dialogs.tsx', import.meta.url), 'utf8')
+const DIALOGS = readFileSync(new URL('../../v8/affiliates/dialogs.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const PAYOUTS = readFileSync(new URL('../../../../worker/src/routes/affiliate-payouts.ts', import.meta.url), 'utf8')
 
@@ -12,7 +13,7 @@ describe('V6 支払いの追記台帳契約', () => {
     expect(API).toContain('/api/affiliate-settlements/preview?')
     expect(PAYOUTS).toContain("'/api/affiliate-settlements/preview'")
     expect(PAYMENT).toContain('api.affiliates.settlementPreview(accountId, period)')
-    expect(PAYMENT).toContain('currentAffiliateSettlementPeriod()')
+    expect(PAYMENT).toContain('currentSettlementPeriod()')
   })
 
   it('締め・明細・振込バッチ・再認証つきCSVを実APIへ接続する', () => {
@@ -23,26 +24,26 @@ describe('V6 支払いの追記台帳契約', () => {
       'api.affiliates.payoutStepUp',
       'api.affiliates.exportPayoutBatch',
       '支払明細をまとめて出す',
-      '振込用CSVを書き出す',
+      '銀行用 CSV',
     ]) {
-      expect(PAYMENT).toContain(word)
+      expect(`${PAYMENT}\n${PAYMENT_DIALOGS}`).toContain(word)
     }
     expect(API).toContain("'Idempotency-Key': idempotencyKey")
     expect(API).toContain("'X-Step-Up-Token': stepUpToken")
     expect(API).toContain("purpose: 'affiliate.payout.export'")
-    expect(PAYMENT).toContain("process.env.NEXT_PUBLIC_API_URL ?? ''")
-    expect(PAYMENT).toContain('statementKeysRef.current.get(item.affiliateId)')
+    expect(PAYMENT).toContain('process.env.NEXT_PUBLIC_API_URL')
+    expect(PAYMENT).toContain('statementKeys.current.get(item.affiliateId)')
     // R43: 締め直後はプレビュー、再開時は台帳の内訳から対象を取る。
     expect(PAYMENT).toContain('Promise.allSettled(statementTargets.map')
     expect(PAYMENT).toContain('}, key)')
-    expect(PAYMENT).toContain('exportKey,')
+    expect(PAYMENT_DIALOGS).toContain('exportKey)')
   })
 
   it('APIに無い支払日と過去履歴を作り物で補わない', () => {
     expect(PAYMENT).toContain('title="次の支払日"')
-    expect(PAYMENT).toContain('支払日の設定APIが接続されると表示します')
+    expect(PAYMENT).toContain('支払日はアフィリエイターごとの取り決めです')
     expect(PAYMENT).toContain('title="今年 払った合計"')
-    expect(PAYMENT).toContain('支払履歴APIが接続されると表示します')
+    expect(PAYMENT).toContain('振込の記録がつながると出ます')
     expect(PAYMENT).toContain('value={null}')
   })
 
@@ -55,7 +56,7 @@ describe('V6 支払いの追記台帳契約', () => {
   })
 
   it('人ごとの内訳は実プレビューを読み、締め期間と登録状態を重ねる', () => {
-    expect(DIALOGS).toContain('data-design-node="GqFTV"')
+    expect(DIALOGS).toContain('designNode="GqFTV"')
     expect(DIALOGS).toContain('api.affiliates.paymentPreview')
     expect(DIALOGS).toContain('api.affiliates.confirmPayment')
     expect(DIALOGS).toContain('periodTo ?? preview.closeDate')
@@ -82,19 +83,20 @@ describe('V6 支払いの追記台帳契約', () => {
   })
 
   it('読込・通常・空・失敗を分け、失敗を0円にしない', () => {
-    expect(PAYMENT).toContain('<ListState kind="loading" />')
-    expect(PAYMENT).toContain('kind="error"')
-    expect(PAYMENT).toContain('kind="empty"')
-    expect(PAYMENT).toContain('締め対象や金額を0とは扱っていません')
-    expect(PAYMENT).toContain('const summaryUnavailable = error && !loading')
-    expect(PAYMENT).toContain('value={summaryUnavailable ? null : preview?.totalAmount ?? 0}')
+    expect(PAYMENT).toContain('loadState === \'loading\'')
+    expect(PAYMENT).toContain('loadState === \'error\'')
+    expect(PAYMENT).toContain('rows.length === 0')
+    expect(PAYMENT).toContain('数の帯は「—」にしています')
+    expect(PAYMENT).toContain("const ready = loadState === 'ready'")
+    expect(PAYMENT).toContain("valueText={ready && preview ? formatYen(preview.totalAmount) : emptyValue('unknown')}")
   })
 
   it('一覧と締め対象の返事を形検査してから画面へ入れる', () => {
     const settlementCheck = PAYMENT.indexOf('Array.isArray(settlement.data.affiliates)')
     const setPreview = PAYMENT.indexOf('setPreview(settlement.data)')
     expect(settlementCheck).toBeGreaterThan(-1)
-    expect(PAYMENT).toContain('setItems(summaries?.success && Array.isArray(summaries.data) ? summaries.data : [])')
+    expect(PAYMENT).toContain('!summaries.success || !Array.isArray(summaries.data) || !current.success')
+    expect(PAYMENT).toContain('setItems(summaries.data)')
     expect(setPreview).toBeGreaterThan(settlementCheck)
   })
 

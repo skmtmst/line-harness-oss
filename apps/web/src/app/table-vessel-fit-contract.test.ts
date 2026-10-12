@@ -30,44 +30,39 @@ function percentTotal(source: string): number {
 }
 
 describe('表は器の幅にぴったり収める', () => {
-  it('/booking/menus: 操作は「中身を見る」＋「…」で、中身が器からはみ出さない', () => {
-    const page = read('booking/menus/page.tsx')
-    expect(page).toContain('<DataTable')
-    // ★V7 行の操作の決まり：主な1つ＋「…」。共通の RowActions を使う。
-    // 4つ並べると1440pxで器から72pxはみ出す。上へ・下へ・止める／再開は「…」の中。
-    expect(page).toContain('<RowActions')
-    expect(page).toContain("label: '中身を見る'")
-    expect(page).toContain("label: '上へ'")
-    expect(page).toContain("label: '下へ'")
-    expect(page).toContain("label: m.is_active ? '止める' : '再開'")
-    // 行への直置きボタン（↑↓・止める・出す）に戻さない。
-    expect(page).not.toContain('を上へ')
-    expect(page).not.toContain('を下へ')
-    expect(page).not.toContain('止める・出す')
-    // 操作列は「中身を見る」＋「…」（約138px）に合わせた固定幅。4つ並びの w-48 に戻さない。
-    expect(page).toMatch(/<Th[^>]*w-44[^>]*>操作<\/Th>/)
-    expect(page).not.toMatch(/<Th[^>]*w-48[^>]*>操作<\/Th>/)
-    // 割合の合計は 100% 未満。残りは「だれが受けられるか」（自動）が吸う。
-    expect(percentTotal(page)).toBeLessThan(100)
+  it('/booking/menus: V8の名前と行末操作が器からはみ出さない', () => {
+    const page = read('../v8/booking-menus/tabs/menus-tab.tsx')
+    const css = read('../v8/booking-menus/settings.module.css')
+    expect(page).toContain('className={styles.menuRow}')
+    expect(page).toContain('<RowMenu')
+    expect(page).toContain('className={styles.rowMenuButton}')
+    expect(css).toMatch(/\.colName\s*\{[^}]*flex: 1 1 0;[^}]*min-width: 0;/)
+    expect(css).toMatch(/\.rowMenuButton\s*\{[^}]*width: var\(--tpl-bm-28\)/)
+    expect(css).toMatch(/\.menuName\s*\{[^}]*max-width: 100%;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/)
   })
 
   it('/events: 操作列は固定幅で、中身が器からはみ出さない', () => {
-    const page = read('events/page.tsx')
+    const page = read('../v8/events/list.tsx')
+    const css = read('../v8/events/list.module.css')
     expect(page).toContain('<DataTable')
-    // 操作列は 2ボタン（約242px）に合わせた固定幅。割合（14%）に戻さない。
-    expect(page).toMatch(/<Th[^>]*w-64[^>]*>操作<\/Th>/)
+    // V8の行末メニューは共通の固定幅。旧2ボタン分の幅へ戻さない。
+    expect(page).toContain('<col className={styles.colMenu} />')
+    expect(page).toContain('<Th aria-label="操作" />')
+    expect(css).toContain('.colMenu { width: var(--tpl-fm-col-menu); }')
     expect(page).not.toMatch(/width:\s*['"]14%['"]/)
     expect(percentTotal(page)).toBeLessThan(100)
   })
 
   it('/events: 申込条件は1行で省略し、全文は title で確認する', () => {
-    const page = read('events/page.tsx')
+    const page = read('../v8/events/list.tsx')
     // 申込条件は状態の札の下へ畳む。独立した列に戻すと、狭い器で見出しが
     // 重なり「全員」が縦に折れる（m19d の撮影指摘）。
     expect(page).not.toContain('>申込条件</Th>')
     // タグ名は長さが読めない。省略を外して素の文字に戻さない。
-    expect(page).toContain('max-w-32 truncate')
-    expect(page).toContain('title={e.visible_tag_name}')
+    expect(page).toContain("<TagPill name={e.visible_tag_name ?? '消えたタグ'} size=\"sm\" />")
+    const tag = read('../components/shared/tag-pill.tsx')
+    expect(tag).toContain('<TruncatedText className={styles.name} value={name} />')
+    expect(read('../components/shared/truncated-text.module.css')).toContain('white-space: nowrap; text-overflow: ellipsis;')
   })
 
   it('/（対応が必要な受信）: 状態列は札に合わせた固定幅で、右に空けない', () => {

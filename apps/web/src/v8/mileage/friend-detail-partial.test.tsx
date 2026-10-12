@@ -5,18 +5,22 @@
  */
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {} }),
   useSearchParams: () => new URLSearchParams('id=f1'),
   usePathname: () => '/mileage/friend',
 }))
-vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a> }))
+vi.mock('next/link', () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
 const today = new Date().toISOString()
+let rank: string | null = null
+let rankLoaded = false
+let connections: Array<{ accountId: string; accountName: string }> | undefined
+beforeEach(() => { rank = null; rankLoaded = false; connections = undefined })
 const entry = (id: string) => ({
   id, entryType: 'grant', status: 'available', amount: 10, reason: '来店', source: 'rule', hasSourceEvent: false,
   sourceReferenceId: null, ruleName: null, mode: 'automatic', executedByStaffName: null, lineAccountId: 'acc',
@@ -31,12 +35,12 @@ vi.mock('@/lib/api', async (importOriginal) => {
       friends: {
         ...actual.api.friends,
         get: async () => ({ success: true, data: { id: 'f1', displayName: '田中', createdAt: '2026-01-01T00:00:00Z' } }),
-        mileage: async () => ({ success: true, data: { summary: { available: 0, pending: 0, lifetimeEarned: 0, spent: 0 }, history: [], insights: null } }),
+        mileage: async () => ({ success: true, data: { summary: { available: 0, pending: 0, lifetimeEarned: 0, spent: 0 }, history: [], insights: null, connections } }),
       },
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'staff' } }) },
       mileage: {
         ...actual.api.mileage,
-        friendsV6: async () => ({ success: false, error: 'x' }),
+        friendsV6: async () => rankLoaded ? ({ success: true, data: { items: [{ friendId: 'f1', rank, rankReason: 'ランクは未公開です', available: 0, pending: 0, monthChange: 0 } ] } }) : ({ success: false, error: 'x' }),
         history: async () => ({ success: true, data: { items: Array.from({ length: 100 }, (_, i) => entry(`e${i}`)), summary: { byType: [] }, pagination: { total: 340, limit: 100, offset: 0 } } }),
       },
     },
@@ -50,4 +54,28 @@ test('最新100件より多いとき、今月の数は「数えられません�
   render(<FriendDetailV8 />)
   await screen.findByText('最新100 件だけでは数えられません')
   expect(screen.getByText(/最新100 件（全340 件）のうち/)).toBeTruthy()
+})
+
+test('未公開のランクを最高到達にせず、未取得の接続先と付与回数を0にしない', async () => {
+  rankLoaded = true
+  render(<FriendDetailV8 />)
+  expect((await screen.findByText('使い道・ランクを作る')).getAttribute('href')).toBe('/mileage?tab=rewards')
+  expect(screen.getByTitle('ランクは未公開です')).toBeTruthy()
+  expect(screen.queryByTitle(/いちばん上のランクです/)).toBeNull()
+  expect(screen.getByTitle('接続先を確認できませんでした')).toBeTruthy()
+  expect(screen.getByTitle('付与記録の回数は未取得')).toBeTruthy()
+})
+
+test('最高ランクと接続先0件を区別し、接続先の同じアカウントは1回表示する', async () => {
+  rankLoaded = true
+  rank = 'gold'
+  connections = []
+  const view = render(<FriendDetailV8 />)
+  await screen.findByTitle(/いちばん上のランクです/)
+  expect(screen.getByTitle('接続先はありません')).toBeTruthy()
+  expect(screen.queryByText('使い道・ランクを作る')).toBeNull()
+  view.unmount()
+  connections = [{ accountId: 'a', accountName: '本店' }, { accountId: 'a', accountName: '本店' }]
+  render(<FriendDetailV8 />)
+  expect(await screen.findByTitle('本人確認済みの接続先：本店')).toBeTruthy()
 })

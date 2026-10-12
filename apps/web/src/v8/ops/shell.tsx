@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import TopBar from '@/components/shared/top-bar'
 import { PageHeading } from '@/components/templates/page-frame'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import type { OpsMe } from '@/lib/api'
@@ -73,6 +74,7 @@ export default function OpsShellV8({
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [drawer, setDrawer] = useState(false)
+  const drawerRef = useOverlayFocus<HTMLElement>(drawer, () => setDrawer(false))
 
   // 上の帯の畳むボタン（⌘\）を受ける。共通の左メニューと同じ合図。
   useEffect(() => {
@@ -158,7 +160,7 @@ export default function OpsShellV8({
       {drawer ? (
         <>
           <button type="button" aria-label="メニューを閉じる" onClick={() => setDrawer(false)} className={styles.scrim} />
-          <aside aria-label="運営メニュー（開いた形）" className={styles.drawer}>
+          <aside ref={drawerRef} aria-label="運営メニュー（開いた形）" className={styles.drawer}>
             <button type="button" aria-label="メニューを閉じる" onClick={() => setDrawer(false)} className={styles.drawerClose}>
               <X aria-hidden="true" />
             </button>
@@ -182,6 +184,12 @@ export default function OpsShellV8({
               roleLabel="運営"
               userName={me?.name ?? ''}
               onLogout={() => logoutAndGoToLogin('/ops/login')}
+              identityActions={[
+                { id: 'profile', label: 'プロフィールを編集', href: '/staff' },
+                { id: 'members', label: 'メンバー管理', href: '/ops/members' },
+                { id: 'two-factor', label: me?.totpEnabled ? '2要素認証（設定済み）' : '2要素認証の設定', href: '/ops/two-factor' },
+                { id: 'logout', label: 'ログアウト', tone: 'danger', dividerBefore: true, onSelect: () => void logoutAndGoToLogin('/ops/login') },
+              ]}
               v8Chrome
               menuCollapsed={collapsed}
             />

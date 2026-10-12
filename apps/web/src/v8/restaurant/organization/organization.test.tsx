@@ -102,3 +102,11 @@ it('WEB169：店舗編集のタイムゾーンは日本時間の表示だけ', a
   expect(screen.queryByRole('textbox', { name: 'タイムゾーン' })).toBeNull()
   expect(screen.getByRole('dialog').textContent).toContain('日本時間（Asia/Tokyo）')
 })
+
+it('B-241 login candidate failure shows retry rather than an empty selector',async()=>{
+ fixture.loginMembers.mockRejectedValueOnce(new Error('人工取得失敗'))
+ render(<OrganizationV8 />)
+ const error=await screen.findByText('ログインメンバーを読み込めませんでした')
+ fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
+ await waitFor(()=>expect(screen.queryByText('ログインメンバーを読み込めませんでした')).toBeNull())
+})

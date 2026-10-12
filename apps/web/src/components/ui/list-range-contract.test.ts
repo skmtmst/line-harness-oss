@@ -30,19 +30,19 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
    */
   ['回答フォーム 回答一覧', '../../app/form-submissions/responses/page.tsx'],
   ['コンテンツ管理', '../../app/contents/page.tsx'],
-  ['運営へのお知らせ', '../../app/line-notifications/operator-notification-rules.tsx'],
-  ['NENキャンペーン 送った履歴', '../../app/nen-campaigns/nen-overview.tsx'],
-  ['コンバージョン', '../../app/conversions/page.tsx'],
-  ['EC連携 取り込みの記録', '../../app/ec-commerce/page.tsx'],
+  ['運営へのお知らせ', '../../v8/settings/line-notifications/operator-tab.tsx'],
+  ['NENキャンペーン 送った履歴', '../../v8/nen-campaigns/list.tsx'],
+  ['コンバージョン', '../../v8/conversions/list.tsx'],
+  ['EC連携 取り込みの記録', '../../v8/settings/ec-commerce/screen.tsx'],
   ['EC連携 会員のつき合わせ', '../../app/ec-commerce/identity-candidates/page.tsx'],
-  ['EC連携 定期便', '../../app/ec-commerce/subscriptions-panel.tsx'],
+  ['EC連携 定期便', '../../v8/settings/ec-commerce/subscriptions.tsx'],
   ['予約メニュー', '../../app/booking/menus/page.tsx'],
-  ['ウェビナー', '../../app/webinars/page.tsx'],
-  ['運営 監査ログ', '../../app/ops/audit/page.tsx'],
-  ['運営 お問い合わせ', '../../app/ops/support/page.tsx'],
-  ['自動化の実行記録', '../../app/automations/runs/page.tsx'],
+  ['ウェビナー', '../../v8/webinars/list.tsx'],
+  ['運営 監査ログ', '../../v8/ops/audit.tsx'],
+  ['運営 お問い合わせ', '../../v8/ops/support.tsx'],
+  ['自動化の実行記録', '../../v8/automations/runs.tsx'],
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
-  ['Webhook のやり取り', '../../app/webhooks/webhook-interactions.tsx'],
+  ['Webhook のやり取り', '../../v8/webhooks/interactions.tsx'],
   // 受信一覧（旧inbox部品 ../inbox/inbox-list.tsx）は、どの入口からも読まれなくなったので外した（2026-10-06）。
   ['スタッフの操作記録', '../staff/login-audit.tsx'],
 ]
@@ -59,7 +59,45 @@ describe('ListRange 統一（監査6 #667）', () => {
     '$name は ListRange を呼ぶ',
     ({ path }) => {
       const source = read(path)
-      expect(source, `${path} に ListRange がない`).toContain('ListRange')
+      if (path === '../../v8/ops/support.tsx') {
+        expect(source).toContain('`${total}件中')
+        expect(source).toContain('tickets.length === 0 ? 0 : 1')
+        expect(source).toContain('setTotal(typeof res.total')
+        expect(source).toContain('offset: tickets.length')
+      } else if (path === '../../v8/ops/audit.tsx') {
+        // 現役の絵は件数を脚注の補足で確認する。ページとAPIの全件数で計算する。
+        expect(source).toContain('title={`${total}件中')
+        expect(source).toContain('(page - 1) * PAGE + 1')
+        expect(source).toContain('Math.min(page * PAGE, total)')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
+      } else if (path === '../../app/rich-menus/page.tsx') {
+        expect(source).toContain('(currentPage - 1) * pageSize + 1')
+        expect(source).toContain('Math.min(currentPage * pageSize, groupTotal)')
+        expect(source).toContain('formatNumber(groupTotal)')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
+      } else if (path === '../../v8/webhooks/interactions.tsx') {
+        expect(source).toContain('`${formatNumber(data.total)} 件中 ${rangeFirst}〜${rangeLast} 件`')
+        expect(source).toContain('data.total === 0 ? 0 : (data.page - 1) * data.limit + 1')
+      } else if (path === '../../v8/automations/runs.tsx') {
+        expect(source).toContain('data.pagination.offset + 1')
+        expect(source).toContain('data.pagination.offset + data.items.length')
+        expect(source).toContain('formatNumber(total)')
+        expect(source).toContain('pageCount > 1')
+      } else if (path === '../../v8/conversions/list.tsx') {
+        expect(source).toContain('(currentPage - 1) * pageSize + current.length')
+        expect(source).toContain('<ListRange total={shown.length}')
+        expect(source).toContain('<Pagination page=')
+        expect(source).not.toContain('pageCount > 1 ?')
+      } else if (path === '../../v8/webinars/list.tsx') {
+        expect(source).toContain('(currentPage - 1) * pageSize + visibleItems.length')
+        expect(source).toContain('paginationSummary(visibleTotal,')
+        expect(source).toContain('const pager = hasListData ?')
+      } else if (path === '../../v8/nen-campaigns/list.tsx') {
+        expect(source).toContain('`\u0024{formatNumber(total)} 件中 \u0024{(page - 1) * size + 1}〜\u0024{Math.min(total, page * size)} 件`')
+        expect(source).toContain('pageCount > 1')
+      } else expect(source, `${path} に ListRange がない`).toContain('ListRange')
     },
   )
 

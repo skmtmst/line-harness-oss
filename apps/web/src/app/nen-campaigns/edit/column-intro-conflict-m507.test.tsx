@@ -15,6 +15,10 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const role = vi.hoisted(() => ({ value: 'owner' }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => role.value }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import { ApiError } from '@/lib/api'
 
 const lineAccountsListApi = vi.hoisted(() => vi.fn())
@@ -27,7 +31,7 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn() }),
   // ?key= なし（一覧=紹介文編集モード）で開く。
   useSearchParams: () => ({ get: () => null }),
@@ -133,6 +137,7 @@ function fakeStorage(): Storage {
 }
 
 beforeEach(() => {
+  role.value = 'owner'
   vi.clearAllMocks()
   vi.stubGlobal('localStorage', fakeStorage())
   lineAccountsListApi.mockResolvedValue({
@@ -150,6 +155,21 @@ afterEach(async () => {
 })
 
 describe('M507残差・409で止めて最新を見せる（実mount）', () => {
+  it('2枚目の入力検査はその紹介文だけに返し、ほかのカードの入力を変えない', async () => {
+    updateColumnMessageApi.mockRejectedValueOnce(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { introText: '紹介文を短くしてください' }))
+    await mount()
+    await setDraft(1, '2枚目の書きかけ')
+    await click(saveButtons()[1])
+    expect(textareas()[1].value).toBe('2枚目の書きかけ')
+    expect(textareas()[1].getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(textareas()[1])
+    expect(textareas()[0].getAttribute('aria-invalid')).not.toBe('true')
+    expect(textareas()[0].value).toBe('紹介文a')
+    await setDraft(1, '短い紹介文')
+    expect(textareas()[1].getAttribute('aria-invalid')).not.toBe('true')
+    await click(saveButtons()[1])
+    expect(updateColumnMessageApi).toHaveBeenLastCalledWith(ACCOUNT_ID, 'b', '短い紹介文', '2026-09-30T00:00:00Z')
+  })
   it('409後は自入力を残したまま最新の紹介文が同カードに別表示され、別カードに触れない', async () => {
     updateColumnMessageApi.mockRejectedValueOnce(conflictError())
     await mount()
@@ -205,6 +225,8 @@ describe('M507残差・409で止めて最新を見せる（実mount）', () => {
 
     expect(container.textContent).toContain('ほかの人が先に保存しました')
     expect(container.textContent).not.toContain('ほかの人が保存した最新の紹介文')
+    expect(textareas()[0].value).toBe('自分の書きかけの紹介文')
+    expect(textareas()[1].value).toBe('紹介文b')
     // 画面は生きていて、入力し直せる。
     await setDraft(0, '入力し直し')
     expect(textareas()[0].value).toBe('入力し直し')
@@ -223,5 +245,30 @@ describe('M507残差・409で止めて最新を見せる（実mount）', () => {
 
     expect(container.textContent).toContain('ほかの人が保存した最新の紹介文')
     expect(textareas()[0].value).toBe('自分の書きかけの紹介文')
+  })
+
+  it('同じ描画の二重押しは1回だけ保存し、失敗後は入力を残して再試行できる', async () => {
+    let reject!: (failure: Error) => void
+    updateColumnMessageApi.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+    await mount()
+    await setDraft(0, '保存する紹介文')
+    const save = saveButtons()[0]
+    await act(async () => { save.click(); save.click() })
+    expect(updateColumnMessageApi).toHaveBeenCalledTimes(1)
+    await act(async () => { reject(new Error('通信が切れました')) })
+    expect(textareas()[0].value).toBe('保存する紹介文')
+    await click(saveButtons()[0])
+    expect(updateColumnMessageApi).toHaveBeenCalledTimes(2)
+    expect(updateColumnMessageApi).toHaveBeenLastCalledWith(ACCOUNT_ID, 'a', '保存する紹介文', '2026-09-30T00:00:00Z')
+    expect(container.textContent).toContain('この紹介文を保存しました')
+  })
+
+  it('閲覧のみでは紹介文を読めるが保存操作は隠す', async () => {
+    role.value = 'viewer'
+    await mount()
+    expect(textareas()[0].value).toBe('紹介文a')
+    expect(textareas().every((field) => field.readOnly)).toBe(true)
+    expect(saveButtons()).toHaveLength(0)
+    expect(updateColumnMessageApi).not.toHaveBeenCalled()
   })
 })

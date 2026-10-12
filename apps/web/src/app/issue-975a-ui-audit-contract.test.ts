@@ -12,19 +12,19 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 describe('U043: テンプレート行の操作は「編集」と「…」メニューにまとめる', () => {
-  const page = read('templates/page.tsx')
+  const page = read('../v8/templates/list.tsx')
 
   it('副操作はメニュー項目として渡す', () => {
     expect(page).toContain("label: '一斉配信で使う'")
-    expect(page).toContain("label: '使用先を見る'")
-    expect(page).toContain("label: 'テンプレートを削除する'")
+    expect(page).toContain("label: '使っている所を見る'")
+    expect(page).toContain("label: '削除する'")
     expect(page).toContain("tone: 'danger'")
   })
 })
 
 describe('U044: 767px以下ではテンプレート一覧をカードへ畳む', () => {
-  const page = read('templates/page.tsx')
-  const styles = read('templates/templates-v6.module.css')
+  const page = read('../v8/templates/list.tsx')
+  const styles = read('../v8/templates/list.module.css')
 
   /*
    * ★V7 監査の直し A（`LD96g`・m18c）で書き換え。以前の「表のままCSSで
@@ -32,12 +32,12 @@ describe('U044: 767px以下ではテンプレート一覧をカードへ畳む',
    * 共通の一覧カード（`MobileTableCards`・767px以下だけ）に任せ、表は
    * 768px 以上だけ出す。見た目の固定の書き換えで、動きの約束は変えない。
    */
-  it('表のマークアップは残し、767px以下は共通カードに任せる', () => {
-    expect(page).toContain('MobileTableCards')
-    expect(page).toContain('hidden md:block')
+  it('V8の狭い板では表の名前と操作を残して補足列を畳む', () => {
+    expect(page).toContain('useNarrowViewport()')
+    expect(page).toContain('{!narrow && <Th className={styles.headCell}>使っている所</Th>}')
     expect(page).not.toContain('data-template-list')
     expect(styles).not.toContain('[data-template-list]')
-    expect(styles).not.toMatch(/^\s*:global\(/m)
+    expect(styles).not.toContain('[data-template-list]')
   })
 })
 
@@ -54,28 +54,29 @@ describe('U054: 作成画面の余白を二重に取らない', () => {
     const page = read('analytics/reports/new/page.tsx')
     expect(page).toContain('rounded-card border p-4 sm:p-6')
   })
-  it('U054の解決に共有部品（CreatePage）は触らない', () => {
-    // shared/ は Claude 所有領域。画面側の局所解決だけで直す。
+  it('共通の保存処理はV8の型へ入力を渡し、外側の余白を足さない', () => {
     const shared = read('../components/shared/create-page.tsx')
-    expect(shared).toContain("'rounded-card space-y-5 p-6'")
+    expect(shared).toContain('<CreateTemplate')
+    expect(shared).not.toContain('space-y-5 p-6')
   })
 })
 
-describe('U055: 予約メニューの数値欄は1列に積み、単位を値の右へ置く', () => {
+describe('U055: V8の予約メニューの数値欄は共通部品で単位を表示する', () => {
   const page = read('booking/menus/new/page.tsx')
 
-  it('狭い画面では1列', () => {
-    expect(page).toContain('grid-cols-1 gap-4 sm:grid-cols-2')
+  it('所要時間はV8の共通NumberInputで分を表示する', () => {
+    expect(page).toContain('<NumberInput unit="分"')
+    expect(page).toContain('aria-label="金額（円）"')
   })
 })
 
 describe('U056: 長文欄ははじめから3行分の高さ', () => {
   it('イベントの説明と質問の返信は rows=3 以上', () => {
-    const wizard = read('../components/events/event-wizard.tsx')
+    const event = read('../v8/events/edit-form.tsx')
     const editor = read('../components/scenarios/question-editor.tsx')
-    expect(wizard).not.toContain('rows={2}')
+    expect(event).not.toContain('rows={2}')
     expect(editor).not.toContain('rows={2}')
-    expect(wizard).toMatch(/id="ev-desc"[\s\S]*?rows=\{3\}/)
+    expect(event).toMatch(/<TextArea[\s\S]*?rows=\{8\}/)
   })
 })
 
@@ -86,7 +87,7 @@ describe('U057: 質問テンプレートの置き場は1つの選択だけ', () 
     expect(page).not.toContain('datalist')
     expect(page).not.toContain('question-template-folders')
     // 置き場の選択肢だけが残る。
-    expect(page).toContain('aria-label="置き場"')
+    expect(page).toContain('aria-label="フォルダ"')
     // 置き場を選ぶと保存値（category）へも同じ名前を入れる。
     expect(page).toContain('setCategory(folders.find')
   })
@@ -121,8 +122,10 @@ describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる'
   })
   it('共通アクションの見本選択は内容に合わせて広がる', () => {
     const page = read('common-actions/new/page.tsx')
-    expect(page).toContain('data-example-select')
-    expect(page).toContain('[data-example-select] .min-w-48 { width: auto; max-width: 100%; }')
+    expect(page).toContain('<EntityKindField kind="common_action"label="見本から受け渡す"')
+    const picker = read('../components/shared/entity-picker-sources.tsx')
+    expect(picker).toContain('<EntityPickerField')
+    expect(page).not.toContain('[data-example-select] .min-w-48')
   })
   it('特典の選択は部品が持つ full 指定を使う（Select側は既存のprop）', () => {
     /* 入口は V8 の画面（src/v8/mileage/reward-edit.tsx）を出すだけ。選ぶ欄はそちらにある。 */

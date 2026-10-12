@@ -17,7 +17,7 @@ import { TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
 import styles from './members.module.css'
-import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
@@ -119,7 +119,7 @@ export default function OpsMembersV8() {
         {tab === 'members' ? (
           <>
             <div className={`${parts.kpis} ${styles.kpis3} ${kpiStyles.strip}`}>
-              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `有効 ${active}・招待中 ${summary.invited}` : emptyValue('unknown')} loading={!loaded} />
+              <KpiCard presentation="cell" icon={<Users size={13} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`2要素認証 設定済み ${summary.totpEnabled}人 / ${summary.members}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
               <KpiCard presentation="cell" icon={<LogIn size={13} aria-hidden="true" />} title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
               <KpiCard presentation="cell" icon={<Eye size={13} aria-hidden="true" />} title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
             </div>
@@ -174,7 +174,7 @@ export default function OpsMembersV8() {
                       <span className={`${parts.fixed} ${styles.colMail}`} role="cell" title={m.email ?? ''}>{m.email ?? emptyValue('unknown')}</span>
                       <span className={`${parts.fixed} ${styles.colTotp}`} role="cell">{totpChip(m)}</span>
                       <span className={`${parts.fixed} ${styles.colState}`} role="cell">{stateChip(m)}</span>
-                      <span className={`${parts.fixed} ${styles.colLogin} ${m.lastLoginAt ? '' : styles.faint}`} role="cell">{shortDateTime(m.lastLoginAt)}</span>
+                      <span className={`${parts.fixed} ${styles.colLogin} ${m.lastLoginAt ? '' : styles.faint}`} role="cell" title={m.lastLoginAt ? formatDateTime(m.lastLoginAt) : undefined}>{shortDateTime(m.lastLoginAt)}</span>
                       <span className={`${styles.colOps} ${styles.ops}`} role="cell">
                         {self || readOnly ? (
                           <span className={styles.faint}>{emptyValue('unknown')}</span>

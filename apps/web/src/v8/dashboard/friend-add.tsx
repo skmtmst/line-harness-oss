@@ -15,6 +15,7 @@ import QrDialog from '@/components/dashboard/qr-dialog'
 import styles from './dashboard.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ListState from '@/components/shared/list-state'
 
 /*
  * 友だち追加リンク（WQmep 段C）。動きは v7 の FriendAddLinkCard と同じ：
@@ -33,6 +34,8 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
   const params = useSearchParams()
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [routes, setRoutes] = useState<EntryRoute[] | null>(null)
+  const [routesError, setRoutesError] = useState(false)
+  const [routesRetry, setRoutesRetry] = useState(0)
   const [routeId, setRouteId] = useState('')
   const qrParam = params.get('qr')
   const [showQr, setShowQr] = useState(() => qrParam !== null)
@@ -54,15 +57,17 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
   useEffect(() => {
     let cancelled = false
     setRoutes(null)
+    setRoutesError(false)
     setRouteId('')
     if (!selectedAccountId) return () => { cancelled = true }
     void api.entryRoutes.list(selectedAccountId)
       .then((res) => {
-        if (!cancelled) setRoutes(res.success ? res.data.filter((route) => route.isActive) : [])
+        if (!res.success) throw new Error('routes_unavailable')
+        if (!cancelled) setRoutes(res.data.filter((route) => route.isActive))
       })
-      .catch(() => { if (!cancelled) setRoutes([]) })
+      .catch(() => { if (!cancelled) setRoutesError(true) })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [selectedAccountId, routesRetry])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const baseLink = visualQa?.friendAddUrl ?? (selectedAccount
@@ -79,12 +84,14 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
         helpLabel="友だち追加リンクの説明"
       />
       <div className={styles.linkRow}>
+        {routesError ? <ListState kind="error" title="経路を読み込めませんでした" onRetry={() => setRoutesRetry((value) => value + 1)} /> : null}
         <span className={styles.linkKey}>発行中</span>
         <span className={styles.routeSelect}>
           <SaveErrorField names={["routeId","route_id"]}><EntitySelect
             value={routeId || '__base_url__'}
             onChange={(value) => setRouteId(value === '__base_url__' ? '' : value)}
             aria-label="発行中の追加URL"
+            disabled={routes === null}
             options={[
               { value: '__base_url__', label: '基本の追加URL' },
               ...(routes ?? []).map((entry) => ({ ...entityOptionMetadata(entry), value: entry.id, label: entry.name })),
@@ -123,6 +130,8 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
         onRouteIdChange={(id) => writeQr(id || 'base')}
         routes={routes ?? []}
         routesPending={routes === null}
+        routesError={routesError}
+        onRetryRoutes={()=>setRoutesRetry(value=>value+1)}
         visualReferenceQr={visualQa?.referenceQr ?? false}
       />
     </>

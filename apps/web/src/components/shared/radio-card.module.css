@@ -1,4 +1,4 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 /*
  * ラジオカード（監査 DEEP-02／共通仕様「入力欄と選択カード」§2）。
@@ -20,27 +20,15 @@
 .legend {
   padding: 0;
   color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 500;
 }
 
 .items {
   display: grid;
-  gap: 8px;
 }
 
 .card {
-  display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
-  height: 100%;
-  padding: 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
   cursor: pointer;
-  transition: background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .card:hover {
@@ -48,23 +36,12 @@
 }
 
 /* 選択中：淡い緑の面＋強めの枠。ホバーでも面の色は変えない。 */
-.checked,
-.checked:hover {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-}
 
 /* 未選択：白い円に輪郭。輪郭は白地で読める濃さ（$ink-faint）を使う。 */
 .radio {
   appearance: none;
   flex: none;
-  width: 20px;
-  height: 20px;
-  margin: 1px 0 0;
   padding: 0;
-  border: 2px solid var(--color-ink-faint);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
   cursor: pointer;
 }
 
@@ -72,47 +49,36 @@
  * 選択中：外側の輪郭＋中央の小さな点。点（8px）と外円の間は
  * inset の影で白い隙間（4px）を作る。accent-deep は白地で 5.44:1。
  */
-.radio:checked {
-  border-color: var(--color-accent-deep);
-  background: var(--color-accent-deep);
-  box-shadow: inset 0 0 0 4px var(--color-canvas);
-}
 
 /* フォーカス枠は選択色と別にする（色だけで選択／操作位置を兼ねない）。 */
-.radio:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
 
 /*
  * ★V8 仕上げ（M10-2）：丸の点の出入りとカードの押した動き。
  * 点は 120ms で色が変わり、カードを押したときはほんの少し沈む
  * （明るさで）。選んだ面の色は変えない。
  */
-[data-theme='v8'] .radio {
+:root .radio {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     border-color var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .card {
+:root .card {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     border-color var(--motion-fast) var(--motion-ease-out),
     filter var(--motion-fast) var(--motion-ease-out);
 }
 
-[data-theme='v8'] .card:active {
+:root .card:active {
   filter: brightness(0.97);
 }
 
 .disabled {
   cursor: not-allowed;
-  background: var(--color-canvas-sunken);
 }
 
 .disabled .radio {
-  border-color: var(--color-ink-disabled);
   cursor: not-allowed;
 }
 
@@ -120,21 +86,12 @@
   border-color: var(--color-status-danger);
 }
 
-.invalid .radio {
-  border-color: var(--color-status-danger);
-}
-
 .body {
-  display: grid;
-  gap: 2px;
   min-width: 0;
 }
 
 .title {
   color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 600;
-  line-height: var(--text-lh, 1.4);
 }
 
 .note,
@@ -150,50 +107,49 @@
  * 濃い緑＋地 accent-soft。題は 13/600・1.5、説明は 12・1行で「…」
  * （オーナー決定）。形と動き（120ms ease-out）は v7 のまま。
  */
-[data-theme='v8'] .card {
+:root .card {
   min-height: 98px;
   padding: 14px;
 }
 
-[data-theme='v8'] .title {
+:root .title {
   font-size: var(--text-label);
 }
 
-[data-theme='v8'] .note {
+:root .note {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-[data-theme='v8'] .checked,
-[data-theme='v8'] .checked:hover {
+:root .checked,
+:root .checked:hover {
   border-width: 1.5px;
   border-color: var(--color-accent-deep);
 }
 
 /* ★V8「枠線の色」：未選択の ○ の輪郭は choice-border。
    選択中の緑・無効の灰・誤りの赤はそれぞれの色を保つ。 */
-[data-theme='v8'] .radio {
+:root .radio {
   border-color: var(--color-choice-border);
 }
 
-[data-theme='v8'] .radio:checked {
+:root .radio:checked {
   border-color: var(--color-accent-deep);
 }
 
-[data-theme='v8'] .disabled .radio {
+:root .disabled .radio {
   border-color: var(--color-ink-disabled);
 }
 
-[data-theme='v8'] .invalid .radio {
+:root .invalid .radio {
   border-color: var(--color-status-danger);
 }
 
 }
 
 /* 正本 fNPdg / r3xz1W。v7 の行配置はそのまま。 */
-.topIcon { display: none; }
-[data-theme='v8'] .card {
+:root .card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -209,32 +165,32 @@
   background: var(--color-canvas);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
-[data-theme='v8'] .topIcon { display: flex; height: var(--polish-icon-control); width: 100%; color: inherit; }
-[data-theme='v8'] .topIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex-shrink: 0; }
-[data-theme='v8'] .checked .topIcon { color: inherit; }
-[data-theme='v8'] .body { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-[data-theme='v8'] .title { font-size: 13px; line-height: 20px; font-weight: 600; }
-[data-theme='v8'] .note { font-size: 12px; line-height: 18px; color: var(--color-ink-secondary); }
-[data-theme='v8'] .radio {
+:root .topIcon { display: flex; height: var(--polish-icon-control); width: 100%; color: inherit; }
+:root .topIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); flex-shrink: 0; }
+:root .checked .topIcon { color: inherit; }
+:root .body { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+:root .title { font-size: 13px; line-height: 20px; font-weight: 600; }
+:root .note { font-size: 12px; line-height: 18px; color: var(--color-ink-secondary); }
+:root .radio {
   position: absolute; top: 14px; right: 14px;
   width: 16px; height: 16px; margin: 0; border: 0;
   outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px;
   background: var(--color-canvas); box-shadow: none;
 }
-[data-theme='v8'] .radio:checked { background: var(--color-canvas); outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; box-shadow: none; }
-[data-theme='v8'] .radio:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
-[data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { background: var(--color-choice-selected); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
-[data-theme='v8'] .disabled { background: var(--color-canvas-sunken); outline-color: var(--color-ink-disabled); }
-[data-theme='v8'] .disabled .radio { outline-color: var(--color-ink-disabled); }
-[data-theme='v8'] .invalid, [data-theme='v8'] .invalid .radio { outline-color: var(--color-status-danger); }
+:root .radio:checked { background: var(--color-canvas); outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; box-shadow: none; }
+:root .radio:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
+:root .checked, :root .checked:hover { background: var(--color-choice-selected); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
+:root .disabled { background: var(--color-canvas-sunken); outline-color: var(--color-ink-disabled); }
+:root .disabled .radio { outline-color: var(--color-ink-disabled); }
+:root .invalid, :root .invalid .radio { outline-color: var(--color-status-danger); }
 
-[data-theme='v8'] .radio { border-radius: var(--polish-radius-pill); }
+:root .radio { border-radius: var(--polish-radius-pill); }
 
 /*
  * V8 の小さい箱（compact・バナー生成の脇のパネル）は装飾の丸を出さない。
  * 普通の箱（card）は絵（A0pDt・VE1u5・選ぶカード fNPdg/r3xz1W）どおり右上に丸を出す（2026-10-06 オーナー）。
  * 小さい箱では、選んだことは枠と面の色で
- * 分かる（[data-theme='v8'] .checked）。読み上げ・矢印キー・Space のために
+ * 分かる（:root .checked）。読み上げ・矢印キー・Space のために
  * 本物の input は残し、見えない大きさで同じ位置に置く。キーボードで来たことは
  * 箱の枠に出す（:has）。行（row）の丸は下の .row 側でそのまま出す。
  *
@@ -243,8 +199,8 @@
  * 共通の約束（focus-visible-contract）に反し、将来 opacity を外したときに
  * キーボードの輪郭が本当に消える。
  */
-[data-theme='v8'] .compact > .radio,
-[data-theme='v8'] .compact > .radio:checked {
+:root .compact > .radio,
+:root .compact > .radio:checked {
   top: 0;
   right: 0;
   width: 1px;
@@ -253,7 +209,7 @@
   opacity: 0;
   pointer-events: none;
 }
-[data-theme='v8'] .compact:has(> .radio:focus-visible) {
+:root .compact:has(> .radio:focus-visible) {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
@@ -264,35 +220,35 @@
  * 2列で並べる大きさ。箱（card）の寸法は変えない。
  *
  * 角は数字で書かず $radius-segment を使う。この約束の値は :root でも
- * [data-theme='v8'] でも 8 のままなので、承認した角 8 がそのまま出る。
+ * :root でも 8 のままなので、承認した角 8 がそのまま出る。
  * （$radius-control は v8 で 10 になるため、ここでは使えない。）
  */
-[data-theme='v8'] .compact {
+:root .compact {
   gap: 3px;
   min-height: 0;
   padding: 8px 10px;
   border-radius: var(--radius-segment);
 }
-[data-theme='v8'] .compact .body { gap: 3px; }
-[data-theme='v8'] .compact .title { font-size: 11px; line-height: 16px; font-weight: 600; }
-[data-theme='v8'] .compact .note { font-size: 10px; line-height: 14px; }
-[data-theme='v8'] .compact.checked .title { color: var(--color-accent-deep); }
-[data-theme='v8'] .compact[data-compact-typography='banner'] .body { gap: var(--tpl-hq-nav-gap); }
-[data-theme='v8'] .compact[data-compact-typography='banner'] .title { font-size: var(--text-caption); line-height: var(--tpl-htn-lh-17); font-weight: 700; }
-[data-theme='v8'] .compact[data-compact-typography='banner'] .note { font-size: var(--text-micro); line-height: var(--tpl-hq-small-lh); }
+:root .compact .body { gap: 3px; }
+:root .compact .title { font-size: 11px; line-height: 16px; font-weight: 600; }
+:root .compact .note { font-size: 10px; line-height: 14px; }
+:root .compact.checked .title { color: var(--color-accent-deep); }
+:root .compact[data-compact-typography='banner'] .body { gap: var(--tpl-hq-nav-gap); }
+:root .compact[data-compact-typography='banner'] .title { font-size: var(--text-caption); line-height: var(--tpl-htn-lh-17); font-weight: 700; }
+:root .compact[data-compact-typography='banner'] .note { font-size: var(--text-micro); line-height: var(--tpl-hq-small-lh); }
 
 /*
  * 高さ 90 の箱（height="short"・★V8 E-3 PUWyq の卓のカード）。
  * 絵は高さ 90 の固定で、中身（印 16＋題 20＋説明 18＋間 8×2）が下の余白へはみ出す形。
  * 上・左右の余白 14 はそのまま、下だけ 6 にして 90 に収める。既定の箱（98）は変えない。
  */
-[data-theme='v8'] .short {
+:root .short {
   min-height: 90px;
   padding-bottom: 6px;
 }
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
-[data-theme='v8'] .card { -webkit-font-smoothing: auto; }
+:root .card { -webkit-font-smoothing: auto; }
 
 /*
  * 変わり形：行（BHEl9 の素のラジオ行）。箱・選んだ面・上段の印なし。
@@ -317,79 +273,79 @@
 .row.invalid { border-color: transparent; }
 .row .topIcon { display: none; }
 .row .title { font-size: 13px; font-weight: 400; line-height: 20px; }
-[data-theme='v8'] .row .body { gap: 2px; }
-[data-theme='v8'] .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
-[data-theme='v8'] .row:active { filter: none; }
-[data-theme='v8'] .row { -webkit-font-smoothing: auto; }
+:root .row .body { gap: 2px; }
+:root .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
+:root .row:active { filter: none; }
+:root .row { -webkit-font-smoothing: auto; }
 
 /* フォームの小さい選択肢（RaMf3・hadfk）。装飾の丸を出さず、印と題を同じ行に置く。 */
-[data-theme='v8'] .form { min-height: 0; padding: 12px 10px; gap: 4px; border-radius: var(--radius-control); }
-[data-theme='v8'] .form:has(.inlineIcon) { padding-inline: 14px; }
-[data-theme='v8'] .form .body { gap: 4px; }
-[data-theme='v8'] .form .title { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 19px; }
-[data-theme='v8'] .form .note { font-size: 11px; line-height: 16px; }
-[data-theme='v8'] .form > .radio { top: 0; right: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-[data-theme='v8'] .form:has(> .radio:focus-visible) { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+:root .form { min-height: 0; padding: 12px 10px; gap: 4px; border-radius: var(--radius-control); }
+:root .form:has(.inlineIcon) { padding-inline: 14px; }
+:root .form .body { gap: 4px; }
+:root .form .title { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 19px; }
+:root .form .note { font-size: 11px; line-height: 16px; }
+:root .form > .radio { top: 0; right: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+:root .form:has(> .radio:focus-visible) { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .inlineIcon { display: inline-flex; color: var(--color-ink-secondary); }
-[data-theme='v8'] .form.checked .inlineIcon { color: var(--color-accent-deep); }
+:root .form.checked .inlineIcon { color: var(--color-accent-deep); }
 .inlineIcon svg { width: 14px; height: 14px; }
 /* 横並びの小さい箱（j8p3yj）。指定した箱だけ、内容に合わせた高さで描く。 */
-[data-theme='v8'] .small {
+:root .small {
   min-height: 0;
   padding: var(--tpl-cn-choice-pad);
   border-radius: var(--radius-control);
 }
-[data-theme='v8'] .small .body { gap: var(--tpl-cn-choice-gap); }
-[data-theme='v8'] .small .title { font-weight: 700; line-height: var(--tpl-cn-name-lh); }
-[data-theme='v8'] .small .note { font-size: var(--text-micro); line-height: var(--tpl-cn-sub-lh); }
+:root .small .body { gap: var(--tpl-cn-choice-gap); }
+:root .small .title { font-weight: 700; line-height: var(--tpl-cn-name-lh); }
+:root .small .note { font-size: var(--text-micro); line-height: var(--tpl-cn-sub-lh); }
 
 /* B-152①：選ぶカードも内側16・カードの中の間8・欄の間12。 */
-[data-theme='v8'] .card { padding: var(--polish-space-card); gap: var(--polish-space-row); }
-[data-theme='v8'] .body { gap: var(--polish-space-row); }
-[data-theme='v8'] .items { gap: var(--polish-space-field); }
+:root .card { padding: var(--polish-space-card); gap: var(--polish-space-row); }
+:root .body { gap: var(--polish-space-row); }
+:root .items { gap: var(--polish-space-field); }
 
 /* B-152②：選択肢の題はラベル、説明は補足。 */
-[data-theme='v8'] .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
-[data-theme='v8'] .legend, html[data-theme='v8'] .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
-[data-theme='v8'] .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
-html[data-theme='v8'] .card:is(.compact, .row, .form, .small) .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
+:root .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
+:root .legend, html:root .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
+:root .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
+html:root .card:is(.compact, .row, .form, .small) .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
 
 /* B-152⑦：箱も120msの地・青い輪・押せない濃さを使う。 */
-[data-theme='v8'] .card, [data-theme='v8'] .card.row {
+:root .card, :root .card.row {
   --polish-overlay-strength: var(--polish-overlay-idle);
   background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
   transition-property: background-color, border-color, outline-color, opacity, --polish-overlay-strength;
   transition-duration: var(--polish-interaction-duration);
 }
-[data-theme='v8'] .card:not(.disabled):hover { --polish-overlay-strength: var(--polish-hover-opacity); }
-[data-theme='v8'] .card:not(.row):not(.checked):not(.disabled):hover { background-color: var(--color-canvas); }
-[data-theme='v8'] .card:not(.disabled):active { --polish-overlay-strength: var(--polish-active-opacity); }
-[data-theme='v8'] .card:active { filter: none; }
-[data-theme='v8'] .card:not(.row):has(.radio:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-[data-theme='v8'] .disabled { opacity: var(--polish-disabled-opacity); }
-html[data-theme='v8'] .disabled:not(.compact):not(.form) .radio:disabled { opacity: var(--polish-enabled-opacity); }
+:root .card:not(.disabled):hover { --polish-overlay-strength: var(--polish-hover-opacity); }
+:root .card:not(.row):not(.checked):not(.disabled):hover { background-color: var(--color-canvas); }
+:root .card:not(.disabled):active { --polish-overlay-strength: var(--polish-active-opacity); }
+:root .card:active { filter: none; }
+:root .card:not(.row):has(.radio:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+:root .disabled { opacity: var(--polish-disabled-opacity); }
+html:root .disabled:not(.compact):not(.form) .radio:disabled { opacity: var(--polish-enabled-opacity); }
 
 /* B-152⑩：説明文は省略せず、必要な行数で読む。 */
-[data-theme='v8'] .note, html[data-theme='v8'] .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+:root .note, html:root .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 
 /* B-203・B-207・B-211：10-10 に採用した共通の形。 */
-html[data-theme='v8'] .card:not(.row) { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
-html[data-theme='v8'] .checked:not(.row), html[data-theme='v8'] .checked:not(.row):hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
-html[data-theme='v8'] .radio { width: var(--choice-size); height: var(--choice-size); border: var(--choice-ring) solid var(--color-choice-border); outline-color: transparent; background: var(--color-canvas); box-shadow: none; }
-html[data-theme='v8'] .radio:checked { outline-color: transparent; border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); box-shadow: none; }
-html[data-theme='v8'] .radio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
-html[data-theme='v8'] .card:not(.row):has(.radio:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
-html[data-theme='v8'] .invalid, html[data-theme='v8'] .invalid .radio { border-color: var(--color-danger); outline-color: var(--color-danger); }
+html:root .card:not(.row) { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
+html:root .checked:not(.row), html:root .checked:not(.row):hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
+html:root .radio { width: var(--choice-size); height: var(--choice-size); border: var(--choice-ring) solid var(--color-choice-border); outline-color: transparent; background: var(--color-canvas); box-shadow: none; }
+html:root .radio:checked { outline-color: transparent; border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); box-shadow: none; }
+html:root .radio:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+html:root .card:not(.row):has(.radio:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
+html:root .invalid, html:root .invalid .radio { border-color: var(--color-danger); outline-color: var(--color-danger); }
 
-html[data-theme='v8'] .card:is(.compact, .form) > .radio { width: var(--choice-size); height: var(--choice-size); opacity: 1; pointer-events: auto; top: var(--space-16); right: var(--space-16); }
-html[data-theme='v8'] .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }
+html:root .card:is(.compact, .form) > .radio { width: var(--choice-size); height: var(--choice-size); opacity: 1; pointer-events: auto; top: var(--space-16); right: var(--space-16); }
+html:root .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }
 /* B-203/229：図と本文が丸より下にある箱は、丸の場所を上で確保する。 */
-html[data-theme='v8'] .card:not(.row)[data-content-placement='below-indicator'] { padding-top: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
-html[data-theme='v8'] .card:not(.row)[data-content-placement='below-indicator'] .body { padding-right: 0; }
-html[data-theme='v8'] .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html:root .card:not(.row)[data-content-placement='below-indicator'] { padding-top: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
+html:root .card:not(.row)[data-content-placement='below-indicator'] .body { padding-right: 0; }
+html:root .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* B-229：カードのラジオは例外なく右上。行型は左のまま。 */
-html[data-theme='v8'] .card:not(.row) { position: relative; display: flex; flex-direction: column; }
-html[data-theme='v8'] .card:not(.row) > .radio { position: absolute; top: var(--space-16); right: var(--space-16); margin: 0; opacity: 1; pointer-events: auto; }
+html:root .card:not(.row) { position: relative; display: flex; flex-direction: column; }
+html:root .card:not(.row) > .radio { position: absolute; top: var(--space-16); right: var(--space-16); margin: 0; opacity: 1; pointer-events: auto; }
 /* 行型の選択は丸だけで示す。カードの選択枠を引き継がない。 */
-html[data-theme='v8'] .card.row { outline-color: transparent; box-shadow: none; background: transparent; }
+html:root .card.row { outline-color: transparent; box-shadow: none; background: transparent; }

@@ -1,30 +1,22 @@
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'),
-  'utf8',
-)
+const PAGE = readFileSync(new URL('../../../v8/account-new/register.tsx', import.meta.url), 'utf8')
+const STEPS = readFileSync(new URL('../../../components/templates/steps.tsx', import.meta.url), 'utf8')
+const CSS = readFileSync(new URL('../../../components/templates/steps.module.css', import.meta.url), 'utf8')
 
-/*
- * #975 U050: アカウント登録（/accounts/new）では、スマホの初期画面に
- * 全5手順のカードが縦に積まれ、最初の入力欄までが長かった。
- *
- * 直し方: 640px 未満では「いまの手順＋全体の位置」だけを出し、
- * 全手順は開いて確認する。640px 以上ではこれまでどおり5段の帯。
- */
-describe('アカウント登録の手順表示（#975 U050）', () => {
-  it('狭い画面では現在の手順と位置だけを出し、全手順は開いて確認する', () => {
-    expect(PAGE).toContain('sm:hidden')
-    expect(PAGE).toContain('<details className="sm:hidden">')
-    expect(PAGE).toContain('手順 {currentStep} / 5')
-    expect(PAGE).toContain('全手順を見る')
+describe('アカウント登録のV8の手順表示（#975 U050）', () => {
+  it('入らない幅では共通Stepsが現在の手順だけを表示し、他の名前を読み上げに残す', () => {
+    expect(PAGE).toContain('<Steps')
+    expect(STEPS).toContain('data-compact')
+    expect(CSS).toContain(".root[data-compact] .name:not([data-step-name='current'])")
+    expect(CSS).toContain('clip: rect(0 0 0 0)')
   })
-
-  it('広い画面ではこれまでどおり5段の帯を出す', () => {
-    expect(PAGE).toContain('hidden gap-2 sm:grid sm:grid-cols-5')
-    expect(PAGE).toContain('aria-label="登録の進捗"')
+  it('進み具合を5段の同じ手順で示し、済んだ段へ入力を残して戻れる', () => {
+    expect(PAGE).toContain('label="登録の進捗"')
+    expect(PAGE).toContain('currentKey={String(createdId ? 5 : currentStep)}')
+    expect(PAGE).toContain('steps={V8_STEPS.map')
+    expect(PAGE).toContain('onSelect: !createdId && currentStep > step.number')
+    expect(CSS).toContain('flex-wrap: nowrap')
   })
 })

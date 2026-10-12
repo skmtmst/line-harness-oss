@@ -5,6 +5,9 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
+vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import { mount, settle, stubFetchNotFound, type Mounted } from '@/test-utils/race'
 
 const fixture = vi.hoisted(() => ({
@@ -12,7 +15,7 @@ const fixture = vi.hoisted(() => ({
   pending: new Map<string, (value: unknown) => void>(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(''),
   useRouter: () => ({ push: vi.fn() }),
   usePathname: () => '/nen-campaigns/edit',
@@ -23,7 +26,6 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.account, loading: false }),
 }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v7' }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {

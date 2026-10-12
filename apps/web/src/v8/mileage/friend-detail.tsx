@@ -53,6 +53,8 @@ import {
   mileageDetailHasSourceEvent,
   mileageEntryTypeLabel,
   mileagePaginationTotal,
+  mileageRankProgress,
+  mileageConnectedAccounts,
   mileageRewardedActions,
   mileageSourceNoteText,
   mileageStatusLabel,
@@ -305,6 +307,10 @@ function FriendDetailInner() {
         ? 'ブロンズ'
         : v6Friend?.rank ?? 'ランクなし'
   const available = v6Friend?.available ?? mileage.summary.available
+  const rankProgress = mileageRankProgress({ rank: v6Friend?.rank, rankReason: v6Friend?.rankReason, nextRankLabel: v6Friend?.nextRank, milesToNextRank: v6Friend?.milesToNextRank })
+  const rankUnpublished = rankProgress.unpublished
+  const connectedAccounts = mileageConnectedAccounts(mileage.connections)
+  const connectionsText = connectedAccounts === null ? '接続先を確認できませんでした' : connectedAccounts.length === 0 ? '接続先はありません' : `本人確認済みの接続先：${connectedAccounts.map((connection) => connection.accountName).join('・')}`
   const pendingMiles = v6Friend?.pending ?? mileage.summary.pending
   const pendingItems = displayedHistory.filter((item) => item.status === 'pending')
   /*
@@ -377,7 +383,7 @@ function FriendDetailInner() {
       title={displayName}
       help={[joinedAt ? `友だちになった日 ${joinedAt}` : null, `会員ランク ${rankLabel}`, lastActive ? `最後に動いた日 ${lastActive}` : null].filter(Boolean).join('・')}
       actions={<div className={styles.headActions}>
-        <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>
+        <Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} title={connectionsText}>
           <MessageCircle size={15} aria-hidden="true" /> トークを開く
         </Button>
         {/* 増やす・減らすはオーナー・管理者だけ（ほかの人には出さない）。 */}
@@ -395,15 +401,15 @@ function FriendDetailInner() {
     >
         <KpiBand>
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="使える残高" value={available} unit="マイル"
-            detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)}` : `生涯 ${formatNumber(mileage.summary.lifetimeEarned)}・使用 ${formatNumber(mileage.summary.spent)}`} />
+            detail={<span title={[rankProgress.headline, rankProgress.detail].filter(Boolean).join('・')}>{v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)}` : `生涯 ${formatNumber(mileage.summary.lifetimeEarned)}・使用 ${formatNumber(mileage.summary.spent)}`}</span>} />
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="確定待ち" value={pendingMiles} unit="マイル"
             detail={historyPartial
               ? `最新${formatNumber(displayedHistory.length)} 件のうち ${pendingItems.length} 件が確定待ち`
               : pendingItems.length > 0 ? `${pendingItems.length} 件が確定待ち` : '確定待ちはありません'} />
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="今月たまった" value={monthComplete ? earnedSum : null} unit="マイル"
-            detail={monthComplete
+            detail={<span title={rewardedActions === null ? '付与記録の回数は未取得' : `${formatNumber(rewardedActions)} 回の付与記録`}>{monthComplete
               ? `できごと ${earnedThisMonth.length} 回${rewardedActions === null ? '' : `・付与記録 ${formatNumber(rewardedActions)} 回`}`
-              : `最新${formatNumber(displayedHistory.length)} 件だけでは数えられません`} />
+              : `最新${formatNumber(displayedHistory.length)} 件だけでは数えられません`}</span>} />
           <KpiCard presentation="band" icon={<Inbox size={16} aria-hidden="true" />} title="期限が近い" value={expiring ?? null} unit="マイル" detail={expiringSub} />
         </KpiBand>
 
@@ -559,7 +565,7 @@ function FriendDetailInner() {
             </div>
           ) : null}
           <div className={styles.summaryFoot}>
-            <Link href="/mileage?tab=rewards" className={styles.backLink}>使い道を見る</Link>
+            <Link href="/mileage?tab=rewards" className={styles.backLink}>{rankUnpublished ? '使い道・ランクを作る' : '使い道を見る'}</Link>
           </div>
         </Card>
       </div>

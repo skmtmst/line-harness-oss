@@ -1,44 +1,13 @@
-@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer properties, theme, base, components, utilities;
 @layer components {
 .card {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 100px;
-  padding: 16px 24px;
-  border: 1px solid var(--color-hairline);
-  border-radius: 0;
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
 }
 
 .card[hidden] {
   display: none;
-}
-
-.cardV6 {
-  justify-content: flex-start;
-  min-height: 106px;
-  gap: 5px;
-  padding: 16px;
-}
-
-/*
- * ★V7 の友だち一覧の詰めた形（zZMNG。高さ100・間4・余白14/16）。
- * v8 では数のマスの実寸（下の cardV6 指定）がこれより強い指定で
- * 上書きするので、このクラスは v7 にだけ効く。
- */
-.cardV6Tight {
-  min-height: 100px;
-  gap: 4px;
-  padding: 14px 16px;
-}
-
-.cardBroadcast {
-  justify-content: flex-start;
-  gap: 8px;
-  padding: 18px;
 }
 
 .head {
@@ -46,12 +15,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   /*
    * 題の行の高さは 20px にそろえる。「？」の有無で数字の位置が
    * ずれないようにする（？自体は 18px の箱で、行を伸ばさない）。
    */
-  min-height: 20px;
 }
 
 .retry {
@@ -64,22 +31,6 @@
 
 .retry:focus-visible {
   outline: revert;
-}
-
-.label {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-body);
-  font-weight: 500;
-}
-
-.labelV6 {
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-}
-
-.labelBroadcast {
-  color: var(--color-ink-faint);
-  font-size: var(--text-body);
 }
 
 .labelSkeleton {
@@ -118,7 +69,6 @@
 .link {
   flex-shrink: 0;
   color: var(--color-action);
-  font-size: var(--text-nano);
 }
 
 .link:hover {
@@ -138,7 +88,6 @@
    * 数の行の高さは1行ぶんにそろえる。題の行（.head 20px）と合わせて、
    * 「？」の有無や補足の長さで数字の位置がずれないようにする。
    */
-  min-height: 1lh;
 }
 
 .valueWarning {
@@ -150,26 +99,11 @@
 }
 
 .detail {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
   /* 補足の行の高さは1行ぶんにそろえる。空でも潰さない。 */
-  min-height: 1lh;
-}
-
-.detailV6 {
-  font-weight: 500;
-}
-
-/* ★V7：補足は状態ではないので緑にしない（緑は「正常」の意味だけに使う）。以前は accent-deep。 */
-.detailNotice {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 500;
 }
 
 .skeleton {
   width: 96px;
-  height: var(--text-metric);
   border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
   animation: kpi-card-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
@@ -182,9 +116,7 @@
 }
 
 /* Pp3nS: the strip owns the boundary; cells have no enclosing box. */
-.valueRow { display: contents; }
-.unit, .labelText, .number { display: contents; }
-[data-theme='v8'] .card {
+:root .card {
   justify-content: flex-start; min-width: 0; min-height: 0;
   gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: var(--radius-card);
   outline: 1px solid var(--card-edge); outline-offset: -0.5px;
@@ -192,64 +124,64 @@
 }
 /* 包みを使わない組み方（画面が strip＋KpiCard を直に並べる所）も、
    数の大きさ・マスの余白は帯と同じ変数で絵どおりにする。 */
-[data-theme='v8'] .strip .card {
+:root .strip .card {
   gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side);
 }
-[data-theme='v8'] .strip .number {
+:root .strip .number {
   font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
 }
-[data-theme='v8'] .head { width: 100%; gap: 8px; min-height: 24px; }
-[data-theme='v8'] .label {
+:root .head { width: 100%; gap: 8px; min-height: 24px; }
+:root .label {
   display: flex; align-items: center; min-width: 0; gap: 8px;
   color: var(--color-ink); font-size: var(--text-caption); font-weight: 500; line-height: 18px;
 }
-[data-theme='v8'] .labelText {
+:root .labelText {
   display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* 帯の「？」は題の直後ではなく行の右端（絵のマスの右端どおり）。
    文が伸びて「？」を右へ押し出す（「…」の扱いは G3 のまま）。 */
-[data-theme='v8'] .tip { flex-shrink: 0; display: inline-flex; height: 24px; align-items: center; }
-[data-theme='v8'] .icon {
+:root .tip { flex-shrink: 0; display: inline-flex; height: 24px; align-items: center; }
+:root .icon {
   display: inline-flex; width: 24px; height: 24px; flex-shrink: 0;
   align-items: center; justify-content: center; border-radius: 9px;
   background: var(--color-canvas); color: var(--color-ink-secondary);
   outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
 }
-[data-theme='v8'] .delta { display: flex; flex-shrink: 0; }
-[data-theme='v8'] .valueRow { display: flex; align-items: center; width: 100%; gap: 6px; }
-[data-theme='v8'] .value {
+:root .delta { display: flex; flex-shrink: 0; }
+:root .valueRow { display: flex; align-items: center; width: 100%; gap: 6px; }
+:root .value {
   display: flex; align-items: flex-end; flex: 1; gap: 3px; min-height: 0;
   white-space: nowrap;
 }
-[data-theme='v8'] .number {
+:root .number {
   display: inline; font-family: var(--font-inter), Inter, sans-serif; font-size: 28px;
   font-weight: 600; color: inherit;
   line-height: 32px; letter-spacing: -0.5px;
 }
-[data-theme='v8'] .unit {
+:root .unit {
   display: inline; margin: 0; font-family: var(--font-sans);
   color: var(--color-ink-secondary); font-size: 12px; font-weight: 400;
   line-height: var(--tpl-band-unit-lh); letter-spacing: 0;
 }
-[data-theme='v8'] .detail {
+:root .detail {
   display: flex; align-items: center; width: 100%; min-height: 0; gap: 0;
   color: var(--color-ink-faint); font-size: 12px; font-weight: 400; line-height: 18px;
 }
-[data-theme='v8'] .detailText { min-width: 0; flex: 1; }
-[data-theme='v8'] .link { font-size: 12px; font-weight: 500; line-height: 18px; }
-[data-theme='v8'] .card[data-kpi-presentation='band'] {
+:root .detailText { min-width: 0; flex: 1; }
+:root .link { font-size: 12px; font-weight: 500; line-height: 18px; }
+:root .card[data-kpi-presentation='band'] {
   border-radius: 0; outline-color: transparent; box-shadow: none;
 }
-[data-theme='v8'] .card[data-kpi-density='compact'] {
+:root .card[data-kpi-density='compact'] {
   padding: 10px 16px; gap: 4px;
 }
-[data-theme='v8'] .card[data-kpi-density='compact'] .number {
+:root .card[data-kpi-density='compact'] .number {
   font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
 }
 .strip { min-width: 0; }
 /* 数の帯の v8 指定は層の外（ファイル末尾）に置く。 */
-[data-theme='v8'] .link { display: inline-flex; align-items: center; gap: 4px; }
-[data-theme='v8'] .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
+:root .link { display: inline-flex; align-items: center; gap: 4px; }
+:root .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
 }
 
 /*
@@ -262,7 +194,7 @@
  * 1列化を効かせるため、ここだけ層の外（どの層より強い）に置く。
  * v7 には効かない（すべて data-theme v8 限定）。
  */
-[data-theme='v8'] .strip[data-kpi-presentation='band'] {
+:root .strip[data-kpi-presentation='band'] {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
@@ -274,68 +206,68 @@
   background: var(--color-canvas);
 }
 /* 子孫まで消す：折りたたみ（KpiCollapse）は後ろのマスを包み div で囲うため。 */
-[data-theme='v8'] .strip[data-kpi-presentation='band'] .card {
+:root .strip[data-kpi-presentation='band'] .card {
   border: 0;
   border-radius: var(--radius-none);
   outline-color: transparent;
   box-shadow: none;
 }
-[data-theme='v8'] .strip[data-kpi-presentation='band'] > *:not(:last-child) {
+:root .strip[data-kpi-presentation='band'] > *:not(:last-child) {
   border-right: 1px solid var(--tpl-band-line);
 }
-[data-theme='v8'] .strip[data-kpi-presentation='band'] .number {
+:root .strip[data-kpi-presentation='band'] .number {
   font-size: var(--tpl-band-number-size);
   line-height: var(--tpl-band-number-lh);
 }
 @media (max-width: 639px) {
-  [data-theme='v8'] .strip[data-kpi-presentation='band'] {
+  :root .strip[data-kpi-presentation='band'] {
     grid-auto-flow: row;
     grid-template-columns: minmax(0, 1fr);
   }
-  [data-theme='v8'] .strip[data-kpi-presentation='band'] > *:not(:last-child) {
+  :root .strip[data-kpi-presentation='band'] > *:not(:last-child) {
     border-right: 0;
     border-bottom: 1px solid var(--tpl-band-line);
   }
 }
-[data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
+:root .card[data-kpi-presentation='cell'] { border-radius: 0; }
 
 /* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
 /* ★V8 数のマスの下の段（Pp3nS「下」：高さ18・右に行き先）。行き先のボタンが押せる高さ32で段を押し広げない（司令塔 2026-10-05） */
-[data-theme='v8'] .detail .retry { min-height: 0; height: auto; padding: 0; line-height: 18px; margin-left: auto; }
+:root .detail .retry { min-height: 0; height: auto; padding: 0; line-height: 18px; margin-left: auto; }
 
 /*
  * 読み込み中の骨組みは、届いた数字と同じ行の高さを取る（動きの点検 8 番）。
  * 以前は 22px で、数字（帯は --tpl-band-number-lh、それ以外は 32px）に替わると
  * 数の帯が 4px 伸び、下の一覧がまとめて押し下げられていた。
  */
-[data-theme='v8'] .skeleton { height: 32px; }
-[data-theme='v8'] .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
+:root .skeleton { height: 32px; }
+:root .card[data-kpi-presentation='band'] .skeleton { height: var(--tpl-band-number-lh); }
 
-[data-theme='v8'] .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
+:root .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
 /* hQQlt：箱の中の小さな件数。通常のカード・数の帯は変えない。 */
-[data-theme='v8'] .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
-[data-theme='v8'] .card[data-kpi-presentation='inline'] .head { order: 2; min-height: 0; }
-[data-theme='v8'] .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
-[data-theme='v8'] .card[data-kpi-presentation='inline'] .number, [data-theme='v8'] .card[data-kpi-presentation='inline'] .unit { font-size: 12px; font-weight: 700; line-height: 18px; }
-[data-theme='v8'] .card[data-kpi-presentation='inline'] .value { gap: 0; }
-[data-theme='v8'] .card[data-kpi-presentation='inline'] .detail { display: none; }
-[data-theme='v8'] .valueDanger { color: var(--color-danger); }
-[data-theme='v8'] .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
+:root .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
+:root .card[data-kpi-presentation='inline'] .head { order: 2; min-height: 0; }
+:root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
+:root .card[data-kpi-presentation='inline'] .number, :root .card[data-kpi-presentation='inline'] .unit { font-size: 12px; font-weight: 700; line-height: 18px; }
+:root .card[data-kpi-presentation='inline'] .value { gap: 0; }
+:root .card[data-kpi-presentation='inline'] .detail { display: none; }
+:root .valueDanger { color: var(--color-danger); }
+:root .strip[data-kpi-presentation='band'][data-kpi-border='inset-top'] {
   border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
 }
 
 /* 予約の帯（O2Z8u・GcyTr）：短い3段、詳しい説明は「？」へ。 */
-[data-theme='v8'] .strip[data-kpi-layout='booking'] .label { font-size: var(--text-caption); line-height: var(--tpl-booking-kpi-label-lh); }
-[data-theme='v8'] .strip[data-kpi-layout='booking'] .labelText { flex: 0 1 auto; }
-[data-theme='v8'] .strip[data-kpi-layout='booking'] .detailText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-[data-theme='v8'] .strip[data-kpi-layout='booking'] .card { min-height: var(--tpl-booking-kpi-height); }
+:root .strip[data-kpi-layout='booking'] .label { font-size: var(--text-caption); line-height: var(--tpl-booking-kpi-label-lh); }
+:root .strip[data-kpi-layout='booking'] .labelText { flex: 0 1 auto; }
+:root .strip[data-kpi-layout='booking'] .detailText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .strip[data-kpi-layout='booking'] .card { min-height: var(--tpl-booking-kpi-height); }
 /* 飲食の共通盤の数の帯（R2w4j / vOtK2）。 */
-[data-theme='v8'] .strip[data-restaurant-fusion] .card { padding: 14px 24px 16px; gap: 8px; }
-[data-theme='v8'] .strip[data-restaurant-fusion] .label { gap: 8px; }
-[data-theme='v8'] .strip[data-restaurant-fusion] .valueRow { padding-left: 0; }
-[data-theme='v8'] .strip[data-restaurant-fusion] .detail { padding-left: 0; }
+:root .strip[data-restaurant-fusion] .card { padding: 14px 24px 16px; gap: 8px; }
+:root .strip[data-restaurant-fusion] .label { gap: 8px; }
+:root .strip[data-restaurant-fusion] .valueRow { padding-left: 0; }
+:root .strip[data-restaurant-fusion] .detail { padding-left: 0; }
 
-[data-theme='v8'] .strip[data-restaurant-fusion='dashboard'] { margin: 13px 24px 0; }
+:root .strip[data-restaurant-fusion='dashboard'] { margin: 13px 24px 0; }
 
 /* 数を押して内訳を開く口。数字と単位の配置は通常の数と同じ。 */
 .valueAction { min-height: 0; display: inline-flex; align-items: inherit; gap: inherit; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }

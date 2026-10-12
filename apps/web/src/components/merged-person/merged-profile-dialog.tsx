@@ -67,7 +67,7 @@ export default function MergedProfileDialog({
       busy={busy}
       error={error}
       onCancel={onCancel}
-      designNode="w8W4Eh"
+      designNode="Hn9eE"
       footer={(
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
