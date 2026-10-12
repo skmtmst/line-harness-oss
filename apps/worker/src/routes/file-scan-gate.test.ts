@@ -13,6 +13,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
  */
 
 let testDb: SqliteD1;
+let allowedHosts = 'example.com';
 
 function insertAccount(id: string, tenantId: string = DEFAULT_TENANT_ID): void {
   testDb.raw.prepare(`INSERT INTO line_accounts
@@ -79,6 +80,7 @@ function environment(): Env['Bindings'] {
     IMAGES: { delete: async () => undefined } as unknown as R2Bucket,
     WORKER_URL: 'https://api.example.com',
     API_KEY: 'env-key-unused',
+    FILE_SCAN_ALLOWED_HOSTS: allowedHosts,
   } as Env['Bindings'];
 }
 
@@ -110,6 +112,7 @@ function post(path: string, staffId: string, body: unknown): Promise<Response> {
 }
 
 beforeEach(() => {
+  allowedHosts = 'example.com';
   testDb = createTestD1();
   insertAccount('acc-1');
   insertAccount('acc-2', 'tenant-B');
@@ -264,13 +267,97 @@ describe('外の検査の設定', () => {
       accountId: 'acc-1',
       externalProvider: 'example',
       externalEndpointUrl: 'https://example.com/scan',
-      externalSecretRef: 'FILE_SCAN_API_KEY',
+      externalSecretRef: 'FILE_SCAN_SECRET_PRIMARY',
     });
     expect(put.status).toBe(200);
     const res = await get('/api/file-scans/config?accountId=acc-1', 'owner-1');
     const body = await res.json() as { data: { config: Record<string, unknown> } };
     expect(body.data.config.externalEndpointUrl).toBe('https://example.com/scan');
-    expect(body.data.config.externalSecretRef).toBe('FILE_SCAN_API_KEY');
+    expect(body.data.config.externalSecretRef).toBe('FILE_SCAN_SECRET_PRIMARY');
     expect(JSON.stringify(body.data.config)).not.toContain('secret-value');
   });
+});
+
+describe('S01 設定の保存境界と監査', () => {
+  const valid = { accountId: 'acc-1', externalProvider: 'scanner', externalEndpointUrl: 'https://example.com/scan', externalSecretRef: 'FILE_SCAN_SECRET_PRIMARY' };
+  it.each([
+    ['ADMIN_API_KEY', 'https://example.com/scan', 'example.com'],
+    ['FILE_SCAN_SECRET_PRIMARY', 'https://evil.example.com/scan', 'example.com'],
+    ['FILE_SCAN_SECRET_PRIMARY', 'https://example.com/scan', ''],
+  ])('古い設定や許可を外した設定は送信停止と返し鍵を読まない: %s / %s / %s', async (name, endpoint, hosts) => {
+    allowedHosts = hosts;
+    testDb.raw.prepare(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_secret_ref,updated_at) VALUES ('acc-1','scanner',?,?,'2026-10-12')`).run(endpoint, name);
+    let reads = 0;
+    const bindings = environment();
+    Object.defineProperty(bindings, name, { get() { reads++; return 'synthetic-token'; } });
+    const res = await app().request('/api/file-scans/config?accountId=acc-1', { headers: { Authorization: 'Bearer key-admin-1' } }, bindings);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { config: Record<string, unknown> } };
+    expect(body.data.config.externalEnabled).toBe(false);
+    expect(body.data.config.externalSecretRef).toBe(name);
+    expect(body.data.config.updatedAt).toBe('2026-10-12');
+    expect(reads).toBe(0);
+  });
+  it.each(['ADMIN_API_KEY', 'LINE_CHANNEL_ACCESS_TOKEN', 'STRIPE_SECRET_KEY', 'CLOUDFLARE_API_TOKEN', 'FILE_SCAN_API_KEY', 'FILE_SCAN_SECRET_', 'FILE_SCAN_SECRET_lower', 'FILE_SCAN_SECRET_A-B', 'FILE_SCAN_SECRET_' + 'A'.repeat(120), null, 123])(
+    '検査専用でない名前は400で欄を示し保存しない: %s', async (name) => {
+      const res = await putConfig('/api/file-scans/config', 'admin-1', { ...valid, externalSecretRef: name });
+      expect(res.status).toBe(400);
+      const body = await res.json() as { fields: Record<string, string> };
+      expect(body.fields.externalSecretRef).toBeTruthy();
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM file_scan_configs').get()).toEqual({ n: 0 });
+    });
+  it.each(['https://evil.example.com', 'https://user:password@example.com', 'https://example.com:8443', 'https://127.0.0.1', 'https://localhost', 'https://scanner.internal', 'https://example.com/' + 'a'.repeat(500), 123])(
+    '不許可の宛先は400で宛先欄を示す: %s', async (endpoint) => {
+      const res = await putConfig('/api/file-scans/config', 'admin-1', { ...valid, externalEndpointUrl: endpoint });
+      expect(res.status).toBe(400);
+      const body = await res.json() as { fields: Record<string, string> };
+      expect(body.fields.externalEndpointUrl).toBeTruthy();
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM file_scan_configs').get()).toEqual({ n: 0 });
+    });
+  it('秘密値の存在を確認せず保存し、誰・いつ・店・ホストを監査へ残す', async () => {
+    // No dedicated secret is present in environment(): the response must not reveal that fact.
+    const res = await putConfig('/api/file-scans/config', 'admin-1', { ...valid, externalEndpointUrl: 'https://example.com/scan?private=query' });
+    expect(res.status).toBe(200);
+    const audit = testDb.raw.prepare("SELECT actor_principal_id, line_account_id, after_json, created_at FROM audit_events WHERE action = 'file_scan.config.update'").get() as Record<string, string>;
+    expect(audit?.actor_principal_id).toBe('admin-1');
+    expect(audit?.line_account_id).toBe('acc-1');
+    expect(JSON.parse(audit.after_json)).toEqual({ endpointHost: 'example.com' });
+    expect(audit.created_at).toBeTruthy();
+    const getRes = await get('/api/file-scans/config?accountId=acc-1', 'admin-1');
+    const body = await getRes.json() as { data: { config: Record<string, unknown> } };
+    expect(Object.keys(body.data.config).sort()).toEqual(['externalEndpointUrl', 'externalProvider', 'externalSecretRef', 'externalEnabled', 'externalTimeoutMs', 'maxBytesOverride', 'maxPixelsOverride', 'updatedAt'].sort());
+    expect(body.data.config.externalEnabled).toBe(true);
+    expect(body.data.config.updatedAt).toBe(audit.created_at);
+  });
+  it('外部検査の停止も監査へ残す', async () => {
+    const res = await putConfig('/api/file-scans/config', 'owner-1', { accountId: 'acc-1', externalProvider: null, externalEndpointUrl: null, externalSecretRef: null });
+    expect(res.status).toBe(200);
+    const audit = testDb.raw.prepare("SELECT after_json FROM audit_events WHERE action = 'file_scan.config.update'").get() as { after_json: string };
+    expect(JSON.parse(audit.after_json)).toEqual({ endpointHost: null });
+  });
+  it('環境に鍵があっても保存・GET・監査は値を読まず応答にも出さない', async () => {
+    const token = crypto.randomUUID();
+    let reads = 0;
+    const bindings = environment();
+    Object.defineProperty(bindings, valid.externalSecretRef, { get() { reads += 1; return token; } });
+    const put = await app().request('/api/file-scans/config', {
+      method: 'PUT', headers: { Authorization: 'Bearer key-admin-1', 'Content-Type': 'application/json' }, body: JSON.stringify(valid),
+    }, bindings);
+    expect(put.status).toBe(200);
+    expect((await put.text()).includes(token)).toBe(false);
+    const getRes = await app().request('/api/file-scans/config?accountId=acc-1', { headers: { Authorization: 'Bearer key-admin-1' } }, bindings);
+    expect(getRes.status).toBe(200);
+    expect((await getRes.text()).includes(token)).toBe(false);
+    expect(reads).toBe(0);
+    const audits = testDb.raw.prepare("SELECT * FROM audit_events WHERE action = 'file_scan.config.update'").all();
+    expect(JSON.stringify(audits).includes(token)).toBe(false);
+  });
+  it.each(['a'.repeat(32) + '.example.com', Array(4).fill('a'.repeat(50)).join('.') + '.com', 'scan-01234567890.example.com', 'scan-81-1234-5678.example.com'])(
+    '長い許可ホストも共通監査の保護を緩めず正確に記録する: %s', async (host) => {
+      allowedHosts = host;
+      const res = await putConfig('/api/file-scans/config', 'admin-1', { ...valid, externalEndpointUrl: `https://${host}/scan` });
+      expect(res.status).toBe(200);
+      const audit = testDb.raw.prepare("SELECT after_json FROM audit_events WHERE action = 'file_scan.config.update'").get() as { after_json: string };
+      expect(JSON.parse(audit.after_json).endpointHostParts.flat().join('')).toBe(host);
+    });
 });

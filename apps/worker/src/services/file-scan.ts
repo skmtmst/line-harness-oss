@@ -1,4 +1,5 @@
 import { jstNow } from '@line-crm/db';
+import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 
 /*
  * 危険なファイルの検査（m12b）。
@@ -613,8 +614,8 @@ export async function getFileScanConfig(db: ScanDb, lineAccountId: string): Prom
 }
 
 /**
- * 外の検査サービスを使う口。設定がなければ null（内蔵検査だけ）。
- * 鍵は設定に置かず、設定の secret_ref が指す名前の環境値から読む。
+ * 不許可の古い設定も null（内蔵検査だけ）。運営が許可した宛先と
+ * 検査専用の名前を確認し終わるまで、選択された環境値を読まない。
  */
 export function resolveExternalScanner(
   env: Record<string, string | undefined>,
@@ -622,18 +623,23 @@ export function resolveExternalScanner(
 ): ThreatScanner | null {
   const endpoint = config?.external_endpoint_url?.trim();
   if (!config?.external_provider || !endpoint) return null;
-  const timeoutMs = Math.max(1000, config.external_timeout_ms || 10000);
   const secretRef = config.external_secret_ref?.trim();
+  if (!isFileScanSecretRef(secretRef)) return null;
+  const url = allowedFileScanEndpoint(endpoint, env.FILE_SCAN_ALLOWED_HOSTS);
+  if (!url) return null;
+  const timeoutMs = Math.max(1000, config.external_timeout_ms || 10000);
   return {
     name: config.external_provider,
     async scan(bytes, context) {
       const headers: Record<string, string> = { 'content-type': context.mimeType };
-      if (secretRef && env[secretRef]) headers.authorization = `Bearer ${env[secretRef]}`;
+      const token = env[secretRef];
+      if (token) headers.authorization = `Bearer ${token}`;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const res = await fetch(endpoint, {
+        const res = await fetch(url.href, {
           method: 'POST',
+          redirect: 'manual',
           headers: {
             ...headers,
             'x-file-scan-filename': encodeURIComponent(context.filename),
@@ -643,6 +649,10 @@ export function resolveExternalScanner(
           body: bytes as unknown as BodyInit,
           signal: controller.signal,
         });
+        // Workerの型はtypeをdefault/errorに限定する。互換fetchのopaque転送も拒否する。
+        if (String(res.type) === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+          throw new ScanRetryableError('external scanner redirect refused');
+        }
         if (!res.ok) throw new ScanRetryableError(`external scanner responded ${res.status}`);
         const data = await res.json<{ verdict?: unknown }>().catch(() => null);
         if (data?.verdict === 'clean') return 'clean';
@@ -650,7 +660,8 @@ export function resolveExternalScanner(
         throw new ScanRetryableError('external scanner returned an unknown verdict');
       } catch (err) {
         if (err instanceof ScanRetryableError) throw err;
-        throw new ScanRetryableError(err instanceof Error ? err.message : 'external scanner failed');
+        // fetch例外にはURLや資格情報が含まれる可能性があるので記録へ持ち込まない。
+        throw new ScanRetryableError('external scanner failed');
       } finally {
         clearTimeout(timer);
       }

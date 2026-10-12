@@ -36,12 +36,21 @@ function app() {
   a.post('/upload', c => uploadFormDocument(c, c.req.query('kind') === 'image-pdf' ? { ...block, fileKinds: ['image', 'pdf'], fileBothSides: false } : c.req.query('kind') === 'mixed' ? { ...block, fileKinds: ['image', 'pdf', 'identity'], fileBothSides: false } : c.req.query('kind') === 'pdf' ? { ...block, fileKind: 'pdf', fileBothSides: false } : block, { accountId: 'a', formId: 'f', friendId: 'u', versionId: null }));
   return a;
 }
-function env() { return { DB: db, IMAGES: store } as Env['Bindings']; }
+let secretReads: string[] = [];
+function env() {
+  return new Proxy({ DB: db, IMAGES: store, FILE_SCAN_ALLOWED_HOSTS: 'scan.example.com', FILE_SCAN_SECRET_PRIMARY: 'test-only-token' } as unknown as Env['Bindings'], {
+    get(target, name: string) {
+      if (name === 'ADMIN_API_KEY' || name.startsWith('FILE_SCAN_SECRET_')) secretReads.push(name);
+      return Reflect.get(target, name);
+    },
+  });
+}
 async function upload(side = 'front', bytes: Uint8Array = png, mime = 'image/png', kind = 'identity') {
   const response = await app().fetch(new Request(`https://app.test/upload?side=${side}&kind=${kind}`, { method: 'POST', headers: { 'Content-Type': mime }, body: bytes as unknown as BodyInit }), env());
   return { response, body: await response.json() as any };
 }
 beforeEach(() => {
+  secretReads = [];
   role = 'owner'; objects = new Map();
   sql = new Database(':memory:'); sql.exec(readFileSync(new URL('../../../../packages/db/bootstrap.sql', import.meta.url), 'utf8'));
   sql.exec(`INSERT INTO tenants(id,name) VALUES ('t','T'); INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES ('a','A','c','tok','sec','t');
@@ -101,7 +110,7 @@ describe('private form documents', () => {
     expect((await upload('single', new Uint8Array(10485761), 'application/pdf', 'pdf')).response.status).toBe(400);
   });
   it('keeps an unavailable external scan pending and retries it with the complete file', async () => {
-    sql.exec(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_timeout_ms,updated_at) VALUES ('a','scanner','https://scan.test',1000,'2026-01-01')`);
+    sql.exec(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_secret_ref,external_timeout_ms,updated_at) VALUES ('a','scanner','https://scan.example.com','FILE_SCAN_SECRET_PRIMARY',1000,'2026-01-01')`);
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
     const fullPdf = new TextEncoder().encode('%PDF-1.7\n' + ' '.repeat(300000) + '\n%%EOF');
     const result = await upload('single', fullPdf, 'application/pdf', 'pdf'); expect(result.body.data.scanStatus).toBe('pending');
@@ -160,7 +169,7 @@ describe('B-213 document corrections', () => {
     expect(await validateDocumentAnswers(db, mixedLayout, { doc: [result.body.data.file] }, { accountId: 'a', formId: 'f', friendId: 'u', versionId: null })).not.toBeNull();
   });
   function external() {
-    sql.exec(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_timeout_ms,updated_at) VALUES ('a','scanner','https://scan.test',1000,'2026-01-01')`);
+    sql.exec(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_secret_ref,external_timeout_ms,updated_at) VALUES ('a','scanner','https://scan.example.com','FILE_SCAN_SECRET_PRIMARY',1000,'2026-01-01')`);
   }
   it('deletes externally flagged content immediately on upload', async () => {
     external(); vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ verdict: 'quarantined' }))));
@@ -212,7 +221,7 @@ it('does not release or retry a quarantined form document, and preserves a faile
   expect(objects.size).toBe(0);
 });
 it('never accepts a missing R2 document as clean even when the external scanner says clean', async () => {
-  sql.exec(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_timeout_ms,updated_at) VALUES ('a','scanner','https://scan.test',1000,'2026-01-01')`);
+  sql.exec(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_secret_ref,external_timeout_ms,updated_at) VALUES ('a','scanner','https://scan.example.com','FILE_SCAN_SECRET_PRIMARY',1000,'2026-01-01')`);
   vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
   await upload(); objects.clear(); sql.exec("UPDATE media_file_scans SET next_retry_at='2000-01-01'");
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ verdict: 'clean' }))); vi.stubGlobal('fetch', fetchMock);
@@ -240,11 +249,32 @@ it('retains submitted ordinary PDF past 90 days and purges an abandoned PDF afte
   expect(sql.prepare('SELECT deletion_reason FROM form_submission_files WHERE id=?').get(second.body.data.file.fileId)).toEqual({ deletion_reason: 'abandoned' });
 });
 it('does not run a sixth check for an older pending row already at the limit', async () => {
-  sql.exec(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_timeout_ms,updated_at) VALUES ('a','scanner','https://scan.test',1000,'2026-01-01')`);
+  sql.exec(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_secret_ref,external_timeout_ms,updated_at) VALUES ('a','scanner','https://scan.example.com','FILE_SCAN_SECRET_PRIMARY',1000,'2026-01-01')`);
   vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); })); await upload();
   sql.exec("UPDATE media_file_scans SET attempts=5, next_retry_at='2000-01-01'");
   const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
   expect(await processDueFileScans(env())).toEqual({ processed: 1, stillPending: 0 });
   expect(fetchMock).not.toHaveBeenCalled();
   expect(sql.prepare('SELECT status,next_retry_at FROM media_file_scans').get()).toEqual({ status: 'rejected', next_retry_at: null });
+});
+
+
+describe('S01 invalid legacy database configuration', () => {
+  it.each([
+    ['ADMIN_API_KEY', 'https://scan.example.com'],
+    ['FILE_SCAN_SECRET_PRIMARY', 'https://evil.example.com'],
+    ['FILE_SCAN_SECRET_PRIMARY', 'https://scan.example.com:8443'],
+  ])('uses only internal scanning on upload and retry without reading %s or sending to %s', async (name, endpoint) => {
+    sql.prepare(`INSERT INTO file_scan_configs(line_account_id,external_provider,external_endpoint_url,external_secret_ref,external_timeout_ms,updated_at) VALUES ('a','scanner',?,?,1000,'2026-01-01')`).run(endpoint, name);
+    const fetchMock = vi.fn(async () => Response.json({ verdict: 'clean' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await upload('single', new TextEncoder().encode('%PDF-1.7\n%%EOF'), 'application/pdf', 'pdf');
+    expect(result.response.status).toBe(201);
+    expect(result.body.data.scanStatus).toBe('clean');
+    sql.exec("UPDATE media_file_scans SET status='pending',next_retry_at='2000-01-01'");
+    await processDueFileScans(env());
+    expect(sql.prepare('SELECT status FROM media_file_scans').get()).toEqual({ status: 'clean' });
+    expect(secretReads).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
