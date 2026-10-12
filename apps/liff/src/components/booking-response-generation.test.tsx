@@ -12,6 +12,16 @@ const slot = {date:'2099-01-01',start:'10:00'};
 beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('外部通信は禁止'); })); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
+it('REV-H2: 支払い必須なのに記録がない応答では完了へ進まない', async () => {
+  vi.mocked(api.createRequest).mockResolvedValue({ booking_id: 'b', status: 'requested', payment_required: true } as never);
+  const onSubmitted = vi.fn();
+  render(<Confirm menu={menu} staff={staff} slot={slot} autoConfirm={true} onBack={()=>{}} onSubmitted={onSubmitted}/>);
+  fireEvent.click(screen.getByRole('button', { name: /予約を確定/ }));
+  await act(async () => {});
+  expect(onSubmitted).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert').textContent).toContain('予約できませんでした');
+});
+
 it('XL-01: 共通予約の送信中に戻ったあと古い成功では完了しない', async () => {
   let resolve!: (value: {booking_id:string;status:string}) => void;
   const promise = new Promise<{booking_id:string;status:string}>(r => {resolve=r;});

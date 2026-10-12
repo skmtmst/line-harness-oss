@@ -1,6 +1,8 @@
 // Cron handler: expire 24h-old request bookings + purge idempotency rows.
 
-import { recoverExpiredBookingPayments, recoverPaidBookingPayments } from './booking-payment-recovery.js';
+import { recoverExpiredBookingPayments, recoverPaidBookingPayments, recoverOrphanedOnlineBookings } from './booking-payment-recovery.js';
+import { recoverConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
+import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 import type { BookingNotificationSender } from './booking-notifier.js';
 import { formatStartsAtForStore, notificationTiming } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
@@ -26,14 +28,17 @@ interface StaleRow {
 export interface RunExpirerParams {
   now: Date;
   sender: BookingNotificationSender;
+  credentials?: GoogleServiceAccountCredentials;
 }
 
 export async function runExpirer(
   db: D1Database,
   params: RunExpirerParams,
 ): Promise<{ expired: number; idempotencyPurged: number }> {
-  await recoverPaidBookingPayments(db, params.now);
+  await recoverPaidBookingPayments(db, params.now, params.credentials);
+  await recoverConfirmedBookingSideEffects(db, { now: params.now, credentials: params.credentials });
   await recoverExpiredBookingPayments(db, params.now);
+  await recoverOrphanedOnlineBookings(db, params.now);
   const cutoff = new Date(params.now.getTime() - REQUEST_TTL_HOURS * 3600_000).toISOString();
   // 機能オフはSQLで先に除き、緊急停止中の行も消費枠に数えず、IDで次のページへ進む。
   const stale: StaleRow[] = [];

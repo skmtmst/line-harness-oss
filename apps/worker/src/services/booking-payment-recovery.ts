@@ -1,9 +1,35 @@
-/** 決済と予約の状態を同じ取引でそろえ、旧版の途中失敗も補完する。外部送信はしない。 */
+import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
+import type { GoogleServiceAccountCredentials } from './google-service-account.js';
+
+/** 旧版の分割保存で支払い行だけ欠けたオンライン予約を期限内に解放する。 */
+export async function recoverOrphanedOnlineBookings(db: D1Database, now: Date): Promise<void> {
+  await db.batch([
+    db.prepare(`UPDATE bookings SET status = 'expired', decided_at = ?, updated_at = ?
+      WHERE status = 'requested' AND julianday(requested_at) <= julianday(?) - (
+        COALESCE((SELECT hold_minutes FROM booking_payment_configs WHERE line_account_id = bookings.line_account_id),10) / 1440.0)
+      AND price_at_booking > 0 AND COALESCE(
+        (SELECT mode FROM booking_payment_menu_settings WHERE menu_id = bookings.menu_id AND line_account_id = bookings.line_account_id),
+        (SELECT mode FROM booking_payment_configs WHERE line_account_id = bookings.line_account_id),'none') = 'online'
+      AND NOT EXISTS (SELECT 1 FROM booking_payments p WHERE p.booking_id = bookings.id AND p.line_account_id = bookings.line_account_id)`)
+      .bind(now.toISOString(), now.toISOString(), now.toISOString()),
+    db.prepare(`INSERT INTO booking_audit_logs
+      (id,booking_id,line_account_id,action,after_json,reason,actor_type,occurred_at)
+      SELECT 'orphan-payment:' || id,id,line_account_id,'expired','{"status":"expired"}',
+        'payment_record_missing','system',? FROM bookings WHERE status='expired' AND decided_at=?
+        AND price_at_booking > 0 AND NOT EXISTS (SELECT 1 FROM booking_payments p
+          WHERE p.booking_id=bookings.id AND p.line_account_id=bookings.line_account_id)
+        AND NOT EXISTS (SELECT 1 FROM booking_audit_logs a WHERE a.id='orphan-payment:' || bookings.id)`)
+      .bind(now.toISOString(), now.toISOString()),
+  ]);
+}
+
+/** 決済と予約の状態・確定回収の記録を同じ取引でそろえる。 */
 export async function reconcilePaidBookingPayment(
   db: D1Database,
   paymentId: string,
   now = new Date(),
   applyPaid = false,
+  credentials: GoogleServiceAccountCredentials = {},
 ): Promise<{ duplicate: boolean } | null> {
   const row = await db.prepare(`SELECT id, line_account_id, booking_id, status
     FROM booking_payments WHERE id = ?`).bind(paymentId).first<{
@@ -34,20 +60,30 @@ export async function reconcilePaidBookingPayment(
       (id, booking_id, line_account_id, action, after_json, actor_type, occurred_at)
       SELECT ?, ?, ?, 'confirmed', '{"status":"confirmed","payment":"paid"}', 'system', ?
       WHERE changes() = 1`).bind(crypto.randomUUID(), row.booking_id, row.line_account_id, nowIso));
+    statements.push(confirmationWorkflowStatement(db, row.booking_id, true));
   }
   const result = statements.length ? await db.batch(statements) : [];
+  if (row.booking_id && await db.prepare(`SELECT id FROM booking_operation_runs
+      WHERE booking_id = ? AND line_account_id = ? AND idempotency_key = ? AND status IN ('queued','retry_wait')`)
+      .bind(row.booking_id, row.line_account_id, `${row.booking_id}:confirmation-effects`).first()) {
+    try { await runConfirmedBookingSideEffects(db, row.booking_id, { now, credentials }); }
+    catch { console.error(JSON.stringify({ event: 'paid_booking_confirmation_incomplete' })); }
+  }
   return { duplicate: !applyPaid || (result[0]?.meta?.changes ?? 0) === 0 };
 }
 
 /** requested の不整合だけを有限数で回収する。承認待ちの支払い済みは期限切れにしない。 */
-export async function recoverPaidBookingPayments(db: D1Database, now: Date): Promise<void> {
+export async function recoverPaidBookingPayments(db: D1Database, now: Date, credentials: GoogleServiceAccountCredentials = {}): Promise<void> {
   const rows = await db.prepare(`SELECT p.id FROM booking_payments p
     JOIN bookings b ON b.id = p.booking_id AND b.line_account_id = p.line_account_id
     WHERE p.status = 'paid' AND b.status = 'requested'
       AND COALESCE((SELECT approval_mode FROM booking_settings
         WHERE line_account_id = b.line_account_id), 'automatic') = 'automatic'
     ORDER BY p.id LIMIT 200`).all<{ id: string }>();
-  for (const row of rows.results ?? []) await reconcilePaidBookingPayment(db, row.id, now);
+  for (const row of rows.results ?? []) {
+    try { await reconcilePaidBookingPayment(db, row.id, now, false, credentials); }
+    catch { console.error(JSON.stringify({ event: 'paid_booking_recovery_failed' })); }
+  }
 }
 
 export async function reconcileExpiredBookingPayment(

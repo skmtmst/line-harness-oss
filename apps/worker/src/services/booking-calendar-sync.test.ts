@@ -237,6 +237,28 @@ afterEach(() => {
 });
 
 describe('R327: 同時再試行で Google 予定を二重に作らない', () => {
+  it('REV-H1: Google予定IDだけ確保して中断した行は、未作成を完了扱いにせず回収する', async () => {
+    const { db, raw } = createTestD1();
+    seedConfirmedWithConnection(raw, 'cal-interrupted', { externalEventId: 'lh0123456789abcdef' });
+    const { created } = stubGoogleFetch();
+    await expect(syncConfirmedBookingToGoogle(db, CREDS, 'cal-interrupted', 'lh0123456789abcdef')).resolves.toMatchObject({ synced: true });
+    expect(created).toHaveLength(1);
+    raw.close();
+  });
+  it('REV-H1: Google受理後の応答消失でも回収は同じ予定IDを再利用して1件に保つ', async () => {
+    const { db, raw } = createTestD1();
+    seedConfirmedWithConnection(raw, 'cal-recovery');
+    const ids = new Set<string>();
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const { id } = JSON.parse(String(init?.body));
+      if (ids.has(id)) return new Response('', { status: 409 });
+      ids.add(id); throw new Error('accepted response lost');
+    }));
+    await expect(syncConfirmedBookingToGoogle(db, CREDS, 'cal-recovery', 'lh0123456789abcdef')).rejects.toThrow('accepted response lost');
+    await expect(syncConfirmedBookingToGoogle(db, CREDS, 'cal-recovery', 'lh0123456789abcdef')).resolves.toMatchObject({ synced: true });
+    expect(ids.size).toBe(1);
+    raw.close();
+  });
   it('同時に2本走っても外部作成は1件、予約と2つの結果の ID が一致する', async () => {
     const { db, raw } = createTestD1();
     seedConfirmedWithConnection(raw, 'cal-sync-1');

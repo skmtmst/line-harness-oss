@@ -396,7 +396,9 @@ bookingPayments.post(
       await markUnpaidBookingPaymentByProviderId(c.env.DB, outcome.providerPaymentId, 'failed');
       return c.json({ success: true, status: 'failed' });
     }
-    const applied = await applyPaidBookingPayment(c.env.DB, outcome.providerPaymentId);
+    const applied = await applyPaidBookingPayment(c.env.DB, outcome.providerPaymentId, {
+      email: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+    });
     if (!applied) return c.json({ success: true, status: 'unknown_payment' });
     return c.json({ success: true, status: applied.duplicate ? 'duplicate' : 'paid' });
   },
@@ -425,11 +427,12 @@ async function markUnpaidBookingPaymentByProviderId(
 export async function applyPaidBookingPayment(
   db: D1Database,
   providerPaymentId: string,
+  credentials: import('../services/google-service-account.js').GoogleServiceAccountCredentials = {},
 ): Promise<{ duplicate: boolean } | null> {
   const row = await db.prepare(
     `SELECT id FROM booking_payments WHERE provider_payment_id = ?`,
   ).bind(providerPaymentId).first<{ id: string }>();
-  return row ? reconcilePaidBookingPayment(db, row.id, new Date(), true) : null;
+  return row ? reconcilePaidBookingPayment(db, row.id, new Date(), true, credentials) : null;
 }
 
 // DELETE /api/booking/admin/menus/:id/payment — メニューごとの上書きを消して店の既定に戻す

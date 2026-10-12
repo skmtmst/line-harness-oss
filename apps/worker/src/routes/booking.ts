@@ -1,3 +1,5 @@
+import { notifyForBooking } from '../services/booking-notification.js';
+import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../services/booking-confirmed-effects.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { peopleBoardEntry } from '@line-crm/shared';
@@ -33,6 +35,7 @@ import {
   getBookingAdminSettings,
   saveBookingAdminSettings,
   createBookingPayment,
+  bookingPaymentInsertStatement,
   getBookingPaymentByBooking,
   decidePrepayOnly,
   prepayNoticeFor,
@@ -79,7 +82,6 @@ import {
   removeBookingFromGoogle,
   runBookingGoogleSync,
   runCalendarDeleteOperation,
-  syncConfirmedBookingToGoogle,
   verifyStaffCalendarConnection,
 } from '../services/booking-calendar-sync.js';
 import {
@@ -90,9 +92,6 @@ import {
   saveIdempotencyResponse,
 } from '../services/booking-idempotency.js';
 import {
-  formatStartsAtForStore,
-  notificationTiming,
-  sendBookingNotification,
   type NotificationKind,
 } from '../services/booking-notifier.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
@@ -112,13 +111,11 @@ import {
   type BookingStatus,
 } from '../services/booking-types.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
-import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import {
   bookingAuditInsert,
   listBookingAuditLogs,
   recordBookingAudit,
-  recordConversionSourceEvent,
 } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
@@ -587,89 +584,6 @@ export async function resolveFriendId(
   return f?.id ?? null;
 }
 
-async function notifyForBooking(
-  db: D1Database,
-  bookingId: string,
-  kind: NotificationKind,
-  existingOperationId?: string,
-  retryKey?: string,
-): Promise<void> {
-  const row = await db
-    .prepare(
-      `SELECT b.starts_at, b.line_account_id,
-              m.name AS menu_name,
-              s.display_name AS staff_name,
-              la.channel_access_token,
-              la.channel_access_token_encrypted,
-              f.line_user_id,
-              bs.timezone
-         FROM bookings b
-         INNER JOIN menus m ON m.id = b.menu_id
-         INNER JOIN staff s ON s.id = b.staff_id
-         INNER JOIN line_accounts la ON la.id = b.line_account_id
-         INNER JOIN friends f ON f.id = b.friend_id
-          LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
-        WHERE b.id = ?`,
-    )
-    .bind(bookingId)
-    .first<{
-      starts_at: string;
-      line_account_id: string;
-      menu_name: string;
-      staff_name: string;
-      channel_access_token: string;
-      channel_access_token_encrypted: string | null;
-      line_user_id: string;
-      timezone: string | null;
-    }>();
-  if (!row) return;
-  const operationId = existingOperationId ?? await queueBookingOperation(db, {
-    bookingId,
-    lineAccountId: row.line_account_id,
-    kind: 'confirmation_line',
-    idempotencyKey: `${bookingId}:confirmation-line:${kind}`,
-    result: { notificationKind: kind },
-  });
-  try {
-    const accessToken = await resolveLineCredential(
-      row.channel_access_token_encrypted,
-      row.channel_access_token,
-      { lineAccountId: row.line_account_id, field: 'channel_access_token' },
-    );
-    // 文面の日時は店舗の時間帯で書く (R332)。kind に応じた相対表現は
-    // 送信時点の実測で組み立てる (R333)。
-    const timeZone = row.timezone ?? 'Asia/Tokyo';
-    const timing = notificationTiming(row.starts_at, timeZone, new Date());
-    await sendBookingNotification({
-      channelAccessToken: accessToken,
-      toLineUserId: row.line_user_id,
-      kind,
-      ctx: {
-        menuName: row.menu_name,
-        staffName: row.staff_name,
-        startsAt: formatStartsAtForStore(row.starts_at, timeZone),
-        ...timing,
-      },
-      retryKey,
-    });
-    await finishBookingOperation(db, {
-      id: operationId,
-      status: 'succeeded',
-      completedAt: new Date().toISOString(),
-      result: { notificationKind: kind, openTracking: 'inbox' },
-    });
-  } catch (error) {
-    await finishBookingOperation(db, {
-      id: operationId,
-      status: 'permanent_failed',
-      completedAt: new Date().toISOString(),
-      errorCode: error instanceof Error ? error.name : 'notification_failed',
-      result: { notificationKind: kind },
-    });
-    throw error;
-  }
-}
-
 // ================================================================
 // LIFF endpoints (/api/liff/booking/*)
 // ================================================================
@@ -682,7 +596,9 @@ booking.get('/api/liff/booking/menus', async (c) => {
       `SELECT id, name, category_label, description,
               duration_minutes, buffer_after_minutes,
               base_price, price_mode, sort_order,
-              cancel_deadline_hours_before, intake_question
+              cancel_deadline_hours_before, intake_question,
+              COALESCE((SELECT mode FROM booking_payment_menu_settings WHERE menu_id = menus.id AND line_account_id = menus.line_account_id),
+                (SELECT mode FROM booking_payment_configs WHERE line_account_id = menus.line_account_id),'none') AS payment_mode
          FROM menus
         WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL
         ORDER BY sort_order ASC, id ASC`,
@@ -792,99 +708,6 @@ async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId
   return latest.by_staff.find((staff) => actualStaff.has(staff.staff_id) && findLatestSlotForInstant(staff.slots,startsAt) !== null)?.staff_id ?? null;
 }
 
-/**
- * 承認なしで確定した予約の確定後の始末。承認で確定したときと同じ中身
- * （前日・当日のお知らせ・成果数え・カレンダー同期・確定の知らせ・自動化）を
- * そろえる。「予約が入ったとき」の webhook は作った側が既に送るので
- * ここでは送らない（二重送り防止）。
- */
-async function runAutoConfirmedSideEffects(
-  db: D1Database,
-  schedule: (task: Promise<unknown>) => void,
-  args: {
-    bookingId: string;
-    lineAccountId: string;
-    friendId: string;
-    staffId: string;
-    menuId: string;
-    startsAt: Date;
-    googleCreds: ReturnType<typeof googleCredentials>;
-  },
-): Promise<void> {
-  const { bookingId, lineAccountId } = args;
-  const snapshot = await db
-    .prepare(`SELECT notification_policy_snapshot FROM bookings WHERE id = ?`)
-    .bind(bookingId)
-    .first<{ notification_policy_snapshot: string | null }>()
-    .then((found) => readNotificationPolicySnapshot(found?.notification_policy_snapshot ?? null));
-  const timing = await getReminderTiming(db, lineAccountId);
-  if (snapshot.day_before || snapshot.hours_before) {
-    await insertConfirmationReminders(db, {
-      bookingId,
-      startsAt: args.startsAt,
-      now: new Date(),
-      reminderHoursBefore: timing.reminderHoursBefore,
-      dayBeforeTime: timing.dayBeforeTime,
-      timeZone: timing.timeZone,
-      kinds: { dayBefore: snapshot.day_before, hoursBefore: snapshot.hours_before },
-    });
-  }
-  try {
-    await recordConversionSourceEvent(db, {
-      sourceType: 'reservation_confirmed',
-      lineAccountId,
-      friendId: args.friendId,
-      sourceEventId: bookingId,
-      metadata: { bookingId, bookingType: 'salon', via: 'automatic' },
-    });
-  } catch (error) {
-    console.error('booking conversion record failed (automatic):', error);
-  }
-  const googleOpId = await queueBookingOperation(db, {
-    bookingId,
-    lineAccountId,
-    kind: 'google_calendar',
-    idempotencyKey: `${bookingId}:google-calendar:create`,
-  });
-  try {
-    const synced = await syncConfirmedBookingToGoogle(db, args.googleCreds, bookingId);
-    await finishBookingOperation(db, {
-      id: googleOpId,
-      status: synced.synced ? 'succeeded' : 'skipped',
-      completedAt: new Date().toISOString(),
-      result: { calendarSync: synced.synced ? 'synced' : 'not_configured' },
-    });
-  } catch (error) {
-    await finishBookingOperation(db, {
-      id: googleOpId,
-      status: 'retry_wait',
-      completedAt: new Date().toISOString(),
-      errorCode: error instanceof Error ? error.name : 'calendar_sync_failed',
-      result: { calendarSync: 'failed' },
-    });
-    console.error('Google Calendar sync (automatic) failed:', error);
-  }
-  if (snapshot.send_line_confirmation) {
-    schedule(
-      notifyForBooking(db, bookingId, 'approved').catch((err) =>
-        console.error('booking notify (approved) failed:', err),
-      ),
-    );
-  }
-  schedule(
-    dispatchAutomationEventWithLogging(db, {
-      lineAccountId,
-      eventType: 'calendar_booked',
-      sourceEventId: bookingId,
-      friendId: args.friendId,
-      eventData: {
-        bookingType: 'salon', bookingId, menuId: args.menuId, staffId: args.staffId,
-      },
-    })
-      .catch((error) => console.error('booking automation event failed:', error)),
-  );
-}
-
 booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string"],"staff_id":["string"],"starts_at":["string"],"customer_note":["string"],"waitlist_id":["string"]}), async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
@@ -920,6 +743,17 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   });
   if (cached) {
     if (cached.status !== 202) {
+      const response = cached.body as { booking_id?: string; payment?: unknown };
+      if (cached.status === 201 && response.booking_id && !response.payment) {
+        const saved = await c.env.DB.prepare(`SELECT menu_id, price_at_booking FROM bookings
+          WHERE id = ? AND line_account_id = ? AND friend_id = ?`)
+          .bind(response.booking_id, accountId, friendId).first<{ menu_id: string; price_at_booking: number }>();
+        if (saved && saved.price_at_booking > 0
+          && (await resolveBookingPaymentConfig(c.env.DB, accountId, saved.menu_id)).mode === 'online'
+          && !await getBookingPaymentByBooking(c.env.DB, accountId, response.booking_id)) {
+          return c.json({ error: 'booking_payment_unavailable' }, 500);
+        }
+      }
       return c.json(cached.body as Record<string, unknown>, cached.status as 200 | 201 | 400 | 409 | 422);
     }
     // 完成応答を書けなかった要求は、先に確保した予約IDを本人の範囲で引く。
@@ -928,16 +762,21 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     const pendingBookingId = (cached.body as { booking_id?: unknown }).booking_id;
     if (typeof pendingBookingId === 'string') {
       const saved = await c.env.DB.prepare(
-        `SELECT id, status FROM bookings WHERE id = ? AND line_account_id = ? AND friend_id = ?`,
-      ).bind(pendingBookingId, accountId, friendId).first<{ id: string; status: string }>();
+        `SELECT id, status, menu_id, price_at_booking FROM bookings WHERE id = ? AND line_account_id = ? AND friend_id = ?`,
+      ).bind(pendingBookingId, accountId, friendId).first<{ id: string; status: string; menu_id: string; price_at_booking: number }>();
       if (saved) {
         const payment = await getBookingPaymentByBooking(c.env.DB, accountId, saved.id);
+        const requiresPayment = saved.price_at_booking > 0
+          && (await resolveBookingPaymentConfig(c.env.DB, accountId, saved.menu_id)).mode === 'online';
+        if (requiresPayment && !payment) return c.json({ error: 'booking_payment_unavailable' }, 500);
+        if (['expired','cancelled','rejected'].includes(saved.status)) return c.json({ error: 'booking_unavailable' }, 409);
         const prepayNotice = await prepayNoticeFor(
           c.env.DB, accountId, await decidePrepayOnly(c.env.DB, accountId, friendId),
         );
         return c.json({
           booking_id: saved.id,
           status: saved.status,
+          payment_required: requiresPayment,
           ...(payment ? { payment: { id: payment.id, status: payment.status, holdUntil: payment.hold_until } } : {}),
           ...(prepayNotice ? { prepayNotice } : {}),
         }, 201);
@@ -1117,10 +956,22 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
       }),
       ...bookingPersonLimitBindings(accountId, friendId, null),
     );
+  const paymentId = requiresOnlinePayment ? crypto.randomUUID() : null;
+  const paymentHoldUntil = requiresOnlinePayment
+    ? new Date(Date.now() + paymentConfig.holdMinutes * 60_000).toISOString() : null;
+  const bookingPayment = paymentId && paymentHoldUntil
+    ? { id: paymentId, status: 'unpaid', holdUntil: paymentHoldUntil } : null;
   let insertResult: { inserted: boolean; consumptionCount: number };
   try {
     insertResult = await insertBookingWithResourceSnapshot(c.env.DB, {
       bookingInsert, bookingId, lineAccountId: accountId, menuId: body.menu_id,
+      additionalStatements: [
+        ...(bookingPayment ? [bookingPaymentInsertStatement(c.env.DB, {
+          id: bookingPayment.id, bookingId, lineAccountId: accountId, amount: menuRow.price,
+          provider: paymentConfig.provider, holdUntil: bookingPayment.holdUntil!, now: nowIso,
+        })] : []),
+        ...(autoConfirm ? [confirmationWorkflowStatement(c.env.DB, bookingId)] : []),
+      ],
     });
   } catch (error) {
     // DB応答だけ消えた場合はcommit済みかもしれない。不在を確認できた
@@ -1204,15 +1055,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     // 承認なし確定: 承認で確定したときと同じ始末をその場でそろえる。
     // 失敗しても予約は成立させる（承認の動きと同じ扱い）。
     try {
-      await runAutoConfirmedSideEffects(c.env.DB, (task) => c.executionCtx.waitUntil(task), {
-        bookingId,
-        lineAccountId: accountId,
-        friendId,
-        staffId: body.staff_id,
-        menuId: body.menu_id,
-        startsAt,
-        googleCreds: googleCredentials(c.env),
-      });
+      await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env) });
     } catch (error) {
       console.error('booking auto-confirm side effects failed:', error);
     }
@@ -1287,28 +1130,6 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
     );
   }
 
-  /*
-   * 決済の差し替え制。online の店・メニューだけ支払いの記録を作り、
-   * 仮押さえの期限を付ける。none／onsite では何も足さず、
-   * 今の予約の流れは一切変えない。
-   */
-  let bookingPayment: { id: string; status: string; holdUntil: string | null } | null = null;
-  try {
-    if (requiresOnlinePayment) {
-      const holdUntil = new Date(Date.now() + paymentConfig.holdMinutes * 60_000).toISOString();
-      const record = await createBookingPayment(c.env.DB, {
-        lineAccountId: accountId,
-        bookingId,
-        amount: menuRow.price,
-        provider: paymentConfig.provider,
-        idempotencyKey: `booking:${bookingId}`,
-        holdUntil,
-      });
-      bookingPayment = { id: record.id, status: record.status, holdUntil: record.hold_until };
-    }
-  } catch (error) {
-    console.error('booking payment record failed:', error);
-  }
   // 無断キャンセルの前払いのみ。前払いの人は案内を付ける（予約自体は仮押さえのまま）。
   let selfPrepayNotice: string | null = null;
   try {
@@ -1322,6 +1143,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   const responseBody = {
     booking_id: bookingId,
     status: initialStatus,
+    payment_required: requiresOnlinePayment,
     ...(bookingPayment ? { payment: bookingPayment } : {}),
     ...(selfPrepayNotice ? { prepayNotice: selfPrepayNotice } : {}),
   };
@@ -5920,6 +5742,9 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     }
   }
   const initialStatus = (adminPrepayOnly ? 'requested' : 'confirmed') satisfies BookingStatus;
+  const adminPaymentConfig = adminPrepayOnly ? await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id) : null;
+  const adminPrepayPayment = adminPaymentConfig?.mode === 'online' && menuRow.price > 0
+    ? { id: crypto.randomUUID(), status: 'unpaid', holdUntil: new Date(Date.now()+adminPaymentConfig.holdMinutes*60000).toISOString() } : null;
   // 予約した時点の内容（値段・時間）の写しを持つ（T）。
   const menuSnapshot = buildMenuSnapshot(menuRow);
   const bookingInsert = c.env.DB.prepare(
@@ -6002,6 +5827,13 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       bookingId,
       lineAccountId: accountId,
       menuId: body.menu_id,
+      additionalStatements: [
+        ...(adminPrepayPayment ? [bookingPaymentInsertStatement(c.env.DB, {
+          id: adminPrepayPayment.id, bookingId, lineAccountId: accountId, amount: menuRow.price,
+          provider: adminPaymentConfig!.provider, holdUntil: adminPrepayPayment.holdUntil, now: nowIso,
+        })] : []),
+        ...(initialStatus === 'confirmed' ? [confirmationWorkflowStatement(c.env.DB, bookingId)] : []),
+      ],
     });
   } catch (error) {
     await releaseReservedIdempotencyResponse(c.env.DB, {
@@ -6037,31 +5869,13 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     return c.json(response, 409);
   }
 
-  // 予約の確定を成果計測へ接続する(#648)。ここは代理登録で、入った時点で
-  // 確定(confirmed)なので、この1か所が「確定した」の起点になる。
-  // 友だちが紐づかない電話予約は数えない(成果は友だちに結びつける)。
-  // 前払いの人は支払い済みまで確定しないので、ここでは数えない。
-  if (friendId && initialStatus === 'confirmed') {
-    try {
-      await recordConversionSourceEvent(c.env.DB, {
-        sourceType: 'reservation_confirmed',
-        lineAccountId: accountId,
-        friendId,
-        sourceEventId: bookingId,
-        metadata: { bookingId, bookingType: 'salon', via: 'proxy_create' },
-      });
-    } catch (error) {
-      console.error('booking conversion record failed (proxy-create):', error);
-    }
-  }
-
   // N-394: 作成も履歴の起点として残す。操作者 (代理登録したスタッフ) を記録する。
   await recordBookingAudit(c.env.DB, {
     bookingId,
     lineAccountId: accountId,
     action: 'created',
     after: {
-      status: 'confirmed',
+      status: initialStatus,
       staff_id: body.staff_id,
       menu_id: body.menu_id,
       starts_at: startsAt.toISOString(),
@@ -6072,114 +5886,22 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     occurredAt: nowIso,
   });
 
-  let confirmationOperationId: string | null = null;
-  if (friendId && (sendDayBefore || sendHoursBefore)) {
-    // N-395: 前日・当日のお知らせはアカウントの設定時刻で作る。
-    // 確認メッセージの可否とは独立して作れる（確認なし＋リマインダありも選べる）。
-    const timing = await getReminderTiming(c.env.DB, accountId);
-    await insertConfirmationReminders(c.env.DB, {
-      bookingId,
-      startsAt,
-      now: new Date(),
-      reminderHoursBefore: timing.reminderHoursBefore,
-      dayBeforeTime: timing.dayBeforeTime,
-      timeZone: timing.timeZone,
-      kinds: { dayBefore: sendDayBefore, hoursBefore: sendHoursBefore },
-    });
-    c.executionCtx.waitUntil(
-      enrollByTrigger(c.env.DB, {
-        triggerType: 'booking',
-        friendId,
-        startsAtIso: startsAt.toISOString(),
-        sourceId: bookingId,
-        sourceEventId: bookingId,
-        lineAccountId: accountId,
-      }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
-    );
-  }
-  if (sendLineConfirmation && friendId) {
-    confirmationOperationId = await queueBookingOperation(c.env.DB, {
-      bookingId,
-      lineAccountId: accountId,
-      kind: 'confirmation_line',
-      idempotencyKey: `${bookingId}:confirmation-line:approved`,
-      result: { notificationKind: 'approved', openTracking: 'inbox' },
-    });
-  }
-  const googleOperationId = await queueBookingOperation(c.env.DB, {
-    bookingId,
-    lineAccountId: accountId,
-    kind: 'google_calendar',
-    idempotencyKey: `${bookingId}:google-calendar:create`,
-  });
   let calendarSync: 'not_configured' | 'synced' | 'failed' = 'not_configured';
-  try {
-    const synced = await syncConfirmedBookingToGoogle(
-      c.env.DB,
-      googleCredentials(c.env),
-      bookingId,
-    );
-    calendarSync = synced.synced ? 'synced' : 'not_configured';
-    await finishBookingOperation(c.env.DB, {
-      id: googleOperationId,
-      status: synced.synced ? 'succeeded' : 'skipped',
-      completedAt: new Date().toISOString(),
-      result: { calendarSync },
-    });
-  } catch (error) {
-    calendarSync = 'failed';
-    await finishBookingOperation(c.env.DB, {
-      id: googleOperationId,
-      status: 'retry_wait',
-      completedAt: new Date().toISOString(),
-      errorCode: error instanceof Error ? error.name : 'calendar_sync_failed',
-      result: { calendarSync },
-    });
-    console.error('Google Calendar sync (proxy-create) failed:', error);
+  if (initialStatus === 'confirmed') {
+    await runConfirmedBookingSideEffects(c.env.DB, bookingId, { credentials: googleCredentials(c.env) });
+    const calendarOp = await c.env.DB.prepare(`SELECT status, result_json FROM booking_operation_runs
+      WHERE booking_id = ? AND kind = 'google_calendar' AND idempotency_key = ?`)
+      .bind(bookingId, `${bookingId}:google-calendar:create`).first<{ status: string; result_json: string }>();
+    if (calendarOp?.status === 'succeeded') calendarSync = 'synced';
+    else if (calendarOp && ['retry_wait','permanent_failed'].includes(calendarOp.status)) calendarSync = 'failed';
+    if (friendId && (sendDayBefore || sendHoursBefore)) {
+      c.executionCtx.waitUntil(enrollByTrigger(c.env.DB, {
+        triggerType: 'booking', friendId, startsAtIso: startsAt.toISOString(), sourceId: bookingId,
+        sourceEventId: bookingId, lineAccountId: accountId,
+      }).catch(() => console.error('proxy reminder enrollment failed')));
+    }
   }
   if (friendId) {
-    if (sendLineConfirmation && confirmationOperationId) {
-      c.executionCtx.waitUntil(
-        notifyForBooking(c.env.DB, bookingId, 'approved', confirmationOperationId).catch((err) =>
-          console.error('booking notify (proxy-create) failed:', err),
-        ),
-      );
-    }
-    const automationOperationId = await queueBookingOperation(c.env.DB, {
-      bookingId,
-      lineAccountId: accountId,
-      kind: 'automation',
-      idempotencyKey: `${bookingId}:automation:calendar-booked`,
-      result: { eventType: BOOKING_CONFIRMED_AUTOMATION_EVENT },
-    });
-    c.executionCtx.waitUntil(
-      dispatchAutomationEventWithLogging(c.env.DB, {
-        lineAccountId: accountId,
-        eventType: 'calendar_booked',
-        sourceEventId: bookingId,
-        friendId,
-        eventData: {
-          bookingType: 'salon', bookingId, menuId: body.menu_id, staffId: body.staff_id,
-        },
-      })
-        .then(() => finishBookingOperation(c.env.DB, {
-          id: automationOperationId,
-          status: 'succeeded',
-          completedAt: new Date().toISOString(),
-          result: { eventType: BOOKING_CONFIRMED_AUTOMATION_EVENT },
-        }))
-        .catch(async (error) => {
-          await finishBookingOperation(c.env.DB, {
-            id: automationOperationId,
-            status: 'retry_wait',
-            completedAt: new Date().toISOString(),
-            errorCode: error instanceof Error ? error.name : 'automation_dispatch_failed',
-            result: { eventType: BOOKING_CONFIRMED_AUTOMATION_EVENT },
-          });
-          throw error;
-        })
-        .catch((error) => console.error('booking automation event failed:', error)),
-    );
     // R150: 「予約が入ったとき」の送信Webhook購読者へも届ける。
     c.executionCtx.waitUntil(
       fireOutgoingWebhooks(c.env.DB, 'booking_created', {
@@ -6211,27 +5933,6 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       bookingCustomerId,
     }),
   ]);
-  // 前払いの人は支払いの記録を作る（online の店だけ）。none の店では印だけ付けて案内を出す。
-  let adminPrepayPayment: { id: string; status: string; holdUntil: string | null } | null = null;
-  if (adminPrepayOnly && initialStatus === 'requested') {
-    try {
-      const paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
-      if (paymentConfig.mode === 'online' && menuRow.price > 0) {
-        const holdUntil = new Date(Date.now() + paymentConfig.holdMinutes * 60_000).toISOString();
-        const record = await createBookingPayment(c.env.DB, {
-          lineAccountId: accountId,
-          bookingId,
-          amount: menuRow.price,
-          provider: paymentConfig.provider,
-          idempotencyKey: `booking:${bookingId}`,
-          holdUntil,
-        });
-        adminPrepayPayment = { id: record.id, status: record.status, holdUntil: record.hold_until };
-      }
-    } catch (error) {
-      console.error('prepay payment record failed:', error);
-    }
-  }
   const response = {
     booking_id: bookingId,
     booking_customer_id: bookingCustomerId,
@@ -7685,102 +7386,22 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   const next = nextStatus(row.status, b.action);
   // 条件付き UPDATE: 同時 PATCH の race を防ぐ。changes=0 のときは別オペレータが先に
   // 状態を変えたので 409 を返し、副作用（reminders 作成・通知）は走らせない。
-  const updateResult = await c.env.DB
+  const updateStatement = c.env.DB
     .prepare(
       `UPDATE bookings SET status = ?, decided_at = ?,
                             updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
         WHERE id = ? AND status = ?`,
     )
-    .bind(next, new Date().toISOString(), id, row.status)
-    .run();
+    .bind(next, new Date().toISOString(), id, row.status);
+  const [updateResult] = await c.env.DB.batch([
+    updateStatement, ...(next === 'confirmed' ? [confirmationWorkflowStatement(c.env.DB, id, true)] : []),
+  ]);
   if ((updateResult.meta?.changes ?? 0) === 0) {
     return c.json({ error: 'concurrent_update' }, 409);
   }
 
   if (next === 'confirmed') {
-    // N-395: 承認で作る前日・当日のお知らせも店舗設定の時刻を使う。
-    // 予約時に選んだ通知方針（snapshot）の ON の種別だけ作る。
-    const approvedPolicy = await c.env.DB
-      .prepare(`SELECT notification_policy_snapshot FROM bookings WHERE id = ?`)
-      .bind(id)
-      .first<{ notification_policy_snapshot: string | null }>()
-      .then((found) => readNotificationPolicySnapshot(found?.notification_policy_snapshot ?? null));
-    const timing = await getReminderTiming(c.env.DB, accountId);
-    if (row.friend_id && (approvedPolicy.day_before || approvedPolicy.hours_before)) {
-      // 未連携の予約は行を作らない（friends JOIN で誰にも送れない行が残る）。
-      // 連携済みでも snapshot で OFF の種別は作らない (N-391)。
-      await insertConfirmationReminders(c.env.DB, {
-        bookingId: id,
-        startsAt: new Date(row.starts_at),
-        now: new Date(),
-        reminderHoursBefore: timing.reminderHoursBefore,
-        dayBeforeTime: timing.dayBeforeTime,
-        timeZone: timing.timeZone,
-        kinds: { dayBefore: approvedPolicy.day_before, hoursBefore: approvedPolicy.hours_before },
-      });
-    }
-    // 承認による確定も同じ起点として数える(#648)。冪等キーは予約IDなので、
-    // 代理登録側と同じ予約を二重に数えることはない。
-    if (row.friend_id) {
-      try {
-        await recordConversionSourceEvent(c.env.DB, {
-          sourceType: 'reservation_confirmed',
-          lineAccountId: accountId,
-          friendId: row.friend_id,
-          sourceEventId: id,
-          metadata: { bookingId: id, bookingType: 'salon', via: 'approve' },
-        });
-      } catch (error) {
-        console.error('booking conversion record failed (approve):', error);
-      }
-    }
-    // N-392: LIFF予約の承認でも Google 同期を台帳へ乗せる。
-    // 裸呼び出しだと失敗がログだけに消えて /sync/retry から回収できない。
-    const approveGoogleOpId = await queueBookingOperation(c.env.DB, {
-      bookingId: id,
-      lineAccountId: accountId,
-      kind: 'google_calendar',
-      idempotencyKey: `${id}:google-calendar:create`,
-    });
-    try {
-      const synced = await syncConfirmedBookingToGoogle(c.env.DB, googleCredentials(c.env), id);
-      await finishBookingOperation(c.env.DB, {
-        id: approveGoogleOpId,
-        status: synced.synced ? 'succeeded' : 'skipped',
-        completedAt: new Date().toISOString(),
-        result: { calendarSync: synced.synced ? 'synced' : 'not_configured' },
-      });
-    } catch (error) {
-      // 失敗は retry_wait で台帳に残し、詳細画面・/sync/retry から回収する。
-      await finishBookingOperation(c.env.DB, {
-        id: approveGoogleOpId,
-        status: 'retry_wait',
-        completedAt: new Date().toISOString(),
-        errorCode: error instanceof Error ? error.name : 'calendar_sync_failed',
-        result: { calendarSync: 'failed' },
-      });
-      console.error('Google Calendar sync (approve) failed:', error);
-    }
-    if (row.friend_id && approvedPolicy.send_line_confirmation) {
-      // N-391: 予約時に確認通知を切った予約には、承認通知も送らない。
-      c.executionCtx.waitUntil(
-        notifyForBooking(c.env.DB, id, 'approved').catch((err) =>
-          console.error('booking notify (approved) failed:', err),
-        ),
-      );
-    }
-    c.executionCtx.waitUntil(
-      dispatchAutomationEventWithLogging(c.env.DB, {
-        lineAccountId: accountId,
-        eventType: 'calendar_booked',
-        sourceEventId: id,
-        friendId: row.friend_id,
-        eventData: {
-          bookingType: 'salon', bookingId: id, menuId: row.menu_id, staffId: row.staff_id,
-        },
-      })
-        .catch((error) => console.error('booking automation event failed:', error)),
-    );
+    await runConfirmedBookingSideEffects(c.env.DB, id, { credentials: googleCredentials(c.env) });
     // R150: 「予約が入ったとき」の送信Webhook購読者へも届ける。
     c.executionCtx.waitUntil(
       fireOutgoingWebhooks(c.env.DB, 'booking_created', {

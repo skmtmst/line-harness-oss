@@ -1938,7 +1938,8 @@ async function runSixHourlyHeavyJobs(
     {
       name: 'booking expirer',
       run: async () => {
-        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification });
+        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification,
+          credentials: { email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY } });
         console.log(
           `[booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
         );
