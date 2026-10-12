@@ -1,0 +1,69 @@
+/* ★V8-B デリバリー連携（DL-1 `dF4Ov`・DL-2 `OIY4Z`・DL-3 `kJLks`・DL-4 `X5d8UF`／2026-10-12 承認）。寸法は globals.css の --tpl-e1-dl-* だけを使う。板の頭は型（PageHeading）が持つ。 */
+
+.body { display: flex; flex-direction: column; gap: var(--tpl-e1-dl-gap); padding: var(--tpl-e1-dl-body-pad); }
+
+/* はじめにの注記：地は案内の青（承認案の $info-soft）。図柄は描かない。 */
+.lead {
+  margin: 0; padding: var(--tpl-e1-dl-note-pad);
+  border-radius: var(--tpl-e1-dl-note-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-e1-dl-note-size); line-height: var(--tpl-e1-dl-note-lh);
+}
+
+/* カードは1列で横幅いっぱい（上下左右20・行の間12）。
+   角丸・線・影は共通の Card（appearance="outlined"）に任せる。
+   承認案 v03 の絵には影が無いが、B-168「カードの角丸と枠を持つ規則には共通の影がある」が正本なので共通の形に合わせる。 */
+.card {
+  gap: var(--tpl-e1-dl-card-gap); padding: var(--tpl-e1-dl-card-pad);
+}
+
+/* 段の頭：題（15/700）と説明（12）の縦並び、間は2 */
+.cardHead { display: flex; flex-direction: column; gap: var(--tpl-e1-dl-head-gap); min-width: 0; }
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-e1-dl-title-size); font-weight: 700; line-height: var(--tpl-e1-dl-title-lh); }
+.cardSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-e1-dl-sub-lh); }
+
+/* 行：ことば＋余白＋こたえ（12/700） */
+.row { display: flex; align-items: baseline; gap: var(--tpl-e1-dl-row-gap); min-width: 0; font-size: var(--text-caption); line-height: var(--tpl-e1-dl-row-lh); }
+/* 状態の行は札（StatusBadge）を並べるので中央で揃える */
+.rowCenter { align-items: center; }
+.rowLabel { flex: 0 0 auto; color: var(--color-ink-secondary); }
+.rowSpacer { flex: 1 1 0; min-width: 0; }
+.rowValue { overflow: hidden; color: var(--color-ink); font-weight: 700; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+
+/* サービスごとの手順の注記：地は真珠色（承認案の $surface-pearl）。図柄は描かない。
+   種類ごとの色分けは、同じ設定の中の注文の引き出し（ec-commerce/order-drawer）と同じ data-tone で書く。 */
+.note {
+  margin: 0; padding: var(--tpl-e1-dl-note-pad);
+  border-radius: var(--tpl-e1-dl-note-radius);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-e1-dl-note-size); line-height: var(--tpl-e1-dl-note-lh);
+}
+
+/* 接続エラーの注記（承認案の $danger-soft／$danger） */
+.note[data-tone='danger'] {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+
+/* 手続きを待っている注記（承認案の $warning-soft／$warning） */
+.note[data-tone='warn'] {
+  background: var(--color-status-warn-soft);
+  color: var(--color-warning);
+}
+
+/* ボタンの行：左から並べる */
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-e1-dl-row-gap); }
+
+/* つなぐお店を選ぶ窓（DL-4 `X5d8UF`）：選んだ行の地は選びの緑（$accent-soft）、線も濃い緑 */
+.stores { display: flex; flex-direction: column; gap: var(--tpl-e1-dl-row-gap); }
+.store {
+  display: flex; gap: var(--tpl-e1-dl-store-gap); padding: var(--tpl-e1-dl-store-pad);
+  border-radius: var(--tpl-e1-radius-m); border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+.storeSelected { border-color: var(--color-accent-deep); background: var(--color-accent-soft); }
+.storeText { display: flex; flex-direction: column; gap: var(--tpl-e1-dl-head-gap); min-width: 0; }
+.storeName { color: var(--color-ink); font-size: var(--tpl-e1-dl-store-name-size); font-weight: 700; line-height: var(--tpl-e1-dl-row-lh); }
+.storeAddress { color: var(--color-ink-faint); font-size: var(--tpl-e1-dl-note-size); line-height: var(--tpl-e1-dl-note-lh); }
