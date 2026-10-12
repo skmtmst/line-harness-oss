@@ -451,3 +451,6 @@
 :global(:root) .frame[data-height-mode='content'][data-page-template='settings']:not(:has([data-shared-part='sticky-bar'])) .settingsContent { padding-bottom: 0; }
 /* 申込者の数の帯も、本文と同じ左右24・上16。 */
 :global(:root) .frame[data-template-layout='event-roster'] > .stats { padding: var(--tpl-roster-body-pad); padding-bottom: 0; }
+
+/* 入力の一括無効を型の本文へ渡す。余白と段間はcreateContentが持つ。 */
+:global(:root) fieldset.createContent { border: 0; margin: 0; }

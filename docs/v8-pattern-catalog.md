@@ -486,6 +486,8 @@
 - **見張り**：`apps/web/src/components/shared/optional-badge.test.tsx`・`apps/web/src/components/shared/text-field-unified.react.test.tsx`／**要る試験**：「（任意）」「＊」を書いたら落ちる試験
 - **10-09 の数**：(a) 804（v8 332）・(b) 52・(c) 196・(d) 手描き 1（1 板）／写し 4・効く範囲 269 ファイル／91 機能／Pen 104 板
 
+- **10-12の追加（F組・B-260）**：`CreatePage`の`contentDisabled`／`contentLabel`で本文をネイティブfieldsetにする。余白と段間は型が持ち、保存中・比較中・閲覧のみの入力をまとめて止める。通知と下の帯はfieldsetの外へ渡す。レポート作成の動作試験で保存・失敗・競合・権限を保つ。
+
 <a id="field-error"></a>
 ## field-error 欄の赤表示
 
