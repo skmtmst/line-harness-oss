@@ -219,8 +219,8 @@ export default function HqStoreList(props: HqStoreListProps) {
   const bandKpis = type === 'tag' ? tagKpis : kpis
 
   const tabs = kind && onKindChange ? (
-    <div className={storeStyles.tabsBox}>
       <Tabs
+        size="compact"
         label={`${words.title}の種類`}
         items={KIND_TABS.map((tab) => ({
           label: tab.label,
@@ -229,7 +229,6 @@ export default function HqStoreList(props: HqStoreListProps) {
           onClick: () => { onKindChange(tab.kind); setPage(1) },
         }))}
       />
-    </div>
   ) : undefined
 
   const createButton = (full: boolean) => !canEdit ? null : (
@@ -529,7 +528,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       help={words.description}
       tabs={type === 'tag' ? <AttributeTabs tab={attribute.tab} onSelect={(key) => { attribute.select(key); setPage(1) }} /> : tabs}
       stats={(
-        <KpiBand data-design="KPIs" className={storeStyles.kpiStrip}>
+        <KpiBand data-design="KPIs">
           {bandKpis.map((kpi) => (
             <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={13} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}

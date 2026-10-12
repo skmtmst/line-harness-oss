@@ -1228,7 +1228,6 @@ export default function TemplatesListV8() {
       {!canMutateTemplates ? (
         <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="hEDTK"></ReadOnlyNotice></div>
       ) : null}
-      <div className={styles.tabsBox}>
       <Tabs
         size="compact"
         label="テンプレートの種類"
@@ -1242,7 +1241,6 @@ export default function TemplatesListV8() {
           { label: 'リサーチ', count: assetCounts.research, current: activeSection === 'research', onClick: () => switchSection('research') },
         ]}
       />
-      </div>
     </>
   )
 
