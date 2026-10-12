@@ -29,7 +29,7 @@ export interface PageHeadingProps {
   titleSize?: 'sub'
   /** 説明の文字を本文の大きさ（13/20）にする。渡さないときは補足の 12/19 のまま。 */
   subtitleSize?: 'body'
-  /** 詳細の説明とタブを詰める口。指定しない画面には効かない。 */
+  /** 一覧・詳細の頭と本文の間を詰める口。指定しない画面には効かない。 */
   bottomSpacing?: 'compact'
   /** B-245：画面全体の説明。題の横から開閉し、人ごと・画面ごとに覚える。 */
   help?: ReactNode

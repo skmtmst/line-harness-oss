@@ -89,7 +89,7 @@
 .previewActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-8); }
 .previewActions button { font-size: 12px; }
 .previewToggle, .previewClose { display: none; }
-.root .footer { position: sticky; bottom: 0; min-height: 60px; border: 0; border-top: 1px solid var(--color-hairline); border-radius: var(--radius-none); box-shadow: none; padding: var(--space-12) var(--space-24); }
+.root .footer { position: sticky; min-height: 60px; border: 0; border-top: 1px solid var(--color-hairline); border-radius: var(--radius-none); box-shadow: none; padding: var(--space-12) var(--space-24); }
 .footer > :nth-child(2) { justify-content: center; }
 .root input:focus-visible, .root textarea:focus-visible, .root summary:focus-visible, .root a:focus-visible { outline: 2px solid var(--color-accent-deep); outline-offset: 2px; }
 .root input, .root textarea { caret-color: var(--color-accent-deep); }

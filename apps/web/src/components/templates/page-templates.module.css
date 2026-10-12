@@ -314,7 +314,8 @@
 :global(:root) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
 :global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-top-gap); }
 
-/* 詳細の説明とタブの間を詰める板（回答フォーム）。指定した詳細だけに効く。 */
+/* 案内と本文の間を詰める板。指定した一覧・詳細だけに効く。 */
+:global(:root) [data-page-template='list'] .heading[data-bottom-spacing='compact'] { padding-bottom: var(--tpl-head-gap); }
 :global(:root) [data-page-template='detail'] .heading[data-bottom-spacing='compact'] {
   padding-bottom: calc(var(--tpl-detail-head-pad-bottom) - var(--tpl-head-gap));
 }

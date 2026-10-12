@@ -474,7 +474,7 @@ export default function MediaSlot({
             ) : null}
           </span>
         )}
-        {error ? <span className={styles.filledError} role="alert">{error}</span> : null}
+        {error && !controlsBelow ? <span className={styles.filledError} role="alert">{error}</span> : null}
       </>
     )
   } else {
@@ -574,7 +574,7 @@ export default function MediaSlot({
         {picker}
       </div>
       {controlsBelow && !readOnly && (error || drag === 'reject') ? <span className={styles.reason} role="alert">{error ?? (formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`)}</span> : null}
-      {controlsBelow && drag === 'idle' ? <>{!filled && canFile && !readOnly ? <span className={styles.desc}>ドラッグ＆ドロップ またはクリック</span> : null}{links}{!readOnly && limit ? <span className={styles.desc}>{limit}</span> : null}</> : null}
+      {controlsBelow && drag === 'idle' ? <>{!filled && canFile && !readOnly ? <small className={styles.desc}>ドラッグ＆ドロップ またはクリック</small> : null}{links}{!readOnly && limit ? <span className={styles.desc}>{limit}</span> : null}</> : null}
       {urlEntry && urlOpen && !readOnly ? (
         <TextField
           id={urlEntry.id}
