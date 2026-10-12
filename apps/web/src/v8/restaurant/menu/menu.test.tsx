@@ -118,3 +118,18 @@ describe('MJoJR メニュー管理', () => {
     expect(screen.queryByRole('button', { name: '再開' })).toBeNull()
   })
 })
+
+it('閲覧のみでも提供時間と所要時間を詳細で読み、保存はできない', async () => {
+  role.value = 'staff'
+  render(<MenuPage />)
+  await screen.findByText('メニュー一覧')
+  const name = screen.getAllByRole('button').find(button => button.getAttribute('title') === '秋の鹿肉コース')!
+  fireEvent.click(name)
+  const dialog = screen.getByRole('dialog')
+  expect(within(dialog).getByText(/提供時間：/)).toBeTruthy()
+  expect(within(dialog).queryByRole('button', { name: /保存/ })).toBeNull()
+  const fieldset = dialog.querySelector('fieldset')!
+  expect(fieldset.disabled).toBe(true)
+  expect(fixture.updateMenu).not.toHaveBeenCalled()
+  expect(fixture.createMenu).not.toHaveBeenCalled()
+})
