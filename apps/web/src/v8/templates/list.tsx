@@ -36,7 +36,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
-import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
+import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName, folderDisplayColor, type FolderDotFolder } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -919,9 +919,9 @@ export default function TemplatesListV8() {
     >
       {/* 補助のデータ（フォルダ）だけ取れないときは、その場所に小さく1行だけ。 */}
       {folderError ? <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}</Notice> : null}
-      <p className={styles.folderNote}>
+      <FolderPanelNote>
         フォルダは種類のタブをまたいで使えます。消しても、中のテンプレートは未分類に残ります
-      </p>
+      </FolderPanelNote>
     </FolderPanel>
   )
 
