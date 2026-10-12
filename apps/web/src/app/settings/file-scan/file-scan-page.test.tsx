@@ -131,6 +131,19 @@ describe('ファイルの検査の設定画面', () => {
     await waitFor(() => { expect(screen.queryByText(message)).toBeNull() })
     expect(screen.getByRole('button', { name: '外の検査の設定を保存する' })).toBeTruthy()
   })
+  test('許可された組と違う設定の案内と400の理由を両欄へ出す', async () => {
+    await openConfig({ ...externalConfig, externalEnabled: false })
+    expect(screen.getByText(/送り先と鍵の名前の組を運営に確認/)).toBeTruthy()
+    const message = '送り先と鍵の名前は、運営が許可した同じ組で指定してください'
+    mocks.saveConfig.mockRejectedValueOnce(new ApiError(400, message, undefined, undefined, undefined, undefined, { externalEndpointUrl: message, externalSecretRef: message }))
+    fireEvent.click(screen.getByRole('button', { name: '外の検査の設定を保存する' }))
+    for (const label of ['送り先（https）', '鍵の名前']) {
+      await waitFor(() => { expect(screen.getByLabelText(label).getAttribute('aria-invalid')).toBe('true') })
+      expect((screen.getByLabelText(label).getAttribute('aria-describedby') ?? '').split(' ').map(id => document.getElementById(id)?.textContent).join(' ')).toContain(message)
+    }
+    await waitFor(() => { expect(document.activeElement).toBe(screen.getByLabelText('送り先（https）')) })
+    expect((screen.getByLabelText('鍵の名前') as HTMLInputElement).value).toBe(externalConfig.externalSecretRef)
+  })
   test('古い鍵の名前では送信停止の案内を出し、保存せず欄へ誘導する', async () => {
     await openConfig({ ...externalConfig, externalSecretRef: 'FILE_SCAN_API_KEY', externalEnabled: false })
     expect(screen.getByText(/古い鍵の名前は使えません/)).toBeTruthy()

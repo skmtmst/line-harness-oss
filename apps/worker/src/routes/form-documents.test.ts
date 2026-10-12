@@ -38,7 +38,7 @@ function app() {
 }
 let secretReads: string[] = [];
 function env() {
-  return new Proxy({ DB: db, IMAGES: store, FILE_SCAN_ALLOWED_HOSTS: 'scan.example.com', FILE_SCAN_SECRET_PRIMARY: 'test-only-token' } as unknown as Env['Bindings'], {
+  return new Proxy({ DB: db, IMAGES: store, FILE_SCAN_ALLOWED_PAIRS: 'scan.example.com=FILE_SCAN_SECRET_PRIMARY', FILE_SCAN_SECRET_PRIMARY: 'test-only-token' } as unknown as Env['Bindings'], {
     get(target, name: string) {
       if (name === 'ADMIN_API_KEY' || name.startsWith('FILE_SCAN_SECRET_')) secretReads.push(name);
       return Reflect.get(target, name);

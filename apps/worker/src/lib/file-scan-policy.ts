@@ -16,8 +16,35 @@ function isPublicHostname(host: string): boolean {
     && !internalSuffixes.some(suffix => host === suffix || host.endsWith(`.${suffix}`));
 }
 
-/** 許可は正確なホスト名だけ。URL、ワイルドカード、IP、ポート指定は許可にならない。 */
-export function allowedFileScanEndpoint(value: unknown, allowedHosts: string | undefined): URL | null {
+/** 1ホスト1鍵・1鍵1ホスト。競合するホスト/鍵の組は全て無効にする。 */
+function allowedPairs(value: string | undefined): Map<string, string> {
+  const hosts = new Map<string, Set<string>>();
+  const keys = new Map<string, Set<string>>();
+  for (const entry of (value ?? '').split(',')) {
+    if (!entry.trim()) continue;
+    const parts = entry.split('=');
+    // 読めない設定を部分的な許可へ読み替えない。
+    if (parts.length !== 2) return new Map();
+    const host = parts[0].trim().toLowerCase();
+    const key = parts[1].trim();
+    if (!host || !isFileScanSecretRef(key)) return new Map();
+    // 不正なホストとの使い回しも先に数えて、安全なホスト側を無効にする。
+    if (!hosts.has(host)) hosts.set(host, new Set());
+    if (!keys.has(key)) keys.set(key, new Set());
+    hosts.get(host)!.add(key);
+    keys.get(key)!.add(host);
+  }
+  const pairs = new Map<string, string>();
+  for (const [host, refs] of hosts) {
+    const key = refs.values().next().value!;
+    if (isPublicHostname(host) && refs.size === 1 && keys.get(key)!.size === 1) pairs.set(host, key);
+  }
+  return pairs;
+}
+
+/** URLの安全性と、運営が許可した同じホスト・鍵の組を保存時/使用時に確認する。 */
+export function allowedFileScanEndpoint(value: unknown, pairs: string | undefined, secretRef: unknown): URL | null {
+  if (!isFileScanSecretRef(secretRef)) return null;
   if (typeof value !== 'string' || value.length > 500 || /[\s\\]/.test(value)) return null;
   const authority = /^https:\/\/([^/?#]+)/i.exec(value)?.[1];
   if (!authority || authority.includes('@')) return null;
@@ -26,7 +53,5 @@ export function allowedFileScanEndpoint(value: unknown, allowedHosts: string | u
   if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
   // 空のuser-infoも資格情報つきURLとして拒否する。
   if (!isPublicHostname(url.hostname)) return null;
-  const hosts = (allowedHosts ?? '').split(',').map(host => host.trim().toLowerCase())
-    .filter(isPublicHostname);
-  return hosts.includes(url.hostname) ? url : null;
+  return allowedPairs(pairs).get(url.hostname) === secretRef ? url : null;
 }

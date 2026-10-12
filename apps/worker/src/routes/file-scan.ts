@@ -460,9 +460,9 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
   // 宛先・名前は切り詰めず、不正な入力全体を拒否する。
   const endpoint = typeof body?.externalEndpointUrl === 'string' ? body.externalEndpointUrl.trim() || null : null;
   const secretRef = typeof body?.externalSecretRef === 'string' ? body.externalSecretRef.trim() || null : null;
-  const url = endpoint ? allowedFileScanEndpoint(endpoint, c.env.FILE_SCAN_ALLOWED_HOSTS) : null;
+  const url = endpoint ? allowedFileScanEndpoint(endpoint, c.env.FILE_SCAN_ALLOWED_PAIRS, secretRef) : null;
   if (endpoint && !url) {
-    return inputError(c, { success: false, error: '運営が許可した公開ホストの https 宛先を指定してください。資格情報や既定以外のポートは使えません' }, 400, ['externalEndpointUrl']);
+    return inputError(c, { success: false, error: '送り先と鍵の名前は、運営が許可した同じ組で指定してください。送り先は公開ホストの https、資格情報なし、既定ポートだけ使えます' }, 400, ['externalEndpointUrl', 'externalSecretRef']);
   }
   if ((provider || endpoint || secretRef) && !isFileScanSecretRef(secretRef)) {
     return inputError(c, { success: false, error: '鍵の名前は FILE_SCAN_SECRET_ で始まる大文字・数字・下線の120文字以内で指定してください' }, 400, ['externalSecretRef']);

@@ -615,7 +615,7 @@ export async function getFileScanConfig(db: ScanDb, lineAccountId: string): Prom
 
 /**
  * 不許可の古い設定も null（内蔵検査だけ）。運営が許可した宛先と
- * 検査専用の名前を確認し終わるまで、選択された環境値を読まない。
+ * 検査専用の名前の同じ組を確認し終わるまで、選択された環境値を読まない。
  */
 export function resolveExternalScanner(
   env: Record<string, string | undefined>,
@@ -625,7 +625,7 @@ export function resolveExternalScanner(
   if (!config?.external_provider || !endpoint) return null;
   const secretRef = config.external_secret_ref?.trim();
   if (!isFileScanSecretRef(secretRef)) return null;
-  const url = allowedFileScanEndpoint(endpoint, env.FILE_SCAN_ALLOWED_HOSTS);
+  const url = allowedFileScanEndpoint(endpoint, env.FILE_SCAN_ALLOWED_PAIRS, secretRef);
   if (!url) return null;
   const timeoutMs = Math.max(1000, config.external_timeout_ms || 10000);
   return {

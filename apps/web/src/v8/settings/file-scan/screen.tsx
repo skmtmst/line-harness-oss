@@ -341,16 +341,16 @@ export default function FileScanScreen() {
           </Button>
         </div>
         {legacySecret ? <Notice tone="warn">古い鍵の名前は使えません。運営が用意した検査専用の鍵の名前へ変更してください。</Notice> : null}
-        {externalConfigured && !externalOn && config?.externalEnabled === false && !legacySecret ? <Notice tone="warn">現在の設定では外の検査へ送信できません。送り先の許可と検査専用の鍵の名前を運営に確認してください。</Notice> : null}
+        {externalConfigured && !externalOn && config?.externalEnabled === false && !legacySecret ? <Notice tone="warn">現在の設定では外の検査へ送信できません。送り先と鍵の名前の組を運営に確認してください。</Notice> : null}
         {configOpen ? (
           <div className={styles.form}>
             <Field label="提供元" htmlFor="file-scan-provider" error={configFields.error('externalProvider')}>
               <SaveErrorField names={["externalProvider","provider"]}><TextField {...configFields.bind('externalProvider')} id="file-scan-provider" value={provider} onChange={(event) => setProvider(event.target.value)} placeholder="例：example-scan" /></SaveErrorField>
             </Field>
-            <Field label="送り先（https）" htmlFor="file-scan-endpoint" error={configFields.error('externalEndpointUrl')} note="運営が許可した公開ホストだけ使えます。転送する宛先は使えません。">
+            <Field label="送り先（https）" htmlFor="file-scan-endpoint" error={configFields.error('externalEndpointUrl')} note="運営が許可した送り先と鍵の名前の組だけ使えます。転送する宛先は使えません。">
               <SaveErrorField names={["externalEndpointUrl","endpoint"]}><TextField {...configFields.bind('externalEndpointUrl')} id="file-scan-endpoint" value={endpoint} onChange={(event) => setEndpoint(event.target.value)} placeholder="https://example.com/scan" /></SaveErrorField>
             </Field>
-            <Field label="鍵の名前" htmlFor="file-scan-secret-ref" error={configFields.error('externalSecretRef')} note="FILE_SCAN_SECRET_ で始まる大文字・数字・下線、120文字以内。鍵の値は入力しません。">
+            <Field label="鍵の名前" htmlFor="file-scan-secret-ref" error={configFields.error('externalSecretRef')} note="FILE_SCAN_SECRET_ で始まる大文字・数字・下線、120文字以内。送り先と同じ組の名前を指定します。鍵の値は入力しません。">
               <SaveErrorField names={["externalSecretRef","secretRef","secret_ref"]}><TextField {...configFields.bind('externalSecretRef')} id="file-scan-secret-ref" value={secretRef} onChange={(event) => setSecretRef(event.target.value)} placeholder="例：FILE_SCAN_SECRET_PRIMARY" /></SaveErrorField>
             </Field>
             <div>
