@@ -231,3 +231,9 @@
 .slots[data-toolbar-layout='slots-stacked'] { flex-direction: column; align-items: stretch; }
 .slots[data-toolbar-layout='slots-stacked'] > .slotsRow { display: flex; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
+
+/* A notice and the search controls form two sections. Preserve the section gap
+   even when the old screen supplied an extra wrapper around the notice. */
+html[data-theme='v8'] :global([data-template-region='toolbar']):has(> div > :is([data-design-part='notice'], [role='status'], [role='alert'])):has(> .slots > .toolbar) {
+  row-gap: var(--polish-space-card);
+}

@@ -225,7 +225,7 @@
 
 - **役目**：表を見出し40・左右24・線は黒7%で並べる
 - **持ち主（コード）**：`apps/web/src/components/shared/table.tsx`・`apps/web/src/components/shared/table.module.css`・`apps/web/src/components/shared/grid-table.tsx`・`apps/web/src/components/shared/grid-table.module.css`・`apps/web/src/components/shared/data-table.module.css`・`apps/web/src/components/shared/table-presentation.module.css`（部品 `DataTable`・`TableHeadRow`・`Th`・`Tr`・`Td`・`SortTh`・`GridTable`・`GridHeadRow`・`GridRow`・`GridCell`）
-  - 行高の対応（§6.5-3・2026-10-11 B-243③訂正）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧、`ListSkeleton`、Pen JpOg0「表の行」は **60**（`--tpl-list-row-h`）。カード内など一般の `DataTable`・`GridTable`・`TableSkeleton` は **56**（`--polish-table-row`）。会員の節目一覧は個別の絵 zQ5vY の行60を一覧の変数で読む。
+  - 行高の対応（§6.5-3・2026-10-12 B-254）：一覧型内の `DataTable`・`GridTable`、テンプレート一覧は、**セル内の描画文字が1行なら52、2行・3行なら60**。判定は共通表の `useListRowDensity`、値は `--tpl-list-row-h`／`--tpl-list-row-multi-h`。文字のない高さ40の見本画像は複数行相当。WQmepの受信表は絵で確認した既存の専用口60を保持。1行の `ListSkeleton` は52、一般の表・`TableSkeleton` は56。行高の正本は見た目の決まり §6.5-3。
   - 読む変数：`--color-table-head`・`--color-hairline`
 - **持ち主（Pen）**：`ASVsl`「表の見出し」・`JpOg0`「表の行」・`TBCUY`「横に送れる表」
 - **見つけ方（コード）**：

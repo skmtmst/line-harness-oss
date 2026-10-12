@@ -46,16 +46,16 @@ try {
   const control = await browser.newPage()
   await control.setContent('<div data-list-skeleton style="width:500px"><table><thead><tr data-shared-part="list-head" style="height:70px"><th>見出し</th></tr></thead><tbody><tr data-shared-part="list-row" style="height:90px"><td>名前</td></tr></tbody></table><div data-kpi-strip><div data-design-version style="height:30px">数</div></div><div data-list-toolbar style="width:10px"><button style="width:150px">操作</button></div><aside data-template-region="folders">フォルダ</aside><div data-list-pager style="width:500px"><nav style="width:100px">前へ・次へ</nav></div><div style="width:900px">はみ出し</div></div>')
   const negative = await control.evaluate(scanListSkeleton)
-  const expected = ['B-178 見出し40', 'B-178 行60', 'B-178 数の帯116', 'B-178 道具のはみ出し', 'B-178 フォルダの畳み忘れ', 'B-178 ページ送りの右寄せ', 'B-178 一覧のはみ出し']
+  const expected = ['B-178 見出し40', 'B-178 行52', 'B-178 数の帯116', 'B-178 道具のはみ出し', 'B-178 フォルダの畳み忘れ', 'B-178 ページ送りの右寄せ', 'B-178 一覧のはみ出し']
   if (expected.some((rule) => !negative.failures.includes(rule))) throw new Error(`対照の見逃し: ${JSON.stringify(negative)}`)
   console.log(`対照：${expected.length}種類の違反を検出`)
   await control.setContent('<div data-list-skeleton style="width:500px"><div data-table-presentation="template-list"><table><tbody><tr data-shared-part="list-row" style="height:56px"><td>テンプレート</td></tr></tbody></table></div></div>')
   const templateNegative = await control.evaluate(scanListSkeleton)
-  if (!templateNegative.failures.includes('B-178 行60')) throw new Error('固定したテンプレート行60の違反を見逃した')
-  await control.locator('tr').evaluate(row => { row.style.height = '60px' })
+  if (!templateNegative.failures.includes('B-178 行52')) throw new Error('固定したテンプレート1行52の違反を見逃した')
+  await control.locator('tr').evaluate(row => { row.style.height = '52px' })
   const templatePositive = await control.evaluate(scanListSkeleton)
-  if (templatePositive.failures.length) throw new Error(`固定したテンプレート行60の誤検出: ${JSON.stringify(templatePositive)}`)
-  console.log('対照：テンプレート行60の違反を検出・正しい行は検出しない')
+  if (templatePositive.failures.length) throw new Error(`固定したテンプレート1行52の誤検出: ${JSON.stringify(templatePositive)}`)
+  console.log('対照：テンプレート1行52の違反を検出・正しい行は検出しない')
   await control.setContent('<div data-shared-part="image-frame" data-image-frame><div data-size="compact" style="width:20px;height:30px">画像</div></div><div data-sticky-layout="center" style="width:500px"><div data-sticky-actions style="width:100px">保存</div></div><div data-event-action-row style="width:10px"><div style="width:200px">すること</div></div>')
   const partControl = await control.evaluate(scanSharedSkeletonParts)
   const partExpected = ['B-178 画像の枠160×106', 'B-178 下の帯の中央操作', 'B-178 することの行のはみ出し']

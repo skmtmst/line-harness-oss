@@ -3,6 +3,7 @@
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import React from 'react'
 import { useTableActionWidth } from './use-table-action-width'
+import { useListRowDensity } from './use-list-row-density'
 import { useListUrlState } from './list-url-state'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes, CSSProperties } from 'react'
 import TruncatedText from './truncated-text'
@@ -146,6 +147,7 @@ export function DataTable({
   grid?: { columns: string; compactColumns?: string; padding: string; headPadding: string; gap?: string; rowHeight?:string }
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
+  useListRowDensity(actionWidthRef)
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   const rowDensity = tableDensity ? undefined : density
   return (

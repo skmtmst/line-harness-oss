@@ -1383,7 +1383,7 @@
   --tpl-mb-col-threshold: 160px; --tpl-mb-col-rate: 120px; --tpl-mb-col-action: 36px; --tpl-mb-rank-row-pad: var(--space-8) 0; --tpl-mb-rank-head-pad-bottom: 4px;
   --tpl-mb-conflict-slot-pad: 12px 0; --tpl-mb-conflict-pad: 12px 16px; --tpl-mb-conflict-radius: var(--polish-radius-control); --tpl-mb-conflict-title-lh: 19px;
   --tpl-mb-total-w: 200px; --tpl-mb-total-pad: 10px 12px; --tpl-mb-total-radius: var(--polish-radius-control); --tpl-mb-total-value: 16px; --tpl-mb-total-value-lh: 23px;
-  --tpl-mb-life-gap: 16px; --tpl-mb-life-pad: 10px 24px; --tpl-mb-life-head-h: var(--tpl-list-head-h); --tpl-mb-life-row-h: var(--tpl-list-row-h); --tpl-mb-life-num-pad: 16px;
+  --tpl-mb-life-gap: 16px; --tpl-mb-life-pad: 10px 24px; --tpl-mb-life-head-h: var(--tpl-list-head-h); --tpl-mb-life-row-h: var(--tpl-list-row-multi-h); --tpl-mb-life-num-pad: 16px;
   --tpl-mb-life-col-threshold: 130px; --tpl-mb-life-col-title: 120px; --tpl-mb-life-col-reached: 90px; --tpl-mb-life-col-notify: 140px;
   --tpl-mb-tabs-h: 28.5px; --tpl-mb-text-action-pull: -7.5px; --tpl-mb-dialog-tail: -10px; --tpl-mb-dialog-pull: -14px; --tpl-mb-chip-h: 22px; --tpl-mb-chip-pad: 0 8px; --tpl-mb-search-w: 260px; --tpl-mb-avatar: 36px;
   /* リッチメニューの一覧（rZEGN・Y9ASp・ZoKow・yOyCg）。 */
@@ -1567,7 +1567,7 @@
   --tpl-db-th-pad: 8px 12px; --tpl-db-th-radius: var(--polish-radius-control); --tpl-db-th-bg: #fafafb; --tpl-db-td-pad: 10px 12px; --tpl-db-col-gap: 16px; --tpl-db-col-name: 260px; --tpl-db-col-wait: 100px; --tpl-db-col-state: 90px; --tpl-db-route-pad: 1px 6px; --tpl-db-route-radius: var(--polish-radius-small);
   --tpl-db-route-w: 220px; --tpl-db-control-h: 36px; --tpl-db-control-radius: var(--polish-radius-control); --tpl-db-url-pad: 0 12px; --tpl-db-row-gap: 8px;
   --tpl-db-fig-size: 22px; --tpl-db-fig-lh: 33px; --tpl-db-fig-gap: 16px; --tpl-db-fig-inner-gap: 2px;
-  --tpl-db-act-pad: 18px 24px; --tpl-db-act-gap: 4px; --tpl-db-band-pad: 10px 14px; --tpl-db-band-gap: 12px; --tpl-db-band-radius: var(--polish-radius-control); --tpl-db-progress-w: 120px; --tpl-db-progress-h: 4px; --tpl-db-close: 14px; --tpl-db-menu: 16px; --tpl-db-head-h: 23px; --tpl-db-chart-right: 23px; --tpl-db-chart-day-w: 80px; --tpl-db-inbox-gap: 12px; --tpl-db-inbox-row-h: 72px; --tpl-db-num-ls: -0.5px; --tpl-db-fig-glyph-lh: 26px; --tpl-db-focus-ring: 2px;
+  --tpl-db-act-pad: 18px 24px; --tpl-db-act-gap: 4px; --tpl-db-band-pad: 10px 14px; --tpl-db-band-gap: 12px; --tpl-db-band-radius: var(--polish-radius-control); --tpl-db-progress-w: 120px; --tpl-db-progress-h: 4px; --tpl-db-close: 14px; --tpl-db-menu: 16px; --tpl-db-head-h: 23px; --tpl-db-chart-right: 23px; --tpl-db-chart-day-w: 80px; --tpl-db-inbox-gap: 12px; --tpl-db-inbox-row-h: var(--tpl-list-row-multi-h); --tpl-db-num-ls: -0.5px; --tpl-db-fig-glyph-lh: 26px; --tpl-db-focus-ring: 2px;
   --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;
   /* 友だち詳細（Q5F2QE・JCDRm）。src/v8/friend-detail だけが読む。 */
   /* mainA：Pen の推移の段・要点の小札・1152 のタグ行。 */
@@ -3161,7 +3161,8 @@ html[data-theme='v8'] [role='table'] [role='row']:not(:has([role='columnheader']
 
 /* B-178：一覧の骨組み（v19Ivv）。画面の寸法ではなく部品の値。 */
 [data-theme='v8'] {
-  --tpl-list-row-h: 60px;
+  --tpl-list-row-h: 52px;
+  --tpl-list-row-multi-h: 60px;
   --tpl-list-head-h: 40px;
   --tpl-list-search-w: 240px;
   --tpl-list-search-min: 120px;

@@ -531,7 +531,7 @@
     {
       "id": "table",
       "name": "表",
-      "role": "一覧型のDataTable・GridTable・ListSkeletonとPen「表の行」は行60、カード内など一般のDataTable・GridTable・TableSkeletonは行56。見出し40・左右24・線は黒7%",
+      "role": "一覧型のDataTable・GridTableとPen「表の行」は中身1行52・2行以上60（B-254）、1行のListSkeletonは52、カード内など一般のDataTable・GridTable・TableSkeletonは行56。見出し40・左右24・線は黒7%",
       "rules": [
         "§6.5-3",
         "§6.1",

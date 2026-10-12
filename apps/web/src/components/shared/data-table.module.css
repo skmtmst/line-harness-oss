@@ -505,7 +505,7 @@
 
 /* B-178：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
 [data-theme='v8'] :global([data-page-template='list'] [data-template-region='content']) .frame:not([data-table-presentation]):not([data-column-layout]):not([data-grid-table]) .row:not(:has([colspan])) {
-  height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h);
+  height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h));
 }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr {
   height: var(--tpl-list-head-h);
@@ -515,10 +515,10 @@
   padding-inline: calc(var(--tpl-list-cell-side) / 2);
 }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) {
-  height: var(--tpl-list-row-h);
+  height: var(--list-content-row-h, var(--tpl-list-row-h));
 }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) > td {
-  height: var(--tpl-list-row-h); padding-block: 0;
+  height: var(--list-content-row-h, var(--tpl-list-row-h)); padding-block: 0;
   padding-inline: calc(var(--tpl-list-cell-side) / 2);
 }
 
@@ -548,11 +548,11 @@
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] { padding-block: 0; box-sizing: border-box; }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > :is(thead, tbody) > tr[data-table-layout='columns'] > :is(th, td) { height: auto; padding-inline: 0; }
 [data-theme='v8'] :global([data-list-skeleton]) .table.table > thead > tr { min-height: var(--tpl-list-head-h); }
-[data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--tpl-list-row-h); }
+[data-theme='v8'] :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--list-content-row-h, var(--tpl-list-row-h)); }
 
-/* 列型の見出しは指定の口を保つ。一覧の行は共通60、一般表は指定の口を使う。 */
+/* 列型の見出しは指定の口を保つ。一覧はB-254の中身52/60、一般表は指定の口。 */
 [data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--table-head-height, var(--tpl-list-head-h)); min-height: var(--table-head-height, var(--tpl-list-head-h)); }
-[data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--tpl-list-row-h); min-height: var(--tpl-list-row-h); }
+[data-theme='v8'] :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h)); }
 .row[data-highlighted] {
   background: var(--color-accent-soft);
 }
@@ -593,3 +593,18 @@ html[data-theme='v8'] .frame[data-grid-table] { container-name: v8-list-table sh
 
 /* 固定V8：名前の横に置く札を同じ1行にそろえる。 */
 html[data-theme='v8'] [data-list-name-cell] .name { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+
+/* B-254: one rendered line is 52; two or three are 60. The table sets the count. */
+html[data-theme='v8'] .table.table > tbody > tr[data-list-content-lines] {
+  --list-content-row-h: var(--tpl-list-row-h);
+  height: var(--list-content-row-h); min-height: var(--list-content-row-h);
+}
+html[data-theme='v8'] .table.table > tbody > tr[data-list-content-lines]:is([data-list-content-lines='2'], [data-list-content-lines='3']) {
+  --list-content-row-h: var(--tpl-list-row-multi-h);
+}
+
+/* Card-contained general tables keep their own 56px density inside a list page. */
+html[data-theme='v8'] .frame[data-list-density-scope='general'] .table.table > tbody > tr:not(:has([colspan])),
+html[data-theme='v8'] .frame[data-list-density-scope='general'] .table.table > tbody > tr:not(:has([colspan])) > td {
+  height: var(--polish-table-row); min-height: var(--polish-table-row);
+}
