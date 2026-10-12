@@ -226,4 +226,6 @@ html:root :is(.toolbar, .slots) :is(.search, .searchSlot)[data-toolbar-search] {
   flex-shrink: 1;
 }
 
-html:root .slots[data-toolbar-layout='slots']:not(:has([data-shared-part='notice'])) { flex-wrap: nowrap; }
+html:root .slots[data-toolbar-layout='slots']:not(:has([data-design-part='notice'])) { flex-wrap: nowrap; }
+html:root .toolbar[data-toolbar-layout='band']:has(.optional) { flex-wrap: nowrap; }
+:root .slots > :is([data-design-part='notice'], div:has(> [data-design-part='notice'])) { flex: 1 0 100%; }

@@ -9,6 +9,7 @@ import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption,
 import styles from './select.module.css'
 import pillStyles from './status-pill.module.css'
 import type { StatusBadgeTone } from './status-badge'
+import { fitSelectContent } from './select-content-size.mjs'
 
 export interface SelectOption {
   value: string
@@ -153,6 +154,17 @@ export default function Select({
 
   const OPTION_HEIGHT = SELECT_MENU_ROW_STRIDE
   const heads = useMemo(() => splitOptionHeads(options, label), [options, label])
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (size !== 'content' || !root || iconOnly) return
+    let active = true
+    const measure = () => { if (active) fitSelectContent(root) }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(root)
+    measure()
+    void document.fonts?.ready.then(measure)
+    return () => { active = false; observer?.disconnect(); root.style.removeProperty('--list-select-content-width') }
+  }, [size, selected?.label, label, treatment, showChevron, iconOnly, icon])
   // 一覧は器（MenuPortal）が後から描くので、ref ではなく描かれた時に受け取る。
   const [listEl, setListEl] = useState<HTMLUListElement | null>(null)
   const [scrollWindow, setScrollWindow] = useState({ top: 0, height: 0 })

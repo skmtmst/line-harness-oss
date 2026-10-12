@@ -43,7 +43,11 @@ export function scanListSkeleton() {
       if (visible(cell) && !near(cell.getBoundingClientRect().height, 116)) fail('B-178 数の帯116', cell)
     }
     for (const toolbar of root.querySelectorAll('[data-list-toolbar]')) {
-      if (!visible(toolbar)) continue
+      if (!visible(toolbar)) {
+        if (getComputedStyle(toolbar).display !== 'contents' && toolbar.dataset.toolbarLayout
+          && [...toolbar.querySelectorAll('input, button')].some(visible)) fail('B-178 道具の幅0', toolbar)
+        continue
+      }
       if (toolbar.scrollWidth > toolbar.clientWidth + 1) fail('B-178 道具のはみ出し', toolbar)
       for (const input of toolbar.querySelectorAll('input[type="search"]')) {
         if (!visible(input) || input.value || !input.placeholder) continue

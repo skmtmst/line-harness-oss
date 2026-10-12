@@ -6,6 +6,7 @@ import { fitListSearchPlaceholder } from '../../src/components/shared/search-fie
 import { scanListSkeleton } from './list-skeleton-scan.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
 import { toolbarContentFit } from '../../src/components/shared/list-toolbar-fit.mjs'
+import { fitSelectContent } from '../../src/components/shared/select-content-size.mjs'
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
@@ -71,5 +72,20 @@ test('content-sized list selects stay readable; real band width decides chip col
     assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-191 選ぶ欄の文字切れ'))
     await page.locator('.root').evaluate(el => { el.className = 'standard root'; el.style.width = '100px' })
     assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-191 選ぶ欄の文字切れ'))
+    await page.locator('.root').evaluate(el => { el.className = 'content root'; el.style.width = '' })
+    await page.locator('.root').evaluate(fitSelectContent)
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-191 選ぶ欄の文字切れ'))
+  } finally { await browser.close() }
+})
+
+test('a notice owns its full row; a zero-width tool band with clipped controls fails', async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<html><style>${read('../../src/app/globals.css')}\n${css('list-toolbar')}\n*{box-sizing:border-box}</style><section data-list-skeleton data-template-region="toolbar"><div class="slots" data-list-toolbar data-toolbar-layout="slots" style="width:800px"><div data-design-part="notice">案内</div><div class="toolbar" data-list-toolbar data-toolbar-layout="band"><button style="width:100px;flex:none">探す</button></div></div></section></html>`)
+    assert.ok(await page.locator('.toolbar').evaluate(el => el.getBoundingClientRect().width) > 100)
+    assert.ok(!(await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具の幅0'))
+    await page.locator('.slots').evaluate(el => el.style.setProperty('flex-wrap', 'nowrap', 'important'))
+    assert.ok((await page.evaluate(scanListSkeleton)).failures.includes('B-178 道具の幅0'))
   } finally { await browser.close() }
 })

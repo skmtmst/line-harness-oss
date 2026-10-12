@@ -422,3 +422,6 @@
 :global(:root) .frame[data-height-mode='content'][data-page-template='settings']:not(:has([data-shared-part='sticky-bar'])) .settingsContent { padding-bottom: 0; }
 /* 申込者の数の帯も、本文と同じ左右24・上16。 */
 :global(:root) .frame[data-template-layout='event-roster'] > .stats { padding: var(--tpl-roster-body-pad); padding-bottom: 0; }
+
+/* Collapsed list folders keep the complete selected label. */
+:global(:root) .collapsedSelect { width: max-content; flex: none; }
